@@ -1,18 +1,21 @@
-// test.click
- 
+// RXPath.click
+/*
+This configuration refers to 
+*/
 
-// Arrival
-new_packet :: Arrival();      // Incoming packets
-drop_packet :: Discard();  // Dropped packets
 
-// Validate packets
+new_packet :: Arrival();      // Incoming packets on RX PHY
+drop_packet :: Discard();  // Dropped packets (for any reasons)
+
+// ********** Validate packet *****************
 mac_filter :: ExactUnicast(validMac, promiscuous);
 multicast_filter :: ExactMulticast(ValidMulticast, promiscous);
 new_packet -> mac_filter;
 new_packet -> multicast_filter;
 
-mac_filter[1] -> drop_packet;
-multicast_filter[1] -> drop_packet;
+// When filter fails
+mac_filter[1] -> drop_packet; // no MAC address matched
+multicast_filter[1] -> drop_packet; // No multicast group matched
 
 // Error Checking
 crc_error_check :: CalculateCRC();
@@ -23,8 +26,10 @@ multicast_filter -> crc_error_check;
 
 crc_error_check -> length_error_check;
 
-crc_error_check[1] -> drop_packet;
-length_error_check[1] -> drop_packet;
+crc_error_check[1] -> drop_packet;  // CRC checksum failed
+length_error_check[1] -> drop_packet;  // Packet length field does not match actual length
+
+// ********** Classify/Filter packet *****************
 
 // Apply filters, and lookup redirection table
 classifier_ip :: Classifier(IPv4, IPv6);
@@ -54,6 +59,7 @@ classifier_L4_ipv6[0] -> hash_ipv6_tcp -> redirection_table;
 classifier_L4_ipv6[1] -> hash_ipv6_udp -> redirection_table;
 classifier_L4_ipv6[2] -> hash_ipv6 -> redirection_table;
 
+// ********** DMA packet *****************
 
 // Packet Demultiplexer
 queue_selector :: SelectQueueIndex(2);
@@ -67,8 +73,8 @@ Q1 :: RXQueue(1);
 redirection_table -> queue_selector;
 queue_selector[0] -> get_buf_descriptor_0 -> packet_dma_0 -> Q0;
 queue_selector[1] -> get_buf_descriptor_1 -> packet_dma_1 -> Q1;
-get_buf_descriptor_0[1] -> drop_packet;  // no free descriptors
-get_buf_descriptor_1[1] -> drop_packet;  // no free descriptors
+get_buf_descriptor_0[1] -> drop_packet;  // ERROR: no free descriptors in Q0
+get_buf_descriptor_1[1] -> drop_packet;  // ERROR: no free descriptors in Q1
 
 
 // update head index after receiving packet
@@ -77,6 +83,8 @@ update_head_idx_1 :: SetQueueHead(1);
 
 packet_dma_0 -> update_head_idx_0;
 packet_dma_1 -> update_head_idx_1;
+
+// ********** Packet arrival notification ****************
 
 // Interrupt Notification Generation
 notification_generation :: NotificationManager();
@@ -88,16 +96,4 @@ interrupt_throttler :: InterruptThrottling(interrupt_rate);
 pcie_interface :: PCIExpressInterface();
 notification_generation -> interrupt_throttler -> pcie_interface;
 
-
-
-/*
-length_error_check -> validate_ip;
-validate_ip :: ValidateIP();
-classifier :: Classify(tcp, udp);
-validate_udp :: ValidateUDP();
-validate_tcp :: ValidateTCP();
-validate_ip -> classifier;
-classifier[0] -> validate_udp;
-classifier[1] -> validate_tcp;
-*/
-
+// *****************************************
