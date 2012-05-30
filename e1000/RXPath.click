@@ -20,14 +20,28 @@ multicast_filter[1] -> drop_packet; // No multicast group matched
 // Error Checking
 crc_error_check :: CalculateCRC();
 length_error_check :: VerifyLengh();
+classifier_ipv4 :: Classifier(IPv4, IPv6);
+classifier_tcp_udp :: Classifier(tcp, udp);
+ipv4_checksum :: IPv4Validate();
+TCP_checksum :: TCPValidate();
+UDP_checksum :: UDPValidate();
+valid_packet :: ValidPacketStats();
 
 mac_filter -> crc_error_check;
 multicast_filter -> crc_error_check;
 
-crc_error_check -> length_error_check;
+crc_error_check -> length_error_check -> classifier_ipv4;
+classifier_ipv4[0] -> ipv4_checksum  -> classifier_tcp_udp;
+classifier_ipv4[1] -> classifier_tcp_udp;
+classifier_tcp_udp[2] -> UDP_checksum -> valid_packet; // valid UDP packet
+classifier_tcp_udp[1] -> TCP_checksum -> valid_packet; // valid TCP packet
+classifier_tcp_udp[0] -> valid_packet; // valid other packet
 
 crc_error_check[1] -> drop_packet;  // CRC checksum failed
-length_error_check[1] -> drop_packet;  // Packet length field does not match actual length
+length_error_check[1] -> drop_packet;  // Pkt len does not match actual len
+ipv4_checksum[1] ->drop_packet; // IPv4 checksum failed
+UDP_checksum[1] ->drop_packet; // UDP checksum failed
+TCP_checksum[1] ->drop_packet; // TCP checksum failed
 
 // ********** Classify/Filter packet *****************
 
@@ -35,7 +49,7 @@ length_error_check[1] -> drop_packet;  // Packet length field does not match act
 classifier_ip :: Classifier(IPv4, IPv6);
 redirection_table :: TableLookup(128);
 
-length_error_check -> classifier_ip;
+valid_packet -> classifier_ip;
 
 // IPv4 classification
 classifier_L4 :: Classifier(tcp, udp);
