@@ -63,12 +63,26 @@ classifier_L4[1] -> hash_ipv4_udp -> redirection_table;
 classifier_L4[2] -> hash_ipv4 -> redirection_table;
 
 // IPv6 classification
-classifier_L4_ipv6 :: Classifier(tcp, udp, ipv6);
+check_ipv6_ex_headers :: Classifier(ipv6, ex_headers);
+classifier_L4_ipv6 :: Classifier(ipv6, tcp, udp);
+classifier_L4_ipv6_EX :: Classifier(ipv6, ex_headers, tcp, udp);
+hash_ipv6_EX_tcp :: CalculateHash(ipv6, ex_headers, tcp);
+hash_ipv6_EX_udp :: CalculateHash(ipv6, ex_headers, udp, );
+hash_ipv6_EX :: CalculateHash(ipv6, ex_headers);
 hash_ipv6_tcp :: CalculateHash(ipv6, tcp);
 hash_ipv6_udp :: CalculateHash(ipv6, udp);
 hash_ipv6 :: CalculateHash(ipv6);
 
-classifier_ip[1] -> classifier_L4_ipv6;
+classifier_ip[1] -> check_ipv6_ex_headers;
+
+// IPv6 with Extended headers classification
+check_ipv6_ex_headers -> classifier_L4_ipv6_EX;
+classifier_L4_ipv6_EX[0] -> hash_ipv6_EX_tcp -> redirection_table;
+classifier_L4_ipv6_EX[1] -> hash_ipv6_EX_udp -> redirection_table;
+classifier_L4_ipv6_EX[2] -> hash_ipv6_EX -> redirection_table;
+
+// IPv6 without Extended headers classification
+check_ipv6_ex_headers[1] -> classifier_L4_ipv6;
 classifier_L4_ipv6[0] -> hash_ipv6_tcp -> redirection_table;
 classifier_L4_ipv6[1] -> hash_ipv6_udp -> redirection_table;
 classifier_L4_ipv6[2] -> hash_ipv6 -> redirection_table;
