@@ -45,3 +45,50 @@ big plus point for virtualization.
 TODO: Find a weakness in virtualization approach.
 
 
+
+
+Example:
+A machine with lot of cores (eg: 32) and cores are divided into CPU packages
+and hence NUMA domains.   User wants to
+run a
+ - Web-server (large number of incoming connections on same port, need high throughput)
+ - Key-value store (large number of incoming connections on same port, need low latency)
+ - Database server (small number of incoming connections, large outgoing data, latency sensitive)
+ - Backup Server (small number of incoming connections, large incoming data, throughput bound)
+
+The machine has one Intel 10G card which has
+ - 128 send(TX)/receive(RX) queues
+ - 128 exact matching 5 tuple filters
+ - FIXME: need more assumptions about hardware filtering and their limitations
+
+
+Question: How to allocate networking resources between these applications?
+How to organize their network stack?
+
+Webserver:
+Threads running on different cores (maybe those cores are on different NUMA nodes)
+Load balancing at connection level
+Batching to improve throughput
+
+Software filtering or hardware filtering?
+
+Most likely hardware filtering will not be suitable in this case because of
+too many short lived connections.  It does not make sense to insert a filter
+(which will take some time) when connection is not going to last very long.
+We might be able to insert a single listen filter, which takes all traffic to
+load balancer, which then redirects it to proper core.
+
+If not hardware filtering, then how would you load balance?
+
+
+It is a tread-off between how expensive it is to insert hardware filter
+to how long this connection will remain active?
+
+
+DNS server:
+short lived connections(single packet request/response), UDP,
+
+In case of DNS server, where request resides in one packet, we might be able
+to use hardware load-balancing based on hashing
+
+
