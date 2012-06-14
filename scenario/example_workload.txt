@@ -1,0 +1,47 @@
+
+
+What questions will be asked to the NIC hardware model?
+What type of answers are expected from them?
+
+What are the modules involved in this system?
+How do they interact?
+
+
+Why does a simple list of features in hardware will not be enough?
+Why you need something as heavyweight as type-system and functional
+programming language?
+
+Example scenario:
+
+Mixed Server workload:
+Why would anyone use mixed server workloads?
+Machines are having more and more cores which can't be used by single server
+(or single server can't scale to all of them), in such scenarios it will be
+reasonable to assume that single machine will be running multiple servers.
+The number of NIC's connected to these machines will be limited compared
+to number of cores, and hence multiple applications will have to share the
+NIC hardware between them.
+
+Example mixed Server workload:
+    - Key Value store (memcached) which is latency sensitive
+    - Webserver  (Throughput sensitive, large number of incoming requests)
+    - Storage server/client (small number of persistent connections)
+    - NFS server
+
+What I want is a mixture of following
+    - Large number of incoming connections (same listen port)
+    - Large number of outgoing connections (large number of ports) maybe a web-crawler??
+    - Lot of incoming data
+    - Lot of outgoing data (video streaming)
+
+
+
+
+
+Qus: Why not use the Virtualization and give one virtual machine to each server?
+Ans: This solution might work, as each server gets different MAC and IP address,
+it is much easier for NIC to do hardware filtering.  This is actually a quite
+big plus point for virtualization.
+TODO: Find a weakness in virtualization approach.
+
+
