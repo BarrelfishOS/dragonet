@@ -59,7 +59,12 @@ run a
 The machine has one Intel 10G card which has
  - 128 send(TX)/receive(RX) queues
  - 128 exact matching 5 tuple filters
+ - 8k-32k signature filters
+ - Syn filter
+ - signature filters are matched after exact matching filters
  - FIXME: need more assumptions about hardware filtering and their limitations
+ - Exact matching filters are applied before flow director filters, hence
+   essentially you can either use flow director filters or full tuple filters
 
 
 Question: How to allocate networking resources between these applications?
@@ -85,6 +90,42 @@ It is a tread-off between how expensive it is to insert hardware filter
 to how long this connection will remain active?
 
 
+Why I won't use per connection filters for webserver?
+  --> overhead of adding filters (in time and complexity)
+  -->
+
+  If I can add filter for every incoming connection when I see syn packet
+  based on which core I want to handle the connection.
+
+Ideally, I want hardware to do load balancing.  Which means
+  1. It filters out all the packets with destination port, destination ip
+  1. Then it apply hash of (source port, source IP) and map it to one of the
+     RX queue.
+
+--------------------------------
+Alternate solution:
+Every server gets own MAC address, MAC address level filtering will result
+into finding correct application.  Flow director filters can be applied after
+that.
+
+--------------------------------
+Using dedicated flow director filters (perfect matching)
+Use syn queue to filter out new connections.
+For every new client for server-port, pass it to load balancer
+Load balancer will add new filter for this particular flow, and forward
+the syn packet to proper core.  Rest of the packets will follow the connection.
+--------------------------------
+
+Using dedicated flow director filters (signature matching)
+Same as above, but here, we also have to consider that there might be collusions.
+And hence, packets which don't belong to this flow might end up in the flow.
+so, after getting the packets, software filter should be applied to make sure
+that it is not due to collision.  It should be easy as this filter only has to
+check the destination IP and port number and if it is wrong, mark it as collision
+and pass it to shared queue.
+
+--------------------------------
+
 DNS server:
 short lived connections(single packet request/response), UDP,
 
@@ -92,3 +133,102 @@ In case of DNS server, where request resides in one packet, we might be able
 to use hardware load-balancing based on hashing
 
 
+--------------------------------
+The Big picture:
+Hardware has some features, applications have some requirements.
+
+Application requirements.
+ -- Number of listen ports
+ -- Number of incoming clients
+ -- Avg number of packets in each connection
+ -- Connection lifetime
+ -- Incoming traffic expected
+ -- Outgoing traffic expected
+ -- Outgoing active connections expected
+ -- Protocol type
+ -- Number of cores involved
+ -- Memory locations
+ -- Low latency preference
+ -- High throughput preference
+ -- Low jitter requirements
+
+Hardware features
+  -- Dedicated RX queues
+  -- Hardware filters
+  -- Large receive offload
+  -- Large send offload
+  -- TCP offload
+
+For given application:
+  -- Does it make sense to use these hardware features?
+  -- Which hardware features should be used?
+  -- How they should be configured?
+  -- How they should be used?
+
+How do I use given resources to best suit application requirements?
+
+--------------------------------
+Application:  DNS Server (eg: Bind)
+Requirements:
+ -- UDP protocol
+ -- Single listen port
+ -- Large number of incoming clients
+ -- Single packet request/response
+ -- Preference to throughput
+ -- Load balancing with multiple cores
+
+Ideal hardware setup
+ -- One dedicated RX queue for each load balancing core.
+ -- Hardware filter for (protocol, destination IP, destination port) to separate
+    packets for this particular application.
+ -- Ideal : Give each separated packet to next core in round-robin fashion
+ -- Alternate - 1:
+    -- Hash (source ip, source port) (assuming uniform distribution of hash values)
+    -- Use hash to select one of the dedicated RX queues.
+ -- Alternate - 2:
+    -- Use one RX queue and one filter (protocol, destination IP,
+        destination port) for this application, and let all the cores
+        share the same RX queue.
+        (not a good idea due to contention on updating RX)
+
+--------------------------------
+Application:  HTTP server (eg: apache)
+A server responding with small sized static pages
+Requirements:
+ -- TCP protocol
+ -- Single listen port
+ -- Preference to throughput
+ -- Large number of incoming clients
+ -- Small request, larger response.
+ -- Load balancing with multiple cores
+
+Ideal hardware setup
+ -- One dedicated RX queue for each load balancing core.
+ -- Hardware filter for (protocol, destination IP, destination port)
+ -- Ideal : Give each new connection to next core in round-robin fashion
+ -- Alternate - 1:
+    -- Hash (source ip, source port)
+    -- Use hash to select one of the dedicated RX queues.
+ -- Alternate - 2:
+    -- Use syn filter to separate syn packets
+    -- Give all syn packets to load balancer
+    -- Load balancer will distribute them in round-robin manner
+    -- Insert new flow directing filter to ensure rest of the packet of
+        this connection goes directly to proper core.
+
+--------------------------------
+Application:  Database server (eg: mysql!!)
+A server handling small number of clients with large number of queries
+ -- TCP protocol
+ -- Single listen port
+ -- Preference to throughput
+ -- small number of incoming clients
+ -- Small request, large response.
+ -- Load balancing with ??
+
+Ideal hardware setup
+
+
+--------------------------------
+--------------------------------
+--------------------------------
