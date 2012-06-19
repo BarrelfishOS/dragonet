@@ -148,7 +148,10 @@ A server responding with small sized static pages
 \end{figure*}
 
 \begin{enumerate}
-    \item How many filters?
+    \item A dedicated RX queue for every core involved in load-balancing
+    \item A dedicated hardware filter for every outgoing connection
+    \item Filtering based on $(protocol, src-ip, src-port,  dest-IP, dest-port)$
+    \item Dedicated queue for each load-balancing core
 \end{enumerate}
 
 \subsection{Application: Web Proxy}

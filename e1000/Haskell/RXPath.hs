@@ -20,9 +20,25 @@ What question this code needs to answer?
   -- Which queue does this code belongs
 -}
 
+import qualified Data.Map as Map
+let mm = Map.fromList([("conf1",2), ("conf2",6)])
+
+
 let pkt = [1..64]
 -- define pkt_status
 if conf_mac_filter then status_mac_filter =
+
+hashPacket :: [Integer] -> Integer
+hashPacket p = let hashFunction = selectHashFunction p
+    if hashFunction == None then
+        0
+    else
+        hashFunction p
+
+classifyPacket :: Map.Map [Char] Integer -> [Integer] -> Integer
+classifyPacket conf_map p = let hash = hashPacket p
+
+let queueID = classifyPacket(mm, pkt)
 -- If conf_mac_filter then add tuple returned by apply_mac_filter (return value
 -- can be true, false, NULL)
 --
