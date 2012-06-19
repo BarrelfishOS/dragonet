@@ -118,7 +118,7 @@ A server handling small number of clients with large number of queries
     \item small number of incoming clients
     \item Small request, large response.
     \item Load balancing with ??
-    \todo{Not complete and useful yet!, get more accurate data about this setup}
+  %  \todo{Not complete and useful yet!, get more accurate data about this setup}
 \end{enumerate}
 
 
@@ -190,7 +190,59 @@ runtimes like MPI and perform some computation in distributed fashion.
         targets
     \item Preference to throughput
 \end{enumerate}
-\todo{Complete the requirements of this application}
+%\todo{Complete the requirements of this application}
+
+\subsubsection{Ideal hardware setup}
+\begin{enumerate}
+    \item How many filters?
+\end{enumerate}
+
+\subsection{Application: Web Proxy}
+
+\subsubsection{Requirements:}
+\begin{enumerate}
+    \item HTTP/TCP Protocol
+    \item Single listen port
+    \item Large number of incoming connections
+    \item Large number of outgoing connections
+    \item Relatively small connection lifetime for outgoing connections.
+    \item Larger connection lifetime for incoming connections (client connections)
+    \item Scaling??
+    \item Preference to latency and throughput (not sure)
+    \item With high probability, Incoming and outgoing connections are on
+            different interfaces
+    \item Examples: Squid
+\end{enumerate}
+
+\subsubsection{Ideal hardware setup}
+\begin{enumerate}
+    \item One dedicated hardware filter for incoming connections
+    \item Filtering based on (protocol, destination IP, destination port)
+    \item Hashing to load balance connections hash(source IP, source port)
+    \item Dedicated queue for each load-balancing core
+    \item Distribution of connections across cores in round-robin fashion.
+    \item Does not make much sense to have a dedicated queues for outgoing
+            connections.
+\end{enumerate}
+
+\subsection{Application: Firewall}
+
+\subsubsection{Requirements:}
+\begin{enumerate}
+    \item Protocol??
+\end{enumerate}
+
+\subsubsection{Ideal hardware setup}
+\begin{enumerate}
+    \item How many filters?
+\end{enumerate}
+
+\subsection{Application: Intrusion Detection System }
+
+\subsubsection{Requirements:}
+\begin{enumerate}
+    \item Protocol??
+\end{enumerate}
 
 \subsubsection{Ideal hardware setup}
 \begin{enumerate}
@@ -198,8 +250,108 @@ runtimes like MPI and perform some computation in distributed fashion.
 \end{enumerate}
 
 
+
+
+\subsection{Application: }
+
+\subsubsection{Requirements:}
+\begin{enumerate}
+    \item Protocol??
+\end{enumerate}
+
+\subsubsection{Ideal hardware setup}
+\begin{enumerate}
+    \item How many filters?
+\end{enumerate}
+
+
+
+\subsection{Application: }
+
+\subsubsection{Requirements:}
+\begin{enumerate}
+    \item Protocol??
+\end{enumerate}
+
+\subsubsection{Ideal hardware setup}
+\begin{enumerate}
+    \item How many filters?
+\end{enumerate}
+
+
+
+
+
 \section{test diagrams}
 test section
+
+
+\tikz [font=\footnotesize,
+        grow=right, level 1/.style={sibling distance=6em},
+                    level 2/.style={sibling distance=1em},
+                    level distance=5cm
+    ]
+    \node {root}
+        child { node {child L1 S1}
+            child { node {child L2 S1}}
+            child { node {child L2 S2}}
+        }
+       child { node {child L1 S2}
+            child { node {child L2 S1}}
+            child { node {child L2 S2}}
+        };
+
+
+\pagebreak
+
+
+\begin{tikzpicture}[
+    grow=down,
+    level 1/.style={sibling distance=3.5cm,level distance=5.2cm},
+    level 2/.style={sibling distance=3.5cm, level distance=6.7cm},
+    edge from parent/.style={very thick,draw=blue!40!black!60,
+        shorten >=5pt, shorten <=5pt},
+    edge from parent path={(\tikzparentnode.south) -- (\tikzchildnode.north)},
+    kant/.style={text width=2cm, text centered, sloped},
+    every node/.style={text ragged, inner sep=2mm},
+    incomingp/.style={rectangle, minimum size=6mm, very thick,
+        draw=red!50!black!50, top color=white, bottom color=red!50!black!20,
+        font=\itshape},
+    QueueShape/.style={rectangle, minimum size=6mm, rounded corners=3mm,
+        very thick, draw=black!50, top color=white, bottom color=black!20,
+        font=\itshape},
+    FilterShape/.style={rectangle, minimum size=6mm, very thick,
+        draw=blue!50!black!50, top color=white, bottom color=black!20,
+        font=\itshape},
+    HashShape/.style={rectangle, minimum size=6mm, very thick,
+        draw=green!50!black!20, top color=white, bottom color=black!20,
+        font=\itshape}
+]
+\node (incoming) [incomingp] {Incoming packets}
+    child {
+        node (filter1) [FilterShape] [rectangle split, rectangle split,
+            rectangle split parts=2, text ragged] {
+            \textbf{Filtering}
+                  \nodepart{second}
+            $ Filter(Protocol, dest-port, dest-IP) $
+            }
+            child { node (otherPackets) [QueueShape] {Other packets}}
+            child {
+                node (hash1) [HashShape] [rectangle split, rectangle split,
+                    rectangle split parts=2, text ragged] {
+                    \textbf{Load balancing Hash}
+                        \nodepart{second}
+                   $ Hash(src-port, src-IP) $
+                    }
+                    child {node {core 1}}
+                    child {node {core 2}}
+                    child {node {core n}}
+                    }
+    };
+\end{tikzpicture}
+
+\pagebreak
+
 
 \begin{tikzpicture}[
     grow=right,
@@ -221,7 +373,7 @@ test section
     child {
         node[punkt] [rectangle split, rectangle split, rectangle split parts=3,
          text ragged] {
-            \textbf{Scenario  1}
+            \textbf{Other packets}
                   \nodepart{second}
             $\text{Country \B}\colon    s\bar{Q}$
                   \nodepart{third}
