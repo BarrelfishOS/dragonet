@@ -57,7 +57,7 @@ Requirements:
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.5\textwidth]{figures/DNSServerIdeal.eps}
-\caption{Test}
+\caption{Ideal configuration for DNS server}
 \end{figure*}
 
 
@@ -96,6 +96,13 @@ A server responding with small sized static pages
 \end{enumerate}
 
 \subsubsection{Ideal hardware setup}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.5\textwidth]{figures/HTTPServerIdeal.eps}
+\caption{Ideal configuration for HTTP server}
+\end{figure*}
+
 \begin{enumerate}
     \item One dedicated RX queue for each load balancing core.
     \item Hardware filter for (protocol, destination IP, destination port)
@@ -117,18 +124,61 @@ A server responding with small sized static pages
         this connection goes directly to proper core.
 \end{enumerate}
 
-\subsection{Application:  Database server (eg: mysql!!)}
-A server handling small number of clients with large number of queries
+
+\subsection{Application: Web crawler}
+
 \subsubsection{Requirements:}
 \begin{enumerate}
-    \item TCP protocol
-    \item Single listen port
+    \item HTTP/TCP Protocol
+    \item Large number of outgoing connections
+    \item Large incoming data
+    \item Relatively small connection lifetime (HTTP requests)
+    \item Scale by adding more cores running same application with different
+        targets
     \item Preference to throughput
-    \item small number of incoming clients
-    \item Small request, large response.
-    \item Load balancing with ??
-  %  \todo{Not complete and useful yet!, get more accurate data about this setup}
 \end{enumerate}
+%\todo{Complete the requirements of this application}
+
+\subsubsection{Ideal hardware setup}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.5\textwidth]{figures/WebCrawlerIdeal.eps}
+\caption{Ideal configuration for Web crawler}
+\end{figure*}
+
+\begin{enumerate}
+    \item How many filters?
+\end{enumerate}
+
+\subsection{Application: Web Proxy}
+
+\subsubsection{Requirements:}
+\begin{enumerate}
+    \item HTTP/TCP Protocol
+    \item Single listen port
+    \item Large number of incoming connections
+    \item Large number of outgoing connections
+    \item Relatively small connection lifetime for outgoing connections.
+    \item Larger connection lifetime for incoming connections (client connections)
+    \item Scaling??
+    \item Preference to latency and throughput (not sure)
+    \item With high probability, Incoming and outgoing connections are on
+            different interfaces
+    \item Examples: Squid
+\end{enumerate}
+
+\subsubsection{Ideal hardware setup}
+\begin{enumerate}
+    \item One dedicated hardware filter for incoming connections
+    \item Filtering based on (protocol, destination IP, destination port)
+    \item Hashing to load balance connections hash(source IP, source port)
+    \item Dedicated queue for each load-balancing core
+    \item Distribution of connections across cores in round-robin fashion.
+    \item Does not make much sense to have a dedicated queues for outgoing
+            connections.
+\end{enumerate}
+
 
 
 \subsection{Application: NFS filesystem client}
@@ -187,52 +237,20 @@ runtimes like MPI and perform some computation in distributed fashion.
 \end{enumerate}
 
 
-\subsection{Application: Web crawler}
-
+\subsection{Application:  Database server (eg: mysql!!)}
+A server handling small number of clients with large number of queries
 \subsubsection{Requirements:}
 \begin{enumerate}
-    \item HTTP/TCP Protocol
-    \item Large number of outgoing connections
-    \item Large incoming data
-    \item Relatively small connection lifetime (HTTP requests)
-    \item Scale by adding more cores running same application with different
-        targets
-    \item Preference to throughput
-\end{enumerate}
-%\todo{Complete the requirements of this application}
-
-\subsubsection{Ideal hardware setup}
-\begin{enumerate}
-    \item How many filters?
-\end{enumerate}
-
-\subsection{Application: Web Proxy}
-
-\subsubsection{Requirements:}
-\begin{enumerate}
-    \item HTTP/TCP Protocol
+    \item TCP protocol
     \item Single listen port
-    \item Large number of incoming connections
-    \item Large number of outgoing connections
-    \item Relatively small connection lifetime for outgoing connections.
-    \item Larger connection lifetime for incoming connections (client connections)
-    \item Scaling??
-    \item Preference to latency and throughput (not sure)
-    \item With high probability, Incoming and outgoing connections are on
-            different interfaces
-    \item Examples: Squid
+    \item Preference to throughput
+    \item small number of incoming clients
+    \item Small request, large response.
+    \item Load balancing with ??
+  %  \todo{Not complete and useful yet!, get more accurate data about this setup}
 \end{enumerate}
 
-\subsubsection{Ideal hardware setup}
-\begin{enumerate}
-    \item One dedicated hardware filter for incoming connections
-    \item Filtering based on (protocol, destination IP, destination port)
-    \item Hashing to load balance connections hash(source IP, source port)
-    \item Dedicated queue for each load-balancing core
-    \item Distribution of connections across cores in round-robin fashion.
-    \item Does not make much sense to have a dedicated queues for outgoing
-            connections.
-\end{enumerate}
+
 
 \subsection{Application: Firewall}
 
