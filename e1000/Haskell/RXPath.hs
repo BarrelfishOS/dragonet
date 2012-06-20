@@ -20,28 +20,55 @@ What question this code needs to answer?
   -- Which queue does this code belongs
 -}
 
+module Main (main) where
+
 import qualified Data.Map as Map
-let mm = Map.fromList([("conf1",2), ("conf2",6)])
+import qualified Data.Maybe
 
+hashTCP :: [Integer] -> Integer
+hashTCP [] = 0
+hashTCP (x:xs) = x + hashTCP xs
 
-let pkt = [1..64]
--- define pkt_status
-if conf_mac_filter then status_mac_filter =
+selectHashFunction :: [Integer] -> Maybe ([Integer] -> Integer)
+selectHashFunction _ = Just hashTCP
+
+-- This function will use ast 5 bits of the hash, and return value at that entry
+lookupRedirectionTable :: [(Integer, Integer)] -> Integer -> Integer
+lookupRedirectionTable redirectionTable hash_value = toInteger ( fst (redirectionTable!!fromIntegral hash_value))
+
+fromJust :: Maybe a -> a
+fromJust (Just x) = x
+fromJust Nothing  = error "fromJust: Nothing"
 
 hashPacket :: [Integer] -> Integer
-hashPacket p = let hashFunction = selectHashFunction p
-    if hashFunction == None then
-        0
-    else
-        hashFunction p
+hashPacket p =
+    if Data.Maybe.isNothing (selectHashFunction p)
+        then 0
+    else Data.Maybe.fromJust (selectHashFunction p) p
 
-classifyPacket :: Map.Map [Char] Integer -> [Integer] -> Integer
-classifyPacket conf_map p = let hash = hashPacket p
 
-let queueID = classifyPacket(mm, pkt)
--- If conf_mac_filter then add tuple returned by apply_mac_filter (return value
--- can be true, false, NULL)
---
+classifyPacket :: Map.Map [Char] Bool -> [(Integer, Integer)]  -> [Integer] -> Integer
+classifyPacket conf_map rdt p = lookupRedirectionTable rdt (hashPacket p)
+
+simpleCall :: Integer
+simpleCall =
+    let mm = Map.fromList([("enableChecksum", False),
+                        ("enableMultiQueue", True)])
+
+    -- The packet holding bytes
+    -- FIXME: Sample values
+        pkt = [1..64]
+
+    -- Table specifying which hash should go to which queue/core
+    -- FIXME: Sample values
+        redirectionTable = replicate 127 (1, 1)
+    in classifyPacket mm redirectionTable pkt
+
+main = print $ simpleCall
+
+-- module main where
+--    main = putStrLn queueID
+
 -- pkt_status
 --      key value store
 --      for every decision and computation on packet, it stores the result
@@ -60,12 +87,4 @@ let queueID = classifyPacket(mm, pkt)
 --
 -- classify :: packet -> hash_type
 -- returns a hashing function
---
---
--- eg:
---  hash_packet classify pkt pkt
---
--- FIXME: Make sure that if the packet has differnt type than expected then
--- hash value is all zeros.
---
 --
