@@ -57,6 +57,11 @@ hashPacket p =
 hashToIndex :: Hash -> Index
 hashToIndex hash = fromIntegral (hash `mod` 127)
 
+-- Returns a default entry in redirection table
+lookupDefaultEntry :: RedirectTbl -> QueueID
+lookupDefaultEntry redirectionTable =
+        toInteger ( fst (redirectionTable!!(hashToIndex 0)))
+
 -- For given lookup-table and hash, give the QueueID to which packet should go
 lookupRedirectionTable :: RedirectTbl -> Hash -> QueueID
 lookupRedirectionTable redirectionTable hash_value =
@@ -66,8 +71,14 @@ lookupRedirectionTable redirectionTable hash_value =
 --  find out the queueId which should get the packet
 classifyPacket :: Map.Map [Char] Bool -> RedirectTbl -> Packet
                     -> QueueID
-classifyPacket conf_map rdt p = lookupRedirectionTable rdt (hashPacket p)
-
+classifyPacket conf_map rdt p =
+    let conf = Map.lookup "enableMultiQueue" conf_map in
+    if Data.Maybe.isNothing conf
+        then lookupDefaultEntry rdt
+    else if Data.Maybe.fromJust conf
+        then lookupRedirectionTable rdt (hashPacket p)
+    else
+        lookupDefaultEntry rdt
 
 -- A test function to apply the algorithm on dummy packet
 handlePacket :: Integer
