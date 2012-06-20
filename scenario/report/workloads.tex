@@ -1,5 +1,9 @@
+\section{Why Haskell?}
+One of the common question that appears is why use Haskell for modeling NIC
+device?
+
 \section{The Big picture}
-\textbf{ Applications have some requirements, and hardware has some features}
+\textbf{Applications have some requirements, and hardware has some features}
 
 \subsection{Application requirements:}
 Following are the possible application requirements.
@@ -7,11 +11,11 @@ Following are the possible application requirements.
 \begin{enumerate}
     \item Number of listen ports
     \item Number of incoming clients
-    \item Avg number of packets in each connection
-    \item Connection lifetime
-    \item Incoming traffic expected
-    \item Outgoing traffic expected
-    \item Outgoing active connections expected
+    \item Number of outgoing active connections expected
+    \item Average connection lifetime
+    \item Average number of packets in each connection
+    \item Expected volume of incoming traffic
+    \item Expected volume of outgoing traffic
     \item Protocol type
     \item Number of cores involved
     \item Memory locations
@@ -22,25 +26,43 @@ Following are the possible application requirements.
 
 \subsection{Hardware features:}
 \begin{enumerate}
-     \item Dedicated RX queues
+     \item Dedicated RX/TX queues
      \item Hardware filters
      \item Large receive offload
      \item Large send offload
      \item TCP offload
 \end{enumerate}
 
-\subsection{Questions for given application:}
+%\subsection{Questions for given application:}
+%\begin{enumerate}
+%     \item Does it make sense to use these hardware features?
+%     \item Which hardware features should be used?
+%     \item How they should be configured?
+%     \item How they should be used?
+%\end{enumerate}
+
+\subsection{Questions for the hardware model:}
+The Mathematical (ie: Haskell based) model of NIC hardware should lead to
+many alternate network stack configurations.  And one should be able ask
+following questions from any of these alternate network stack configurations.
+
 \begin{enumerate}
-     \item Does it make sense to use these hardware features?
-     \item Which hardware features should be used?
-     \item How they should be configured?
-     \item How they should be used?
+     \item What will be the \textbf{flow setup cost}?
+     \item What will be the \textbf{Flow tear-down cost}?
+     \item What are the \textbf{scalability limits}? (ie: How many parallel
+        flows can be handled?)
+     \item What is the \textbf{Scale up cost} when resources are increased
+        during application execution?
+     \item What is the \textbf{Scale down cost} when resources are decreased/
+        removed during application execution?
+     \item What is the \textbf{packet classification/processing cost}?
+     \item What is the \textbf{latency} in delivering single packet?
+     \item How many packets can be delivered in one second.
+            Eg: \textbf{Throughput}.
 \end{enumerate}
 
-How do I use given resources to best suit application requirements?
 
---------------------------------
-\subsection{Application:  DNS Server (eg: Bind)}
+\subsection{Application: DNS Server}
 Requirements:
 \begin{enumerate}
     \item UDP protocol
@@ -50,7 +72,7 @@ Requirements:
     \item Preference to throughput
     \item Load balancing with multiple cores
 \end{enumerate}
-
+Example of this server will be bind
 \subsubsection{Ideal hardware setup}
 
 
@@ -214,14 +236,22 @@ If there is only one application
     \item Use hash(source IP, source port) to select the destination core.
 \end{enumerate}
 
+\subsection{Application: Key-value store}
 
+\subsubsection{Requirements:}
+A multi-core key value store like memcached
+\begin{enumerate}
+    \item Protocol??
+\end{enumerate}
 
-
+\subsubsection{Ideal hardware setup}
+\begin{enumerate}
+    \item How many filters?
+\end{enumerate}
 
 \subsection{Application: MPI application}
 A class of scientific applications which communicate with each other using
 runtimes like MPI and perform some computation in distributed fashion.
-
 
 \subsubsection{Requirements:}
 \begin{enumerate}
@@ -239,7 +269,6 @@ runtimes like MPI and perform some computation in distributed fashion.
     \item How many filters?
 \end{enumerate}
 
-
 \subsection{Application:  Database server (eg: mysql!!)}
 A server handling small number of clients with large number of queries
 \subsubsection{Requirements:}
@@ -247,13 +276,10 @@ A server handling small number of clients with large number of queries
     \item TCP protocol
     \item Single listen port
     \item Preference to throughput
-    \item small number of incoming clients
     \item Small request, large response.
     \item Load balancing with ??
   %  \todo{Not complete and useful yet!, get more accurate data about this setup}
 \end{enumerate}
-
-
 
 \subsection{Application: Firewall}
 
@@ -268,35 +294,6 @@ A server handling small number of clients with large number of queries
 \end{enumerate}
 
 \subsection{Application: Intrusion Detection System }
-
-\subsubsection{Requirements:}
-\begin{enumerate}
-    \item Protocol??
-\end{enumerate}
-
-\subsubsection{Ideal hardware setup}
-\begin{enumerate}
-    \item How many filters?
-\end{enumerate}
-
-
-
-
-\subsection{Application: }
-
-\subsubsection{Requirements:}
-\begin{enumerate}
-    \item Protocol??
-\end{enumerate}
-
-\subsubsection{Ideal hardware setup}
-\begin{enumerate}
-    \item How many filters?
-\end{enumerate}
-
-
-
-\subsection{Application: }
 
 \subsubsection{Requirements:}
 \begin{enumerate}

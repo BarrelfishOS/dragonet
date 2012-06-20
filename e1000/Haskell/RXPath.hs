@@ -8,16 +8,7 @@ Aim:
   --Output:
   --    Packet in classified queue
   --    Notification of packet generation
-  --    Status of packet in descriptor
-
-What needs to capture
-    -- Incoming packet
-    -- Calculations performed
-    -- Decisions made
-    --  Classifications made.
-
-What question this code needs to answer?
-  -- Which queue does this code belongs
+  --    Status of packet in descriptor (TODO)
 -}
 
 module Main (main) where
@@ -34,6 +25,7 @@ type RedirectTbl = [(QueueID, CoreID)]
 
 -- TCP Hashing function
 -- Currently, it just adds all bytes to get the hash
+-- FIXME: Dummy hash function
 hashTCP :: Packet -> Hash
 hashTCP [] = 0
 hashTCP (x:xs) = x + hashTCP xs
@@ -69,8 +61,7 @@ lookupRedirectionTable redirectionTable hash_value =
 
 -- For given configuration, redirection-table and packet,
 --  find out the queueId which should get the packet
-classifyPacket :: Map.Map [Char] Bool -> RedirectTbl -> Packet
-                    -> QueueID
+classifyPacket :: Map.Map [Char] Bool -> RedirectTbl -> Packet -> QueueID
 classifyPacket conf_map rdt p =
     let conf = Map.lookup "enableMultiQueue" conf_map in
     if Data.Maybe.isNothing conf
@@ -98,17 +89,4 @@ handlePacket =
 main = print $ handlePacket
 
 
--- ###################################################################
--- pkt_status
---      key value store
---      for every decision and computation on packet, it stores the result
---
--- checksum_calculation
---      A function which takes packet as input and returns a hash (a number)
---      which is a checksum of packet.
---
--- validate_checksum  :: checksum_fun -> packet -> bool
---      uses checksum_calculation to calculate checksum and returns
---      true/false based on if the checksum matched or not.
---
 
