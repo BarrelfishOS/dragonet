@@ -25,33 +25,38 @@ module Main (main) where
 import qualified Data.Map as Map
 import qualified Data.Maybe
 
-hashTCP :: [Integer] -> Integer
+type Packet = [Integer]
+type Hash = Integer
+type QueueID = Integer
+
+
+hashTCP :: Packet -> Hash
 hashTCP [] = 0
 hashTCP (x:xs) = x + hashTCP xs
 
-selectHashFunction :: [Integer] -> Maybe ([Integer] -> Integer)
+selectHashFunction :: Packet -> Maybe (Packet -> Hash)
 selectHashFunction _ = Just hashTCP
 
 -- This function will use ast 5 bits of the hash, and return value at that entry
-lookupRedirectionTable :: [(Integer, Integer)] -> Integer -> Integer
-lookupRedirectionTable redirectionTable hash_value = toInteger ( fst (redirectionTable!!fromIntegral hash_value))
+lookupRedirectionTable :: [(Integer, Integer)] -> Hash -> QueueID
+lookupRedirectionTable redirectionTable hash_value =
+        toInteger ( fst (redirectionTable!!fromIntegral hash_value))
 
-fromJust :: Maybe a -> a
-fromJust (Just x) = x
-fromJust Nothing  = error "fromJust: Nothing"
 
-hashPacket :: [Integer] -> Integer
+hashPacket :: Packet -> Hash
 hashPacket p =
-    if Data.Maybe.isNothing (selectHashFunction p)
+    let hashFunction = selectHashFunction p in
+    if Data.Maybe.isNothing hashFunction
         then 0
-    else Data.Maybe.fromJust (selectHashFunction p) p
+    else Data.Maybe.fromJust hashFunction p
 
 
-classifyPacket :: Map.Map [Char] Bool -> [(Integer, Integer)]  -> [Integer] -> Integer
+classifyPacket :: Map.Map [Char] Bool -> [(Integer, Integer)] -> Packet
+                    -> QueueID
 classifyPacket conf_map rdt p = lookupRedirectionTable rdt (hashPacket p)
 
-simpleCall :: Integer
-simpleCall =
+handlePacket :: Integer
+handlePacket =
     let mm = Map.fromList([("enableChecksum", False),
                         ("enableMultiQueue", True)])
 
@@ -64,10 +69,7 @@ simpleCall =
         redirectionTable = replicate 127 (1, 1)
     in classifyPacket mm redirectionTable pkt
 
-main = print $ simpleCall
-
--- module main where
---    main = putStrLn queueID
+main = print $ handlePacket
 
 -- pkt_status
 --      key value store
@@ -81,10 +83,4 @@ main = print $ simpleCall
 --      uses checksum_calculation to calculate checksum and returns
 --      true/false based on if the checksum matched or not.
 --
--- hash_packet :: hash_type -> packet -> hash
--- Runs the hash function based on the requested hash_type and returns the
--- hash
---
--- classify :: packet -> hash_type
--- returns a hashing function
---
+
