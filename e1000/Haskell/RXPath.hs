@@ -40,9 +40,9 @@ selectHashFunction _ = Just hashTCP
 hashPacket :: Packet -> Hash
 hashPacket p =
     let hashFunction = selectHashFunction p in
-    if Data.Maybe.isNothing hashFunction
-        then 0
-    else Data.Maybe.fromJust hashFunction p
+    case hashFunction of
+        Nothing -> 0
+        Just fn -> fn p
 
 -- Given hash, convert into an index for Redirection Table
 -- This function will use last 5 bits of the hash
@@ -64,12 +64,9 @@ lookupRedirectionTable redirectionTable hash_value =
 classifyPacket :: Map.Map [Char] Bool -> RedirectTbl -> Packet -> QueueID
 classifyPacket conf_map rdt p =
     let conf = Map.lookup "enableMultiQueue" conf_map in
-    if Data.Maybe.isNothing conf
-        then lookupDefaultEntry rdt
-    else if Data.Maybe.fromJust conf
-        then lookupRedirectionTable rdt (hashPacket p)
-    else
-        lookupDefaultEntry rdt
+    case conf of
+        Nothing -> lookupDefaultEntry rdt
+        Just a -> lookupRedirectionTable rdt (hashPacket p)
 
 -- A test function to apply the algorithm on dummy packet
 handlePacket :: Integer
