@@ -14,7 +14,23 @@ Aim:
 module Main (main) where
 
 import qualified Data.Map as Map
+import qualified Data.ByteString as BS
 import qualified Data.Maybe
+
+data EtherAddr = EtherAddr Data.ByteString deriving (Show, Eq)
+data UnknownPacket = UnknownPacket BS deriving (Show, Eq)
+
+data InvalidPacket = InvalidPacket UnknownPacket String deriving (Show, Eq)
+data EthernetPacket = EthernetPacket UnknownPacket
+                      EtherAddr
+                      EtherAddr
+                      Integer
+                      Integer
+                  deriving (Show, Eq)
+
+main = print "Hi there"
+
+{-
 
 type Packet = [Integer]
 type Hash = Integer
@@ -85,5 +101,6 @@ handlePacket =
 
 main = print $ handlePacket
 
+-}
 
 
