@@ -17,16 +17,33 @@ import qualified Data.Map as Map
 import qualified Data.ByteString as BS
 import qualified Data.Maybe
 
-data EtherAddr = EtherAddr Data.ByteString deriving (Show, Eq)
-data UnknownPacket = UnknownPacket BS deriving (Show, Eq)
+-- Ethernet address
+data EtherAddr = EtherAddr BS.ByteString deriving (Show, Eq)
 
-data InvalidPacket = InvalidPacket UnknownPacket String deriving (Show, Eq)
-data EthernetPacket = EthernetPacket UnknownPacket
-                      EtherAddr
-                      EtherAddr
-                      Integer
-                      Integer
-                  deriving (Show, Eq)
+-- Contents of packet
+data PacketData = PacketData {
+        bytes :: BS.ByteString
+        } deriving (Show, Eq)
+
+-- unclassified/unprocessed packet
+data UnknownPacket = UnknownPacket {
+    packetData :: PacketData
+    } deriving (Show, Eq)
+
+-- Invalid packet with reason for invalidation
+data InvalidPacket = InvalidPacket {
+    invalidData :: PacketData
+    , reason :: String
+    } deriving (Show, Eq)
+
+-- Ethernet packet
+data EthernetPacket = EthernetPacket {
+    etherData :: PacketData
+    , srcAddr :: EtherAddr
+    , dstAddr :: EtherAddr
+    , pktLen  :: Integer
+    , pktType :: Integer
+    } deriving (Show, Eq)
 
 main = print "Hi there"
 
