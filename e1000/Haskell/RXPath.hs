@@ -15,6 +15,7 @@ module Main (main) where
 
 import qualified Data.Map as Map
 import qualified Data.ByteString as BS
+import qualified Data.Word as W
 import qualified Data.Maybe
 
 -- Ethernet address
@@ -45,7 +46,24 @@ data EthernetPacket = EthernetPacket {
     , pktType :: Integer
     } deriving (Show, Eq)
 
-main = print "Hi there"
+
+getNextPacket :: UnknownPacket
+-- The packet holding bytes
+-- FIXME: Stupid packet, make it more realasitic
+getNextPacket =
+   UnknownPacket $ PacketData $ BS.pack (replicate 64 (53 :: W.Word8))
+
+main = print $ getNextPacket
+
+{-
+
+Is it a valid packet?
+Which queue it belongs?
+Which CPU will be interrupted?
+What is the state of the system?  (packet count, status, etc)
+
+Combined data type,
+-}
 
 {-
 
