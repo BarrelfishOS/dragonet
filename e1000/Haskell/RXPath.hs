@@ -46,14 +46,38 @@ data EthernetPacket = EthernetPacket {
     , pktType :: Integer
     } deriving (Show, Eq)
 
+-- Union of different valid packets
+data MyPacket = EtherPacket EthernetPacket
+            | InvalidPkt InvalidPacket
+    deriving (Show, Eq)
 
-getNextPacket :: UnknownPacket
--- The packet holding bytes
+
+processPacket :: UnknownPacket -> MyPacket
+processPacket pkt = InvalidPkt $ InvalidPacket (packetData pkt) "test invalid"
+
+-- Invalidate the given packet with given error message
+invalidatePacket :: UnknownPacket -> String -> MyPacket
+invalidatePacket pkt msg =
+        InvalidPkt $ InvalidPacket (packetData pkt) msg
+
+
+-- Checks if the packet has valid length
+-- FIXME: put the actual values for MAX/MIN ethernet packet sizes
+lengthErrorCheck :: UnknownPacket -> MyPacket
+lengthErrorCheck pkt
+    | len >= 1532 = invalidatePacket pkt "packet too long"
+    | len < 60 = invalidatePacket pkt "packet too short"
+    | otherwise = processPacket pkt
+    where len = toInteger $ BS.length $ bytes $ packetData pkt
+
+-- getNextPacket for processing:  Currently it is generated/hardcoded.
 -- FIXME: Stupid packet, make it more realasitic
+getNextPacket :: UnknownPacket
 getNextPacket =
    UnknownPacket $ PacketData $ BS.pack (replicate 64 (53 :: W.Word8))
 
-main = print $ getNextPacket
+-- main function which prints the fate of the next packet
+main = print $ lengthErrorCheck getNextPacket
 
 {-
 
