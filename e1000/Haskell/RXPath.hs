@@ -61,12 +61,18 @@ invalidatePacket pkt msg =
         InvalidPkt $ InvalidPacket (packetData pkt) msg
 
 
+-- Checks if the packet has valid CRC checksum
+crcChecksum :: UnknownPacket -> Bool
+crcChecksum pkt = True -- FIXME: Actually calculate CRC checksum
+
+
 -- Checks if the packet has valid length
 -- FIXME: put the actual values for MAX/MIN ethernet packet sizes
 lengthErrorCheck :: UnknownPacket -> MyPacket
 lengthErrorCheck pkt
     | len >= 1532 = invalidatePacket pkt "packet too long"
     | len < 60 = invalidatePacket pkt "packet too short"
+    | not $ crcChecksum pkt = invalidatePacket pkt "invalid CRC Checksum"
     | otherwise = processPacket pkt
     where len = toInteger $ BS.length $ bytes $ packetData pkt
 
