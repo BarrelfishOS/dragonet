@@ -80,13 +80,9 @@ subList start end payload =
 
 -- Convert [Word8] of size 2 into Word16
 convert2Word16 :: [W.Word8] -> W.Word16
-convert2Word16 xs =
-    (Bits.shiftL (fromIntegral (xs !! 0) :: W.Word16) 8) + (fromIntegral (xs !!  1) :: W.Word16)
-{-
-convert2Word16 w1:w2:[] =
-    Bits.shiftL (fromIntegral w1 :: W.Word16) 8) + (fromIntegral w2 :: W.Word16)
-convert2Word16 xs = error "incorrect length of array"
--}
+convert2Word16 (w1:w2:[]) = (Bits.shiftL (fromIntegral w1 :: W.Word16) 8)
+                                + (fromIntegral w2 :: W.Word16)
+convert2Word16 _ = error "incorrect length of array"
 
 -- Convert into Ethernet packet
 toEthernetPkt :: UnknownPacket -> EthernetPacket
@@ -96,13 +92,12 @@ toEthernetPkt pkt = let
     srcAddr = EtherAddr $ subList 0 6 $ packetData pkt --first 6 octets
     , dstAddr = EtherAddr $ subList 6 12 $ packetData pkt -- next 6 octets
     , pktLen = convert2Word16 $ BS.unpack $ subList 12 14 $ packetData pkt -- packet length
---    , pktLen = 0 -- subList 12 14 $ packetData pkt -- packet length
     , payload = PacketData $ subList 18 (len - 4) $ packetData pkt -- data octates
     , pktCRC = BS.unpack $ subList (len - 4) len $ packetData pkt -- last 4 octets
     , pktType = 0
     }
 
-  -- Checks if the packet has valid length
+-- Checks if the packet has valid length
 -- FIXME: put the actual values for MAX/MIN ethernet packet sizes
 lengthErrorCheck :: UnknownPacket -> MyPacket
 lengthErrorCheck pkt
