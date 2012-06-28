@@ -49,7 +49,7 @@ data EthernetPacket = EthernetPacket {
     } deriving (Show, Eq)
 
 -- Union of different valid packets
-data MyPacket = EtherPacket EthernetPacket
+data MyPacket = EtherPkt EthernetPacket
             | InvalidPkt InvalidPacket
     deriving (Show, Eq)
 
@@ -63,12 +63,29 @@ invalidatePacket pkt msg =
         InvalidPkt $ InvalidPacket (packetData pkt) msg
 
 -- Checks if the packet has valid CRC checksum
-crcChecksum :: UnknownPacket -> Bool
-crcChecksum pkt = True -- FIXME: Actually calculate CRC checksum
+invalidCRC :: UnknownPacket -> Bool
+invalidCRC pkt = False -- FIXME: Actually calculate CRC checksum
+
+-- Check if the given address is broadcast or not (ie: ff:ff:ff:ff:ff:ff )
+isBroadcastPacket :: EtherAddr -> Bool
+isBroadcastPacket ethAddr = ( ethAddr == EtherAddr (BS.replicate 6 0xff) )
 
 -- Check if packet is multicast
-isMulticastPacket :: UnknownPacket -> Bool
-isMulticastPacket pkt = False -- FIXME: actually validate packet
+-- ie: belongs to one of the group to which this machine belongs
+isMulticastPacket :: EtherAddr -> Bool
+isMulticastPacket ethAddr = False -- FIXME: actually check if packet is
+
+-- Check if the given address is anycast or not (ie: belongs to this machine)
+isAnycastPacket :: EtherAddr -> Bool
+isAnycastPacket ethAddr = True
+
+-- Check if packet is intented for this machine
+invalidIncoming :: EthernetPacket -> Bool
+invalidIncoming ethPkt
+    | isBroadcastPacket $ dstAddr ethPkt = False
+    | isMulticastPacket $ dstAddr ethPkt = False
+    | isAnycastPacket $ dstAddr ethPkt = False
+    | otherwise = True
 
 -- gets specified part of the payload ([including start, excluding end])
 -- index starts at zero
@@ -99,13 +116,21 @@ toEthernetPkt pkt = let
 
 -- Checks if the packet has valid length
 -- FIXME: put the actual values for MAX/MIN ethernet packet sizes
-lengthErrorCheck :: UnknownPacket -> MyPacket
-lengthErrorCheck pkt
-    | len >= 1532 = invalidatePacket pkt "packet too long"
-    | len < 60 = invalidatePacket pkt "packet too short"
-    | not $ crcChecksum pkt = invalidatePacket pkt "invalid CRC Checksum"
-    | otherwise = processPacket pkt
+invalidLength :: UnknownPacket -> Bool
+invalidLength pkt
+    | len >= 1532 = True
+    | len < 60 = True
+    | otherwise = False
     where len = toInteger $ BS.length $ bytes $ packetData pkt
+
+validatePacket :: UnknownPacket -> MyPacket
+validatePacket pkt
+    | invalidLength pkt = invalidatePacket pkt "invalid packet length"
+    | invalidCRC pkt = invalidatePacket pkt "invalid CRC Checksum"
+    | invalidIncoming ethPkt = invalidatePacket pkt
+                                        "not intented for this machine"
+    | otherwise = EtherPkt ethPkt
+    where ethPkt = toEthernetPkt pkt
 
 -- getNextPacket for processing:  Currently it is generated/hardcoded.
 -- FIXME: Stupid packet, make it more realasitic
@@ -115,7 +140,7 @@ getNextPacket =
    UnknownPacket $ PacketData $ BS.pack ([50..120] :: [W.Word8])
 
 -- main function which prints the fate of the next packet
-main = print $ lengthErrorCheck getNextPacket
+main = print $ validatePacket getNextPacket
 
 {-
 
