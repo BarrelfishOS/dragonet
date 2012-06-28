@@ -32,12 +32,6 @@ data UnknownPacket = UnknownPacket {
     packetData :: PacketData
     } deriving (Show, Eq)
 
--- Invalid packet with reason for invalidation
-data InvalidPacket = InvalidPacket {
-    invalidData :: PacketData
-    , reason :: String
-    } deriving (Show, Eq)
-
 -- Ethernet packet
 data EthernetPacket = EthernetPacket {
     srcAddr :: EtherAddr
@@ -45,25 +39,28 @@ data EthernetPacket = EthernetPacket {
     , pktLen  :: W.Word16
     , payload :: PacketData
     , pktCRC :: [W.Word8]
-    , pktType :: Integer
+    , originalPkt :: UnknownPacket
     } deriving (Show, Eq)
 
--- Union of different valid packets
-data MyPacket = EtherPkt EthernetPacket
-            | InvalidPkt InvalidPacket
+data L2Packet = BroadcastPkt EthernetPacket
+              | UnicastPkt EthernetPacket
+              | MulticastPkt EthernetPacket
+              | InvalidPktL2 {
+                    invalidPktL2 :: EthernetPacket
+                    , reasonL2 :: String
+                    }
     deriving (Show, Eq)
 
-
-processPacket :: UnknownPacket -> MyPacket
-processPacket pkt = InvalidPkt $ InvalidPacket (packetData pkt) "test invalid"
-
--- Invalidate the given packet with given error message
-invalidatePacket :: UnknownPacket -> String -> MyPacket
-invalidatePacket pkt msg =
-        InvalidPkt $ InvalidPacket (packetData pkt) msg
+data L3Packet = IPv4Pkt L2Packet
+              | IPv6Pkt L2Packet
+              | InvalidPktL3 {
+                invalidPktL3 :: L2Packet
+                , reasonL3 :: String
+                }
+    deriving (Show, Eq)
 
 -- Checks if the packet has valid CRC checksum
-invalidCRC :: UnknownPacket -> Bool
+invalidCRC :: EthernetPacket -> Bool
 invalidCRC pkt = False -- FIXME: Actually calculate CRC checksum
 
 -- Check if the given address is broadcast or not (ie: ff:ff:ff:ff:ff:ff )
@@ -78,14 +75,6 @@ isMulticastPacket ethAddr = False -- FIXME: actually check if packet is
 -- Check if the given address is anycast or not (ie: belongs to this machine)
 isAnycastPacket :: EtherAddr -> Bool
 isAnycastPacket ethAddr = True
-
--- Check if packet is intented for this machine
-invalidIncoming :: EthernetPacket -> Bool
-invalidIncoming ethPkt
-    | isBroadcastPacket $ dstAddr ethPkt = False
-    | isMulticastPacket $ dstAddr ethPkt = False
-    | isAnycastPacket $ dstAddr ethPkt = False
-    | otherwise = True
 
 -- gets specified part of the payload ([including start, excluding end])
 -- index starts at zero
@@ -111,26 +100,50 @@ toEthernetPkt pkt = let
     , pktLen = convert2Word16 $ BS.unpack $ subList 12 14 $ packetData pkt -- packet length
     , payload = PacketData $ subList 18 (len - 4) $ packetData pkt -- data octates
     , pktCRC = BS.unpack $ subList (len - 4) len $ packetData pkt -- last 4 octets
-    , pktType = 0
+    , originalPkt = pkt
     }
 
 -- Checks if the packet has valid length
 -- FIXME: put the actual values for MAX/MIN ethernet packet sizes
-invalidLength :: UnknownPacket -> Bool
+invalidLength :: EthernetPacket -> Bool
 invalidLength pkt
     | len >= 1532 = True
     | len < 60 = True
     | otherwise = False
-    where len = toInteger $ BS.length $ bytes $ packetData pkt
+    where len = toInteger $ BS.length $ bytes $ packetData $ originalPkt pkt
 
-validatePacket :: UnknownPacket -> MyPacket
-validatePacket pkt
-    | invalidLength pkt = invalidatePacket pkt "invalid packet length"
-    | invalidCRC pkt = invalidatePacket pkt "invalid CRC Checksum"
-    | invalidIncoming ethPkt = invalidatePacket pkt
-                                        "not intented for this machine"
-    | otherwise = EtherPkt ethPkt
-    where ethPkt = toEthernetPkt pkt
+-- Check if packet is intented for this machine
+invalidIncoming :: EthernetPacket -> Bool
+invalidIncoming ethPkt
+    | isBroadcastPacket $ dstAddr ethPkt = False
+    | isMulticastPacket $ dstAddr ethPkt = False
+    | isAnycastPacket $ dstAddr ethPkt = False
+    | otherwise = True
+
+
+toL2Packet :: EthernetPacket -> L2Packet
+toL2Packet ethPkt
+    | isBroadcastPacket $ dstAddr ethPkt = BroadcastPkt ethPkt
+    | isMulticastPacket $ dstAddr ethPkt = MulticastPkt ethPkt
+    | otherwise = UnicastPkt ethPkt
+
+validL2Destination :: L2Packet -> Bool
+validL2Destination (BroadcastPkt ethPkt) = True
+validL2Destination (MulticastPkt ethPkt) = True -- FIXME: add code here
+validL2Destination (UnicastPkt ethPkt) = True -- FIXME: add code here
+validL2Destination (InvalidPktL2 _ _) = False -- maybe Error
+
+
+validateL2Packet :: EthernetPacket -> L2Packet
+validateL2Packet ethPkt
+    | invalidLength ethPkt = InvalidPktL2 { invalidPktL2 = ethPkt
+                             , reasonL2 = "invalid packet length" }
+    | invalidCRC ethPkt = InvalidPktL2 { invalidPktL2 = ethPkt
+                             , reasonL2 = "invalid CRC Checksum" }
+    | not $ validL2Destination l2Pkt = InvalidPktL2 { invalidPktL2 = ethPkt
+                             , reasonL2 = "not intented for this machine"}
+    | otherwise = l2Pkt
+    where l2Pkt = toL2Packet ethPkt
 
 -- getNextPacket for processing:  Currently it is generated/hardcoded.
 -- FIXME: Stupid packet, make it more realasitic
@@ -140,7 +153,7 @@ getNextPacket =
    UnknownPacket $ PacketData $ BS.pack ([50..120] :: [W.Word8])
 
 -- main function which prints the fate of the next packet
-main = print $ validatePacket getNextPacket
+main = print $ validateL2Packet $ toEthernetPkt getNextPacket
 
 {-
 
