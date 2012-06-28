@@ -42,6 +42,7 @@ data EthernetPacket = EthernetPacket {
     , originalPkt :: UnknownPacket
     } deriving (Show, Eq)
 
+-- Generic L2 packet type with tags for types
 data L2Packet = BroadcastPkt EthernetPacket
               | UnicastPkt EthernetPacket
               | MulticastPkt EthernetPacket
@@ -51,6 +52,7 @@ data L2Packet = BroadcastPkt EthernetPacket
                     }
     deriving (Show, Eq)
 
+-- L3 packet type
 data L3Packet = IPv4Pkt L2Packet
               | IPv6Pkt L2Packet
               | InvalidPktL3 {
@@ -59,22 +61,7 @@ data L3Packet = IPv4Pkt L2Packet
                 }
     deriving (Show, Eq)
 
--- Checks if the packet has valid CRC checksum
-invalidCRC :: EthernetPacket -> Bool
-invalidCRC pkt = False -- FIXME: Actually calculate CRC checksum
-
--- Check if the given address is broadcast or not (ie: ff:ff:ff:ff:ff:ff )
-isBroadcastPacket :: EtherAddr -> Bool
-isBroadcastPacket ethAddr = ( ethAddr == EtherAddr (BS.replicate 6 0xff) )
-
--- Check if packet is multicast
--- ie: belongs to one of the group to which this machine belongs
-isMulticastPacket :: EtherAddr -> Bool
-isMulticastPacket ethAddr = False -- FIXME: actually check if packet is
-
--- Check if the given address is anycast or not (ie: belongs to this machine)
-isAnycastPacket :: EtherAddr -> Bool
-isAnycastPacket ethAddr = True
+-- #################### Ethernet packet parsing ####################
 
 -- gets specified part of the payload ([including start, excluding end])
 -- index starts at zero
@@ -95,16 +82,30 @@ toEthernetPkt :: UnknownPacket -> EthernetPacket
 toEthernetPkt pkt = let
     len = BS.length $ bytes $ packetData pkt in
     EthernetPacket {
-    srcAddr = EtherAddr $ subList 0 6 $ packetData pkt --first 6 octets
-    , dstAddr = EtherAddr $ subList 6 12 $ packetData pkt -- next 6 octets
-    , pktLen = convert2Word16 $ BS.unpack $ subList 12 14 $ packetData pkt -- packet length
-    , payload = PacketData $ subList 18 (len - 4) $ packetData pkt -- data octates
-    , pktCRC = BS.unpack $ subList (len - 4) len $ packetData pkt -- last 4 octets
-    , originalPkt = pkt
+        --srcAddr = first 6 octets
+        srcAddr = EtherAddr $ subList 0 6 $ packetData pkt
+        -- dstAddr = next 6 octets
+        , dstAddr = EtherAddr $ subList 6 12 $ packetData pkt
+        -- packet length
+        , pktLen =convert2Word16 $ BS.unpack $ subList 12 14 $ packetData pkt
+        -- data octates
+        , payload = PacketData $ subList 18 (len - 4) $ packetData pkt
+        -- last 4 octets
+        , pktCRC = BS.unpack $ subList (len - 4) len $ packetData pkt
+        -- Original packet (for reference purposes)
+        , originalPkt = pkt
     }
+
+
+-- #################### Ethernet packet validation ####################
+--
+-- Checks if the packet has valid CRC checksum
+invalidCRC :: EthernetPacket -> Bool
+invalidCRC pkt = False -- FIXME: Actually calculate CRC checksum
 
 -- Checks if the packet has valid length
 -- FIXME: put the actual values for MAX/MIN ethernet packet sizes
+-- FIXME: Use length from Ethernet header instead of array length
 invalidLength :: EthernetPacket -> Bool
 invalidLength pkt
     | len >= 1532 = True
@@ -112,28 +113,48 @@ invalidLength pkt
     | otherwise = False
     where len = toInteger $ BS.length $ bytes $ packetData $ originalPkt pkt
 
--- Check if packet is intented for this machine
-invalidIncoming :: EthernetPacket -> Bool
-invalidIncoming ethPkt
-    | isBroadcastPacket $ dstAddr ethPkt = False
-    | isMulticastPacket $ dstAddr ethPkt = False
-    | isAnycastPacket $ dstAddr ethPkt = False
-    | otherwise = True
 
+-- Check if the given address is broadcast or not (ie: ff:ff:ff:ff:ff:ff )
+isBroadcastPacket :: EtherAddr -> Bool
+isBroadcastPacket ethAddr = ( ethAddr == EtherAddr (BS.replicate 6 0xff) )
 
+-- Check if packet is multicast
+-- ie: belongs to one of the group to which this machine belongs
+isMulticastPacket :: EtherAddr -> Bool
+isMulticastPacket ethAddr = False -- FIXME: actually check if packet is
+
+-- Classify L2 packet into Uni/Multi/Broadcast type
 toL2Packet :: EthernetPacket -> L2Packet
 toL2Packet ethPkt
     | isBroadcastPacket $ dstAddr ethPkt = BroadcastPkt ethPkt
     | isMulticastPacket $ dstAddr ethPkt = MulticastPkt ethPkt
     | otherwise = UnicastPkt ethPkt
 
+-- Check if the given address belongs to this machine
+isMyUnicastAddr :: EtherAddr -> Bool
+isMyUnicastAddr ethAddr =
+        -- FIXME: Check given address in list of NIC MAC addresses
+        True
+
+-- Check if the given address belongs to this machine
+isMyMulticastGroupAddr :: EtherAddr -> Bool
+isMyMulticastGroupAddr ethAddr =
+        -- FIXME: Check given address in list of groups this NIC is member of
+        True
+
+
+-- Classified L2 packet will be checked if it belongs to this machine or not
 validL2Destination :: L2Packet -> Bool
 validL2Destination (BroadcastPkt ethPkt) = True
-validL2Destination (MulticastPkt ethPkt) = True -- FIXME: add code here
-validL2Destination (UnicastPkt ethPkt) = True -- FIXME: add code here
-validL2Destination (InvalidPktL2 _ _) = False -- maybe Error
+validL2Destination (MulticastPkt ethPkt) =
+                                    isMyMulticastGroupAddr $ dstAddr ethPkt
+validL2Destination (UnicastPkt ethPkt) = isMyUnicastAddr $ dstAddr ethPkt
+validL2Destination (InvalidPktL2 _ _) = False
+    --  error "should not happen!!"
+    -- As packet is not validated yet, it can't be marked as invalid
 
-
+-- Validate given Ethernet packet and convert it into L2Packet for
+-- further processing
 validateL2Packet :: EthernetPacket -> L2Packet
 validateL2Packet ethPkt
     | invalidLength ethPkt = InvalidPktL2 { invalidPktL2 = ethPkt
@@ -145,6 +166,10 @@ validateL2Packet ethPkt
     | otherwise = l2Pkt
     where l2Pkt = toL2Packet ethPkt
 
+
+
+-- #################### Packet generator ####################
+
 -- getNextPacket for processing:  Currently it is generated/hardcoded.
 -- FIXME: Stupid packet, make it more realasitic
 getNextPacket :: UnknownPacket
@@ -152,8 +177,12 @@ getNextPacket =
 --   UnknownPacket $ PacketData $ BS.pack (replicate 64 (53 :: W.Word8))
    UnknownPacket $ PacketData $ BS.pack ([50..120] :: [W.Word8])
 
+-- #################### Main module ####################
+
 -- main function which prints the fate of the next packet
 main = print $ validateL2Packet $ toEthernetPkt getNextPacket
+
+-- #################### EOF ####################
 
 {-
 
