@@ -57,16 +57,27 @@ data L2Packet = BroadcastPkt EthernetPacket
 -- #################### L3 packet ####################
 -- IPv4Packet
 data IPv4Packet = IPv4Packet {
-    srcIP :: IPAddr
-    , dstIP :: IPAddr
-    , protocol :: W.Word8
-    , headerChecksum :: [W.Word8]
-    , originalL2 :: L2Packet
+    srcIPv4 :: IPAddr
+    , dstIPv4 :: IPAddr
+    , protocolv4 :: W.Word8
+    , headerChecksumv4 :: [W.Word8]
+    , originalL2v4 :: L2Packet
     } deriving (Show, Eq)
 
+-- IPv6Packet
+data IPv6Packet = IPv6Packet {
+    srcIPv6 :: IPAddr
+    , dstIPv6 :: IPAddr
+    , protocolv6 :: W.Word8
+    , originalL2v6 :: L2Packet
+    } deriving (Show, Eq)
+
+data IPPacket = IPv4 IPv4Packet
+            | IPv6 IPv6Packet
+
 -- L3 packet type
-data L3Packet = IPv4Pkt L2Packet
-              | IPv6Pkt L2Packet
+data L3Packet = IPv4Pkt IPv4Packet
+              | IPv6Pkt IPv6Packet
               | InvalidPktL3 {
                 invalidPktL3 :: L2Packet
                 , reasonL3 :: String
@@ -196,31 +207,49 @@ getL2Payload (MulticastPkt ethPkt) = payload ethPkt
 getL2Payload (InvalidPktL2 ethPkt _) =
                     error "invalid L2 packet in L3 processing"
 
-{-
--- Check if given protocol is IPv4
-isIPv4 :: PacketData -> Bool
-isIPv4 l2payload =
-    convert2Word32 $ subList 0 4 l2payload
-
 -- #################### L3 packet parsing ####################
+
+-- Get the version of L3 protocol used
+getIPVersion :: PacketData -> W.Word8
+getIPVersion l2payload =
+                Bits.shiftR ((BS.unpack $ bytes l2payload)!!0) 4
+
 toL3Layer :: L2Packet -> L3Packet
-toL3Layer l2Pkt
-    | isIPv4 l2Payload
+toL3Layer l2Pkt =
+    case (getIPVersion l2Payload) of
+        4 -> IPv4Pkt IPv4Packet {
+                srcIPv4 = IPAddr $ subList 12 16 $ l2Payload
+                , dstIPv4 = IPAddr $ subList 16 20 $ l2Payload
+                , protocolv4 = (BS.unpack $ bytes l2Payload) !! 9
+                , headerChecksumv4 =
+                            BS.unpack $ subList 10 12 $ l2Payload
+                , originalL2v4 = l2Pkt
+            }
+        6 -> IPv6Pkt IPv6Packet {
+                srcIPv6 = IPAddr $ subList 12 16 $ l2Payload
+                , dstIPv6 = IPAddr $ subList 16 20 $ l2Payload
+                , protocolv6 = (BS.unpack $ bytes l2Payload) !! 9
+                , originalL2v6 = l2Pkt
+            }
+        _ -> InvalidPktL3 {
+                invalidPktL3 = l2Pkt
+                , reasonL3 = "Invalid L3 protocol type"
+            }
     where l2Payload = getL2Payload l2Pkt
--}
+
 -- #################### Packet generator ####################
 
 -- getNextPacket for processing:  Currently it is generated/hardcoded.
 -- FIXME: Stupid packet, make it more realasitic
 getNextPacket :: UnknownPacket
 getNextPacket =
---   UnknownPacket $ PacketData $ BS.pack (replicate 64 (53 :: W.Word8))
    UnknownPacket $ PacketData $ BS.pack ([50..120] :: [W.Word8])
 
 -- #################### Main module ####################
 
 -- main function which prints the fate of the next packet
-main = print $ validateL2Packet $ toEthernetPkt getNextPacket
+main = print $ toL3Layer $ validateL2Packet
+                $ toEthernetPkt getNextPacket
 
 -- #################### EOF ####################
 
