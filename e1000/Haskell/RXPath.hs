@@ -237,6 +237,46 @@ toL3Layer l2Pkt =
             }
     where l2Payload = getL2Payload l2Pkt
 
+-- Validates the checksum of IPv4 packet
+-- FIXME: Currently it assumes that checksum is correct
+checksumIPv4 :: IPv4Packet -> Bool
+checksumIPv4 ipv4Pkt = True
+
+-- invalidates the packet if the IPv4 checksum is wrong
+ipv4ValidateChecksum :: IPv4Packet -> L3Packet
+ipv4ValidateChecksum ipv4Pkt =
+    case (checksumIPv4 ipv4Pkt) of
+        True -> IPv4Pkt ipv4Pkt
+        False -> InvalidPktL3 {
+                    invalidPktL3 = originalL2v4 ipv4Pkt
+                    , reasonL3 = "Invalid checksum"
+                }
+
+
+-- Validate "something/everything" about IPv6 packet
+-- FIXME: Currently it assumes that packet is correct
+checkSomethingIPv6 :: IPv6Packet -> Bool
+checkSomethingIPv6 ipv6Pkt = True
+
+-- invalidates the packet if something is wrong with IPv6 packet
+ipv6ValidateSomething :: IPv6Packet -> L3Packet
+ipv6ValidateSomething ipv6Pkt =
+    case (checkSomethingIPv6 ipv6Pkt) of
+        True -> IPv6Pkt ipv6Pkt
+        False -> InvalidPktL3 {
+                    invalidPktL3 = originalL2v6 ipv6Pkt
+                    , reasonL3 = "Something is invalid!"
+                }
+
+-- validate L3 level of packet
+validateL3Packet :: L3Packet -> L3Packet
+validateL3Packet (IPv4Pkt ipv4Pkt) = ipv4ValidateChecksum ipv4Pkt
+validateL3Packet (IPv6Pkt ipv6Pkt) = ipv6ValidateSomething ipv6Pkt
+validateL3Packet (InvalidPktL3 invalidpktl3 reasonl3) = InvalidPktL3 {
+        invalidPktL3 = invalidpktl3
+        , reasonL3 = reasonl3
+        }
+
 -- #################### Packet generator ####################
 
 -- getNextPacket for processing:  Currently it is generated/hardcoded.
@@ -248,7 +288,7 @@ getNextPacket =
 -- #################### Main module ####################
 
 -- main function which prints the fate of the next packet
-main = print $ toL3Layer $ validateL2Packet
+main = print $ validateL3Packet $ toL3Layer $ validateL2Packet
                 $ toEthernetPkt getNextPacket
 
 -- #################### EOF ####################
