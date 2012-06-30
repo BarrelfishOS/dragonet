@@ -22,6 +22,7 @@ import qualified Data.Maybe
 -- Ethernet address
 data EtherAddr = EtherAddr BS.ByteString deriving (Show, Eq)
 data IPAddr = IPAddr BS.ByteString deriving (Show, Eq)
+data PortNo = PortNo W.Word16 deriving (Show, Eq)
 
 -- Contents of packet
 data PacketData = PacketData {
@@ -55,27 +56,26 @@ data L2Packet = BroadcastPkt EthernetPacket
     deriving (Show, Eq)
 
 -- #################### L3 packet ####################
--- IPv4Packet
+-- For IPv4 protocol
 data IPv4Packet = IPv4Packet {
     srcIPv4 :: IPAddr
     , dstIPv4 :: IPAddr
     , protocolv4 :: W.Word8
     , headerChecksumv4 :: [W.Word8]
+    , payloadL3v4 :: PacketData
     , originalL2v4 :: L2Packet
     } deriving (Show, Eq)
 
--- IPv6Packet
+-- For IPv6 protocol
 data IPv6Packet = IPv6Packet {
     srcIPv6 :: IPAddr
     , dstIPv6 :: IPAddr
     , protocolv6 :: W.Word8
+    , payloadL3v6 :: PacketData
     , originalL2v6 :: L2Packet
     } deriving (Show, Eq)
 
-data IPPacket = IPv4 IPv4Packet
-            | IPv6 IPv6Packet
-
--- L3 packet type
+-- L3 packet type which groups together ipv4, ipv6 and invalid packets
 data L3Packet = IPv4Pkt IPv4Packet
               | IPv6Pkt IPv6Packet
               | InvalidPktL3 {
@@ -83,6 +83,48 @@ data L3Packet = IPv4Pkt IPv4Packet
                 , reasonL3 :: String
                 }
     deriving (Show, Eq)
+
+-- #################### L4 packet ####################
+
+-- Unreliable datagram protocol (UDP)
+data UDPPacket =  UDPPacket {
+    srcPortUDP :: PortNo
+    , dstPortUDP :: PortNo
+    , checksumUDP :: [W.Word8]
+    , payloadUDP :: PacketData
+    , originalL3UDP :: L3Packet
+    } deriving (Show, Eq)
+
+-- Reliable streaming protocol (TCP)
+data TCPPacket =  TCPPacket {
+    srcPortTCP :: PortNo
+    , dstPortTCP :: PortNo
+    , flagsTCP :: W.Word8
+    , checksumTCP :: [W.Word8]
+    , payloadTCP :: PacketData
+    , originalL3TCP :: L3Packet
+    } deriving (Show, Eq)
+
+-- Other protocols
+data OtherL4Packet = OtherL4Packet {
+    payloadOtherL4 :: PacketData
+    , originalL3OtherL4 :: L3Packet
+    } deriving (Show, Eq)
+
+
+-- L4 packet type which groups together TCP, UDP and Other protocols
+data L4BasePacket = UDPPkt UDPPacket
+            | TCPPkt TCPPacket
+            | OtherL4Pkt OtherL4Packet
+    deriving (Show, Eq)
+
+
+-- L4 packet recording invalid packets
+data L4Packet =  L4BasePkt L4BasePacket
+            | InvalidPktL4 {
+                invalidPktL4 :: L4BasePacket
+                , reasonL4 :: String }
+        deriving (Show, Eq)
 
 -- #################### Ethernet packet parsing ####################
 
@@ -223,12 +265,16 @@ toL3Layer l2Pkt =
                 , protocolv4 = (BS.unpack $ bytes l2Payload) !! 9
                 , headerChecksumv4 =
                             BS.unpack $ subList 10 12 $ l2Payload
+                , payloadL3v4 = PacketData $ BS.drop 20
+                                    $ bytes l2Payload
                 , originalL2v4 = l2Pkt
             }
         6 -> IPv6Pkt IPv6Packet {
                 srcIPv6 = IPAddr $ subList 12 16 $ l2Payload
                 , dstIPv6 = IPAddr $ subList 16 20 $ l2Payload
                 , protocolv6 = (BS.unpack $ bytes l2Payload) !! 9
+                , payloadL3v6 = PacketData $ BS.drop 20 $ bytes l2Payload
+                -- FIXME: Find out proper value for IPv6 payload start
                 , originalL2v6 = l2Pkt
             }
         _ -> InvalidPktL3 {
@@ -276,6 +322,62 @@ validateL3Packet (InvalidPktL3 invalidpktl3 reasonl3) = InvalidPktL3 {
         invalidPktL3 = invalidpktl3
         , reasonL3 = reasonl3
         }
+
+
+-- Get payload from L3 packet
+getL3Payload :: L3Packet -> PacketData
+getL3Payload (IPv4Pkt ipv4Pkt) = payloadL3v4 ipv4Pkt
+getL3Payload (IPv6Pkt ipv6Pkt) = payloadL3v6 ipv6Pkt
+getL3Payload (InvalidPktL3 _ _) =
+                    error "invalid L3 packet in L4 processing"
+
+-- Get L4 protocol from L3 packet
+getL4Protocol :: L3Packet -> W.Word8
+getL4Protocol (IPv4Pkt ipv4Pkt) = protocolv4 ipv4Pkt
+getL4Protocol (IPv6Pkt ipv6Pkt) = protocolv6 ipv6Pkt
+getL4Protocol (InvalidPktL3 _ _) =
+                    error "invalid L3 packet in L4 processing"
+
+
+-- #################### L4 packet parsing ####################
+
+-- Convert given L3 packet into L4 packet
+toL4Layer :: L3Packet -> L4BasePacket
+toL4Layer l3Pkt =
+    case (getL4Protocol l3Pkt) of
+        -- UDP protocol
+        77 -> UDPPkt UDPPacket {
+                srcPortUDP = PortNo $ convert2Word16 $ BS.unpack
+                    $ subList 0 2 l3Payload
+                , dstPortUDP = PortNo $ convert2Word16 $ BS.unpack
+                    $ subList 2 4 l3Payload
+                , checksumUDP = BS.unpack $ subList 6 8 l3Payload
+                , payloadUDP = PacketData $ BS.drop 8
+                                    $ bytes l3Payload
+                , originalL3UDP = l3Pkt
+            }
+        -- TCP protocol
+        78 -> TCPPkt TCPPacket {
+                srcPortTCP = PortNo $ convert2Word16 $ BS.unpack
+                    $ subList 0 2 $ l3Payload
+                , dstPortTCP = PortNo $ convert2Word16 $ BS.unpack
+                    $ subList 2 4 $ l3Payload
+                , flagsTCP = (BS.unpack $ subList 13 14 l3Payload)!!1
+                , checksumTCP = BS.unpack $ subList 16 18 l3Payload
+                , payloadTCP = PacketData $ BS.drop 20
+                                    $ bytes l3Payload
+                , originalL3TCP = l3Pkt
+            }
+
+        -- Other protocols
+        _ -> OtherL4Pkt OtherL4Packet {
+                payloadOtherL4 = PacketData $ bytes l3Payload
+                , originalL3OtherL4 = l3Pkt
+            }
+    where l3Payload = getL3Payload l3Pkt
+
+-- Validate the given L4Base packet
+--validateL4Packet :: L4BasePacket -> L4Packet
 
 -- #################### Packet generator ####################
 
