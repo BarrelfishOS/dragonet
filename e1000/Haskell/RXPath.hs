@@ -376,8 +376,65 @@ toL4Layer l3Pkt =
             }
     where l3Payload = getL3Payload l3Pkt
 
+
+-- ------------------------ UDP protocol --------------------
+
+-- Validates the checksum of UDP packet
+-- FIXME: Currently it assumes that checksum is correct
+checkUDPChecksum :: UDPPacket -> Bool
+checkUDPChecksum udpPkt = True
+
+-- invalidates the packet if the UDP checksum is wrong
+udpValidateChecksum :: UDPPacket -> L4Packet
+udpValidateChecksum udpPkt =
+    case (checkUDPChecksum udpPkt) of
+        True ->  L4BasePkt $ UDPPkt udpPkt
+        False -> InvalidPktL4 {
+                    invalidPktL4 = UDPPkt udpPkt
+                    , reasonL4 = "Invalid UDP checksum"
+                }
+
+
+-- Validate UDP packet
+-- Currently only one test is there, but more can be easily added
+validateUDPPacket :: UDPPacket -> L4Packet
+validateUDPPacket udpPkt = udpValidateChecksum udpPkt
+
+-- ------------------------ TCP protocol --------------------
+
+-- Validates the checksum of TCP packet
+-- FIXME: Currently it assumes that checksum is correct
+checkTCPChecksum :: TCPPacket -> Bool
+checkTCPChecksum tcpPkt = True
+
+-- invalidates the packet if the TCP checksum is wrong
+tcpValidateChecksum :: TCPPacket -> L4Packet
+tcpValidateChecksum tcpPkt =
+    case (checkTCPChecksum tcpPkt) of
+        True ->  L4BasePkt $ TCPPkt tcpPkt
+        False -> InvalidPktL4 {
+                    invalidPktL4 = TCPPkt tcpPkt
+                    , reasonL4 = "Invalid TCP checksum"
+                }
+
+
+-- Validate TCP packet
+-- Currently only one test is there, but more can be easily added
+validateTCPPacket :: TCPPacket -> L4Packet
+validateTCPPacket tcpPkt = tcpValidateChecksum tcpPkt
+
+-- ------------------------ Other L4 level protocols ---------------
+
+-- Validate packets of other protocols
+-- Currently there are no tests, but they can be easily added.
+validateOtherL4Packet :: OtherL4Packet -> L4Packet
+validateOtherL4Packet otherPkt = L4BasePkt $ OtherL4Pkt otherPkt
+
 -- Validate the given L4Base packet
---validateL4Packet :: L4BasePacket -> L4Packet
+validateL4Packet :: L4BasePacket -> L4Packet
+validateL4Packet (UDPPkt udpPkt) = validateUDPPacket udpPkt
+validateL4Packet (TCPPkt tcpPkt) = validateTCPPacket tcpPkt
+validateL4Packet (OtherL4Pkt otherPkt) = validateOtherL4Packet otherPkt
 
 -- #################### Packet generator ####################
 
@@ -390,8 +447,9 @@ getNextPacket =
 -- #################### Main module ####################
 
 -- main function which prints the fate of the next packet
-main = print $ validateL3Packet $ toL3Layer $ validateL2Packet
-                $ toEthernetPkt getNextPacket
+main = print $ validateL4Packet $ toL4Layer
+             $ validateL3Packet $ toL3Layer
+             $ validateL2Packet $ toEthernetPkt getNextPacket
 
 -- #################### EOF ####################
 
