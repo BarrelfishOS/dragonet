@@ -19,6 +19,7 @@ import qualified Data.Word as W
 import qualified Data.Bits as Bits
 import qualified Data.Maybe
 
+
 -- Ethernet address
 data EtherAddr = EtherAddr BS.ByteString deriving (Show, Eq)
 data IPAddr = IPAddr BS.ByteString deriving (Show, Eq)
@@ -28,6 +29,9 @@ data PortNo = PortNo W.Word16 deriving (Show, Eq)
 data PacketData = PacketData {
         bytes :: BS.ByteString
         } deriving (Show, Eq)
+
+-- type for hash of PacketData
+type Hash = Integer
 
 -- unclassified/unprocessed packet
 data UnknownPacket = UnknownPacket {
@@ -125,6 +129,14 @@ data L4Packet =  L4BasePkt L4BasePacket
                 invalidPktL4 :: L4BasePacket
                 , reasonL4 :: String }
         deriving (Show, Eq)
+
+
+-- #################### Redirection table ####################
+type Index = Integer
+type QueueID = Integer
+type CoreID = Integer
+type RedirectTbl = [(QueueID, CoreID)]
+
 
 -- #################### Ethernet packet parsing ####################
 
@@ -436,6 +448,72 @@ validateL4Packet (UDPPkt udpPkt) = validateUDPPacket udpPkt
 validateL4Packet (TCPPkt tcpPkt) = validateTCPPacket tcpPkt
 validateL4Packet (OtherL4Pkt otherPkt) = validateOtherL4Packet otherPkt
 
+-- #################### Packet validation ####################
+
+-- Validate given packet
+validatePacket :: UnknownPacket -> L4Packet
+validatePacket pkt = validateL4Packet $ toL4Layer
+             $ validateL3Packet $ toL3Layer
+             $ validateL2Packet $ toEthernetPkt pkt
+
+
+
+-- #################### Packet classification ####################
+
+-- logic for hashing the byte array
+-- Currently, it just adds all bytes to get the hash
+-- FIXME: Dummy hash function
+hashSum :: [W.Word8] -> Hash
+hashSum [] = 0
+hashSum (x:xs) = (fromIntegral x) + (hashSum xs)
+
+-- hash the given packet data
+hashPacketData :: PacketData -> Hash
+hashPacketData pktData = hashSum $ BS.unpack $ bytes pktData
+
+-- Hashes UDP packet
+hashUDPPacket :: UDPPacket -> Hash
+hashUDPPacket udpPkt = hashPacketData $ payloadUDP udpPkt
+
+-- Hashes TCP packet
+hashTCPPacket :: TCPPacket -> Hash
+hashTCPPacket tcpPkt = hashPacketData $ payloadTCP tcpPkt
+
+-- Hashes other types of packets
+hashOtherL4Packet :: OtherL4Packet -> Hash
+hashOtherL4Packet othrL4Pkt = hashPacketData $ payloadOtherL4 othrL4Pkt
+
+-- Return the hash for L4 level packets
+hashL4Packet :: L4BasePacket -> Hash
+hashL4Packet (UDPPkt udpPkt) = hashUDPPacket udpPkt
+hashL4Packet (TCPPkt tcpPkt) = hashTCPPacket tcpPkt
+hashL4Packet (OtherL4Pkt othrL4Pkt) = hashOtherL4Packet othrL4Pkt
+
+-- Hash given packet, if packet is invalid, then raise error
+hashPacket :: L4Packet -> Hash
+hashPacket (L4BasePkt l4Pkt) = hashL4Packet l4Pkt
+hashPacket (InvalidPktL4 _ _) = error "hashing invalid pkt"
+
+
+-- Given hash, convert into an index for Redirection Table
+-- This function will use last 5 bits of the hash
+hashToIndex :: Hash -> Index
+hashToIndex hash = fromIntegral (hash `mod` 127)
+
+-- For given lookup-table and hash, give the QueueID to which packet should go
+lookupQueueInRedirectionTable :: RedirectTbl -> Hash -> QueueID
+lookupQueueInRedirectionTable redirectionTable hash_value =
+        toInteger ( fst (redirectionTable!!
+                (fromIntegral $ hashToIndex hash_value)))
+
+-- For given lookup-table and hash, give the core which should
+-- receive the notification
+lookupCoreInRedirectionTable :: RedirectTbl -> Hash -> CoreID
+lookupCoreInRedirectionTable redirectionTable hash_value =
+        toInteger ( snd (redirectionTable!!
+                (fromIntegral $ hashToIndex hash_value)))
+
+
 -- #################### Packet generator ####################
 
 -- getNextPacket for processing:  Currently it is generated/hardcoded.
@@ -447,9 +525,17 @@ getNextPacket =
 -- #################### Main module ####################
 
 -- main function which prints the fate of the next packet
-main = print $ validateL4Packet $ toL4Layer
-             $ validateL3Packet $ toL3Layer
-             $ validateL2Packet $ toEthernetPkt getNextPacket
+-- main = print $ validatePacket getNextPacket
+main = print $ (show l4Pkt)
+           ++  ", Hash is " ++ (show hash)
+           ++ ", Selected queue is " ++ (show queue)
+           ++ ", Selected core is " ++ (show core)
+    where
+        redirectionTable = replicate 127 (1, 1)
+        l4Pkt = validatePacket getNextPacket
+        hash = hashPacket l4Pkt
+        queue = lookupQueueInRedirectionTable redirectionTable hash
+        core = lookupCoreInRedirectionTable redirectionTable hash
 
 -- #################### EOF ####################
 
@@ -467,8 +553,8 @@ Combined data type,
 
 type Packet = [Integer]
 type Hash = Integer
-type QueueID = Integer
 type Index = Int
+type QueueID = Integer
 type CoreID = Integer
 type RedirectTbl = [(QueueID, CoreID)]
 
