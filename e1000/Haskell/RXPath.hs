@@ -449,12 +449,12 @@ validateL4Packet (OtherL4Pkt otherPkt) = validateOtherL4Packet otherPkt
 -- #################### Packet validation ####################
 
 -- Validate given packet
-validatePacket :: UnknownPacket -> L4Packet
-validatePacket pkt = validateL4Packet $ toL4Layer
-             $ validateL3Packet $ toL3Layer
-             $ validateL2Packet $ toEthernetPkt pkt
-
-
+validatePacket ::NS.NICState -> UnknownPacket -> (NS.NICState, L4Packet)
+validatePacket nicState pkt = (ns, l4Pkt) where
+                l4Pkt = validateL4Packet $ toL4Layer
+                        $ validateL3Packet $ toL3Layer
+                        $ validateL2Packet $ toEthernetPkt pkt
+                ns = NS.incrementPacketCount nicState
 
 -- #################### Packet classification ####################
 
@@ -509,11 +509,13 @@ main = print $ (show l4Pkt)
            ++  ", Hash is " ++ (show hash)
            ++ ", Selected queue is " ++ (show queue)
            ++ ", Selected core is " ++ (show core)
+           ++ ", no. of packets processed " ++ (show pktCount)
     where
         nicState = NS.initNICState
-        l4Pkt = validatePacket getNextPacket
+        (nicState2, l4Pkt) = validatePacket nicState getNextPacket
         hash = hashPacket l4Pkt
-        queue = NS.lookupQueue nicState hash
-        core = NS.lookupCore nicState hash
+        queue = NS.lookupQueue nicState2 hash
+        core = NS.lookupCore nicState2 hash
+        pktCount = NS.packetCount nicState2
 
 -- #################### EOF ####################

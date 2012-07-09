@@ -17,8 +17,10 @@ module NICState (
     , initNICState
     , controlMultiQueue
     , updateQueueElement
+    , incrementPacketCount
     , lookupQueue
     , lookupCore
+    , packetCount
 ) where
 
 -- import qualified Data.Map as Map
@@ -38,6 +40,7 @@ data QueueState = QueueState {
 data NICState = NICState {
         queueState ::[QueueState]
         , useMultiQueue :: Bool
+        , packetCount :: Integer
     } deriving (Show, Eq)
 
 
@@ -59,6 +62,7 @@ initNICState :: NICState
 initNICState = NICState {
             queueState = replicate (fromInteger getQueueCount) getDefaultQueue
             , useMultiQueue = False
+            , packetCount = 0
        }
 
 -- Controls MultiQueue by turning it on or off
@@ -84,6 +88,12 @@ updateQueueElement nicState idx qState = nicState {
                     }
 
 
+incrementPacketCount :: NICState -> NICState
+incrementPacketCount nicState = nicState {
+                        packetCount = ((packetCount nicState) + 1)
+                    }
+
+
 -- Given hash, convert into an index for Redirection Table
 -- This function will use last x bits of the hash (based on no. of queues)
 hashToIndex :: Hash -> Index
@@ -96,8 +106,6 @@ lookupHash nicState hash = (queueState nicState) !! idx
     where
         idx = fromInteger $ hashToIndex hash
 
-
--- ##################### Dealing with NIC state ###########
 
 -- For given lookup-table and hash, give the QueueID to which packet should go
 lookupQueue :: NICState -> Hash -> QueueID
