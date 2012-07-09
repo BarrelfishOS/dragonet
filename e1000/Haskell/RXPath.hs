@@ -501,21 +501,31 @@ getNextPacket :: UnknownPacket
 getNextPacket =
    UnknownPacket $ PacketData $ BS.pack ([50..120] :: [W.Word8])
 
+-- Provides the decisions made on next packet as String
+handleNextPacket :: NS.NICState -> (NS.NICState, [Char])
+handleNextPacket nicState = (nicState', output) where
+            (nicState', l4Pkt) = validatePacket nicState getNextPacket
+            hash = hashPacket l4Pkt
+            queue = NS.lookupQueue nicState' hash
+            core = NS.lookupCore nicState' hash
+            pktCount = NS.packetCount nicState'
+            output = " ["
+                ++ (show l4Pkt)
+                ++  ", Hash is " ++ (show hash)
+                ++ ", Selected queue is " ++ (show queue)
+                ++ ", Selected core is " ++ (show core)
+                ++ ", no. of packets processed " ++ (show pktCount)
+                ++ "]\n\n\n\n\n"
+
 -- #################### Main module ####################
 
 -- main function which prints the fate of the next packet
 -- main = print $ validatePacket getNextPacket
-main = print $ (show l4Pkt)
-           ++  ", Hash is " ++ (show hash)
-           ++ ", Selected queue is " ++ (show queue)
-           ++ ", Selected core is " ++ (show core)
-           ++ ", no. of packets processed " ++ (show pktCount)
+main = print $ out1 ++ out2 ++ out3
     where
         nicState = NS.initNICState
-        (nicState2, l4Pkt) = validatePacket nicState getNextPacket
-        hash = hashPacket l4Pkt
-        queue = NS.lookupQueue nicState2 hash
-        core = NS.lookupCore nicState2 hash
-        pktCount = NS.packetCount nicState2
+        (nicState', out1) = handleNextPacket nicState
+        (nicState'', out2) = handleNextPacket nicState'
+        (nicState''', out3) = handleNextPacket nicState''
 
 -- #################### EOF ####################
