@@ -18,7 +18,8 @@ module NICState (
     , controlMultiQueue
     , updateQueueElement
     , lookupHash
-
+    , queueID
+    , coreID
 ) where
 
 -- import qualified Data.Map as Map

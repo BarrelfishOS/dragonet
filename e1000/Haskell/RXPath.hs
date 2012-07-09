@@ -506,18 +506,15 @@ hashToIndex :: Hash -> Index
 hashToIndex hash = fromIntegral (hash `mod` 127)
 
 -- For given lookup-table and hash, give the QueueID to which packet should go
-lookupQueueInRedirectionTable :: RedirectTbl -> Hash -> QueueID
-lookupQueueInRedirectionTable redirectionTable hash_value =
-        toInteger ( fst (redirectionTable!!
-                (fromIntegral $ hashToIndex hash_value)))
+lookupQueueInRedirectionTable :: NS.NICState -> Hash -> QueueID
+lookupQueueInRedirectionTable nicState hash_value =
+       NS.queueID (NS.lookupHash nicState hash_value)
 
 -- For given lookup-table and hash, give the core which should
 -- receive the notification
-lookupCoreInRedirectionTable :: RedirectTbl -> Hash -> CoreID
-lookupCoreInRedirectionTable redirectionTable hash_value =
-        toInteger ( snd (redirectionTable!!
-                (fromIntegral $ hashToIndex hash_value)))
-
+lookupCoreInRedirectionTable :: NS.NICState -> Hash -> QueueID
+lookupCoreInRedirectionTable nicState hash_value =
+       NS.coreID (NS.lookupHash nicState hash_value)
 
 -- #################### Packet generator ####################
 
@@ -537,10 +534,9 @@ main = print $ (show l4Pkt)
            ++ ", Selected core is " ++ (show core)
     where
         nicState = NS.initNICState
-        redirectionTable = replicate 127 (1, 1)
         l4Pkt = validatePacket getNextPacket
         hash = hashPacket l4Pkt
-        queue = lookupQueueInRedirectionTable redirectionTable hash
-        core = lookupCoreInRedirectionTable redirectionTable hash
+        queue = lookupQueueInRedirectionTable nicState hash
+        core = lookupCoreInRedirectionTable nicState hash
 
 -- #################### EOF ####################
