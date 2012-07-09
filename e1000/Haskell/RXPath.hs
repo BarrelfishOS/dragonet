@@ -18,7 +18,6 @@ import qualified Data.Map as Map
 import qualified Data.ByteString as BS
 import qualified Data.Word as W
 import qualified Data.Bits as Bits
-import qualified Data.Maybe
 import qualified NICState as NS
 
 -- Ethernet address
@@ -134,12 +133,8 @@ data L4Packet =  L4BasePkt L4BasePacket
 type QueueID = Integer  -- ID for the hardware queue
 type CoreID = Integer  -- ID for the CPU which can accept notification
 
--- Redirection table holding the mapping between hash values and CPU cores
-type RedirectTbl = [(QueueID, CoreID)]
-
 -- Mechanism to convert hash into index for redirection Table.
 type Hash = Integer -- Hash of the packet
-type Index = Integer -- Index within Redirection Table
 
 -- #################### Ethernet packet parsing ####################
 
@@ -498,24 +493,6 @@ hashPacket (L4BasePkt l4Pkt) = hashL4Packet l4Pkt
 hashPacket (InvalidPktL4 _ _) = error "hashing invalid pkt"
 
 
--- ##################### Dealing with redirection table ###########
-
--- Given hash, convert into an index for Redirection Table
--- This function will use last 5 bits of the hash
-hashToIndex :: Hash -> Index
-hashToIndex hash = fromIntegral (hash `mod` 127)
-
--- For given lookup-table and hash, give the QueueID to which packet should go
-lookupQueueInRedirectionTable :: NS.NICState -> Hash -> QueueID
-lookupQueueInRedirectionTable nicState hash_value =
-       NS.queueID (NS.lookupHash nicState hash_value)
-
--- For given lookup-table and hash, give the core which should
--- receive the notification
-lookupCoreInRedirectionTable :: NS.NICState -> Hash -> QueueID
-lookupCoreInRedirectionTable nicState hash_value =
-       NS.coreID (NS.lookupHash nicState hash_value)
-
 -- #################### Packet generator ####################
 
 -- getNextPacket for processing:  Currently it is generated/hardcoded.
@@ -536,7 +513,7 @@ main = print $ (show l4Pkt)
         nicState = NS.initNICState
         l4Pkt = validatePacket getNextPacket
         hash = hashPacket l4Pkt
-        queue = lookupQueueInRedirectionTable nicState hash
-        core = lookupCoreInRedirectionTable nicState hash
+        queue = NS.lookupQueue nicState hash
+        core = NS.lookupCore nicState hash
 
 -- #################### EOF ####################

@@ -4,9 +4,9 @@
  - lookupHash :: given hash returns table state
  -          if nothing matches, should return default value
  -
- -  addEntry :: for given Hash, add the tuple
+ -  updateQueueElement :: for given index, update the queue assignment
  -
- -  deleteEntry :: for given hash, remove the tuple
+ -  deleteEntry :: for given index, remove mapping from Queue lookup table
  -
  -
 -}
@@ -17,9 +17,8 @@ module NICState (
     , initNICState
     , controlMultiQueue
     , updateQueueElement
-    , lookupHash
-    , queueID
-    , coreID
+    , lookupQueue
+    , lookupCore
 ) where
 
 -- import qualified Data.Map as Map
@@ -86,7 +85,7 @@ updateQueueElement nicState idx qState = nicState {
 
 
 -- Given hash, convert into an index for Redirection Table
--- This function will use last 5 bits of the hash
+-- This function will use last x bits of the hash (based on no. of queues)
 hashToIndex :: Hash -> Index
 hashToIndex hash = fromIntegral (hash `mod` getQueueCount)
 
@@ -96,6 +95,21 @@ lookupHash :: NICState -> Hash -> QueueState
 lookupHash nicState hash = (queueState nicState) !! idx
     where
         idx = fromInteger $ hashToIndex hash
+
+
+-- ##################### Dealing with NIC state ###########
+
+-- For given lookup-table and hash, give the QueueID to which packet should go
+lookupQueue :: NICState -> Hash -> QueueID
+lookupQueue nicState hash_value =
+       queueID (lookupHash nicState hash_value)
+
+-- For given lookup-table and hash, give the core which should
+-- receive the notification
+lookupCore :: NICState -> Hash -> QueueID
+lookupCore nicState hash_value =
+       coreID (lookupHash nicState hash_value)
+
 
 
 {-
