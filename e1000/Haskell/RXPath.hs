@@ -19,6 +19,7 @@ import qualified Data.ByteString as BS
 import qualified Data.Word as W
 import qualified Data.Bits as Bits
 import qualified Data.Maybe
+import qualified NICState as NS
 
 -- Ethernet address
 data EtherAddr = EtherAddr BS.ByteString deriving (Show, Eq)
@@ -535,6 +536,7 @@ main = print $ (show l4Pkt)
            ++ ", Selected queue is " ++ (show queue)
            ++ ", Selected core is " ++ (show core)
     where
+        nicState = NS.initNICState
         redirectionTable = replicate 127 (1, 1)
         l4Pkt = validatePacket getNextPacket
         hash = hashPacket l4Pkt

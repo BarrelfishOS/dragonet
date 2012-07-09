@@ -1,6 +1,6 @@
 
 
-RXPath:	RXPath.hs
+RXPath:	*.hs
 	ghc RXPath.hs -o RXPath -fwarn-incomplete-patterns
 
 run: RXPath
