@@ -509,18 +509,38 @@ handleNextPacket nicState = (nicState', output) where
             queue = NS.lookupQueue nicState' hash
             core = NS.lookupCore nicState' hash
             pktCount = NS.packetCount nicState'
-            output = " ["
+            output = "["
                 ++ (show l4Pkt)
-                ++  ", Hash is " ++ (show hash)
-                ++ ", ##### Selected queue is " ++ (show queue)
-                ++ ", Selected core is ##### " ++ (show core)
-                ++ ", no. of packets processed " ++ (show pktCount)
-                ++ "]\n\n\n\n\n"
+                ++  "],\n Hash = " ++ (show hash)
+                ++ ",\n Selected queue = " ++ (show queue)
+                ++ ",\n Selected core = " ++ (show core)
+                ++ ",\n # packets processed = " ++ (show pktCount)
+                ++ "\n\n\n"
 
 -- #################### Main module ####################
 
 -- main function which prints the fate of the next packet
--- main = print $ out1 ++ out2 ++ out3
+main = do
+        putStrLn out1
+        putStrLn out2
+        putStrLn out3
+        where
+        -- Initialize default NIC state
+        nicState = NS.initNICState
+        -- Handle first packet
+        (nicState', out1) = handleNextPacket nicState
+        -- Change NIC state to update the queue/core which should get packet
+        nicState'' = NS.updateQueueElement nicState' 6 1 1
+        -- Handle next packet (2nd packet)
+        (nicState''', out2) = handleNextPacket nicState''
+        -- Disable MultiQueueSupport
+        nicState'''' = NS.controlMultiQueue nicState''' False
+        -- Handle next packet (3rd packet)
+        (nicState''''', out3) = handleNextPacket nicState''''
+
+
+{-
+-- main function which prints the fate of the next packet
 main = print $ out1 ++ out2 ++ out3
     where
         -- Initialize default NIC state
@@ -535,5 +555,5 @@ main = print $ out1 ++ out2 ++ out3
         nicState'''' = NS.controlMultiQueue nicState''' False
         -- Handle next packet (3rd packet)
         (nicState''''', out3) = handleNextPacket nicState''''
-
+-}
 -- #################### EOF ####################
