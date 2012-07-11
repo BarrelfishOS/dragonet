@@ -1,14 +1,14 @@
 {- How Redirection table should be implemented?
- - init: creates state including empty redirection table
+ - initNICState: creates state including empty redirection table
  -
  - lookupHash :: given hash returns table state
  -          if nothing matches, should return default value
  -
  -  updateQueueElement :: for given index, update the queue assignment
  -
- -  deleteEntry :: for given index, remove mapping from Queue lookup table
+ -  incrementPacketCount :: keeps track of number of total packets processed
  -
- -
+ -  controlMultiQueue :: Allows controlling the behaviour of multiple queues
 -}
 
 module NICState (
@@ -61,7 +61,7 @@ getDefaultQueue = QueueState {
 initNICState :: NICState
 initNICState = NICState {
             queueState = replicate (fromInteger getQueueCount) getDefaultQueue
-            , useMultiQueue = False
+            , useMultiQueue = True
             , packetCount = 0
        }
 
@@ -81,10 +81,10 @@ replaceQueueElement qList idx qState = a ++ (qState:b) where
 
 
 -- update queue settings for given queue
-updateQueueElement :: NICState -> Index -> QueueState  -> NICState
-updateQueueElement nicState idx qState = nicState {
+updateQueueElement :: NICState -> Index -> QueueID -> CoreID -> NICState
+updateQueueElement nicState idx qid coreid = nicState {
                        queueState = replaceQueueElement
-                            (queueState nicState) idx qState
+                            (queueState nicState) idx (QueueState qid coreid)
                     }
 
 
@@ -102,10 +102,12 @@ hashToIndex hash = fromIntegral (hash `mod` getQueueCount)
 -- lookupHash :: given hash returns table state
 --          if nothing matches, should return default value
 lookupHash :: NICState -> Hash -> QueueState
-lookupHash nicState hash = (queueState nicState) !! idx
+lookupHash nicState hash =
+    case (useMultiQueue nicState) of
+       True ->  (queueState nicState) !! idx
+       False -> (queueState nicState) !! 0
     where
         idx = fromInteger $ hashToIndex hash
-
 
 -- For given lookup-table and hash, give the QueueID to which packet should go
 lookupQueue :: NICState -> Hash -> QueueID
