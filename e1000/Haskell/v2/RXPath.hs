@@ -24,38 +24,32 @@ type QueueID = Integer  -- ID for the hardware queue
 -- Function prototype for selecting proper action
 type Classifier = (Packet -> Integer)
 
+data Decision = Decision {
+                selector :: Classifier
+                , results :: [Action]
+              }
+           --  deriving (Show, Eq) -- FIXME: not working due to fun ptr Classifier
+
 -- action specifiying what action each step can take
 data Action = Dropped
             | InQueue {
                 queueID :: QueueID
                 }
-            | Decision {  selector :: Classifier
-                        , results :: [Action]
-              }
---          deriving (Show, Eq) -- FIXME: not working due to fun ptr Classifier
+            | ToDecide Decision
+           --  deriving (Show, Eq) -- FIXME: not working due to fun ptr Classifier
 
 
 -- Decision function implementation
-decide :: Classifier -> [Action] -> Packet -> Action
-decide classifier actionList pkt =
+decide :: Decision -> Packet -> Action
+decide (Decision classifier actionList) pkt =
             case nextAction of
                 Dropped -> Dropped
                 InQueue q -> InQueue q
-                Decision fnPtr actionList -> decide fnPtr actionList pkt
+              --  ToDecide (Decision fnPtr actionList) -> decide2
+                ToDecide toDecide -> decide toDecide pkt
+                           -- (Decision fnPtr actionList) pkt
             where
                 nextAction = actionList !! (fromIntegral $ classifier pkt)
-
--- Decision function implementation
-decide2 :: Action -> Packet -> Action
-decide2 (Decision classifier actionList) pkt =
-            case nextAction of
-                Dropped -> Dropped
-                InQueue q -> InQueue q
-                Decision fnPtr actionList -> decide2
-                            (Decision fnPtr actionList) pkt
-            where
-                nextAction = actionList !! (fromIntegral $ classifier pkt)
-decide2 _ _ = error "called with invalid action"
 
 
 -- #################### Few classifiers ####################
@@ -99,22 +93,28 @@ selectQueue _ = 0 -- Default queue (when no other filter matches)
 
 -- Takes raw packet and returns associated action
 classifyPacket :: Packet -> Action
-classifyPacket pkt = decide isValidTCP [
-                        Decision { selector = isValidUDP
-                                , results = [
-                                    Dropped
-                                    , qDecision
-                                 ]
-                            }
-                        , qDecision
-                    ] pkt
-                   where
-                        qDecision = Decision { selector = selectQueue
-                                , results = [(InQueue 0), (InQueue 1)]
-                            }
+classifyPacket pkt = decide Decision {
+            selector = isValidTCP
+               , results = [
+                   ToDecide Decision {
+                        selector = isValidUDP
+                        , results = [
+                            Dropped
+                            , qDecision
+                          ]
+                   }
+                   , qDecision
+                ]
+            } pkt
+            where
+                qDecision = ToDecide Decision {
+                    selector = selectQueue
+                    , results = [(InQueue 0), (InQueue 1)]
+                }
+
 
 selectProperQueue :: Packet -> Action
-selectProperQueue pkt = decide selectQueue acList pkt
+selectProperQueue pkt = decide (Decision selectQueue acList) pkt
                     where
                         acList = [(InQueue 0), (InQueue 1)]
 
