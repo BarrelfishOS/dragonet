@@ -21,17 +21,22 @@ data Packet = RawPacket {
 
 type QueueID = Integer  -- ID for the hardware queue
 
+data CResult = InvalidState String
+        | ValidAction Integer
+        deriving (Show, Eq)
+
 -- Function prototype for selecting proper action
-type Classifier = (Packet -> Integer)
+type Classifier = (Packet -> CResult)
 
 data Decision = Decision {
                 selector :: Classifier
-                , results :: [Action]
+                , possibleActions :: [Action]
               }
            --  deriving (Show, Eq) -- FIXME: not working due to fun ptr Classifier
 
 -- action specifiying what action each step can take
-data Action = Dropped
+data Action = Error String
+            | Dropped
             | InQueue {
                 queueID :: QueueID
                 }
@@ -39,66 +44,72 @@ data Action = Dropped
            --  deriving (Show, Eq) -- FIXME: not working due to fun ptr Classifier
 
 
+-- findAction finds the action based on the classifier.
+-- It also handles the Error case properly.
+findAction :: Decision -> Packet -> Action
+findAction (Decision classifier actionList) pkt =
+    case (classifier pkt) of
+        (InvalidState cause) -> Error cause
+        (ValidAction idx) -> actionList !! (fromIntegral idx)
+
 -- Decision function implementation
 decide :: Decision -> Packet -> Action
 decide (Decision classifier actionList) pkt =
-            case nextAction of
-                Dropped -> Dropped
-                InQueue q -> InQueue q
-              --  ToDecide (Decision fnPtr actionList) -> decide2
-                ToDecide toDecide -> decide toDecide pkt
-                           -- (Decision fnPtr actionList) pkt
-            where
-                nextAction = actionList !! (fromIntegral $ classifier pkt)
-
+    case nextAction of
+        Error info -> Error info
+        Dropped -> Dropped
+        InQueue q -> InQueue q
+        ToDecide toDecide -> decide toDecide pkt
+    where
+        nextAction = findAction (Decision classifier actionList) pkt
 
 -- #################### Few classifiers ####################
 
 -- Validate L2 packet
-isValidL2 :: Packet -> Integer
-isValidL2 (RawPacket pktContents) = 1 -- FIXME: Assuming valid packet
-isValidL2 _ = error "invalid type packet passed to isValidL2"
+isValidL2 :: Packet -> CResult
+isValidL2 (RawPacket pktContents) = ValidAction 1 -- FIXME: Assuming valid packet
+isValidL2 _ = InvalidState "invalid type packet passed to isValidL2"
 
 -- Check if it is valid IPv4 packet
-isValidIPv4 :: Packet -> Integer
-isValidIPv4 (L2Packet pkt) = 1 -- FIXME: Assuming valid packet
-isValidIPv4 _ = error "invalid type packet passed to isValidv4"
+isValidIPv4 :: Packet -> CResult
+isValidIPv4 (L2Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
+isValidIPv4 _ = InvalidState "invalid type packet passed to isValidv4"
 
 -- Check if it is valid IPv6 packet
-isValidIPv6 :: Packet -> Integer
-isValidIPv6 (L2Packet pkt) = 1 -- FIXME: Assuming valid packet
-isValidIPv6 _ = error "invalid type packet passed to isValidv6"
+isValidIPv6 :: Packet -> CResult
+isValidIPv6 (L2Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
+isValidIPv6 _ = InvalidState "invalid type packet passed to isValidv6"
 
 -- Check if it is valid L3 packet
-isValidL3 :: Packet -> Integer
-isValidL3 (IPv4Packet pkt) = 1 -- FIXME: Assuming valid packet
-isValidL3 (IPv6Packet pkt) = 1 -- FIXME: Assuming valid packet
-isValidL3 _ = error "invalid type packet passed to isValidL3"
+isValidL3 :: Packet -> CResult
+isValidL3 (IPv4Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
+isValidL3 (IPv6Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
+isValidL3 _ = InvalidState "invalid type packet passed to isValidL3"
 
 -- Check if it is valid TCP packet
-isValidTCP :: Packet -> Integer
-isValidTCP (L3Packet pkt) = 1 -- FIXME: Assuming valid packet
-isValidTCP _ = error "invalid type packet passed to isValidTCP"
+isValidTCP :: Packet -> CResult
+isValidTCP (L3Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
+isValidTCP _ = InvalidState "invalid type packet passed to isValidTCP"
 
 -- Check if it is valid UDP packet
-isValidUDP :: Packet -> Integer
-isValidUDP (L3Packet pkt) = 1 -- FIXME: Assuming valid packet
-isValidUDP _ = error "invalid type packet passed to isValidUDP"
+isValidUDP :: Packet -> CResult
+isValidUDP (L3Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
+isValidUDP _ = InvalidState "invalid type packet passed to isValidUDP"
 
 -- Selects queue after applying filters based on packet type
-selectQueue :: Packet -> Integer
-selectQueue (TCPPacket pkt) = 1 -- FIXME: get hash and select queue
-selectQueue (UDPPacket pkt) = 1 -- FIXME: get hash and select queue
-selectQueue _ = 0 -- Default queue (when no other filter matches)
+selectQueue :: Packet -> CResult
+selectQueue (TCPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
+selectQueue (UDPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
+selectQueue _ = ValidAction 0 -- Default queue (when no other filter matches)
 
 -- Takes raw packet and returns associated action
 classifyPacket :: Packet -> Action
 classifyPacket pkt = decide Decision {
             selector = isValidTCP
-               , results = [
+               , possibleActions = [
                    ToDecide Decision {
                         selector = isValidUDP
-                        , results = [
+                        , possibleActions = [
                             Dropped
                             , qDecision
                           ]
@@ -109,7 +120,7 @@ classifyPacket pkt = decide Decision {
             where
                 qDecision = ToDecide Decision {
                     selector = selectQueue
-                    , results = [(InQueue 0), (InQueue 1)]
+                    , possibleActions = [(InQueue 0), (InQueue 1)]
                 }
 
 
