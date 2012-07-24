@@ -15,8 +15,6 @@ data Packet = RawPacket {
             | UDPPacket Packet
             deriving (Show, Eq)
 
-
-
 type QueueID = Integer  -- ID for the hardware queue
 
 -- Function prototype for selecting proper action
@@ -29,25 +27,19 @@ data Action = Dropped
                 }
             | Decide {  clf :: Classifier
                         , alist :: [Action]
-                     }
---            | Decide (Classifier -> [Action] -> Packet -> Action)
---            deriving (Show, Eq) -- FIXME: not working due to function ptr
-
-
-
-processSelected :: Action -> Packet -> Action
-processSelected (Dropped) pkt = Dropped
-processSelected (InQueue q) pkt = InQueue q
-processSelected (Decide fnPtr actionList) pkt = decide fnPtr actionList pkt
+              }
+--          deriving (Show, Eq) -- FIXME: not working due to fun ptr Classifier
 
 
 -- Decision function implementation
 decide :: Classifier -> [Action] -> Packet -> Action
-decide classifier actionList pkt = let
-                    idx = fromIntegral $ classifier pkt
-                    selectedAction = actionList !! idx
-                in
-                    processSelected selectedAction pkt
+decide classifier actionList pkt =
+            case nextAction of
+                Dropped -> Dropped
+                InQueue q -> InQueue q
+                Decide fnPtr actionList -> decide fnPtr actionList pkt
+            where
+                nextAction = actionList !! (fromIntegral $ classifier pkt)
 
 
 -- #################### Main module ####################
