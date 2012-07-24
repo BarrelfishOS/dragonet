@@ -18,40 +18,41 @@ data Packet = RawPacket {
 
 
 type QueueID = Integer  -- ID for the hardware queue
-type CoreID = Integer  -- ID for the CPU which can accept notification
 
 -- Function prototype for selecting proper action
 type Classifier = (Packet -> Integer)
 
-data Result = Dropped
+-- action specifiying what action each step can take
+data Action = Dropped
             | InQueue {
                 queueID :: QueueID
                 }
-
--- action specifiying what action each step can take
-data Action = DropPacket Packet
-            | DMAPacket QueueID Packet
-            | Decide (Classifier -> [Action] -> Packet -> Action)
+            | Decide {  clf :: Classifier
+                        , alist :: [Action]
+                     }
+--            | Decide (Classifier -> [Action] -> Packet -> Action)
 --            deriving (Show, Eq) -- FIXME: not working due to function ptr
+
+
+
+processSelected :: Action -> Packet -> Action
+processSelected (Dropped) pkt = Dropped
+processSelected (InQueue q) pkt = InQueue q
+processSelected (Decide fnPtr actionList) pkt = decide fnPtr actionList pkt
 
 
 -- Decision function implementation
 decide :: Classifier -> [Action] -> Packet -> Action
-decide classifier actionList pkt =
-                selectedAction
-                where
+decide classifier actionList pkt = let
                     idx = fromIntegral $ classifier pkt
                     selectedAction = actionList !! idx
+                in
+                    processSelected selectedAction pkt
 
 
 -- #################### Main module ####################
-{-
-decideQueue :: Packet -> QueueID
-
-chooseQueue :: hash -> queueid
--}
-
--- main function which
+-- main function
 main = print "hello world"
 
 -- ################################## EOF ###################################
+
