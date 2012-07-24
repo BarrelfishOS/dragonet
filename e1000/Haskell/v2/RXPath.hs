@@ -29,8 +29,8 @@ data Action = Dropped
             | InQueue {
                 queueID :: QueueID
                 }
-            | Decide {  clf :: Classifier
-                        , alist :: [Action]
+            | Decision {  selector :: Classifier
+                        , results :: [Action]
               }
 --          deriving (Show, Eq) -- FIXME: not working due to fun ptr Classifier
 
@@ -41,9 +41,22 @@ decide classifier actionList pkt =
             case nextAction of
                 Dropped -> Dropped
                 InQueue q -> InQueue q
-                Decide fnPtr actionList -> decide fnPtr actionList pkt
+                Decision fnPtr actionList -> decide fnPtr actionList pkt
             where
                 nextAction = actionList !! (fromIntegral $ classifier pkt)
+
+-- Decision function implementation
+decide2 :: Action -> Packet -> Action
+decide2 (Decision classifier actionList) pkt =
+            case nextAction of
+                Dropped -> Dropped
+                InQueue q -> InQueue q
+                Decision fnPtr actionList -> decide2
+                            (Decision fnPtr actionList) pkt
+            where
+                nextAction = actionList !! (fromIntegral $ classifier pkt)
+decide2 _ _ = error "called with invalid action"
+
 
 -- #################### Few classifiers ####################
 
@@ -84,6 +97,21 @@ selectQueue (TCPPacket pkt) = 1 -- FIXME: get hash and select queue
 selectQueue (UDPPacket pkt) = 1 -- FIXME: get hash and select queue
 selectQueue _ = 0 -- Default queue (when no other filter matches)
 
+-- Takes raw packet and returns associated action
+classifyPacket :: Packet -> Action
+classifyPacket pkt = decide isValidTCP [
+                        Decision { selector = isValidUDP
+                                , results = [
+                                    Dropped
+                                    , qDecision
+                                 ]
+                            }
+                        , qDecision
+                    ] pkt
+                   where
+                        qDecision = Decision { selector = selectQueue
+                                , results = [(InQueue 0), (InQueue 1)]
+                            }
 
 selectProperQueue :: Packet -> Action
 selectProperQueue pkt = decide selectQueue acList pkt
