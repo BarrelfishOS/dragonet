@@ -26,7 +26,11 @@ data CResult = InvalidState String
         deriving (Show, Eq)
 
 -- Function prototype for selecting proper action
-type Classifier = (Packet -> CResult)
+--type Classifier = (Packet -> CResult)
+data Classifier = Classifier {
+            funPtr :: (Packet -> CResult)
+        }
+       -- deriving (Show, Eq) -- FIXME: not working due to fun ptr Classifier
 
 data Decision = Decision {
                 selector :: Classifier
@@ -48,7 +52,7 @@ data Action = Error String
 -- It also handles the Error case properly.
 findAction :: Decision -> Packet -> Action
 findAction (Decision classifier actionList) pkt =
-    case (classifier pkt) of
+    case ((funPtr classifier) pkt) of
         (InvalidState cause) -> Error cause
         (ValidAction idx) -> actionList !! (fromIntegral idx)
 
@@ -105,10 +109,10 @@ selectQueue _ = ValidAction 0 -- Default queue (when no other filter matches)
 -- Takes raw packet and returns associated action
 classifyPacket :: Packet -> Action
 classifyPacket pkt = decide Decision {
-            selector = isValidTCP
+            selector = (Classifier isValidTCP)
                , possibleActions = [
                    ToDecide Decision {
-                        selector = isValidUDP
+                        selector = (Classifier isValidUDP)
                         , possibleActions = [
                             Dropped
                             , qDecision
@@ -119,13 +123,13 @@ classifyPacket pkt = decide Decision {
             } pkt
             where
                 qDecision = ToDecide Decision {
-                    selector = selectQueue
+                    selector = (Classifier selectQueue)
                     , possibleActions = [(InQueue 0), (InQueue 1)]
                 }
 
 
 selectProperQueue :: Packet -> Action
-selectProperQueue pkt = decide (Decision selectQueue acList) pkt
+selectProperQueue pkt = decide (Decision (Classifier selectQueue) acList) pkt
                     where
                         acList = [(InQueue 0), (InQueue 1)]
 
