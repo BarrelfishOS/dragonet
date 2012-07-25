@@ -1,6 +1,7 @@
 
 module Main (main) where
 
+import qualified Data.Word as W
 import qualified Data.ByteString as BS
 
 -- packet with tags based on how it is classified
@@ -25,6 +26,7 @@ data CResult = InvalidState String
         | ValidAction Integer
         deriving (Show, Eq)
 
+
 -- Function prototype for selecting proper action
 --type Classifier = (Packet -> CResult)
 data Classifier = Classifier {
@@ -32,11 +34,14 @@ data Classifier = Classifier {
         }
        -- deriving (Show, Eq) -- FIXME: not working due to fun ptr Classifier
 
+instance Show Classifier where
+    show funPtr = "funptr"
+
 data Decision = Decision {
                 selector :: Classifier
                 , possibleActions :: [Action]
               }
-           --  deriving (Show, Eq) -- FIXME: not working due to fun ptr Classifier
+              deriving (Show) -- FIXME: not working due to fun ptr Classifier
 
 -- action specifiying what action each step can take
 data Action = Error String
@@ -45,7 +50,7 @@ data Action = Error String
                 queueID :: QueueID
                 }
             | ToDecide Decision
-           --  deriving (Show, Eq) -- FIXME: not working due to fun ptr Classifier
+            deriving (Show) -- FIXME: not working due to fun ptr Classifier
 
 
 -- findAction finds the action based on the classifier.
@@ -106,27 +111,67 @@ selectQueue (TCPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
 selectQueue (UDPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
 selectQueue _ = ValidAction 0 -- Default queue (when no other filter matches)
 
+
+theBigDecision :: Decision
+theBigDecision =
+            Decision {
+                    selector = (Classifier isValidTCP)
+                    , possibleActions = [
+                        ToDecide Decision {
+                            selector = (Classifier isValidUDP)
+                            , possibleActions = [
+                                Dropped
+                                , qAction
+                                ]
+                        }
+                        , qAction
+                    ]
+                }
+            where
+                qAction = ToDecide Decision {
+                    selector = (Classifier selectQueue)
+                    , possibleActions = [(InQueue 0), (InQueue 1)]
+                }
+
+
+
 -- Takes raw packet and returns associated action
 classifyPacket :: Packet -> Action
-classifyPacket pkt = decide Decision {
+classifyPacket pkt = decide theBigDecision pkt
+{-
+Decision {
             selector = (Classifier isValidTCP)
                , possibleActions = [
                    ToDecide Decision {
                         selector = (Classifier isValidUDP)
                         , possibleActions = [
                             Dropped
-                            , qDecision
+                            , qAction
                           ]
                    }
-                   , qDecision
+                   , qAction
                 ]
             } pkt
             where
-                qDecision = ToDecide Decision {
+                qAction = ToDecide Decision {
                     selector = (Classifier selectQueue)
                     , possibleActions = [(InQueue 0), (InQueue 1)]
                 }
+                bigDecision = Decision {
+                    selector = (Classifier isValidTCP)
+                    , possibleActions = [
+                        ToDecide Decision {
+                            selector = (Classifier isValidUDP)
+                            , possibleActions = [
+                                Dropped
+                                , qAction
+                                ]
+                        }
+                        , qAction
+                    ]
+                }
 
+            -}
 
 selectProperQueue :: Packet -> Action
 selectProperQueue pkt = decide (Decision (Classifier selectQueue) acList) pkt
@@ -134,8 +179,18 @@ selectProperQueue pkt = decide (Decision (Classifier selectQueue) acList) pkt
                         acList = [(InQueue 0), (InQueue 1)]
 
 -- #################### Main module ####################
--- main function
-main = print "hello world"
 
+-- getNextPacket for processing:  Currently it is generated/hardcoded.
+-- FIXME: Stupid packet, make it more realasitic
+getNextPacket :: Packet
+getNextPacket = L3Packet $ RawPacket $ BS.pack ([50..120] :: [W.Word8])
+
+-- main function
+main = do
+        putStrLn out1
+        putStrLn out2
+    where
+        out1 = show $ classifyPacket getNextPacket
+        out2 = show $ theBigDecision
 -- ################################## EOF ###################################
 
