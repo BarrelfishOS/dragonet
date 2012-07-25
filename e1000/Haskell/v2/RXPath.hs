@@ -31,17 +31,23 @@ data CResult = InvalidState String
 --type Classifier = (Packet -> CResult)
 data Classifier = Classifier {
             funPtr :: (Packet -> CResult)
+            , funName :: String
         }
-       -- deriving (Show, Eq) -- FIXME: not working due to fun ptr Classifier
 
+-- To simplify the printing of data-structures like Decision and Action
 instance Show Classifier where
-    show funPtr = "funptr"
+    show (Classifier fpr fun_name) = show fun_name
+
+instance Eq Classifier where
+    (Classifier fpr1 fun_name1) == (Classifier fpr2 fun_name2) =
+                (fun_name1 == fun_name2)
+
 
 data Decision = Decision {
                 selector :: Classifier
                 , possibleActions :: [Action]
               }
-              deriving (Show) -- FIXME: not working due to fun ptr Classifier
+              deriving (Show, Eq)
 
 -- action specifiying what action each step can take
 data Action = Error String
@@ -50,7 +56,7 @@ data Action = Error String
                 queueID :: QueueID
                 }
             | ToDecide Decision
-            deriving (Show) -- FIXME: not working due to fun ptr Classifier
+            deriving (Show, Eq)
 
 
 -- findAction finds the action based on the classifier.
@@ -115,10 +121,10 @@ selectQueue _ = ValidAction 0 -- Default queue (when no other filter matches)
 theBigDecision :: Decision
 theBigDecision =
             Decision {
-                    selector = (Classifier isValidTCP)
+                    selector = (Classifier isValidTCP "isValidTCP")
                     , possibleActions = [
                         ToDecide Decision {
-                            selector = (Classifier isValidUDP)
+                            selector = (Classifier isValidUDP "isValidUDP")
                             , possibleActions = [
                                 Dropped
                                 , qAction
@@ -129,7 +135,7 @@ theBigDecision =
                 }
             where
                 qAction = ToDecide Decision {
-                    selector = (Classifier selectQueue)
+                    selector = (Classifier selectQueue "selectQueue ")
                     , possibleActions = [(InQueue 0), (InQueue 1)]
                 }
 
