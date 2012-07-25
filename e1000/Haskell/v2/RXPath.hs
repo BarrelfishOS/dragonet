@@ -3,6 +3,7 @@ module Main (main) where
 
 import qualified Data.Word as W
 import qualified Data.ByteString as BS
+import qualified NICState as NS
 
 -- packet with tags based on how it is classified
 data Packet = RawPacket {
@@ -49,6 +50,8 @@ data Decision = Decision {
               }
               deriving (Show, Eq)
 
+
+
 -- action specifiying what action each step can take
 data Action = Error String
             | Dropped
@@ -57,6 +60,20 @@ data Action = Error String
                 }
             | ToDecide Decision
             deriving (Show, Eq)
+
+{-
+ -- Trying to print the Decision structure as a tree in Dot notation
+ -- Need more work to complete this
+printDecision :: Decision -> String
+printDecision (Decision clf (Error msg)) = show clf ++ " -> "
+                ++ "Error" ++ " \n"
+printDecision (Decision clf (Dropped)) = show clf ++ " -> "
+                ++ "DropPacket" ++ " \n"
+printDecision (Decision clf (InQueue qid)) = show clf ++ " -> "
+                ++ "ToQueue" ++ (show qid) ++ " \n"
+printDecision (Decision clf (Error msg)) = show clf ++ " -> "
+                ++ "Error" ++ " \n"
+-}
 
 
 -- findAction finds the action based on the classifier.
@@ -157,6 +174,7 @@ main = do
         putStrLn out1
         putStrLn out2
     where
+        nicState = NS.updateQueueElement NS.initNICState 6 1 1
         out1 = show $ classifyPacket getNextPacket
         out2 = show $ theBigDecision
 -- ################################## EOF ###################################
