@@ -138,45 +138,6 @@ theBigDecision =
 -- Takes raw packet and returns associated action
 classifyPacket :: Packet -> Action
 classifyPacket pkt = decide theBigDecision pkt
-{-
-Decision {
-            selector = (Classifier isValidTCP)
-               , possibleActions = [
-                   ToDecide Decision {
-                        selector = (Classifier isValidUDP)
-                        , possibleActions = [
-                            Dropped
-                            , qAction
-                          ]
-                   }
-                   , qAction
-                ]
-            } pkt
-            where
-                qAction = ToDecide Decision {
-                    selector = (Classifier selectQueue)
-                    , possibleActions = [(InQueue 0), (InQueue 1)]
-                }
-                bigDecision = Decision {
-                    selector = (Classifier isValidTCP)
-                    , possibleActions = [
-                        ToDecide Decision {
-                            selector = (Classifier isValidUDP)
-                            , possibleActions = [
-                                Dropped
-                                , qAction
-                                ]
-                        }
-                        , qAction
-                    ]
-                }
-
-            -}
-
-selectProperQueue :: Packet -> Action
-selectProperQueue pkt = decide (Decision (Classifier selectQueue) acList) pkt
-                    where
-                        acList = [(InQueue 0), (InQueue 1)]
 
 -- #################### Main module ####################
 
