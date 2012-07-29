@@ -92,6 +92,23 @@ data AbstractTree = AbstractTree {
                 }
                deriving (Show, Eq)
 
+printRelations :: [Relation] -> String
+printRelations [] = []
+printRelations (x:[]) = (parent x) ++ " -> " ++ (child x) ++ "\n"
+printRelations (x:xs) = (printRelations [x]) ++ (printRelations xs)
+
+
+printDeclarations :: [Declaration] -> String
+printDeclarations [] = []
+printDeclarations (x:[]) = (instanceName x) ++ " :: " ++ (instanceType x)
+                                        ++ "()" ++ "\n"
+printDeclarations (x:xs) = (printDeclarations [x]) ++ (printDeclarations xs)
+
+printAbstractTree :: AbstractTree -> String
+printAbstractTree tree = decls ++ rels
+        where
+            decls = printDeclarations $ declarations tree
+            rels = printRelations $ relations tree
 
 convertAction :: RootNode -> Action -> AbstractTree
 convertAction root (Error msg) = let
@@ -206,10 +223,10 @@ isValidUDP (L3Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
 isValidUDP _ = InvalidState "invalid type packet passed to isValidUDP"
 
 -- Selects queue after applying filters based on packet type
-selectQueue :: Packet -> CResult
-selectQueue (TCPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
-selectQueue (UDPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
-selectQueue _ = ValidAction 0 -- Default queue (when no other filter matches)
+applyFilter :: Packet -> CResult
+applyFilter (TCPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
+applyFilter (UDPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
+applyFilter _ = ValidAction 0 -- Default queue (when no other filter matches)
 
 
 theBigDecision :: Decision
@@ -229,7 +246,7 @@ theBigDecision =
                 }
             where
                 qAction = ToDecide Decision {
-                    selector = (Classifier selectQueue "selectQueue")
+                    selector = (Classifier applyFilter "applyFilter")
                     , possibleActions = [(InQueue 0), (InQueue 1)]
                 }
 
@@ -248,14 +265,17 @@ getNextPacket = L3Packet $ RawPacket $ BS.pack ([50..120] :: [W.Word8])
 
 -- main function
 main = do
-        putStrLn out1
-        putStrLn out2
-        putStrLn out3
+--        putStrLn out1
+--        putStrLn out2
+--        putStrLn out3
+        putStrLn out4
     where
         nicState = NS.updateQueueElement NS.initNICState 6 1 1
         out1 = show $ classifyPacket getNextPacket
         out2 = show $ theBigDecision
-        out3 = show $ convertDecision theBigDecision
+        myTree = convertDecision theBigDecision
+        out3 = "\n\n\n\n\n"
+        out4 = printAbstractTree myTree
 
 -- ################################## EOF ###################################
 
