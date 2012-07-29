@@ -61,20 +61,97 @@ data Action = Error String
             | ToDecide Decision
             deriving (Show, Eq)
 
-{-
- -- Trying to print the Decision structure as a tree in Dot notation
- -- Need more work to complete this
-printDecision :: Decision -> String
-printDecision (Decision clf (Error msg)) = show clf ++ " -> "
-                ++ "Error" ++ " \n"
-printDecision (Decision clf (Dropped)) = show clf ++ " -> "
-                ++ "DropPacket" ++ " \n"
-printDecision (Decision clf (InQueue qid)) = show clf ++ " -> "
-                ++ "ToQueue" ++ (show qid) ++ " \n"
-printDecision (Decision clf (Error msg)) = show clf ++ " -> "
-                ++ "Error" ++ " \n"
--}
+-- #################### Code for traversing/printing Decision ################
+-- Code for traversing the data-structure
+type Name = String
+data RootNode = RootNode {
+                    rootNodeName ::  Name
+                   -- , relatedAction :: Action
+               }
+               deriving (Show, Eq)
 
+data Declaration = Declaration {
+                    instanceName :: Name
+                    , instanceType :: Name
+                   -- , instanceAction :: Action
+                }
+               deriving (Show, Eq)
+
+data Relation = Relation {
+                    parent :: Name
+                    , child :: Name
+                   -- , parentAction :: Action
+                   -- , childAction :: Action
+                }
+               deriving (Show, Eq)
+
+data ResultSet = ResultSet {
+                rootNode :: RootNode
+                , declarations :: [Declaration]
+                , relations :: [Relation]
+                }
+               deriving (Show, Eq)
+
+
+printAction :: RootNode -> Action -> ResultSet
+printAction root (Error msg) = let
+                    eleName = "ERROR"
+                    inst = eleName ++ "State"
+                    rName = RootNode inst
+                    decls = [(Declaration inst eleName)]
+                    rels = [(Relation (rootNodeName root) inst)]
+                in
+                    ResultSet rName decls rels
+printAction root (Dropped) = let
+                    eleName = "DROPPED"
+                    inst = eleName ++ "State"
+                    rName = RootNode inst
+                    decls = [(Declaration inst eleName)]
+                    rels = [(Relation (rootNodeName root) inst)]
+                in
+                    ResultSet rName decls rels
+printAction root (InQueue qid) = let
+                    eleName = "RXQueue"
+                    inst = eleName ++ (show qid)
+                    rName = RootNode inst
+                    decls = [(Declaration inst eleName)]
+                    rels = [(Relation (rootNodeName root) inst)]
+                in
+                    ResultSet rName decls rels
+printAction root (ToDecide des) = let
+                    res = printDecision des
+                    inst = rootNodeName (rootNode res)
+                    rName = RootNode inst
+                    decls = [] ++ (declarations res)
+                    rels = [(Relation (rootNodeName root) inst)] ++
+                            (relations res)
+                in
+                    ResultSet rName decls rels
+
+-- Processes list of action and returns their combined results
+myMapper :: RootNode -> [Action] -> ResultSet
+myMapper root [] = error "Error: list of possible actions is empty!"
+myMapper root (x:[]) = printAction root x
+myMapper root (x:xs) = ResultSet rName decls rels
+        where
+            res1 = printAction root x
+            resRest = myMapper root xs
+            rName = rootNode res1
+            decls = (declarations res1) ++ (declarations resRest)
+            rels = (relations res1) ++ (relations resRest)
+
+-- Convert decision data-strucutre into graph elements
+printDecision :: Decision -> ResultSet
+printDecision decision = ResultSet rName decls rels
+        where
+            eleName = rootNodeName $ RootNode (funName (selector decision))
+            inst = eleName ++ "Fun"
+            rName = RootNode inst
+            results = myMapper rName (possibleActions decision)
+            decls = [(Declaration inst eleName)] ++ (declarations results)
+            rels =  relations results
+
+-- #################### Decision function implementation ####################
 
 -- findAction finds the action based on the classifier.
 -- It also handles the Error case properly.
@@ -152,7 +229,7 @@ theBigDecision =
                 }
             where
                 qAction = ToDecide Decision {
-                    selector = (Classifier selectQueue "selectQueue ")
+                    selector = (Classifier selectQueue "selectQueue")
                     , possibleActions = [(InQueue 0), (InQueue 1)]
                 }
 
@@ -173,9 +250,12 @@ getNextPacket = L3Packet $ RawPacket $ BS.pack ([50..120] :: [W.Word8])
 main = do
         putStrLn out1
         putStrLn out2
+        putStrLn out3
     where
         nicState = NS.updateQueueElement NS.initNICState 6 1 1
         out1 = show $ classifyPacket getNextPacket
         out2 = show $ theBigDecision
+        out3 = show $ printDecision theBigDecision
+
 -- ################################## EOF ###################################
 
