@@ -63,7 +63,9 @@ data Action = Error String
 
 -- #################### Code for traversing/printing Decision ################
 -- Code for traversing the data-structure
-type Name = String
+type Name = String -- the name of elements (printable)
+type Position = Integer -- position of action with respect to siblings
+
 data RootNode = RootNode {
                     rootNodeName ::  Name
                    -- , relatedAction :: Action
@@ -79,6 +81,7 @@ data Declaration = Declaration {
 
 data Relation = Relation {
                     parent :: Name
+                    , childPos :: Position
                     , child :: Name
                    -- , parentAction :: Action
                    -- , childAction :: Action
@@ -94,7 +97,8 @@ data AbstractTree = AbstractTree {
 
 printRelations :: [Relation] -> String
 printRelations [] = []
-printRelations (x:[]) = (parent x) ++ " -> " ++ (child x) ++ "\n"
+printRelations (x:[]) = (parent x) ++ "[" ++ (show (childPos x)) ++ "]"
+                        ++ " -> " ++ (child x) ++ "\n"
 printRelations (x:xs) = (printRelations [x]) ++ (printRelations xs)
 
 
@@ -110,49 +114,49 @@ printAbstractTree tree = decls ++ rels
             decls = printDeclarations $ declarations tree
             rels = printRelations $ relations tree
 
-convertAction :: RootNode -> Action -> AbstractTree
-convertAction root (Error msg) = let
+convertAction :: RootNode -> Position -> Action -> AbstractTree
+convertAction root pos (Error msg) = let
                     eleName = "ERROR"
                     inst = eleName ++ "State"
                     rName = RootNode inst
                     decls = [(Declaration inst eleName)]
-                    rels = [(Relation (rootNodeName root) inst)]
+                    rels = [(Relation (rootNodeName root) pos inst)]
                 in
                     AbstractTree rName decls rels
-convertAction root (Dropped) = let
+convertAction root pos (Dropped) = let
                     eleName = "DROPPED"
                     inst = eleName ++ "State"
                     rName = RootNode inst
                     decls = [(Declaration inst eleName)]
-                    rels = [(Relation (rootNodeName root) inst)]
+                    rels = [(Relation (rootNodeName root) pos inst)]
                 in
                     AbstractTree rName decls rels
-convertAction root (InQueue qid) = let
+convertAction root pos (InQueue qid) = let
                     eleName = "RXQueue"
                     inst = eleName ++ (show qid)
                     rName = RootNode inst
                     decls = [(Declaration inst eleName)]
-                    rels = [(Relation (rootNodeName root) inst)]
+                    rels = [(Relation (rootNodeName root) pos inst)]
                 in
                     AbstractTree rName decls rels
-convertAction root (ToDecide des) = let
+convertAction root pos (ToDecide des) = let
                     res = convertDecision des
                     inst = rootNodeName (rootNode res)
                     rName = RootNode inst
                     decls = [] ++ (declarations res)
-                    rels = [(Relation (rootNodeName root) inst)] ++
+                    rels = [(Relation (rootNodeName root) pos inst)] ++
                             (relations res)
                 in
                     AbstractTree rName decls rels
 
 -- Processes list of action and returns their combined results
-myMapper :: RootNode -> [Action] -> AbstractTree
-myMapper root [] = error "Error: list of possible actions is empty!"
-myMapper root (x:[]) = convertAction root x
-myMapper root (x:xs) = AbstractTree rName decls rels
+myMapper :: RootNode -> Position -> [Action] -> AbstractTree
+myMapper root pos [] = error "Error: list of possible actions is empty!"
+myMapper root pos (x:[]) = convertAction root pos x
+myMapper root pos (x:xs) = AbstractTree rName decls rels
         where
-            res1 = convertAction root x
-            resRest = myMapper root xs
+            res1 = convertAction root pos x
+            resRest = myMapper root (pos + 1) xs
             rName = rootNode res1
             decls = (declarations res1) ++ (declarations resRest)
             rels = (relations res1) ++ (relations resRest)
@@ -164,7 +168,7 @@ convertDecision decision = AbstractTree rName decls rels
             eleName = rootNodeName $ RootNode (funName (selector decision))
             inst = eleName ++ "Fun"
             rName = RootNode inst
-            results = myMapper rName (possibleActions decision)
+            results = myMapper rName 0 (possibleActions decision)
             decls = [(Declaration inst eleName)] ++ (declarations results)
             rels =  relations results
 
