@@ -175,10 +175,10 @@ convertDecision decision = AbstractTree rName decls rels
 
 -- #################### Decision function implementation ####################
 
--- findAction finds the action based on the classifier.
+-- applyDecision finds the action based on the classifier.
 -- It also handles the Error case properly.
-findAction :: Decision -> NS.NICState -> Packet -> Action
-findAction (Decision classifier actionList) nicstate pkt =
+applyDecision :: Decision -> NS.NICState -> Packet -> Action
+applyDecision (Decision classifier actionList) nicstate pkt =
     case ((funPtr classifier) nicstate pkt) of
         (InvalidState cause) -> Error cause
         (ValidAction idx) -> actionList !! (fromIntegral idx)
@@ -187,12 +187,12 @@ findAction (Decision classifier actionList) nicstate pkt =
 decide :: Decision -> NS.NICState -> Packet -> Action
 decide (Decision classifier actionList) nicstate pkt =
     case nextAction of
-        Error info -> Error info
-        Dropped -> Dropped
-        InQueue q -> InQueue q
         ToDecide toDecide -> decide toDecide nicstate pkt
+        InQueue q -> InQueue q
+        Dropped -> Dropped
+        Error info -> Error info
     where
-        nextAction = findAction (Decision classifier actionList) nicstate pkt
+        nextAction = applyDecision (Decision classifier actionList) nicstate pkt
 
 -- #################### Classifier placeholders ####################
 
