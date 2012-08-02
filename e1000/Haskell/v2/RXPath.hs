@@ -1,6 +1,7 @@
 
 module Main (main) where
 
+import qualified List as List
 import qualified Data.Word as W
 import qualified Data.ByteString as BS
 import qualified NICState as NS
@@ -31,7 +32,7 @@ data CResult = InvalidState String
 -- Function prototype for selecting proper action
 --type Classifier = (Packet -> CResult)
 data Classifier = Classifier {
-            funPtr :: (Packet -> CResult)
+            funPtr :: (NS.NICState -> Packet -> CResult)
             , funName :: String
         }
 
@@ -111,7 +112,7 @@ printDeclarations (x:xs) = (printDeclarations [x]) ++ (printDeclarations xs)
 printAbstractTree :: AbstractTree -> String
 printAbstractTree tree = decls ++ rels
         where
-            decls = printDeclarations $ declarations tree
+            decls = printDeclarations $ List.nub (declarations tree)
             rels = printRelations $ relations tree
 
 convertAction :: RootNode -> Position -> Action -> AbstractTree
@@ -176,89 +177,156 @@ convertDecision decision = AbstractTree rName decls rels
 
 -- findAction finds the action based on the classifier.
 -- It also handles the Error case properly.
-findAction :: Decision -> Packet -> Action
-findAction (Decision classifier actionList) pkt =
-    case ((funPtr classifier) pkt) of
+findAction :: Decision -> NS.NICState -> Packet -> Action
+findAction (Decision classifier actionList) nicstate pkt =
+    case ((funPtr classifier) nicstate pkt) of
         (InvalidState cause) -> Error cause
         (ValidAction idx) -> actionList !! (fromIntegral idx)
 
 -- Decision function implementation
-decide :: Decision -> Packet -> Action
-decide (Decision classifier actionList) pkt =
+decide :: Decision -> NS.NICState -> Packet -> Action
+decide (Decision classifier actionList) nicstate pkt =
     case nextAction of
         Error info -> Error info
         Dropped -> Dropped
         InQueue q -> InQueue q
-        ToDecide toDecide -> decide toDecide pkt
+        ToDecide toDecide -> decide toDecide nicstate pkt
     where
-        nextAction = findAction (Decision classifier actionList) pkt
+        nextAction = findAction (Decision classifier actionList) nicstate pkt
 
--- #################### Few classifiers ####################
+-- #################### Classifier placeholders ####################
 
 -- Validate L2 packet
-isValidL2 :: Packet -> CResult
-isValidL2 (RawPacket pktContents) = ValidAction 1 -- FIXME: Assuming valid packet
-isValidL2 _ = InvalidState "invalid type packet passed to isValidL2"
+checksumCRC :: NS.NICState -> Packet -> CResult
+checksumCRC nicstate (RawPacket pktContents) = ValidAction 1
+                -- FIXME: Assuming valid packet
+checksumCRC nicstate _ = InvalidState "invalid type packet passed to checksumCRC"
+
+-- Validate L2 length
+isValidLength :: NS.NICState -> Packet -> CResult
+isValidLength nicstate (RawPacket pktContents) = ValidAction 1
+                -- FIXME: Assuming valid packet
+isValidLength nicstate _ = InvalidState "invalid type packet passed to isValidLength"
+
+-- classify L2 packet
+classifyL2 :: NS.NICState -> Packet -> CResult
+classifyL2 nicstate (RawPacket pktContents) = ValidAction 1
+                -- FIXME: Assuming valid packet
+classifyL2 nicstate _ = InvalidState "invalid type packet passed to classifyL2"
+
+
+-- Validate isValidUnicast packet
+isValidUnicast :: NS.NICState -> Packet -> CResult
+isValidUnicast nicstate (RawPacket pktContents) = ValidAction 1
+                -- FIXME: Assuming valid packet
+isValidUnicast nicstate _ = InvalidState "invalid type packet passed to isValidUnicast"
+
+-- Validate isValidMulticast packet
+isValidMulticast :: NS.NICState -> Packet -> CResult
+isValidMulticast nicstate (RawPacket pktContents) = ValidAction 1
+                -- FIXME: Assuming valid packet
+isValidMulticast nicstate _ = InvalidState "invalid type packet passed to isValidMulticast"
+
+-- Validate isValidBroadcast packet
+isValidBroadcast :: NS.NICState -> Packet -> CResult
+isValidBroadcast nicstate (RawPacket pktContents) = ValidAction 1
+                -- FIXME: Assuming valid packet
+isValidBroadcast nicstate _ = InvalidState "invalid type packet passed to isValidBroadcast"
+
+
 
 -- Check if it is valid IPv4 packet
-isValidIPv4 :: Packet -> CResult
-isValidIPv4 (L2Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
-isValidIPv4 _ = InvalidState "invalid type packet passed to isValidv4"
+checksumIPv4 :: NS.NICState -> Packet -> CResult
+checksumIPv4 nicstate (L2Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
+checksumIPv4 nicstate _ = InvalidState "invalid type packet passed to isValidv4"
 
 -- Check if it is valid IPv6 packet
-isValidIPv6 :: Packet -> CResult
-isValidIPv6 (L2Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
-isValidIPv6 _ = InvalidState "invalid type packet passed to isValidv6"
+checksumIPv6 :: NS.NICState -> Packet -> CResult
+checksumIPv6 nicstate (L2Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
+checksumIPv6 nicstate _ = InvalidState "invalid type packet passed to isValidv6"
 
 -- Check if it is valid L3 packet
-isValidL3 :: Packet -> CResult
-isValidL3 (IPv4Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
-isValidL3 (IPv6Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
-isValidL3 _ = InvalidState "invalid type packet passed to isValidL3"
+classifyL3 :: NS.NICState -> Packet -> CResult
+classifyL3 nicstate (IPv4Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
+classifyL3 nicstate (IPv6Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
+classifyL3 nicstate _ = InvalidState "invalid type packet passed to classifyL3"
 
 -- Check if it is valid TCP packet
-isValidTCP :: Packet -> CResult
-isValidTCP (L3Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
-isValidTCP _ = InvalidState "invalid type packet passed to isValidTCP"
+isValidTCP :: NS.NICState -> Packet -> CResult
+isValidTCP nicstate (L3Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
+isValidTCP nicstate _ = InvalidState "invalid type packet passed to isValidTCP"
 
 -- Check if it is valid UDP packet
-isValidUDP :: Packet -> CResult
-isValidUDP (L3Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
-isValidUDP _ = InvalidState "invalid type packet passed to isValidUDP"
+isValidUDP :: NS.NICState -> Packet -> CResult
+isValidUDP nicstate (L3Packet pkt) = ValidAction 1 -- FIXME: Assuming valid packet
+isValidUDP nicstate _ = InvalidState "invalid type packet passed to isValidUDP"
 
 -- Selects queue after applying filters based on packet type
-applyFilter :: Packet -> CResult
-applyFilter (TCPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
-applyFilter (UDPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
-applyFilter _ = ValidAction 0 -- Default queue (when no other filter matches)
+applyFilter :: NS.NICState -> Packet -> CResult
+applyFilter nicstate (TCPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
+applyFilter nicstate (UDPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
+applyFilter nicstate _ = ValidAction 0 -- Default queue (when no other filter matches)
 
 
 theBigDecision :: Decision
-theBigDecision =
-            Decision {
-                    selector = (Classifier isValidTCP "isValidTCP")
-                    , possibleActions = [
-                        ToDecide Decision {
-                            selector = (Classifier isValidUDP "isValidUDP")
-                            , possibleActions = [
-                                Dropped
-                                , qAction
-                                ]
-                        }
-                        , qAction
-                    ]
-                }
+theBigDecision = des
             where
-                qAction = ToDecide Decision {
+                actionQSelect = ToDecide Decision {
                     selector = (Classifier applyFilter "applyFilter")
                     , possibleActions = [(InQueue 0), (InQueue 1)]
                 }
+                actionUDP = ToDecide Decision {
+                     selector = (Classifier isValidUDP "isValidUDP")
+                     , possibleActions = [ Dropped , actionQSelect]
+                }
+                actionL4 = ToDecide Decision {
+                    selector = (Classifier isValidTCP "isValidTCP")
+                    , possibleActions = [actionUDP , actionQSelect]
+                }
+                actionIPv4 = ToDecide Decision {
+                    selector = (Classifier checksumIPv4 "checksumIPv4")
+                    , possibleActions = [Dropped, actionL4]
+                }
+                actionIPv6 = ToDecide Decision {
+                    selector = (Classifier checksumIPv6 "checksumIPv6")
+                    , possibleActions = [Dropped, actionL4]
+                }
+                actionL3 = ToDecide Decision {
+                    selector = (Classifier classifyL3 "classifyL3")
+                    , possibleActions = [Dropped, actionIPv4, actionIPv6]
+                }
+                actionMulticast = ToDecide Decision {
+                    selector = (Classifier isValidMulticast "isValidMulticast")
+                    , possibleActions = [Dropped, actionL3]
+                }
+                actionBroadcast = ToDecide Decision {
+                    selector = (Classifier isValidBroadcast "isValidBroadcast")
+                    , possibleActions = [Dropped, actionL3]
+                }
+                actionUnicast = ToDecide Decision {
+                    selector = (Classifier isValidUnicast "isValidUnicast")
+                    , possibleActions = [Dropped, actionL3]
+                }
 
+                actionClassifyL2 = ToDecide Decision {
+                    selector = (Classifier classifyL2 "classifyL2")
+                    , possibleActions = [Dropped, actionUnicast,
+                            actionMulticast, actionBroadcast]
+                }
+
+                actionValidateLength = ToDecide Decision {
+                    selector = (Classifier isValidLength "isValidLength")
+                    , possibleActions = [Dropped, actionClassifyL2]
+                }
+                des = Decision {
+                    selector = (Classifier checksumCRC "checksumCRC")
+                    , possibleActions = [Dropped, actionValidateLength]
+                }
 
 
 -- Takes raw packet and returns associated action
-classifyPacket :: Packet -> Action
-classifyPacket pkt = decide theBigDecision pkt
+classifyPacket :: NS.NICState -> Packet -> Action
+classifyPacket nicstate pkt = decide theBigDecision nicstate pkt
 
 -- #################### Main module ####################
 
@@ -275,7 +343,7 @@ main = do
         putStrLn out4
     where
         nicState = NS.updateQueueElement NS.initNICState 6 1 1
-        out1 = show $ classifyPacket getNextPacket
+--        out1 = show $ classifyPacket nicState getNextPacket
         out2 = show $ theBigDecision
         myTree = convertDecision theBigDecision
         out3 = "\n\n\n\n\n"
