@@ -1,5 +1,18 @@
 
-module Main (main) where
+module DecisionTree (
+    Packet
+    , Classifier
+    , CResult
+    , Action
+    , Decision
+    , decide
+    , convertDecision
+    , selector
+    , possibleActions
+) where
+
+
+--module Main (main) where
 
 import qualified List as List
 import qualified Data.Word as W
@@ -267,9 +280,9 @@ applyFilter nicstate (TCPPacket pkt) = ValidAction 1 -- FIXME: get hash and sele
 applyFilter nicstate (UDPPacket pkt) = ValidAction 1 -- FIXME: get hash and select queue
 applyFilter nicstate _ = ValidAction 0 -- Default queue (when no other filter matches)
 
-
-theBigDecision :: Decision
-theBigDecision = des
+{-
+packetHandlingDes :: Decision
+packetHandlingDes = des
             where
                 actionQSelect = ToDecide Decision {
                     selector = (Classifier applyFilter "applyFilter")
@@ -326,7 +339,7 @@ theBigDecision = des
 
 -- Takes raw packet and returns associated action
 classifyPacket :: NS.NICState -> Packet -> Action
-classifyPacket nicstate pkt = decide theBigDecision nicstate pkt
+classifyPacket nicstate pkt = decide packetHandlingDes nicstate pkt
 
 -- #################### Main module ####################
 
@@ -344,10 +357,11 @@ main = do
     where
         nicState = NS.updateQueueElement NS.initNICState 6 1 1
 --        out1 = show $ classifyPacket nicState getNextPacket
-        out2 = show $ theBigDecision
-        myTree = convertDecision theBigDecision
+        out2 = show $ packetHandlingDes
+        myTree = convertDecision packetHandlingDes
         out3 = "\n\n\n\n\n"
         out4 = printAbstractTree myTree
+-}
 
 -- ################################## EOF ###################################
 
