@@ -12,9 +12,7 @@ module DecisionTree (
 
 
 --module Main (main) where
-
-import qualified List as List
-import qualified Data.Word as W
+import qualified Data.List as DL
 import qualified Data.ByteString as BS
 import qualified NICState as NS
 
@@ -124,7 +122,7 @@ printDeclarations (x:xs) = (printDeclarations [x]) ++ (printDeclarations xs)
 printAbstractTree :: AbstractTree -> String
 printAbstractTree tree = decls ++ rels
         where
-            decls = printDeclarations $ List.nub (declarations tree)
+            decls = printDeclarations $ DL.nub (declarations tree)
             rels = printRelations $ relations tree
 
 convertAction :: RootNode -> Position -> Action -> AbstractTree

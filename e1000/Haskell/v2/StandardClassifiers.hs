@@ -13,13 +13,8 @@ module StandardClassifiers (
     , applyFilter
 ) where
 
-import qualified List as List
-import qualified Data.Word as W
-import qualified Data.ByteString as BS
 import qualified NICState as NS
 import qualified DecisionTree as DT
-
-
 
 
 -- #################### Classifier placeholders ####################

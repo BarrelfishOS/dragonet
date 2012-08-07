@@ -1,7 +1,6 @@
 
 module Main (main) where
 
-import qualified List as List
 import qualified Data.Word as W
 import qualified Data.ByteString as BS
 import qualified NICState as NS
