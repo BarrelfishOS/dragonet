@@ -6,7 +6,7 @@ import qualified Data.ByteString as BS
 import qualified NICState as NS
 import qualified DecisionTree as DT
 import qualified StandardClassifiers as SC
-
+import qualified ConvertDecision as CD
 
 
 packetHandlingDes :: DT.Decision
@@ -88,9 +88,9 @@ main = do
 --        out4 = show nicState
         out1 = show $ classifyPacket nicState getNextPacket
         out2 = show $ packetHandlingDes
-        myTree = DT.convertDecision packetHandlingDes
+        myTree = CD.convertDT packetHandlingDes
 --        myTree = DT.convertDT.DT.Decision packetHandlingDes
         out3 = "\n\n\n\n\n"
-        out4 = DT.printAbstractTree myTree
+        out4 = CD.printAbstractTree myTree
 
 
