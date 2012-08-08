@@ -63,6 +63,7 @@ data Decision = Decision {
 -- action specifiying what action each step can take
 data Action = Error String
             | Dropped
+            | Processed
             | InQueue {
                 queueID :: QueueID
                 }
@@ -86,6 +87,7 @@ decide (Decision classifier actionList) nicstate pkt =
         ToDecide toDecide -> decide toDecide nicstate pkt
         InQueue q -> InQueue q
         Dropped -> Dropped
+        Processed -> Processed
         Error info -> Error info
     where
         nextAction = applyDecision (Decision classifier actionList) nicstate pkt

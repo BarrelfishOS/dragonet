@@ -73,6 +73,14 @@ convertAction root pos (DT.Error msg) = let
                     rels = [(Relation (rootNodeName root) pos inst)]
                 in
                     AbstractTree rName decls rels
+convertAction root pos (DT.Processed) = let
+                    eleName = "Processed"
+                    inst = eleName ++ "State"
+                    rName = RootNode inst
+                    decls = [(Declaration inst eleName)]
+                    rels = [(Relation (rootNodeName root) pos inst)]
+                in
+                    AbstractTree rName decls rels
 convertAction root pos (DT.Dropped) = let
                     eleName = "DROPPED"
                     inst = eleName ++ "State"
@@ -116,10 +124,11 @@ convertDT :: DT.Decision -> AbstractTree
 convertDT decision = AbstractTree rName decls rels
         where
             eleName = rootNodeName $ RootNode (DT.funName (DT.selector decision))
-            inst = eleName ++ "Fun"
-            rName = RootNode inst
+            className = "m" ++ eleName
+            rName = RootNode eleName
             results = myMapper rName 0 (DT.possibleActions decision)
-            decls = [(Declaration inst eleName)] ++ (declarations results)
+            decls = [(Declaration eleName className)] ++
+                (declarations results)
             rels =  relations results
 
 
