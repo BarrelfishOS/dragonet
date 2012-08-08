@@ -66,24 +66,24 @@ printAbstractTree tree = decls ++ rels
 -- #################### Convert Decision into Abstract Tree ################
 convertAction :: RootNode -> Position -> DT.Action -> AbstractTree
 convertAction root pos (DT.Error msg) = let
-                    eleName = "ERROR"
-                    inst = eleName ++ "State"
+                    inst = "ERROR"
+                    eleName = inst ++ "State"
                     rName = RootNode inst
                     decls = [(Declaration inst eleName)]
                     rels = [(Relation (rootNodeName root) pos inst)]
                 in
                     AbstractTree rName decls rels
 convertAction root pos (DT.Processed) = let
-                    eleName = "Processed"
-                    inst = eleName ++ "State"
+                    inst = "Processed"
+                    eleName = inst ++ "State"
                     rName = RootNode inst
                     decls = [(Declaration inst eleName)]
                     rels = [(Relation (rootNodeName root) pos inst)]
                 in
                     AbstractTree rName decls rels
 convertAction root pos (DT.Dropped) = let
-                    eleName = "DROPPED"
-                    inst = eleName ++ "State"
+                    inst = "DROPPED"
+                    eleName = inst ++ "State"
                     rName = RootNode inst
                     decls = [(Declaration inst eleName)]
                     rels = [(Relation (rootNodeName root) pos inst)]

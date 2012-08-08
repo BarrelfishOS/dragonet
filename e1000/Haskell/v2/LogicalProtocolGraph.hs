@@ -21,6 +21,7 @@ import qualified LPGModules as LPGm
 initLPG :: DT.Decision
 initLPG = des
         where
+        {-
                actionTCPPCB= DT.ToDecide DT.Decision {
                     DT.selector = (DT.Classifier LPGm.mTCPPCB "TCPPCB")
                     , DT.possibleActions = [DT.Dropped]
@@ -30,20 +31,20 @@ initLPG = des
                     DT.selector = (DT.Classifier LPGm.mUDPPCB "UDPPCB")
                     , DT.possibleActions = [DT.Dropped]
                   }
-
+-}
                actionICMP = DT.ToDecide DT.Decision {
                     DT.selector = (DT.Classifier LPGm.mICMP "ICMP")
-                    , DT.possibleActions = [DT.Dropped]
+                    , DT.possibleActions = [DT.Processed]
                   }
 
                actionTCP = DT.ToDecide DT.Decision {
                     DT.selector = (DT.Classifier LPGm.mTCP "TCP")
-                    , DT.possibleActions = [actionTCPPCB]
+                    , DT.possibleActions = [DT.Dropped]
                   }
 
                actionUDP = DT.ToDecide DT.Decision {
                     DT.selector = (DT.Classifier LPGm.mUDP "UDP")
-                    , DT.possibleActions = [actionUDPPCB]
+                    , DT.possibleActions = [DT.Dropped]
                   }
 
                actionIPv6 = DT.ToDecide DT.Decision {
