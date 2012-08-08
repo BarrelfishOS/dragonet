@@ -17,9 +17,7 @@ main = do
         putStrLn out4
     where
         testLP = LP.initLPG
-        out2 = show $ testLP
         myTree = CD.convertDT testLP
-        out3 = "\n\n\n\n\n"
         out4 = CD.printAbstractTree myTree
 
 

@@ -1,5 +1,13 @@
 module LogicalProtocolGraph (
-    initLPG
+    Application(..)
+    , Socket(..)
+    , GenPCB(..)
+    , UDPPCB(..)
+    , TCPPCB(..)
+    , initLPG
+    , createApp
+    , createTCPSocket
+    , createUDPSocket
 --    , socket
 --    , bind
 --    , listen
@@ -11,10 +19,6 @@ module LogicalProtocolGraph (
 import qualified NICState as NS
 import qualified DecisionTree as DT
 import qualified LPGModules as LPGm
--- import qualified ConvertDecision as CD
-
-
--- LogicalProtocolGraph
 
 -- Get initial minimal functional graph
 -- Process packets till classification in TCP/UDP and then drop them.
@@ -67,4 +71,58 @@ initLPG = des
                     DT.selector = (DT.Classifier LPGm.mNIC "NIC")
                     , DT.possibleActions = [actionEthernet]
                   }
+
+
+type PortNo = Integer
+
+data TCPPCB = TCPPCB {
+        portNoTCP :: PortNo
+    }
+    deriving (Show, Eq)
+
+data UDPPCB = UDPPCB {
+        portNoUDP :: PortNo
+    }
+    deriving (Show, Eq)
+
+data GenPCB = TcpPCB  TCPPCB
+            | UdpPCB UDPPCB
+    deriving (Show, Eq)
+
+data Socket = Socket {
+        apps :: [Application]
+        , pcb :: GenPCB
+    }
+    deriving (Show, Eq)
+
+data Application = Application {
+        appName :: String
+        , appSocks :: [Socket]
+    }
+    deriving (Show, Eq)
+
+-- create new application
+createApp :: String -> Application
+createApp name =
+        Application {
+            appName = name
+            , appSocks = []
+        }
+
+-- Create a TCP socket, connected to the application
+-- NOTE: It does not update the list of sockets inside application
+createTCPSocket :: Application -> Socket
+createTCPSocket app = Socket {
+                    apps = [app]
+                    , pcb = TcpPCB $ TCPPCB 0
+                }
+
+-- Create a UDP socket, connected to the application
+-- NOTE: It does not update the list of sockets inside application
+createUDPSocket :: Application -> Socket
+createUDPSocket app = Socket {
+                    apps = [app]
+                    , pcb = UdpPCB $ UDPPCB 0
+                }
+
 
