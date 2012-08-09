@@ -1,14 +1,12 @@
 module LogicalProtocolGraph (
-    Application(..)
+    LogicalProtocolGraph1(..)
+    , L4Protocol(..)
+    , Application(..)
     , Socket(..)
-    , GenPCB(..)
-    , UDPPCB(..)
-    , TCPPCB(..)
+    , PCB(..)
     , initLPG
     , createApp
-    , createTCPSocket
-    , createUDPSocket
---    , socket
+    , socket
     , bind
 --    , listen
 --    , accept
@@ -21,22 +19,46 @@ import qualified DecisionTree as DT
 import qualified LPGModules as LPGm
 import qualified Data.List as DL
 
+type PortNo = Integer
+type SocketDes = Integer
+
+
+data L4Protocol = TCP
+        | UDP
+        deriving (Show, Eq)
+
+data Application = Application {
+        appName :: String
+        , appSocks :: [Socket]
+    }
+    deriving (Show, Eq)
+
+data Socket = Socket {
+        socketID :: SocketDes
+        , apps :: [Application]
+        , protocol :: L4Protocol
+    }
+    deriving (Show, Eq)
+
+
+data PCB = PCB {
+        sock :: Socket
+        , portNo :: PortNo
+    }
+    deriving (Show, Eq)
+
+data LogicalProtocolGraph1 = LogicalProtocolGraph1 {
+        lpg :: DT.Decision
+        , socketCount :: SocketDes
+    }
+    deriving (Show, Eq)
+
+
 -- Get initial minimal functional graph
 -- Process packets till classification in TCP/UDP and then drop them.
-initLPG :: DT.Decision
-initLPG = des
+initLPG :: LogicalProtocolGraph1
+initLPG = (LogicalProtocolGraph1 des 0)
         where
-        {-
-               actionTCPPCB= DT.ToDecide DT.Decision {
-                    DT.selector = (DT.Classifier LPGm.mTCPPCB "TCPPCB")
-                    , DT.possibleActions = [DT.Dropped]
-                  }
-
-               actionUDPPCB= DT.ToDecide DT.Decision {
-                    DT.selector = (DT.Classifier LPGm.mUDPPCB "UDPPCB")
-                    , DT.possibleActions = [DT.Dropped]
-                  }
--}
                actionICMP = DT.ToDecide DT.Decision {
                     DT.selector = (DT.Classifier LPGm.mICMP "ICMP")
                     , DT.possibleActions = [DT.Processed]
@@ -74,33 +96,7 @@ initLPG = des
                   }
 
 
-type PortNo = Integer
 
-data TCPPCB = TCPPCB {
-        portNoTCP :: PortNo
-    }
-    deriving (Show, Eq)
-
-data UDPPCB = UDPPCB {
-        portNoUDP :: PortNo
-    }
-    deriving (Show, Eq)
-
-data GenPCB = TcpPCB  TCPPCB
-            | UdpPCB UDPPCB
-    deriving (Show, Eq)
-
-data Socket = Socket {
-        apps :: [Application]
-        , pcb :: GenPCB
-    }
-    deriving (Show, Eq)
-
-data Application = Application {
-        appName :: String
-        , appSocks :: [Socket]
-    }
-    deriving (Show, Eq)
 
 -- create new application
 createApp :: String -> Application
@@ -110,22 +106,19 @@ createApp name =
             , appSocks = []
         }
 
--- Create a TCP socket, connected to the application
--- NOTE: It does not update the list of sockets inside application
-createTCPSocket :: Application -> Socket
-createTCPSocket app = Socket {
-                    apps = [app]
-                    , pcb = TcpPCB $ TCPPCB 0
-                }
 
--- Create a UDP socket, connected to the application
--- NOTE: It does not update the list of sockets inside application
-createUDPSocket :: Application -> Socket
-createUDPSocket app = Socket {
-                    apps = [app]
-                    , pcb = UdpPCB $ UDPPCB 0
+socket :: LogicalProtocolGraph1 -> Application -> L4Protocol ->
+                (LogicalProtocolGraph1, Socket)
+socket lp app proto = (lp', sock)
+            where
+            sock = Socket {
+                    socketID = socketCount lp
+                    , apps = [app]
+                    , protocol = proto
                 }
-
+            lp' = lp {
+                    socketCount = (socketCount lp) + 1
+                }
 
 -- #################### Copy Decision tree into new ################
 
@@ -135,11 +128,11 @@ copyAction (modName, modAction) (DT.Processed) = (DT.Processed)
 copyAction (modName, modAction) (DT.Dropped) = (DT.Dropped)
 copyAction (modName, modAction) (DT.InQueue qid) = (DT.InQueue qid)
 copyAction (modName, modAction) (DT.ToDecide des) =
-                (DT.ToDecide (copyDT des modName modAction))
+                (DT.ToDecide (appendAction des modName modAction))
 
 -- Copy decision data-strucutre with appending the action for given module
-copyDT :: DT.Decision -> String -> DT.Action -> DT.Decision
-copyDT (DT.Decision (DT.Classifier funptr fname) alist) modName pcbAction =
+appendAction :: DT.Decision -> String -> DT.Action -> DT.Decision
+appendAction (DT.Decision (DT.Classifier funptr fname) alist) modName pcbAction =
         if fname == modName
                     then DT.Decision (DT.Classifier funptr fname)
                         (newList ++ [pcbAction])
@@ -161,27 +154,39 @@ appToAction app =  DT.ToDecide DT.Decision {
 
 -- Socket to action
 socketToAction :: Socket -> DT.Action
-socketToAction (Socket appList pcb) =
+socketToAction (Socket id appList proto) =
             DT.ToDecide DT.Decision {
                     -- FIXME: There will be multiple sockets, parameterize it
-                    DT.selector = (DT.Classifier LPGm.mSocket "Socket")
+                    DT.selector = (DT.Classifier LPGm.mSocket
+                            ("Socket_" ++ (show id)))
                     , DT.possibleActions = DL.map (appToAction) appList
                   }
+
+
+decodeProtocol :: Socket -> PortNo -> (PCB, String, DT.Classifier)
+decodeProtocol sock portno =
+            (pcb, protoName, clasify)
+            where
+                pcb = (PCB sock portno)
+                protoName = show (protocol sock)
+                clasify = case (protocol sock) of
+                    TCP -> DT.Classifier LPGm.mTCPPCB
+                        ("TCPPCB" ++ "_" ++ (show portno))
+                    UDP -> DT.Classifier LPGm.mUDPPCB
+                        ("UDPPCB" ++ "_" ++ (show portno))
 
 -- Find if socket is TCP or UDP
 -- Find the action list for TCP/UDP
 -- Create TCP/UDP PCB with port number
 -- Add it to action list of TCP/UDP
-bind :: DT.Decision -> Socket -> PortNo -> DT.Decision
-bind des (Socket appList (UdpPCB udp)) portno = initLPG
-bind des (Socket appList (TcpPCB tcp)) portno = des'
+bind :: LogicalProtocolGraph1 -> Socket -> PortNo -> LogicalProtocolGraph1
+bind lp sock portno = lp { lpg = des' }
+                       -- (LogicalProtocolGraph1 des' sList)
     where
-        pcb = TcpPCB TCPPCB {portNoTCP = portno}
-
-        des' = copyDT des "TCP" (DT.ToDecide (DT.Decision {
-                    DT.selector = (DT.Classifier LPGm.mTCPPCB
-                        ("TCPPCB" ++ "_" ++ (show portno)))
-                    , DT.possibleActions = [(socketToAction (Socket appList (TcpPCB tcp)))]
-                  } ))
-
+        (pcb, protoName, classify) = decodeProtocol sock portno
+        newAction = DT.ToDecide DT.Decision {
+                    DT.selector = classify
+                    , DT.possibleActions = [(socketToAction sock)]
+                  }
+        des' = appendAction (lpg lp) protoName newAction
 

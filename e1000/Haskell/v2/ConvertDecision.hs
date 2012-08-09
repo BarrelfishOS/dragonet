@@ -77,8 +77,6 @@ convertAction root pos (DT.Processed) = let
                     inst = "Processed"
                     eleName = inst ++ "State"
                     rName = RootNode inst
---                    decls = [(Declaration inst eleName)]
---                    rels = [(Relation (rootNodeName root) pos inst)]
                     decls = []
                     rels = []
                 in
