@@ -10,8 +10,9 @@ module LogicalProtocolGraph (
     , bind
 --    , listen
 --    , accept
---   , connect
+   , connect
 --   , close
+--   , clone -- clones existing socket/connection into new application (fork)
 ) where
 
 import qualified NICState as NS
@@ -190,3 +191,19 @@ bind lp sock portno = lp { lpg = des' }
                   }
         des' = appendAction (lpg lp) protoName newAction
 
+
+findFreePort :: LogicalProtocolGraph1 -> PortNo
+findFreePort lp = 84
+
+
+-- connect call
+-- Ensure that it is TCP socket
+-- Find a free port
+-- do everything that is done by bind
+-- initiate three way handshake???
+connect :: LogicalProtocolGraph1 -> Socket -> LogicalProtocolGraph1
+connect lp (Socket id appList (TCP)) =
+            bind lp (Socket id appList (TCP)) portno
+            where
+                portno = findFreePort lp
+connect lp (Socket id appList _ ) = error "connect called on non-TCP socket!!"

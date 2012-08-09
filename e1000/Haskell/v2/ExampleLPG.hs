@@ -11,10 +11,10 @@ import qualified LogicalProtocolGraph as LP
 
 -- main function
 main = do
-        putStrLn out3
+--        putStrLn out1
 --        putStrLn out2
 --        putStrLn out3
---        putStrLn out4
+        putStrLn out4
     where
         lp1 = LP.initLPG
         out1 = CD.printAbstractTree $ CD.convertDT $ LP.lpg lp1
@@ -29,4 +29,6 @@ main = do
         lp4' = LP.bind lp4 sock3 69
         out3 = CD.printAbstractTree $ CD.convertDT $ LP.lpg lp4'
 
+        lpConnect = LP.connect lp1' sock1
+        out4 = CD.printAbstractTree $ CD.convertDT $ LP.lpg lpConnect
 
