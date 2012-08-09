@@ -9,7 +9,7 @@ module LogicalProtocolGraph (
     , createTCPSocket
     , createUDPSocket
 --    , socket
---    , bind
+    , bind
 --    , listen
 --    , accept
 --   , connect
@@ -19,6 +19,7 @@ module LogicalProtocolGraph (
 import qualified NICState as NS
 import qualified DecisionTree as DT
 import qualified LPGModules as LPGm
+import qualified Data.List as DL
 
 -- Get initial minimal functional graph
 -- Process packets till classification in TCP/UDP and then drop them.
@@ -124,5 +125,44 @@ createUDPSocket app = Socket {
                     apps = [app]
                     , pcb = UdpPCB $ UDPPCB 0
                 }
+
+
+-- #################### Copy Decision tree into new ################
+
+copyAction :: String -> DT.Action -> DT.Action -> DT.Action
+copyAction modName modAction (DT.Error msg) = (DT.Error msg)
+copyAction modName modAction (DT.Processed) = (DT.Processed)
+copyAction modName modAction (DT.Dropped) = (DT.Dropped)
+copyAction modName modAction (DT.InQueue qid) = (DT.InQueue qid)
+copyAction modName modAction (DT.ToDecide des) =
+                (DT.ToDecide (copyDT des modName modAction))
+
+-- Copy decision data-strucutre with appending the action for given module
+copyDT :: DT.Decision -> String -> DT.Action -> DT.Decision
+copyDT (DT.Decision (DT.Classifier funptr fname) alist) modName pcbAction =
+        if fname == modName
+                    then DT.Decision (DT.Classifier funptr fname)
+                        (newList ++ [pcbAction])
+                    else
+                        DT.Decision (DT.Classifier funptr fname) newList
+    where
+        -- for every decision in alist, replace it with copied decision
+        newList = DL.map (copyAction modName pcbAction) alist
+
+
+-- Find if socket is TCP or UDP
+-- Find the action list for TCP/UDP
+-- Create TCP/UDP PCB with port number
+-- Add it to action list of TCP/UDP
+bind :: DT.Decision -> Socket -> PortNo -> DT.Decision
+bind des (Socket appList (UdpPCB udp) ) portno = initLPG
+bind des (Socket appList (TcpPCB tcp) ) portno = des'
+    where
+        pcb = TcpPCB TCPPCB {portNoTCP = portno}
+        des' = copyDT des "TCP" (DT.ToDecide (DT.Decision {
+                    DT.selector = (DT.Classifier LPGm.mTCPPCB
+                        ("TCPPCB" ++ "_" ++ (show portno)))
+                    , DT.possibleActions = [DT.Processed]
+                  } ))
 
 

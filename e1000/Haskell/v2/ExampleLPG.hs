@@ -11,13 +11,16 @@ import qualified LogicalProtocolGraph as LP
 
 -- main function
 main = do
---        putStrLn out1
+        putStrLn out2
 --        putStrLn out2
 --        putStrLn out3
-        putStrLn out4
+--        putStrLn out4
     where
-        testLP = LP.initLPG
-        myTree = CD.convertDT testLP
-        out4 = CD.printAbstractTree myTree
+        lp1 = LP.initLPG
+        out1 = CD.printAbstractTree $ CD.convertDT lp1
+        app1 = LP.createApp "echoServer"
+        soc1 = LP.createTCPSocket app1
+        lp2 = LP.bind lp1 soc1 7
+        out2 = CD.printAbstractTree $ CD.convertDT lp2
 
 
