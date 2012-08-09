@@ -129,12 +129,12 @@ createUDPSocket app = Socket {
 
 -- #################### Copy Decision tree into new ################
 
-copyAction :: String -> DT.Action -> DT.Action -> DT.Action
-copyAction modName modAction (DT.Error msg) = (DT.Error msg)
-copyAction modName modAction (DT.Processed) = (DT.Processed)
-copyAction modName modAction (DT.Dropped) = (DT.Dropped)
-copyAction modName modAction (DT.InQueue qid) = (DT.InQueue qid)
-copyAction modName modAction (DT.ToDecide des) =
+copyAction :: (String, DT.Action) -> DT.Action -> DT.Action
+copyAction (modName, modAction) (DT.Error msg) = (DT.Error msg)
+copyAction (modName, modAction) (DT.Processed) = (DT.Processed)
+copyAction (modName, modAction) (DT.Dropped) = (DT.Dropped)
+copyAction (modName, modAction) (DT.InQueue qid) = (DT.InQueue qid)
+copyAction (modName, modAction) (DT.ToDecide des) =
                 (DT.ToDecide (copyDT des modName modAction))
 
 -- Copy decision data-strucutre with appending the action for given module
@@ -147,22 +147,41 @@ copyDT (DT.Decision (DT.Classifier funptr fname) alist) modName pcbAction =
                         DT.Decision (DT.Classifier funptr fname) newList
     where
         -- for every decision in alist, replace it with copied decision
-        newList = DL.map (copyAction modName pcbAction) alist
+        newList = DL.map (copyAction (modName, pcbAction)) alist
 
+
+-- Create an action entry from an Application
+appToAction :: Application -> DT.Action
+appToAction app =  DT.ToDecide DT.Decision {
+                    DT.selector = (DT.Classifier LPGm.mAPP (appName app))
+--                    , DT.possibleActions = []
+                    , DT.possibleActions = [DT.Processed]
+                  }
+
+
+-- Socket to action
+socketToAction :: Socket -> DT.Action
+socketToAction (Socket appList pcb) =
+            DT.ToDecide DT.Decision {
+                    -- FIXME: There will be multiple sockets, parameterize it
+                    DT.selector = (DT.Classifier LPGm.mSocket "Socket")
+                    , DT.possibleActions = DL.map (appToAction) appList
+                  }
 
 -- Find if socket is TCP or UDP
 -- Find the action list for TCP/UDP
 -- Create TCP/UDP PCB with port number
 -- Add it to action list of TCP/UDP
 bind :: DT.Decision -> Socket -> PortNo -> DT.Decision
-bind des (Socket appList (UdpPCB udp) ) portno = initLPG
-bind des (Socket appList (TcpPCB tcp) ) portno = des'
+bind des (Socket appList (UdpPCB udp)) portno = initLPG
+bind des (Socket appList (TcpPCB tcp)) portno = des'
     where
         pcb = TcpPCB TCPPCB {portNoTCP = portno}
+
         des' = copyDT des "TCP" (DT.ToDecide (DT.Decision {
                     DT.selector = (DT.Classifier LPGm.mTCPPCB
                         ("TCPPCB" ++ "_" ++ (show portno)))
-                    , DT.possibleActions = [DT.Processed]
+                    , DT.possibleActions = [(socketToAction (Socket appList (TcpPCB tcp)))]
                   } ))
 
 

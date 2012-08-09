@@ -9,6 +9,8 @@ module LPGModules (
     , mICMP
     , mTCPPCB
     , mUDPPCB
+    , mSocket
+    , mAPP
 ) where
 
 import qualified NICState as NS
@@ -64,6 +66,18 @@ mTCPPCB nicstate _ = error "invalid type packet passed to mTCPPCB"
 mUDPPCB :: NS.NICState -> DT.Packet -> DT.CResult
 mUDPPCB nicstate (DT.RawPacket pktContents) = DT.ValidAction 0
 mUDPPCB nicstate _ = error "invalid type packet passed to mUDPPCB"
+
+-- Module to represent TCP PCB processing
+mSocket :: NS.NICState -> DT.Packet -> DT.CResult
+mSocket nicstate (DT.RawPacket pktContents) = DT.ValidAction 0
+mSocket nicstate _ = error "invalid type packet passed to mSocket"
+
+
+
+-- Module to represent TCP PCB processing
+mAPP :: NS.NICState -> DT.Packet -> DT.CResult
+mAPP nicstate (DT.RawPacket pktContents) = DT.ValidAction 0
+mAPP nicstate _ = error "invalid type packet passed to mAPP"
 
 
 

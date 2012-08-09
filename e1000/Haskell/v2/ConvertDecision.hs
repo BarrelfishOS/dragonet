@@ -77,8 +77,10 @@ convertAction root pos (DT.Processed) = let
                     inst = "Processed"
                     eleName = inst ++ "State"
                     rName = RootNode inst
-                    decls = [(Declaration inst eleName)]
-                    rels = [(Relation (rootNodeName root) pos inst)]
+--                    decls = [(Declaration inst eleName)]
+--                    rels = [(Relation (rootNodeName root) pos inst)]
+                    decls = []
+                    rels = []
                 in
                     AbstractTree rName decls rels
 convertAction root pos (DT.Dropped) = let
@@ -110,6 +112,7 @@ convertAction root pos (DT.ToDecide des) = let
 -- Processes list of action and returns their combined results
 myMapper :: RootNode -> Position -> [DT.Action] -> AbstractTree
 myMapper root pos [] = error "Error: list of possible actions is empty!"
+--myMapper root pos [] = AbstractTree (rootNode root) [] []
 myMapper root pos (x:[]) = convertAction root pos x
 myMapper root pos (x:xs) = AbstractTree rName decls rels
         where

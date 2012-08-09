@@ -21,6 +21,7 @@ main = do
         app1 = LP.createApp "echoServer"
         soc1 = LP.createTCPSocket app1
         lp2 = LP.bind lp1 soc1 7
-        out2 = CD.printAbstractTree $ CD.convertDT lp2
+        lp3 = LP.bind lp2 soc1 8
+        out2 = CD.printAbstractTree $ CD.convertDT lp3
 
 
