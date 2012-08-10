@@ -197,6 +197,8 @@ locateModules :: String -> DT.Action -> [DT.Decision]
 locateModules modName (DT.ToDecide des) = listModules modName des
 locateModules modName _ = []
 
+
+
 myCompare :: String -> String -> Bool
 myCompare [] _ = True
 myCompare x [] = False
@@ -252,6 +254,9 @@ connect lp (Socket id appList (TCP)) =
                 portno = findFreePort lp TCP
 connect lp (Socket id appList _ ) = error "connect called on non-TCP socket!!"
 
-
+-- Find appropriate protocol block (TCP/UDP)
+-- Find pcb block
+-- remove this pcb block from list of available actions in protocol block.
 -- close :: LogicalProtocolGraph1 -> Socket -> LogicalProtocolGraph1
+-- FIXME: Finish the implementation
 
