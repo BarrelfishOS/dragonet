@@ -192,9 +192,53 @@ bind lp sock portno = lp { lpg = des' }
         des' = appendAction (lpg lp) protoName newAction
 
 
-findFreePort :: LogicalProtocolGraph1 -> PortNo
-findFreePort lp = 84
+-- Find more
+locateModules :: String -> DT.Action -> [DT.Decision]
+locateModules modName (DT.ToDecide des) = listModules modName des
+locateModules modName _ = []
 
+myCompare :: String -> String -> Bool
+myCompare [] _ = True
+myCompare x [] = False
+myCompare (x:[]) (y:ys) = if x == y then True else False
+myCompare (x:xs) (y:ys) = if x == y then myCompare xs ys else False
+
+
+-- List all PCB connected to the decision-tree
+listModules :: String -> DT.Decision  -> [DT.Decision]
+listModules modName des =
+    if myCompare modName (DT.funName (DT.selector des))
+--    if (funName (selector des)) == modName
+        then
+            modList ++ [des]
+        else
+            modList
+    where
+        modList = DL.concat $
+                DL.map (locateModules modName) (DT.possibleActions des)
+
+getPortNo :: DT.Decision -> PortNo
+getPortNo des = if fixedPart == "PCB_" then portno
+    else
+     error "not proper decision block!, only TCPPCB_X or UDPPCB_X are accepted."
+    where
+        modName = DT.funName (DT.selector des)
+        (protoPart, rest) = DL.splitAt 3 modName
+        (fixedPart, portStr) =  DL.splitAt 4 rest
+        portno = read portStr :: Integer
+
+findPort :: LogicalProtocolGraph1 -> L4Protocol -> PortNo -> Bool
+findPort lp proto portno =
+            DL.any (==portno) ports
+        where
+            blockName = if proto == TCP then ( "TCPPCB" ++ "_" )
+                        else ( "UDPPCB" ++ "_" )
+            pcbDecisions = listModules blockName (lpg lp)
+            ports = DL.map getPortNo pcbDecisions
+
+findFreePort :: LogicalProtocolGraph1 -> L4Protocol -> PortNo
+findFreePort lp proto = DL.head $
+                        DL.dropWhile (findPort lp proto) [1024 .. 65535]
 
 -- connect call
 -- Ensure that it is TCP socket
@@ -205,5 +249,9 @@ connect :: LogicalProtocolGraph1 -> Socket -> LogicalProtocolGraph1
 connect lp (Socket id appList (TCP)) =
             bind lp (Socket id appList (TCP)) portno
             where
-                portno = findFreePort lp
+                portno = findFreePort lp TCP
 connect lp (Socket id appList _ ) = error "connect called on non-TCP socket!!"
+
+
+-- close :: LogicalProtocolGraph1 -> Socket -> LogicalProtocolGraph1
+
