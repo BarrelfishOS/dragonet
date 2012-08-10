@@ -34,6 +34,9 @@ data Application = Application {
     }
     deriving (Show, Eq)
 
+socketFixedPart :: String
+socketFixedPart = "Socket_"
+
 data Socket = Socket {
         socketID :: SocketDes
         , apps :: [Application]
@@ -108,12 +111,35 @@ createApp name =
         }
 
 
+getSocketID :: DT.Decision -> SocketDes
+getSocketID des = if fixedPart == socketFixedPart then sockid
+       else error "not proper decision block, only Socket_ is accepted"
+    where
+        modName = DT.funName (DT.selector des)
+        (fixedPart, rest) = DL.splitAt (DL.length socketFixedPart) modName
+        sockid = read rest :: Integer
+
+
+findSocket :: LogicalProtocolGraph1 -> SocketDes -> Bool
+findSocket lp sockID =
+            DL.any (==sockID) valueList
+        where
+            blockName = socketFixedPart
+            decisionList = listModules (beginWith) blockName (lpg lp)
+            valueList = DL.map getSocketID decisionList
+
+
+findFreeSocket :: LogicalProtocolGraph1 -> SocketDes
+findFreeSocket lp = DL.head $
+                        DL.dropWhile (findSocket lp) [0 .. 1024]
+
 socket :: LogicalProtocolGraph1 -> Application -> L4Protocol ->
                 (LogicalProtocolGraph1, Socket)
 socket lp app proto = (lp', sock)
             where
             sock = Socket {
                     socketID = socketCount lp
+--                    socketID = findFreeSocket lp
                     , apps = [app]
                     , protocol = proto
                 }
@@ -152,14 +178,13 @@ appToAction app =  DT.ToDecide DT.Decision {
                     , DT.possibleActions = [DT.Processed]
                   }
 
-
 -- Socket to action
 socketToAction :: Socket -> DT.Action
 socketToAction (Socket id appList proto) =
             DT.ToDecide DT.Decision {
                     -- FIXME: There will be multiple sockets, parameterize it
                     DT.selector = (DT.Classifier LPGm.mSocket
-                            ("Socket_" ++ (show id)))
+                            (socketFixedPart ++ (show id)))
                     , DT.possibleActions = DL.map (appToAction) appList
                   }
 
@@ -192,24 +217,30 @@ bind lp sock portno = lp { lpg = des' }
         des' = appendAction (lpg lp) protoName newAction
 
 
+
+compareWith :: String -> String -> Bool
+compareWith x y = (x == y)
+
+beginWith :: String -> String -> Bool
+beginWith [] _ = True
+beginWith x [] = False
+beginWith (x:[]) (y:ys) = if x == y then True else False
+beginWith (x:xs) (y:ys) = if x == y then beginWith xs ys else False
+
+type Comparator = (String -> String -> Bool)
+
 -- Find more
-locateModules :: String -> DT.Action -> [DT.Decision]
-locateModules modName (DT.ToDecide des) = listModules modName des
-locateModules modName _ = []
+locateModules :: Comparator -> String -> DT.Action -> [DT.Decision]
+locateModules compare modName (DT.ToDecide des) =
+                        listModules compare modName des
+locateModules compare modName _ = []
 
-
-
-myCompare :: String -> String -> Bool
-myCompare [] _ = True
-myCompare x [] = False
-myCompare (x:[]) (y:ys) = if x == y then True else False
-myCompare (x:xs) (y:ys) = if x == y then myCompare xs ys else False
 
 
 -- List all PCB connected to the decision-tree
-listModules :: String -> DT.Decision  -> [DT.Decision]
-listModules modName des =
-    if myCompare modName (DT.funName (DT.selector des))
+listModules :: Comparator -> String -> DT.Decision -> [DT.Decision]
+listModules compare modName des =
+    if compare modName (DT.funName (DT.selector des))
 --    if (funName (selector des)) == modName
         then
             modList ++ [des]
@@ -217,7 +248,7 @@ listModules modName des =
             modList
     where
         modList = DL.concat $
-                DL.map (locateModules modName) (DT.possibleActions des)
+            DL.map (locateModules compare modName) (DT.possibleActions des)
 
 getPortNo :: DT.Decision -> PortNo
 getPortNo des = if fixedPart == "PCB_" then portno
@@ -235,7 +266,7 @@ findPort lp proto portno =
         where
             blockName = if proto == TCP then ( "TCPPCB" ++ "_" )
                         else ( "UDPPCB" ++ "_" )
-            pcbDecisions = listModules blockName (lpg lp)
+            pcbDecisions = listModules (beginWith) blockName (lpg lp)
             ports = DL.map getPortNo pcbDecisions
 
 findFreePort :: LogicalProtocolGraph1 -> L4Protocol -> PortNo
@@ -254,9 +285,11 @@ connect lp (Socket id appList (TCP)) =
                 portno = findFreePort lp TCP
 connect lp (Socket id appList _ ) = error "connect called on non-TCP socket!!"
 
+
 -- Find appropriate protocol block (TCP/UDP)
 -- Find pcb block
 -- remove this pcb block from list of available actions in protocol block.
--- close :: LogicalProtocolGraph1 -> Socket -> LogicalProtocolGraph1
--- FIXME: Finish the implementation
+close :: LogicalProtocolGraph1 -> Socket -> LogicalProtocolGraph1
+close lp sock = lp
+
 
