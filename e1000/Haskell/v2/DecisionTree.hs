@@ -57,7 +57,15 @@ data Decision = Decision {
                 , possibleActions :: [Action]
               }
               deriving (Show, Eq)
-
+{-
+data RDecision = RDecision {
+                selector :: Classifier
+                , possibleActions :: [RDecision]
+              }
+              | RDropped
+              | RProcessed
+              deriving (Show, Eq)
+-}
 
 
 -- action specifiying what action each step can take
