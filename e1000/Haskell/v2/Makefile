@@ -6,9 +6,9 @@ LPG:	*.hs
 	ghc ExampleLPG.hs -o ExampleLPG -fwarn-incomplete-patterns
 
 runEX: e1kExample
-	./e1kExample | tee config.click
-	clicky -f config.click --pdf=config.pdf
-#	evince config.pdf &
+	./e1kExample | tee e1kExample.click
+	clicky -f e1kExample.click --pdf=e1kExample.pdf
+#	evince e1kExample.pdf &
 
 run: LPG
 	./ExampleLPG | tee LPG.click

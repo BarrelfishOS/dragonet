@@ -21,7 +21,7 @@ main = do
         putStrLn graph1
     where
         -- Initialize the logical protocol graph
-        lp1 = LP.initLPG
+        lp1 = LP.initLPGExpand
 
         -- First application is active now
         -- It will open two sockets and will bind to two ports

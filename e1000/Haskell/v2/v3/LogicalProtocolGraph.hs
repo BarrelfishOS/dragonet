@@ -5,6 +5,7 @@ module LogicalProtocolGraph (
     , Socket(..)
     , PCB(..)
     , initLPG
+    , initLPGExpand
     , createApp
     , socket
     , bind
@@ -97,6 +98,109 @@ initLPG = (LogicalProtocolGraph1 des 0)
                     , DT.possibleActions = [actionEthernet]
                   }
 
+-- Get initial minimal but expanded functional graph
+-- Process packets till classification in TCP/UDP and then drop them.
+initLPGExpand :: LogicalProtocolGraph1
+initLPGExpand = (LogicalProtocolGraph1 des 0)
+        where
+               cProcessICMP = DT.Decision {
+                    DT.compute = (DT.Computation "ICMP")
+                    , DT.possibleActions = [DT.Processed]
+                  }
+
+               cProcessTCP = DT.Decision {
+                    DT.compute = (DT.Computation "TCP")
+                    , DT.possibleActions = [DT.Dropped]
+                  }
+
+               cProcessUDP = DT.Decision {
+                    DT.compute = (DT.Computation "UDP")
+                    , DT.possibleActions = [DT.Dropped]
+                  }
+
+               cClassifyUDP =  DT.Decision {
+                     DT.compute = (DT.Computation "ClassifyUDP")
+                     , DT.possibleActions = [DT.Dropped, cProcessUDP]
+                }
+               cClassifyTCP =  DT.Decision {
+                    DT.compute = (DT.Computation "ClassifyTCP")
+                    , DT.possibleActions = [DT.Dropped, cProcessTCP]
+                }
+
+
+               cValidateUDP =  DT.Decision {
+                     DT.compute = (DT.Computation "isValidUDP")
+                     , DT.possibleActions = [DT.Dropped, cClassifyUDP]
+                }
+               cValidateTCP =  DT.Decision {
+                    DT.compute = (DT.Computation "isValidTCP")
+                    , DT.possibleActions = [DT.Dropped, cClassifyTCP]
+                }
+
+                -- Layer L3 computations
+               cIPv6Processing = DT.Decision {
+                    DT.compute = (DT.Computation "IPv6")
+                    , DT.possibleActions = [cValidateTCP, cValidateUDP,
+                            cProcessICMP]
+                  }
+
+               cIPv4Processing = DT.Decision {
+                    DT.compute = (DT.Computation "IPv4")
+                    , DT.possibleActions = [cValidateTCP, cValidateUDP,
+                            cProcessICMP]
+                  }
+
+               cIPv4Checksum =  DT.Decision {
+                    DT.compute = (DT.Computation "checksumIPv4")
+                    , DT.possibleActions = [DT.Dropped, cIPv4Processing]
+                }
+
+               cIPv6Checksum  =  DT.Decision {
+                    DT.compute = (DT.Computation "checksumIPv6")
+                    , DT.possibleActions = [DT.Dropped, cIPv6Processing]
+                }
+
+               actionEthernet = DT.Decision {
+                    DT.compute = (DT.Computation "classifyL3")
+                    , DT.possibleActions = [cIPv4Checksum, cIPv6Checksum]
+                  }
+
+                -- Layer L2 computations
+               actionMulticast =  DT.Decision {
+                    DT.compute = (DT.Computation "isValidMulticast")
+                    , DT.possibleActions = [DT.Dropped, actionEthernet]
+                }
+               actionBroadcast =  DT.Decision {
+                    DT.compute = (DT.Computation "isValidBroadcast")
+                    , DT.possibleActions = [DT.Dropped, actionEthernet]
+                }
+               actionUnicast =  DT.Decision {
+                    DT.compute = (DT.Computation "isValidUnicast")
+                    , DT.possibleActions = [DT.Dropped, actionEthernet]
+                }
+
+               actionClassifyL2 =  DT.Decision {
+                    DT.compute = (DT.Computation "classifyL2")
+                    , DT.possibleActions = [DT.Dropped, actionUnicast,
+                            actionMulticast, actionBroadcast]
+                }
+
+               actionValidateLength =  DT.Decision {
+                    DT.compute = (DT.Computation "isValidLength")
+                    , DT.possibleActions = [DT.Dropped, actionClassifyL2]
+                }
+
+               cChecksum = DT.Decision {
+                    DT.compute = (DT.Computation "checksumCRC")
+                    , DT.possibleActions = [DT.Dropped, actionValidateLength]
+                }
+
+                -- NIC hardware representation
+               des = DT.Decision {
+                    DT.compute = (DT.Computation "NIC")
+                    , DT.possibleActions = [cChecksum]
+                  }
+
 
 -- create new application
 createApp :: String -> Application
@@ -160,7 +264,8 @@ appendAction (DT.Processed) _ _= (DT.Processed)
 appendAction (DT.Dropped) _ _= (DT.Dropped)
 appendAction (DT.InQueue qid) _ _= (DT.InQueue qid)
 appendAction (DT.Decision (DT.Computation cname) dlist) modName toAdd =
-        if cname == modName
+       if cname == modName
+--        if cname == (["Classify"] ++ modName)
                     then DT.Decision (DT.Computation cname)
                         (newList ++ [toAdd])
                     else
