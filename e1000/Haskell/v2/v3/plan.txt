@@ -40,6 +40,72 @@ Or, in what different ways I can approach the formulation of this problem?
         These decisions can be about packets, or about something else.
 
 ------------------------------------------------------------------------
+How should I abstract out the decision process?
+
+------------------------------------------------------------------------
+What I want to capture?
+How the decisions are made
+
+------------------------------------------------------------------------
+Why I want to capture?
+I want to capture the functionality of NIC hardware and the state of
+network stack, so that I can do better matching between NIC hardware
+and network stack.
+
+What is the functionality of NIC?
+    --> Packet processing: That is, deciding what to do with given packet.
+    --> They react to events
+        - Incoming packet
+        - events from user
+            + new packet
+            + configuration change
+
+What is the functionality of logical protocol stack?
+    --> Tells the state of system
+    --> How system is currently configured to react to particular event?
+    --> How system is currently making decisions?
+
+Point is that, these decisions can be implemented in multiple ways.
+
+------------------------------------------------------------------------
+There has to be a notion of ``Computation`` or ``Action``:
+ * Examples of computations:
+   + These are intermediate steps
+   + Takes some input (ie: packet, configuration), and produces some output
+   + These outputs are used by decision making blocks
+   + Why can't I just imply computation inside decision making?
+        This is the way I am doing things right now.
+    - Checksum
+    - Hash
+    - Filter
+ * Examples of Action
+   + Actions are terminal.
+   + They are final outcome of decision making
+    - Copy
+    - DMA (isn't it just a copy?)
+    - Drop
+    - Send
+    - Notification generation
+   + What about actions related to device configuration?
+
+------------------------------------------------------------------------
+Question: Implications of **Assuming computations inside decisions**
+Ans:
+
+  * Pros:
+    + Easy as there are no separate blocks.
+
+  * Cons:
+    + Loss of flexibility as decision and computations are merged
+    + This can't exploit situations where decisions and computations
+        can be separated and done at different places.
+    + May be, it can be simulated with decisions which just do computations
+        and call only next guy instead of choosing between list of next
+        elements.
+
+------------------------------------------------------------------------
+------------------------------------------------------------------------
+------------------------------------------------------------------------
  * What is a decision?
     - For given set of input, it selects one of the possible output from
         finite set of outputs.
