@@ -1,0 +1,74 @@
+
+------------------------------------------------------------------------
+Add pre-conditions and post-conditions.
+    --> Few examples of these conditions as starting point
+    --> Data-structure for pre and post conditions
+    --> Code to generate all possible combinations of these graphs
+
+
+------------------------------------------------------------------------
+Q: What is a **condition**?
+A:
+  * It can be a unit condition, or combination of condition
+  * They can be combined with
+    - AND
+    - OR
+  * Basic conditions are called combinators
+    - They can be expressed in high level labels
+    - Will get translated into bit-level value conditions
+    - Conditions will be
+      + ==
+      + !=
+      + <=
+      + >=
+      + between range
+  * Condition will be a function which, when applied on packet,
+        returns true or false
+
+------------------------------------------------------------------------
+Q: Why am I thinking about packet here?  Is there any other way to approach
+this problem?
+A: What are the possible way to think about this problem?
+Or, in what different ways I can approach the formulation of this problem?
+ * What will happen to each packet?
+    - This is what I have been doing most of the time.  For every incoming
+        packet, you decide what will happen to it.  And based on these
+        decisions, you figure out whole stack.
+ * What is the data-flow? What are different decisions made?
+    - Forget about packet, concentrate on decisions here.
+        eg: decision X is connected to decision Y, etc
+        These decisions can be about packets, or about something else.
+
+------------------------------------------------------------------------
+ * What is a decision?
+    - For given set of input, it selects one of the possible output from
+        finite set of outputs.
+
+ * Can condition be a decision?
+   - Condition can be a binary decision which
+
+------------------------------------------------------------------------
+Few examples of these conditions as starting point
+
+* IPv4
+  - Preconditions
+    +
+
+------------------------------------------------------------------------
+Logical protocol graph should be made up of just graph nodes and their
+pre-conditions and post-conditions.
+
+------------------------------------------------------------------------
+Physical resource graph (eg: NIC dataflow) should be hard-wired.
+
+------------------------------------------------------------------------
+Find out a way to generate different possible logical protocol graphs from
+given pre and post conditions.
+
+------------------------------------------------------------------------
+Use some kind of subgraph mapping algorithm to match one of the logical
+protocol graph onto physical graph.
+
+------------------------------------------------------------------------
+
+
