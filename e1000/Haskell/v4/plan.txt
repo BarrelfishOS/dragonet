@@ -139,6 +139,61 @@ Few examples of these conditions as starting point
         - UDP
         - ICMP
 
+eg:
+
+ * NIC gives out packet
+ * Ethernet module
+    - accepts packets
+    - gives out
+        + invalid packet
+        + IPv4 packet
+        + IPv6 packet
+ * IPv4 module
+    - accepts IPv4 packet
+    - gives out
+        + Invalid packet
+        + TCP packet
+        + UDP packet
+        + ICMP packet
+ * IPv6 module
+    - accepts IPv6 packet
+    - gives out
+        + Invalid packet
+        + TCP packet
+        + UDP packet
+        + ICMP packet
+ * UDP module
+    - accepts UDP packet
+    - gives out
+        + Invalid packet
+        + DNS packet
+        + NFS packet
+
+
+Post-condition for IPv4
+--> invalid or TCP or UDP or ICMP
+
+Pre-condition for UDP
+--> UDP
+
+
+
+------------------------------------------------------------------------
+Question: Can a node have more than one pre/post conditions?
+
+ANSWER: Lets start with pre-condition.
+
+------------------------------------------------------------------------
+What is pre-condition?
+It is a condition which must be meet.  It qualifies packet to go to next step.
+eg: packet has IPv4 protocol tag.
+
+------------------------------------------------------------------------
+Can there be more than one pre-condition?
+Which also translate to that can there be more than one path to reach some
+particular processing element.  Certainly yes, but does that mean it needs
+more than one pre-condition?
+
 ------------------------------------------------------------------------
 Logical protocol graph should be made up of just graph nodes and their
 pre-conditions and post-conditions.

@@ -40,9 +40,19 @@ data Decision = Decision {
                 compute :: Computation
                 , next :: [Decision]
               }
-              | Action
+              | Act {
+                    action :: Action
+              }
               deriving (Show, Eq)
 
+-- Defination of condition
+data Condition = Condition {
+                    tag :: String
+               }
+               | And Condition Condition
+               | Or Condition Condition
+               | Not Condition
+               deriving (Show, Eq)
 
 data Step = Step {
                 pre :: Condition
@@ -60,7 +70,10 @@ main = do
         putStrLn out1
     where
         des = Dropped
-        out1 = show des
+        pre = Condition "Packet"
+        post = Or (Condition "IPv4") (Condition "IPv6")
+        step1 = Step pre post (Act Dropped)
+        out1 = show step1
 
 -- ################################## EOF ###################################
 
