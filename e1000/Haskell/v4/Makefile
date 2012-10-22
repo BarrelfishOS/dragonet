@@ -1,10 +1,10 @@
 
-DecisionTree:	*.hs
-	ghc DecisionTree.hs -o DecisionTree -fwarn-incomplete-patterns
+Elements:	*.hs
+	ghc Elements.hs -o Elements -fwarn-incomplete-patterns
 
-run:	DecisionTree
-	./DecisionTree
+run:	Elements
+	./Elements
 
 clean:
-	rm -f *.hi *.o DecisionTree
+	rm -f *.hi *.o Elements
 

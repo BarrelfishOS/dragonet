@@ -1,12 +1,13 @@
 #!/usr/bin/env runhaskell
-{-
 module DecisionTree (
     Computation(..)
-    , Decision(..)
+    , SDecision(..)
+    , Action(..)
+    , Condition(..)
+    , Step(..)
 ) where
--}
 
-module Main (main) where
+--module Main (main) where
 
 import qualified Data.ByteString as BS
 -- import qualified NICState as NS
@@ -41,6 +42,16 @@ data Decision = Decision {
                 , next :: [Decision]
               }
               | Act {
+                    saction :: Action
+              }
+              deriving (Show, Eq)
+
+-- Stupid decision.  It is placeholder for decision and should
+-- eventually replace the decision
+data SDecision = SDecision {
+                decision :: String
+              }
+              | SAct {
                     action :: Action
               }
               deriving (Show, Eq)
@@ -52,12 +63,14 @@ data Condition = Condition {
                | And Condition Condition
                | Or Condition Condition
                | Not Condition
+               | Empty
+               | Error
                deriving (Show, Eq)
 
 data Step = Step {
                 pre :: Condition
                 , post :: Condition
-                , des :: Decision
+                , des :: SDecision
             }
             deriving (Show, Eq)
 -- #################### Decision function implementation ####################
@@ -66,13 +79,13 @@ data Step = Step {
 -- #################### Main module ####################
 
 -- main function
-main = do
+tmain = do
         putStrLn out1
     where
         des = Dropped
         pre = Condition "Packet"
         post = Or (Condition "IPv4") (Condition "IPv6")
-        step1 = Step pre post (Act Dropped)
+        step1 = Step pre post (SDecision "test")
         out1 = show step1
 
 -- ################################## EOF ###################################
