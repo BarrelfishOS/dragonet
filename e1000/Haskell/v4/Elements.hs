@@ -1,24 +1,14 @@
 #!/usr/bin/env runhaskell
 
-{-
-module Elements (
-    Computation(..)
-    , SDecision(..)
-    , Action(..)
-    , Condition(..)
-    , Step(..)
-) where
--}
+module Elements (getElementList) where
 
-module Main (main) where
+-- module Main (main) where
 
 import qualified DecisionTree as DT
 
 {-
  - Create list of all modules which are possible in logical protocol graph
  -}
-
--- #################### Main module ####################
 
 
 -- Get NIC hardware emulator module
@@ -83,14 +73,19 @@ getUDPMod = DT.Step pre post (DT.SAct actName)
             pre = DT.Condition "UDP"
             post = DT.Empty
 
+
+getElementList :: [DT.Step]
+getElementList = modList
+    where
+        modList = [getUDPMod, getTCPMod, getIPv6Mod, getIPv4Mod,
+                    getEthernetMod, getNICMod]
+
+
 -- main function
 main = do
         putStrLn out1
     where
-        modList = [getUDPMod, getTCPMod, getIPv6Mod, getIPv4Mod,
-                    getEthernetMod, getNICMod]
-        out1 = show modList
-        -- out1 = show getIPv6Mod
+        out1 = show getElementList
 
 -- ################################## EOF ###################################
 

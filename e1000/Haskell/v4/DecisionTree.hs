@@ -73,6 +73,13 @@ data Step = Step {
                 , des :: SDecision
             }
             deriving (Show, Eq)
+
+data Node = Node {
+                elem :: Step
+                , edges :: [Node]
+            }
+            deriving (Show, Eq)
+
 -- #################### Decision function implementation ####################
 
 
