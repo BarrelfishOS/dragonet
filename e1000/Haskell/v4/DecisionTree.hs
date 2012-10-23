@@ -5,6 +5,8 @@ module DecisionTree (
     , Action(..)
     , Condition(..)
     , Step(..)
+    , Node(..)
+    , conditionCompare
 ) where
 
 --module Main (main) where
@@ -56,16 +58,38 @@ data SDecision = SDecision {
               }
               deriving (Show, Eq)
 
+
+type Tag = String -- tag for condition
+
 -- Defination of condition
 data Condition = Condition {
-                    tag :: String
+                    tag :: Tag
                }
                | And Condition Condition
                | Or Condition Condition
-               | Not Condition
+--               | Not Condition
                | Empty
                | Error
                deriving (Show, Eq)
+
+
+toTagList :: Condition -> [Tag]
+toTagList Empty = []
+toTagList Error = ["Error"]
+toTagList (Condition t) = [t]
+toTagList (Or c1 c2)= (toTagList c1) ++ (toTagList c2)
+toTagList _ = error "not supported yet"
+
+-- Compare two conditions
+conditionCompare :: Condition -> Condition -> Bool
+conditionCompare Empty Empty = True
+conditionCompare Error  _ = False
+conditionCompare _ Error = False
+--conditionCompare (Or c11 c12) c2 = ((conditionCompare c11 c2) or
+--                                    (conditionCompare c12 c2))
+conditionCompare _ _ = False
+
+
 
 data Step = Step {
                 pre :: Condition
