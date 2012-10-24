@@ -1,33 +1,42 @@
 #!/usr/bin/env runhaskell
 
-{-
 module DecisionTree (
     Action(..)
+    , Terminal(..)
+    , NonTerminal(..)
     , PreCondition(..)
     , PostCondition(..)
     , Module(..)
     , Node(..)
+    , defaultPostcondition
+    , finalPostcondition
+    , initPrecondition
 ) where
--}
 
-module Main (main) where
+-- module Main (main) where
 
 type QueueID = Integer  -- ID for the hardware queue
 
 type Tag = String -- tag for condition
 
-data Action = Dropped
+data Terminal = Dropped
             | Processed
             | InQueue {
                 queueID :: QueueID
             }
-            |    NIC
+            deriving (Show, Eq)
+
+data NonTerminal = NIC
             | Ethernet
             | IPv4
             | IPv6
             | ICMP
             | UDP
             | TCP
+            deriving (Show, Eq)
+
+data Action = T Terminal
+            | NT NonTerminal
             deriving (Show, Eq)
 
 
@@ -88,7 +97,7 @@ defaultPostcondition m n = n ++ [newNode]
 main = do
         putStrLn out1
     where
-        act = Dropped
+        act = T Dropped
         precond = PreCondition initPrecondition
         postcond = PostCondition defaultPostcondition
         m = Module precond postcond act

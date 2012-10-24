@@ -1,10 +1,10 @@
 
-GraphGenerator:	*.hs
-	ghc GraphGenerator.hs -o GraphGenerator -fwarn-incomplete-patterns
+Elements:	*.hs
+	ghc Elements.hs -o Elements -fwarn-incomplete-patterns
 
-run:	GraphGenerator
-	./GraphGenerator
+run:	Elements
+	./Elements
 
 clean:
-	rm -f *.hi *.o GraphGenerator
+	rm -f *.hi *.o Elements
 

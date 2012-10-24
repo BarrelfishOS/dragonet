@@ -1,8 +1,8 @@
 #!/usr/bin/env runhaskell
 
-module Elements (getElementList) where
+-- module Elements (getElementList) where
 
--- module Main (main) where
+module Main (main) where
 
 import qualified DecisionTree as DT
 
@@ -12,76 +12,84 @@ import qualified DecisionTree as DT
 
 
 -- Get NIC hardware emulator module
-getNICMod :: DT.Step
-getNICMod = DT.Step pre post (DT.SDecision desName)
+getNICMod :: DT.Module
+getNICMod = DT.Module precond postcond action
         where
-            desName = "NIC"
-            pre = DT.Empty
-            post = DT.Condition "Ethernet"
+            precond = DT.PreCondition DT.initPrecondition
+            postcond = DT.PostCondition DT.defaultPostcondition
+            action = DT.NT DT.NIC
 
 -- Get Ethernet module
-getEthernetMod :: DT.Step
-getEthernetMod = DT.Step pre post (DT.SDecision desName)
+getEthernetMod :: DT.Module
+getEthernetMod = DT.Module precond postcond action
         where
-            desName = "Ethernet"
-            pre = DT.Condition "Ethernet"
-            post = DT.Or (DT.Or (DT.Condition "IPv4") (DT.Condition "IPv6"))
-                    DT.Error
+            precond = DT.PreCondition DT.initPrecondition
+            postcond = DT.PostCondition DT.defaultPostcondition
+            action = DT.NT DT.Ethernet
+            -- post = DT.Or (DT.Or (DT.Condition "IPv4") (DT.Condition "IPv6"))
+            --        DT.Error
 
 
 -- Get IPv4 capable module
-getIPv4Mod :: DT.Step
-getIPv4Mod = DT.Step pre post (DT.SDecision desName)
+getIPv4Mod :: DT.Module
+getIPv4Mod = DT.Module precond postcond action
         where
-            desName = "IPv4"
-            pre = DT.Condition "IPv4"
-            post = DT.Or (DT.Or (DT.Or (DT.Condition "ICMP")
-                            (DT.Condition "UDP")) (DT.Condition "TCP"))
-                            DT.Error
+            precond = DT.PreCondition DT.initPrecondition
+            postcond = DT.PostCondition DT.defaultPostcondition
+            action = DT.NT DT.IPv4
+            -- post = DT.Or (DT.Or (DT.Or (DT.Condition "ICMP")
+            --                (DT.Condition "UDP")) (DT.Condition "TCP"))
+            --                DT.Error
 
 -- Get IPv6 capable module
-getIPv6Mod :: DT.Step
-getIPv6Mod = DT.Step pre post (DT.SDecision desName)
+getIPv6Mod :: DT.Module
+getIPv6Mod = DT.Module precond postcond action
         where
-            desName = "IPv6"
-            pre = DT.Condition "IPv6"
-            post = DT.Or (DT.Or (DT.Or (DT.Condition "ICMP")
-                            (DT.Condition "UDP")) (DT.Condition "TCP"))
-                            DT.Error
+            precond = DT.PreCondition DT.initPrecondition
+            postcond = DT.PostCondition DT.defaultPostcondition
+            action = DT.NT DT.IPv6
+            -- post = DT.Or (DT.Or (DT.Or (DT.Condition "ICMP")
+            --                (DT.Condition "UDP")) (DT.Condition "TCP"))
+            --                DT.Error
 
 -- Get ICMP processing module
-getICMPMod :: DT.Step
-getICMPMod = DT.Step pre post (DT.SAct actName)
+getICMPMod :: DT.Module
+getICMPMod = DT.Module precond postcond action
         where
-            actName = DT.Processed
-            pre = DT.Condition "ICMP"
-            post = DT.Empty
+            precond = DT.PreCondition DT.initPrecondition
+            postcond = DT.PostCondition DT.defaultPostcondition
+            action = DT.NT DT.ICMP
+            -- post = DT.Empty
 
 -- Get TCP processing module
-getTCPMod :: DT.Step
-getTCPMod = DT.Step pre post (DT.SAct actName)
+getTCPMod :: DT.Module
+getTCPMod = DT.Module precond postcond action
         where
-            actName = DT.Dropped
-            pre = DT.Condition "TCP"
-            post = DT.Empty
+            precond = DT.PreCondition DT.initPrecondition
+            postcond = DT.PostCondition DT.defaultPostcondition
+            action = DT.NT DT.TCP
+            -- post = DT.Empty
 
 -- Get UDP processing module
-getUDPMod :: DT.Step
-getUDPMod = DT.Step pre post (DT.SAct actName)
+getUDPMod :: DT.Module
+getUDPMod = DT.Module precond postcond action
         where
-            actName = DT.Dropped
-            pre = DT.Condition "UDP"
-            post = DT.Empty
+            precond = DT.PreCondition DT.initPrecondition
+            postcond = DT.PostCondition DT.defaultPostcondition
+            action = DT.NT DT.UDP
+            -- actName = DT.Dropped
+            -- post = DT.Empty
 
 
-getElementList :: [DT.Step]
+getElementList :: [DT.Module]
 getElementList = modList
     where
         modList = [getUDPMod, getTCPMod, getIPv6Mod, getIPv4Mod,
                     getEthernetMod, getNICMod]
 
 
--- main function
+-- #################### Main module ####################
+
 main = do
         putStrLn out1
     where
