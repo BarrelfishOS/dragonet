@@ -1,123 +1,98 @@
 #!/usr/bin/env runhaskell
+
+{-
 module DecisionTree (
-    Computation(..)
-    , SDecision(..)
-    , Action(..)
-    , Condition(..)
-    , Step(..)
+    Action(..)
+    , PreCondition(..)
+    , PostCondition(..)
+    , Module(..)
     , Node(..)
-    , conditionCompare
 ) where
+-}
 
---module Main (main) where
-
-import qualified Data.ByteString as BS
--- import qualified NICState as NS
+module Main (main) where
 
 type QueueID = Integer  -- ID for the hardware queue
 
--- packet: capturing incoming packet
--- Currently it is a placeholder and not actually used
-data Packet = Packet {
-                    bytes :: BS.ByteString
-              }
-              deriving (Show, Eq)
-
--- Computation: Name of the computation unit
--- Note: can also add a function which will actually perform the computation
---      using packet as input
-data Computation = Computation {
-        name :: String
-    }
-    deriving (Show, Eq)
+type Tag = String -- tag for condition
 
 data Action = Dropped
             | Processed
             | InQueue {
                 queueID :: QueueID
             }
+            |    NIC
+            | Ethernet
+            | IPv4
+            | IPv6
+            | ICMP
+            | UDP
+            | TCP
             deriving (Show, Eq)
 
--- Recursive decision tree which captures the decision tree
-data Decision = Decision {
-                compute :: Computation
-                , next :: [Decision]
-              }
-              | Act {
-                    saction :: Action
-              }
-              deriving (Show, Eq)
 
--- Stupid decision.  It is placeholder for decision and should
--- eventually replace the decision
-data SDecision = SDecision {
-                decision :: String
-              }
-              | SAct {
-                    action :: Action
-              }
-              deriving (Show, Eq)
+data PreCondition = PreCondition {
+            preCond :: (Module -> [Node] -> Bool)
+        }
 
+data PostCondition = PostCondition {
+            postCond :: (Module -> [Node] -> [Node])
+        }
 
-type Tag = String -- tag for condition
-
--- Defination of condition
-data Condition = Condition {
-                    tag :: Tag
-               }
-               | And Condition Condition
-               | Or Condition Condition
---               | Not Condition
-               | Empty
-               | Error
-               deriving (Show, Eq)
-
-
-toTagList :: Condition -> [Tag]
-toTagList Empty = []
-toTagList Error = ["Error"]
-toTagList (Condition t) = [t]
-toTagList (Or c1 c2)= (toTagList c1) ++ (toTagList c2)
-toTagList _ = error "not supported yet"
-
--- Compare two conditions
-conditionCompare :: Condition -> Condition -> Bool
-conditionCompare Empty Empty = True
-conditionCompare Error  _ = False
-conditionCompare _ Error = False
---conditionCompare (Or c11 c12) c2 = ((conditionCompare c11 c2) or
---                                    (conditionCompare c12 c2))
-conditionCompare _ _ = False
-
-
-
-data Step = Step {
-                pre :: Condition
-                , post :: Condition
-                , des :: SDecision
+data Module = Module {
+                pre :: PreCondition
+                , post :: PostCondition
+                , action :: Action
             }
-            deriving (Show, Eq)
+
+-- To support printing of module
+instance Show Module where
+    show (Module pre post action) = show action
+
+
+instance Eq Module where
+    (Module pre1 post1 action1) == (Module pre2 post2 action2) =
+        (action1 == action2)
+
 
 data Node = Node {
-                elem :: Step
+                elem :: Module
                 , edges :: [Node]
             }
             deriving (Show, Eq)
 
--- #################### Decision function implementation ####################
+-- ################ Decision function implementation #################
 
 
 -- #################### Main module ####################
 
+-- Precondition for the first module
+-- If the graph is empty then it will return true, otherwise false
+initPrecondition :: Module -> [Node] -> Bool
+initPrecondition _ [] = True
+initPrecondition _ _ = False
+
+-- Postcondition for last node
+-- It will return the same module without any modification
+finalPostcondition :: Module -> [Node] -> [Node]
+finalPostcondition _ n = n
+
+-- Postcondition for most of modules
+-- It will just add given module at end of nodes list
+defaultPostcondition :: Module -> [Node] -> [Node]
+defaultPostcondition m n = n ++ [newNode]
+        where
+            newNode = (Node m [])
+
 -- main function
-tmain = do
+main = do
         putStrLn out1
     where
-        des = Dropped
-        pre = Condition "Packet"
-        post = Or (Condition "IPv4") (Condition "IPv6")
-        step1 = Step pre post (SDecision "test")
-        out1 = show step1
+        act = Dropped
+        precond = PreCondition initPrecondition
+        postcond = PostCondition defaultPostcondition
+        m = Module precond postcond act
+        out1 = show m
 
--- ################################## EOF ###################################
+-- ################################ EOF #################################
 
