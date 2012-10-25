@@ -11,6 +11,7 @@ module DecisionTree (
     , defaultPostcondition
     , finalPostcondition
     , initPrecondition
+    , testPreCondition
 ) where
 
 -- module Main (main) where
@@ -53,34 +54,50 @@ data Module = Module {
                 pre :: PreCondition
                 , post :: PostCondition
                 , action :: Action
+                , dependency :: [[Action]]
             }
 
 -- To support printing of module
 instance Show Module where
-    show (Module pre post action) = show action
+    show (Module pre post act dep) =
+                "\nModule: { " ++ show act ++ show dep ++ "}"
 
 
 instance Eq Module where
-    (Module pre1 post1 action1) == (Module pre2 post2 action2) =
-        (action1 == action2)
-
+    (Module pre1 post1 act1 dep1) == (Module pre2 post2 act2 dep2) =
+        (act1 == act2) && (dep1 == dep2)
 
 data Node = Node {
-                elem :: Module
+                element :: Module
                 , edges :: [Node]
             }
             deriving (Show, Eq)
 
--- ################ Decision function implementation #################
+-- ########### Helper functions for condition test ##############
+
+-- test subset
+-- for given superset and subset list, make sure that all elements
+-- of subset list belongs to superset
+testListSubset :: [Action] -> [Action] -> Bool
+testListSubset superset subset = head $ dropWhile (== True) $
+                map (flip elem superset) subset
 
 
--- #################### Main module ####################
+-- checks over multiple lists of dependencies if anyone of them is
+-- satisfied
+testPreCondition :: [[Action]] -> Module -> [Node] -> Bool
+testPreCondition mlist2 mod nlist = head $ dropWhile (== False) $
+                        map (testListSubset superset) mlist2
+    where
+        superset = map (action) $ map (element) nlist
+
 
 -- Precondition for the first module
 -- If the graph is empty then it will return true, otherwise false
 initPrecondition :: Module -> [Node] -> Bool
 initPrecondition _ [] = True
 initPrecondition _ _ = False
+
 
 -- Postcondition for last node
 -- It will return the same module without any modification
@@ -94,19 +111,7 @@ defaultPostcondition m n = n ++ [newNode]
         where
             newNode = (Node m [])
 
-{-
-allActionsPerformed :: [Node]
--- check if given action is performed by atleast one module in nodes list.
-isActionPerformed :: [Node] -> Action -> Bool
-isActionPerformed nlist action
-
--- function which can be passed to precondition checking
--- This precondition function makes sure that list of action is performed
--- as part of precondition
-preConditionCheck :: [Action] ->  Module -> [Node] -> Bool
-preConditionCheck alist mod nlist =
-
--}
+-- #################### Main module ####################
 
 -- main function
 main = do
@@ -115,7 +120,7 @@ main = do
         act = T Dropped
         precond = PreCondition initPrecondition
         postcond = PostCondition defaultPostcondition
-        m = Module precond postcond act
+        m = Module precond postcond act [[]]
         out1 = show m
 
 -- ################################ EOF #################################
