@@ -1,14 +1,39 @@
 #!/usr/bin/env runhaskell
+{-
+ - Create list of all modules which are possible in logical protocol graph
+-}
 
---module Elements (getElementList) where
+module Elements (
+    getElementList
+    , testPreCondition
+) where
 
-module Main (main) where
+-- module Main (main) where
 
 import qualified DecisionTree as DT
 
-{-
- - Create list of all modules which are possible in logical protocol graph
- -}
+
+-- test subset
+-- for given superset and subset list, make sure that all elements
+-- of subset list belongs to superset
+testListSubset :: [DT.Action] -> [DT.Action] -> Bool
+testListSubset _ [] = True
+testListSubset [] _ = False
+testListSubset superset subset = nonElements == []
+    where
+        nonElements = dropWhile (== True) $ map (flip elem superset) subset
+
+
+-- checks over multiple lists of dependencies if anyone of them is
+-- satisfied
+testPreCondition :: [[DT.Action]] -> DT.Module -> [DT.Node] -> Bool
+testPreCondition [[]] _ _ = True
+testPreCondition mlist2 _ [] = False
+testPreCondition mlist2 mod nlist = satisfiedDep /= []
+    where
+        superset = DT.getActLstNode nlist
+        satisfiedDep = dropWhile (== False) $
+                map (testListSubset superset) mlist2
 
 
 -- Get NIC hardware emulator module
@@ -25,7 +50,7 @@ getEthernetMod :: DT.Module
 getEthernetMod = DT.Module precond postcond action dependent
         where
             dependent = [[(DT.NT DT.NIC)]]
-            precond = DT.PreCondition (DT.testPreCondition dependent)
+            precond = DT.PreCondition (testPreCondition dependent)
             postcond = DT.PostCondition DT.defaultPostcondition
             action = DT.NT DT.Ethernet
 
@@ -34,7 +59,7 @@ getIPv4Mod :: DT.Module
 getIPv4Mod = DT.Module precond postcond action dependent
         where
             dependent = [[(DT.NT DT.NIC), (DT.NT DT.Ethernet)]]
-            precond = DT.PreCondition (DT.testPreCondition dependent)
+            precond = DT.PreCondition (testPreCondition dependent)
             postcond = DT.PostCondition DT.defaultPostcondition
             action = DT.NT DT.IPv4
 
@@ -43,7 +68,7 @@ getIPv6Mod :: DT.Module
 getIPv6Mod = DT.Module precond postcond action dependent
         where
             dependent = [[(DT.NT DT.NIC), (DT.NT DT.Ethernet)]]
-            precond = DT.PreCondition (DT.testPreCondition dependent)
+            precond = DT.PreCondition (testPreCondition dependent)
             postcond = DT.PostCondition DT.defaultPostcondition
             action = DT.NT DT.IPv6
 
@@ -55,7 +80,7 @@ getICMPMod = DT.Module precond postcond action dependent
                 [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv4)],
                 [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv6)]
                ]
-            precond = DT.PreCondition (DT.testPreCondition dependent)
+            precond = DT.PreCondition (testPreCondition dependent)
             postcond = DT.PostCondition DT.defaultPostcondition
             action = DT.NT DT.ICMP
 
@@ -67,7 +92,7 @@ getTCPMod = DT.Module precond postcond action dependent
                 [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv4)],
                 [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv6)]
                ]
-            precond = DT.PreCondition (DT.testPreCondition dependent)
+            precond = DT.PreCondition (testPreCondition dependent)
             postcond = DT.PostCondition DT.defaultPostcondition
             action = DT.NT DT.TCP
 
@@ -79,7 +104,7 @@ getUDPMod = DT.Module precond postcond action dependent
                 [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv4)],
                 [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv6)]
                ]
-            precond = DT.PreCondition (DT.testPreCondition dependent)
+            precond = DT.PreCondition (testPreCondition dependent)
             postcond = DT.PostCondition DT.defaultPostcondition
             action = DT.NT DT.UDP
 

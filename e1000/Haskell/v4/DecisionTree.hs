@@ -11,7 +11,10 @@ module DecisionTree (
     , defaultPostcondition
     , finalPostcondition
     , initPrecondition
-    , testPreCondition
+    , applyPrecondition
+    , applyPostcondition
+    , getActLstNode
+    , getModLstNode
 ) where
 
 -- module Main (main) where
@@ -73,24 +76,23 @@ data Node = Node {
             }
             deriving (Show, Eq)
 
+getModLstNode :: [Node] -> [Module]
+getModLstNode nlist = map (element) nlist
+
+getActLstNode :: [Node] -> [Action]
+getActLstNode nlist = map (action) $ getModLstNode nlist
+
 -- ########### Helper functions for condition test ##############
 
--- test subset
--- for given superset and subset list, make sure that all elements
--- of subset list belongs to superset
-testListSubset :: [Action] -> [Action] -> Bool
-testListSubset superset subset = head $ dropWhile (== True) $
-                map (flip elem superset) subset
+-- Applies a precondition associated with given module
+-- and returns the result
+applyPrecondition :: [Node] -> Module -> Bool
+applyPrecondition nl m = (preCond (pre m)) m nl
 
-
--- checks over multiple lists of dependencies if anyone of them is
--- satisfied
-testPreCondition :: [[Action]] -> Module -> [Node] -> Bool
-testPreCondition mlist2 mod nlist = head $ dropWhile (== False) $
-                        map (testListSubset superset) mlist2
-    where
-        superset = map (action) $ map (element) nlist
-
+-- Applies the postcondition associated iwth given module
+-- and returns the result
+applyPostcondition :: [Node] -> Module -> [Node]
+applyPostcondition nl m = (postCond (post m)) m nl
 
 -- Precondition for the first module
 -- If the graph is empty then it will return true, otherwise false
