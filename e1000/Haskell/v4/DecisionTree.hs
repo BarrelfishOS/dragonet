@@ -33,6 +33,7 @@ data NonTerminal = NIC
             | ICMP
             | UDP
             | TCP
+            | RTP
             deriving (Show, Eq)
 
 data Action = T Terminal
@@ -92,6 +93,20 @@ defaultPostcondition :: Module -> [Node] -> [Node]
 defaultPostcondition m n = n ++ [newNode]
         where
             newNode = (Node m [])
+
+{-
+allActionsPerformed :: [Node]
+-- check if given action is performed by atleast one module in nodes list.
+isActionPerformed :: [Node] -> Action -> Bool
+isActionPerformed nlist action
+
+-- function which can be passed to precondition checking
+-- This precondition function makes sure that list of action is performed
+-- as part of precondition
+preConditionCheck :: [Action] ->  Module -> [Node] -> Bool
+preConditionCheck alist mod nlist =
+
+-}
 
 -- main function
 main = do
