@@ -14,6 +14,7 @@ module DecisionTree (
     , applyPrecondition
     , applyPostcondition
     , getActLstNode
+    , getActLstMod
     , getModLstNode
 ) where
 
@@ -79,8 +80,12 @@ data Node = Node {
 getModLstNode :: [Node] -> [Module]
 getModLstNode nlist = map (element) nlist
 
+
+getActLstMod :: [Module] -> [Action]
+getActLstMod mlist = map (action) mlist
+
 getActLstNode :: [Node] -> [Action]
-getActLstNode nlist = map (action) $ getModLstNode nlist
+getActLstNode nlist = getActLstMod $ getModLstNode nlist
 
 -- ########### Helper functions for condition test ##############
 
