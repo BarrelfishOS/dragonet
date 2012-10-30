@@ -6,6 +6,7 @@
 module Elements (
     getElementList
     , testPreCondition
+    , main
 ) where
 
 -- module Main (main) where
@@ -28,8 +29,8 @@ testListSubset superset subset = nonElements == []
 -- satisfied
 testPreCondition :: [[DT.Action]] -> DT.Module -> [DT.Node] -> Bool
 testPreCondition [[]] _ _ = True
-testPreCondition mlist2 _ [] = False
-testPreCondition mlist2 mod nlist = satisfiedDep /= []
+testPreCondition _ _ [] = False
+testPreCondition mlist2 _ nlist = satisfiedDep /= []
     where
         superset = DT.getActLstNode nlist
         satisfiedDep = dropWhile (== False) $
@@ -113,11 +114,12 @@ getElementList :: [DT.Module]
 getElementList = modList
     where
         modList = [getUDPMod, getTCPMod, getIPv6Mod, getIPv4Mod,
-                    getEthernetMod, getNICMod]
+                    getEthernetMod, getNICMod, getICMPMod]
 
 
 -- #################### Main module ####################
 
+main :: IO()
 main = do
         putStrLn out1
         putStrLn lineBreak

@@ -16,13 +16,12 @@ module DecisionTree (
     , getActLstNode
     , getActLstMod
     , getModLstNode
+    , main
 ) where
 
 -- module Main (main) where
 
 type QueueID = Integer  -- ID for the hardware queue
-
-type Tag = String -- tag for condition
 
 data Terminal = Dropped
             | Processed
@@ -63,12 +62,12 @@ data Module = Module {
 
 -- To support printing of module
 instance Show Module where
-    show (Module pre post act dep) =
-                "\nModule: { " ++ show act ++ show dep ++ "}"
+    show (Module _ _ act1 dep1) =
+                "\nModule: { " ++ show act1 ++ show dep1 ++ "}"
 
 
 instance Eq Module where
-    (Module pre1 post1 act1 dep1) == (Module pre2 post2 act2 dep2) =
+    (Module _ _ act1 dep1) == (Module _ _ act2 dep2) =
         (act1 == act2) && (dep1 == dep2)
 
 data Node = Node {
@@ -121,6 +120,7 @@ defaultPostcondition m n = n ++ [newNode]
 -- #################### Main module ####################
 
 -- main function
+main :: IO()
 main = do
         putStrLn out1
     where

@@ -39,12 +39,13 @@ checkAllModulesUsed mlist nlist = unusedActions == []
         unusedActions = dropWhile (== True) $
                 map (flip elem fromNodes) fromModules
 
+{-
 -- check if perticular action is reached
 isActionReached :: [DT.Node] -> DT.Action ->  Bool
 isActionReached nlist act = elem act fromNodes
     where
         fromNodes = DT.getActLstNode nlist
-
+-}
 
 -- loop till you reach desired state
 keepWorking :: [DT.Module] -> [DT.Node] -> [DT.Node]
@@ -61,6 +62,7 @@ generateGraph :: [DT.Module] -> [DT.Node]
 generateGraph ml = keepWorking ml []
 
 -- main function
+main :: IO()
 main = do
         putStrLn out0
         putStrLn lineBreak
@@ -71,6 +73,8 @@ main = do
         putStrLn out3
         putStrLn lineBreak
         putStrLn outF
+        putStrLn lineBreak
+        putStrLn outF2
     where
         lineBreak = "\n\n"
         ml = EL.getElementList
@@ -87,6 +91,7 @@ main = do
         out3 = "[R1] " ++ (show currentState3)
 
         outF = show $ generateGraph EL.getElementList
+        outF2 = ""
 
 -- ############################# EOF ###################################
 
