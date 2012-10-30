@@ -39,27 +39,35 @@ checkAllModulesUsed mlist nlist = unusedActions == []
         unusedActions = dropWhile (== True) $
                 map (flip elem fromNodes) fromModules
 
-{-
+
+-- loop till you reach desired state
+useAllModules :: [DT.Module] -> [DT.Node] -> [DT.Node]
+useAllModules mlist nlist
+    | checkAllModulesUsed mlist nlist = nlist
+    | otherwise = useAllModules mlist nlist'
+        where
+            nlist' = applyRound mlist nlist
+
+
 -- check if perticular action is reached
 isActionReached :: [DT.Node] -> DT.Action ->  Bool
 isActionReached nlist act = elem act fromNodes
     where
         fromNodes = DT.getActLstNode nlist
--}
 
--- loop till you reach desired state
-keepWorking :: [DT.Module] -> [DT.Node] -> [DT.Node]
-keepWorking mlist nlist
-    | checkAllModulesUsed mlist nlist = nlist
-    | otherwise = keepWorking mlist nlist'
+
+-- Keep applying modules till you reach the desired state
+reachDesiredAction :: [DT.Module] -> [DT.Node] -> DT.Action -> [DT.Node]
+reachDesiredAction mlist nlist act
+    | isActionReached nlist act = nlist
+    | otherwise = reachDesiredAction mlist nlist' act
         where
             nlist' = applyRound mlist nlist
 
-
-
 -- Generate graph by connecting given steps
 generateGraph :: [DT.Module] -> [DT.Node]
-generateGraph ml = keepWorking ml []
+generateGraph ml = useAllModules ml []
+
 
 -- main function
 main :: IO()
@@ -85,13 +93,13 @@ main = do
         out1 = "[R1] " ++ (show currentState1)
 
         currentState2 = applyRound ml currentState1
-        out2 = "[R1] " ++ (show currentState2)
+        out2 = "[R2] " ++ (show currentState2)
 
         currentState3 = applyRound ml currentState2
-        out3 = "[R1] " ++ (show currentState3)
+        out3 = "[R3] " ++ (show currentState3)
 
-        outF = show $ generateGraph EL.getElementList
-        outF2 = ""
+        outF = "[All] " ++ (show $ generateGraph EL.getElementList)
+        outF2 = "[Action] " ++ (show $ reachDesiredAction ml [] (DT.NT DT.TCP))
 
 -- ############################# EOF ###################################
 
