@@ -279,6 +279,15 @@ TODO:
     --> Implement the algorithm to generate all possible combinations
     -->
 ------------------------------------------------------------------------
+My current problem is that even though modules are in reasonable order
+they also include modules which should not be there. For example, having
+module TCP before ICMP does not make any sense.  I can solve this problem
+by:
+ * Adding a condition function with more strict search
+ * Adding list of modules which must not be in action (eg: both IPv4 and IPv6
+    should not be present in same processing path)
+ * Making a tree and not a list in Nodes.
+
 ------------------------------------------------------------------------
 ------------------------------------------------------------------------
 ------------------------------------------------------------------------

@@ -28,7 +28,7 @@ data Terminal = Dropped
             | InQueue {
                 queueID :: QueueID
             }
-            deriving (Show, Eq)
+            deriving (Show, Eq, Ord)
 
 data NonTerminal = NIC
             | Ethernet
@@ -38,11 +38,11 @@ data NonTerminal = NIC
             | UDP
             | TCP
             | RTP
-            deriving (Show, Eq)
+            deriving (Show, Eq, Ord)
 
 data Action = T Terminal
             | NT NonTerminal
-            deriving (Show, Eq)
+            deriving (Show, Eq, Ord)
 
 
 data PreCondition = PreCondition {

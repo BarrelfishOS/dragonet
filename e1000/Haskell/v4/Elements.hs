@@ -6,12 +6,35 @@
 module Elements (
     getElementList
     , testPreCondition
+    , testExactPrecondition
+    , testLoosePreCondition
     , main
 ) where
 
 -- module Main (main) where
 
 import qualified DecisionTree as DT
+import qualified Data.List as DL
+
+-- test that two lists are equal (they can have different order of elements)
+testListEqual :: [DT.Action] -> [DT.Action] -> Bool
+testListEqual [] [] = True
+testListEqual [] _ = False
+testListEqual l1 l2 = (DL.sort $ DL.nub l1) == (DL.sort $ DL.nub l2)
+
+
+-- Test that nodes have exactly the same elements which are in
+-- the dependency of module
+-- Test that one of the precondition of module matches exactly with
+-- given module configuration.
+testExactPrecondition :: [[DT.Action]] -> DT.Module -> [DT.Node] -> Bool
+testExactPrecondition [[]] _ [] = True
+testExactPrecondition _ _ [] = False
+testExactPrecondition preCondAList _ nlist = satisfiedDep /= []
+    where
+        pastActions = DT.getActLstNode nlist
+        satisfiedDep = dropWhile (== False) $
+                map (testListEqual pastActions) preCondAList
 
 
 -- test subset
@@ -27,15 +50,20 @@ testListSubset superset subset = nonElements == []
 
 -- checks over multiple lists of dependencies if anyone of them is
 -- satisfied
-testPreCondition :: [[DT.Action]] -> DT.Module -> [DT.Node] -> Bool
-testPreCondition [[]] _ _ = True
-testPreCondition _ _ [] = False
-testPreCondition mlist2 _ nlist = satisfiedDep /= []
+testLoosePreCondition :: [[DT.Action]] -> DT.Module -> [DT.Node] -> Bool
+testLoosePreCondition [[]] _ _ = True
+testLoosePreCondition _ _ [] = False
+testLoosePreCondition malist _ nlist = satisfiedDep /= []
     where
         superset = DT.getActLstNode nlist
         satisfiedDep = dropWhile (== False) $
-                map (testListSubset superset) mlist2
+                map (testListSubset superset) malist
 
+
+-- wrapper to choose between strict or loose function
+testPreCondition :: [[DT.Action]] -> DT.Module -> [DT.Node] -> Bool
+--testPreCondition malist m nlist = testLoosePreCondition malist m nlist
+testPreCondition malist m nlist = testExactPrecondition malist m nlist
 
 -- Get NIC hardware emulator module
 getNICMod :: DT.Module
@@ -93,6 +121,7 @@ getTCPMod = DT.Module precond postcond action dependent
                 [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv4)],
                 [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv6)]
                ]
+            --precond = DT.PreCondition (testExactPrecondition dependent)
             precond = DT.PreCondition (testPreCondition dependent)
             postcond = DT.PostCondition DT.defaultPostcondition
             action = DT.NT DT.TCP
