@@ -5,6 +5,7 @@
 
 module Elements (
     getElementList
+    , getElementListSmall
     , testPreCondition
     , testExactPrecondition
     , testLoosePreCondition
@@ -62,8 +63,8 @@ testLoosePreCondition malist _ nlist = satisfiedDep /= []
 
 -- wrapper to choose between strict or loose function
 testPreCondition :: [[DT.Action]] -> DT.Module -> [DT.Node] -> Bool
---testPreCondition malist m nlist = testLoosePreCondition malist m nlist
-testPreCondition malist m nlist = testExactPrecondition malist m nlist
+testPreCondition malist m nlist = testLoosePreCondition malist m nlist
+--testPreCondition malist m nlist = testExactPrecondition malist m nlist
 
 -- Get NIC hardware emulator module
 getNICMod :: DT.Module
@@ -87,7 +88,7 @@ getEthernetMod = DT.Module precond postcond action dependent
 getIPv4Mod :: DT.Module
 getIPv4Mod = DT.Module precond postcond action dependent
         where
-            dependent = [[(DT.NT DT.NIC), (DT.NT DT.Ethernet)]]
+            dependent = [[(DT.NT DT.Ethernet)]]
             precond = DT.PreCondition (testPreCondition dependent)
             postcond = DT.PostCondition DT.defaultPostcondition
             action = DT.NT DT.IPv4
@@ -96,7 +97,7 @@ getIPv4Mod = DT.Module precond postcond action dependent
 getIPv6Mod :: DT.Module
 getIPv6Mod = DT.Module precond postcond action dependent
         where
-            dependent = [[(DT.NT DT.NIC), (DT.NT DT.Ethernet)]]
+            dependent = [[(DT.NT DT.Ethernet)]]
             precond = DT.PreCondition (testPreCondition dependent)
             postcond = DT.PostCondition DT.defaultPostcondition
             action = DT.NT DT.IPv6
@@ -106,43 +107,53 @@ getICMPMod :: DT.Module
 getICMPMod = DT.Module precond postcond action dependent
         where
             dependent = [
-                [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv4)],
-                [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv6)]
+                [(DT.NT DT.IPv4)],
+                [(DT.NT DT.IPv6)]
                ]
             precond = DT.PreCondition (testPreCondition dependent)
             postcond = DT.PostCondition DT.defaultPostcondition
             action = DT.NT DT.ICMP
 
+
 -- Get TCP processing module
+
 getTCPMod :: DT.Module
 getTCPMod = DT.Module precond postcond action dependent
         where
             dependent = [
-                [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv4)],
-                [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv6)]
+                [(DT.NT DT.IPv4)],
+                [(DT.NT DT.IPv6)]
                ]
             --precond = DT.PreCondition (testExactPrecondition dependent)
             precond = DT.PreCondition (testPreCondition dependent)
             postcond = DT.PostCondition DT.defaultPostcondition
             action = DT.NT DT.TCP
 
+
 -- Get UDP processing module
 getUDPMod :: DT.Module
 getUDPMod = DT.Module precond postcond action dependent
         where
             dependent = [
-                [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv4)],
-                [(DT.NT DT.NIC), (DT.NT DT.Ethernet), (DT.NT DT.IPv6)]
+                [(DT.NT DT.IPv4)],
+                [(DT.NT DT.IPv6)]
                ]
             precond = DT.PreCondition (testPreCondition dependent)
             postcond = DT.PostCondition DT.defaultPostcondition
             action = DT.NT DT.UDP
+
+-- Using small list for testing purposes
+getElementListSmall :: [DT.Module]
+getElementListSmall = modList
+    where
+        modList = [getNICMod]
 
 
 getElementList :: [DT.Module]
 getElementList = modList
     where
         modList = [getUDPMod, getTCPMod, getIPv6Mod, getIPv4Mod,
+        --modList = [getUDPMod, getIPv6Mod, getIPv4Mod,
                     getEthernetMod, getNICMod, getICMPMod]
 
 

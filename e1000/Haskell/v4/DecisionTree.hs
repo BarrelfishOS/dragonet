@@ -23,6 +23,7 @@ module DecisionTree (
 
 type QueueID = Integer  -- ID for the hardware queue
 
+-- set of terminal actions, which mark that there is no further execution
 data Terminal = Dropped
             | Processed
             | InQueue {
@@ -30,6 +31,7 @@ data Terminal = Dropped
             }
             deriving (Show, Eq, Ord)
 
+-- set of non-terminal action, which means that these can be further extended
 data NonTerminal = NIC
             | Ethernet
             | IPv4
@@ -40,6 +42,7 @@ data NonTerminal = NIC
             | RTP
             deriving (Show, Eq, Ord)
 
+-- Actions which can be taken from a module
 data Action = T Terminal
             | NT NonTerminal
             deriving (Show, Eq, Ord)
@@ -53,6 +56,8 @@ data PostCondition = PostCondition {
             postCond :: (Module -> [Node] -> [Node])
         }
 
+-- Module marks a computation which should be performed on every node
+-- I should rename it to Computation
 data Module = Module {
                 pre :: PreCondition
                 , post :: PostCondition
@@ -63,18 +68,27 @@ data Module = Module {
 -- To support printing of module
 instance Show Module where
     show (Module _ _ act1 dep1) =
-                "\nModule: { " ++ show act1 ++ show dep1 ++ "}"
+                "Module: { " ++ show act1 ++ show dep1 ++ "}\n"
 
 
 instance Eq Module where
     (Module _ _ act1 dep1) == (Module _ _ act2 dep2) =
         (act1 == act2) && (dep1 == dep2)
 
+-- It is node in dataflow graph where vertex is a module/computation
+-- and edges mark which other computations can be performed after this computation
 data Node = Node {
                 element :: Module
                 , edges :: [Node]
             }
-            deriving (Show, Eq)
+            deriving (Eq)
+
+instance Show Node where
+    show (Node elem1 _) =
+                show elem1
+                --  "\nNode: { element " ++ show elem1 ++ "}"
+
+
 
 getModLstNode :: [Node] -> [Module]
 getModLstNode nlist = map (element) nlist

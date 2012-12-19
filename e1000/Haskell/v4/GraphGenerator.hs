@@ -109,22 +109,24 @@ reachDesiredAction mlist nlist act
 reachDesiredActionV2 :: [DT.Module] -> [State] -> DT.Action -> [State]
 reachDesiredActionV2 mlist slist act
     | reachedAction /= [] = reachedAction
+    |  slist == slist' = error ("no modules matches pre-cond \nmlist:\n" ++
+                    (show mlist) ++ ("\n\n\n#####\n[slist]:\n") ++
+                    (show slist) ++ "\n\n\n#####\nfinal action:\n" ++
+                    (show act))
     | otherwise = reachDesiredActionV2 mlist slist' act
         where
             reachedAction = isActionReachedList slist act
             slist' = applyRoundV2 mlist slist
 
 
-
 -- Generate graph by connecting given steps
 generateGraph :: [DT.Module] -> State
 generateGraph ml = useAllModules ml []
 
-
 -- main function
 main :: IO()
 main = do
-{-
+
         putStrLn out0
         putStrLn lineBreak
         putStrLn out1
@@ -133,31 +135,41 @@ main = do
         putStrLn lineBreak
         putStrLn out3
         putStrLn lineBreak
--}
+        putStrLn out4
+        putStrLn lineBreak
+
         putStrLn outF3
         putStrLn lineBreak
         putStrLn "Done!!"
         putStrLn lineBreak
+
 --        putStrLn outF2
 --        putStrLn lineBreak
 --        putStrLn outF
     where
         lineBreak = "\n\n"
         ml = EL.getElementList
-{-
+--        ml = EL.getElementListSmall
+
+
         currentState = []
         out0 = "[Full list] " ++ (show ml)
 
-        currentState1 = applyRound ml currentState
+        currentState1 = applyRoundV2 ml currentState
         out1 = "[R1] " ++ (show currentState1)
 
-        currentState2 = applyRound ml currentState1
+        currentState2 = applyRoundV2 ml currentState1
         out2 = "[R2] " ++ (show currentState2)
 
-        currentState3 = applyRound ml currentState2
+        currentState3 = applyRoundV2 ml currentState2
         out3 = "[R3] " ++ (show currentState3)
--}
-        outF3 = "[ActionV2] " ++ (show $ reachDesiredActionV2 ml [[]]
+
+        currentState4 = applyRoundV2 ml currentState3
+        out4 = "[R4] " ++ (show currentState4)
+
+
+        outF3 = "[Action] " ++ (show $ reachDesiredActionV2 ml [[]]
+--                    (DT.NT DT.Ethernet))
                     (DT.NT DT.TCP))
 
 --        outF = "[Action] " ++ (show $ reachDesiredAction ml [] (DT.NT DT.TCP))

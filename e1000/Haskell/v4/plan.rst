@@ -1,3 +1,14 @@
+==========
+TODO
+==========
+
+ - Reduce the precondition dependency list
+
+==========
+Questions
+==========
+
+ - Why do I have module and node?
 
 ------------------------------------------------------------------------
 Add pre-conditions and post-conditions.
