@@ -48,16 +48,20 @@ packetHandlingDes = des
 
                 actionClassifyL2 =  DT.Decision {
                     DT.compute = (DT.Computation "classifyL2")
+                    -- Ethernet_classify
                     , DT.possibleActions = [DT.Dropped, actionUnicast,
                             actionMulticast, actionBroadcast]
                 }
 
                 actionValidateLength =  DT.Decision {
                     DT.compute = (DT.Computation "isValidLength")
+                    -- ethernet_validate_len
                     , DT.possibleActions = [DT.Dropped, actionClassifyL2]
                 }
                 des = DT.Decision {
                     DT.compute = (DT.Computation "checksumCRC")
+                    -- Ethernet_validate_header
+                    --, DT.compute = (DT.Computation Ethernet_validate_header)
                     , DT.possibleActions = [DT.Dropped, actionValidateLength]
                 }
 

@@ -19,6 +19,7 @@ module LogicalProtocolGraph (
 import qualified NICState as NS
 import qualified DecisionTree as DT
 import qualified Data.List as DL
+import Debug.Trace
 
 type PortNo = Integer
 type SocketDes = Integer
@@ -60,6 +61,97 @@ data LogicalProtocolGraph1 = LogicalProtocolGraph1 {
 
 -- Get initial minimal functional graph
 -- Process packets till classification in TCP/UDP and then drop them.
+initLPGExpand :: LogicalProtocolGraph1
+initLPGExpand = (LogicalProtocolGraph1 des 0)
+        where
+               actionICMP = DT.Decision {
+                    DT.compute = (DT.Computation "ICMP")
+                    , DT.possibleActions = [DT.Processed]
+                  }
+
+               -- UDP
+
+               actionUDPValHeader = DT.Decision {
+                    DT.compute = (DT.Computation "UDP_validate_header")
+                    , DT.possibleActions = [DT.Dropped, actionUDPValChecksum]
+                  }
+
+               actionUDPValChecksum = DT.Decision {
+                    DT.compute = (DT.Computation "UDP_validate_checksum")
+                    , DT.possibleActions = [DT.Dropped, actionUDPClassify]
+                  }
+               actionUDPClassify = DT.Decision {
+                    DT.compute = (DT.Computation "UDP_classify")
+                    , DT.possibleActions = [DT.Dropped]
+                  }
+
+               -- TCP
+
+               actionTCPValHeader = DT.Decision {
+                    DT.compute = (DT.Computation "TCP_validate_header")
+                    , DT.possibleActions = [DT.Dropped, actionTCPValState]
+                  }
+
+               actionTCPValState = DT.Decision {
+                    DT.compute = (DT.Computation "TCP_validate_state")
+                    , DT.possibleActions = [DT.Dropped, actionTCPClassify]
+                  }
+               actionTCPClassify = DT.Decision {
+                    DT.compute = (DT.Computation "TCP_classify")
+                    , DT.possibleActions = [DT.Dropped]
+                  }
+
+               actionIPv4 = (ip 4)
+               actionIPv6 = (ip 6)
+
+               actionEthernetLen = DT.Decision {
+                    DT.compute = (DT.Computation "Ethernet_validate_len")
+                    , DT.possibleActions = [actionEthernetHdr]
+                  }
+               actionEthernetHdr = DT.Decision {
+                    DT.compute = (DT.Computation "Ethernet_validate_header")
+                    , DT.possibleActions = [actionEthernetMAC]
+                  }
+               actionEthernetMAC = DT.Decision {
+                    DT.compute = (DT.Computation "Ethernet_validate_mac")
+                    , DT.possibleActions = [actionEthernetClassify]
+                  }
+               actionEthernetClassify = DT.Decision {
+                    DT.compute = (DT.Computation "Ethernet_classify")
+                    , DT.possibleActions = [actionIPv4, actionIPv6]
+                  }
+
+               des = DT.Decision {
+                    DT.compute = (DT.Computation "NIC")
+                    , DT.possibleActions = [actionEthernetLen]
+                  }
+
+               -- wrapper for IP versions
+               ip = (
+                 \v -> DT.Decision {
+                   DT.compute = (DT.Computation ((ipstr v) ++ "_validate_header"))
+                   , DT.possibleActions = [DT.Dropped,
+                      DT.Decision {
+                         DT.compute = (DT.Computation ((ipstr v) ++ "_checksum"))
+                         , DT.possibleActions = [DT.Dropped,
+                                                 DT.Decision {
+                                                   DT.compute = (DT.Computation ((ipstr v) ++ "_classify"))
+                                                   , DT.possibleActions = [DT.Dropped, actionTCPValHeader, actionUDPValHeader, actionICMP]
+                                                   }
+                                                ]
+                         }
+                      ]
+                   }
+
+                 )
+
+               ipstr = (\v -> "IPv" ++ (show v))
+
+
+
+
+-- Get initial minimal functional graph
+-- Process packets till classification in TCP/UDP and then drop them.
 initLPG :: LogicalProtocolGraph1
 initLPG = (LogicalProtocolGraph1 des 0)
         where
@@ -69,12 +161,12 @@ initLPG = (LogicalProtocolGraph1 des 0)
                   }
 
                actionTCP = DT.Decision {
-                    DT.compute = (DT.Computation "TCP")
+                    DT.compute = (DT.Computation "TCP_classify")
                     , DT.possibleActions = [DT.Dropped]
                   }
 
                actionUDP = DT.Decision {
-                    DT.compute = (DT.Computation "UDP")
+                    DT.compute = (DT.Computation "UDP_classify")
                     , DT.possibleActions = [DT.Dropped]
                   }
 
@@ -98,108 +190,6 @@ initLPG = (LogicalProtocolGraph1 des 0)
                     , DT.possibleActions = [actionEthernet]
                   }
 
--- Get initial minimal but expanded functional graph
--- Process packets till classification in TCP/UDP and then drop them.
-initLPGExpand :: LogicalProtocolGraph1
-initLPGExpand = (LogicalProtocolGraph1 des 0)
-        where
-               cProcessICMP = DT.Decision {
-                    DT.compute = (DT.Computation "ICMP")
-                    , DT.possibleActions = [DT.Processed]
-                  }
-
-               cProcessTCP = DT.Decision {
-                    DT.compute = (DT.Computation "TCP")
-                    , DT.possibleActions = [DT.Dropped]
-                  }
-
-               cProcessUDP = DT.Decision {
-                    DT.compute = (DT.Computation "UDP")
-                    , DT.possibleActions = [DT.Dropped]
-                  }
-
-               cClassifyUDP =  DT.Decision {
-                     DT.compute = (DT.Computation "ClassifyUDP")
-                     , DT.possibleActions = [DT.Dropped, cProcessUDP]
-                }
-               cClassifyTCP =  DT.Decision {
-                    DT.compute = (DT.Computation "ClassifyTCP")
-                    , DT.possibleActions = [DT.Dropped, cProcessTCP]
-                }
-
-
-               cValidateUDP =  DT.Decision {
-                     DT.compute = (DT.Computation "isValidUDP")
-                     , DT.possibleActions = [DT.Dropped, cClassifyUDP]
-                }
-               cValidateTCP =  DT.Decision {
-                    DT.compute = (DT.Computation "isValidTCP")
-                    , DT.possibleActions = [DT.Dropped, cClassifyTCP]
-                }
-
-                -- Layer L3 computations
-               cIPv6Processing = DT.Decision {
-                    DT.compute = (DT.Computation "IPv6")
-                    , DT.possibleActions = [cValidateTCP, cValidateUDP,
-                            cProcessICMP]
-                  }
-
-               cIPv4Processing = DT.Decision {
-                    DT.compute = (DT.Computation "IPv4")
-                    , DT.possibleActions = [cValidateTCP, cValidateUDP,
-                            cProcessICMP]
-                  }
-
-               cIPv4Checksum =  DT.Decision {
-                    DT.compute = (DT.Computation "checksumIPv4")
-                    , DT.possibleActions = [DT.Dropped, cIPv4Processing]
-                }
-
-               cIPv6Checksum  =  DT.Decision {
-                    DT.compute = (DT.Computation "checksumIPv6")
-                    , DT.possibleActions = [DT.Dropped, cIPv6Processing]
-                }
-
-               actionEthernet = DT.Decision {
-                    DT.compute = (DT.Computation "classifyL3")
-                    , DT.possibleActions = [cIPv4Checksum, cIPv6Checksum]
-                  }
-
-                -- Layer L2 computations
-               actionMulticast =  DT.Decision {
-                    DT.compute = (DT.Computation "isValidMulticast")
-                    , DT.possibleActions = [DT.Dropped, actionEthernet]
-                }
-               actionBroadcast =  DT.Decision {
-                    DT.compute = (DT.Computation "isValidBroadcast")
-                    , DT.possibleActions = [DT.Dropped, actionEthernet]
-                }
-               actionUnicast =  DT.Decision {
-                    DT.compute = (DT.Computation "isValidUnicast")
-                    , DT.possibleActions = [DT.Dropped, actionEthernet]
-                }
-
-               actionClassifyL2 =  DT.Decision {
-                    DT.compute = (DT.Computation "classifyL2")
-                    , DT.possibleActions = [DT.Dropped, actionUnicast,
-                            actionMulticast, actionBroadcast]
-                }
-
-               actionValidateLength =  DT.Decision {
-                    DT.compute = (DT.Computation "isValidLength")
-                    , DT.possibleActions = [DT.Dropped, actionClassifyL2]
-                }
-
-               cChecksum = DT.Decision {
-                    DT.compute = (DT.Computation "checksumCRC")
-                    , DT.possibleActions = [DT.Dropped, actionValidateLength]
-                }
-
-                -- NIC hardware representation
-               des = DT.Decision {
-                    DT.compute = (DT.Computation "NIC")
-                    , DT.possibleActions = [cChecksum]
-                  }
 
 
 -- create new application
@@ -235,8 +225,9 @@ findFreeSocket lp = DL.head $
 
 socket :: LogicalProtocolGraph1 -> Application -> L4Protocol ->
                 (LogicalProtocolGraph1, Socket)
-socket lp app proto = (lp', sock)
-            where
+socket lp app proto = trace ("--socket app:" ++  (show app) ++ "proto" ++  (show proto))
+                      (lp', sock)
+  where
             sock = Socket {
                     socketID = socketCount lp
 --                    socketID = findFreeSocket lp
@@ -284,7 +275,7 @@ appToAction app =   DT.Decision {
 
 -- Socket to action
 socketToAction :: Socket -> DT.Decision
-socketToAction (Socket id appList proto) =
+socketToAction (Socket id appList proto) = trace ("--socketToAction")
             DT.Decision {
                     -- FIXME: There will be multiple sockets, parameterize it
                     DT.compute = (DT.Computation
@@ -294,11 +285,14 @@ socketToAction (Socket id appList proto) =
 
 
 decodeProtocol :: Socket -> PortNo -> (PCB, String, DT.Computation)
-decodeProtocol sock portno =
+decodeProtocol sock portno = trace ("--decodeProtocol " ++ protoName ++ (show clasify))
             (pcb, protoName, clasify)
             where
                 pcb = (PCB sock portno)
-                protoName = show (protocol sock)
+                protoName |  protoNameAsStr == "TCP"      = "TCP_classify"
+                          |  protoNameAsStr == "UDP"      = "UDP_classify"
+                          |  otherwise  = error "wrong protocol name"
+                protoNameAsStr = show (protocol sock)
                 clasify = case (protocol sock) of
                     TCP -> DT.Computation ("TCPPCB" ++ "_" ++ (show portno))
                     UDP -> DT.Computation ("UDPPCB" ++ "_" ++ (show portno))
@@ -309,7 +303,6 @@ decodeProtocol sock portno =
 -- Add it to action list of TCP/UDP
 bind :: LogicalProtocolGraph1 -> Socket -> PortNo -> LogicalProtocolGraph1
 bind lp sock portno = lp { lpg = des' }
-                       -- (LogicalProtocolGraph1 des' sList)
     where
         (pcb, protoName, classify) = decodeProtocol sock portno
         newAction = DT.Decision {
@@ -392,5 +385,122 @@ connect lp (Socket id appList _ ) = error "connect called on non-TCP socket!!"
 -- remove this pcb block from list of available actions in protocol block.
 close :: LogicalProtocolGraph1 -> Socket -> LogicalProtocolGraph1
 close lp sock = lp
+
+
+-- Get initial minimal but expanded functional graph
+-- Process packets till classification in TCP/UDP and then drop them.
+-- SK: What is the difference between processed and actions? Why is there initLPGExpand and initLPG
+-- initLPGExpand :: LogicalProtocolGraph1
+-- initLPGExpand = (LogicalProtocolGraph1 des 0)
+--         where
+--                cProcessICMP = DT.Decision {
+--                     DT.compute = (DT.Computation "ICMP")
+--                     , DT.possibleActions = [DT.Processed]
+--                   }
+
+--                cProcessTCP = DT.Decision {
+--                     DT.compute = (DT.Computation "TCP_classify")
+--                     , DT.possibleActions = [DT.Dropped]
+--                   }
+
+--                cProcessUDPHeader = DT.Decision {
+--                     DT.compute = (DT.Computation "UDP_validate_headers")
+--                     , DT.possibleActions = [DT.Dropped, cProcessUDPChecksum]
+--                   }
+
+--                cProcessUDPChecksum = DT.Decision {
+--                     DT.compute = (DT.Computation "UDP_validate_checksum")
+--                     , DT.possibleActions = [DT.Dropped, cProcessUDPClassify]
+--                   }
+
+--                cProcessUDPClassify = DT.Decision {
+--                     DT.compute = (DT.Computation "UDP_classify")
+--                     , DT.possibleActions = [DT.Dropped]
+--                   }
+
+--                cClassifyUDP =  DT.Decision {
+--                      DT.compute = (DT.Computation "ClassifyUDP")
+--                      , DT.possibleActions = [DT.Dropped, cProcessUDPHeader]
+--                 }
+--                cClassifyTCP =  DT.Decision {
+--                     DT.compute = (DT.Computation "ClassifyTCP")
+--                     , DT.possibleActions = [DT.Dropped, cProcessTCP]
+--                 }
+
+
+--                cValidateUDP =  DT.Decision {
+--                      DT.compute = (DT.Computation "isValidUDP")
+--                      , DT.possibleActions = [DT.Dropped, cClassifyUDP]
+--                 }
+--                cValidateTCP =  DT.Decision {
+--                     DT.compute = (DT.Computation "isValidTCP")
+--                     , DT.possibleActions = [DT.Dropped, cClassifyTCP]
+--                 }
+
+--                 -- Layer L3 computations
+--                cIPv6Processing = DT.Decision {
+--                     DT.compute = (DT.Computation "IPv6")
+--                     , DT.possibleActions = [cValidateTCP, cValidateUDP,
+--                             cProcessICMP]
+--                   }
+
+--                cIPv4Processing = DT.Decision {
+--                     DT.compute = (DT.Computation "IPv4")
+--                     , DT.possibleActions = [cValidateTCP, cValidateUDP,
+--                             cProcessICMP]
+--                   }
+
+--                cIPv4Checksum =  DT.Decision {
+--                     DT.compute = (DT.Computation "checksumIPv4")
+--                     , DT.possibleActions = [DT.Dropped, cIPv4Processing]
+--                 }
+
+--                cIPv6Checksum  =  DT.Decision {
+--                     DT.compute = (DT.Computation "checksumIPv6")
+--                     , DT.possibleActions = [DT.Dropped, cIPv6Processing]
+--                 }
+
+--                actionEthernet = DT.Decision {
+--                     DT.compute = (DT.Computation "classifyL3")
+--                     , DT.possibleActions = [cIPv4Checksum, cIPv6Checksum]
+--                   }
+
+--                 -- Layer L2 computations
+--                actionMulticast =  DT.Decision {
+--                     DT.compute = (DT.Computation "isValidMulticast")
+--                     , DT.possibleActions = [DT.Dropped, actionEthernet]
+--                 }
+--                actionBroadcast =  DT.Decision {
+--                     DT.compute = (DT.Computation "isValidBroadcast")
+--                     , DT.possibleActions = [DT.Dropped, actionEthernet]
+--                 }
+--                actionUnicast =  DT.Decision {
+--                     DT.compute = (DT.Computation "isValidUnicast")
+--                     , DT.possibleActions = [DT.Dropped, actionEthernet]
+--                 }
+
+--                actionClassifyL2 =  DT.Decision {
+--                     DT.compute = (DT.Computation "classifyL2")
+--                     , DT.possibleActions = [DT.Dropped, actionUnicast,
+--                             actionMulticast, actionBroadcast]
+--                 }
+
+--                actionValidateLength =  DT.Decision {
+--                     DT.compute = (DT.Computation "isValidLength")
+--                     , DT.possibleActions = [DT.Dropped, actionClassifyL2]
+--                 }
+
+--                cChecksum = DT.Decision {
+--                     DT.compute = (DT.Computation "checksumCRC")
+--                     , DT.possibleActions = [DT.Dropped, actionValidateLength]
+--                 }
+
+--                 -- NIC hardware representation
+--                des = DT.Decision {
+--                     DT.compute = (DT.Computation "NIC")
+--                     , DT.possibleActions = [cChecksum]
+--                   }
+
+
 
 

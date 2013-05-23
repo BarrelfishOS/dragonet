@@ -45,38 +45,23 @@ data AbstractTree = AbstractTree {
 -- #################### Printing Abstract Tree ################
 printRelations :: [Relation] -> String
 printRelations [] = []
-printRelations (x:[]) | p == "NIC"   = "" 
-                      | otherwise    = (parent x) -- ++ "[" ++ (show (childPos x)) ++ "]"
-                                       ++ " -> " ++ (child x) ++ ";\n"
-  where p = (parent x)
+printRelations (x:[]) = (parent x) ++ "[" ++ (show (childPos x)) ++ "]"
+                        ++ " -> " ++ (child x) ++ "\n"
 printRelations (x:xs) = (printRelations [x]) ++ (printRelations xs)
+
 
 printDeclarations :: [Declaration] -> String
 printDeclarations [] = []
-printDeclarations (x:[]) | n == "NIC"    = ""
-                         | otherwise =  (instanceName x) ++ code
-                                       ++ ";\n"
-  where code
-          | (instanceType x) == ""           = ""
-          | otherwise                        = " [" ++ (instanceType x) ++ "]";
-        n = (instanceName x)
+printDeclarations (x:[]) = (instanceName x) ++ " :: " ++ (instanceType x)
+                                        ++ "()" ++ "\n"
 printDeclarations (x:xs) = (printDeclarations [x]) ++ (printDeclarations xs)
 
-printStart = "digraph {\n"
-
-printEnd = "}\n"
-
 printAbstractTree :: AbstractTree -> String
-printAbstractTree tree = start ++ decls ++ rels ++ end
+printAbstractTree tree = decls ++ rels
         where
-          start = printStart
-          end = printEnd
-          decls = printDeclarations $ DL.nub (declarations tree)
-          rels = printRelations $ trimAbstractTree $ relations tree
-          
-trimAbstractTree :: [Relation] -> [Relation]
-trimAbstractTree [] = []                    
-trimAbstractTree (x:xs) = x : trimAbstractTree (filter (\y -> not(x ==y)) xs)
+            decls = printDeclarations $ DL.nub (declarations tree)
+            rels = printRelations $ relations tree
+
 
 -- #################### Convert Decision into Abstract Tree ################
 convertAction :: RootNode -> Position -> DT.Decision -> AbstractTree
@@ -98,19 +83,17 @@ convertAction root pos (DT.Processed) = let
                     AbstractTree rName decls rels
 convertAction root pos (DT.Dropped) = let
                     inst = "DROPPED"
-                    style = "shape=box,style=filled,color=gray" -- Dropped as red box
                     eleName = inst ++ "State"
                     rName = RootNode inst
-                    decls = [(Declaration inst style)]
+                    decls = [(Declaration inst eleName)]
                     rels = [(Relation (rootNodeName root) pos inst)]
                 in
                     AbstractTree rName decls rels
 convertAction root pos (DT.InQueue qid) = let
                     eleName = "RXQueue"
-                    style = "shape=box,style=filled,color=gray" -- Queues are boxes
                     inst = eleName ++ (show qid)
                     rName = RootNode inst
-                    decls = [(Declaration inst style)]
+                    decls = [(Declaration inst eleName)]
                     rels = [(Relation (rootNodeName root) pos inst)]
                 in
                     AbstractTree rName decls rels

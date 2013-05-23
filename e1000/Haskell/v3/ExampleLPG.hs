@@ -22,20 +22,19 @@ main = do
     where
         -- Initialize the logical protocol graph
         lp1 = LP.initLPGExpand
+        --lp1 = LP.initLPG
 
         -- First application is active now
         -- It will open two sockets and will bind to two ports
-        app1 = LP.createApp "echoServer"
+        app1 = LP.createApp "iperf_bm"
         (lp1', sock1) = LP.socket lp1 app1 LP.TCP
-        (lp1'', sock2) = LP.socket lp1' app1 LP.UDP
-        lp''' = LP.bind lp1'' sock1 7
-        lp2 = LP.bind lp''' sock2 7
+        lp2 = LP.bind lp1' sock1 2010
 
         -- Second application is active now
         -- It will open one socket and will bind to a port
-        app2 = LP.createApp "tftpd"
-        (lp2', sock3) = LP.socket lp2 app2 LP.UDP
-        lp3 = LP.bind lp2' sock3 69
+        app2 = LP.createApp "iperf_loadGen"
+        (lp2', sock3) = LP.socket lp2 app2 LP.TCP
+        lp3 = LP.bind lp2' sock3 2021
 
         -- Application 3 will open a connection
         app3 = LP.createApp "telnetClient"
@@ -47,5 +46,9 @@ main = do
         -- (ds1, graph1) = getGraphAndDS $ LP.lpg lp1
         -- (ds1, graph1) = getGraphAndDS $ LP.lpg lp2
         -- (ds1, graph1) = getGraphAndDS $ LP.lpg lp3
+        -- (ds1, graph1) = getGraphAndDS $ LP.lpg lp3
+
+
         (ds1, graph1) = getGraphAndDS $ LP.lpg lp4
+        --(ds1, graph1) = getGraphAndDS $ LP.lpg lp2
 
