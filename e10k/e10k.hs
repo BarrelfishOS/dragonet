@@ -15,22 +15,22 @@ qname s i = s ++ (show i)
 
 e10kRxDescFetch i next = [DT.Decision {
         DT.compute = (DT.Computation (qname "DescFetch" i)),
-        DT.possibleActions = [DT.Dropped] ++ next 
+        DT.possibleActions = [DT.Dropped] ++ next
 }]
 
 e10kRxChecksumming i next = [DT.Decision {
         DT.compute = (DT.Computation (qname "RxChecksumOffload" i)),
-        DT.possibleActions = next 
+        DT.possibleActions = next
 }]
 
 e10kRSC i next = [DT.Decision {
         DT.compute = (DT.Computation (qname "RSC" i)),
-        DT.possibleActions = next 
+        DT.possibleActions = next
 }]
 
 e10kRxInterrupt i next = [DT.Decision {
         DT.compute = (DT.Computation (qname "RxInterrupt" i)),
-        DT.possibleActions = next 
+        DT.possibleActions = next
 }]
 
 e10kInQueue i = d
@@ -46,27 +46,27 @@ e10kInQueues = makeQueues e10kNumQueues
 e10kEthertype next = [DT.Decision {
         DT.compute = (DT.Computation "EtherTypeFilter"),
             -- TODO: can packets really be dropped here?
-        DT.possibleActions = [DT.Dropped] ++ e10kInQueues ++ next 
+        DT.possibleActions = [DT.Dropped] ++ e10kInQueues ++ next
 }]
 
 e10kSynFilter next = [DT.Decision {
         DT.compute = (DT.Computation "TCPSynFilter"),
-        DT.possibleActions = e10kInQueues ++ next 
+        DT.possibleActions = e10kInQueues ++ next
 }]
 
 e10k5tupleFilter next = [DT.Decision {
-        DT.compute = (DT.Computation "5tupleFilter"),
-        DT.possibleActions = [DT.Dropped] ++ e10kInQueues ++ next 
+        DT.compute = (DT.Computation "FiveTupleFilter"),
+        DT.possibleActions = [DT.Dropped] ++ e10kInQueues ++ next
 }]
 
 e10kFlowDirectorFilter next = [DT.Decision {
         DT.compute = (DT.Computation "FlowDirectorFilter"),
-        DT.possibleActions = [DT.Dropped] ++ e10kInQueues ++ next 
+        DT.possibleActions = [DT.Dropped] ++ e10kInQueues ++ next
 }]
 
 e10kRSSFilter next = [DT.Decision {
         DT.compute = (DT.Computation "RSSFilter"),
-        DT.possibleActions = e10kInQueues ++ next 
+        DT.possibleActions = e10kInQueues ++ next
 }]
 
 e10kQueueSelect =
