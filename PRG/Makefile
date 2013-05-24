@@ -1,5 +1,5 @@
 
-all: e10k e1k tulip BCM5704
+all: e10k e1k tulip BCM5704 LPG
 
 e1k:	base e1k.hs
 	ghc e1k.hs -o e1k -fwarn-incomplete-patterns
@@ -34,12 +34,28 @@ BCM5704: base BCM5704.hs
 BCM5704_clean: base_clean
 	rm -f BCM5704 BCM5704.dot BCM5704.pdf
 
+
+LPG:	base LPGbase ExampleLPG.hs
+	ghc ExampleLPG.hs -o ExampleLPG -fwarn-incomplete-patterns
+	./ExampleLPG | grep -i -v dropped > ExampleLPG.dot
+	./ExampleLPG > ExampleLPG.dot
+	dot -Tpdf -o ExampleLPG.pdf ExampleLPG.dot
+
+LPG_clean: LPGbase_clean
+	rm -f ExampleLPG ExampleLPG.dot ExampleLPG.pdf
+
+
 #base: Makefile
 base: DecisionTree/ConvertDecision.hs DecisionTree/DecisionTree.hs Makefile
 
+LPGbase: LPG/LogicalProtocolGraph.hs
+
 base_clean:
-	rm -f *.hi *.o
 	rm -f DecisionTree/*.hi DecisionTree/*.o
 
-clean: e1k_clean e10k_clean tulip_clean BCM5704_clean
+LPGbase_clean:
+	rm -f LPG/*.hi LPG/*.o
+
+clean: e1k_clean e10k_clean tulip_clean BCM5704_clean LPG_clean
+	rm -f *.hi *.o
 
