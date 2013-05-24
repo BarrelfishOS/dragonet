@@ -34,10 +34,12 @@ BCM5704: base BCM5704.hs
 BCM5704_clean: base_clean
 	rm -f BCM5704 BCM5704.dot BCM5704.pdf
 
-base: ConvertDecision.hs DecisionTree.hs Makefile
+#base: Makefile
+base: DecisionTree/ConvertDecision.hs DecisionTree/DecisionTree.hs Makefile
 
 base_clean:
 	rm -f *.hi *.o
+	rm -f DecisionTree/*.hi DecisionTree/*.o
 
 clean: e1k_clean e10k_clean tulip_clean BCM5704_clean
 

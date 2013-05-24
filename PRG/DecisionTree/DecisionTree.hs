@@ -1,11 +1,10 @@
 
-module DecisionTree (
+module DecisionTree.DecisionTree (
     Computation(..)
     , Decision(..)
 ) where
 
 import qualified Data.ByteString as BS
-import qualified NICState as NS
 
 type QueueID = Integer  -- ID for the hardware queue
 

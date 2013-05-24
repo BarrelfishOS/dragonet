@@ -1,11 +1,11 @@
 
-module ConvertDecision (
+module DecisionTree.ConvertDecision (
     convertDT
     , printAbstractTree
 ) where
 
 
-import qualified DecisionTree as DT
+import qualified DecisionTree.DecisionTree as DT
 import qualified Data.List as DL
 
 -- #################### Code for traversing/printing Decision ################
@@ -45,7 +45,7 @@ data AbstractTree = AbstractTree {
 -- #################### Printing Abstract Tree ################
 printRelations :: [Relation] -> String
 printRelations [] = []
-printRelations (x:[]) | p == "NIC"   = "" 
+printRelations (x:[]) | p == "NIC"   = ""
                       | otherwise    = (parent x) -- ++ "[" ++ (show (childPos x)) ++ "]"
                                        ++ " -> " ++ (child x) ++ ";\n"
   where p = (parent x)
@@ -73,9 +73,9 @@ printAbstractTree tree = start ++ decls ++ rels ++ end
           end = printEnd
           decls = printDeclarations $ DL.nub (declarations tree)
           rels = printRelations $ trimAbstractTree $ relations tree
-          
+
 trimAbstractTree :: [Relation] -> [Relation]
-trimAbstractTree [] = []                    
+trimAbstractTree [] = []
 trimAbstractTree (x:xs) = x : trimAbstractTree (filter (\y -> not(x ==y)) xs)
 
 -- #################### Convert Decision into Abstract Tree ################

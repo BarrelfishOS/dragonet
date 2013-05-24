@@ -1,9 +1,8 @@
 
 module Main (main) where
 
-import qualified NICState as NS
-import qualified DecisionTree as DT
-import qualified ConvertDecision as CD
+import qualified DecisionTree.DecisionTree as DT
+import qualified  DecisionTree.ConvertDecision as CD
 
 
 -- Config
