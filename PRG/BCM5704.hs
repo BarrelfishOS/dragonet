@@ -30,7 +30,7 @@ eBCMInQueues = makeQueues eBCMNumQueues
 
 
 eBCMFlexibleFilter next = [DT.Decision {
-        DT.compute = (DT.Computation "FlexibleFilter"),
+        DT.compute = (DT.Computation "RuleChecker"),
         DT.possibleActions = [DT.Dropped] ++ eBCMInQueues ++ next
 }]
 
