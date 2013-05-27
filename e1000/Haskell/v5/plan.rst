@@ -1,11 +1,20 @@
 
 
-
-
 next question
 ---------------------
 Qus:
 Ans:
+
+
+
+next question
+---------------------
+Qus: Can I make module dataType able to work with Ix?
+Ans: It might work as long as this is graph and there are no expectations like
+it needs to be sorted or anything like that.
+
+
+
 
 next question
 ---------------------
@@ -18,6 +27,27 @@ Qus: Figure out how to introduce filter rule which will enable modelling
 each and every flow.
 Ans: idea: some sort of agregation of every flow selection.
 
+
+
+
+
+next question
+---------------------
+Qus: Can I use readymade graph libraries for my graphs?
+Ans: There is Data.Graph library but it has a requirement on Vertex dataType
+is that it is indexable. Which means that it should be able to answer
+questions like index, range, in_range.
+http://www.haskell.org/ghc/docs/6.12.2/html/libraries/base-4.2.0.1/Data-Ix.html
+
+I can try and do this by adding an integer in the structure as integer,
+but I am not able to comprehend it's implications
+
+
+next question
+---------------------
+Qus: Support for heterogeneous list/collections
+Ans: Yes!
+http://www.haskell.org/haskellwiki/Heterogenous_collections
 
 next question
 ---------------------
