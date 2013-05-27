@@ -15,8 +15,8 @@ getGraphAndDS des = (ds, graph)
 
 -- main function
 main = do
-        putStrLn ds1
-        putStrLn linebreak
+        ---putStrLn ds1
+        ---putStrLn linebreak
         putStrLn graph1
     where
         -- Initialize the logical protocol graph
