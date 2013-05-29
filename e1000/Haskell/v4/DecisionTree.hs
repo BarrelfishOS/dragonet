@@ -22,7 +22,7 @@ module DecisionTree (
     , main
 ) where
 
-
+import qualified Data.Set as Set
 import qualified Data.Data as DD
 --import qualified Data.Typeable as DDT
 

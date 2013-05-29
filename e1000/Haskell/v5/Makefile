@@ -11,6 +11,7 @@ compileG: Graph.hs
 runG:	compileG
 	./GraphTest > testG.dot
 	dot -Tpng -o testG.png testG.dot
+	cat testG.dot
 
 clean:
 	rm -f *.hi *.o test1 GraphTest  testG.dot

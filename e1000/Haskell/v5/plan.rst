@@ -2,9 +2,57 @@
 
 next question
 ---------------------
-Qus:
+Qus:  Create a data-structure for a graph with overloaded datatype
 Ans:
 
+
+next question
+---------------------
+Qus: Create a graph of all dependencies in for basic computations.
+Ans:  It seems that even basic computations have dependencies.  I tried to
+capture these dependencies using list, but it became too complicated and error
+prone.  I need a data-structure which is natural graph, and can work with
+overloaded datatypes
+
+
+
+next question
+---------------------
+Qus: Create a graph of all dependencies of pre and post conditions
+Ans: If I have all dependencies in the dependency-List then these can be
+used for pre and post conditions.
+
+next question
+---------------------
+Qus: Where exactly the pre and post conditions be?
+Ans: Should they be on Conditions? or should they be on Modules?
+
+example:
+L4 tests depend on which L3 it is. As L3 will change where the L4 header starts.
+You need to verify that it is TCP before making any tests
+You need to verify that it is IPv4 or IPv6 before testing any of later tests.
+
+next question
+---------------------
+Qus: Create a graph out of it.
+Ans:
+Problem: can't use Data.Graph because I don't know howto override defination
+of Vertex.  Also, it is based on quite old paper (1994), so going with
+web-tutorial.
+
+It seems that the web-tutorial code works just by creating a representative
+graph where vertices are integers.  You can map these integers to some
+different datatypes to get graph of some other types, but these types will
+not be embedded into the graph.
+
+So, I have two options :
+ * Create a recursive data-type and use it to generate graph.
+ * Create list of nodes and the graph will be overlay in the index based
+   adjecency  list
+
+Answer depends on what you want to do with these graphs later.
+ * Find different paths
+ * Find all nodes
 
 
 next question
@@ -12,8 +60,6 @@ next question
 Qus: Can I make module dataType able to work with Ix?
 Ans: It might work as long as this is graph and there are no expectations like
 it needs to be sorted or anything like that.
-
-
 
 
 next question
