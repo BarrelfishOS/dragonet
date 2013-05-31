@@ -10,6 +10,7 @@ module Main (
 
 import qualified DecisionTree as DT
 import qualified Elements as EL
+import qualified Data.Data as DD
 
 -- Current state of the system
 type State = [DT.Node]
@@ -140,12 +141,14 @@ main = do
 
         putStrLn outF3
         putStrLn lineBreak
+
+        putStrLn testLine
         putStrLn "Done!!"
         putStrLn lineBreak
 
---        putStrLn outF2
---        putStrLn lineBreak
---        putStrLn outF
+        putStrLn outF2
+        putStrLn lineBreak
+        putStrLn outF
     where
         lineBreak = "\n\n"
         ml = EL.getElementList
@@ -169,12 +172,12 @@ main = do
 
 
         outF3 = "[Action] " ++ (show $ reachDesiredActionV2 ml [[]]
---                    (DT.NT DT.Ethernet))
                     (DT.NT DT.TCP))
 
---        outF = "[Action] " ++ (show $ reachDesiredAction ml [] (DT.NT DT.TCP))
---        outF2 = "[All] " ++ (show $ generateGraph EL.getElementList)
+        outF = "[Action] " ++ (show $ reachDesiredAction ml [] (DT.NT DT.TCP))
+        outF2 = "[All] " ++ (show $ generateGraph EL.getElementList)
 
+        testLine = show $ DD.typeOf (undefined :: DT.Testing)
 
 -- ############################# EOF ###################################
 

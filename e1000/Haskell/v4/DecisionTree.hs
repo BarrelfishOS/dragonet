@@ -1,5 +1,7 @@
 #!/usr/bin/env runhaskell
 
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module DecisionTree (
     Action(..)
     , Terminal(..)
@@ -8,6 +10,7 @@ module DecisionTree (
     , PostCondition(..)
     , Module(..)
     , Node(..)
+    , Testing(..)
     , defaultPostcondition
     , finalPostcondition
     , initPrecondition
@@ -19,6 +22,10 @@ module DecisionTree (
     , main
 ) where
 
+import qualified Data.Set as Set
+import qualified Data.Data as DD
+--import qualified Data.Typeable as DDT
+
 -- module Main (main) where
 
 type QueueID = Integer  -- ID for the hardware queue
@@ -29,7 +36,7 @@ data Terminal = Dropped
             | InQueue {
                 queueID :: QueueID
             }
-            deriving (Show, Eq, Ord)
+            deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
 -- set of non-terminal action, which means that these can be further extended
 data NonTerminal = NIC
@@ -40,12 +47,18 @@ data NonTerminal = NIC
             | UDP
             | TCP
             | RTP
-            deriving (Show, Eq, Ord)
+            deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+
+--data ExperimentalTerm = NIC2
+--            | Ethernet2
+--            deriving (DD.Data)
+--
+data Testing = C1 | C2 deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
 -- Actions which can be taken from a module
 data Action = T Terminal
             | NT NonTerminal
-            deriving (Show, Eq, Ord)
+            deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
 
 data PreCondition = PreCondition {

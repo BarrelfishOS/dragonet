@@ -2,10 +2,9 @@ module Main (main) where
 
 import qualified Data.Word as W
 import qualified Data.ByteString as BS
-import qualified NICState as NS
-import qualified DecisionTree as DT
-import qualified ConvertDecision as CD
-import qualified LogicalProtocolGraph as LP
+import qualified DecisionTree.DecisionTree as DT
+import qualified DecisionTree.ConvertDecision as CD
+import qualified LPG.LogicalProtocolGraph as LP
 
 getGraphAndDS :: DT.Decision -> (String, String)
 getGraphAndDS des = (ds, graph)
@@ -16,8 +15,8 @@ getGraphAndDS des = (ds, graph)
 
 -- main function
 main = do
-        putStrLn ds1
-        putStrLn linebreak
+        ---putStrLn ds1
+        ---putStrLn linebreak
         putStrLn graph1
     where
         -- Initialize the logical protocol graph

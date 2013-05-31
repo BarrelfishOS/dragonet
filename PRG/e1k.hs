@@ -1,9 +1,8 @@
 
 module Main (main) where
 
-import qualified NICState as NS
-import qualified DecisionTree as DT
-import qualified ConvertDecision as CD
+import qualified DecisionTree.DecisionTree as DT
+import qualified DecisionTree.ConvertDecision as CD
 
 
 packetHandlingDes :: DT.Decision
@@ -69,15 +68,8 @@ packetHandlingDes = des
 
 -- main function
 main = do
---        putStrLn out2
---        putStrLn out3
         putStrLn out4
     where
-        nicState = NS.updateQueueElement NS.initNICState 6 1 1
---        out4 = show nicState
-        out2 = show $ packetHandlingDes
         myTree = CD.convertDT packetHandlingDes
---        myTree = DT.convertDT.DT.Decision packetHandlingDes
-        out3 = "\n\n\n\n\n"
         out4 = CD.printAbstractTree myTree
 

@@ -1,4 +1,5 @@
-module LogicalProtocolGraph (
+
+module LPG.LogicalProtocolGraph (
     LogicalProtocolGraph1(..)
     , L4Protocol(..)
     , Application(..)
@@ -16,8 +17,7 @@ module LogicalProtocolGraph (
 --   , clone -- clones existing socket/connection into new application (fork)
 ) where
 
-import qualified NICState as NS
-import qualified DecisionTree as DT
+import qualified DecisionTree.DecisionTree as DT
 import qualified Data.List as DL
 import Debug.Trace
 
