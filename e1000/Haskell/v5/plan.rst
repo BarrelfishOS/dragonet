@@ -2,8 +2,22 @@
 
 next question
 ---------------------
+Qus: Make sure the verification nodes are clearly marked as **AND** nodes.
+Ans:  This is needed to avoid confusion between AND and OR nodes.
+The main fact is that, all the inputs for AND nodes needs to be executed,
+but the order does not matter.  But in case of OR nodes, the tag is valid as
+long as any input is active.
+
+I plan to do this by distinguishing AND and OR nodes with different node boxes.
+This also means that I need to store the information about every node
+specifying whether it is AND or OR node.  It is already captured in the
+data-structure (all computations in same list are AND, and lists associated
+with same TAG are OR), but I need to push it into the node-list as well.
+
+next question
+---------------------
 Qus:  Create a data-structure for a graph with overloaded datatype
-Ans:
+Ans: Done
 
 
 next question
