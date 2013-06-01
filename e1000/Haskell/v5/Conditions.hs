@@ -26,6 +26,7 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | L2ValidSrc
         | L2ValidType -- clasifier
         | VerifiedL2Ethernet -- tag specifying that is it a valid Ethernet packet
+        | VerifiedL2
         | ClassifiedL3IPv4 -- IPv4 starter node
         | L3IPv4ValidVersion
         | L3IPv4ValidLength
@@ -45,6 +46,8 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | L3IPv6ValidDest
         | L3IPv6ValidProtocol -- clasifies the next level protocol
         | VerifiedL3IPv6
+        | VerifiedL3
+        | ClassifiedL3
         | ClassifiedL4ICMP -- ICMP starter node
         | L4ICMPValidType
         | VerifiedL4ICMP -- ICMP verified node
@@ -138,25 +141,68 @@ makeEdgeList :: a -> [a] -> [Edge a]
 makeEdgeList _ [] = []
 makeEdgeList src (x:xs) = [(src, x)] ++ makeEdgeList src xs
 
-getEdges :: (Ord a) => [Gnode a] -> [Edge a]
+getEdges :: [Gnode a] -> [Edge a]
 getEdges nlist = DL.concat $ DL.map
                     ( \ e -> makeEdgeList (fst e) (snd e)) nlist
+
+{-
+ - prints the edge with additional description (if needed)
+ -}
+showEdge :: (Show a) => Edge a -> String
+showEdge (from, to) = show from ++ " -> " ++ show to ++
+                   " [label = \"" ++ "\"];\n"
+
+{-
+ - Find all AND nodes in given graph
+ -}
+findANDnodes :: [Gnode a] -> [a]
+findANDnodes gnodeList = DL.map fst $ DL.filter (\x -> length (snd x) > 1 ) gnodeList
+
+findORnodes :: [Gnode a] -> [a]
+findORnodes gnodeList = DL.map fst $ DL.filter (\x -> length (snd x) <= 1 ) gnodeList
+
+isMyList :: Computation -> Bool
+isMyList v = [] /= DL.filter (== v) allANDnodes
+    where
+    allANDnodes = DL.map fst $ DL.filter (\x -> length (snd x) > 1 ) getNetworkDependency
+
+isANDnode :: a -> Bool
+isANDnode _ = True
+
+{-
+ - prints the vertex with information like AND or OR type (if needed)
+ -}
+showORnode :: (Show a) => a -> String
+showORnode v = show v ++ " [label = " ++ (show  v) ++ "];\n"
+
+showANDnode :: (Show a) => a -> String
+showANDnode v = show v ++ " [label = " ++ (show  v) ++
+        ", color=gray,style=filled,shape=trapezium];\n"
+
 
 {-
  - Prints the graph in dot format
  - Arguments are <list of vertices> <list of edges>
  -}
-showGraphViz :: (Show a) => [a] -> [(a, a)] -> String
-showGraphViz vertices edges =
+showGraphViz :: (Show a) => [a] -> [a] -> [Edge a] -> String
+showGraphViz verOR verAND edges =
     "digraph name {\n" ++
     "rankdir=LR;\n" ++
-    (DL.concatMap showNode vertices) ++
+    (DL.concatMap showORnode verOR) ++
+    (DL.concatMap showANDnode verAND) ++
     (DL.concatMap showEdge edges) ++
     "}\n"
-    where showEdge (from, to) = show from ++ " -> " ++ show to ++
-                   " [label = \"" ++ "\"];\n"
-          showNode v = show v ++ " [label = " ++ (show  v) ++ "];\n"
+--    where showEdge (from, to) = show from ++ " -> " ++ show to ++
+--                   " [label = \"" ++ "\"];\n"
+--          showNode v = show v ++ " [label = " ++ (show  v) ++ "];\n"
 
+showGraphVizWrapper ::(Show a) => [Gnode a] -> String
+showGraphVizWrapper gnodeList = showGraphViz verticesListOR verticesListAND
+                                    edgesList
+    where
+        verticesListOR = findORnodes gnodeList
+        verticesListAND = findANDnodes gnodeList
+        edgesList = getEdges gnodeList
 
 {-
  - Small example  dependency list for testing
@@ -171,8 +217,10 @@ getNetworkDependencyDummy = [
     ]
 
 {-
- - Gives list of all dependencies between various nodes in typical network
- - graph
+ - Gives list of all dependencies between various nodes in typical network graph
+ - Rules: AND nodes should appear only once in the following node.
+ -      AND nodes should have more than one dependency edges in single declaration.
+ -      OR nodes should always have only one entry in every declaration
  -}
 getNetworkDependency :: [Gnode Computation]
 getNetworkDependency = [
@@ -195,8 +243,7 @@ getNetworkDependency = [
         , (L3IPv4ValidProtocol, [ClassifiedL3IPv4])
         , (VerifiedL3IPv4, [L3IPv4ValidVersion, L3IPv4ValidLength
             , L3IPv4ValidTTL, L3IPv4ValidChecksum, L3IPv4ValidSrc
-            , L3IPv4ValidDest, L3IPv4ValidReassembly])
-        , (VerifiedL3IPv4, [VerifiedL2Ethernet])
+            , L3IPv4ValidDest, L3IPv4ValidReassembly, VerifiedL2Ethernet])
 
         , (ClassifiedL3IPv6, [L2ValidType])
         , (L3IPv6ValidVersion, [ClassifiedL3IPv6])
@@ -207,16 +254,15 @@ getNetworkDependency = [
         , (L3IPv6ValidProtocol, [ClassifiedL3IPv6])
         , (VerifiedL3IPv6 , [L3IPv6ValidVersion, L3IPv6ValidLength
             , L3IPv6ValidHops, L3IPv6ValidSrc, L3IPv6ValidDest
-            , L3IPv6ValidProtocol])
-        , (VerifiedL3IPv6, [VerifiedL2Ethernet])
+            , L3IPv6ValidProtocol, VerifiedL2Ethernet])
 
+        , (VerifiedL3, [VerifiedL3IPv4])
+        , (VerifiedL3, [VerifiedL3IPv6])
 
         , (ClassifiedL4ICMP, [L3IPv4ValidProtocol]) -- ICMP classification
         , (ClassifiedL4ICMP, [L3IPv6ValidProtocol]) --
         , (L4ICMPValidType, [ClassifiedL4ICMP])
-        , (VerifiedL4ICMP, [L4ICMPValidType])
-        , (VerifiedL4ICMP, [VerifiedL3IPv6])
-        , (VerifiedL4ICMP, [VerifiedL3IPv4])
+        , (VerifiedL4ICMP, [L4ICMPValidType, VerifiedL3])
 
         , (ClassifiedL4UDP, [L3IPv4ValidProtocol]) -- UDP classification
         , (ClassifiedL4UDP, [L3IPv6ValidProtocol]) --
@@ -225,10 +271,7 @@ getNetworkDependency = [
         , (L4UDPValidLength, [ClassifiedL4UDP])
         , (L4UDPValidChecksum, [ClassifiedL4UDP])
         , (VerifiedL4UDP, [L4UDPValidSrc, L4UDPValidDest
-            , L4UDPValidLength, L4UDPValidChecksum])
-        , (VerifiedL4UDP, [VerifiedL3IPv4])
-        , (VerifiedL4UDP, [VerifiedL3IPv6])
-
+            , L4UDPValidLength, L4UDPValidChecksum, VerifiedL3])
 
         , (ClassifiedL4TCP, [L3IPv4ValidProtocol]) -- TCP classification
         , (ClassifiedL4TCP, [L3IPv6ValidProtocol]) --
@@ -251,9 +294,7 @@ getNetworkDependency = [
             , L4TCPValidChecksum, L4TCPValidSequence, L4TCPValidAckNo
             , L4TCPValidAck, L4TCPValidSyn, L4TCPValidFin, L4TCPValidFlags
             , L4TCPValidWindow, L4TCPValidUrgent, L4TCPValidOffset
-            , L4TCPValidState])
-        , (VerifiedL4TCP, [VerifiedL3IPv6])
-        , (VerifiedL4TCP, [VerifiedL3IPv4])
+            , L4TCPValidState, VerifiedL3])
 
         , (L4TCPUpdateProtoState, [VerifiedL4TCP])
         -- TCP writeback State
@@ -355,16 +396,13 @@ main_debug = do
         out1 = myShowList $ getNetworkDependencyDummy
         out2 = myShowList $ getVertices getNetworkDependencyDummy
         out3 = myShowList $ getEdges getNetworkDependencyDummy
-        outDot = showGraphViz (getVertices getNetworkDependencyDummy)
-                    (getEdges getNetworkDependencyDummy)
+        outDot = showGraphVizWrapper getNetworkDependencyDummy
 
 
 main  :: IO()
 main = do
         putStrLn outDot
     where
-        outDotDummy = showGraphViz (getVertices getNetworkDependencyDummy)
-                    (getEdges getNetworkDependencyDummy)
-        outDot = showGraphViz (getVertices getNetworkDependency)
-                    (getEdges getNetworkDependency)
+        outDotDummy = showGraphVizWrapper getNetworkDependencyDummy
+        outDot = showGraphVizWrapper getNetworkDependency
 
