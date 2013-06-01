@@ -278,6 +278,6 @@ main  :: IO()
 main = do
         putStrLn outDot
     where
-        outDotDummy = MG.showGraphVizWrapper getNetworkDependencyDummy
-        outDot = MG.showGraphVizWrapper getNetworkDependency
+        outDotDummy = MG.showFlowGraph getNetworkDependencyDummy
+        outDot = MG.showFlowGraph getNetworkDependency
 
