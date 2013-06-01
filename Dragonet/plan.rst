@@ -2,6 +2,29 @@
 
 next question
 ---------------------
+Qus: translate e1k PRG
+Ans:
+Status:
+
+next question
+---------------------
+Qus:  How am I going to deal with filters and queues?
+Ans:
+
+Status:
+
+
+next question
+---------------------
+Qus: How to rewrite existing PRG by using new language
+Ans:  Part of it will involve rewriting modules which will hold some
+network properties
+
+Status:
+
+
+next question
+---------------------
 Qus: Make sure the verification nodes are clearly marked as **AND** nodes.
 Ans:  This is needed to avoid confusion between AND and OR nodes.
 The main fact is that, all the inputs for AND nodes needs to be executed,
@@ -14,11 +37,13 @@ specifying whether it is AND or OR node.  It is already captured in the
 data-structure (all computations in same list are AND, and lists associated
 with same TAG are OR), but I need to push it into the node-list as well.
 
+Status: Done
+
 next question
 ---------------------
 Qus:  Create a data-structure for a graph with overloaded datatype
 Ans: Done
-
+Status: Done
 
 next question
 ---------------------

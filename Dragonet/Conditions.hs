@@ -2,13 +2,13 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
---module Conditions (
-module Main (
+--module Main (
+module Conditions (
     Computation(..)
     , Module(..)
     , getModLst
     , moduleRange
-    , main
+    , getNetworkDependency
 ) where
 
 import qualified MyGraph as MG
@@ -23,6 +23,9 @@ import qualified Data.Ix as Ix
 data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | L2ValidLen
         | L2ValidCRC
+        | L2ValidBroadcast
+        | L2ValidMulticast
+        | L2ValidUnicast
         | L2ValidDest
         | L2ValidSrc
         | L2ValidType -- clasifier
@@ -75,39 +78,11 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | L4TCPValidState
         | L4TCPUpdateProtoState -- Updates the protocol state in machine
         | VerifiedL4TCP
+        | L4Unclasified
 --        | IsFlow Proto SrcIP DstIP SrcPort DstPort -- for flow filtering
         | ToKernelMemory -- packet copy to kernel memory
         | ToUserMemory -- packet copy to user memory
         deriving (Show, Eq, Ord, Ix.Ix, DD.Typeable, DD.Data)
-
-
-type Dependency = (Computation, Computation)
--- data Dependency = Dependency (Computation, Computation)
-
-
-getDependencyList :: [Dependency]
-getDependencyList = [
-        (L2ValidType, ClassifiedL2Ethernet)
-        , (L2ValidCRC, ClassifiedL2Ethernet)
-        , (L2ValidDest, ClassifiedL2Ethernet)
-        , (L2ValidSrc, ClassifiedL2Ethernet)
-        , (ClassifiedL2Ethernet, L2ValidType)
-        , (L3IPv4ValidVersion, ClassifiedL3IPv4)
-        , (L3IPv4ValidVersion, ClassifiedL3IPv4)
-        , (L3IPv4ValidLength, ClassifiedL3IPv4)
-        , (L3IPv4ValidTTL, ClassifiedL3IPv4)
-        , (VerifiedL3IPv4, ClassifiedL3IPv4) -- clasify nxt lvl prto
-        , (L3IPv4ValidChecksum, ClassifiedL3IPv4)
-                ]
-
-getValidityList :: [Dependency]
-getValidityList = [
-        (VerifiedL2Ethernet, L2ValidType)
-        , (VerifiedL2Ethernet, L2ValidSrc)
-        , (VerifiedL2Ethernet, L2ValidDest)
-        , (VerifiedL2Ethernet, L2ValidCRC)
-
-            ]
 
 
 {-
@@ -134,10 +109,17 @@ getNetworkDependency = [
         , (L2ValidLen, [ClassifiedL2Ethernet])
         , (L2ValidType, [ClassifiedL2Ethernet])
         , (L2ValidCRC, [ClassifiedL2Ethernet])
-        , (L2ValidDest, [ClassifiedL2Ethernet])
+        , (L2ValidBroadcast, [ClassifiedL2Ethernet])
+        , (L2ValidMulticast, [ClassifiedL2Ethernet])
+        , (L2ValidUnicast, [ClassifiedL2Ethernet])
+        , (L2ValidDest, [L2ValidBroadcast])
+        , (L2ValidDest, [L2ValidMulticast])
+        , (L2ValidDest, [L2ValidUnicast])
         , (L2ValidSrc, [ClassifiedL2Ethernet])
         , (VerifiedL2Ethernet, [L2ValidCRC, L2ValidLen, L2ValidType
                        , L2ValidDest, L2ValidSrc])
+
+        -- IPv4 related tags
         , (ClassifiedL3IPv4, [L2ValidType])
         , (L3IPv4ValidVersion, [ClassifiedL3IPv4])
         , (L3IPv4ValidLength, [ClassifiedL3IPv4])
@@ -151,6 +133,7 @@ getNetworkDependency = [
             , L3IPv4ValidTTL, L3IPv4ValidChecksum, L3IPv4ValidSrc
             , L3IPv4ValidDest, L3IPv4ValidReassembly, VerifiedL2Ethernet])
 
+        -- IPv6 related tags
         , (ClassifiedL3IPv6, [L2ValidType])
         , (L3IPv6ValidVersion, [ClassifiedL3IPv6])
         , (L3IPv6ValidLength, [ClassifiedL3IPv6])
@@ -162,16 +145,21 @@ getNetworkDependency = [
             , L3IPv6ValidHops, L3IPv6ValidSrc, L3IPv6ValidDest
             , L3IPv6ValidProtocol, VerifiedL2Ethernet])
 
+
+        -- Generic L3 level tags
         , (VerifiedL3, [VerifiedL3IPv4])
         , (VerifiedL3, [VerifiedL3IPv6])
 
-        , (ClassifiedL4ICMP, [L3IPv4ValidProtocol]) -- ICMP classification
-        , (ClassifiedL4ICMP, [L3IPv6ValidProtocol]) --
+        , (ClassifiedL3, [L3IPv4ValidProtocol])
+        , (ClassifiedL3, [L3IPv6ValidProtocol])
+
+        -- ICMP related computations
+        , (ClassifiedL4ICMP, [ClassifiedL3]) -- ICMP classification
         , (L4ICMPValidType, [ClassifiedL4ICMP])
         , (VerifiedL4ICMP, [L4ICMPValidType, VerifiedL3])
 
-        , (ClassifiedL4UDP, [L3IPv4ValidProtocol]) -- UDP classification
-        , (ClassifiedL4UDP, [L3IPv6ValidProtocol]) --
+        -- UDP related computations
+        , (ClassifiedL4UDP, [ClassifiedL3])
         , (L4UDPValidSrc, [ClassifiedL4UDP])
         , (L4UDPValidDest, [ClassifiedL4UDP])
         , (L4UDPValidLength, [ClassifiedL4UDP])
@@ -179,9 +167,8 @@ getNetworkDependency = [
         , (VerifiedL4UDP, [L4UDPValidSrc, L4UDPValidDest
             , L4UDPValidLength, L4UDPValidChecksum, VerifiedL3])
 
-        , (ClassifiedL4TCP, [L3IPv4ValidProtocol]) -- TCP classification
-        , (ClassifiedL4TCP, [L3IPv6ValidProtocol]) --
-
+        -- TCP related computations
+        , (ClassifiedL4TCP, [ClassifiedL3]) -- TCP classification
         , (L4TCPValidSrc, [ClassifiedL4TCP])
         , (L4TCPValidDest, [ClassifiedL4TCP])
         , (L4TCPValidLength, [ClassifiedL4TCP])
@@ -205,10 +192,12 @@ getNetworkDependency = [
         , (L4TCPUpdateProtoState, [VerifiedL4TCP])
         -- TCP writeback State
 
-        -- clasifies the next level protocol
-        , (ToUserMemory, [L4TCPUpdateProtoState])
-        , (ToUserMemory, [VerifiedL4UDP])
-        , (ToUserMemory, [VerifiedL4TCP])
+        , (L4Unclasified, [ClassifiedL3]) -- unsupported protocols
+        , (ToKernelMemory, [L4TCPUpdateProtoState])
+        , (ToKernelMemory, [VerifiedL4UDP])
+        , (ToKernelMemory, [VerifiedL4TCP])
+        , (ToKernelMemory, [L4Unclasified])
+        , (ToKernelMemory, [VerifiedL4ICMP])
     ]
 
 
