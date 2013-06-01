@@ -11,6 +11,7 @@ module Main (
     , main
 ) where
 
+import qualified MyGraph as MG
 import qualified Data.Data as DD
 import qualified Data.List as DL
 import qualified Data.Ix as Ix
@@ -109,105 +110,10 @@ getValidityList = [
             ]
 
 
-type Gnode a = (a, [a])
-type Edge a = (a, a)
-
-myShowList :: (Show a) => [a] -> String
-myShowList [] = "\n"
-myShowList (x:xs) = show x ++ "\n" ++ myShowList xs
-
-{-
- - Remove the duplicates from the list
- -}
-rmdups :: (Ord a) => [a] -> [a]
-rmdups = DL.map DL.head . DL.group . DL.sort
-
-{-
- - get list of valid vertices from given Gnode list.
- - This also includes the vertices which have only incoming edges
- - and no outgoing edges
--}
-getVertices :: (Ord a) => [Gnode a] -> [a]
-getVertices nlist = rmdups $ source_vertex ++ dest_vertex
-    where
-        source_vertex = DL.map fst nlist
-        dest_vertex = DL.concat $ DL.map snd nlist
-
-
-{-
- - Get list of all the edges from given list of Gnodes
- -}
-makeEdgeList :: a -> [a] -> [Edge a]
-makeEdgeList _ [] = []
-makeEdgeList src (x:xs) = [(src, x)] ++ makeEdgeList src xs
-
-getEdges :: [Gnode a] -> [Edge a]
-getEdges nlist = DL.concat $ DL.map
-                    ( \ e -> makeEdgeList (fst e) (snd e)) nlist
-
-{-
- - prints the edge with additional description (if needed)
- -}
-showEdge :: (Show a) => Edge a -> String
-showEdge (from, to) = show from ++ " -> " ++ show to ++
-                   " [label = \"" ++ "\"];\n"
-
-{-
- - Find all AND nodes in given graph
- -}
-findANDnodes :: [Gnode a] -> [a]
-findANDnodes gnodeList = DL.map fst $ DL.filter (\x -> length (snd x) > 1 ) gnodeList
-
-findORnodes :: [Gnode a] -> [a]
-findORnodes gnodeList = DL.map fst $ DL.filter (\x -> length (snd x) <= 1 ) gnodeList
-
-isMyList :: Computation -> Bool
-isMyList v = [] /= DL.filter (== v) allANDnodes
-    where
-    allANDnodes = DL.map fst $ DL.filter (\x -> length (snd x) > 1 ) getNetworkDependency
-
-isANDnode :: a -> Bool
-isANDnode _ = True
-
-{-
- - prints the vertex with information like AND or OR type (if needed)
- -}
-showORnode :: (Show a) => a -> String
-showORnode v = show v ++ " [label = " ++ (show  v) ++ "];\n"
-
-showANDnode :: (Show a) => a -> String
-showANDnode v = show v ++ " [label = " ++ (show  v) ++
-        ", color=gray,style=filled,shape=trapezium];\n"
-
-
-{-
- - Prints the graph in dot format
- - Arguments are <list of vertices> <list of edges>
- -}
-showGraphViz :: (Show a) => [a] -> [a] -> [Edge a] -> String
-showGraphViz verOR verAND edges =
-    "digraph name {\n" ++
-    "rankdir=LR;\n" ++
-    (DL.concatMap showORnode verOR) ++
-    (DL.concatMap showANDnode verAND) ++
-    (DL.concatMap showEdge edges) ++
-    "}\n"
---    where showEdge (from, to) = show from ++ " -> " ++ show to ++
---                   " [label = \"" ++ "\"];\n"
---          showNode v = show v ++ " [label = " ++ (show  v) ++ "];\n"
-
-showGraphVizWrapper ::(Show a) => [Gnode a] -> String
-showGraphVizWrapper gnodeList = showGraphViz verticesListOR verticesListAND
-                                    edgesList
-    where
-        verticesListOR = findORnodes gnodeList
-        verticesListAND = findANDnodes gnodeList
-        edgesList = getEdges gnodeList
-
 {-
  - Small example  dependency list for testing
  - -}
-getNetworkDependencyDummy :: [Gnode Computation]
+getNetworkDependencyDummy :: [MG.Gnode Computation]
 getNetworkDependencyDummy = [
         (ClassifiedL2Ethernet, [])
         , (L2ValidLen, [ClassifiedL2Ethernet])
@@ -222,7 +128,7 @@ getNetworkDependencyDummy = [
  -      AND nodes should have more than one dependency edges in single declaration.
  -      OR nodes should always have only one entry in every declaration
  -}
-getNetworkDependency :: [Gnode Computation]
+getNetworkDependency :: [MG.Gnode Computation]
 getNetworkDependency = [
         (ClassifiedL2Ethernet, [])
         , (L2ValidLen, [ClassifiedL2Ethernet])
@@ -377,32 +283,12 @@ main_old = do
         m = Module "Ethernet" [L2ValidLen, L2ValidCRC]
         out1 = show $ getModLst
         out2 = show $ DD.typeOf (m)
---        gr = DG.buildG (1,3) [(1, 2),(2, 2),(2, 2),(2, 3),(1, 3)]
---        gr = DG.buildG (1,3) [(1,'a',2),(2,'a',2),(2,'b',2),(2,'c',3),(1,'a',3)]
-
-main_debug :: IO()
-main_debug = do
-        putStrLn "########### Actual Graph #############"
-        putStrLn out1
-        putStrLn "########### Vertices #############"
-        putStrLn out2
-        putStrLn "########### Edges #############"
-        putStrLn out3
-        putStrLn "########### DoT #############"
-        putStrLn outDot
-
-    where
-        lineBreak = "\n\n"
-        out1 = myShowList $ getNetworkDependencyDummy
-        out2 = myShowList $ getVertices getNetworkDependencyDummy
-        out3 = myShowList $ getEdges getNetworkDependencyDummy
-        outDot = showGraphVizWrapper getNetworkDependencyDummy
 
 
 main  :: IO()
 main = do
         putStrLn outDot
     where
-        outDotDummy = showGraphVizWrapper getNetworkDependencyDummy
-        outDot = showGraphVizWrapper getNetworkDependency
+        outDotDummy = MG.showGraphVizWrapper getNetworkDependencyDummy
+        outDot = MG.showGraphVizWrapper getNetworkDependency
 
