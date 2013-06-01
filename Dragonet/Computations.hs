@@ -92,18 +92,6 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
 
 
 {-
- - Small example  dependency list for testing
- - -}
-getNetworkDependencyDummy :: [MG.Gnode Computation]
-getNetworkDependencyDummy = [
-        (ClassifiedL2Ethernet, [])
-        , (L2ValidLen, [ClassifiedL2Ethernet])
-        , (L2ValidType, [ClassifiedL2Ethernet])
-        , (VerifiedL2Ethernet, [L2ValidCRC, L2ValidLen, L2ValidType])
-        , (ClassifiedL3IPv4, [L2ValidType])
-    ]
-
-{-
  - Gives list of all dependencies between various nodes in typical network graph
  - Rules: AND nodes should appear only once in the following node.
  -      AND nodes should have more than one dependency edges in single declaration.
@@ -194,17 +182,35 @@ getNetworkDependency = [
             , L4TCPValidAck, L4TCPValidSyn, L4TCPValidFin, L4TCPValidFlags
             , L4TCPValidWindow, L4TCPValidUrgent, L4TCPValidOffset
             , L4TCPValidState, VerifiedL3])
-
-        , (L4TCPUpdateProtoState, [VerifiedL4TCP])
         -- TCP writeback State
+        , (L4TCPUpdateProtoState, [VerifiedL4TCP])
 
-        , (L4Unclasified, [ClassifiedL3]) -- unsupported protocols
+        -- unsupported protocols.  Anything that was not treated specially
+        -- by above nodes
+        , (L4Unclasified, [ClassifiedL3])
+
+        -- Copying packets into system memory
+        -- TODO: Filters/queues should come into play here.
         , (ToKernelMemory, [L4TCPUpdateProtoState])
         , (ToKernelMemory, [VerifiedL4UDP])
         , (ToKernelMemory, [VerifiedL4TCP])
         , (ToKernelMemory, [L4Unclasified])
         , (ToKernelMemory, [VerifiedL4ICMP])
     ]
+
+
+{-
+ - Small sample dependency list for testing purposes
+ -}
+getNetworkDependencyDummy :: [MG.Gnode Computation]
+getNetworkDependencyDummy = [
+        (ClassifiedL2Ethernet, [])
+        , (L2ValidLen, [ClassifiedL2Ethernet])
+        , (L2ValidType, [ClassifiedL2Ethernet])
+        , (VerifiedL2Ethernet, [L2ValidCRC, L2ValidLen, L2ValidType])
+        , (ClassifiedL3IPv4, [L2ValidType])
+    ]
+
 
 
 data Module = Module {

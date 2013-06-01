@@ -33,7 +33,8 @@ OUTPUT:
 
  * NetworkProcessing.{png,pdf} : The graph capturing all the computation
         and dependencies between them.  This is generic and hardware
-        independent graph.
+        independent graph.  The grey nodes represents "AND" nodes
+        whereas other nodes are "OR" nodes.
  * E1k.{png,pdf} : The PRG for Intel E1K driver.
 
 ----------
