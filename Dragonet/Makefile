@@ -25,16 +25,7 @@ NetworkProcessing_clean:
 	rm -f NetworkProcessing.hi NetworkProcessing.o NetworkProcessing
 	rm -f NetworkProcessing.dot NetworkProcessing.png NetworkProcessing.pdf
 
-Base: Conditions.hs
-
-
-compileG: Graph.hs
-	ghc Graph.hs -o GraphTest -Wall # -Werror
-
-runG:	compileG
-	./GraphTest > testG.dot
-	dot -Tpng -o testG.png testG.dot
-	cat testG.dot
+Base: Computations.hs
 
 clean: E1k_clean NetworkProcessing_clean
 	rm -f *.hi *.o

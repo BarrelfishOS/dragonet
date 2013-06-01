@@ -1,26 +1,43 @@
 
-
-next question
----------------------
-Qus: translate e1k PRG
-Ans:
-Status:
-
 next question
 ---------------------
 Qus:  How am I going to deal with filters and queues?
 Ans:
+Status: NOT_DONE
 
-Status:
+next question
+---------------------
+Qus:  Need a code to get a subgraph from full graph which will include all
+the computations needed to reach particular computation/tag/decision
+Ans: This is useful to have feature, specially when **NetworkProcessing**
+graph is becoming too big.
+
+Status: NOT_DONE
+
+next question
+---------------------
+Qus: How to add parameterized support for computations.
+Ans: This is needed to add support for filters and queues.
+
+Status: NOT_DONE: Next thing to do
+
+
+next question
+---------------------
+Qus: translate e1k PRG
+Ans: Partially done.  e1k PRG is there but without queues.  Currently the
+last thing it does is to copy to kernel memory.  What I need is queue support
+(which means parameterized computations)
+Status: Done
 
 
 next question
 ---------------------
 Qus: How to rewrite existing PRG by using new language
-Ans:  Part of it will involve rewriting modules which will hold some
-network properties
+Ans: I am directly using a way to describe the graph by specifying all the
+dependencies (edges).
 
-Status:
+Status: Done
 
 
 next question

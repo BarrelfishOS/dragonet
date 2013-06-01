@@ -2,8 +2,14 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
+{-
+ - All the possible computations which can happen in the Network processing.
+ -
+ -
+ -}
+
 --module Main (
-module Conditions (
+module Computations (
     Computation(..)
     , Module(..)
     , getModLst

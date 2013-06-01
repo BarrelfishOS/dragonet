@@ -2,6 +2,15 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
+{-
+ - Physical Resource Graph (PRG) for the E1k NIC (Intel 82576 1GbE).
+ - This PRG only shows the receive side and not the send side.
+ - Currently, this graph captures only one of the possible combination
+ - of all the possible configurations.
+ - In future, this and other possible valid configurations needs to be
+ - generated automatically.
+ -}
+
 --module E1k (
 module Main (
     main
@@ -9,11 +18,12 @@ module Main (
 
 
 import qualified MyGraph as MG
-import qualified Conditions as MC
+import qualified Computations as MC
 
 
 {-
- - Returns list of modules which are involved into
+ - Returns list of computations which can happen in the E1k NIC
+ - and their dependencies.
  -}
 getE1kPRG :: [MG.Gnode MC.Computation]
 getE1kPRG = [
@@ -44,7 +54,7 @@ getE1kPRG = [
 
 
 {-
- - main function: mostly used to test e1k by generating it
+ - main function: used to test if the PRG generated for E1k is correct or not
  -}
 main  :: IO()
 main = do

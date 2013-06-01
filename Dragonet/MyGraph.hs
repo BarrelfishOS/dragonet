@@ -2,6 +2,13 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
+
+{-
+ - Code to deal with graph related functionalities like converting into
+ - a graph, generating visualizations using DoT.
+ -}
+
+
 --module Main (
 module MyGraph (
     Gnode
@@ -11,8 +18,15 @@ module MyGraph (
 
 import qualified Data.List as DL
 
+-- Gnode is the Datatype which captures single vertex of the Graph
+-- and all its dependenceis
+-- The DataType "a" is expected to be in instance of
+--  "Show", "Eq", "Ord"
+--  NOTE: Code depending on "Ord" is not used anymore (rmdups) and can be
+--      removed.
 type Gnode a = (a, [a])
-type Edge a = (a, a)
+
+type Edge a = (a, a) -- connects two vertices.
 
 {-
  - For debugging purposes:
@@ -71,6 +85,11 @@ showEdge (from, to) = show from ++ " -> " ++ show to ++
 findANDnodes :: [Gnode a] -> [a]
 findANDnodes gnodeList = DL.map fst $ DL.filter (\x -> length (snd x) > 1 ) gnodeList
 
+{-
+ - Find all OR nodes in given graph.
+ - TODO: These two functions are too similar.  There should be a way
+ - to write them in one function.
+ -}
 findORnodes :: [Gnode a] -> [a]
 findORnodes gnodeList = DL.map fst $ DL.filter (\x -> length (snd x) <= 1 ) gnodeList
 
@@ -99,16 +118,29 @@ showGraphViz verOR verAND edges =
     (DL.concatMap showEdge edges) ++
     "}\n"
 
-showFlowGraph ::(Show a) => [Gnode a] -> String
-showFlowGraph gnodeList = showGraphViz verticesListOR verticesListAND
+{-
+ - Converts given dependency graph encoded in Gnode list into DoT compatible
+ -  graph notation.
+ -  One can run command ``dot`` on this generated output to produce a graph.
+ -}
+showDependencyGraph ::(Show a) => [Gnode a] -> String
+showDependencyGraph gnodeList = showGraphViz verticesListOR verticesListAND
                                     edgesList
     where
         verticesListOR = findORnodes gnodeList
         verticesListAND = findANDnodes gnodeList
         edgesList = reverseEdges $ getEdges gnodeList
 
-showDependencyGraph ::(Show a) => [Gnode a] -> String
-showDependencyGraph gnodeList = showGraphViz verticesListOR verticesListAND
+{-
+ - Just like above showDependencyGraph function, converts Gnode list
+ - into DoT compatible graph, but it reverts the direction of all the
+ - edges to generate a flow graph instead of dependency graph.
+ -
+ - TODO: These two functions are too similar.  There should be a way
+ - to write them as one function.
+ -}
+showFlowGraph ::(Show a) => [Gnode a] -> String
+showFlowGraph gnodeList = showGraphViz verticesListOR verticesListAND
                                     edgesList
     where
         verticesListOR = findORnodes gnodeList
