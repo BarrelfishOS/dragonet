@@ -15,6 +15,7 @@ module Computations (
     , getModLst
     , moduleRange
     , getNetworkDependency
+    , ToQueue(..)
 ) where
 
 import qualified MyGraph as MG
@@ -22,6 +23,30 @@ import qualified Data.Data as DD
 import qualified Data.List as DL
 import qualified Data.Ix as Ix
 
+
+
+-- for flow filtering
+--type IsFlow = Integer
+type Proto = String
+type SrcIP = String
+type DstIP = String
+type SrcPort = String
+type DstPort = String
+
+type Qid = String
+
+{-
+ - Parameterized queues
+ -}
+data ToQueue = ToQueue {
+        qid :: Integer  -- Queue number
+    }
+    deriving (Eq, Ord)
+   -- deriving (Eq, Ord, Ix.Ix, DD.Typeable, DD.Data)
+
+
+instance Show ToQueue where
+    show (ToQueue id)  = "ToQueue_" ++ show id
 
 -- List of all the computations/tests which can happen on incoming packets
 -- presence of these tags in any module will show that the module is capable of
@@ -85,11 +110,23 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | L4TCPUpdateProtoState -- Updates the protocol state in machine
         | VerifiedL4TCP
         | L4Unclasified
---        | IsFlow Proto SrcIP DstIP SrcPort DstPort -- for flow filtering
         | ToKernelMemory -- packet copy to kernel memory
         | ToUserMemory -- packet copy to user memory
-        deriving (Show, Eq, Ord, Ix.Ix, DD.Typeable, DD.Data)
-
+        | IsFlow Proto SrcIP DstIP SrcPort DstPort -- for flow filtering
+        | Copy ToQueue
+        | CopyToQueue Qid
+        deriving (Show, Eq, Ord)
+        --deriving (Eq, Ord)
+        --deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+{-
+instance Show Computation where
+    show (IsFlow proto sip dip sp dp) = "IsFlow_P_" ++ show proto ++ "_SIP_"
+                ++ show sip  ++ "_DIP_" ++ show dip ++ "_SP_" ++ show sp
+                ++ "_DP_" ++ show dp
+    show (CopyToQueue1 qid) = "Queue_" ++ show qid
+-}
+--instance Show Computation where
+--    show a = show a
 
 {-
  - Gives list of all dependencies between various nodes in typical network graph
@@ -189,15 +226,13 @@ getNetworkDependency = [
         -- by above nodes
         , (L4Unclasified, [ClassifiedL3])
 
-        -- Copying packets into system memory
-        -- TODO: Filters/queues should come into play here.
-        , (ToKernelMemory, [L4TCPUpdateProtoState])
-        , (ToKernelMemory, [VerifiedL4UDP])
-        , (ToKernelMemory, [VerifiedL4TCP])
-        , (ToKernelMemory, [L4Unclasified])
-        , (ToKernelMemory, [VerifiedL4ICMP])
+        -- Copying packets into the default queue
+        , ((CopyToQueue "0:Default"), [L4TCPUpdateProtoState])
+        , ((CopyToQueue "0:Default"), [VerifiedL4UDP])
+        , ((CopyToQueue "0:Default"), [VerifiedL4TCP])
+        , ((CopyToQueue "0:Default"), [L4Unclasified])
+        , ((CopyToQueue "0:Default"), [VerifiedL4ICMP])
     ]
-
 
 {-
  - Small sample dependency list for testing purposes
@@ -216,7 +251,8 @@ getNetworkDependencyDummy = [
 data Module = Module {
         name :: String
         , computations :: [Computation]
-    } deriving (Eq, Ord, DD.Typeable, DD.Data)
+    } deriving (Eq, Ord)
+--    } deriving (Eq, Ord, DD.Typeable, DD.Data)
 
 -- To support printing of module
 instance Show Module where
@@ -274,8 +310,6 @@ main_old :: IO()
 main_old = do
         putStrLn out1
         putStrLn lineBreak
-        putStrLn out2
-        putStrLn lineBreak
 --        putStrLn $ show gr
 
     where
@@ -283,7 +317,7 @@ main_old = do
         -- m = L4TCPValidAckNo
         m = Module "Ethernet" [L2ValidLen, L2ValidCRC]
         out1 = show $ getModLst
-        out2 = show $ DD.typeOf (m)
+--        out2 = show $ DD.typeOf (m)
 
 
 main  :: IO()

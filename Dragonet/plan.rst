@@ -1,11 +1,20 @@
 
-next question
+
+
+Next question
 ---------------------
-Qus:  How am I going to deal with filters and queues?
+Qus:  Get simple LPG implemented over NetworkGraph
 Ans:
+
 Status: NOT_DONE
 
-next question
+Next question
+---------------------
+Qus:  How am I going to deal with filters and queues?
+Ans: I have managed to add them into the Computation Datatype.
+Status: DONE
+
+Next question
 ---------------------
 Qus:  Need a code to get a subgraph from full graph which will include all
 the computations needed to reach particular computation/tag/decision
@@ -14,15 +23,39 @@ graph is becoming too big.
 
 Status: NOT_DONE
 
-next question
+
+Next question
+---------------------
+Qus:  Show ``queue 0`` as a default queue, and use different shape for
+queues in the graph printing.
+Ans: Fixed the issue of marking ``queue 0`` as default.  For giving proper
+shape, I need to introduce another class instance **ToVertex** which will
+give the properties of the vertex (eg: color shape).  The problem here is that
+I am worried how slow will it become (as it became slow when I tried to add
+custom Show instance to Computations datatype)
+
+Status: NOT_DONE
+
+
+Next question
+---------------------
+Qus:  Problem: defining Show instance for Computation makes whole execution
+extremely slow.  I don't know why, and I don't know how to fix it.
+Ans: Even if I provide most stupid implementation of Show, it is still
+ridiculously slow.  And I don't know why.
+
+Status: Unresolved
+
+Next question
 ---------------------
 Qus: How to add parameterized support for computations.
-Ans: This is needed to add support for filters and queues.
+Ans: This is needed to add support for filters and queues.  I have managed
+to add this support.  The tricky part here is howto print these parameterized
+datatypes.
 
-Status: NOT_DONE: Next thing to do
+Status: DONE
 
-
-next question
+Next question
 ---------------------
 Qus: translate e1k PRG
 Ans: Partially done.  e1k PRG is there but without queues.  Currently the
@@ -31,7 +64,7 @@ last thing it does is to copy to kernel memory.  What I need is queue support
 Status: Done
 
 
-next question
+Next question
 ---------------------
 Qus: How to rewrite existing PRG by using new language
 Ans: I am directly using a way to describe the graph by specifying all the
@@ -40,7 +73,7 @@ dependencies (edges).
 Status: Done
 
 
-next question
+Next question
 ---------------------
 Qus: Make sure the verification nodes are clearly marked as **AND** nodes.
 Ans:  This is needed to avoid confusion between AND and OR nodes.
@@ -56,13 +89,13 @@ with same TAG are OR), but I need to push it into the node-list as well.
 
 Status: Done
 
-next question
+Next question
 ---------------------
 Qus:  Create a data-structure for a graph with overloaded datatype
 Ans: Done
 Status: Done
 
-next question
+Next question
 ---------------------
 Qus: Create a graph of all dependencies in for basic computations.
 Ans:  It seems that even basic computations have dependencies.  I tried to
@@ -72,13 +105,13 @@ overloaded datatypes
 
 
 
-next question
+Next question
 ---------------------
 Qus: Create a graph of all dependencies of pre and post conditions
 Ans: If I have all dependencies in the dependency-List then these can be
 used for pre and post conditions.
 
-next question
+Next question
 ---------------------
 Qus: Where exactly the pre and post conditions be?
 Ans: Should they be on Conditions? or should they be on Modules?
@@ -88,7 +121,7 @@ L4 tests depend on which L3 it is. As L3 will change where the L4 header starts.
 You need to verify that it is TCP before making any tests
 You need to verify that it is IPv4 or IPv6 before testing any of later tests.
 
-next question
+Next question
 ---------------------
 Qus: Create a graph out of it.
 Ans:
@@ -111,19 +144,19 @@ Answer depends on what you want to do with these graphs later.
  * Find all nodes
 
 
-next question
+Next question
 ---------------------
 Qus: Can I make module dataType able to work with Ix?
 Ans: It might work as long as this is graph and there are no expectations like
 it needs to be sorted or anything like that.
 
 
-next question
+Next question
 ---------------------
 Qus: Read about how TCP segmentation works
 Ans:
 
-next question
+Next question
 ---------------------
 Qus: Figure out how to introduce filter rule which will enable modelling
 each and every flow.
@@ -133,7 +166,7 @@ Ans: idea: some sort of agregation of every flow selection.
 
 
 
-next question
+Next question
 ---------------------
 Qus: Can I use readymade graph libraries for my graphs?
 Ans: There is Data.Graph library but it has a requirement on Vertex dataType
@@ -145,26 +178,26 @@ I can try and do this by adding an integer in the structure as integer,
 but I am not able to comprehend it's implications
 
 
-next question
+Next question
 ---------------------
 Qus: Support for heterogeneous list/collections
 Ans: Yes!
 http://www.haskell.org/haskellwiki/Heterogenous_collections
 
-next question
+Next question
 ---------------------
 Qus:  Write Module Datatype in details
 Ans:
 
 
-next question
+Next question
 ---------------------
 Qus: Define conditions as basic operations.
 Ans: Done, now working on Module data-structure which will encapsulate
 few basic tests, and will give some name to it.
 
 
-next question
+Next question
 ---------------------
 Qus: How should I define the conditions?
 Ans: What I want is that every test is different datatype.  But in that case,
@@ -185,20 +218,20 @@ If we make it elementory datatype, then
  - Not all conditions are binary yes/no type
  - example: is this flow (TCP src_ip, dst_ip, src_port, dst_port)?
 
-next question
+Next question
 ---------------------
 Qus: What is the current state of V4?  where was I stuck?
 Ans: The approach used in V4 was packet based, which is limiting.
 So, I am abandoning it for condition based design and rewriting the code.
 
 
-next question
+Next question
 ---------------------
 Qus: Check if Data.Typeable works for you or not.
 Ans: Yes, it works for me.  I had to enable some language extensions,
 but it worked after that.
 
-next question
+Next question
 ---------------------
 Qus: Is there any way to look inside the datatype to find out the subtypes
 involved in the datatype.
@@ -210,7 +243,7 @@ needs a concrete object and not just dataype.
 
 So the current answer is: Nope as per my current understanding.
 
-next question
+Next question
 ---------------------
 Qus: Can I find out the name of function?
 Ans: Nope, you can't get the name of the function that easily.
@@ -218,7 +251,7 @@ Template Haskell might have some trick, but I am not sure if it will be worth
 to explore it.
 
 
-next question
+Next question
 ---------------------
 Qus: Can I find out name of type?
 Ans: Yes I can. It seems that I will have to use **Template Haskell** or use
@@ -237,6 +270,6 @@ Further Reading:
 
 ##########################
 
-next question
+Next question
 ---------------------
 

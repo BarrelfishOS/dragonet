@@ -47,11 +47,30 @@ getE1kPRG = [
         , (MC.ClassifiedL4UDP, [MC.ClassifiedL3]) -- UDP classification
         , (MC.ClassifiedL4TCP, [MC.ClassifiedL3]) -- TCP classification
         , (MC.L4Unclasified, [MC.ClassifiedL3]) -- all other packets
-        , (MC.ToKernelMemory, [MC.ClassifiedL4TCP]) --
-        , (MC.ToKernelMemory, [MC.ClassifiedL4UDP]) --
-        , (MC.ToKernelMemory, [MC.L4Unclasified]) --
-        ]
 
+        -- some exaple filters
+        , (http_flow, [MC.ClassifiedL4TCP]) -- sample filter
+        , (telnet_flow, [MC.ClassifiedL4TCP]) -- sample filter
+        , (tftp_flow, [MC.ClassifiedL4UDP]) -- sample filter
+        , (q4, [http_flow])
+        , (q3, [telnet_flow])
+        , (q1, [tftp_flow])
+
+        , (q0, [MC.ClassifiedL4TCP]) --
+        , (q0, [MC.ClassifiedL4UDP]) --
+        , (q0, [MC.L4Unclasified]) --
+        ]
+    where
+        q0 =  (MC.CopyToQueue "0:Default")
+        q1 =  (MC.CopyToQueue "1")
+        q2 =  (MC.CopyToQueue "2")
+        q3 =  (MC.CopyToQueue "3")
+        q4 =  (MC.CopyToQueue "4")
+
+        -- sample http server filter
+        http_flow = (MC.IsFlow "TCP" "255.255.255.255" "192.168.2.4" "ANY" "80")
+        telnet_flow = (MC.IsFlow "TCP" "255.255.255.255" "192.168.2.4" "ANY" "80")
+        tftp_flow = (MC.IsFlow "UDP" "255.255.255.255" "192.168.2.4" "ANY" "69")
 
 {-
  - main function: used to test if the PRG generated for E1k is correct or not

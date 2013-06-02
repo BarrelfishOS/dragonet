@@ -17,6 +17,7 @@ module MyGraph (
 ) where
 
 import qualified Data.List as DL
+import qualified Data.Char as DC
 
 -- Gnode is the Datatype which captures single vertex of the Graph
 -- and all its dependenceis
@@ -67,6 +68,12 @@ getEdges nlist = DL.concat $ DL.map
                     ( \ e -> makeEdgeList (fst e) (snd e)) nlist
 
 {-
+ - Replaces blank spaces with Underscores in given string
+ -}
+replaceSpaces :: String -> String
+replaceSpaces str = map (\x-> (if DC.isAlphaNum x then x else '_' )) str
+
+{-
  - Reversing edges to convert dependency graph into flow graph
  -}
 reverseEdges :: [Edge a] -> [Edge a]
@@ -76,8 +83,9 @@ reverseEdges edgelist = DL.map (\(a, b) -> (b, a)) edgelist
  - prints the edge with additional description (if needed)
  -}
 showEdge :: (Show a) => Edge a -> String
-showEdge (from, to) = show from ++ " -> " ++ show to ++
-                   " [label = \"" ++ "\"];\n"
+showEdge (from, to) =  (replaceSpaces $ show from) ++ " -> " ++
+            (replaceSpaces $ show to ) ++ " [label = \"" ++ "\"];\n"
+
 
 {-
  - Find all AND nodes in given graph
@@ -98,12 +106,15 @@ findORnodes gnodeList = DL.map fst $ DL.filter (\x -> length (snd x) <= 1 ) gnod
  - prints the vertex with information like AND or OR type (if needed)
  -}
 showORnode :: (Show a) => a -> String
-showORnode v = show v ++ " [label = " ++ (show  v) ++ "];\n"
+showORnode v = nodeName ++ " [label = " ++ nodeName  ++ "];\n"
+    where
+        nodeName = replaceSpaces $ show v
 
 showANDnode :: (Show a) => a -> String
-showANDnode v = show v ++ " [label = " ++ (show  v) ++
+showANDnode v = nodeName ++ " [label = " ++ nodeName ++
         ", color=gray,style=filled,shape=trapezium];\n"
-
+    where
+        nodeName = replaceSpaces $ show v
 
 {-
  - Prints the graph in dot format
