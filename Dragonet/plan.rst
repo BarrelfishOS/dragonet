@@ -1,10 +1,27 @@
 
 
 
+next question
+---------------------
+Qus: Create Socket abstraction
+Ans:
+
+Status: NOT_DONE
+
+
+
+next question
+---------------------
+Qus: Create application abstraction
+Ans:
+
+Status: NOT_DONE
+
 Next question
 ---------------------
 Qus:  Get simple LPG implemented over NetworkGraph
-Ans:
+Ans: Maybe I should take a look at old code and see how I can integrate
+sockets into them.
 
 Status: NOT_DONE
 

@@ -11,11 +11,16 @@
 --module Main (
 module Computations (
     Computation(..)
+    , Socket(..)
     , Module(..)
-    , getModLst
-    , moduleRange
+    , Application(..)
+    , Filter(..)
+    , AppName
+    , SocketId
+    , L2Address
+    , L3Address
+    , L4Address
     , getNetworkDependency
-    , ToQueue(..)
 ) where
 
 import qualified MyGraph as MG
@@ -24,29 +29,33 @@ import qualified Data.List as DL
 import qualified Data.Ix as Ix
 
 
+type L2Address = String
+type L3Address = String
+type L4Address = String
 
 -- for flow filtering
---type IsFlow = Integer
-type Proto = String
-type SrcIP = String
-type DstIP = String
-type SrcPort = String
-type DstPort = String
+type Protocol = String
+
+data Filter = Filter {
+        protocol :: Protocol
+        , srcIP :: L3Address
+        , dstIP :: L3Address
+        , srcPort :: L4Address
+        , dstPort :: L4Address
+    } deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
 type Qid = String
 
-{-
- - Parameterized queues
- -}
-data ToQueue = ToQueue {
-        qid :: Integer  -- Queue number
-    }
-    deriving (Eq, Ord)
-   -- deriving (Eq, Ord, Ix.Ix, DD.Typeable, DD.Data)
+type SocketId = Integer
+type AppName = String
 
+data Application = Application {
+        appName :: AppName
+    } deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
-instance Show ToQueue where
-    show (ToQueue id)  = "ToQueue_" ++ show id
+data Socket = Socket {
+      socketId :: SocketId
+    } deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
 -- List of all the computations/tests which can happen on incoming packets
 -- presence of these tags in any module will show that the module is capable of
@@ -109,18 +118,24 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | L4TCPValidState
         | L4TCPUpdateProtoState -- Updates the protocol state in machine
         | VerifiedL4TCP
-        | L4Unclasified
+        | L4ReadyToClassify
+        | UnclasifiedL4
+        | ClasifiedL4
+        | VerifiedL4
         | ToKernelMemory -- packet copy to kernel memory
         | ToUserMemory -- packet copy to user memory
-        | IsFlow Proto SrcIP DstIP SrcPort DstPort -- for flow filtering
-        | Copy ToQueue
+--        | IsFlow Protocol SrcIP DstIP SrcPort DstPort -- for flow filtering
+        | IsFlow  Filter -- for flow filtering
         | CopyToQueue Qid
-        deriving (Show, Eq, Ord)
+        | ToDefaultKernelProcessing
+        | ToSocket Socket
+        | ToApplication Application
+        deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+        --deriving (Show, Eq, Ord)
         --deriving (Eq, Ord)
-        --deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 {-
 instance Show Computation where
-    show (IsFlow proto sip dip sp dp) = "IsFlow_P_" ++ show proto ++ "_SIP_"
+    show (IsFlow Protocol sip dip sp dp) = "IsFlow_P_" ++ show Protocol ++ "_SIP_"
                 ++ show sip  ++ "_DIP_" ++ show dip ++ "_SP_" ++ show sp
                 ++ "_DP_" ++ show dp
     show (CopyToQueue1 qid) = "Queue_" ++ show qid
@@ -224,15 +239,30 @@ getNetworkDependency = [
 
         -- unsupported protocols.  Anything that was not treated specially
         -- by above nodes
-        , (L4Unclasified, [ClassifiedL3])
+        , (UnclasifiedL4, [ClassifiedL3])
+
+        , (L4ReadyToClassify, [ClassifiedL4TCP])
+        , (L4ReadyToClassify, [ClassifiedL4UDP])
+        , (L4ReadyToClassify, [ClassifiedL4ICMP])
+        , (L4ReadyToClassify, [UnclasifiedL4])
+
+        -- Filtering the packet
+        , (generic_filter, [L4ReadyToClassify])
 
         -- Copying packets into the default queue
-        , ((CopyToQueue "0:Default"), [L4TCPUpdateProtoState])
-        , ((CopyToQueue "0:Default"), [VerifiedL4UDP])
-        , ((CopyToQueue "0:Default"), [VerifiedL4TCP])
-        , ((CopyToQueue "0:Default"), [L4Unclasified])
-        , ((CopyToQueue "0:Default"), [VerifiedL4ICMP])
+        , (default_queue, [generic_filter])
+
+        , (VerifiedL4, [L4TCPUpdateProtoState])
+        , (VerifiedL4, [VerifiedL4UDP])
+        , (VerifiedL4, [VerifiedL4TCP])
+        , (VerifiedL4, [VerifiedL4ICMP])
+
+        , (ToDefaultKernelProcessing, [default_queue, VerifiedL4])
     ]
+    where
+       generic_filter = (IsFlow (Filter "ANY" "ANY" "ANY" "ANY" "ANY"))
+       default_queue = (CopyToQueue "0:Default")
+
 
 {-
  - Small sample dependency list for testing purposes
