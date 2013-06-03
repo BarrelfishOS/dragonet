@@ -11,9 +11,10 @@
  - generated automatically.
  -}
 
---module E1k (
-module Main (
-    main
+--module Main (
+module E1k (
+    getE1kPRG
+    , main
 ) where
 
 

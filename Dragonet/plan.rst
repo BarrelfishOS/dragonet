@@ -1,5 +1,17 @@
 
 
+next question
+---------------------
+Qus: Figure out a way to make LPG, Ek1 as modules while generating
+    associated diagram.
+Ans: This essentially means that I can't treat these as separate application.
+This is specially needed so that I can do the embedding.  So, the current
+plan is to create a single application which will write separate dot file
+for every graph.
+
+Status: NOT_DONE
+
+
 
 next question
 ---------------------

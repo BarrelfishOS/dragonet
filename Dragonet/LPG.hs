@@ -6,9 +6,10 @@
  - Logical Protocol Graph (LPG) support
  -}
 
---module LPG (
-module Main (
-    main
+--module Main (
+module LPG (
+    getSampleLPG2Apps
+    , main
 ) where
 
 import qualified MyGraph as MG
@@ -65,14 +66,16 @@ bind lpg app sock filter = lpgFiltered ++ [
         tosocket = (MC.ToSocket sock)
         thisFlow = (MC.IsFlow filter)
         toapp = (MC.ToApplication app)
+
+
 {-
- - main function: used to test if the PRG generated for E1k is correct or not
+ - Returns a sample LPG graph with two applications :
+ - apache webserver and tetnet client
  -}
-main  :: IO()
-main = do
-         putStrLn outDot
+getSampleLPG2Apps :: [MG.Gnode MC.Computation] ->  [MG.Gnode MC.Computation]
+getSampleLPG2Apps lpg = finalLPG
     where
-        lpg = MC.getNetworkDependency
+        -- Apache server
         (lpg', s) = openSocket lpg
         app = MC.Application "Apache"
         apacheFilter = MC.Filter "TCP" "ANY" "MYIP" "ANY" "80"
@@ -82,8 +85,16 @@ main = do
         (lpg2', s2) = openSocket lpg2
         telnetapp = MC.Application "telnet"
         telnetFilter = MC.Filter "TCP" "192.68.2.10" "MYIP" "23" "12210"
-        lpg3 = bind lpg2' telnetapp s2 telnetFilter
+        finalLPG = bind lpg2' telnetapp s2 telnetFilter
 
 
-        outDot = MG.showFlowGraph lpg3
+{-
+ - main function: used to test if the PRG generated for E1k is correct or not
+ -}
+main  :: IO()
+main = do
+         putStrLn outDot
+    where
+        lpg = MC.getNetworkDependency
+        outDot = MG.showFlowGraph $ getSampleLPG2Apps lpg
 
