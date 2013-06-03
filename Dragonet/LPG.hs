@@ -77,5 +77,13 @@ main = do
         app = MC.Application "Apache"
         apacheFilter = MC.Filter "TCP" "ANY" "MYIP" "ANY" "80"
         lpg2 = bind lpg' app s apacheFilter
-        outDot = MG.showFlowGraph lpg2
+
+        -- Telnet client
+        (lpg2', s2) = openSocket lpg2
+        telnetapp = MC.Application "telnet"
+        telnetFilter = MC.Filter "TCP" "192.68.2.10" "MYIP" "23" "12210"
+        lpg3 = bind lpg2' telnetapp s2 telnetFilter
+
+
+        outDot = MG.showFlowGraph lpg3
 

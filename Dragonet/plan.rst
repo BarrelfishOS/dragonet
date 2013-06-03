@@ -4,26 +4,26 @@
 next question
 ---------------------
 Qus: Create Socket abstraction
-Ans:
+Ans: Added another datatype  which can also work as computation
 
-Status: NOT_DONE
+Status: DONE
 
 
 
 next question
 ---------------------
 Qus: Create application abstraction
-Ans:
-
-Status: NOT_DONE
+Ans: Added another datatype  which can also work as computation. This
+may not be the best way.
+Status: DONE
 
 Next question
 ---------------------
 Qus:  Get simple LPG implemented over NetworkGraph
-Ans: Maybe I should take a look at old code and see how I can integrate
-sockets into them.
+Ans: I am able to support Socket and Bind API right now.  Connect will
+be a special case of bind, and I may have to work more for close.
 
-Status: NOT_DONE
+Status: DONE
 
 Next question
 ---------------------
