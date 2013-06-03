@@ -1,9 +1,133 @@
 
 
+
+next question
+---------------------
+Qus:
+Ans:
+
+Status: NOT_DONE
+
+next question
+---------------------
+Qus:  Assumption
+Ans:
+ - There will be atleast one node in PRG and it will be the starting node of
+   LPG.
+
+Status: NOT_DONE
+
+next question
+---------------------
+Qus: What happens when you have more than one previous nodes?
+Ans: Example : L3Classify has L3IPv4Classify  L3IPv6Classify  as previous nodes.
+
+ - Are all of them in HW?
+    -> yes -> Then you are good.  Put this one in h/w as well
+    -> No
+        -> is this AND node?
+            -> Yes: implement it in S/W with all the previous nodes which
+            are in software as software dependencies
+        -> is this OR node?
+            -> Yes: Create separate flows for hardware and software.
+                Duplicate the node in both software and hardware.
+                for hardware node, put it in hardware path
+                and software path should take care of the case which is not
+                handled by hardware
+
+
+Status: NOT_DONE
+
+next question
+---------------------
+Qus: Howto detect the previous node?
+Ans:
+
+Status: NOT_DONE
+
+
+
+
+next question
+---------------------
+Qus:  Algorithm to check if node can be mapped onto h/w
+Ans: is previous node in hardware?
+ - Yes:
+    - Can this node go in H/W based on embedding test?
+        - Yes
+           - Add it in hardware and follow the dependency from PRG
+        - Nope
+           - Add this as a first node in Software after the ``copy to queue``
+                with ``copy to queue`` as dependency
+ - Nope:
+    Append behind the previous node which is in the software and follow the
+        LPG dependency
+
+Status: NOT_DONE
+
+
+
+next question
+---------------------
+Qus:  Figure out a way to separate virtual nodes from computation nodes
+    and also maybe classification nodes
+Ans: Virtual nodes work only as a tag, and they do not represent any compuation
+as such.  So, in theory they can't be present in hardware.  So, if I know
+which one are virtual node, then I can treat them specially in my embedding
+algorithm.
+
+Status: NOT_DONE
+
+
+
+next question
+---------------------
+Qus:  Why would any LPG node be mapped onto PRG node?
+Ans: It can be one of the following reasons :
+ * Not present in H/W (take care of virtual nodes)
+ * Node is present, but dependencies are not met
+
+
+Status: NOT_DONE
+
+
+next question
+---------------------
+Qus:  Mapping LPG node into PRG node
+Ans: For given LPG node, is there corrusponding PRG node?
+    if yes, then check if it satisfies all the dependencies of LPG node.
+        if yes, it can be mapped into PRG
+    if No, emulate it into the software
+
+Status: NOT_DONE
+
+
+next question
+---------------------
+Qus:  Formal definition of embedding
+Ans: Graph embedding means :
+ * For every node in LPG, try to map it onto the PRG node.
+
+Status: NOT_DONE
+
+
+next question
+---------------------
+Qus:  Write down the tentative algorithm for embedding
+Ans:
+
+Status: NOT_DONE
+
+
+
+
 next question
 ---------------------
 Qus: Implement embedding of sample LPG and E1k
-Ans:
+Ans: I have managed to implement very simple embedding where I highlight
+nodes which are in both graphs and either merge edges or only show
+once from large graph.  This looks somewhat sensible, but this solution
+does not take into consideration the dependencies between nodes.
 
 Status: NOT_DONE
 
@@ -17,8 +141,7 @@ This is specially needed so that I can do the embedding.  So, the current
 plan is to create a single application which will write separate dot file
 for every graph.
 
-Status: NOT_DONE
-
+Status: DONE
 
 
 next question
