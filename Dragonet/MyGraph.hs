@@ -22,38 +22,14 @@ import qualified Data.Char as DC
 -- Gnode is the Datatype which captures single vertex of the Graph
 -- and all its dependenceis
 -- The DataType "a" is expected to be in instance of
---  "Show", "Eq", "Ord"
---  NOTE: Code depending on "Ord" is not used anymore (rmdups) and can be
---      removed.
+--  "Show", "Eq"
 type Gnode a = (a, [a])
 
 type Edge a = (a, a) -- connects two vertices.
 
-{-
- - For debugging purposes:
- - Shows the list datatype in more readable way by putting
- - every element on new line.
- -}
-myShowList :: (Show a) => [a] -> String
-myShowList [] = "\n"
-myShowList (x:xs) = show x ++ "\n" ++ myShowList xs
 
-{-
- - Remove the duplicates from the list
- -}
-rmdups :: (Ord a) => [a] -> [a]
-rmdups = DL.map DL.head . DL.group . DL.sort
-
-{-
- - get list of valid vertices from given Gnode list.
- - This also includes the vertices which have only incoming edges
- - and no outgoing edges
--}
-getVertices :: (Ord a) => [Gnode a] -> [a]
-getVertices nlist = rmdups $ source_vertex ++ dest_vertex
-    where
-        source_vertex = DL.map fst nlist
-        dest_vertex = DL.concat $ DL.map snd nlist
+type ShowEdgeFn a = Edge a -> String
+type ShowVertexFn a = a -> String
 
 
 {-
@@ -116,46 +92,72 @@ showANDnode v = nodeName ++ " [label = " ++ nodeName ++
     where
         nodeName = replaceSpaces $ show v
 
+showNode :: (Show a) => (Eq a) => [a] -> [a] -> [a] -> a -> String
+showNode orList andList embList v
+        | DL.elem v andList = showANDnode v
+        | DL.elem v orList = showORnode v
+        | DL.elem v embList = error "element in wrong list"
+        | otherwise = error "element is not in any list"
+
+
+showNodeGeneric :: (Show a) => (Eq a) => [([a], ShowVertexFn a)] -> a -> String
+showNodeGeneric fancyList v
+    | DL.length matchedElement /= 0 = ((snd $ DL.head matchedElement) v)
+    | otherwise = error "element not found in fancy list"
+    where
+        matchedElement = DL.filter (\ aa -> DL.elem v (fst aa)) fancyList
+
+
 {-
  - Prints the graph in dot format
  - Arguments are <list of vertices> <list of edges>
  -}
-showGraphViz :: (Show a) => [a] -> [a] -> [Edge a] -> String
-showGraphViz verOR verAND edges =
+showGraphViz :: (Show a) => (Eq a) => [a] -> ShowVertexFn a ->
+                    [Edge a] -> ShowEdgeFn a -> String
+showGraphViz vertexList svf edges sef =
     "digraph name {\n" ++
     "rankdir=LR;\n" ++
-    (DL.concatMap showORnode verOR) ++
-    (DL.concatMap showANDnode verAND) ++
-    (DL.concatMap showEdge edges) ++
+    (DL.concatMap svf vertexList) ++
+    (DL.concatMap svf vertexList) ++
+    (DL.concatMap sef edges) ++
     "}\n"
+
+
+{-
+ - Converts given graph encoded in Gnode list into DoT compatible
+ -  graph notation.
+ -  One can run command ``dot`` on this generated output to produce a graph.
+ -}
+showGenGraph ::(Show a) => (Eq a) => [Gnode a] -> Bool -> String
+showGenGraph gnodeList isDependency = showGraphViz verticesList shownodefn
+--                                (showNode verticesListOR  verticesListAND [])
+                                edgesList showEdge
+    where
+        verticesListOR = findORnodes gnodeList
+        verticesListAND = findANDnodes gnodeList
+        verticesList =  verticesListOR ++ verticesListAND
+        shownodefn = (showNodeGeneric [(verticesListOR, showORnode)
+                        , (verticesListAND, showANDnode)])
+        edgesList
+            | isDependency = getEdges gnodeList
+            | otherwise = reverseEdges $ getEdges gnodeList
+
+
 
 {-
  - Converts given dependency graph encoded in Gnode list into DoT compatible
  -  graph notation.
  -  One can run command ``dot`` on this generated output to produce a graph.
  -}
-showDependencyGraph ::(Show a) => [Gnode a] -> String
-showDependencyGraph gnodeList = showGraphViz verticesListOR verticesListAND
-                                    edgesList
-    where
-        verticesListOR = findORnodes gnodeList
-        verticesListAND = findANDnodes gnodeList
-        edgesList = reverseEdges $ getEdges gnodeList
+showDependencyGraph ::(Show a) => (Eq a) => [Gnode a] -> String
+showDependencyGraph gnodeList = showGenGraph gnodeList True
+
 
 {-
  - Just like above showDependencyGraph function, converts Gnode list
  - into DoT compatible graph, but it reverts the direction of all the
  - edges to generate a flow graph instead of dependency graph.
- -
- - TODO: These two functions are too similar.  There should be a way
- - to write them as one function.
  -}
-showFlowGraph ::(Show a) => [Gnode a] -> String
-showFlowGraph gnodeList = showGraphViz verticesListOR verticesListAND
-                                    edgesList
-    where
-        verticesListOR = findORnodes gnodeList
-        verticesListAND = findANDnodes gnodeList
-        edgesList = reverseEdges $ getEdges gnodeList
-
+showFlowGraph ::(Show a) => (Eq a) => [Gnode a] -> String
+showFlowGraph gnodeList = showGenGraph gnodeList False
 

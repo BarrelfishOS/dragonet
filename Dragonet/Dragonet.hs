@@ -3,12 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
 {-
- - Physical Resource Graph (PRG) for the E1k NIC (Intel 82576 1GbE).
- - This PRG only shows the receive side and not the send side.
- - Currently, this graph captures only one of the possible combination
- - of all the possible configurations.
- - In future, this and other possible valid configurations needs to be
- - generated automatically.
+ - This file orchastrates the whole flow
  -}
 
 --module Dragonet(
@@ -22,9 +17,8 @@ import qualified Computations as MC
 import qualified E1k as E1k
 import qualified LPG as LPG
 import qualified NetworkProcessing as NP
+import qualified Embedding as EMBD
 
--- For file writing
-import System.IO
 
 {-
  - Generates NetworkDependency graph
@@ -46,9 +40,17 @@ genLPGGraph :: IO ()
 genLPGGraph = writeFile "LPG.dot" $ MG.showFlowGraph $ LPG.getSampleLPG2Apps $
             MC.getNetworkDependency
 
+{-
+ - Generates embedded graph for PRG and LPG
+ -}
+genEmbeddedPraph :: IO ()
+genEmbeddedPraph = writeFile "Embedded.dot" $ EMBD.embedSimple lpg prg
+    where
+        lpg = LPG.getSampleLPG2Apps $ MC.getNetworkDependency
+        prg = E1k.getE1kPRG
 
 {-
- - main function: used to test if the PRG generated for E1k is correct or not
+ - main function:
  -}
 main  :: IO()
 main = do
@@ -58,6 +60,8 @@ main = do
         genE10kPRGGraph
         putStrLn "Generating LPG.dot"
         genLPGGraph
+        putStrLn "Generating Embedded.dot"
+        genEmbeddedPraph
         putStrLn outmsg
     where
         outmsg = "Done!"

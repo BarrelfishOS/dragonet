@@ -2,6 +2,14 @@
 
 next question
 ---------------------
+Qus: Implement embedding of sample LPG and E1k
+Ans:
+
+Status: NOT_DONE
+
+
+next question
+---------------------
 Qus: Figure out a way to make LPG, Ek1 as modules while generating
     associated diagram.
 Ans: This essentially means that I can't treat these as separate application.
