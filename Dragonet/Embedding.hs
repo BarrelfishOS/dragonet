@@ -25,8 +25,7 @@ embedSimple :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation] ->
         String
 embedSimple bigGraph smallGraph = embeddedGraph
     where
-        embeddedGraph = MG.showFlowGraph bigGraph
-
+        embeddedGraph = MG.showEmbeddedGraph bigGraph smallGraph
 
 
 main  :: IO()

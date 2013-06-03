@@ -14,6 +14,7 @@ module MyGraph (
     Gnode
     , showDependencyGraph
     , showFlowGraph
+    , showEmbeddedGraph
 ) where
 
 import qualified Data.List as DL
@@ -66,16 +67,16 @@ showEdge (from, to) =  (replaceSpaces $ show from) ++ " -> " ++
 {-
  - Find all AND nodes in given graph
  -}
-findANDnodes :: [Gnode a] -> [a]
-findANDnodes gnodeList = DL.map fst $ DL.filter (\x -> length (snd x) > 1 ) gnodeList
+findANDnodes :: (Eq a) => [Gnode a] -> [a]
+findANDnodes gnodeList = DL.nub $ DL.map fst $ DL.filter (\x -> length (snd x) > 1 ) gnodeList
 
 {-
  - Find all OR nodes in given graph.
  - TODO: These two functions are too similar.  There should be a way
  - to write them in one function.
  -}
-findORnodes :: [Gnode a] -> [a]
-findORnodes gnodeList = DL.map fst $ DL.filter (\x -> length (snd x) <= 1 ) gnodeList
+findORnodes :: (Eq a) => [Gnode a] -> [a]
+findORnodes gnodeList = DL.nub $ DL.map fst $ DL.filter (\x -> length (snd x) <= 1 ) gnodeList
 
 
 {-
@@ -91,6 +92,13 @@ showANDnode v = nodeName ++ " [label = " ++ nodeName ++
         ", color=gray,style=filled,shape=trapezium];\n"
     where
         nodeName = replaceSpaces $ show v
+
+showEmbeddednode :: (Show a) => a -> String
+showEmbeddednode v = nodeName ++ " [label = " ++ nodeName ++
+        ", color=green,style=filled,shape=rectangle];\n"
+    where
+        nodeName = replaceSpaces $ show v
+
 
 showNode :: (Show a) => (Eq a) => [a] -> [a] -> [a] -> a -> String
 showNode orList andList embList v
@@ -130,7 +138,6 @@ showGraphViz vertexList svf edges sef =
  -}
 showGenGraph ::(Show a) => (Eq a) => [Gnode a] -> Bool -> String
 showGenGraph gnodeList isDependency = showGraphViz verticesList shownodefn
---                                (showNode verticesListOR  verticesListAND [])
                                 edgesList showEdge
     where
         verticesListOR = findORnodes gnodeList
@@ -141,6 +148,32 @@ showGenGraph gnodeList isDependency = showGraphViz verticesList shownodefn
         edgesList
             | isDependency = getEdges gnodeList
             | otherwise = reverseEdges $ getEdges gnodeList
+
+
+showEmbeddedGraph ::(Show a) => (Eq a) => [Gnode a] -> [Gnode a] -> String
+showEmbeddedGraph gbig gsmall = showGraphViz verticesList shownodefn
+                                edgesList showEdge
+    where
+        vbigOR = findORnodes gbig
+        vsmallOR = findORnodes gsmall
+        vembedOR = DL.intersect vbigOR vsmallOR
+        vbigAND = findANDnodes gbig
+        vsmallAND = findANDnodes gsmall
+        vembedAND = DL.intersect vbigAND vsmallAND
+        verticesList = DL.nub (vbigOR ++ vsmallOR ++ vbigAND ++ vsmallAND)
+
+        shownodefn = (showNodeGeneric [
+                        (vembedOR, showEmbeddednode)
+                        , (vbigOR, showORnode)
+                        , (vsmallOR, showORnode)
+                        , (vbigAND, showANDnode)
+                        , (vsmallAND, showANDnode)])
+
+        ebig = reverseEdges $ getEdges gbig
+        --esmall = reverseEdges $ getEdges gsmall
+        esmall = []
+        edgesList = DL.nub (ebig ++ esmall)
+
 
 
 
