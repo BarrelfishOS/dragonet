@@ -42,7 +42,11 @@ data Filter = Filter {
         , dstIP :: L3Address
         , srcPort :: L4Address
         , dstPort :: L4Address
-    } deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+    } deriving (Eq, Ord, DD.Typeable, DD.Data)
+
+instance Show Filter where
+    show (Filter proto sip dip sp dp) = show proto ++ "_" ++ show sip ++ "_"
+            ++ dip  ++ "_" ++ sp  ++ "_" ++ dp
 
 type Qid = String
 
@@ -51,11 +55,17 @@ type AppName = String
 
 data Application = Application {
         appName :: AppName
-    } deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+    } deriving (Eq, Ord, DD.Typeable, DD.Data)
+
+instance Show Application where
+    show (Application aname) = show aname
 
 data Socket = Socket {
       socketId :: SocketId
-    } deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+    } deriving (Eq, Ord, DD.Typeable, DD.Data)
+
+instance Show Socket where
+    show (Socket sid) = show sid
 
 -- List of all the computations/tests which can happen on incoming packets
 -- presence of these tags in any module will show that the module is capable of
