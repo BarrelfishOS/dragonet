@@ -12,7 +12,6 @@
 module Computations (
     Computation(..)
     , Socket(..)
-    , Module(..)
     , Application(..)
     , Filter(..)
     , AppName
@@ -21,13 +20,17 @@ module Computations (
     , L3Address
     , L4Address
     , getNetworkDependency
+    , getNetworkDependencyDummy
+    , embeddGraphs
+    , sortGraph
 ) where
 
 import qualified MyGraph as MG
 import qualified Data.Data as DD
 import qualified Data.List as DL
+import qualified Data.Set as Set
 import qualified Data.Ix as Ix
-
+import qualified Debug.Trace as TR
 
 type L2Address = String
 type L3Address = String
@@ -279,85 +282,106 @@ getNetworkDependency = [
  -}
 getNetworkDependencyDummy :: [MG.Gnode Computation]
 getNetworkDependencyDummy = [
-        (ClassifiedL2Ethernet, [])
+        (VerifiedL2Ethernet, [L2ValidLen, L2ValidType])
         , (L2ValidLen, [ClassifiedL2Ethernet])
         , (L2ValidType, [ClassifiedL2Ethernet])
-        , (VerifiedL2Ethernet, [L2ValidCRC, L2ValidLen, L2ValidType])
         , (ClassifiedL3IPv4, [L2ValidType])
+        , (ClassifiedL2Ethernet, [])
     ]
 
+-- FIXME: Implement getPreviousNodes
+
+-- FIXME: implement matchDependencies
+
+{-
+ - Check if the second node satisfies all the dependencies of first node.
+ -
+ -}
+--isDepSatisfied :: (Eq a) => [MG.Gnode a] -> [MG.Gnode a] -> a -> Bool
+
+getDependencyPaths :: (Eq a) => [MG.Gnode a] -> a -> [[a]]
+getDependencyPaths gnodeList v = [[]]
 
 
-data Module = Module {
-        name :: String
-        , computations :: [Computation]
-    } deriving (Eq, Ord)
---    } deriving (Eq, Ord, DD.Typeable, DD.Data)
+{-
+ -
+ -}
+getDependencies :: (Eq a) => [MG.Gnode a] -> a -> ([a], [a])
+getDependencies gnodeList v
+        | length listANDnodes > 1 = error "More than one list of AND dependencies"
+        | length listANDnodes > 1 && length listORnodes > 1 =
+                        error "Both AND and OR dependencies present"
+        | otherwise = (listANDDeps, listORDeps)
+    where
+        depList = DL.filter (\x -> (fst x) == v) gnodeList
+        filterddepList = DL.filter (\x ->  (snd x) /= [] ) depList
+        listANDnodes = DL.filter (\x -> length (snd x) > 1) filterddepList
+        listORnodes = DL.filter (\x -> length (snd x) == 1) filterddepList
+        listANDDeps
+                | listANDnodes == [] = []
+                | otherwise = snd $ DL.head listANDnodes
+        listORDeps
+                | listORnodes == [] = []
+                | otherwise = concatMap snd listANDnodes
 
--- To support printing of module
-instance Show Module where
-    show (Module n comps) =
-                "Module: { " ++ show n ++ " --> " ++ show comps ++ "}\n"
+getANDdependencies :: (Eq a) => [MG.Gnode a] -> a -> [a]
+getANDdependencies gnodeList v = fst $ getDependencies gnodeList v
+
+getORdependencies :: (Eq a) => [MG.Gnode a] -> a -> [a]
+getORdependencies gnodeList v = snd $ getDependencies gnodeList v
 
 
-getNICModule :: Module
-getNICModule = Module "NIC" []
+getNodesList :: (Eq a) => [MG.Gnode a] -> [a]
+getNodesList gnodeList = DL.map fst gnodeList
 
-getEthernetModule :: Module
-getEthernetModule = Module "Ethernet" [L2ValidType, L2ValidCRC, L2ValidDest]
+getSinkNodesList :: (Eq a) => [MG.Gnode a] -> [a]
+getSinkNodesList gnodeList = DL.concatMap snd gnodeList
 
-getIPv4Module :: Module
-getIPv4Module = Module "IPv4" [L3IPv4ValidVersion, L3IPv4ValidLength
-            , L3IPv4ValidTTL, VerifiedL3IPv4, L3IPv4ValidChecksum
-            , L3IPv4ValidSrc, L3IPv4ValidDest, L3IPv4ValidReassembly]
+mySubset :: (Ord a) => (Eq a) => (Show a) => [a] -> [a] -> Bool
+mySubset superSet subSet = Set.fromList subSet `Set.isSubsetOf`  Set.fromList superSet
 
-getIPv6Module :: Module
-getIPv6Module = Module "IPv6" [L3IPv6ValidVersion, L3IPv6ValidLength
-            , L3IPv6ValidHops, L3IPv6ValidSrc, L3IPv6ValidDest
-            , L3IPv6ValidProtocol]
+-- find the first node which is not in sortedNodes list, but but not dependent
+-- on any other element in unsorted list
+findNextSortedNodes :: (Ord a) => (Eq a) => (Show a) => [MG.Gnode a] -> [MG.Gnode a] -> [MG.Gnode a]
+findNextSortedNodes sortedNodes unsortedNodes = DL.filter (\x -> mySubset  sinkNodes (snd x)) unsortedNodes
+    where
+        sinkNodes =  getNodesList sortedNodes
 
-getICMPModule :: Module
-getICMPModule =  Module "ICMP" [L4ICMPValidType]
 
-getUDPModule :: Module
-getUDPModule =  Module "UDP" [L4UDPValidSrc, L4UDPValidDest, L4UDPValidLength
-            , L4UDPValidChecksum]
+sortGraph :: (Ord a) => (Eq a) => (Show a) => ([MG.Gnode a], [MG.Gnode a]) -> ([MG.Gnode a], [MG.Gnode a])
+sortGraph (sortedNodes, unsortedNodes)
+    | unsortedNodes == [] = (sortedNodes, [])
+    | selectedNodes == [] = error "No suitable nodes found even there are nodes in unsorted list"
+    | otherwise = sortGraph (newSorted, newUnsorted)
+        where
+            selectedNodes = findNextSortedNodes sortedNodes unsortedNodes
+            newSorted = sortedNodes ++ selectedNodes
+            newUnsorted =  unsortedNodes DL.\\ selectedNodes
 
-getTCPModule :: Module
-getTCPModule =  Module "TCP" [L4TCPValidSrc, L4TCPValidDest, L4TCPValidLength
-        , L4TCPValidChecksum, L4TCPValidSequence, L4TCPValidAckNo
-        , L4TCPValidAck, L4TCPValidSyn, L4TCPValidFin, L4TCPValidFlags
-        , L4TCPValidWindow, L4TCPValidUrgent, L4TCPValidOffset
-        , L4TCPValidState]
+{-
+f1 :: (Eq a) => [MG.Gnode a] -> [MG.Gnode a] -> a -> [MG.Gnode a]
+f1 prg rag v =
+    | DL.notElem v getNodesList prg
 
--- List of all modules available
-getModLst :: [Module]
-getModLst = [getNICModule, getEthernetModule, getIPv4Module, getIPv6Module
-                , getICMPModule, getUDPModule, getTCPModule]
+    where
+-}
 
-moduleRange :: (Module, Module) -> [Module]
-moduleRange (m1, m2) = DL.takeWhile (<= m2) $ DL.dropWhile (< m1) $ getModLst
-
--- To support printing of module
-instance Ix.Ix Module where
-    range (m1, m2) = moduleRange (m1, m2)
-    rangeSize (m1, m2) = DL.length $ moduleRange (m1, m2)
-    index (m1, m2) m3 = DL.length $ DL.takeWhile (< m3) $ moduleRange (m1, m2)
-    inRange (m1, m2) m3 = [] /= ( DL.takeWhile (== m3) $ moduleRange (m1, m2))
+{-
+ - Embed LPG onto PRG
+ -}
+embeddGraphs :: (Eq a) => [MG.Gnode a] -> [MG.Gnode a] -> [MG.Gnode a]
+embeddGraphs lpg prg = lpg
 
 -- main function (just for testing purposes)
 main_old :: IO()
 main_old = do
-        putStrLn out1
+        putStrLn out2
         putStrLn lineBreak
---        putStrLn $ show gr
 
     where
         lineBreak = "\n\n"
-        -- m = L4TCPValidAckNo
-        m = Module "Ethernet" [L2ValidLen, L2ValidCRC]
-        out1 = show $ getModLst
---        out2 = show $ DD.typeOf (m)
+        m = L4TCPValidAckNo
+        out2 = show $ DD.typeOf (m)
 
 
 main  :: IO()

@@ -3,9 +3,9 @@
 
 next question
 ---------------------
-Qus:
+Qus: What does it means by satisfying dependencies?
 Ans:
-
+two nodes are same
 Status: NOT_DONE
 
 next question

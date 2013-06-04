@@ -50,6 +50,24 @@ genEmbeddedPraph = writeFile "Embedded.dot" $ EMBD.embedSimple lpg prg
         prg = E1k.getE1kPRG
 
 {-
+ -
+ -}
+testSorting :: IO ()
+testSorting =
+        do
+        putStrLn "Before Sorting"
+        putStrLn beforeSort
+        putStrLn lineBreak
+        putStrLn "After sorting"
+        putStrLn afterSort
+        putStrLn lineBreak
+        where
+        lineBreak = "\n\n"
+        graph = MC.getNetworkDependency
+        beforeSort = show graph
+        (sorted, empty) =MC.sortGraph ([], graph)
+        afterSort = show sorted
+{-
  - main function:
  -}
 main  :: IO()
@@ -62,6 +80,7 @@ main = do
         genLPGGraph
         putStrLn "Generating Embedded.dot"
         genEmbeddedPraph
+        testSorting
         putStrLn outmsg
     where
         outmsg = "Done!"

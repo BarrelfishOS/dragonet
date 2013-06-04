@@ -27,6 +27,12 @@ embedSimple bigGraph smallGraph = embeddedGraph
     where
         embeddedGraph = MG.showEmbeddedGraph bigGraph smallGraph
 
+embedV2 :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation] ->
+         [MG.Gnode MC.Computation]
+embedV2 bigGraph smallGraph = embeddedGraph
+    where
+        embeddedGraph = MC.embeddGraphs bigGraph smallGraph
+
 
 main  :: IO()
 main = do
@@ -35,4 +41,6 @@ main = do
         lpg = LPG.getSampleLPG2Apps $ MC.getNetworkDependency
         prg = E1k.getE1kPRG
         outDot = embedSimple lpg prg
+
+
 

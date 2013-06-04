@@ -36,7 +36,7 @@ getMaxSocketID nodesList
     | sockIDList == [] = 0
     | otherwise = DL.maximum sockIDList
     where
-       sockIDList = map getSocketID $ filter (isSocket) $ map fst nodesList
+       sockIDList = map getSocketID $ DL.filter (isSocket) $ map fst nodesList
 
 {-
  - Opens a new socket in given graph.
@@ -56,7 +56,7 @@ openSocket currentGraph = (newGraph, socket)
  -  app and filter.  Also, if the filter already exist then I should complain
  -}
 bind :: [MG.Gnode MC.Computation] -> MC.Application -> MC.Socket -> MC.Filter -> [MG.Gnode MC.Computation]
-bind lpg app sock filter = lpgFiltered ++ [
+bind lpg app sock fl = lpgFiltered ++ [
                     (thisFlow, [MC.L4ReadyToClassify])
                     , (tosocket, [thisFlow, MC.VerifiedL4])
                     , (toapp, [MC.ToSocket sock])
@@ -64,7 +64,7 @@ bind lpg app sock filter = lpgFiltered ++ [
     where
         lpgFiltered = lpg
         tosocket = (MC.ToSocket sock)
-        thisFlow = (MC.IsFlow filter)
+        thisFlow = (MC.IsFlow fl)
         toapp = (MC.ToApplication app)
 
 
