@@ -76,14 +76,14 @@ instance Show Socket where
 -- presence of these tags in any module will show that the module is capable of
 -- performing this perticular computation
 data Computation = ClassifiedL2Ethernet -- Ethernet starter node
-        | L2ValidLen
-        | L2ValidCRC
-        | L2ValidBroadcast
-        | L2ValidMulticast
-        | L2ValidUnicast
-        | L2ValidDest
-        | L2ValidSrc
-        | L2ValidType -- clasifier
+        | L2EtherValidLen
+        | L2EtherValidCRC
+        | L2EtherValidBroadcast
+        | L2EtherValidMulticast
+        | L2EtherValidUnicast
+        | L2EtherValidDest
+        | L2EtherValidSrc
+        | L2EtherValidType -- clasifier
         | VerifiedL2Ethernet -- tag specifying that is it a valid Ethernet packet
         | VerifiedL2
         | ClassifiedL3IPv4 -- IPv4 starter node
@@ -168,21 +168,21 @@ instance Show Computation where
 getNetworkDependency :: [MG.Gnode Computation]
 getNetworkDependency = [
         (ClassifiedL2Ethernet, [])
-        , (L2ValidLen, [ClassifiedL2Ethernet])
-        , (L2ValidType, [ClassifiedL2Ethernet])
-        , (L2ValidCRC, [ClassifiedL2Ethernet])
-        , (L2ValidBroadcast, [ClassifiedL2Ethernet])
-        , (L2ValidMulticast, [ClassifiedL2Ethernet])
-        , (L2ValidUnicast, [ClassifiedL2Ethernet])
-        , (L2ValidDest, [L2ValidBroadcast])
-        , (L2ValidDest, [L2ValidMulticast])
-        , (L2ValidDest, [L2ValidUnicast])
-        , (L2ValidSrc, [ClassifiedL2Ethernet])
-        , (VerifiedL2Ethernet, [L2ValidCRC, L2ValidLen, L2ValidType
-                       , L2ValidDest, L2ValidSrc])
+        , (L2EtherValidLen, [ClassifiedL2Ethernet])
+        , (L2EtherValidType, [ClassifiedL2Ethernet])
+        , (L2EtherValidCRC, [ClassifiedL2Ethernet])
+        , (L2EtherValidBroadcast, [ClassifiedL2Ethernet])
+        , (L2EtherValidMulticast, [ClassifiedL2Ethernet])
+        , (L2EtherValidUnicast, [ClassifiedL2Ethernet])
+        , (L2EtherValidDest, [L2EtherValidBroadcast])
+        , (L2EtherValidDest, [L2EtherValidMulticast])
+        , (L2EtherValidDest, [L2EtherValidUnicast])
+        , (L2EtherValidSrc, [ClassifiedL2Ethernet])
+        , (VerifiedL2Ethernet, [L2EtherValidCRC, L2EtherValidLen, L2EtherValidType
+                       , L2EtherValidDest, L2EtherValidSrc])
 
         -- IPv4 related tags
-        , (ClassifiedL3IPv4, [L2ValidType])
+        , (ClassifiedL3IPv4, [L2EtherValidType])
         , (L3IPv4ValidVersion, [ClassifiedL3IPv4])
         , (L3IPv4ValidLength, [ClassifiedL3IPv4])
         , (L3IPv4ValidTTL, [ClassifiedL3IPv4])
@@ -196,7 +196,7 @@ getNetworkDependency = [
             , L3IPv4ValidDest, L3IPv4ValidReassembly, VerifiedL2Ethernet])
 
         -- IPv6 related tags
-        , (ClassifiedL3IPv6, [L2ValidType])
+        , (ClassifiedL3IPv6, [L2EtherValidType])
         , (L3IPv6ValidVersion, [ClassifiedL3IPv6])
         , (L3IPv6ValidLength, [ClassifiedL3IPv6])
         , (L3IPv6ValidHops, [ClassifiedL3IPv6])
@@ -291,10 +291,10 @@ getDefaultFilter = (IsFlow (Filter "ANY" "ANY" "ANY" "ANY" "ANY"))
  -}
 getNetworkDependencyDummy :: [MG.Gnode Computation]
 getNetworkDependencyDummy = [
-        (VerifiedL2Ethernet, [L2ValidLen, L2ValidType])
-        , (L2ValidLen, [ClassifiedL2Ethernet])
-        , (L2ValidType, [ClassifiedL2Ethernet])
-        , (ClassifiedL3IPv4, [L2ValidType])
+        (VerifiedL2Ethernet, [L2EtherValidLen, L2EtherValidType])
+        , (L2EtherValidLen, [ClassifiedL2Ethernet])
+        , (L2EtherValidType, [ClassifiedL2Ethernet])
+        , (ClassifiedL3IPv4, [L2EtherValidType])
         , (ClassifiedL2Ethernet, [])
     ]
 
