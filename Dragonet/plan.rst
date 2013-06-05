@@ -1,5 +1,13 @@
 
 
+next question
+---------------------
+Qus: Does E10k keeps any information when packet reaches the queue?
+Ans:
+
+Status:
+
+
 
 next question
 ---------------------
