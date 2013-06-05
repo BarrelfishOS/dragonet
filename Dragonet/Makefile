@@ -14,7 +14,8 @@ Dragonet: Dragonet_compile
 	dot -Tpdf -o E1kPRG.pdf E1kPRG.dot
 	dot -Tpng -o Embedded.png Embedded.dot
 	dot -Tpdf -o Embedded.pdf Embedded.dot
-
+	dot -Tpng -o EmbeddedV2.png EmbeddedV2.dot
+	dot -Tpdf -o EmbeddedV2.pdf EmbeddedV2.dot
 Base: Computations.hs E1k.hs LPG.hs MyGraph.hs NetworkProcessing.hs Makefile
 
 clean:

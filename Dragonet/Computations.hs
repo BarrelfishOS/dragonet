@@ -23,6 +23,8 @@ module Computations (
     , getNetworkDependencyDummy
     , embeddGraphs
     , sortGraph
+    , getDefaultQueue
+    , getDefaultFilter
 ) where
 
 import qualified MyGraph as MG
@@ -139,6 +141,7 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | ToUserMemory -- packet copy to user memory
 --        | IsFlow Protocol SrcIP DstIP SrcPort DstPort -- for flow filtering
         | IsFlow  Filter -- for flow filtering
+        | InSoftware
         | CopyToQueue Qid
         | ToDefaultKernelProcessing
         | ToSocket Socket
@@ -273,9 +276,15 @@ getNetworkDependency = [
         , (ToDefaultKernelProcessing, [default_queue, VerifiedL4])
     ]
     where
-       generic_filter = (IsFlow (Filter "ANY" "ANY" "ANY" "ANY" "ANY"))
-       default_queue = (CopyToQueue "0:Default")
+       generic_filter = getDefaultFilter
+       default_queue = getDefaultQueue
 
+
+getDefaultQueue :: Computation
+getDefaultQueue = (CopyToQueue "0:Default")
+
+getDefaultFilter :: Computation
+getDefaultFilter = (IsFlow (Filter "ANY" "ANY" "ANY" "ANY" "ANY"))
 
 {-
  - Small sample dependency list for testing purposes
@@ -348,15 +357,23 @@ findNextSortedNodes sortedNodes unsortedNodes = DL.filter (\x -> mySubset  sinkN
         sinkNodes =  getNodesList sortedNodes
 
 
-sortGraph :: (Ord a) => (Eq a) => (Show a) => ([MG.Gnode a], [MG.Gnode a]) -> ([MG.Gnode a], [MG.Gnode a])
-sortGraph (sortedNodes, unsortedNodes)
+sortGraphStep :: (Ord a) => (Eq a) => (Show a) => ([MG.Gnode a], [MG.Gnode a]) -> ([MG.Gnode a], [MG.Gnode a])
+sortGraphStep (sortedNodes, unsortedNodes)
     | unsortedNodes == [] = (sortedNodes, [])
-    | selectedNodes == [] = error "No suitable nodes found even there are nodes in unsorted list"
-    | otherwise = sortGraph (newSorted, newUnsorted)
+    | selectedNodes == [] = error ("No suitable nodes found even there are nodes in unsorted list " ++ show unsortedNodes)
+    | otherwise = sortGraphStep (newSorted, newUnsorted)
         where
             selectedNodes = findNextSortedNodes sortedNodes unsortedNodes
             newSorted = sortedNodes ++ selectedNodes
             newUnsorted =  unsortedNodes DL.\\ selectedNodes
+
+
+sortGraph :: (Ord a) => (Eq a) => (Show a) => [MG.Gnode a] -> [MG.Gnode a]
+sortGraph graph
+    | unsorted /= [] = error ("Could not sort the graph because of: " ++ show unsorted)
+    | otherwise = sorted
+    where
+        (sorted, unsorted) = sortGraphStep ([], graph)
 
 {-
 f1 :: (Eq a) => [MG.Gnode a] -> [MG.Gnode a] -> a -> [MG.Gnode a]
@@ -366,11 +383,86 @@ f1 prg rag v =
     where
 -}
 
+
+addToSoftPartOR :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
+    -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
+addToSoftPartOR  prg swstartnode  emblpg (vname, deps)
+    | DL.elem (DL.head deps) (getNodesList prg) = (vname, [swstartnode])
+    | otherwise = (vname, deps)
+
+{-
+ - all previous nodes are in H/W --> just add single dep to InSoftware
+ - some previous nodes in H/W --> add dep to all nodes which are not in h/w and to inSoftware
+ - all previous nodes in S/W --> add dep to all those nodes
+ -}
+addToSoftPartAND :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
+    -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
+addToSoftPartAND  prg swstartnode emblpg (vname, deps)
+    | inSW == [] = (vname, [swstartnode])
+    | inHW == [] = (vname, deps)
+    | otherwise = (vname, [swstartnode] ++ inSW)
+    where
+        hwNodes = getNodesList prg
+        inHW = filter (\x -> DL.elem x hwNodes)  deps
+        inSW = filter (\x -> DL.notElem x hwNodes)  deps
+
+
+addToHWPartOR :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
+    -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
+addToHWPartOR prg swstartnode emblpg (vname, deps)
+    | DL.elem (DL.head deps) (getNodesList prg) = (vname, deps)
+    | otherwise = error ("previous node [ " ++ show (DL.head deps) ++ " ]  is not in hardware, whereas this node [ " ++ show vname ++ " ]is in h/w ")
+
+{-
+ - all previous nodes are in H/W --> just add single dep to InSoftware
+ - some previous nodes in H/W --> add dep to all nodes which are not in h/w and to inSoftware
+ - all previous nodes in S/W --> add dep to all those nodes
+ -}
+addToHWPartAND :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
+    -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
+addToHWPartAND prg swstartnode emblpg (vname, deps)
+    | inSW == [] = (vname, deps)
+    | inHW == [] = (vname, deps)
+    | otherwise = error ("2:previous node [ " ++ show (DL.head deps) ++ " ]  is not in hardware, whereas this node [ " ++ show vname ++ " ]is in h/w ")
+    where
+        hwNodes = getNodesList prg
+        inHW = filter (\x -> DL.elem x hwNodes)  deps
+        inSW = filter (\x -> DL.notElem x hwNodes)  deps
+
+
+
+addToEmbedded :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
+        -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
+addToEmbedded prg swstartnode emblpg (vname, deps)
+    | DL.elem vname $ getNodesList prg = if length deps == 1 then addToHWPartOR prg swstartnode  emblpg (vname, deps)
+                    else addToHWPartAND prg swstartnode emblpg (vname, deps)
+    | otherwise = if length deps == 1 then addToSoftPartOR prg swstartnode  emblpg (vname, deps)
+                    else addToSoftPartAND prg swstartnode emblpg (vname, deps)
+
+
+-- FIXME: Implement findNextEmbeddingNode
+
+embeddGraphStep :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
+        -> ([MG.Gnode a], [MG.Gnode a]) -> ([MG.Gnode a], [MG.Gnode a])
+embeddGraphStep prg  swstartnode (lpgEmbedded, lpgUnembedded)
+        | lpgUnembedded == [] = (lpgEmbedded, lpgUnembedded)
+        | otherwise = embeddGraphStep prg swstartnode (lpgEmbedded', lpgUnembedded')
+        where
+            v = head lpgUnembedded
+            newV = addToEmbedded prg swstartnode lpgEmbedded v
+            lpgEmbedded' = lpgEmbedded ++ [newV]
+            lpgUnembedded' = DL.deleteBy (\x y -> fst x == fst y) newV lpgUnembedded
+
 {-
  - Embed LPG onto PRG
  -}
-embeddGraphs :: (Eq a) => [MG.Gnode a] -> [MG.Gnode a] -> [MG.Gnode a]
-embeddGraphs lpg prg = lpg
+embeddGraphs :: (Eq a) => (Ord a) => (Show a) => [MG.Gnode a] -> [MG.Gnode a]
+                -> a -> a -> [MG.Gnode a]
+embeddGraphs lpg prg swstartnode defaultQueue
+    | unEmbedded /= [] = error "Still some vertieces are not converted"
+    | otherwise = embedded ++ [(swstartnode, [defaultQueue])]
+    where
+        (embedded, unEmbedded) = embeddGraphStep prg swstartnode ([], lpg)
 
 -- main function (just for testing purposes)
 main_old :: IO()

@@ -48,6 +48,18 @@ getE1kPRG = [
         , (MC.ClassifiedL4UDP, [MC.ClassifiedL3]) -- UDP classification
         , (MC.ClassifiedL4TCP, [MC.ClassifiedL3]) -- TCP classification
         , (MC.UnclasifiedL4, [MC.ClassifiedL3]) -- all other packets
+        , (MC.ClassifiedL4ICMP, [MC.ClassifiedL3]) -- UDP classification
+
+
+        , (MC.L4ReadyToClassify, [MC.ClassifiedL4TCP])
+        , (MC.L4ReadyToClassify, [MC.ClassifiedL4UDP])
+        , (MC.L4ReadyToClassify, [MC.ClassifiedL4ICMP])
+        , (MC.L4ReadyToClassify, [MC.UnclasifiedL4])
+
+        -- Filtering the packet
+        , (generic_filter, [MC.L4ReadyToClassify])
+
+
 
         -- some exaple filters
         , (http_flow, [MC.ClassifiedL4TCP]) -- sample filter
@@ -62,13 +74,14 @@ getE1kPRG = [
         , (q0, [MC.UnclasifiedL4]) --
         ]
     where
-        q0 =  (MC.CopyToQueue "0:Default")
-        q1 =  (MC.CopyToQueue "1")
-        q2 =  (MC.CopyToQueue "2")
-        q3 =  (MC.CopyToQueue "3")
-        q4 =  (MC.CopyToQueue "4")
+        q0 = MC.getDefaultQueue
+        q1 = (MC.CopyToQueue "1")
+        q2 = (MC.CopyToQueue "2")
+        q3 = (MC.CopyToQueue "3")
+        q4 = (MC.CopyToQueue "4")
 
         -- sample http server filter
+        generic_filter = MC.getDefaultFilter
         http_flow = (MC.IsFlow (MC.Filter "TCP" "255.255.255.255" "192.168.2.4" "ANY" "80"))
         telnet_flow = (MC.IsFlow (MC.Filter "TCP" "255.255.255.255" "192.168.2.4" "ANY" "80"))
         tftp_flow = (MC.IsFlow (MC.Filter "UDP" "255.255.255.255" "192.168.2.4" "ANY" "69"))

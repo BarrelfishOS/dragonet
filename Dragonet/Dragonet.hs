@@ -44,10 +44,22 @@ genLPGGraph = writeFile "LPG.dot" $ MG.showFlowGraph $ LPG.getSampleLPG2Apps $
  - Generates embedded graph for PRG and LPG
  -}
 genEmbeddedPraph :: IO ()
-genEmbeddedPraph = writeFile "Embedded.dot" $ EMBD.embedSimple lpg prg
+genEmbeddedPraph = writeFile "Embedded.dot" $ EMBD.embedSimple lpg' prg'
     where
         lpg = LPG.getSampleLPG2Apps $ MC.getNetworkDependency
         prg = E1k.getE1kPRG
+        lpg' = MC.sortGraph lpg
+        prg' = MC.sortGraph prg
+
+{-
+ - Generates embedded graph for PRG and LPG
+ -}
+testEmbedV2:: IO ()
+testEmbedV2 = writeFile "EmbeddedV2.dot" $ EMBD.embedV2 lpg prg
+    where
+        lpg = LPG.getSampleLPG2Apps $ MC.getNetworkDependency
+        prg = E1k.getE1kPRG
+
 
 {-
  -
@@ -65,7 +77,7 @@ testSorting =
         lineBreak = "\n\n"
         graph = MC.getNetworkDependency
         beforeSort = show graph
-        (sorted, empty) =MC.sortGraph ([], graph)
+        sorted = MC.sortGraph graph
         afterSort = show sorted
 {-
  - main function:
@@ -80,6 +92,8 @@ main = do
         genLPGGraph
         putStrLn "Generating Embedded.dot"
         genEmbeddedPraph
+        putStrLn "testing generic graph embedding EmbeddedV2.dot"
+        testEmbedV2
         testSorting
         putStrLn outmsg
     where

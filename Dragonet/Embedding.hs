@@ -9,6 +9,7 @@
 --module Dragonet(
 module Embedding(
     embedSimple
+    , embedV2
     , main
 ) where
 
@@ -28,11 +29,15 @@ embedSimple bigGraph smallGraph = embeddedGraph
         embeddedGraph = MG.showEmbeddedGraph bigGraph smallGraph
 
 embedV2 :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation] ->
-         [MG.Gnode MC.Computation]
-embedV2 bigGraph smallGraph = embeddedGraph
+--         [MG.Gnode MC.Computation]
+        String
+embedV2 bigGraph smallGraph = embeddedGraphStr
     where
-        embeddedGraph = MC.embeddGraphs bigGraph smallGraph
+        lpg = MC.sortGraph bigGraph
+        prg = MC.sortGraph smallGraph
 
+        embeddedGraph = MC.embeddGraphs lpg prg MC.InSoftware MC.getDefaultQueue
+        embeddedGraphStr = MG.showFlowGraph embeddedGraph
 
 main  :: IO()
 main = do
