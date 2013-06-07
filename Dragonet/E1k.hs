@@ -62,16 +62,13 @@ getE1kPRG = [
 
 
         -- some exaple filters
-        , (http_flow, [MC.ClassifiedL4TCP]) -- sample filter
-        , (telnet_flow, [MC.ClassifiedL4TCP]) -- sample filter
-        , (tftp_flow, [MC.ClassifiedL4UDP]) -- sample filter
+        , (http_flow, [MC.L4ReadyToClassify]) -- sample filter
+        , (telnet_flow, [MC.L4ReadyToClassify]) -- sample filter
+        , (tftp_flow, [MC.L4ReadyToClassify]) -- sample filter
         , (q4, [http_flow])
         , (q3, [telnet_flow])
         , (q1, [tftp_flow])
-
-        , (q0, [MC.ClassifiedL4TCP]) --
-        , (q0, [MC.ClassifiedL4UDP]) --
-        , (q0, [MC.UnclasifiedL4]) --
+        , (q0, [generic_filter])
         ]
     where
         q0 = MC.getDefaultQueue
@@ -82,7 +79,7 @@ getE1kPRG = [
 
         -- sample http server filter
         generic_filter = MC.getDefaultFilter
-        http_flow = (MC.IsFlow (MC.Filter "TCP" "255.255.255.255" "192.168.2.4" "ANY" "80"))
+        http_flow = (MC.IsFlow (MC.Filter "TCP" "ANY" "192.168.2.4" "ANY" "80"))
         telnet_flow = (MC.IsFlow (MC.Filter "TCP" "255.255.255.255" "192.168.2.4" "ANY" "80"))
         tftp_flow = (MC.IsFlow (MC.Filter "UDP" "255.255.255.255" "192.168.2.4" "ANY" "69"))
 

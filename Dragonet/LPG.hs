@@ -78,7 +78,7 @@ getSampleLPG2Apps lpg = finalLPG
         -- Apache server
         (lpg', s) = openSocket lpg
         app = MC.Application "Apache"
-        apacheFilter = MC.Filter "TCP" "ANY" "MYIP" "ANY" "80"
+        apacheFilter = MC.Filter "TCP" "ANY" "192.168.2.4" "ANY" "80"
         lpg2 = bind lpg' app s apacheFilter
 
         -- Telnet client
