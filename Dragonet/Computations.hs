@@ -384,12 +384,6 @@ f1 prg rag v =
 -}
 
 
-addToSoftPartOR :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
-    -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
-addToSoftPartOR  prg swstartnode  emblpg (vname, deps)
-    | DL.elem (DL.head deps) (getNodesList prg) = (vname, [swstartnode])
-    | otherwise = (vname, deps)
-
 {-
  - all previous nodes are in H/W --> just add single dep to InSoftware
  - some previous nodes in H/W --> add dep to all nodes which are not in h/w and to inSoftware
@@ -406,12 +400,12 @@ addToSoftPartAND  prg swstartnode emblpg (vname, deps)
         inHW = filter (\x -> DL.elem x hwNodes)  deps
         inSW = filter (\x -> DL.notElem x hwNodes)  deps
 
-
-addToHWPartOR :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
+addToSoftPartOR :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
     -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
-addToHWPartOR prg swstartnode emblpg (vname, deps)
-    | DL.elem (DL.head deps) (getNodesList prg) = (vname, deps)
-    | otherwise = error ("previous node [ " ++ show (DL.head deps) ++ " ]  is not in hardware, whereas this node [ " ++ show vname ++ " ]is in h/w ")
+addToSoftPartOR  prg swstartnode  emblpg (vname, deps)
+    | DL.elem (DL.head deps) (getNodesList prg) = (vname, [swstartnode])
+    | otherwise = (vname, deps)
+
 
 {-
  - all previous nodes are in H/W --> just add single dep to InSoftware
@@ -430,17 +424,25 @@ addToHWPartAND prg swstartnode emblpg (vname, deps)
         inSW = filter (\x -> DL.notElem x hwNodes)  deps
 
 
+addToHWPartOR :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
+    -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
+addToHWPartOR prg swstartnode emblpg (vname, deps)
+    | DL.elem (DL.head deps) (getNodesList prg) = (vname, deps)
+    | otherwise = error ("previous node [ " ++ show (DL.head deps) ++ " ]  is not in hardware, whereas this node [ " ++ show vname ++ " ]is in h/w ")
 
-addToEmbedded :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
+
+
+{-
+ - Find a node which can be embedded next
+ -}
+findNextToEmbed :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
         -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
-addToEmbedded prg swstartnode emblpg (vname, deps)
+findNextToEmbed prg swstartnode emblpg (vname, deps)
     | DL.elem vname $ getNodesList prg = if length deps == 1 then addToHWPartOR prg swstartnode  emblpg (vname, deps)
                     else addToHWPartAND prg swstartnode emblpg (vname, deps)
     | otherwise = if length deps == 1 then addToSoftPartOR prg swstartnode  emblpg (vname, deps)
                     else addToSoftPartAND prg swstartnode emblpg (vname, deps)
 
-
--- FIXME: Implement findNextEmbeddingNode
 
 embeddGraphStep :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
         -> ([MG.Gnode a], [MG.Gnode a]) -> ([MG.Gnode a], [MG.Gnode a])
@@ -449,7 +451,7 @@ embeddGraphStep prg  swstartnode (lpgEmbedded, lpgUnembedded)
         | otherwise = embeddGraphStep prg swstartnode (lpgEmbedded', lpgUnembedded')
         where
             v = head lpgUnembedded
-            newV = addToEmbedded prg swstartnode lpgEmbedded v
+            newV = findNextToEmbed prg swstartnode lpgEmbedded v
             lpgEmbedded' = lpgEmbedded ++ [newV]
             lpgUnembedded' = DL.deleteBy (\x y -> fst x == fst y) newV lpgUnembedded
 
