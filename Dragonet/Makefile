@@ -2,10 +2,12 @@
 all: Dragonet
 
 Dragonet_compile: Dragonet.hs Base
-	ghc Dragonet.hs -o Dragonet -Wall # -Werror
+	ghc -rtsopts Dragonet.hs -o Dragonet -Wall # -Werror
 
 Dragonet: Dragonet_compile
 	./Dragonet
+
+genModels: Dragonet
 	dot -Tpng -o LPG.png LPG.dot
 	dot -Tpdf -o LPG.pdf LPG.dot
 	dot -Tpng -o NetDep.png NetDep.dot
@@ -16,6 +18,11 @@ Dragonet: Dragonet_compile
 	dot -Tpdf -o Embedded.pdf Embedded.dot
 	dot -Tpng -o EmbeddedV2.png EmbeddedV2.dot
 	dot -Tpdf -o EmbeddedV2.pdf EmbeddedV2.dot
+	dot -Tpng -o E1kPRGConf.png E1kPRGConf.dot
+	dot -Tpdf -o E1kPRGConf.pdf E1kPRGConf.dot
+
+
+
 Base: Computations.hs E1k.hs LPG.hs MyGraph.hs NetworkProcessing.hs Makefile
 
 clean:

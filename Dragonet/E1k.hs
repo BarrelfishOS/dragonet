@@ -14,12 +14,39 @@
 --module Main (
 module E1k (
     getE1kPRG
+    , getE1kPRGConf
+    , getE1kPRGConfTest
     , main
 ) where
 
 
 import qualified MyGraph as MG
 import qualified Computations as MC
+
+
+
+--getE1kPRGConfTest :: [MG.Gnode MC.Computation]
+getE1kPRGConfTest ::  IO()
+getE1kPRGConfTest =  putStrLn $ show $ getE1kPRGConf exampleConf
+    where
+        exampleConf = [
+            MC.EthernetChecksum True
+            , MC.UDPChecksum True
+         ]
+
+
+{-
+ - Based on the given configuration, give the nodes which will be involved
+ - in the computation.
+ -
+ -}
+--getE1kPRGConf :: [MC.Configuration] -> [MG.Gnode MC.Computation]
+getE1kPRGConf :: [MC.Configuration] -> [MC.Computation]
+getE1kPRGConf [] = []
+getE1kPRGConf (x:xs) = mods ++ getE1kPRGConf xs
+    where
+        mods = [] -- FIXME: this should be based on the configuration
+
 
 
 {-

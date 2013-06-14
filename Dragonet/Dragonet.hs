@@ -61,6 +61,13 @@ testEmbedV2 = writeFile "EmbeddedV2.dot" $ EMBD.embedV2 lpg prg
         prg = E1k.getE1kPRG
 
 
+testE1kConf :: IO()
+testE1kConf = E1k.getE1kPRGConfTest
+--    do
+--        putStrLn $ MG.showFlowGraph E1k.getE1kPRGConfTest
+--        writeFile "E1kPRGConf.dot" $ MG.showFlowGraph E1k.getE1kPRGConfTest
+
+
 {-
  -
  -}
@@ -82,8 +89,8 @@ testSorting =
 {-
  - main function:
  -}
-main  :: IO()
-main = do
+mainV1  :: IO()
+mainV1 = do
         putStrLn "Generating NetDep.dot"
         genNetGraph
         putStrLn "Generating E1kPRG.dot"
@@ -99,4 +106,5 @@ main = do
     where
         outmsg = "Done!"
 
-
+main :: IO()
+main  = testE1kConf

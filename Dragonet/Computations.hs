@@ -11,6 +11,7 @@
 --module Main (
 module Computations (
     Computation(..)
+    , Configuration(..)
     , Socket(..)
     , Application(..)
     , Filter(..)
@@ -40,6 +41,7 @@ type L4Address = String
 
 -- for flow filtering
 type Protocol = String
+
 
 data Filter = Filter {
         protocol :: Protocol
@@ -71,6 +73,13 @@ data Socket = Socket {
 
 instance Show Socket where
     show (Socket sid) = show sid
+
+
+data Configuration = EthernetChecksum Bool
+                | IPv4Checksum Bool
+                | TCPChecksum Bool
+                | UDPChecksum Bool
+                deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
 -- List of all the computations/tests which can happen on incoming packets
 -- presence of these tags in any module will show that the module is capable of
