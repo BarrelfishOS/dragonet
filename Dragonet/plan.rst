@@ -4,7 +4,7 @@ next question
 ---------------------
 Qus: Does E10k keeps any information when packet reaches the queue?
 Ans:
-
+It seems yes (Antoine confirmed it)
 Status:
 
 

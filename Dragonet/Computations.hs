@@ -351,16 +351,21 @@ mySubset superSet subSet = Set.fromList subSet `Set.isSubsetOf`  Set.fromList su
 
 -- find the first node which is not in sortedNodes list, but but not dependent
 -- on any other element in unsorted list
-findNextSortedNodes :: (Ord a) => (Eq a) => (Show a) => [MG.Gnode a] -> [MG.Gnode a] -> [MG.Gnode a]
-findNextSortedNodes sortedNodes unsortedNodes = DL.filter (\x -> mySubset  sinkNodes (snd x)) unsortedNodes
+findNextSortedNodes :: (Ord a) => (Eq a) => (Show a) => [MG.Gnode a] ->
+        [MG.Gnode a] -> [MG.Gnode a]
+findNextSortedNodes sortedNodes unsortedNodes =
+       DL.filter (\x -> mySubset  sinkNodes (snd x)) unsortedNodes
     where
-        sinkNodes =  getNodesList sortedNodes
+       sinkNodes =  getNodesList sortedNodes
 
 
-sortGraphStep :: (Ord a) => (Eq a) => (Show a) => ([MG.Gnode a], [MG.Gnode a]) -> ([MG.Gnode a], [MG.Gnode a])
+sortGraphStep :: (Ord a) => (Eq a) => (Show a) =>
+        ([MG.Gnode a], [MG.Gnode a]) -> ([MG.Gnode a], [MG.Gnode a])
 sortGraphStep (sortedNodes, unsortedNodes)
     | unsortedNodes == [] = (sortedNodes, [])
-    | selectedNodes == [] = error ("No suitable nodes found even there are nodes in unsorted list " ++ show unsortedNodes)
+    | selectedNodes == [] = error (
+        "No suitable nodes found even there are nodes in unsorted list " ++
+        show unsortedNodes)
     | otherwise = sortGraphStep (newSorted, newUnsorted)
         where
             selectedNodes = findNextSortedNodes sortedNodes unsortedNodes
@@ -370,7 +375,8 @@ sortGraphStep (sortedNodes, unsortedNodes)
 
 sortGraph :: (Ord a) => (Eq a) => (Show a) => [MG.Gnode a] -> [MG.Gnode a]
 sortGraph graph
-    | unsorted /= [] = error ("Could not sort the graph because of: " ++ show unsorted)
+    | unsorted /= [] = error ("Could not sort the graph because of: " ++
+        show unsorted)
     | otherwise = sorted
     where
         (sorted, unsorted) = sortGraphStep ([], graph)
@@ -384,9 +390,10 @@ f1 prg rag v =
 -}
 
 
-{-
+{- Given node should go in the software, so add it to the software part
  - all previous nodes are in H/W --> just add single dep to InSoftware
- - some previous nodes in H/W --> add dep to all nodes which are not in h/w and to inSoftware
+ - some previous nodes in H/W --> add dep to all nodes which are not in h/w
+ -              and to inSoftware
  - all previous nodes in S/W --> add dep to all those nodes
  -}
 addToSoftPartAND :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
@@ -407,9 +414,10 @@ addToSoftPartOR  prg swstartnode  emblpg (vname, deps)
     | otherwise = (vname, deps)
 
 
-{-
+{- Given node can go in the hardware, so add it to hardware part
  - all previous nodes are in H/W --> just add single dep to InSoftware
- - some previous nodes in H/W --> add dep to all nodes which are not in h/w and to inSoftware
+ - some previous nodes in H/W --> add dep to all nodes which are not in
+ -          h/w and to inSoftware
  - all previous nodes in S/W --> add dep to all those nodes
  -}
 addToHWPartAND :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
@@ -417,7 +425,9 @@ addToHWPartAND :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
 addToHWPartAND prg swstartnode emblpg (vname, deps)
     | inSW == [] = (vname, deps)
     | inHW == [] = (vname, deps)
-    | otherwise = error ("2:previous node [ " ++ show (DL.head deps) ++ " ]  is not in hardware, whereas this node [ " ++ show vname ++ " ]is in h/w ")
+    | otherwise = error ("2:previous node [ " ++ show (DL.head deps) ++
+        " ]  is not in hardware, whereas this node [ " ++ show vname ++
+        " ]is in h/w ")
     where
         hwNodes = getNodesList prg
         inHW = filter (\x -> DL.elem x hwNodes)  deps
@@ -428,20 +438,27 @@ addToHWPartOR :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
     -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
 addToHWPartOR prg swstartnode emblpg (vname, deps)
     | DL.elem (DL.head deps) (getNodesList prg) = (vname, deps)
-    | otherwise = error ("previous node [ " ++ show (DL.head deps) ++ " ]  is not in hardware, whereas this node [ " ++ show vname ++ " ]is in h/w ")
+    | otherwise = error ("previous node [ " ++ show (DL.head deps) ++
+        " ]  is not in hardware, whereas this node [ " ++ show vname ++
+        " ]is in h/w ")
 
 
 
 {-
- - Find a node which can be embedded next
+ - Embedd the node v by finding out whether it can go in hardware
+ - or in software
  -}
-findNextToEmbed :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
+embedGivenNode :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
         -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
-findNextToEmbed prg swstartnode emblpg (vname, deps)
-    | DL.elem vname $ getNodesList prg = if length deps == 1 then addToHWPartOR prg swstartnode  emblpg (vname, deps)
-                    else addToHWPartAND prg swstartnode emblpg (vname, deps)
-    | otherwise = if length deps == 1 then addToSoftPartOR prg swstartnode  emblpg (vname, deps)
-                    else addToSoftPartAND prg swstartnode emblpg (vname, deps)
+embedGivenNode prg swstartnode emblpg (vname, deps)
+    | DL.elem vname $ getNodesList prg = if length deps == 1 then
+                        addToHWPartOR prg swstartnode  emblpg (vname, deps)
+                    else
+                        addToHWPartAND prg swstartnode emblpg (vname, deps)
+    | otherwise = if length deps == 1 then
+            addToSoftPartOR prg swstartnode  emblpg (vname, deps)
+        else
+            addToSoftPartAND prg swstartnode emblpg (vname, deps)
 
 
 embeddGraphStep :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
@@ -451,7 +468,7 @@ embeddGraphStep prg  swstartnode (lpgEmbedded, lpgUnembedded)
         | otherwise = embeddGraphStep prg swstartnode (lpgEmbedded', lpgUnembedded')
         where
             v = head lpgUnembedded
-            newV = findNextToEmbed prg swstartnode lpgEmbedded v
+            newV = embedGivenNode prg swstartnode lpgEmbedded v
             lpgEmbedded' = lpgEmbedded ++ [newV]
             lpgUnembedded' = DL.deleteBy (\x y -> fst x == fst y) newV lpgUnembedded
 
