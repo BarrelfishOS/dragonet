@@ -25,34 +25,43 @@ import qualified MyGraph as MG
 import qualified Computations as MC
 import qualified Configurations as MConf
 import qualified Data.List as DL
+import qualified Debug.Trace as DT
 
 
 getE1kPRGConfTestV2 ::  IO()
 getE1kPRGConfTestV2 =
     do
+
+        putStrLn "#################  basicPRG  ###########################\n"
+        putStrLn $ show $ basicPRG
+        putStrLn "#################  Conf ###########################\n"
+        putStrLn $ show $ exampleConf
+        putStrLn "#################  activeNodesForConf ###################\n"
         putStrLn $ show $ getActiveNodesForConf basicPRG exampleConf
-        putStrLn "####################33\n"
+        putStrLn "#######################################################\n"
         --putStrLn $ show $ getDepListReplacement basicPRG exampleConf [MC.L2EtherValidUnicast]
-        putStrLn $ show $ getDepReplacement basicPRG exampleConf MC.L2EtherValidCRC -- MC.L2EtherValidUnicast
+        --putStrLn $ show $ getDepReplacement basicPRG exampleConf MC.L2EtherValidCRC -- MC.L2EtherValidUnicast
+        putStrLn "#######################################################\n"
+        putStrLn "#######################################################\n"
+        putStrLn "#######################################################\n"
 
     where
         basicPRG = getE1kBasicPRG
-        exampleConf = [
+        exampleConf = getExampleConf
+
+getExampleConf :: [MConf.Configuration]
+getExampleConf = [
             MConf.Always
+--            , MConf.IPv4Checksum
+            , MConf.EthernetChecksum
             , MConf.UDPChecksum
          ]
-
 
 getE1kPRGConfTest :: [MG.Gnode MC.Computation]
 --getE1kPRGConfTest ::  IO()
 getE1kPRGConfTest =  getE1kPRGConf exampleConf
     where
-        exampleConf = [
-            MConf.Always
-            , MConf.EthernetChecksum
-            , MConf.UDPChecksum
-         ]
-
+        exampleConf = getExampleConf
 
 {-
  - Based on the given configuration, give the nodes which will be involved
@@ -60,7 +69,7 @@ getE1kPRGConfTest =  getE1kPRGConf exampleConf
  -
  -}
 getE1kPRGConf :: [MConf.Configuration] -> [MG.Gnode MC.Computation]
-getE1kPRGConf confList = getE0kPRGGeneric basicPRG confList
+getE1kPRGConf confList = getE0kPRGGeneric basicPRG confList basicPRG
     where
         basicPRG = getE1kBasicPRG
 
@@ -116,7 +125,7 @@ getE1kPRG = [
     where
         q0 = MC.getDefaultQueue
         q1 = (MC.CopyToQueue "1")
-        q2 = (MC.CopyToQueue "2")
+ --       q2 = (MC.CopyToQueue "2")
         q3 = (MC.CopyToQueue "3")
         q4 = (MC.CopyToQueue "4")
 
@@ -133,9 +142,9 @@ getE1kPRG = [
  -}
 getAllORDeps :: [(MC.Computation, [MC.Computation], MConf.Configuration)]
         -> MC.Computation -> [MC.Computation]
-getAllORDeps basicPRG x = DL.map (\(a, b, c) ->
+getAllORDeps basicPRG x = DL.map (\(_, b, _) ->
                 if length b == 1 then DL.head b else error "PRG contains AND node")
-                $ DL.filter (\(a, b, c) -> a == x ) basicPRG
+                $ DL.filter (\(aa, _, _) -> aa == x ) basicPRG
 
 
 {-
@@ -143,10 +152,15 @@ getAllORDeps basicPRG x = DL.map (\(a, b, c) ->
  -}
 getDepListReplacement :: [(MC.Computation, [MC.Computation], MConf.Configuration)]
                 -> [MConf.Configuration] -> [MC.Computation] -> [MC.Computation]
-getDepListReplacement basicPRG conflist [] = []
-getDepListReplacement basicPRG conflist (x:xs) = replacement ++ getDepListReplacement basicPRG conflist xs
+getDepListReplacement _ _ [] = []
+getDepListReplacement basicPRG conflist (x:xs) =
+           {- DT.trace ("## replacing "
+           ++ show x ++ " with " ++ show replacement ++ " ####")
+           -}
+           replacement ++ getDepListReplacement basicPRG conflist xs
     where
         replacement = getDepReplacement basicPRG conflist x
+
 
 {-
  - Find a replacement node for given dependency nodej
@@ -154,41 +168,69 @@ getDepListReplacement basicPRG conflist (x:xs) = replacement ++ getDepListReplac
 getDepReplacement :: [(MC.Computation, [MC.Computation], MConf.Configuration)]
                 -> [MConf.Configuration] -> MC.Computation -> [MC.Computation]
 getDepReplacement basicPRG conflist x
-    | x `elem` getActiveNodesForConf basicPRG conflist = [x]
-    | otherwise = depReps -- for every dependency of x, get a replacement
+    | x `elem` activeNodes  =
+        {-
+        DT.trace (".... in active nodes " ++ show x ++ "" )
+        -}
+        [x]
+    | otherwise =
+        {-
+        DT.trace (".... node " ++ show x ++ " is Not in active nodes "
+        ++ show activeNodes ++ " so replacing with " ++ show depReps
+        ++ " INPUT {" ++ show basicPRG ++ "}.... {" ++ show conflist ++ "}"  )
+        -}
+        depReps -- for every dependency of x, get a replacement
     where
+        activeNodes = getActiveNodesForConf basicPRG conflist
         depReps = getDepListReplacement basicPRG conflist $
             getAllORDeps basicPRG x
 
 
 isGivenNodeActive :: (MC.Computation, [MC.Computation], MConf.Configuration)
                 -> [MConf.Configuration] -> [MC.Computation]
-isGivenNodeActive (comp, deps, conf) conflist = if conf `elem` conflist then [comp]
+isGivenNodeActive (comp, _, conf) conflist = if conf `elem` conflist then [comp]
                             else []
 
 getActiveNodesForConf :: [(MC.Computation, [MC.Computation], MConf.Configuration)]
             -> [MConf.Configuration] -> [MC.Computation]
-getActiveNodesForConf [] conf = []
-getActiveNodesForConf (x:xs)  conf = xlist  ++ getActiveNodesForConf xs conf
+getActiveNodesForConf [] _ = []
+getActiveNodesForConf (x:xs) conf = xlist ++ getActiveNodesForConf xs conf
     where
         xlist = isGivenNodeActive x conf
 
 
 {-
- - Get normal graph from given basicPRG and configuration list
+ - Get normal graph from given basicPRG, configuration list, and currently
+ - processed nodes
  -}
 getE0kPRGGeneric ::  [(MC.Computation, [MC.Computation], MConf.Configuration)]
-            -> [MConf.Configuration] -> [MG.Gnode MC.Computation]
-getE0kPRGGeneric [] confList = []
-getE0kPRGGeneric (x:xs) confList = replacedNode ++ getE0kPRGGeneric xs confList
+            -> [MConf.Configuration]
+            -> [(MC.Computation, [MC.Computation], MConf.Configuration)]
+            -> [MG.Gnode MC.Computation]
+getE0kPRGGeneric _ _ [] = []
+getE0kPRGGeneric basicPRG confList (x:xs) =
+            {-
+            DT.trace (
+            "getE0kPRGGeneric 1: replaced {{" ++ show x ++ " }} with {{ "
+            ++ show replacedNode ++ "}}")
+            -}
+            replacedNode ++ getE0kPRGGeneric basicPRG confList xs
     where
-        activeNodes = getActiveNodesForConf (x:xs) confList
-        (node, deps, cconf) = x
-        replacementDeps = getDepListReplacement (x:xs) confList deps
-        --replacementDeps = getDepReplacement (x:xs) confList $ DL.head deps
+        activeNodes = getActiveNodesForConf basicPRG confList
+        (node, deps, _) = x
+        replacementDeps = getDepListReplacement basicPRG confList deps
         replacedNode
             | node `elem` activeNodes = [(node, replacementDeps)]
             | otherwise = []
+
+
+getE1kBasicPRGDummy :: [(MC.Computation, [MC.Computation], MConf.Configuration)]
+getE1kBasicPRGDummy = [
+        (MC.ClassifiedL2Ethernet, [], MConf.Always)
+        , (MC.L2EtherValidLen, [MC.ClassifiedL2Ethernet], MConf.Always)
+        ]
+
+
 
 {-
  - Returns list of computations which can happen in the E0k NIC
@@ -210,9 +252,9 @@ getE1kBasicPRG = [
         , (MC.L2EtherValidDest, [MC.L2EtherValidUnicast], MConf.Always)
         , (MC.L2EtherValidType, [MC.L2EtherValidDest], MConf.Always)
         , (MC.ClassifiedL3IPv4, [MC.L2EtherValidType], MConf.Always)
-        , (MC.L3IPv4ValidChecksum, [MC.ClassifiedL3IPv4], MConf.Always)
+        , (MC.L3IPv4ValidChecksum, [MC.ClassifiedL3IPv4], MConf.IPv4Checksum)
 
-        , (MC.L3IPv4ValidProtocol, [MC.L3IPv4ValidChecksum], MConf.IPv4Checksum)
+        , (MC.L3IPv4ValidProtocol, [MC.L3IPv4ValidChecksum], MConf.Always)
 
         , (MC.ClassifiedL3IPv6, [MC.L2EtherValidType], MConf.Always)
         , (MC.L3IPv6ValidProtocol, [MC.ClassifiedL3IPv6], MConf.Always)
@@ -244,7 +286,7 @@ getE1kBasicPRG = [
     where
         q0 = MC.getDefaultQueue
         q1 = (MC.CopyToQueue "1")
-        q2 = (MC.CopyToQueue "2")
+--        q2 = (MC.CopyToQueue "2")
         q3 = (MC.CopyToQueue "3")
         q4 = (MC.CopyToQueue "4")
 
