@@ -55,8 +55,12 @@ getExampleConf = [
 --            , MConf.IPv4Checksum
             , MConf.EthernetChecksum
             , MConf.UDPChecksum
-            , MConf.QueueConf $ MC.Queue "Q4" "C4"
+            , MConf.QueueConf testQueue
+            , MConf.FilterConf testFilter testQueue
          ]
+         where
+            testQueue = MC.Queue "Q4" "C4"
+            testFilter = MC.Filter  "tcp" "sipx" "dstipx" "sptx" "dptx"
 
 getE1kPRGConfTest :: [MG.Gnode MC.Computation]
 --getE1kPRGConfTest ::  IO()
@@ -233,7 +237,7 @@ getE0kPRGGenericV2 ::  [(MC.Computation, [MC.Computation], MConf.Configuration)]
 getE0kPRGGenericV2 basicPRG confList changingList =  additionalEdges ++
                 getE0kPRGGeneric basicPRG confList changingList
     where
-        additionalEdges = []
+        additionalEdges = MConf.genAllDependencies confList
 
 
 
