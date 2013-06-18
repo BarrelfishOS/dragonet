@@ -55,6 +55,7 @@ getExampleConf = [
 --            , MConf.IPv4Checksum
             , MConf.EthernetChecksum
             , MConf.UDPChecksum
+            , MConf.QueueConf "4"
          ]
 
 getE1kPRGConfTest :: [MG.Gnode MC.Computation]
@@ -69,7 +70,8 @@ getE1kPRGConfTest =  getE1kPRGConf exampleConf
  -
  -}
 getE1kPRGConf :: [MConf.Configuration] -> [MG.Gnode MC.Computation]
-getE1kPRGConf confList = getE0kPRGGeneric basicPRG confList basicPRG
+--getE1kPRGConf confList = getE0kPRGGeneric basicPRG confList basicPRG
+getE1kPRGConf confList = getE0kPRGGenericV2 basicPRG confList basicPRG
     where
         basicPRG = getE1kBasicPRG
 
@@ -123,11 +125,11 @@ getE1kPRG = [
         , (q0, [generic_filter])
         ]
     where
-        q0 = MC.getDefaultQueue
-        q1 = (MC.CopyToQueue "1")
- --       q2 = (MC.CopyToQueue "2")
-        q3 = (MC.CopyToQueue "3")
-        q4 = (MC.CopyToQueue "4")
+        q0 = MC.ToQueue MC.getDefaultQueue
+        q1 = (MC.ToQueue (MC.Queue "Q1" "C1"))
+ --       q2 = (MC.ToQueue (MC.Queue "Q2" "C2"))
+        q3 = (MC.ToQueue (MC.Queue "Q3" "C4"))
+        q4 = (MC.ToQueue (MC.Queue "Q3" "C4"))
 
         -- sample http server filter
         generic_filter = MC.getDefaultFilter
@@ -224,6 +226,17 @@ getE0kPRGGeneric basicPRG confList (x:xs) =
             | otherwise = []
 
 
+getE0kPRGGenericV2 ::  [(MC.Computation, [MC.Computation], MConf.Configuration)]
+            -> [MConf.Configuration]
+            -> [(MC.Computation, [MC.Computation], MConf.Configuration)]
+            -> [MG.Gnode MC.Computation]
+getE0kPRGGenericV2 basicPRG confList changingList =  additionalEdges ++
+                getE0kPRGGeneric basicPRG confList changingList
+    where
+        additionalEdges = []
+
+
+
 getE1kBasicPRGDummy :: [(MC.Computation, [MC.Computation], MConf.Configuration)]
 getE1kBasicPRGDummy = [
         (MC.ClassifiedL2Ethernet, [], MConf.Always)
@@ -272,8 +285,9 @@ getE1kBasicPRG = [
 
         -- Filtering the packet
         , (generic_filter, [MC.L4ReadyToClassify], MConf.Always)
+        , (q0, [generic_filter], MConf.Always)
 
-
+        {-
         -- some exaple filters
         , (http_flow, [MC.L4ReadyToClassify], MConf.Always) -- sample filter
         , (telnet_flow, [MC.L4ReadyToClassify], MConf.Always) -- sample filter
@@ -281,20 +295,24 @@ getE1kBasicPRG = [
         , (q4, [http_flow], MConf.Always)
         , (q3, [telnet_flow], MConf.Always)
         , (q1, [tftp_flow], MConf.Always)
-        , (q0, [generic_filter], MConf.Always)
+        -}
+
         ]
     where
-        q0 = MC.getDefaultQueue
+        q0 = MC.ToQueue MC.getDefaultQueue
+        generic_filter = MC.getDefaultFilter
+
+        {-
         q1 = (MC.CopyToQueue "1")
---        q2 = (MC.CopyToQueue "2")
+        q2 = (MC.CopyToQueue "2")
         q3 = (MC.CopyToQueue "3")
         q4 = (MC.CopyToQueue "4")
 
         -- sample http server filter
-        generic_filter = MC.getDefaultFilter
         http_flow = (MC.IsFlow (MC.Filter "TCP" "ANY" "192.168.2.4" "ANY" "80"))
         telnet_flow = (MC.IsFlow (MC.Filter "TCP" "255.255.255.255" "192.168.2.4" "ANY" "80"))
         tftp_flow = (MC.IsFlow (MC.Filter "UDP" "255.255.255.255" "192.168.2.4" "ANY" "69"))
+        -}
 
 {-
  - main function: used to test if the PRG generated for E1k is correct or not

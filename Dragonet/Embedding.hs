@@ -36,7 +36,7 @@ embedV2 bigGraph smallGraph = embeddedGraphStr
         lpg = MC.sortGraph bigGraph
         prg = MC.sortGraph smallGraph
 
-        embeddedGraph = MC.embeddGraphs lpg prg MC.InSoftware MC.getDefaultQueue
+        embeddedGraph = MC.embeddGraphs lpg prg MC.InSoftware (MC.ToQueue MC.getDefaultQueue)
         embeddedGraphStr = MG.showFlowGraph embeddedGraph
 
 main  :: IO()

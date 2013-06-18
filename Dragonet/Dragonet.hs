@@ -92,8 +92,8 @@ testSorting =
 {-
  - main function:
  -}
-mainV1  :: IO()
-mainV1 = do
+main  :: IO()
+main = do
         putStrLn "Generating NetDep.dot"
         genNetGraph
         putStrLn "Generating E1kPRG.dot"
@@ -106,8 +106,10 @@ mainV1 = do
         testEmbedV2
         testSorting
         putStrLn outmsg
+        putStrLn "Testing PRG with configuration"
+        testE1kConf
     where
         outmsg = "Done!"
 
-main :: IO()
-main  = testE1kConf
+mainV2 :: IO()
+mainV2  = testE1kConf

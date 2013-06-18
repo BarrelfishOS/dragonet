@@ -1,9 +1,28 @@
 
 
+
 next question
 ---------------------
 Qus:
 Ans:
+
+Status:
+
+next question
+---------------------
+Qus:
+Ans:
+
+Status:
+
+
+next question
+---------------------
+Qus: Restrictiveness of graph implementation
+Ans: Currently, my graph only allows dealing with Computation nodes,
+which is becoming more and more restrictive.  I need more generic way for
+showing the graph, and even for embedding the graph.
+
 Status:
 
 

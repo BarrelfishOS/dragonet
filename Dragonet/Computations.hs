@@ -14,6 +14,9 @@ module Computations (
     , Socket(..)
     , Application(..)
     , Filter(..)
+    , Queue(..)
+    , Qid
+    , CoreID
     , AppName
     , SocketId
     , L2Address
@@ -31,8 +34,8 @@ import qualified MyGraph as MG
 import qualified Data.Data as DD
 import qualified Data.List as DL
 import qualified Data.Set as Set
-import qualified Data.Ix as Ix
-import qualified Debug.Trace as TR
+--import qualified Data.Ix as Ix
+--import qualified Debug.Trace as TR
 
 type L2Address = String
 type L3Address = String
@@ -41,6 +44,13 @@ type L4Address = String
 -- for flow filtering
 type Proto = String
 
+data Queue = Queue {
+        queueId :: Qid
+        , coreId :: CoreID
+    } deriving (Eq, Ord, DD.Typeable, DD.Data)
+
+instance Show Queue where
+    show (Queue qid coreid) = show qid ++ " core " ++ show coreid
 
 data Filter = Filter {
         protocol :: Proto
@@ -55,6 +65,7 @@ instance Show Filter where
             ++ dip  ++ "_" ++ sp  ++ "_" ++ dp
 
 type Qid = String
+type CoreID = String
 
 type SocketId = Integer
 type AppName = String
@@ -164,7 +175,7 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
 --        | IsFlow Protocol SrcIP DstIP SrcPort DstPort -- for flow filtering
         | IsFlow  Filter -- for flow filtering
         | InSoftware
-        | CopyToQueue Qid
+        | ToQueue Queue
         | ToDefaultKernelProcessing
         | ToSocket Socket
         | ToApplication Application
@@ -299,11 +310,11 @@ getNetworkDependency = [
     ]
     where
        generic_filter = getDefaultFilter
-       default_queue = getDefaultQueue
+       default_queue = ToQueue getDefaultQueue
 
 
-getDefaultQueue :: Computation
-getDefaultQueue = (CopyToQueue "0:Default")
+getDefaultQueue :: Queue
+getDefaultQueue = Queue "0:Default" "0"
 
 getDefaultFilter :: Computation
 getDefaultFilter = (IsFlow (Filter "ANY" "ANY" "ANY" "ANY" "ANY"))
