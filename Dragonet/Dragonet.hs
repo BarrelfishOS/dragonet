@@ -62,11 +62,14 @@ testEmbedV2 = writeFile "EmbeddedV2.dot" $ EMBD.embedV2 lpg prg
 
 
 testE1kConf :: IO()
-testE1kConf = E1k.getE1kPRGConfTest
---    do
---        putStrLn $ MG.showFlowGraph E1k.getE1kPRGConfTest
---        writeFile "E1kPRGConf.dot" $ MG.showFlowGraph E1k.getE1kPRGConfTest
-
+testE1kConf = -- E1k.getE1kPRGConfTest
+    do
+        E1k.getE1kPRGConfTestV2
+        putStrLn "####################################\n\n"
+        putStrLn $ show $ E1k.getE1kPRGConfTest
+        putStrLn "####################################\n\n"
+        --putStrLn $ MG.showFlowGraph E1k.getE1kPRGConfTest
+        writeFile "E1kPRGConf.dot" $ MG.showFlowGraph E1k.getE1kPRGConfTest
 
 {-
  -

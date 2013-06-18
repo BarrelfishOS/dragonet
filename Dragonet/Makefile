@@ -8,6 +8,8 @@ Dragonet: Dragonet_compile
 	./Dragonet
 
 genModels: Dragonet
+	dot -Tpng -o E1kPRGConf.png E1kPRGConf.dot
+	dot -Tpdf -o E1kPRGConf.pdf E1kPRGConf.dot
 	dot -Tpng -o LPG.png LPG.dot
 	dot -Tpdf -o LPG.pdf LPG.dot
 	dot -Tpng -o NetDep.png NetDep.dot
@@ -18,8 +20,6 @@ genModels: Dragonet
 	dot -Tpdf -o Embedded.pdf Embedded.dot
 	dot -Tpng -o EmbeddedV2.png EmbeddedV2.dot
 	dot -Tpdf -o EmbeddedV2.pdf EmbeddedV2.dot
-	dot -Tpng -o E1kPRGConf.png E1kPRGConf.dot
-	dot -Tpdf -o E1kPRGConf.pdf E1kPRGConf.dot
 
 
 

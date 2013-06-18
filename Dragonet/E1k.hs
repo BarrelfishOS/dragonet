@@ -16,6 +16,7 @@ module E1k (
     getE1kPRG
     , getE1kPRGConf
     , getE1kPRGConfTest
+    , getE1kPRGConfTestV2
     , main
 ) where
 
@@ -26,17 +27,31 @@ import qualified Configurations as MConf
 import qualified Data.List as DL
 
 
+getE1kPRGConfTestV2 ::  IO()
+getE1kPRGConfTestV2 =
+    do
+        putStrLn $ show $ getActiveNodesForConf basicPRG exampleConf
+        putStrLn "####################33\n"
+        --putStrLn $ show $ getDepListReplacement basicPRG exampleConf [MC.L2EtherValidUnicast]
+        putStrLn $ show $ getDepReplacement basicPRG exampleConf MC.L2EtherValidCRC -- MC.L2EtherValidUnicast
 
---getE1kPRGConfTest :: [MG.Gnode MC.Computation]
-getE1kPRGConfTest ::  IO()
-getE1kPRGConfTest =  putStrLn $ show  $ getE1kPRGConf exampleConf
+    where
+        basicPRG = getE1kBasicPRG
+        exampleConf = [
+            MConf.Always
+            , MConf.UDPChecksum
+         ]
+
+
+getE1kPRGConfTest :: [MG.Gnode MC.Computation]
+--getE1kPRGConfTest ::  IO()
+getE1kPRGConfTest =  getE1kPRGConf exampleConf
     where
         exampleConf = [
             MConf.Always
             , MConf.EthernetChecksum
             , MConf.UDPChecksum
          ]
-
 
 
 {-
@@ -48,6 +63,7 @@ getE1kPRGConf :: [MConf.Configuration] -> [MG.Gnode MC.Computation]
 getE1kPRGConf confList = getE0kPRGGeneric basicPRG confList
     where
         basicPRG = getE1kBasicPRG
+
 
 {-
  - Returns list of computations which can happen in the E1k NIC
@@ -169,6 +185,7 @@ getE0kPRGGeneric (x:xs) confList = replacedNode ++ getE0kPRGGeneric xs confList
         activeNodes = getActiveNodesForConf (x:xs) confList
         (node, deps, cconf) = x
         replacementDeps = getDepListReplacement (x:xs) confList deps
+        --replacementDeps = getDepReplacement (x:xs) confList $ DL.head deps
         replacedNode
             | node `elem` activeNodes = [(node, replacementDeps)]
             | otherwise = []
