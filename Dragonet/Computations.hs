@@ -11,7 +11,6 @@
 --module Main (
 module Computations (
     Computation(..)
-    , Configuration(..)
     , Socket(..)
     , Application(..)
     , Filter(..)
@@ -40,11 +39,11 @@ type L3Address = String
 type L4Address = String
 
 -- for flow filtering
-type Protocol = String
+type Proto = String
 
 
 data Filter = Filter {
-        protocol :: Protocol
+        protocol :: Proto
         , srcIP :: L3Address
         , dstIP :: L3Address
         , srcPort :: L4Address
@@ -75,11 +74,25 @@ instance Show Socket where
     show (Socket sid) = show sid
 
 
-data Configuration = EthernetChecksum Bool
-                | IPv4Checksum Bool
-                | TCPChecksum Bool
-                | UDPChecksum Bool
-                deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+
+
+-- To be used in future to define Computation and Configuration
+-- But for time being, I am ignoring them. (Layer and Protocol)
+data Layer = L1 -- hardware
+        | L2 -- Ethernet
+        | L3 -- IP layer
+        | L4 -- TCP/UDP layer
+        | L5 -- Application
+        deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+
+data Protocol = Ethernet
+        | IPv4
+        | IPv6
+        | ICMP
+        | UDP
+        | TCP
+        | Socket1
+
 
 -- List of all the computations/tests which can happen on incoming packets
 -- presence of these tags in any module will show that the module is capable of

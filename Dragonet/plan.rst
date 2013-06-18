@@ -2,6 +2,95 @@
 
 next question
 ---------------------
+Qus:
+Ans:
+Status:
+
+
+next question
+---------------------
+Qus:  Assumption: There will be no AND node in PRG.
+Ans: PRG's can arrange themselves in such a way that all the AND dependencies
+are sequentially satisfied.
+
+This is needed because if AND dependencies are present in PRG and if they can
+be turned off by configuration, then it becomes quite complex to generate
+final graph.
+
+Status:
+
+next question
+---------------------
+Qus:
+Ans:
+
+I need list of active nodes and list nodes which are not active
+For list of nodes which are not active, I can trace their dependencies
+and find a node which can replace them.
+
+Then I replace all nodes in the graph with these active and indirect active nodes
+
+
+nodeReplacementTable  -> [(Computation, Computation)]
+
+
+Status:
+
+
+
+next question
+---------------------
+Qus:  How would I capture flows?
+Ans:
+configuration bits.
+There are x queues.  There are y tuple matching filters, z flow director filters.
+
+Status:
+
+
+next question
+---------------------
+Qus: How is the real hardware?
+Ans:
+Real hardware is simple DFG where each node does yes/no decision, with few
+exception of hash table lookup which is multi-directional decision.  Each
+decision has an input for which also uses configuration in it. And based  on
+the configuration, the computation/decision is made or skipped.
+
+What I am trying to do is get the processing tree from the decision tree, once
+I have processing tree, then I don't need configuration any longer.
+
+
+Status:
+
+
+next question
+---------------------
+Qus: How am I going to integrate the configuration?
+Ans:
+
+Configuration implies that part of the graph will be turned on/off based
+on the value of given configuration.  So, when I am making the graph, I check
+if given configuration is present or not.  If it is not present, then I skip
+the module, otherwise I add the module.
+
+The problem is that, when I am adding the next module, I need to know the
+name of current module so that I can mark the depencency.  Either, I remember
+the dependency, or pass as an argument.
+
+
+Maybe I can provide the most complicated possible configuration, and then
+turn off the parts which are not present in configuration.
+
+Should I start from end or from the begining?
+
+getNextNode :: currentNode, conf -> nextNode
+
+
+Status:
+
+next question
+---------------------
 Qus: Does E10k keeps any information when packet reaches the queue?
 Ans:
 It seems yes (Antoine confirmed it)

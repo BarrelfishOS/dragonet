@@ -23,7 +23,7 @@ genModels: Dragonet
 
 
 
-Base: Computations.hs E1k.hs LPG.hs MyGraph.hs NetworkProcessing.hs Makefile
+Base: Computations.hs Configurations.hs E1k.hs LPG.hs MyGraph.hs NetworkProcessing.hs Makefile
 
 clean:
 	rm -f *.hi *.o Dragonet
