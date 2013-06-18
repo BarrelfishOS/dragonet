@@ -21,7 +21,7 @@ data Configuration = Always
                 | IPv4Checksum
                 | TCPChecksum
                 | UDPChecksum
-                | QueueConf MC.Qid
+                | QueueConf MC.Queue
                 deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
 

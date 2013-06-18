@@ -55,7 +55,7 @@ getExampleConf = [
 --            , MConf.IPv4Checksum
             , MConf.EthernetChecksum
             , MConf.UDPChecksum
-            , MConf.QueueConf "4"
+            , MConf.QueueConf $ MC.Queue "Q4" "C4"
          ]
 
 getE1kPRGConfTest :: [MG.Gnode MC.Computation]
