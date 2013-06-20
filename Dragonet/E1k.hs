@@ -23,7 +23,8 @@ module E1k (
 
 import qualified MyGraph as MG
 import qualified Computations as MC
-import qualified Configurations as MConf
+--import qualified Configurations as MConf
+import qualified Computations as MConf
 import qualified Data.List as DL
 import qualified Debug.Trace as DT
 
@@ -246,6 +247,74 @@ getE1kBasicPRGDummy = [
         (MC.ClassifiedL2Ethernet, [], MConf.Always)
         , (MC.L2EtherValidLen, [MC.ClassifiedL2Ethernet], MConf.Always)
         ]
+
+
+
+{-
+ - Returns list of computations which can happen in the E1k NIC
+ - and their dependencies.
+ -}
+getE1kPRGV2 :: [MG.Gnode MC.Computation]
+getE1kPRGV2 = [
+        (MC.ClassifiedL2Ethernet, [])
+        , (MC.L2EtherValidLen, [MC.ClassifiedL2Ethernet])
+
+--        , (MConf.EthernetChecksum, [MC.L2EtherValidLen])
+--        , (MC.L2EtherValidCRC, [MConf.EthernetChecksum])
+
+        , (MC.L2EtherValidBroadcast, [MC.L2EtherValidCRC])
+        , (MC.L2EtherValidMulticast, [MC.L2EtherValidCRC])
+        , (MC.L2EtherValidUnicast, [MC.L2EtherValidCRC])
+        , (MC.L2EtherValidDest, [MC.L2EtherValidBroadcast])
+        , (MC.L2EtherValidDest, [MC.L2EtherValidMulticast])
+        , (MC.L2EtherValidDest, [MC.L2EtherValidUnicast])
+        , (MC.L2EtherValidType, [MC.L2EtherValidDest])
+        , (MC.ClassifiedL3IPv4, [MC.L2EtherValidType])
+        , (MC.L3IPv4ValidChecksum, [MC.ClassifiedL3IPv4])
+        , (MC.L3IPv4ValidProtocol, [MC.L3IPv4ValidChecksum])
+        , (MC.ClassifiedL3IPv6, [MC.L2EtherValidType])
+        , (MC.L3IPv6ValidProtocol, [MC.ClassifiedL3IPv6])
+        , (MC.ClassifiedL3, [MC.L3IPv4ValidProtocol])
+        , (MC.ClassifiedL3, [MC.L3IPv6ValidProtocol])
+        , (MC.ClassifiedL4UDP, [MC.ClassifiedL3]) -- UDP classification
+        , (MC.ClassifiedL4TCP, [MC.ClassifiedL3]) -- TCP classification
+        , (MC.UnclasifiedL4, [MC.ClassifiedL3]) -- all other packets
+        , (MC.ClassifiedL4ICMP, [MC.ClassifiedL3]) -- UDP classification
+
+
+        , (MC.L4ReadyToClassify, [MC.ClassifiedL4TCP])
+        , (MC.L4ReadyToClassify, [MC.ClassifiedL4UDP])
+        , (MC.L4ReadyToClassify, [MC.ClassifiedL4ICMP])
+        , (MC.L4ReadyToClassify, [MC.UnclasifiedL4])
+
+        -- Filtering the packet
+        , (generic_filter, [MC.L4ReadyToClassify])
+
+
+
+        -- some exaple filters
+        , (http_flow, [MC.L4ReadyToClassify]) -- sample filter
+        , (telnet_flow, [MC.L4ReadyToClassify]) -- sample filter
+        , (tftp_flow, [MC.L4ReadyToClassify]) -- sample filter
+        , (q4, [http_flow])
+        , (q3, [telnet_flow])
+        , (q1, [tftp_flow])
+        , (q0, [generic_filter])
+        ]
+    where
+        q0 = MC.ToQueue MC.getDefaultQueue
+        q1 = (MC.ToQueue (MC.Queue "Q1" "C1"))
+ --       q2 = (MC.ToQueue (MC.Queue "Q2" "C2"))
+        q3 = (MC.ToQueue (MC.Queue "Q3" "C4"))
+        q4 = (MC.ToQueue (MC.Queue "Q3" "C4"))
+
+        -- sample http server filter
+        generic_filter = MC.getDefaultFilter
+        http_flow = (MC.IsFlow (MC.Filter "TCP" "ANY" "192.168.2.4" "ANY" "80"))
+        telnet_flow = (MC.IsFlow (MC.Filter "TCP" "255.255.255.255" "192.168.2.4" "ANY" "80"))
+        tftp_flow = (MC.IsFlow (MC.Filter "UDP" "254.255.255.255" "192.168.2.4" "ANY" "69"))
+
+
 
 
 

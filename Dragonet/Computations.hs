@@ -28,12 +28,18 @@ module Computations (
     , sortGraph
     , getDefaultQueue
     , getDefaultFilter
+    -- For Configuration Module
+    , Configuration(..)
+    , genDependencies
+    , genAllDependencies
+
 ) where
 
 import qualified MyGraph as MG
 import qualified Data.Data as DD
 import qualified Data.List as DL
 import qualified Data.Set as Set
+
 --import qualified Data.Ix as Ix
 --import qualified Debug.Trace as TR
 
@@ -83,6 +89,46 @@ data Socket = Socket {
 
 instance Show Socket where
     show (Socket sid) = show sid
+
+
+
+
+{-
+ -
+ - From Configuration
+ -}
+
+data Configuration = Always
+                | EthernetChecksum
+                | IPv4Checksum
+                | TCPChecksum
+                | UDPChecksum
+                | QueueConf Queue
+                | FilterConf Filter Queue
+                deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+
+{-
+ - Generates additional edges needed to support given configuration
+ - This is specially needed for configurations which can add dynamic number
+ - of edges.
+ - eg: hardware queues, filters
+ -}
+genDependencies :: Configuration -> [(Computation, [Computation])]
+genDependencies (QueueConf q) = [(node, deps)]
+    where
+        node =  ToQueue q
+        deps = []
+genDependencies (FilterConf f q) = deps
+    where
+        node =  IsFlow f
+        deps = [(node, [L4ReadyToClassify])
+                , ((ToQueue q), [node])]
+genDependencies _ = []
+
+
+genAllDependencies :: [Configuration] -> [(Computation, [Computation])]
+genAllDependencies confList = DL.concatMap genDependencies confList
+
 
 
 
@@ -179,6 +225,7 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | ToDefaultKernelProcessing
         | ToSocket Socket
         | ToApplication Application
+        | ShortCircuit Configuration
         deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
         --deriving (Show, Eq, Ord)
         --deriving (Eq, Ord)
