@@ -42,7 +42,8 @@ getE1kPRGConfTestV2 =
 getExampleConfBetter :: [MC.ConfDecision]
 getExampleConfBetter = [
 --            , MC.L3IPv4ValidChecksum
-            (MC.ConfDecision MC.L2EtherValidCRC MC.ON)
+            (MC.ConfDecision MC.L2EtherValidCRC MC.OFF)
+            , (MC.ConfDecision MC.L4ReadyToClassify MC.OFF)
             , (MC.ConfDecision MC.L4UDPValidChecksum MC.UnConfigured)
             , (MC.ConfDecision (MC.ToQueue testQueue) MC.UnConfigured)
             , (MC.ConfDecision (MC.IsFlow testFilter) MC.UnConfigured)
@@ -305,7 +306,7 @@ applyConfig prg confDes
             (MC.ConfDecision conf confStat) = confDes
             matchingConfNodes =  DL.filter (matchConfigNode conf) prg
             newNode = MC.IsConfSet confDes
-            newPRG = DL.foldl (replaceNode  newNode) prg matchingConfNodes
+            newPRG = DL.foldl (replaceNodesWith  newNode) prg matchingConfNodes
 
 
 applyConfigList:: [MG.Gnode MC.Computation] -> [MC.ConfDecision]
@@ -316,6 +317,10 @@ applyConfigList prg (x:xs) = applyConfigList prg' xs
         prg' = applyConfig prg x
 
 
+{-
+ - for given oldNode and newNode, replace ocurrances of oldNode with NewNode
+ - both in "single" (node, dependencies) tuple
+ -}
 myReplaceFn ::  MC.Computation -> MC.Computation -> MG.Gnode MC.Computation
     -> MG.Gnode MC.Computation
 myReplaceFn oldX newX (n, dep) = (n', dep')
@@ -323,12 +328,20 @@ myReplaceFn oldX newX (n, dep) = (n', dep')
         n' = if n == oldX then newX else n
         dep' = DL.map (\x -> if x == oldX then newX else x) dep
 
-replaceNode :: MC.Computation -> [MG.Gnode MC.Computation]
+
+{-
+ - Replace the oldNode with newNode, for all the tuples in given PRG
+ -}
+replaceNodesWith :: MC.Computation -> [MG.Gnode MC.Computation]
     -> MG.Gnode  MC.Computation
     -> [MG.Gnode MC.Computation]
-replaceNode newNode prg (oldNode, _) = DL.map (myReplaceFn oldNode newNode) prg
+replaceNodesWith newNode prg (oldNode, _) = DL.map (myReplaceFn oldNode newNode) prg
 
-replaceNodeForON ::  [MG.Gnode MC.Computation] -> MG.Gnode  MC.Computation
+{-
+ - Replace the given oldNode with internal Computation within the oldNode
+ - for whole PRG
+ -}
+replaceNodeForON ::  [MG.Gnode MC.Computation] -> MG.Gnode MC.Computation
         -> [MG.Gnode MC.Computation]
 replaceNodeForON prg ((MC.IsConfSet (MC.ConfDecision comp stat)), deps) =
         DL.map (myReplaceFn oldNode newNode) prg
@@ -336,6 +349,49 @@ replaceNodeForON prg ((MC.IsConfSet (MC.ConfDecision comp stat)), deps) =
     oldNode = MC.IsConfSet (MC.ConfDecision comp stat)
     newNode = comp
 replaceNodeForON prg _ = error "Invalid module cropped in the replaceNodeForON"
+
+{-
+ - Get all dependencies of selected node
+ -}
+getAllDeps :: MC.Computation -> [MG.Gnode MC.Computation] -> [MC.Computation]
+getAllDeps chosenOne list = DL.concatMap (\(_, deps) -> deps)
+            $ DL.filter (\(node,_) -> node == chosenOne) list
+
+{-
+ - Remove the given node from the PRGlist
+ -}
+removeNode :: MC.Computation -> [MG.Gnode MC.Computation]
+    -> [MG.Gnode MC.Computation]
+removeNode deleteMe list = DL.filter  (\x -> (fst x) /= deleteMe ) list
+
+
+{-
+ - Remove the given oldNode, and modify all the nodes which were dependent on it
+ - with node before oldNode
+ -}
+replaceNodeForOFF ::  [MG.Gnode MC.Computation] -> MG.Gnode MC.Computation
+        -> [MG.Gnode MC.Computation]
+replaceNodeForOFF prg ((MC.IsConfSet (MC.ConfDecision comp stat)), deps)
+    | DL.length allDeps == 0 = prg'
+    | otherwise = prg''
+
+    where
+    oldNode = MC.IsConfSet (MC.ConfDecision comp stat)
+    allDeps = getAllDeps oldNode prg
+    prg' = removeNode oldNode prg
+    prg'' = replaceOnlyDeps oldNode allDeps prg'
+
+replaceOnlyDeps :: MC.Computation -> [MC.Computation]
+        -> [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
+replaceOnlyDeps oldNode newDep [] = []
+replaceOnlyDeps oldNode newDep (x:xs) = dps ++ replaceOnlyDeps oldNode newDep xs
+    where
+    (node, currentDeps) = x
+    dps
+        | oldNode `DL.notElem` currentDeps = [x]
+        | DL.length currentDeps > 1 = (error ("AND node [" ++ show x ++
+            "] is having dependency config node [" ++ show oldNode ++ "]\n"))
+        | otherwise = DL.map (\nd -> (node, [nd])) newDep
 
 -- ###############################
 
@@ -351,13 +407,15 @@ selectConfigNode _ _ = False
 purgeFixedOFFConfigs :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
 purgeFixedOFFConfigs prg = newPRG
     where
-    newPRG = prg
+    --newPRG = prg
     selectedNodes = DL.filter (selectConfigNode MC.OFF) prg
+    newPRG = DL.foldl (replaceNodeForOFF) prg selectedNodes
 --    newNode = ??
---    newPRG = DL.foldl (replaceNode  newNode) prg selectedNodes
+--    newPRG = DL.foldl (replaceNodesWith  newNode) prg selectedNodes
 
-
-
+{-
+ -
+ -}
 purgeFixedONConfigs :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
 purgeFixedONConfigs prg = newPRG
     where
@@ -400,20 +458,20 @@ getE1kPRG = [
         , (MC.ClassifiedL4ICMP, [MC.ClassifiedL3]) -- UDP classification
 
 
-        , (MC.L4ReadyToClassify, [MC.ClassifiedL4TCP])
-        , (MC.L4ReadyToClassify, [MC.ClassifiedL4UDP])
-        , (MC.L4ReadyToClassify, [MC.ClassifiedL4ICMP])
-        , (MC.L4ReadyToClassify, [MC.UnclasifiedL4])
+        , (l4ReadyToClassify, [MC.ClassifiedL4TCP])
+        , (l4ReadyToClassify, [MC.ClassifiedL4UDP])
+        , (l4ReadyToClassify, [MC.ClassifiedL4ICMP])
+        , (l4ReadyToClassify, [MC.UnclasifiedL4])
 
         -- Filtering the packet
-        , (generic_filter, [MC.L4ReadyToClassify])
+        , (generic_filter, [l4ReadyToClassify])
 
 
 
         -- some exaple filters
-        , (flow1, [MC.L4ReadyToClassify]) -- sample filter
-        , (flow2, [MC.L4ReadyToClassify]) -- sample filter
-        , (flow3, [MC.L4ReadyToClassify]) -- sample filter
+        , (flow1, [l4ReadyToClassify]) -- sample filter
+        , (flow2, [l4ReadyToClassify]) -- sample filter
+        , (flow3, [l4ReadyToClassify]) -- sample filter
         , (q4, [flow1]) -- Added just to make show the queues at proper place
         , (q3, [flow2]) -- Added just to make show the queues at proper place
         , (q1, [flow3]) -- Added just to make show the queues at proper place
@@ -424,6 +482,10 @@ getE1kPRG = [
              MC.L2EtherValidCRC MConf.UnConfigured))
         ipv4Checksum = (MConf.IsConfSet  (MConf.ConfDecision
              MC.L3IPv4ValidChecksum MConf.UnConfigured))
+
+        -- l4ReadyToClassify = MC.L4ReadyToClassify
+        l4ReadyToClassify = (MConf.IsConfSet  (MConf.ConfDecision
+            MC.L4ReadyToClassify MConf.UnConfigured))
 
 
         q0 = MC.ToQueue (MC.Queue 0 0)

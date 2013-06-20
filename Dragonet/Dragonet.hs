@@ -103,11 +103,11 @@ main = do
         putStrLn "Generating Embedded.dot"
         genEmbeddedPraph
         putStrLn "testing generic graph embedding EmbeddedV2.dot"
-        testEmbedV2
-        testSorting
-        putStrLn outmsg
+--        testEmbedV2
+--        testSorting
         putStrLn "Testing PRG with configuration"
         testE1kConf
+        putStrLn outmsg
     where
         outmsg = "Done!"
 
