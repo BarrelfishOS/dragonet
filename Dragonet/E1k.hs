@@ -14,7 +14,10 @@
 --module Main (
 module E1k (
     getE1kPRG
-    , getE1kPRGConf
+    , applyConfigList
+    , purgeFixedOFFConfigs
+    , purgeFixedONConfigs
+    , purgeFixedConfigs
     , getE1kPRGConfTest
     , getE1kPRGConfTestV2
     , main
@@ -41,9 +44,8 @@ getE1kPRGConfTestV2 =
 
 getExampleConfBetter :: [MC.ConfDecision]
 getExampleConfBetter = [
---            , MC.L3IPv4ValidChecksum
-            (MC.ConfDecision MC.L2EtherValidCRC MC.OFF)
-            , (MC.ConfDecision MC.L4ReadyToClassify MC.OFF)
+            (MC.ConfDecision MC.L2EtherValidCRC MC.ON)
+            , (MC.ConfDecision  MC.L3IPv4ValidChecksum MC.OFF)
             , (MC.ConfDecision MC.L4UDPValidChecksum MC.UnConfigured)
             , (MC.ConfDecision (MC.ToQueue testQueue) MC.UnConfigured)
             , (MC.ConfDecision (MC.IsFlow testFilter) MC.UnConfigured)
@@ -68,7 +70,7 @@ getExampleConf = [
 
 getE1kPRGConfTest :: [MG.Gnode MC.Computation]
 --getE1kPRGConfTest ::  IO()
-getE1kPRGConfTest = purgeFixedConfigs $ applyConfigList getE1kPRG getExampleConfBetter
+getE1kPRGConfTest = applyConfigList getE1kPRG getExampleConfBetter
 
 
 {-
@@ -483,9 +485,9 @@ getE1kPRG = [
         ipv4Checksum = (MConf.IsConfSet  (MConf.ConfDecision
              MC.L3IPv4ValidChecksum MConf.UnConfigured))
 
-        -- l4ReadyToClassify = MC.L4ReadyToClassify
-        l4ReadyToClassify = (MConf.IsConfSet  (MConf.ConfDecision
-            MC.L4ReadyToClassify MConf.UnConfigured))
+        l4ReadyToClassify = MC.L4ReadyToClassify
+        --l4ReadyToClassify = (MConf.IsConfSet  (MConf.ConfDecision
+        --    MC.L4ReadyToClassify MConf.UnConfigured))
 
 
         q0 = MC.ToQueue (MC.Queue 0 0)
@@ -496,7 +498,7 @@ getE1kPRG = [
            (MC.ToQueue (MC.Queue 3 3))  MConf.UnConfigured))
 
         q4 = (MConf.IsConfSet  (MConf.ConfDecision
-           (MC.ToQueue (MC.Queue 4 3))  MConf.UnConfigured))
+           (MC.ToQueue (MC.Queue 4 4))  MConf.UnConfigured))
 
         -- sample http server filter
         generic_filter = MC.getDefaultFitlerForID 0

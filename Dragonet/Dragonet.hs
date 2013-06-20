@@ -33,6 +33,35 @@ genNetGraph = writeFile "NetDep.dot" $ MG.showFlowGraph
 genE10kPRGGraph :: IO ()
 genE10kPRGGraph = writeFile "E1kPRG.dot" $ MG.showFlowGraph E1k.getE1kPRG
 
+testE1kConf :: IO()
+testE1kConf = -- E1k.getE1kPRGConfTest
+    do
+        putStrLn "####################################\n\n"
+        writeFile "E1kbasePRG.dot" $ MG.showFlowGraph basePRG
+        writeFile "E1kconf1PRG.dot" $ MG.showFlowGraph conf1PRG
+        writeFile "E1kconf1PurgedPRG.dot" $ MG.showFlowGraph conf1PRG'
+        writeFile "E1kconf2PRG.dot" $ MG.showFlowGraph conf2PRG
+        writeFile "E1kconf2PurgedPRG.dot" $ MG.showFlowGraph conf2PRG'
+    where
+        basePRG = E1k.getE1kPRG
+        conf1PRG = E1k.applyConfigList basePRG conf1
+        conf1PRG' = E1k.purgeFixedConfigs conf1PRG
+
+        conf2PRG = E1k.applyConfigList conf1PRG' conf1
+        conf2PRG' = E1k.purgeFixedConfigs conf2PRG
+
+        conf1 = [
+            (MC.ConfDecision MC.L2EtherValidCRC MC.ON)
+            , (MC.ConfDecision  MC.L3IPv4ValidChecksum MC.OFF)
+            , (MC.ConfDecision (MC.ToQueue testQueue) MC.ON)
+            ]
+        conf2 = [
+            (MC.ConfDecision MC.L4UDPValidChecksum MC.ON)
+            , (MC.ConfDecision (MC.IsFlow testFilter) MC.ON)
+            ]
+        testQueue = MC.Queue 4 4
+        testFilter = MC.Filter 1 MC.TCP (MC.toIP "192.168.002.001") (MC.toIP "192.168.003.001") 4444 80
+
 {-
  - Generates LPG for sample case of two applications
  -}
@@ -61,15 +90,6 @@ testEmbedV2 = writeFile "EmbeddedV2.dot" $ EMBD.embedV2 lpg prg
         prg = E1k.getE1kPRG
 
 
-testE1kConf :: IO()
-testE1kConf = -- E1k.getE1kPRGConfTest
-    do
-        E1k.getE1kPRGConfTestV2
-        putStrLn "####################################\n\n"
-        putStrLn $ show $ E1k.getE1kPRGConfTest
-        putStrLn "####################################\n\n"
-        --putStrLn $ MG.showFlowGraph E1k.getE1kPRGConfTest
-        writeFile "E1kPRGConf.dot" $ MG.showFlowGraph E1k.getE1kPRGConfTest
 
 {-
  -
@@ -103,7 +123,7 @@ main = do
         putStrLn "Generating Embedded.dot"
         genEmbeddedPraph
         putStrLn "testing generic graph embedding EmbeddedV2.dot"
---        testEmbedV2
+        testEmbedV2
 --        testSorting
         putStrLn "Testing PRG with configuration"
         testE1kConf
