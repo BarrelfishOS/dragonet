@@ -34,21 +34,22 @@ getE1kPRGConfTestV2 =
     do
 
         putStrLn "#################  basicPRG  ###########################\n"
-        putStrLn $ show $ basicPRG
+        putStrLn $ show $ getE1kPRG
         putStrLn "#################  Conf ###########################\n"
-        putStrLn $ show $ exampleConf
-        putStrLn "#################  activeNodesForConf ###################\n"
-        putStrLn $ show $ getActiveNodesForConf basicPRG exampleConf
-        putStrLn "#######################################################\n"
-        --putStrLn $ show $ getDepListReplacement basicPRG exampleConf [MC.L2EtherValidUnicast]
-        --putStrLn $ show $ getDepReplacement basicPRG exampleConf MC.L2EtherValidCRC -- MC.L2EtherValidUnicast
-        putStrLn "#######################################################\n"
-        putStrLn "#######################################################\n"
+        putStrLn $ show $ getExampleConfBetter
         putStrLn "#######################################################\n"
 
-    where
-        basicPRG = getE1kBasicPRG
-        exampleConf = getExampleConf
+getExampleConfBetter :: [MC.Computation]
+getExampleConfBetter = [
+--            , MC.L3IPv4ValidChecksum
+            MC.L2EtherValidCRC
+            , MC.L4UDPValidChecksum
+            , MC.ToQueue testQueue
+            , MC.IsFlow testFilter
+         ]
+         where
+            testQueue = MC.Queue 4 4
+            testFilter = MC.Filter 1 MC.TCP (MC.toIP "192.168.002.001") (MC.toIP "192.168.003.001") 4444 80
 
 getExampleConf :: [MConf.Configuration]
 getExampleConf = [
@@ -65,9 +66,8 @@ getExampleConf = [
 
 getE1kPRGConfTest :: [MG.Gnode MC.Computation]
 --getE1kPRGConfTest ::  IO()
-getE1kPRGConfTest =  getE1kPRGConf exampleConf
-    where
-        exampleConf = getExampleConf
+getE1kPRGConfTest =  applyConfigList getE1kPRG getExampleConfBetter
+
 
 {-
  - Based on the given configuration, give the nodes which will be involved
@@ -245,12 +245,69 @@ getE0kPRGGenericV2 basicPRG confList changingList =  additionalEdges ++
 
 
 
+
 getE1kBasicPRGDummy :: [(MC.Computation, [MC.Computation], MConf.Configuration)]
 getE1kBasicPRGDummy = [
         (MC.ClassifiedL2Ethernet, [], MConf.Always)
         , (MC.L2EtherValidLen, [MC.ClassifiedL2Ethernet], MConf.Always)
         ]
 
+
+
+matchConfigNode :: MC.Computation -> MG.Gnode MC.Computation ->  Bool
+matchConfigNode x ((MC.IsConfSet (MC.ConfDecision c _)), _)  = c == x
+matchConfigNode _ _ = False
+
+getConfigNodesInternal :: MG.Gnode MC.Computation -> [MG.Gnode MC.Computation]
+getConfigNodesInternal ((MC.IsConfSet x), deps) = [(MC.IsConfSet x, deps)]
+getConfigNodesInternal _ = []
+
+getConfigNodes :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
+getConfigNodes [] = []
+getConfigNodes (x:xs) = (getConfigNodesInternal x) ++ getConfigNodes xs
+
+isConfigPresent :: [MG.Gnode MC.Computation] -> MC.Computation -> [MG.Gnode MC.Computation]
+isConfigPresent prg conf = DL.filter (matchConfigNode conf)  $ getConfigNodes prg
+
+
+{-
+ - For every node, if the node is in Config list,
+ -      if it is ON
+ -          replace it with actual instantiation
+ -          newInstace = replacing node
+ -      if it is OFF
+ -          remove it
+ -          newInstace = dependency of removed node.
+ -
+ -      Modify all dependencies to point to new instance
+ -}
+
+ {-
+ -  for given configuration
+ -      check if configuration node is present
+ -      if no,
+ -          return
+ -      if yes,
+ -          update configuration node
+ -          update its dependencies
+ -}
+applyConfig :: [MG.Gnode MC.Computation] -> MC.Computation
+    -> [MG.Gnode MC.Computation]
+applyConfig prg conf
+        | isConfigPresent prg conf == [] = newPRG
+        | otherwise = prg
+    where
+            newPRG = []
+--            toBeReplacedNode =
+--            replacingNode =
+--            newPRG = replaceNode prg toBeReplacedNode replacingNode
+
+applyConfigList:: [MG.Gnode MC.Computation] -> [MC.Computation]
+    -> [MG.Gnode MC.Computation]
+applyConfigList prg [] = prg
+applyConfigList prg (x:xs) = applyConfigList prg' xs
+    where
+        prg' = applyConfig prg x
 
 
 {-
