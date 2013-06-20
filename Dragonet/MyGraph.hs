@@ -90,7 +90,7 @@ findORnodes gnodeList = DL.nub $ DL.map fst $ DL.filter (\x -> length (snd x) <=
  -}
 showORnode :: (Show a) => a -> String
 showORnode v
-    | "IsConfSet" `DL.isInfixOf` nodeName = nodeName ++ " [label = "
+    | "IsConfSet" `DL.isPrefixOf` nodeName = nodeName ++ " [label = "
         ++ nodeName ++ ", color=gray,style=filled,shape=tab];\n"
     | otherwise = nodeName ++ " [label = " ++ nodeName  ++ "];\n"
     where

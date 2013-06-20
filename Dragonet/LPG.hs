@@ -78,15 +78,18 @@ getSampleLPG2Apps lpg = finalLPG
         -- Apache server
         (lpg', s) = openSocket lpg
         app = MC.Application "Apache"
-        apacheFilter = MC.Filter "TCP" "ANY" "192.168.2.4" "ANY" "80"
+
+        apacheFilter = MC.Filter MC.TCP MC.anyIP (MC.toIP "192.168.2.4")
+            MC.anyPort 80
         lpg2 = bind lpg' app s apacheFilter
 
         -- Telnet client
         (lpg2', s2) = openSocket lpg2
         telnetapp = MC.Application "telnet"
-        telnetFilter = MC.Filter "TCP" "192.68.2.10" "MYIP" "23" "12210"
-        finalLPG = bind lpg2' telnetapp s2 telnetFilter
 
+        telnetFilter = MC.Filter MC.TCP (MC.toIP "192.168.2.4")
+            (MC.toIP "192.168.2.1") MC.anyPort 23
+        finalLPG = bind lpg2' telnetapp s2 telnetFilter
 
 {-
  - main function: used to test if the PRG generated for E1k is correct or not

@@ -15,6 +15,7 @@ module Computations (
     , Application(..)
     , Filter(..)
     , Queue(..)
+    , Protocol(..)
     , Qid
     , CoreID
     , AppName
@@ -22,6 +23,10 @@ module Computations (
     , L2Address
     , L3Address
     , L4Address
+    , anyValue
+    , toIP
+    , anyIP
+    , anyPort
     , getNetworkDependency
     , getNetworkDependencyDummy
     , embeddGraphs
@@ -46,23 +51,54 @@ import qualified Data.Set as Set
 --import qualified Data.Ix as Ix
 --import qualified Debug.Trace as TR
 
-type L2Address = String
-type L3Address = String
-type L4Address = String
+type L2Address = Integer
+type L3Address = Integer
+type L4Address = Integer
 
 -- for flow filtering
-type Proto = String
+data Protocol = NONEProtocol
+    | Ethernet
+    | IEEE80211
+    | IPv4
+    | IPv6
+    | ICMP
+    | UDP
+    | TCP
+    | ANYProtocol
+    deriving (Show, Eq, Ord, Enum, DD.Typeable, DD.Data)
+
+{-
+data Qid = NONEQid
+    | Integer
+    | ANYQid
+    deriving (Show, Eq, Ord, Enum, DD.Typeable, DD.Data)
+-}
+
+type Qid = Integer
+type CoreID = Integer
+
+toIP :: String -> L3Address
+toIP value = 127001
+
+anyIP ::  L3Address
+anyIP = 0
+
+anyPort :: L4Address
+anyPort =  0
+
+anyValue :: Integer
+anyValue =  0
 
 data Queue = Queue {
         queueId :: Qid
         , coreId :: CoreID
-    } deriving (Eq, Ord, DD.Typeable, DD.Data)
+    } deriving (Eq, Ord,  DD.Typeable, DD.Data)
 
 instance Show Queue where
     show (Queue qid coreid) = show qid ++ " core " ++ show coreid
 
 data Filter = Filter {
-        protocol :: Proto
+        protocol :: Protocol
         , srcIP :: L3Address
         , dstIP :: L3Address
         , srcPort :: L4Address
@@ -71,10 +107,7 @@ data Filter = Filter {
 
 instance Show Filter where
     show (Filter proto sip dip sp dp) = show proto ++ "_" ++ show sip ++ "_"
-            ++ dip  ++ "_" ++ sp  ++ "_" ++ dp
-
-type Qid = String
-type CoreID = String
+            ++ show dip  ++ "_" ++ show sp  ++ "_" ++ show dp
 
 type SocketId = Integer
 type AppName = String
@@ -94,21 +127,23 @@ instance Show Socket where
     show (Socket sid) = show sid
 
 
-
-
 {-
  -
  - From Configuration
  -}
-
 data Configuration = Always
-                | EthernetChecksum
-                | IPv4Checksum
-                | TCPChecksum
-                | UDPChecksum
+                | EthernetChecksum Bool
+                | IPv4Checksum Bool
+                | TCPChecksum Bool
+                | UDPChecksum Bool
                 | QueueConf Queue
                 | FilterConf Filter Queue
-                deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+                deriving (Show,  Eq, Ord, DD.Typeable, DD.Data)
+
+showConfBounds :: Configuration -> String
+showConfBounds (QueueConf _) = "[(0, 0)..(MaxQueue, MaxCore)]"
+showConfBounds (FilterConf _ _) = "AllPossibleFilters"
+showConfBounds _ = "[False, True]"
 
 data ConfStatus = ON
                 | OFF
@@ -122,8 +157,11 @@ data ConfDecision = ConfDecision {
     } deriving (Eq, Ord, DD.Typeable, DD.Data)
 
 instance Show ConfDecision where
-    show (ConfDecision conf comp stat) = show conf ++ " " ++ show comp ++
-        " " ++ show stat
+    show (ConfDecision conf comp stat) =  show comp ++ " " ++ show stat
+        ++ " " ++ showConfBounds conf
+--        ++ " [" ++ show (max conf conf) ++ "--" ++ show (min conf conf) ++ "]"
+--        ++ (show (max conf conf))
+--        ++ (show (minBound conf))
 
 
 {-
@@ -160,14 +198,6 @@ data Layer = L1 -- hardware
         | L4 -- TCP/UDP layer
         | L5 -- Application
         deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
-
-data Protocol = Ethernet
-        | IPv4
-        | IPv6
-        | ICMP
-        | UDP
-        | TCP
-        | Socket1
 
 
 -- List of all the computations/tests which can happen on incoming packets
@@ -380,10 +410,10 @@ getNetworkDependency = [
 
 
 getDefaultQueue :: Queue
-getDefaultQueue = Queue "0:Default" "0"
+getDefaultQueue = Queue 0 0
 
 getDefaultFilter :: Computation
-getDefaultFilter = (IsFlow (Filter "ANY" "ANY" "ANY" "ANY" "ANY"))
+getDefaultFilter = (IsFlow (Filter ANYProtocol 0 0 0 0))
 
 {-
  - Small sample dependency list for testing purposes
