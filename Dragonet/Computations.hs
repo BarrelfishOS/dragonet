@@ -32,7 +32,7 @@ module Computations (
     , embeddGraphs
     , sortGraph
     , getDefaultQueue
-    , getDefaultFilter
+    , getDefaultFitlerForID
     -- For Configuration Module
     , Configuration(..)
     , ConfDecision(..)
@@ -76,6 +76,7 @@ data Qid = NONEQid
 
 type Qid = Integer
 type CoreID = Integer
+type FilterID = Integer
 
 toIP :: String -> L3Address
 toIP value = 127001
@@ -96,9 +97,9 @@ data Queue = Queue {
 
 instance Show Queue where
     show (Queue qid coreid) = show qid ++ " core " ++ show coreid
-
 data Filter = Filter {
-        protocol :: Protocol
+        filterID :: FilterID
+        , protocol :: Protocol
         , srcIP :: L3Address
         , dstIP :: L3Address
         , srcPort :: L4Address
@@ -106,8 +107,9 @@ data Filter = Filter {
     } deriving (Eq, Ord, DD.Typeable, DD.Data)
 
 instance Show Filter where
-    show (Filter proto sip dip sp dp) = show proto ++ "_" ++ show sip ++ "_"
-            ++ show dip  ++ "_" ++ show sp  ++ "_" ++ show dp
+    show (Filter fid proto sip dip sp dp) = show fid ++ " " ++ show proto
+        ++ "_" ++ show sip ++ "_" ++ show dip  ++ "_" ++ show sp  ++ "_"
+        ++ show dp
 
 type SocketId = Integer
 type AppName = String
@@ -151,17 +153,12 @@ data ConfStatus = ON
                 deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
 data ConfDecision = ConfDecision {
-        configuration :: Configuration
-        , computation :: Computation
+        computation :: Computation
         , status :: ConfStatus
     } deriving (Eq, Ord, DD.Typeable, DD.Data)
 
 instance Show ConfDecision where
-    show (ConfDecision conf comp stat) =  show comp ++ " " ++ show stat
-        ++ " " ++ showConfBounds conf
---        ++ " [" ++ show (max conf conf) ++ "--" ++ show (min conf conf) ++ "]"
---        ++ (show (max conf conf))
---        ++ (show (minBound conf))
+    show (ConfDecision comp stat) =  show comp ++ " " ++ show stat
 
 
 {-
@@ -405,15 +402,15 @@ getNetworkDependency = [
         , (ToDefaultKernelProcessing, [default_queue, VerifiedL4])
     ]
     where
-       generic_filter = getDefaultFilter
+       generic_filter = getDefaultFitlerForID 0
        default_queue = ToQueue getDefaultQueue
 
 
 getDefaultQueue :: Queue
 getDefaultQueue = Queue 0 0
 
-getDefaultFilter :: Computation
-getDefaultFilter = (IsFlow (Filter ANYProtocol 0 0 0 0))
+getDefaultFitlerForID :: FilterID -> Computation
+getDefaultFitlerForID x = (IsFlow (Filter x ANYProtocol 0 0 0 0))
 
 {-
  - Small sample dependency list for testing purposes

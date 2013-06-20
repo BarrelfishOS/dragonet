@@ -61,7 +61,7 @@ getExampleConf = [
          ]
          where
             testQueue = MC.Queue 4 4
-            testFilter = MC.Filter MC.TCP  192168002001 192168003001   4444 80
+            testFilter = MC.Filter 1 MC.TCP (MC.toIP "192.168.002.001") (MC.toIP "192.168.003.001") 4444 80
 
 getE1kPRGConfTest :: [MG.Gnode MC.Computation]
 --getE1kPRGConfTest ::  IO()
@@ -137,12 +137,12 @@ getE1kPRGOrig = [
         q4 = (MC.ToQueue (MC.Queue 3 4))
 
         -- sample http server filter
-        generic_filter = MC.getDefaultFilter
-        http_flow = (MC.IsFlow (MC.Filter MC.TCP MC.anyIP (MC.toIP "192.168.2.4")
+        generic_filter = MC.getDefaultFitlerForID 0
+        http_flow = (MC.IsFlow (MC.Filter 1 MC.TCP MC.anyIP (MC.toIP "192.168.2.4")
             MC.anyPort 80))
-        telnet_flow = (MC.IsFlow (MC.Filter MC.TCP (MC.toIP "255.255.255.255")
+        telnet_flow = (MC.IsFlow (MC.Filter 2 MC.TCP (MC.toIP "255.255.255.255")
             (MC.toIP "192.168.2.4") MC.anyPort 80))
-        tftp_flow = (MC.IsFlow (MC.Filter MC.UDP (MC.toIP "201.3.2.5")
+        tftp_flow = (MC.IsFlow (MC.Filter 3 MC.UDP (MC.toIP "201.3.2.5")
             (MC.toIP "192.168.2.4") MC.anyPort 69))
 
 
@@ -295,38 +295,42 @@ getE1kPRG = [
 
 
         -- some exaple filters
-        , (http_flow, [MC.L4ReadyToClassify]) -- sample filter
-        , (telnet_flow, [MC.L4ReadyToClassify]) -- sample filter
-        , (tftp_flow, [MC.L4ReadyToClassify]) -- sample filter
-        , (q4, [http_flow])
-        , (q3, [telnet_flow])
-        , (q1, [tftp_flow])
+        , (flow1, [MC.L4ReadyToClassify]) -- sample filter
+        , (flow2, [MC.L4ReadyToClassify]) -- sample filter
+        , (flow3, [MC.L4ReadyToClassify]) -- sample filter
+        , (q4, [flow1]) -- Added just to make show the queues at proper place
+        , (q3, [flow2]) -- Added just to make show the queues at proper place
+        , (q1, [flow3]) -- Added just to make show the queues at proper place
         , (q0, [generic_filter])
         ]
     where
         etherChecksum = (MConf.IsConfSet  (MConf.ConfDecision
-            (MConf.EthernetChecksum True) MC.L2EtherValidCRC MConf.UnConfigured))
+             MC.L2EtherValidCRC MConf.UnConfigured))
         ipv4Checksum = (MConf.IsConfSet  (MConf.ConfDecision
-            (MConf.IPv4Checksum True) MC.L3IPv4ValidChecksum MConf.UnConfigured))
+             MC.L3IPv4ValidChecksum MConf.UnConfigured))
 
 
---        aq1 = MC.Queue 1 1
---        q1 = (MConf.IsConfSet  (MConf.ConfDecision
---            (MConf.QueueConf aq1) MC.L3IPv4ValidChecksum MConf.UnConfigured))
+        q0 = MC.ToQueue (MC.Queue 0 0)
+        q1 = (MConf.IsConfSet  (MConf.ConfDecision
+           (MC.ToQueue (MC.Queue 1 1))  MConf.UnConfigured))
 
-        q0 = MC.ToQueue MC.getDefaultQueue
-        q1 = (MC.ToQueue (MC.Queue 1 1))
- --       q2 = (MC.ToQueue (MC.Queue 2 2))
-        q3 = (MC.ToQueue (MC.Queue 3 4))
-        q4 = (MC.ToQueue (MC.Queue 3 4))
+        q3 = (MConf.IsConfSet  (MConf.ConfDecision
+           (MC.ToQueue (MC.Queue 3 3))  MConf.UnConfigured))
+
+        q4 = (MConf.IsConfSet  (MConf.ConfDecision
+           (MC.ToQueue (MC.Queue 4 3))  MConf.UnConfigured))
 
         -- sample http server filter
-        generic_filter = MC.getDefaultFilter
-        http_flow = (MC.IsFlow (MC.Filter MC.TCP MC.anyIP (MC.toIP "192.168.2.4")
-            MC.anyPort 80))
-        telnet_flow = (MC.IsFlow (MC.Filter MC.TCP  (MC.toIP "192.168.2.4")
-            (MC.toIP "192.168.2.1") MC.anyPort 23))
-        tftp_flow = (MC.IsFlow (MC.Filter MC.UDP (MC.toIP "24.35.17.5") (MC.toIP "192.168.2.4") MC.anyPort 69))
+        generic_filter = MC.getDefaultFitlerForID 0
+
+        flow1 = (MConf.IsConfSet  (MConf.ConfDecision
+            (MC.getDefaultFitlerForID 1) MConf.UnConfigured))
+
+        flow2 = (MConf.IsConfSet  (MConf.ConfDecision
+            (MC.getDefaultFitlerForID 2) MConf.UnConfigured))
+
+        flow3 = (MConf.IsConfSet  (MConf.ConfDecision
+            (MC.getDefaultFitlerForID 3) MConf.UnConfigured))
 
 
 {-
@@ -374,7 +378,7 @@ getE1kBasicPRG = [
         ]
     where
         q0 = MC.ToQueue MC.getDefaultQueue
-        generic_filter = MC.getDefaultFilter
+        generic_filter = MC.getDefaultFitlerForID 0
 
 {-
  - main function: used to test if the PRG generated for E1k is correct or not

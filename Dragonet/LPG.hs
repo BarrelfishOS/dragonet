@@ -79,7 +79,7 @@ getSampleLPG2Apps lpg = finalLPG
         (lpg', s) = openSocket lpg
         app = MC.Application "Apache"
 
-        apacheFilter = MC.Filter MC.TCP MC.anyIP (MC.toIP "192.168.2.4")
+        apacheFilter = MC.Filter 1 MC.TCP MC.anyIP (MC.toIP "192.168.2.4")
             MC.anyPort 80
         lpg2 = bind lpg' app s apacheFilter
 
@@ -87,7 +87,7 @@ getSampleLPG2Apps lpg = finalLPG
         (lpg2', s2) = openSocket lpg2
         telnetapp = MC.Application "telnet"
 
-        telnetFilter = MC.Filter MC.TCP (MC.toIP "192.168.2.4")
+        telnetFilter = MC.Filter 2 MC.TCP (MC.toIP "192.168.2.4")
             (MC.toIP "192.168.2.1") MC.anyPort 23
         finalLPG = bind lpg2' telnetapp s2 telnetFilter
 
