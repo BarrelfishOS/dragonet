@@ -259,6 +259,7 @@ matchConfigNode :: MC.Computation -> MG.Gnode MC.Computation ->  Bool
 matchConfigNode x ((MC.IsConfSet (MC.ConfDecision c _)), _)  = c == x
 matchConfigNode _ _ = False
 
+
 getConfigNodesInternal :: MG.Gnode MC.Computation -> [MG.Gnode MC.Computation]
 getConfigNodesInternal ((MC.IsConfSet x), deps) = [(MC.IsConfSet x, deps)]
 getConfigNodesInternal _ = []
@@ -304,8 +305,10 @@ applyConfig prg confDes
             (MC.ConfDecision conf confStat) = confDes
 --            matchingConfNodes = isConfigPresent prg conf
             matchingConfNodes =  DL.filter (matchConfigNode conf) prg
-            newPRG = replaceNode prg (fst $ DL.head matchingConfNodes)
-                (MC.IsConfSet confDes)
+            oldNode = fst $ DL.head matchingConfNodes
+            newNode = MC.IsConfSet confDes
+            newPRG = replaceNode prg oldNode newNode
+
 
 
 applyConfigList:: [MG.Gnode MC.Computation] -> [MC.ConfDecision]
