@@ -39,13 +39,13 @@ getE1kPRGConfTestV2 =
         putStrLn $ show $ getExampleConfBetter
         putStrLn "#######################################################\n"
 
-getExampleConfBetter :: [MC.Computation]
+getExampleConfBetter :: [MC.ConfDecision]
 getExampleConfBetter = [
 --            , MC.L3IPv4ValidChecksum
-            MC.L2EtherValidCRC
-            , MC.L4UDPValidChecksum
-            , MC.ToQueue testQueue
-            , MC.IsFlow testFilter
+            (MC.ConfDecision MC.L2EtherValidCRC MC.ON)
+            , (MC.ConfDecision MC.L4UDPValidChecksum MC.UnConfigured)
+            , (MC.ConfDecision (MC.ToQueue testQueue) MC.UnConfigured)
+            , (MC.ConfDecision (MC.IsFlow testFilter) MC.UnConfigured)
          ]
          where
             testQueue = MC.Queue 4 4
@@ -64,9 +64,10 @@ getExampleConf = [
             testQueue = MC.Queue 4 4
             testFilter = MC.Filter 1 MC.TCP (MC.toIP "192.168.002.001") (MC.toIP "192.168.003.001") 4444 80
 
+
 getE1kPRGConfTest :: [MG.Gnode MC.Computation]
 --getE1kPRGConfTest ::  IO()
-getE1kPRGConfTest =  applyConfigList getE1kPRG getExampleConfBetter
+getE1kPRGConfTest = purgeFixedConfigs $ applyConfigList getE1kPRG getExampleConfBetter
 
 
 {-
@@ -267,7 +268,7 @@ getConfigNodes [] = []
 getConfigNodes (x:xs) = (getConfigNodesInternal x) ++ getConfigNodes xs
 
 isConfigPresent :: [MG.Gnode MC.Computation] -> MC.Computation -> [MG.Gnode MC.Computation]
-isConfigPresent prg conf = DL.filter (matchConfigNode conf)  $ getConfigNodes prg
+isConfigPresent prg conf = DL.filter (matchConfigNode conf) prg
 
 
 {-
@@ -291,23 +292,49 @@ isConfigPresent prg conf = DL.filter (matchConfigNode conf)  $ getConfigNodes pr
  -          update configuration node
  -          update its dependencies
  -}
-applyConfig :: [MG.Gnode MC.Computation] -> MC.Computation
+applyConfig :: [MG.Gnode MC.Computation] -> MC.ConfDecision
     -> [MG.Gnode MC.Computation]
-applyConfig prg conf
-        | isConfigPresent prg conf == [] = newPRG
-        | otherwise = prg
+applyConfig prg confDes
+        | matchingConfNodes == [] = prg
+        | DL.length matchingConfNodes > 1 = (error $
+            "multiple config nodes maching given config\n" ++
+            "This is not exactly an error, but needs some more implementation to support")
+        | otherwise = newPRG
     where
-            newPRG = []
---            toBeReplacedNode =
---            replacingNode =
---            newPRG = replaceNode prg toBeReplacedNode replacingNode
+            (MC.ConfDecision conf confStat) = confDes
+--            matchingConfNodes = isConfigPresent prg conf
+            matchingConfNodes =  DL.filter (matchConfigNode conf) prg
+            newPRG = replaceNode prg (fst $ DL.head matchingConfNodes)
+                (MC.IsConfSet confDes)
 
-applyConfigList:: [MG.Gnode MC.Computation] -> [MC.Computation]
+
+applyConfigList:: [MG.Gnode MC.Computation] -> [MC.ConfDecision]
     -> [MG.Gnode MC.Computation]
 applyConfigList prg [] = prg
 applyConfigList prg (x:xs) = applyConfigList prg' xs
     where
         prg' = applyConfig prg x
+
+
+myReplaceFn ::  MC.Computation -> MC.Computation -> MG.Gnode MC.Computation
+    -> MG.Gnode MC.Computation
+myReplaceFn oldX newX (n, dep) = (n', dep')
+    where
+        n' = if n == oldX then newX else n
+        dep' = DL.map (\x -> if x == oldX then newX else x) dep
+
+replaceNode :: [MG.Gnode MC.Computation] -> MC.Computation -> MC.Computation
+    -> [MG.Gnode MC.Computation]
+replaceNode prg oldNode newNode = DL.map (myReplaceFn oldNode newNode) prg
+
+
+{-
+ - Find all the nodes which have fixed config (either ON or OFF)
+ - For every node, find a replacement [nodes]
+ -}
+purgeFixedConfigs :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
+purgeFixedConfigs prg = prg
+
 
 
 {-
