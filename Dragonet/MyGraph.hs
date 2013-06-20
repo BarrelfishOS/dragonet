@@ -12,6 +12,7 @@
 --module Main (
 module MyGraph (
     Gnode
+    , NodeCategory(..)
     , showDependencyGraph
     , showFlowGraph
     , showEmbeddedGraph
@@ -28,6 +29,11 @@ type Gnode a = (a, [a])
 
 type Edge a = (a, a) -- connects two vertices.
 
+data NodeCategory =
+    ANDNode
+    | ORNode
+    | CONFNode
+    deriving (Show, Eq, Ord)
 
 type ShowEdgeFn a = Edge a -> String
 type ShowVertexFn a = a -> String
@@ -83,9 +89,13 @@ findORnodes gnodeList = DL.nub $ DL.map fst $ DL.filter (\x -> length (snd x) <=
  - prints the vertex with information like AND or OR type (if needed)
  -}
 showORnode :: (Show a) => a -> String
-showORnode v = nodeName ++ " [label = " ++ nodeName  ++ "];\n"
+showORnode v
+    | "IsConfSet" `DL.isInfixOf` nodeName = nodeName ++ " [label = "
+        ++ nodeName ++ ", color=gray,style=filled,shape=tab];\n"
+    | otherwise = nodeName ++ " [label = " ++ nodeName  ++ "];\n"
     where
         nodeName = replaceSpaces $ show v
+
 
 showANDnode :: (Show a) => a -> String
 showANDnode v = nodeName ++ " [label = " ++ nodeName ++
@@ -108,6 +118,7 @@ showNode orList andList embList v
         | otherwise = error "element is not in any list"
 
 
+
 showNodeGeneric :: (Show a) => (Eq a) => [([a], ShowVertexFn a)] -> a -> String
 showNodeGeneric fancyList v
     | DL.length matchedElement /= 0 = ((snd $ DL.head matchedElement) v)
@@ -126,7 +137,6 @@ showGraphViz vertexList svf edges sef =
     "digraph name {\n" ++
     "rankdir=LR;\n" ++
     (DL.concatMap svf vertexList) ++
-    (DL.concatMap svf vertexList) ++
     (DL.concatMap sef edges) ++
     "}\n"
 
@@ -143,8 +153,10 @@ showGenGraph gnodeList isDependency = showGraphViz verticesList shownodefn
         verticesListOR = findORnodes gnodeList
         verticesListAND = findANDnodes gnodeList
         verticesList =  verticesListOR ++ verticesListAND
-        shownodefn = (showNodeGeneric [(verticesListOR, showORnode)
-                        , (verticesListAND, showANDnode)])
+        shownodefn = (showNodeGeneric [
+                   (verticesListOR, showORnode)
+                   , (verticesListAND, showANDnode)
+                ])
         edgesList
             | isDependency = getEdges gnodeList
             | otherwise = reverseEdges $ getEdges gnodeList

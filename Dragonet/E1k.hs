@@ -85,8 +85,8 @@ getE1kPRGConf confList = getE0kPRGGenericV2 basicPRG confList basicPRG
  - Returns list of computations which can happen in the E1k NIC
  - and their dependencies.
  -}
-getE1kPRG :: [MG.Gnode MC.Computation]
-getE1kPRG = [
+getE1kPRGOrig :: [MG.Gnode MC.Computation]
+getE1kPRGOrig = [
         (MC.ClassifiedL2Ethernet, [])
         , (MC.L2EtherValidLen, [MC.ClassifiedL2Ethernet])
         , (MC.L2EtherValidCRC, [MC.L2EtherValidLen])
@@ -254,17 +254,16 @@ getE1kBasicPRGDummy = [
  - Returns list of computations which can happen in the E1k NIC
  - and their dependencies.
  -}
-getE1kPRGV2 :: [MG.Gnode MC.Computation]
-getE1kPRGV2 = [
+getE1kPRG :: [MG.Gnode MC.Computation]
+getE1kPRG = [
         (MC.ClassifiedL2Ethernet, [])
         , (MC.L2EtherValidLen, [MC.ClassifiedL2Ethernet])
 
---        , (MConf.EthernetChecksum, [MC.L2EtherValidLen])
---        , (MC.L2EtherValidCRC, [MConf.EthernetChecksum])
+        , (etherChecksum, [MC.L2EtherValidLen])
 
-        , (MC.L2EtherValidBroadcast, [MC.L2EtherValidCRC])
-        , (MC.L2EtherValidMulticast, [MC.L2EtherValidCRC])
-        , (MC.L2EtherValidUnicast, [MC.L2EtherValidCRC])
+        , (MC.L2EtherValidBroadcast, [etherChecksum])
+        , (MC.L2EtherValidMulticast, [etherChecksum])
+        , (MC.L2EtherValidUnicast, [etherChecksum])
         , (MC.L2EtherValidDest, [MC.L2EtherValidBroadcast])
         , (MC.L2EtherValidDest, [MC.L2EtherValidMulticast])
         , (MC.L2EtherValidDest, [MC.L2EtherValidUnicast])
@@ -302,6 +301,7 @@ getE1kPRGV2 = [
         , (q0, [generic_filter])
         ]
     where
+        etherChecksum = (MConf.IsConfSet  (MConf.ConfDecision MConf.EthernetChecksum  MC.L2EtherValidCRC MConf.UnConfigured))
         q0 = MC.ToQueue MC.getDefaultQueue
         q1 = (MC.ToQueue (MC.Queue "Q1" "C1"))
  --       q2 = (MC.ToQueue (MC.Queue "Q2" "C2"))

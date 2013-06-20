@@ -30,8 +30,11 @@ module Computations (
     , getDefaultFilter
     -- For Configuration Module
     , Configuration(..)
+    , ConfDecision(..)
+    , ConfStatus(..)
     , genDependencies
     , genAllDependencies
+    , getNodeCategory
 
 ) where
 
@@ -106,6 +109,22 @@ data Configuration = Always
                 | QueueConf Queue
                 | FilterConf Filter Queue
                 deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+
+data ConfStatus = ON
+                | OFF
+                | UnConfigured
+                deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+
+data ConfDecision = ConfDecision {
+        configuration :: Configuration
+        , computation :: Computation
+        , status :: ConfStatus
+    } deriving (Eq, Ord, DD.Typeable, DD.Data)
+
+instance Show ConfDecision where
+    show (ConfDecision conf comp stat) = show conf ++ " " ++ show comp ++
+        " " ++ show stat
+
 
 {-
  - Generates additional edges needed to support given configuration
@@ -225,7 +244,7 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | ToDefaultKernelProcessing
         | ToSocket Socket
         | ToApplication Application
-        | ShortCircuit Configuration
+        | IsConfSet ConfDecision
         deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
         --deriving (Show, Eq, Ord)
         --deriving (Eq, Ord)
@@ -562,6 +581,16 @@ embeddGraphs lpg prg swstartnode defaultQueue
     | otherwise = embedded ++ [(swstartnode, [defaultQueue])]
     where
         (embedded, unEmbedded) = embeddGraphStep prg swstartnode ([], lpg)
+
+
+getNodeCategory :: MG.Gnode Computation -> MG.NodeCategory
+getNodeCategory ((IsConfSet _), deps)
+    | DL.length deps > 1 = error "ERROR: given node is both AND and configuration"
+    | otherwise = MG.CONFNode
+getNodeCategory (n, deps)
+    | DL.length deps > 1 = MG.ANDNode
+    | otherwise = MG.ORNode
+
 
 -- main function (just for testing purposes)
 main_old :: IO()
