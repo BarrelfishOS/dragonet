@@ -260,6 +260,9 @@ matchConfigNode x ((MC.IsConfSet (MC.ConfDecision c _)), _)  = c == x
 matchConfigNode _ _ = False
 
 
+
+
+{-
 getConfigNodesInternal :: MG.Gnode MC.Computation -> [MG.Gnode MC.Computation]
 getConfigNodesInternal ((MC.IsConfSet x), deps) = [(MC.IsConfSet x, deps)]
 getConfigNodesInternal _ = []
@@ -270,7 +273,7 @@ getConfigNodes (x:xs) = (getConfigNodesInternal x) ++ getConfigNodes xs
 
 isConfigPresent :: [MG.Gnode MC.Computation] -> MC.Computation -> [MG.Gnode MC.Computation]
 isConfigPresent prg conf = DL.filter (matchConfigNode conf) prg
-
+-}
 
 {-
  - For every node, if the node is in Config list,
@@ -297,18 +300,12 @@ applyConfig :: [MG.Gnode MC.Computation] -> MC.ConfDecision
     -> [MG.Gnode MC.Computation]
 applyConfig prg confDes
         | matchingConfNodes == [] = prg
-        | DL.length matchingConfNodes > 1 = (error $
-            "multiple config nodes maching given config\n" ++
-            "This is not exactly an error, but needs some more implementation to support")
         | otherwise = newPRG
     where
             (MC.ConfDecision conf confStat) = confDes
---            matchingConfNodes = isConfigPresent prg conf
             matchingConfNodes =  DL.filter (matchConfigNode conf) prg
-            oldNode = fst $ DL.head matchingConfNodes
             newNode = MC.IsConfSet confDes
-            newPRG = replaceNode prg oldNode newNode
-
+            newPRG = DL.foldl (replaceNode  newNode) prg matchingConfNodes
 
 
 applyConfigList:: [MG.Gnode MC.Computation] -> [MC.ConfDecision]
@@ -326,18 +323,50 @@ myReplaceFn oldX newX (n, dep) = (n', dep')
         n' = if n == oldX then newX else n
         dep' = DL.map (\x -> if x == oldX then newX else x) dep
 
-replaceNode :: [MG.Gnode MC.Computation] -> MC.Computation -> MC.Computation
+replaceNode :: MC.Computation -> [MG.Gnode MC.Computation]
+    -> MG.Gnode  MC.Computation
     -> [MG.Gnode MC.Computation]
-replaceNode prg oldNode newNode = DL.map (myReplaceFn oldNode newNode) prg
+replaceNode newNode prg (oldNode, _) = DL.map (myReplaceFn oldNode newNode) prg
+
+replaceNodeForON ::  [MG.Gnode MC.Computation] -> MG.Gnode  MC.Computation
+        -> [MG.Gnode MC.Computation]
+replaceNodeForON prg ((MC.IsConfSet (MC.ConfDecision comp stat)), deps) =
+        DL.map (myReplaceFn oldNode newNode) prg
+    where
+    oldNode = MC.IsConfSet (MC.ConfDecision comp stat)
+    newNode = comp
+replaceNodeForON prg _ = error "Invalid module cropped in the replaceNodeForON"
+
+-- ###############################
+
+selectConfigNode :: MC.ConfStatus -> MG.Gnode MC.Computation ->  Bool
+selectConfigNode val ((MC.IsConfSet (MC.ConfDecision _ stat)), _) = stat == val
+selectConfigNode _ _ = False
 
 
 {-
  - Find all the nodes which have fixed config (either ON or OFF)
  - For every node, find a replacement [nodes]
  -}
-purgeFixedConfigs :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
-purgeFixedConfigs prg = prg
+purgeFixedOFFConfigs :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
+purgeFixedOFFConfigs prg = newPRG
+    where
+    newPRG = prg
+    selectedNodes = DL.filter (selectConfigNode MC.OFF) prg
+--    newNode = ??
+--    newPRG = DL.foldl (replaceNode  newNode) prg selectedNodes
 
+
+
+purgeFixedONConfigs :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
+purgeFixedONConfigs prg = newPRG
+    where
+    selectedNodes = DL.filter (selectConfigNode MC.ON) prg
+    newPRG = DL.foldl (replaceNodeForON) prg selectedNodes
+
+
+purgeFixedConfigs :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
+purgeFixedConfigs prg = purgeFixedOFFConfigs $ purgeFixedONConfigs $ prg
 
 
 {-
