@@ -79,7 +79,14 @@ type CoreID = Integer
 type FilterID = Integer
 
 toIP :: String -> L3Address
-toIP value = 127001
+toIP address = (read octet4::Integer) + ((read octet3::Integer) * 1000) +
+    ((read octet2::Integer) * 1000000) + ((read octet1::Integer) * 1000000000)
+    where
+       (octet1, address')  = DL.break condition  address
+       (octet2, address'') = DL.break condition $ DL.dropWhile condition address'
+       (octet3, address''') = DL.break condition $ DL.dropWhile condition address''
+       (octet4, _) = DL.break condition $ DL.dropWhile condition address'''
+       condition = (\x -> x == '.')
 
 anyIP ::  L3Address
 anyIP = 0
@@ -151,6 +158,15 @@ data ConfStatus = ON
                 | OFF
                 | UnConfigured
                 deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+
+data EmulatedComp = EmulatedComp  {
+        eComp :: Computation
+    } deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+
+data PartialComp = PartialComp {
+        pComp :: Computation
+        , pNeeds :: Computation
+    } deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
 data ConfDecision = ConfDecision {
         computation :: Computation
@@ -276,6 +292,8 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | ToSocket Socket
         | ToApplication Application
         | IsConfSet ConfDecision
+        | IsPartial PartialComp
+        | IsEmulated EmulatedComp
         deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
         --deriving (Show, Eq, Ord)
         --deriving (Eq, Ord)
