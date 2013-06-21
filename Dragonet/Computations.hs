@@ -142,9 +142,9 @@ data Configuration = Always
                 | FilterConf Filter Queue
                 deriving (Show,  Eq, Ord, DD.Typeable, DD.Data)
 
-showConfBounds :: Configuration -> String
-showConfBounds (QueueConf _) = "[(0, 0)..(MaxQueue, MaxCore)]"
-showConfBounds (FilterConf _ _) = "AllPossibleFilters"
+showConfBounds :: Computation -> String
+showConfBounds (ToQueue _) = "[(0, 0)..(MaxQueue, MaxCore)]"
+showConfBounds (IsFlow _) = "[AllPossibleFilters]"
 showConfBounds _ = "[False, True]"
 
 data ConfStatus = ON
@@ -158,8 +158,12 @@ data ConfDecision = ConfDecision {
     } deriving (Eq, Ord, DD.Typeable, DD.Data)
 
 instance Show ConfDecision where
-    show (ConfDecision comp stat) =  show comp ++ " " ++ show stat
+    show (ConfDecision comp (UnConfigured)) =  show UnConfigured ++
+        " " ++ show comp ++ " " ++ showConfBounds comp
+    show (ConfDecision comp (OFF)) =  show OFF ++ " " ++ show comp
+    show (ConfDecision comp (ON)) =  show ON ++ " " ++ show comp
 
+--        " " ++ show (DD.typeOf comp) ++ " " ++ showConfBounds comp
 
 {-
  - Generates additional edges needed to support given configuration

@@ -9,5 +9,6 @@ for f in ${flist} ; do
     pngFile="${justFile}.png"
     dot -Tpng -o "${pngFile}" "${f}"
     dot -Tpdf -o "${pdfFile}" "${f}"
+    echo converted "${f} to ${pngFile} and ${pdfFile}"
 done
 

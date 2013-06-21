@@ -258,12 +258,25 @@ getE1kBasicPRGDummy = [
 
 
 
+{-
+ - Find all the ConfDecision nodes which are dealing with same Computation Node
+ - as input config node.
+ -}
 matchConfigNode :: MC.Computation -> MG.Gnode MC.Computation ->  Bool
-matchConfigNode x ((MC.IsConfSet (MC.ConfDecision c _)), _)  = c == x
+matchConfigNode x ((MC.IsConfSet (MC.ConfDecision c _)), _)  =
+    compareComputeNodesForConfig  c x
 matchConfigNode _ _ = False
 
-
-
+{-
+ - Compare computations such that it will tell which two of them are same
+ - for purpose of Configuration matching
+ -}
+compareComputeNodesForConfig :: MC.Computation -> MC.Computation -> Bool
+compareComputeNodesForConfig (MC.IsFlow f1) (MC.IsFlow f2) =
+    MC.filterID f1 == MC.filterID f2
+compareComputeNodesForConfig (MC.ToQueue q1) (MC.ToQueue q2) =
+    MC.queueId q1 == MC.queueId q2
+compareComputeNodesForConfig x y = x == y
 
 {-
 getConfigNodesInternal :: MG.Gnode MC.Computation -> [MG.Gnode MC.Computation]
@@ -277,18 +290,6 @@ getConfigNodes (x:xs) = (getConfigNodesInternal x) ++ getConfigNodes xs
 isConfigPresent :: [MG.Gnode MC.Computation] -> MC.Computation -> [MG.Gnode MC.Computation]
 isConfigPresent prg conf = DL.filter (matchConfigNode conf) prg
 -}
-
-{-
- - For every node, if the node is in Config list,
- -      if it is ON
- -          replace it with actual instantiation
- -          newInstace = replacing node
- -      if it is OFF
- -          remove it
- -          newInstace = dependency of removed node.
- -
- -      Modify all dependencies to point to new instance
- -}
 
  {-
  -  for given configuration
