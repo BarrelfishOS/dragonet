@@ -34,7 +34,7 @@ genE10kPRGGraph :: IO ()
 genE10kPRGGraph = writeFile "E1kPRG.dot" $ MG.showFlowGraph E1k.getE1kPRG
 
 testE1kConf :: IO()
-testE1kConf = -- E1k.getE1kPRGConfTest
+testE1kConf =
     do
         putStrLn "####################################\n\n"
         writeFile "E1kbasePRG.dot" $ MG.showFlowGraph basePRG
@@ -50,23 +50,10 @@ testE1kConf = -- E1k.getE1kPRGConfTest
         conf2PRG = E1k.applyConfigList conf1PRG' conf1
         conf2PRG' = E1k.purgeFixedConfigs conf2PRG
 
-        conf1 = [
-            (MC.ConfDecision MC.L2EtherValidCRC MC.ON)
-            , (MC.ConfDecision  MC.L3IPv4ValidChecksum MC.OFF)
-            , (MC.ConfDecision (MC.ToQueue testQueue) MC.ON)
-            , (MC.ConfDecision (MC.IsFlow testFilter) MC.ON)
-            , (MC.ConfDecision (MC.IsPartial tcpChecksumPartial) MC.ON)
-            ]
+        conf1 = E1k.getTestcaseConfiguration
         conf2 = [
             (MC.ConfDecision MC.L4UDPValidChecksum MC.ON)
             ]
-
-        testQueue = MC.Queue 4 1
-        testFilter = MC.Filter 1 MC.TCP (MC.toIP "192.168.002.001") (MC.toIP "192.168.003.001") 4444 80
-        tcpChecksumPartial = MC.PartialComp MC.L4TCPValidChecksum
-            tcpEmulatedPart
-        tcpEmulatedPart = MC.IsEmulated (MC.EmulatedComp MC.L4TCPChecksumAdjustment)
-
 
 
 {-
@@ -82,8 +69,9 @@ genLPGGraph = writeFile "LPG.dot" $ MG.showFlowGraph $ LPG.getSampleLPG2Apps $
 genEmbeddedPraph :: IO ()
 genEmbeddedPraph = writeFile "Embedded.dot" $ EMBD.embedSimple lpg' prg'
     where
+
         lpg = LPG.getSampleLPG2Apps $ MC.getNetworkDependency
-        prg = E1k.getE1kPRG
+        prg = E1k.purgeFixedConfigs $ E1k.applyConfigList E1k.getE1kPRG E1k.getTestcaseConfiguration
         lpg' = MC.sortGraph lpg
         prg' = MC.sortGraph prg
 
@@ -94,7 +82,7 @@ testEmbedV2:: IO ()
 testEmbedV2 = writeFile "EmbeddedV2.dot" $ EMBD.embedV2 lpg prg
     where
         lpg = LPG.getSampleLPG2Apps $ MC.getNetworkDependency
-        prg = E1k.getE1kPRG
+        prg = E1k.purgeFixedConfigs $ E1k.applyConfigList E1k.getE1kPRG E1k.getTestcaseConfiguration
 
 
 

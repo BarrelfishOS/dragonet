@@ -3,8 +3,29 @@
 
 next question
 ---------------------
-Qus:
+Qus: ToDo
 Ans:
+
+Add features
+ * Queues
+   - flow director filters
+   - bitmasking filters
+ * checksums
+ * Segmentation (receive and send)
+ * virtualization
+ * userspace networking ??
+
+NICs to add:
+ BC-1G
+ BC-10G ??
+ Intel-1G
+ Intel-10G
+ solarflare
+
+Optimization question
+There are 16 high priority flows, and 127 low priority flows.  How can you
+minimize the co-placement for high priority flows while maintaining good
+balance in others.
 
 Status:
 
