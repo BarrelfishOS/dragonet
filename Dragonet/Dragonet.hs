@@ -55,12 +55,19 @@ testE1kConf = -- E1k.getE1kPRGConfTest
             , (MC.ConfDecision  MC.L3IPv4ValidChecksum MC.OFF)
             , (MC.ConfDecision (MC.ToQueue testQueue) MC.ON)
             , (MC.ConfDecision (MC.IsFlow testFilter) MC.ON)
+            , (MC.ConfDecision (MC.IsPartial tcpChecksumPartial) MC.ON)
             ]
         conf2 = [
             (MC.ConfDecision MC.L4UDPValidChecksum MC.ON)
             ]
+
         testQueue = MC.Queue 4 1
         testFilter = MC.Filter 1 MC.TCP (MC.toIP "192.168.002.001") (MC.toIP "192.168.003.001") 4444 80
+        tcpChecksumPartial = MC.PartialComp MC.L4TCPValidChecksum
+            tcpEmulatedPart
+        tcpEmulatedPart = MC.IsEmulated (MC.EmulatedComp MC.L4TCPChecksumAdjustment)
+
+
 
 {-
  - Generates LPG for sample case of two applications

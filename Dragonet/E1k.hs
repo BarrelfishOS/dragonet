@@ -456,7 +456,9 @@ getE1kPRG = [
         , (MC.ClassifiedL3, [MC.L3IPv4ValidProtocol])
         , (MC.ClassifiedL3, [MC.L3IPv6ValidProtocol])
         , (MC.ClassifiedL4UDP, [MC.ClassifiedL3]) -- UDP classification
-        , (MC.ClassifiedL4TCP, [MC.ClassifiedL3]) -- TCP classification
+
+        , (tcpChecksum, [MC.ClassifiedL3]) -- TCP checksum
+        , (MC.ClassifiedL4TCP, [tcpChecksum]) -- TCP classification
         , (MC.UnclasifiedL4, [MC.ClassifiedL3]) -- all other packets
         , (MC.ClassifiedL4ICMP, [MC.ClassifiedL3]) -- UDP classification
 
@@ -485,6 +487,13 @@ getE1kPRG = [
              MC.L2EtherValidCRC MConf.UnConfigured))
         ipv4Checksum = (MConf.IsConfSet  (MConf.ConfDecision
              MC.L3IPv4ValidChecksum MConf.UnConfigured))
+
+
+        tcpChecksum = (MConf.IsConfSet (MConf.ConfDecision
+            tcpChecksumPartial  MConf.UnConfigured))
+        tcpChecksumPartial = MC.IsPartial (MC.PartialComp MC.L4TCPValidChecksum
+            tcpEmulatedPart)
+        tcpEmulatedPart = MC.IsEmulated (MC.EmulatedComp MC.L4TCPChecksumAdjustment)
 
         l4ReadyToClassify = MC.L4ReadyToClassify
         --l4ReadyToClassify = (MConf.IsConfSet  (MConf.ConfDecision

@@ -92,6 +92,8 @@ showORnode :: (Show a) => a -> String
 showORnode v
     | "IsConfSet" `DL.isPrefixOf` nodeName = nodeName ++ " [label = "
         ++ nodeName ++ ", color=gray,style=filled,shape=tab];\n"
+    | "IsPartial" `DL.isPrefixOf` nodeName = nodeName ++ " [label = "
+        ++ nodeName ++ ", color=turquoise,style=filled,shape=folder];\n"
     | otherwise = nodeName ++ " [label = " ++ nodeName  ++ "];\n"
     where
         nodeName = replaceSpaces $ show v

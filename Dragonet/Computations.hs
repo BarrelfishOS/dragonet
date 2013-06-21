@@ -37,6 +37,8 @@ module Computations (
     , Configuration(..)
     , ConfDecision(..)
     , ConfStatus(..)
+    , EmulatedComp(..)
+    , PartialComp(..)
     , genDependencies
     , genAllDependencies
     , getNodeCategory
@@ -161,12 +163,18 @@ data ConfStatus = ON
 
 data EmulatedComp = EmulatedComp  {
         eComp :: Computation
-    } deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+    } deriving (Eq, Ord, DD.Typeable, DD.Data)
+
+instance Show EmulatedComp where
+    show (EmulatedComp c) = show c
 
 data PartialComp = PartialComp {
         pComp :: Computation
         , pNeeds :: Computation
-    } deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+    } deriving (Eq, Ord, DD.Typeable, DD.Data)
+
+instance Show PartialComp where
+    show (PartialComp c n) = show c ++  " " ++ show n
 
 data ConfDecision = ConfDecision {
         computation :: Computation
@@ -266,6 +274,7 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | L4TCPValidDest
         | L4TCPValidLength
         | L4TCPValidChecksum
+        | L4TCPChecksumAdjustment
         | L4TCPValidSequence
         | L4TCPValidAckNo
         | L4TCPValidAck
