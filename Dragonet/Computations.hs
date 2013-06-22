@@ -213,8 +213,6 @@ genAllDependencies confList = DL.concatMap genDependencies confList
 
 
 
-
-
 -- To be used in future to define Computation and Configuration
 -- But for time being, I am ignoring them. (Layer and Protocol)
 data Layer = L1 -- hardware
@@ -294,7 +292,8 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | ToKernelMemory -- packet copy to kernel memory
         | ToUserMemory -- packet copy to user memory
 --        | IsFlow Protocol SrcIP DstIP SrcPort DstPort -- for flow filtering
-        | IsFlow  Filter -- for flow filtering
+        | IsFlow Filter -- for flow filtering
+        | IsHashFilter Filter -- for hash based filtering
         | InSoftware
         | ToQueue Queue
         | ToDefaultKernelProcessing
@@ -433,15 +432,15 @@ getNetworkDependency = [
         , (ToDefaultKernelProcessing, [default_queue, VerifiedL4])
     ]
     where
-       generic_filter = getDefaultFitlerForID 0
+       generic_filter = IsFlow (getDefaultFitlerForID 0)
        default_queue = ToQueue getDefaultQueue
 
 
 getDefaultQueue :: Queue
 getDefaultQueue = Queue 0 0
 
-getDefaultFitlerForID :: FilterID -> Computation
-getDefaultFitlerForID x = (IsFlow (Filter x ANYProtocol 0 0 0 0))
+getDefaultFitlerForID :: FilterID -> Filter
+getDefaultFitlerForID x = (Filter x ANYProtocol 0 0 0 0)
 
 {-
  - Small sample dependency list for testing purposes
@@ -454,19 +453,6 @@ getNetworkDependencyDummy = [
         , (ClassifiedL3IPv4, [L2EtherValidType])
         , (ClassifiedL2Ethernet, [])
     ]
-
--- FIXME: Implement getPreviousNodes
-
--- FIXME: implement matchDependencies
-
-{-
- - Check if the second node satisfies all the dependencies of first node.
- -
- -}
---isDepSatisfied :: (Eq a) => [MG.Gnode a] -> [MG.Gnode a] -> a -> Bool
-
-getDependencyPaths :: (Eq a) => [MG.Gnode a] -> a -> [[a]]
-getDependencyPaths gnodeList v = [[]]
 
 
 {-

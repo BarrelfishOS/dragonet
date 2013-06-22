@@ -29,7 +29,7 @@ import qualified Computations as MC
 --import qualified Configurations as MConf
 import qualified Computations as MConf
 import qualified Data.List as DL
-import qualified Debug.Trace as DT
+--import qualified Debug.Trace as DT
 
 
 getE1kPRGConfTest ::  IO()
@@ -47,31 +47,24 @@ getTestcaseConfiguration = [
             (MC.ConfDecision MC.L2EtherValidCRC MC.ON)
             , (MC.ConfDecision  MC.L3IPv4ValidChecksum MC.OFF)
             , (MC.ConfDecision (MC.ToQueue testQueue) MC.ON)
-            , (MC.ConfDecision (MC.IsFlow testFilter) MC.ON)
+            , (MC.ConfDecision (MC.IsFlow f1) MC.ON)
             , (MC.ConfDecision (MC.IsPartial tcpChecksumPartial) MC.ON)
+            , (MC.ConfDecision (MC.IsPartial hf1) MC.ON)
             ]
         where
         testQueue = MC.Queue 4 1
-        testFilter = MC.Filter 1 MC.TCP MC.anyIP (MC.toIP "192.168.2.4") MC.anyPort 80
+        f1 = MC.Filter 1 MC.TCP MC.anyIP (MC.toIP "192.168.2.4") MC.anyPort 80
         tcpChecksumPartial = MC.PartialComp MC.L4TCPValidChecksum
             tcpEmulatedPart
         tcpEmulatedPart = MC.IsEmulated (MC.EmulatedComp MC.L4TCPChecksumAdjustment)
 
+        hf1 = MC.PartialComp (MC.IsFlow f4) hf1EmulatedPart
+        hf1EmulatedPart = MC.IsEmulated (MC.EmulatedComp (MC.IsHashFilter f4))
 
+        f4' = MC.getDefaultFitlerForID 4
 
-
-getExampleConfBetter :: [MC.ConfDecision]
-getExampleConfBetter = [
-            (MC.ConfDecision MC.L2EtherValidCRC MC.ON)
-            , (MC.ConfDecision  MC.L3IPv4ValidChecksum MC.OFF)
-            , (MC.ConfDecision MC.L4UDPValidChecksum MC.UnConfigured)
-            , (MC.ConfDecision (MC.ToQueue testQueue) MC.UnConfigured)
-            , (MC.ConfDecision (MC.IsFlow testFilter) MC.UnConfigured)
-         ]
-         where
-            testQueue = MC.Queue 4 4
-            testFilter = MC.Filter 1 MC.TCP (MC.toIP "192.168.002.001") (MC.toIP "192.168.003.001") 4444 80
-
+        f4 = MC.Filter 4 MC.TCP (MC.toIP "192.168.2.4")
+            (MC.toIP "192.168.2.1") MC.anyPort 23
 
 {-
  - Find all the ConfDecision nodes which are dealing with same Computation Node
@@ -89,8 +82,16 @@ matchConfigNode _ _ = False
 compareComputeNodesForConfig :: MC.Computation -> MC.Computation -> Bool
 compareComputeNodesForConfig (MC.IsFlow f1) (MC.IsFlow f2) =
     MC.filterID f1 == MC.filterID f2
+compareComputeNodesForConfig (MC.IsHashFilter f1) (MC.IsHashFilter f2) =
+    MC.filterID f1 == MC.filterID f2
 compareComputeNodesForConfig (MC.ToQueue q1) (MC.ToQueue q2) =
     MC.queueId q1 == MC.queueId q2
+compareComputeNodesForConfig (MC.IsPartial p1) (MC.IsPartial p2) =
+    compareComputeNodesForConfig (MC.pComp p1) (MC.pComp p2)
+        -- I am not sure if following part should be there or not.
+        && compareComputeNodesForConfig (MC.pNeeds p1) (MC.pNeeds p2)
+compareComputeNodesForConfig (MC.IsEmulated ec1) (MC.IsEmulated ec2) =
+    compareComputeNodesForConfig (MC.eComp ec1) (MC.eComp ec2)
 compareComputeNodesForConfig x y = x == y
 
 {-
@@ -121,7 +122,7 @@ applyConfig prg confDes
         | matchingConfNodes == [] = prg
         | otherwise = newPRG
     where
-            (MC.ConfDecision conf confStat) = confDes
+            (MC.ConfDecision conf _) = confDes
             matchingConfNodes =  DL.filter (matchConfigNode conf) prg
             newNode = MC.IsConfSet confDes
             newPRG = DL.foldl (replaceNodesWith  newNode) prg matchingConfNodes
@@ -161,12 +162,12 @@ replaceNodesWith newNode prg (oldNode, _) = DL.map (myReplaceFn oldNode newNode)
  -}
 replaceNodeForON ::  [MG.Gnode MC.Computation] -> MG.Gnode MC.Computation
         -> [MG.Gnode MC.Computation]
-replaceNodeForON prg ((MC.IsConfSet (MC.ConfDecision comp stat)), deps) =
+replaceNodeForON prg ((MC.IsConfSet (MC.ConfDecision comp stat)), _) =
         DL.map (myReplaceFn oldNode newNode) prg
     where
     oldNode = MC.IsConfSet (MC.ConfDecision comp stat)
     newNode = comp
-replaceNodeForON prg _ = error "Invalid module cropped in the replaceNodeForON"
+replaceNodeForON _ _ = error "Invalid module cropped in the replaceNodeForON"
 
 {-
  - Get all dependencies of selected node
@@ -189,7 +190,7 @@ removeNode deleteMe list = DL.filter  (\x -> (fst x) /= deleteMe ) list
  -}
 replaceNodeForOFF ::  [MG.Gnode MC.Computation] -> MG.Gnode MC.Computation
         -> [MG.Gnode MC.Computation]
-replaceNodeForOFF prg ((MC.IsConfSet (MC.ConfDecision comp stat)), deps)
+replaceNodeForOFF prg ((MC.IsConfSet (MC.ConfDecision comp stat)), _)
     | DL.length allDeps == 0 = prg'
     | otherwise = prg''
     where
@@ -202,7 +203,7 @@ replaceNodeForOFF _ _ = (error ("unexpected node found in the list"
 
 replaceOnlyDeps :: MC.Computation -> [MC.Computation]
         -> [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
-replaceOnlyDeps oldNode newDep [] = []
+replaceOnlyDeps _ _ [] = []
 replaceOnlyDeps oldNode newDep (x:xs) = dps ++ replaceOnlyDeps oldNode newDep xs
     where
     (node, currentDeps) = x
@@ -287,15 +288,15 @@ getE1kPRG = [
         -- Filtering the packet
         , (generic_filter, [l4ReadyToClassify])
 
-
-
         -- some exaple filters
         , (flow1, [l4ReadyToClassify]) -- sample filter
         , (flow2, [l4ReadyToClassify]) -- sample filter
         , (flow3, [l4ReadyToClassify]) -- sample filter
+        , (hf1, [l4ReadyToClassify]) -- sample filter
         , (q4, [flow1]) -- Added just to make show the queues at proper place
         , (q3, [flow2]) -- Added just to make show the queues at proper place
         , (q1, [flow3]) -- Added just to make show the queues at proper place
+        , (q3, [hf1]) -- Added just to make show the queues at proper place
         , (q0, [generic_filter])
         ]
     where
@@ -310,6 +311,14 @@ getE1kPRG = [
         tcpChecksumPartial = MC.IsPartial (MC.PartialComp MC.L4TCPValidChecksum
             tcpEmulatedPart)
         tcpEmulatedPart = MC.IsEmulated (MC.EmulatedComp MC.L4TCPChecksumAdjustment)
+
+        hf1 = (MConf.IsConfSet (MConf.ConfDecision
+            partialhf1 MConf.UnConfigured))
+        partialhf1  = MC.IsPartial (MC.PartialComp (MC.IsFlow ff1)
+            ff1EmulatedPart)
+        ff1EmulatedPart = MC.IsEmulated (MC.EmulatedComp (MC.IsHashFilter ff1))
+        ff1 = MC.getDefaultFitlerForID 4
+
 
         l4ReadyToClassify = MC.L4ReadyToClassify
         --l4ReadyToClassify = (MConf.IsConfSet  (MConf.ConfDecision
@@ -327,16 +336,16 @@ getE1kPRG = [
            (MC.ToQueue (MC.Queue 4 4))  MConf.UnConfigured))
 
         -- sample http server filter
-        generic_filter = MC.getDefaultFitlerForID 0
+        generic_filter = MC.IsFlow (MC.getDefaultFitlerForID 0)
 
         flow1 = (MConf.IsConfSet  (MConf.ConfDecision
-            (MC.getDefaultFitlerForID 1) MConf.UnConfigured))
+            (MC.IsFlow (MC.getDefaultFitlerForID 1)) MConf.UnConfigured))
 
         flow2 = (MConf.IsConfSet  (MConf.ConfDecision
-            (MC.getDefaultFitlerForID 2) MConf.UnConfigured))
+            (MC.IsFlow (MC.getDefaultFitlerForID 2)) MConf.UnConfigured))
 
         flow3 = (MConf.IsConfSet  (MConf.ConfDecision
-            (MC.getDefaultFitlerForID 3) MConf.UnConfigured))
+            (MC.IsFlow (MC.getDefaultFitlerForID 3)) MConf.UnConfigured))
 
 
 {-
