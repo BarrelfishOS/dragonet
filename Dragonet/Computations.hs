@@ -161,6 +161,15 @@ data ConfStatus = ON
                 | UnConfigured
                 deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
+type ModeType = String
+data Mode = Mode {
+        mName :: ModeType
+        , mComp :: Computation
+    } deriving (Eq, Ord, DD.Typeable, DD.Data)
+
+instance Show Mode where
+    show (Mode name c) = show name ++ " " ++ show c
+
 data EmulatedComp = EmulatedComp  {
         eComp :: Computation
     } deriving (Eq, Ord, DD.Typeable, DD.Data)
@@ -302,6 +311,7 @@ data Computation = ClassifiedL2Ethernet -- Ethernet starter node
         | IsConfSet ConfDecision
         | IsPartial PartialComp
         | IsEmulated EmulatedComp
+        | InMode Mode
         deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
         --deriving (Show, Eq, Ord)
         --deriving (Eq, Ord)

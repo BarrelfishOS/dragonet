@@ -21,6 +21,7 @@ module E1k (
     , getE1kPRGConfTest
     , getTestcaseConfiguration
     , main
+--    , compareComputeNodesForConfig
 ) where
 
 
