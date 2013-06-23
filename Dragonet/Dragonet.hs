@@ -53,7 +53,7 @@ testE1kConf =
 
         conf1 = E1k.getTestcaseConfiguration
         conf2 = [
-            (MC.ConfDecision MC.L4UDPValidChecksum MC.ON)
+            (MC.ConfDecision MC.L4UDPValidChecksum MC.ENABLE)
             ]
 
 
@@ -72,7 +72,7 @@ genEmbeddedPraph = writeFile "Embedded.dot" $ EMBD.embedSimple lpg' prg'
     where
 
         lpg = LPG.getSampleLPG2Apps $ MC.getNetworkDependency
-        prg = E1k.purgeFixedConfigs $ E1k.applyConfigList E1k.getE1kPRG E1k.getTestcaseConfiguration
+        prg = E1k.purgeUnreachableNodes [] $ E1k.purgeFixedConfigs $ E1k.applyConfigList E1k.getE1kPRG E1k.getTestcaseConfiguration
         lpg' = MC.sortGraph lpg
         prg' = MC.sortGraph prg
 
@@ -83,8 +83,7 @@ testEmbedV2:: IO ()
 testEmbedV2 = writeFile "EmbeddedV2.dot" $ EMBD.embedV2 lpg prg
     where
         lpg = LPG.getSampleLPG2Apps $ MC.getNetworkDependency
-        prg = E1k.purgeFixedConfigs $ E1k.applyConfigList E1k.getE1kPRG E1k.getTestcaseConfiguration
-
+        prg = E1k.purgeUnreachableNodes [] $ E1k.purgeFixedConfigs $ E1k.applyConfigList E1k.getE1kPRG E1k.getTestcaseConfiguration
 
 
 {-

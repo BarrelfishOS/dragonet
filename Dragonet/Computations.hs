@@ -39,14 +39,10 @@ module Computations (
     , sortGraph
     , getDefaultQueue
     , getDefaultFitlerForID
-    -- For Configuration Module
-    , Configuration(..)
     , ConfDecision(..)
     , ConfStatus(..)
     , EmulatedComp(..)
     , PartialComp(..)
-    , genDependencies
-    , genAllDependencies
     , getNodeCategory
 
 ) where
@@ -155,27 +151,15 @@ instance Show Socket where
     show (Socket sid) = show sid
 
 
-{-
- -
- - From Configuration
- -}
-data Configuration = Always
-                | EthernetChecksum Bool
-                | IPv4Checksum Bool
-                | TCPChecksum Bool
-                | UDPChecksum Bool
-                | QueueConf Queue
-                | FilterConf Filter Queue
-                deriving (Show,  Eq, Ord, DD.Typeable, DD.Data)
-
 showConfBounds :: Computation -> String
 showConfBounds (ToQueue _) = "[(0, 0)..(MaxQueue, MaxCore)]"
 showConfBounds (IsFlow _) = "[AllPossibleFilters]"
 showConfBounds _ = "[False, True]"
 
-data ConfStatus = ON
-                | OFF
-                | UnConfigured
+data ConfStatus = ENABLE
+                | SKIP
+                | STOP
+                | Undecided
                 deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
 type ModeType = String
@@ -204,39 +188,18 @@ instance Show PartialComp where
     show (PartialComp c n) = show c ++  " " ++ show n
 
 data ConfDecision = ConfDecision {
-        computation :: Computation
-        , status :: ConfStatus
+        dComp :: Computation
+        , dStatus :: ConfStatus
     } deriving (Eq, Ord, DD.Typeable, DD.Data)
 
 instance Show ConfDecision where
-    show (ConfDecision comp (UnConfigured)) =  show UnConfigured ++
+    show (ConfDecision comp (Undecided)) =  show Undecided ++
         " " ++ show comp ++ " " ++ showConfBounds comp
-    show (ConfDecision comp (OFF)) =  show OFF ++ " " ++ show comp
-    show (ConfDecision comp (ON)) =  show ON ++ " " ++ show comp
+    show (ConfDecision comp (SKIP)) =  show SKIP ++ " " ++ show comp
+    show (ConfDecision comp (ENABLE)) =  show ENABLE ++ " " ++ show comp
+    show (ConfDecision comp (STOP)) =  show STOP ++ " " ++ show comp
 
 --        " " ++ show (DD.typeOf comp) ++ " " ++ showConfBounds comp
-
-{-
- - Generates additional edges needed to support given configuration
- - This is specially needed for configurations which can add dynamic number
- - of edges.
- - eg: hardware queues, filters
- -}
-genDependencies :: Configuration -> [(Computation, [Computation])]
-genDependencies (QueueConf q) = [(node, deps)]
-    where
-        node =  ToQueue q
-        deps = []
-genDependencies (FilterConf f q) = deps
-    where
-        node =  IsFlow f
-        deps = [(node, [L4ReadyToClassify])
-                , ((ToQueue q), [node])]
-genDependencies _ = []
-
-
-genAllDependencies :: [Configuration] -> [(Computation, [Computation])]
-genAllDependencies confList = DL.concatMap genDependencies confList
 
 
 
@@ -253,7 +216,11 @@ data Layer = L1 -- hardware
 -- List of all the computations/tests which can happen on incoming packets
 -- presence of these tags in any module will show that the module is capable of
 -- performing this perticular computation
-data Computation = ClassifiedL2Ethernet -- Ethernet starter node
+data Computation =
+        L0Tag
+        | L2Virtualization
+        | L2NOVirtualization
+        | ClassifiedL2Ethernet -- Ethernet starter node
         | L2EtherValidLen
         | L2EtherValidCRC
         | L2EtherValidBroadcast
