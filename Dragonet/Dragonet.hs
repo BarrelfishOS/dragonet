@@ -39,14 +39,15 @@ testE1kConf =
         putStrLn "####################################\n\n"
         writeFile "E1kbasePRG.dot" $ MG.showFlowGraph basePRG
         writeFile "E1kconf1PRG.dot" $ MG.showFlowGraph conf1PRG
-        writeFile "E1kconf1PurgedPRG.dot" $ MG.showFlowGraph conf1PRG'
+        writeFile "E1kconf1PurgedPRG.dot" $ MG.showFlowGraph conf1PRG''
         writeFile "E1kconf2PRG.dot" $ MG.showFlowGraph conf2PRG
         writeFile "E1kconf2PurgedPRG.dot" $ MG.showFlowGraph conf2PRG'
     where
         basePRG = E1k.getE1kPRG
         conf1PRG = E1k.applyConfigList basePRG conf1
         conf1PRG' = E1k.purgeFixedConfigs conf1PRG
-
+        conf1PRG'' = E1k.purgeUnreachableNodes [] conf1PRG'
+--        conf1PRG'' = conf1PRG'
         conf2PRG = E1k.applyConfigList conf1PRG' conf1
         conf2PRG' = E1k.purgeFixedConfigs conf2PRG
 

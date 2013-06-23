@@ -18,6 +18,7 @@ module E1k (
     , purgeFixedOFFConfigs
     , purgeFixedONConfigs
     , purgeFixedConfigs
+    , purgeUnreachableNodes
     , getE1kPRGConfTest
     , getTestcaseConfiguration
     , main
@@ -25,7 +26,7 @@ module E1k (
 ) where
 
 
-import qualified MyGraph as MG
+--import qualified MyGraph as MG
 import qualified Computations as MC
 --import qualified Configurations as MConf
 import qualified Computations as MConf
@@ -62,8 +63,6 @@ getTestcaseConfiguration = [
         hf1 = MC.PartialComp (MC.IsFlow f4) hf1EmulatedPart
         hf1EmulatedPart = MC.IsEmulated (MC.EmulatedComp (MC.IsHashFilter f4))
 
-        f4' = MC.getDefaultFitlerForID 4
-
         f4 = MC.Filter 4 MC.TCP (MC.toIP "192.168.2.4")
             (MC.toIP "192.168.2.1") MC.anyPort 23
 
@@ -71,7 +70,7 @@ getTestcaseConfiguration = [
  - Find all the ConfDecision nodes which are dealing with same Computation Node
  - as input config node.
  -}
-matchConfigNode :: MC.Computation -> MG.Gnode MC.Computation ->  Bool
+matchConfigNode :: MC.Computation -> MC.Gnode MC.Computation ->  Bool
 matchConfigNode x ((MC.IsConfSet (MC.ConfDecision c _)), _)  =
     compareComputeNodesForConfig  c x
 matchConfigNode _ _ = False
@@ -96,15 +95,15 @@ compareComputeNodesForConfig (MC.IsEmulated ec1) (MC.IsEmulated ec2) =
 compareComputeNodesForConfig x y = x == y
 
 {-
-getConfigNodesInternal :: MG.Gnode MC.Computation -> [MG.Gnode MC.Computation]
+getConfigNodesInternal :: MC.Gnode MC.Computation -> [MC.Gnode MC.Computation]
 getConfigNodesInternal ((MC.IsConfSet x), deps) = [(MC.IsConfSet x, deps)]
 getConfigNodesInternal _ = []
 
-getConfigNodes :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
+getConfigNodes :: [MC.Gnode MC.Computation] -> [MC.Gnode MC.Computation]
 getConfigNodes [] = []
 getConfigNodes (x:xs) = (getConfigNodesInternal x) ++ getConfigNodes xs
 
-isConfigPresent :: [MG.Gnode MC.Computation] -> MC.Computation -> [MG.Gnode MC.Computation]
+isConfigPresent :: [MC.Gnode MC.Computation] -> MC.Computation -> [MC.Gnode MC.Computation]
 isConfigPresent prg conf = DL.filter (matchConfigNode conf) prg
 -}
 
@@ -117,8 +116,8 @@ isConfigPresent prg conf = DL.filter (matchConfigNode conf) prg
  -          update configuration node
  -          update its dependencies
  -}
-applyConfig :: [MG.Gnode MC.Computation] -> MC.ConfDecision
-    -> [MG.Gnode MC.Computation]
+applyConfig :: [MC.Gnode MC.Computation] -> MC.ConfDecision
+    -> [MC.Gnode MC.Computation]
 applyConfig prg confDes
         | matchingConfNodes == [] = prg
         | otherwise = newPRG
@@ -129,8 +128,8 @@ applyConfig prg confDes
             newPRG = DL.foldl (replaceNodesWith  newNode) prg matchingConfNodes
 
 
-applyConfigList:: [MG.Gnode MC.Computation] -> [MC.ConfDecision]
-    -> [MG.Gnode MC.Computation]
+applyConfigList:: [MC.Gnode MC.Computation] -> [MC.ConfDecision]
+    -> [MC.Gnode MC.Computation]
 applyConfigList prg [] = prg
 applyConfigList prg (x:xs) = applyConfigList prg' xs
     where
@@ -141,8 +140,8 @@ applyConfigList prg (x:xs) = applyConfigList prg' xs
  - for given oldNode and newNode, replace ocurrances of oldNode with NewNode
  - both in "single" (node, dependencies) tuple
  -}
-myReplaceFn ::  MC.Computation -> MC.Computation -> MG.Gnode MC.Computation
-    -> MG.Gnode MC.Computation
+myReplaceFn ::  MC.Computation -> MC.Computation -> MC.Gnode MC.Computation
+    -> MC.Gnode MC.Computation
 myReplaceFn oldX newX (n, dep) = (n', dep')
     where
         n' = if n == oldX then newX else n
@@ -152,17 +151,17 @@ myReplaceFn oldX newX (n, dep) = (n', dep')
 {-
  - Replace the oldNode with newNode, for all the tuples in given PRG
  -}
-replaceNodesWith :: MC.Computation -> [MG.Gnode MC.Computation]
-    -> MG.Gnode  MC.Computation
-    -> [MG.Gnode MC.Computation]
+replaceNodesWith :: MC.Computation -> [MC.Gnode MC.Computation]
+    -> MC.Gnode  MC.Computation
+    -> [MC.Gnode MC.Computation]
 replaceNodesWith newNode prg (oldNode, _) = DL.map (myReplaceFn oldNode newNode) prg
 
 {-
  - Replace the given oldNode with internal Computation within the oldNode
  - for whole PRG
  -}
-replaceNodeForON ::  [MG.Gnode MC.Computation] -> MG.Gnode MC.Computation
-        -> [MG.Gnode MC.Computation]
+replaceNodeForON ::  [MC.Gnode MC.Computation] -> MC.Gnode MC.Computation
+        -> [MC.Gnode MC.Computation]
 replaceNodeForON prg ((MC.IsConfSet (MC.ConfDecision comp stat)), _) =
         DL.map (myReplaceFn oldNode newNode) prg
     where
@@ -173,15 +172,15 @@ replaceNodeForON _ _ = error "Invalid module cropped in the replaceNodeForON"
 {-
  - Get all dependencies of selected node
  -}
-getAllDeps :: MC.Computation -> [MG.Gnode MC.Computation] -> [MC.Computation]
+getAllDeps :: MC.Computation -> [MC.Gnode MC.Computation] -> [MC.Computation]
 getAllDeps chosenOne list = DL.concatMap (\(_, deps) -> deps)
             $ DL.filter (\(node,_) -> node == chosenOne) list
 
 {-
  - Remove the given node from the PRGlist
  -}
-removeNode :: MC.Computation -> [MG.Gnode MC.Computation]
-    -> [MG.Gnode MC.Computation]
+removeNode :: MC.Computation -> [MC.Gnode MC.Computation]
+    -> [MC.Gnode MC.Computation]
 removeNode deleteMe list = DL.filter  (\x -> (fst x) /= deleteMe ) list
 
 
@@ -189,8 +188,8 @@ removeNode deleteMe list = DL.filter  (\x -> (fst x) /= deleteMe ) list
  - Remove the given oldNode, and modify all the nodes which were dependent on it
  - with node before oldNode
  -}
-replaceNodeForOFF ::  [MG.Gnode MC.Computation] -> MG.Gnode MC.Computation
-        -> [MG.Gnode MC.Computation]
+replaceNodeForOFF ::  [MC.Gnode MC.Computation] -> MC.Gnode MC.Computation
+        -> [MC.Gnode MC.Computation]
 replaceNodeForOFF prg ((MC.IsConfSet (MC.ConfDecision comp stat)), _)
     | DL.length allDeps == 0 = prg'
     | otherwise = prg''
@@ -203,7 +202,7 @@ replaceNodeForOFF _ _ = (error ("unexpected node found in the list"
             ++ " which was supposed to have only config nodes"))
 
 replaceOnlyDeps :: MC.Computation -> [MC.Computation]
-        -> [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
+        -> [MC.Gnode MC.Computation] -> [MC.Gnode MC.Computation]
 replaceOnlyDeps _ _ [] = []
 replaceOnlyDeps oldNode newDep (x:xs) = dps ++ replaceOnlyDeps oldNode newDep xs
     where
@@ -216,7 +215,7 @@ replaceOnlyDeps oldNode newDep (x:xs) = dps ++ replaceOnlyDeps oldNode newDep xs
 
 -- ###############################
 
-selectConfigNode :: MC.ConfStatus -> MG.Gnode MC.Computation ->  Bool
+selectConfigNode :: MC.ConfStatus -> MC.Gnode MC.Computation ->  Bool
 selectConfigNode val ((MC.IsConfSet (MC.ConfDecision _ stat)), _) = stat == val
 selectConfigNode _ _ = False
 
@@ -225,7 +224,7 @@ selectConfigNode _ _ = False
  - Find all the nodes which have fixed config (either ON or OFF)
  - For every node, find a replacement [nodes]
  -}
-purgeFixedOFFConfigs :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
+purgeFixedOFFConfigs :: [MC.Gnode MC.Computation] -> [MC.Gnode MC.Computation]
 purgeFixedOFFConfigs prg = newPRG
     where
     --newPRG = prg
@@ -237,22 +236,195 @@ purgeFixedOFFConfigs prg = newPRG
 {-
  -
  -}
-purgeFixedONConfigs :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
+purgeFixedONConfigs :: [MC.Gnode MC.Computation] -> [MC.Gnode MC.Computation]
 purgeFixedONConfigs prg = newPRG
     where
     selectedNodes = DL.filter (selectConfigNode MC.ON) prg
     newPRG = DL.foldl (replaceNodeForON) prg selectedNodes
 
-
-purgeFixedConfigs :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation]
+purgeFixedConfigs :: [MC.Gnode MC.Computation] -> [MC.Gnode MC.Computation]
 purgeFixedConfigs prg = purgeFixedOFFConfigs $ purgeFixedONConfigs $ prg
+
+
+purgeUnreachableNodes :: [MC.Gnode MC.Computation] -> [MC.Gnode MC.Computation]
+    -> [MC.Gnode MC.Computation]
+purgeUnreachableNodes reachable prg
+    | newReachableNodes == reachable = reachable
+    | otherwise = purgeUnreachableNodes (newReachableNodes) prg
+    where
+    newReachableNodes = DL.filter (isReachable reachable) prg
+
+-- Makes assumption that input nodes are in sorted
+isReachable :: [MC.Gnode MC.Computation] -> MC.Gnode MC.Computation -> Bool
+isReachable prg (n, deps) = (notRechableDeps == [])
+    where
+    notRechableDeps = DL.filter (\x -> x `DL.notElem` reachableNodes) deps
+    reachableNodes = getNonOFFNodesList $ MC.getNodesList prg
+
+{-
+ - Get all the nonOFF nodes (nodes which are configured ON, or unconfigured,
+ -  or are basic nodes.
+ -}
+getNonOFFNodesList :: [MC.Computation] -> [MC.Computation]
+getNonOFFNodesList [] = []
+getNonOFFNodesList (x:xs)
+    | isNonOffNode x = (x:getNonOFFNodesList xs)
+    | otherwise = getNonOFFNodesList xs
+
+{-
+ - Tells if given node is nonOFF (configurationwise), after taking care of
+ - tags and other details
+ -}
+isNonOffNode :: MC.Computation -> Bool
+isNonOffNode (MC.IsConfSet (MC.ConfDecision _ status)) = status /= MC.OFF
+isNonOffNode (MC.InMode (MC.Mode _ c)) = isNonOffNode c
+isNonOffNode (MC.IsEmulated (MC.EmulatedComp c)) = isNonOffNode c
+isNonOffNode (MC.IsPartial (MC.PartialComp c _)) = isNonOffNode c
+    -- maybe I should also check the PNeeds list of PartialComp here
+isNonOffNode c = True
+
+
+
+{-
+getE1kWithMultipleModes :: [MC.Gnode MC.Computation]
+getE1kWithMultipleModes =
+
+    where
+    pf = addTagToAllPRG "PF" vnic
+    vf1 = addTagToAllPRG "VF1" vnic
+    vf2 = addTagToAllPRG "VF1" vnic
+    vnic = getE1kVF
+    vNICConf = (MConf.IsConfSet (MConf.ConfDecision
+           MC.L2Virtualization MConf.UnConfigured))
+
+    l2Filter = (MConf.IsConfSet (MConf.ConfDecision
+           l2Filter1 MConf.UnConfigured))
+-}
+
+{-
+ - Adds specified tag as mode to all the nodes and their dependencies
+ -}
+addTagToAllPRG :: MC.ModeType -> [MC.Gnode MC.Computation] ->
+    [MC.Gnode MC.Computation]
+addTagToAllPRG mode [] = []
+addTagToAllPRG mode (x:xs) = (currentNode:(addTagToAllPRG mode xs))
+    where
+    currentNode = (c', deps')
+    (c, deps) = x
+    c' = (MC.InMode (MC.Mode mode c))
+    deps' = DL.map (\x -> (MC.InMode (MC.Mode mode x))) deps
+
 
 
 {-
  - Returns list of computations which can happen in the E1k NIC
  - and their dependencies.
  -}
-getE1kPRG :: [MG.Gnode MC.Computation]
+getE1kVF :: [MC.Gnode MC.Computation]
+getE1kVF = [
+        (MC.ClassifiedL2Ethernet, [])
+        , (MC.L2EtherValidLen, [MC.ClassifiedL2Ethernet])
+
+        , (etherChecksum, [MC.L2EtherValidLen])
+
+        , (MC.L2EtherValidBroadcast, [etherChecksum])
+        , (MC.L2EtherValidMulticast, [etherChecksum])
+        , (MC.L2EtherValidUnicast, [etherChecksum])
+        , (MC.L2EtherValidDest, [MC.L2EtherValidBroadcast])
+        , (MC.L2EtherValidDest, [MC.L2EtherValidMulticast])
+        , (MC.L2EtherValidDest, [MC.L2EtherValidUnicast])
+        , (MC.L2EtherValidType, [MC.L2EtherValidDest])
+        , (MC.ClassifiedL3IPv4, [MC.L2EtherValidType])
+        , (ipv4Checksum, [MC.ClassifiedL3IPv4])
+        , (MC.L3IPv4ValidProtocol, [ipv4Checksum])
+        , (MC.ClassifiedL3IPv6, [MC.L2EtherValidType])
+        , (MC.L3IPv6ValidProtocol, [MC.ClassifiedL3IPv6])
+        , (MC.ClassifiedL3, [MC.L3IPv4ValidProtocol])
+        , (MC.ClassifiedL3, [MC.L3IPv6ValidProtocol])
+        , (MC.ClassifiedL4UDP, [MC.ClassifiedL3]) -- UDP classification
+
+        , (tcpChecksum, [MC.ClassifiedL3]) -- TCP checksum
+        , (MC.ClassifiedL4TCP, [tcpChecksum]) -- TCP classification
+        , (MC.UnclasifiedL4, [MC.ClassifiedL3]) -- all other packets
+        , (MC.ClassifiedL4ICMP, [MC.ClassifiedL3]) -- UDP classification
+
+
+        , (l4ReadyToClassify, [MC.ClassifiedL4TCP])
+        , (l4ReadyToClassify, [MC.ClassifiedL4UDP])
+        , (l4ReadyToClassify, [MC.ClassifiedL4ICMP])
+        , (l4ReadyToClassify, [MC.UnclasifiedL4])
+
+        -- Filtering the packet
+        , (generic_filter, [l4ReadyToClassify])
+
+        -- some exaple filters
+        , (flow1, [l4ReadyToClassify]) -- sample filter
+        , (flow2, [l4ReadyToClassify]) -- sample filter
+        , (flow3, [l4ReadyToClassify]) -- sample filter
+        , (hf1, [l4ReadyToClassify]) -- sample filter
+        , (q4, [flow1]) -- Added just to make show the queues at proper place
+        , (q3, [flow2]) -- Added just to make show the queues at proper place
+        , (q1, [flow3]) -- Added just to make show the queues at proper place
+        , (q3, [hf1]) -- Added just to make show the queues at proper place
+        , (q0, [generic_filter])
+        ]
+    where
+
+        etherChecksum = (MConf.IsConfSet  (MConf.ConfDecision
+             MC.L2EtherValidCRC MConf.UnConfigured))
+        ipv4Checksum = (MConf.IsConfSet  (MConf.ConfDecision
+             MC.L3IPv4ValidChecksum MConf.UnConfigured))
+
+
+        tcpChecksum = (MConf.IsConfSet (MConf.ConfDecision
+            tcpChecksumPartial  MConf.UnConfigured))
+        tcpChecksumPartial = MC.IsPartial (MC.PartialComp MC.L4TCPValidChecksum
+            tcpEmulatedPart)
+        tcpEmulatedPart = MC.IsEmulated (MC.EmulatedComp MC.L4TCPChecksumAdjustment)
+
+        hf1 = (MConf.IsConfSet (MConf.ConfDecision
+            partialhf1 MConf.UnConfigured))
+        partialhf1  = MC.IsPartial (MC.PartialComp (MC.IsFlow ff1)
+            ff1EmulatedPart)
+        ff1EmulatedPart = MC.IsEmulated (MC.EmulatedComp (MC.IsHashFilter ff1))
+        ff1 = MC.getDefaultFitlerForID 4
+
+
+        l4ReadyToClassify = MC.L4ReadyToClassify
+        --l4ReadyToClassify = (MConf.IsConfSet  (MConf.ConfDecision
+        --    MC.L4ReadyToClassify MConf.UnConfigured))
+
+
+        q0 = MC.ToQueue (MC.Queue 0 0)
+        q1 = (MConf.IsConfSet  (MConf.ConfDecision
+           (MC.ToQueue (MC.Queue 1 1))  MConf.UnConfigured))
+
+        q3 = (MConf.IsConfSet  (MConf.ConfDecision
+           (MC.ToQueue (MC.Queue 3 3))  MConf.UnConfigured))
+
+        q4 = (MConf.IsConfSet  (MConf.ConfDecision
+           (MC.ToQueue (MC.Queue 4 4))  MConf.UnConfigured))
+
+        -- sample http server filter
+        generic_filter = MC.IsFlow (MC.getDefaultFitlerForID 0)
+
+        flow1 = (MConf.IsConfSet  (MConf.ConfDecision
+            (MC.IsFlow (MC.getDefaultFitlerForID 1)) MConf.UnConfigured))
+
+        flow2 = (MConf.IsConfSet  (MConf.ConfDecision
+            (MC.IsFlow (MC.getDefaultFitlerForID 2)) MConf.UnConfigured))
+
+        flow3 = (MConf.IsConfSet  (MConf.ConfDecision
+            (MC.IsFlow (MC.getDefaultFitlerForID 3)) MConf.UnConfigured))
+
+
+
+
+{-
+ - Returns list of computations which can happen in the E1k NIC
+ - and their dependencies.
+ -}
+getE1kPRG :: [MC.Gnode MC.Computation]
 getE1kPRG = [
         (MC.ClassifiedL2Ethernet, [])
         , (MC.L2EtherValidLen, [MC.ClassifiedL2Ethernet])
@@ -356,5 +528,5 @@ main  :: IO()
 main = do
          putStrLn outDot
     where
-        outDot = MG.showFlowGraph getE1kPRG
+        outDot = show getE1kPRG
 

@@ -12,7 +12,7 @@ module LPG (
     , main
 ) where
 
-import qualified MyGraph as MG
+--import qualified MyGraph as MG
 import qualified Computations as MC
 import qualified Data.List as DL
 
@@ -31,7 +31,7 @@ getSocketID _ = error "Invalid data type"
  -}
 
 
-getMaxSocketID :: [MG.Gnode MC.Computation] -> MC.SocketId
+getMaxSocketID :: [MC.Gnode MC.Computation] -> MC.SocketId
 getMaxSocketID nodesList
     | sockIDList == [] = 0
     | otherwise = DL.maximum sockIDList
@@ -42,7 +42,7 @@ getMaxSocketID nodesList
  - Opens a new socket in given graph.
  - It also adds this newly created socket into the graph.
  -}
-openSocket :: [MG.Gnode MC.Computation] -> ([MG.Gnode MC.Computation], MC.Socket)
+openSocket :: [MC.Gnode MC.Computation] -> ([MC.Gnode MC.Computation], MC.Socket)
 openSocket currentGraph = (newGraph, socket)
     where
         maxSockID = getMaxSocketID currentGraph
@@ -55,7 +55,7 @@ openSocket currentGraph = (newGraph, socket)
  - FIXME: make sure that I have removed duplicate entries for sock,
  -  app and filter.  Also, if the filter already exist then I should complain
  -}
-bind :: [MG.Gnode MC.Computation] -> MC.Application -> MC.Socket -> MC.Filter -> [MG.Gnode MC.Computation]
+bind :: [MC.Gnode MC.Computation] -> MC.Application -> MC.Socket -> MC.Filter -> [MC.Gnode MC.Computation]
 bind lpg app sock fl = lpgFiltered ++ [
                     (thisFlow, [MC.L4ReadyToClassify])
                     , (tosocket, [thisFlow, MC.VerifiedL4])
@@ -72,7 +72,7 @@ bind lpg app sock fl = lpgFiltered ++ [
  - Returns a sample LPG graph with two applications :
  - apache webserver and tetnet client
  -}
-getSampleLPG2Apps :: [MG.Gnode MC.Computation] ->  [MG.Gnode MC.Computation]
+getSampleLPG2Apps :: [MC.Gnode MC.Computation] ->  [MC.Gnode MC.Computation]
 getSampleLPG2Apps lpg = finalLPG
     where
         -- Apache server
@@ -99,5 +99,5 @@ main = do
          putStrLn outDot
     where
         lpg = MC.getNetworkDependency
-        outDot = MG.showFlowGraph $ getSampleLPG2Apps lpg
+        outDot = show $ getSampleLPG2Apps lpg
 

@@ -11,11 +11,16 @@
 --module Main (
 module Computations (
     Computation(..)
+    , Gnode
+    , Edge
+    , NodeCategory(..)
     , Socket(..)
     , Application(..)
     , Filter(..)
     , Queue(..)
     , Protocol(..)
+    , Mode(..)
+    , ModeType
     , Qid
     , CoreID
     , AppName
@@ -30,6 +35,7 @@ module Computations (
     , getNetworkDependency
     , getNetworkDependencyDummy
     , embeddGraphs
+    , getNodesList
     , sortGraph
     , getDefaultQueue
     , getDefaultFitlerForID
@@ -45,13 +51,24 @@ module Computations (
 
 ) where
 
-import qualified MyGraph as MG
+--import qualified MyGraph as MG
 import qualified Data.Data as DD
 import qualified Data.List as DL
 import qualified Data.Set as Set
 
 --import qualified Data.Ix as Ix
 --import qualified Debug.Trace as TR
+
+type Gnode a = (a, [a])
+
+type Edge a = (a, a) -- connects two vertices.
+
+data NodeCategory =
+    ANDNode
+    | ORNode
+    | CONFNode
+    deriving (Show, Eq, Ord)
+
 
 type L2Address = Integer
 type L3Address = Integer
@@ -162,6 +179,7 @@ data ConfStatus = ON
                 deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
 
 type ModeType = String
+
 data Mode = Mode {
         mName :: ModeType
         , mComp :: Computation
@@ -331,7 +349,7 @@ instance Show Computation where
  -      AND nodes should have more than one dependency edges in single declaration.
  -      OR nodes should always have only one entry in every declaration
  -}
-getNetworkDependency :: [MG.Gnode Computation]
+getNetworkDependency :: [Gnode Computation]
 getNetworkDependency = [
         (ClassifiedL2Ethernet, [])
         , (L2EtherValidLen, [ClassifiedL2Ethernet])
@@ -455,7 +473,7 @@ getDefaultFitlerForID x = (Filter x ANYProtocol 0 0 0 0)
 {-
  - Small sample dependency list for testing purposes
  -}
-getNetworkDependencyDummy :: [MG.Gnode Computation]
+getNetworkDependencyDummy :: [Gnode Computation]
 getNetworkDependencyDummy = [
         (VerifiedL2Ethernet, [L2EtherValidLen, L2EtherValidType])
         , (L2EtherValidLen, [ClassifiedL2Ethernet])
@@ -468,7 +486,7 @@ getNetworkDependencyDummy = [
 {-
  -
  -}
-getDependencies :: (Eq a) => [MG.Gnode a] -> a -> ([a], [a])
+getDependencies :: (Eq a) => [Gnode a] -> a -> ([a], [a])
 getDependencies gnodeList v
         | length listANDnodes > 1 = error "More than one list of AND dependencies"
         | length listANDnodes > 1 && length listORnodes > 1 =
@@ -486,17 +504,17 @@ getDependencies gnodeList v
                 | listORnodes == [] = []
                 | otherwise = concatMap snd listANDnodes
 
-getANDdependencies :: (Eq a) => [MG.Gnode a] -> a -> [a]
+getANDdependencies :: (Eq a) => [Gnode a] -> a -> [a]
 getANDdependencies gnodeList v = fst $ getDependencies gnodeList v
 
-getORdependencies :: (Eq a) => [MG.Gnode a] -> a -> [a]
+getORdependencies :: (Eq a) => [Gnode a] -> a -> [a]
 getORdependencies gnodeList v = snd $ getDependencies gnodeList v
 
 
-getNodesList :: (Eq a) => [MG.Gnode a] -> [a]
+getNodesList :: (Eq a) => [Gnode a] -> [a]
 getNodesList gnodeList = DL.map fst gnodeList
 
-getSinkNodesList :: (Eq a) => [MG.Gnode a] -> [a]
+getSinkNodesList :: (Eq a) => [Gnode a] -> [a]
 getSinkNodesList gnodeList = DL.concatMap snd gnodeList
 
 mySubset :: (Ord a) => (Eq a) => (Show a) => [a] -> [a] -> Bool
@@ -504,8 +522,8 @@ mySubset superSet subSet = Set.fromList subSet `Set.isSubsetOf`  Set.fromList su
 
 -- find the first node which is not in sortedNodes list, but but not dependent
 -- on any other element in unsorted list
-findNextSortedNodes :: (Ord a) => (Eq a) => (Show a) => [MG.Gnode a] ->
-        [MG.Gnode a] -> [MG.Gnode a]
+findNextSortedNodes :: (Ord a) => (Eq a) => (Show a) => [Gnode a] ->
+        [Gnode a] -> [Gnode a]
 findNextSortedNodes sortedNodes unsortedNodes =
        DL.filter (\x -> mySubset  sinkNodes (snd x)) unsortedNodes
     where
@@ -513,7 +531,7 @@ findNextSortedNodes sortedNodes unsortedNodes =
 
 
 sortGraphStep :: (Ord a) => (Eq a) => (Show a) =>
-        ([MG.Gnode a], [MG.Gnode a]) -> ([MG.Gnode a], [MG.Gnode a])
+        ([Gnode a], [Gnode a]) -> ([Gnode a], [Gnode a])
 sortGraphStep (sortedNodes, unsortedNodes)
     | unsortedNodes == [] = (sortedNodes, [])
     | selectedNodes == [] = error (
@@ -526,7 +544,7 @@ sortGraphStep (sortedNodes, unsortedNodes)
             newUnsorted =  unsortedNodes DL.\\ selectedNodes
 
 
-sortGraph :: (Ord a) => (Eq a) => (Show a) => [MG.Gnode a] -> [MG.Gnode a]
+sortGraph :: (Ord a) => (Eq a) => (Show a) => [Gnode a] -> [Gnode a]
 sortGraph graph
     | unsorted /= [] = error ("Could not sort the graph because of: " ++
         show unsorted)
@@ -535,7 +553,7 @@ sortGraph graph
         (sorted, unsorted) = sortGraphStep ([], graph)
 
 {-
-f1 :: (Eq a) => [MG.Gnode a] -> [MG.Gnode a] -> a -> [MG.Gnode a]
+f1 :: (Eq a) => [Gnode a] -> [Gnode a] -> a -> [Gnode a]
 f1 prg rag v =
     | DL.notElem v getNodesList prg
 
@@ -549,8 +567,8 @@ f1 prg rag v =
  -              and to inSoftware
  - all previous nodes in S/W --> add dep to all those nodes
  -}
-addToSoftPartAND :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
-    -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
+addToSoftPartAND :: (Eq a) => (Ord a) => (Show a)  => [Gnode a] -> a
+    -> [Gnode a] -> Gnode a -> Gnode a
 addToSoftPartAND  prg swstartnode emblpg (vname, deps)
     | inSW == [] = (vname, [swstartnode])
     | inHW == [] = (vname, deps)
@@ -560,8 +578,8 @@ addToSoftPartAND  prg swstartnode emblpg (vname, deps)
         inHW = filter (\x -> DL.elem x hwNodes)  deps
         inSW = filter (\x -> DL.notElem x hwNodes)  deps
 
-addToSoftPartOR :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
-    -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
+addToSoftPartOR :: (Eq a) => (Ord a) => (Show a)  => [Gnode a] -> a
+    -> [Gnode a] -> Gnode a -> Gnode a
 addToSoftPartOR  prg swstartnode  emblpg (vname, deps)
     | DL.elem (DL.head deps) (getNodesList prg) = (vname, [swstartnode])
     | otherwise = (vname, deps)
@@ -573,8 +591,8 @@ addToSoftPartOR  prg swstartnode  emblpg (vname, deps)
  -          h/w and to inSoftware
  - all previous nodes in S/W --> add dep to all those nodes
  -}
-addToHWPartAND :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
-    -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
+addToHWPartAND :: (Eq a) => (Ord a) => (Show a)  => [Gnode a] -> a
+    -> [Gnode a] -> Gnode a -> Gnode a
 addToHWPartAND prg swstartnode emblpg (vname, deps)
     | inSW == [] = (vname, deps)
     | inHW == [] = (vname, deps)
@@ -587,8 +605,8 @@ addToHWPartAND prg swstartnode emblpg (vname, deps)
         inSW = filter (\x -> DL.notElem x hwNodes)  deps
 
 
-addToHWPartOR :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
-    -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
+addToHWPartOR :: (Eq a) => (Ord a) => (Show a)  => [Gnode a] -> a
+    -> [Gnode a] -> Gnode a -> Gnode a
 addToHWPartOR prg swstartnode emblpg (vname, deps)
     | DL.elem (DL.head deps) (getNodesList prg) = (vname, deps)
     | otherwise = error ("previous node [ " ++ show (DL.head deps) ++
@@ -601,8 +619,8 @@ addToHWPartOR prg swstartnode emblpg (vname, deps)
  - Embedd the node v by finding out whether it can go in hardware
  - or in software
  -}
-embedGivenNode :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
-        -> [MG.Gnode a] -> MG.Gnode a -> MG.Gnode a
+embedGivenNode :: (Eq a) => (Ord a) => (Show a)  => [Gnode a] -> a
+        -> [Gnode a] -> Gnode a -> Gnode a
 embedGivenNode prg swstartnode emblpg (vname, deps)
     | DL.elem vname $ getNodesList prg = if length deps == 1 then
                         addToHWPartOR prg swstartnode  emblpg (vname, deps)
@@ -614,8 +632,8 @@ embedGivenNode prg swstartnode emblpg (vname, deps)
             addToSoftPartAND prg swstartnode emblpg (vname, deps)
 
 
-embeddGraphStep :: (Eq a) => (Ord a) => (Show a)  => [MG.Gnode a] -> a
-        -> ([MG.Gnode a], [MG.Gnode a]) -> ([MG.Gnode a], [MG.Gnode a])
+embeddGraphStep :: (Eq a) => (Ord a) => (Show a)  => [Gnode a] -> a
+        -> ([Gnode a], [Gnode a]) -> ([Gnode a], [Gnode a])
 embeddGraphStep prg  swstartnode (lpgEmbedded, lpgUnembedded)
         | lpgUnembedded == [] = (lpgEmbedded, lpgUnembedded)
         | otherwise = embeddGraphStep prg swstartnode (lpgEmbedded', lpgUnembedded')
@@ -628,8 +646,8 @@ embeddGraphStep prg  swstartnode (lpgEmbedded, lpgUnembedded)
 {-
  - Embed LPG onto PRG
  -}
-embeddGraphs :: (Eq a) => (Ord a) => (Show a) => [MG.Gnode a] -> [MG.Gnode a]
-                -> a -> a -> [MG.Gnode a]
+embeddGraphs :: (Eq a) => (Ord a) => (Show a) => [Gnode a] -> [Gnode a]
+                -> a -> a -> [Gnode a]
 embeddGraphs lpg prg swstartnode defaultQueue
     | unEmbedded /= [] = error "Still some vertieces are not converted"
     | otherwise = embedded ++ [(swstartnode, [defaultQueue])]
@@ -637,13 +655,13 @@ embeddGraphs lpg prg swstartnode defaultQueue
         (embedded, unEmbedded) = embeddGraphStep prg swstartnode ([], lpg)
 
 
-getNodeCategory :: MG.Gnode Computation -> MG.NodeCategory
+getNodeCategory :: Gnode Computation -> NodeCategory
 getNodeCategory ((IsConfSet _), deps)
     | DL.length deps > 1 = error "ERROR: given node is both AND and configuration"
-    | otherwise = MG.CONFNode
+    | otherwise = CONFNode
 getNodeCategory (n, deps)
-    | DL.length deps > 1 = MG.ANDNode
-    | otherwise = MG.ORNode
+    | DL.length deps > 1 = ANDNode
+    | otherwise = ORNode
 
 
 -- main function (just for testing purposes)
@@ -662,6 +680,6 @@ main  :: IO()
 main = do
         putStrLn outDot
     where
-        outDotDummy = MG.showFlowGraph getNetworkDependencyDummy
-        outDot = MG.showFlowGraph getNetworkDependency
+        outDotDummy = show getNetworkDependencyDummy
+        outDot = show getNetworkDependency
 

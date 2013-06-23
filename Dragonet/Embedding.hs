@@ -22,14 +22,14 @@ import qualified LPG as LPG
  - Embeds the small graph inside large graph
  - This emplementation just marks all the nodes in both graphs as embedded ones.
  -}
-embedSimple :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation] ->
+embedSimple :: [MC.Gnode MC.Computation] -> [MC.Gnode MC.Computation] ->
         String
 embedSimple bigGraph smallGraph = embeddedGraph
     where
         embeddedGraph = MG.showEmbeddedGraph bigGraph smallGraph
 
-embedV2 :: [MG.Gnode MC.Computation] -> [MG.Gnode MC.Computation] ->
---         [MG.Gnode MC.Computation]
+embedV2 :: [MC.Gnode MC.Computation] -> [MC.Gnode MC.Computation] ->
+--         [MC.Gnode MC.Computation]
         String
 embedV2 bigGraph smallGraph = embeddedGraphStr
     where

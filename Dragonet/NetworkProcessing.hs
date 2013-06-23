@@ -14,10 +14,10 @@ module NetworkProcessing (
     , main
 ) where
 
-import qualified MyGraph as MG
+--import qualified MyGraph as MG
 import qualified Computations as MC
 
-getNetworkProcessingGraph :: [MG.Gnode MC.Computation]
+getNetworkProcessingGraph :: [MC.Gnode MC.Computation]
 getNetworkProcessingGraph = MC.getNetworkDependency
 
 {-
@@ -27,6 +27,6 @@ main  :: IO()
 main = do
          putStrLn outDot
     where
-        outDot = MG.showFlowGraph getNetworkProcessingGraph
+        outDot = show getNetworkProcessingGraph
 
 

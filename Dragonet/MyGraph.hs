@@ -11,42 +11,31 @@
 
 --module Main (
 module MyGraph (
-    Gnode
-    , NodeCategory(..)
-    , showDependencyGraph
+    showDependencyGraph
     , showFlowGraph
     , showEmbeddedGraph
 ) where
 
+import qualified Computations as MC
 import qualified Data.List as DL
 import qualified Data.Char as DC
 
--- Gnode is the Datatype which captures single vertex of the Graph
+-- MC.Gnode is the Datatype which captures single vertex of the Graph
 -- and all its dependenceis
 -- The DataType "a" is expected to be in instance of
 --  "Show", "Eq"
-type Gnode a = (a, [a])
-
-type Edge a = (a, a) -- connects two vertices.
-
-data NodeCategory =
-    ANDNode
-    | ORNode
-    | CONFNode
-    deriving (Show, Eq, Ord)
-
-type ShowEdgeFn a = Edge a -> String
+type ShowEdgeFn a = MC.Edge a -> String
 type ShowVertexFn a = a -> String
 
 
 {-
- - Get list of all the edges from given list of Gnodes
+ - Get list of all the edges from given list of MC.Gnodes
  -}
-makeEdgeList :: a -> [a] -> [Edge a]
+makeEdgeList :: a -> [a] -> [MC.Edge a]
 makeEdgeList _ [] = []
 makeEdgeList src (x:xs) = [(src, x)] ++ makeEdgeList src xs
 
-getEdges :: [Gnode a] -> [Edge a]
+getEdges :: [MC.Gnode a] -> [MC.Edge a]
 getEdges nlist = DL.concat $ DL.map
                     ( \ e -> makeEdgeList (fst e) (snd e)) nlist
 
@@ -59,13 +48,13 @@ replaceSpaces str = map (\x-> (if DC.isAlphaNum x then x else '_' )) str
 {-
  - Reversing edges to convert dependency graph into flow graph
  -}
-reverseEdges :: [Edge a] -> [Edge a]
+reverseEdges :: [MC.Edge a] -> [MC.Edge a]
 reverseEdges edgelist = DL.map (\(a, b) -> (b, a)) edgelist
 
 {-
- - prints the edge with additional description (if needed)
+ - prints the MC.Edge with additional description (if needed)
  -}
-showEdge :: (Show a) => Edge a -> String
+showEdge :: (Show a) => MC.Edge a -> String
 showEdge (from, to) =  (replaceSpaces $ show from) ++ " -> " ++
             (replaceSpaces $ show to ) ++ " [label = \"" ++ "\"];\n"
 
@@ -73,7 +62,7 @@ showEdge (from, to) =  (replaceSpaces $ show from) ++ " -> " ++
 {-
  - Find all AND nodes in given graph
  -}
-findANDnodes :: (Eq a) => [Gnode a] -> [a]
+findANDnodes :: (Eq a) => [MC.Gnode a] -> [a]
 findANDnodes gnodeList = DL.nub $ DL.map fst $ DL.filter (\x -> length (snd x) > 1 ) gnodeList
 
 {-
@@ -81,7 +70,7 @@ findANDnodes gnodeList = DL.nub $ DL.map fst $ DL.filter (\x -> length (snd x) >
  - TODO: These two functions are too similar.  There should be a way
  - to write them in one function.
  -}
-findORnodes :: (Eq a) => [Gnode a] -> [a]
+findORnodes :: (Eq a) => [MC.Gnode a] -> [a]
 findORnodes gnodeList = DL.nub $ DL.map fst $ DL.filter (\x -> length (snd x) <= 1 ) gnodeList
 
 
@@ -134,7 +123,7 @@ showNodeGeneric fancyList v
  - Arguments are <list of vertices> <list of edges>
  -}
 showGraphViz :: (Show a) => (Eq a) => [a] -> ShowVertexFn a ->
-                    [Edge a] -> ShowEdgeFn a -> String
+                    [MC.Edge a] -> ShowEdgeFn a -> String
 showGraphViz vertexList svf edges sef =
     "digraph name {\n" ++
     "rankdir=LR;\n" ++
@@ -144,11 +133,11 @@ showGraphViz vertexList svf edges sef =
 
 
 {-
- - Converts given graph encoded in Gnode list into DoT compatible
+ - Converts given graph encoded in MC.Gnode list into DoT compatible
  -  graph notation.
  -  One can run command ``dot`` on this generated output to produce a graph.
  -}
-showGenGraph ::(Show a) => (Eq a) => [Gnode a] -> Bool -> String
+showGenGraph ::(Show a) => (Eq a) => [MC.Gnode a] -> Bool -> String
 showGenGraph gnodeList isDependency = showGraphViz verticesList shownodefn
                                 edgesList showEdge
     where
@@ -164,7 +153,7 @@ showGenGraph gnodeList isDependency = showGraphViz verticesList shownodefn
             | otherwise = reverseEdges $ getEdges gnodeList
 
 
-showEmbeddedGraph ::(Show a) => (Eq a) => [Gnode a] -> [Gnode a] -> String
+showEmbeddedGraph ::(Show a) => (Eq a) => [MC.Gnode a] -> [MC.Gnode a] -> String
 showEmbeddedGraph gbig gsmall = showGraphViz verticesList shownodefn
                                 edgesList showEdge
     where
@@ -192,19 +181,19 @@ showEmbeddedGraph gbig gsmall = showGraphViz verticesList shownodefn
 
 
 {-
- - Converts given dependency graph encoded in Gnode list into DoT compatible
+ - Converts given dependency graph encoded in MC.Gnode list into DoT compatible
  -  graph notation.
  -  One can run command ``dot`` on this generated output to produce a graph.
  -}
-showDependencyGraph ::(Show a) => (Eq a) => [Gnode a] -> String
+showDependencyGraph ::(Show a) => (Eq a) => [MC.Gnode a] -> String
 showDependencyGraph gnodeList = showGenGraph gnodeList True
 
 
 {-
- - Just like above showDependencyGraph function, converts Gnode list
+ - Just like above showDependencyGraph function, converts MC.Gnode list
  - into DoT compatible graph, but it reverts the direction of all the
  - edges to generate a flow graph instead of dependency graph.
  -}
-showFlowGraph ::(Show a) => (Eq a) => [Gnode a] -> String
+showFlowGraph ::(Show a) => (Eq a) => [MC.Gnode a] -> String
 showFlowGraph gnodeList = showGenGraph gnodeList False
 
