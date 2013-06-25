@@ -24,6 +24,7 @@ import qualified Data.Char as DC
 -- and all its dependenceis
 -- The DataType "a" is expected to be in instance of
 --  "Show", "Eq"
+
 type ShowEdgeFn a = MC.Edge a -> String
 type ShowVertexFn a = a -> String
 
@@ -31,11 +32,11 @@ type ShowVertexFn a = a -> String
 {-
  - Get list of all the edges from given list of MC.Gnodes
  -}
-makeEdgeList :: a -> [a] -> [MC.Edge a]
+makeEdgeList :: MC.GraphNode a => a -> [a] -> [MC.Edge a]
 makeEdgeList _ [] = []
 makeEdgeList src (x:xs) = [(src, x)] ++ makeEdgeList src xs
 
-getEdges :: [MC.Gnode a] -> [MC.Edge a]
+getEdges ::  MC.GraphNode a => [MC.Gnode a] -> [MC.Edge a]
 getEdges nlist = DL.concat $ DL.map
                     ( \ e -> makeEdgeList (fst e) (snd e)) nlist
 
@@ -48,16 +49,18 @@ replaceSpaces str = map (\x-> (if DC.isAlphaNum x then x else '_' )) str
 {-
  - Reversing edges to convert dependency graph into flow graph
  -}
-reverseEdges :: [MC.Edge a] -> [MC.Edge a]
+reverseEdges :: MC.GraphNode a => [MC.Edge a] -> [MC.Edge a]
 reverseEdges edgelist = DL.map (\(a, b) -> (b, a)) edgelist
 
 {-
  - prints the MC.Edge with additional description (if needed)
  -}
-showEdge :: (Show a) => MC.Edge a -> String
-showEdge (from, to) =  (replaceSpaces $ show from) ++ " -> " ++
-            (replaceSpaces $ show to ) ++ " [label = \"" ++ "\"];\n"
-
+showEdge :: MC.GraphNode a => MC.Edge a -> String
+showEdge (from, to) =  (replaceSpaces fromV) ++ " -> " ++
+            (replaceSpaces toV ) ++ " [label = \"" ++ "\"];\n"
+        where
+        fromV = MC.toVertex from
+        toV = MC.toVertex to
 
 {-
  - Find all AND nodes in given graph
@@ -77,7 +80,7 @@ findORnodes gnodeList = DL.nub $ DL.map fst $ DL.filter (\x -> length (snd x) <=
 {-
  - prints the vertex with information like AND or OR type (if needed)
  -}
-showORnode :: (Show a) => a -> String
+showORnode :: MC.GraphNode a => a -> String
 showORnode v
     | "IsConfSet" `DL.isPrefixOf` nodeName = nodeName ++ " [label = "
         ++ nodeName ++ ", color=gray,style=filled,shape=tab];\n"
@@ -85,23 +88,23 @@ showORnode v
         ++ nodeName ++ ", color=turquoise,style=filled,shape=folder];\n"
     | otherwise = nodeName ++ " [label = " ++ nodeName  ++ "];\n"
     where
-        nodeName = replaceSpaces $ show v
+        nodeName = replaceSpaces $ MC.toVertex v
 
 
-showANDnode :: (Show a) => a -> String
+showANDnode :: MC.GraphNode a => a -> String
 showANDnode v = nodeName ++ " [label = " ++ nodeName ++
         ", color=gray,style=filled,shape=trapezium];\n"
     where
-        nodeName = replaceSpaces $ show v
+        nodeName = replaceSpaces $ MC.toVertex v
 
-showEmbeddednode :: (Show a) => a -> String
+showEmbeddednode :: MC.GraphNode a => a -> String
 showEmbeddednode v = nodeName ++ " [label = " ++ nodeName ++
         ", color=green,style=filled,shape=rectangle];\n"
     where
-        nodeName = replaceSpaces $ show v
+        nodeName = replaceSpaces $ MC.toVertex v
 
 
-showNode :: (Show a) => (Eq a) => [a] -> [a] -> [a] -> a -> String
+showNode :: MC.GraphNode a => (Eq a) => [a] -> [a] -> [a] -> a -> String
 showNode orList andList embList v
         | DL.elem v andList = showANDnode v
         | DL.elem v orList = showORnode v
@@ -110,7 +113,7 @@ showNode orList andList embList v
 
 
 
-showNodeGeneric :: (Show a) => (Eq a) => [([a], ShowVertexFn a)] -> a -> String
+showNodeGeneric :: MC.GraphNode a => (Eq a) => [([a], ShowVertexFn a)] -> a -> String
 showNodeGeneric fancyList v
     | DL.length matchedElement /= 0 = ((snd $ DL.head matchedElement) v)
     | otherwise = error "element not found in fancy list"
@@ -122,7 +125,7 @@ showNodeGeneric fancyList v
  - Prints the graph in dot format
  - Arguments are <list of vertices> <list of edges>
  -}
-showGraphViz :: (Show a) => (Eq a) => [a] -> ShowVertexFn a ->
+showGraphViz :: (MC.GraphNode a) => (Eq a) => [a] -> ShowVertexFn a ->
                     [MC.Edge a] -> ShowEdgeFn a -> String
 showGraphViz vertexList svf edges sef =
     "digraph name {\n" ++
@@ -137,7 +140,7 @@ showGraphViz vertexList svf edges sef =
  -  graph notation.
  -  One can run command ``dot`` on this generated output to produce a graph.
  -}
-showGenGraph ::(Show a) => (Eq a) => [MC.Gnode a] -> Bool -> String
+showGenGraph ::(MC.GraphNode a) => (Eq a) => [MC.Gnode a] -> Bool -> String
 showGenGraph gnodeList isDependency = showGraphViz verticesList shownodefn
                                 edgesList showEdge
     where
@@ -153,7 +156,7 @@ showGenGraph gnodeList isDependency = showGraphViz verticesList shownodefn
             | otherwise = reverseEdges $ getEdges gnodeList
 
 
-showEmbeddedGraph ::(Show a) => (Eq a) => [MC.Gnode a] -> [MC.Gnode a] -> String
+showEmbeddedGraph ::(MC.GraphNode a) => (Eq a) => [MC.Gnode a] -> [MC.Gnode a] -> String
 showEmbeddedGraph gbig gsmall = showGraphViz verticesList shownodefn
                                 edgesList showEdge
     where
@@ -185,7 +188,7 @@ showEmbeddedGraph gbig gsmall = showGraphViz verticesList shownodefn
  -  graph notation.
  -  One can run command ``dot`` on this generated output to produce a graph.
  -}
-showDependencyGraph ::(Show a) => (Eq a) => [MC.Gnode a] -> String
+showDependencyGraph ::(MC.GraphNode a) => (Eq a) => [MC.Gnode a] -> String
 showDependencyGraph gnodeList = showGenGraph gnodeList True
 
 
@@ -194,6 +197,6 @@ showDependencyGraph gnodeList = showGenGraph gnodeList True
  - into DoT compatible graph, but it reverts the direction of all the
  - edges to generate a flow graph instead of dependency graph.
  -}
-showFlowGraph ::(Show a) => (Eq a) => [MC.Gnode a] -> String
+showFlowGraph ::(MC.GraphNode a) => (Eq a) => [MC.Gnode a] -> String
 showFlowGraph gnodeList = showGenGraph gnodeList False
 

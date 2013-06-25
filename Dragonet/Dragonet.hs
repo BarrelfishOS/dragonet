@@ -111,8 +111,8 @@ main  :: IO()
 main = do
         putStrLn "Generating NetDep.dot"
         genNetGraph
-        putStrLn "Generating E1kPRG.dot"
-        genE10kPRGGraph
+        putStrLn "Generating E1kPRG.dot with conf"
+        testE1kConf
         putStrLn "Generating LPG.dot"
         genLPGGraph
         putStrLn "Generating Embedded.dot"
@@ -120,8 +120,6 @@ main = do
         putStrLn "testing generic graph embedding EmbeddedV2.dot"
         testEmbedV2
 --        testSorting
-        putStrLn "Testing PRG with configuration"
-        testE1kConf
         putStrLn outmsg
     where
         outmsg = "Done!"

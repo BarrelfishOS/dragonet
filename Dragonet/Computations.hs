@@ -11,6 +11,7 @@
 --module Main (
 module Computations (
     Computation(..)
+    , GraphNode(..)
     , Gnode
     , Edge
     , NodeCategory(..)
@@ -164,13 +165,14 @@ data ConfStatus = ENABLE
 
 type ModeType = String
 
+
 data Mode = Mode {
         mName :: ModeType
         , mComp :: Computation
     } deriving (Eq, Ord, DD.Typeable, DD.Data)
 
 instance Show Mode where
-    show (Mode name c) = show name ++ " " ++ show c
+    show (Mode name c) = show c ++ " " ++ show name
 
 data EmulatedComp = EmulatedComp  {
         eComp :: Computation
@@ -211,6 +213,11 @@ data Layer = L1 -- hardware
         | L4 -- TCP/UDP layer
         | L5 -- Application
         deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
+
+
+class (Show gn) => GraphNode gn where
+    toVertex :: gn -> String
+    toVertex gn = show gn
 
 
 -- List of all the computations/tests which can happen on incoming packets
@@ -298,8 +305,12 @@ data Computation =
         | IsEmulated EmulatedComp
         | InMode Mode
         deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
-        --deriving (Show, Eq, Ord)
-        --deriving (Eq, Ord)
+
+
+instance GraphNode Computation where
+    toVertex (InMode m) = show m
+    toVertex c = show c
+
 {-
 instance Show Computation where
     show (IsFlow Protocol sip dip sp dp) = "IsFlow_P_" ++ show Protocol ++ "_SIP_"

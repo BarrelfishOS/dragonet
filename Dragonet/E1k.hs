@@ -32,7 +32,7 @@ import qualified Computations as MC
 --import qualified Configurations as MConf
 import qualified Computations as MConf
 import qualified Data.List as DL
---import qualified Debug.Trace as DT
+import qualified Debug.Trace as DT
 
 
 getE1kPRGConfTest ::  IO()
@@ -76,6 +76,7 @@ getTestcaseConfiguration = [
 matchConfigNode :: MC.Computation -> MC.Gnode MC.Computation ->  Bool
 matchConfigNode x ((MC.IsConfSet (MC.ConfDecision c _)), _)  =
     compareComputeNodesForConfig  c x
+matchConfigNode x ((MC.InMode (MC.Mode _ c)), _)  = matchConfigNode x (c, [])
 matchConfigNode _ _ = False
 
 {-
@@ -125,13 +126,13 @@ isConfigPresent prg conf = DL.filter (matchConfigNode conf) prg
 applyConfig :: [MC.Gnode MC.Computation] -> MC.ConfDecision
     -> [MC.Gnode MC.Computation]
 applyConfig prg confDes
-        | matchingConfNodes == [] = prg
+        | matchedConfs == [] = prg
         | otherwise = newPRG
     where
             (MC.ConfDecision conf _) = confDes
-            matchingConfNodes =  DL.filter (matchConfigNode conf) prg
+            matchedConfs = DL.filter (matchConfigNode conf) prg
             newNode = MC.IsConfSet confDes
-            newPRG = DL.foldl (replaceNodesWith  newNode) prg matchingConfNodes
+            newPRG = DL.foldl (replaceNodesWith newNode) prg matchedConfs
 
 
 applyConfigList:: [MC.Gnode MC.Computation] -> [MC.ConfDecision]
@@ -142,6 +143,7 @@ applyConfigList prg (x:xs) = applyConfigList prg' xs
         prg' = applyConfig prg x
 
 
+
 {-
  - for given oldNode and newNode, replace ocurrances of oldNode with NewNode
  - both in "single" (node, dependencies) tuple
@@ -150,8 +152,17 @@ myReplaceFn ::  MC.Computation -> MC.Computation -> MC.Gnode MC.Computation
     -> MC.Gnode MC.Computation
 myReplaceFn oldX newX (n, dep) = (n', dep')
     where
-        n' = if n == oldX then newX else n
-        dep' = DL.map (\x -> if x == oldX then newX else x) dep
+        n' = if n == oldX then (adaptForMode oldX newX) else n
+        dep' = DL.map (\x -> if x == oldX then (adaptForMode oldX newX) else x) dep
+
+{-
+ - Changes newNode Mode based on oldNode mode
+ - Essentially, final result should always have oldNode mode
+ -}
+adaptForMode :: MC.Computation -> MC.Computation -> MC.Computation
+adaptForMode (MC.InMode (MC.Mode om oc))  (MC.InMode (MC.Mode nm nc)) = (MC.InMode (MC.Mode om nc))
+adaptForMode (MC.InMode (MC.Mode om oc)) c = (MC.InMode (MC.Mode om c))
+adaptForMode x c = c
 
 
 {-
@@ -173,14 +184,48 @@ replaceNodeForENABLE prg ((MC.IsConfSet (MC.ConfDecision comp stat)), _) =
     where
     oldNode = MC.IsConfSet (MC.ConfDecision comp stat)
     newNode = comp
+replaceNodeForENABLE prg ((MC.InMode (MC.Mode n c)), _) =
+    replaceNodeForENABLE prg (c, [])
 replaceNodeForENABLE _ _ = error "Invalid module cropped in the replaceNodeForENABLE"
+
+
+compareComputeNodesForExchange :: MC.Computation -> MC.Computation -> Bool
+compareComputeNodesForExchange (MC.IsFlow f1) (MC.IsFlow f2) =
+    MC.protocol f1 == MC.protocol f2
+    && MC.srcIP f1 == MC.srcIP f2
+    && MC.dstIP f1 == MC.dstIP f2
+    && MC.srcPort f1 == MC.srcPort f2
+    && MC.dstPort f1 == MC.dstPort f2
+compareComputeNodesForExchange (MC.IsHashFilter f1) (MC.IsHashFilter f2) =
+    MC.protocol f1 == MC.protocol f2
+    && MC.srcIP f1 == MC.srcIP f2
+    && MC.dstIP f1 == MC.dstIP f2
+    && MC.srcPort f1 == MC.srcPort f2
+    && MC.dstPort f1 == MC.dstPort f2
+compareComputeNodesForExchange (MC.ToQueue q1) (MC.ToQueue q2) =
+    q1 == q2 -- FIXME: maybe I should just compare coreID's and not queueIDs
+compareComputeNodesForExchange (MC.IsPartial p1) (MC.IsPartial p2) =
+    compareComputeNodesForExchange (MC.pComp p1) (MC.pComp p2)
+        -- I am not sure if following part should be there or not.
+        && compareComputeNodesForExchange (MC.pNeeds p1) (MC.pNeeds p2)
+compareComputeNodesForExchange (MC.IsEmulated ec1) (MC.IsEmulated ec2) =
+    compareComputeNodesForExchange (MC.eComp ec1) (MC.eComp ec2)
+compareComputeNodesForExchange (MC.IsConfSet conf1) (MC.IsConfSet conf2) =
+    compareComputeNodesForExchange (MC.dComp conf1) (MC.dComp conf2)
+    && (MC.dStatus conf1) == (MC.dStatus conf1)
+compareComputeNodesForExchange (MC.InMode m1) (MC.InMode m2) =
+   MC.mName m1 ==  MC.mName m2
+   && MC.mComp m1 == MC.mComp m2
+compareComputeNodesForExchange x y = x == y
+
+
 
 {-
  - Get all dependencies of selected node
  -}
 getAllDeps :: MC.Computation -> [MC.Gnode MC.Computation] -> [MC.Computation]
 getAllDeps chosenOne list = DL.concatMap (\(_, deps) -> deps)
-            $ DL.filter (\(node,_) -> node == chosenOne) list
+            $ DL.filter (\(node,_) -> compareComputeNodesForExchange node chosenOne) list
 
 {-
  - Remove the given node from the PRGlist
@@ -204,6 +249,17 @@ replaceNodeForSKIP prg ((MC.IsConfSet (MC.ConfDecision comp stat)), _)
     allDeps = getAllDeps oldNode prg
     prg' = removeNode oldNode prg
     prg'' = replaceOnlyDeps oldNode allDeps prg'
+replaceNodeForSKIP prg ((MC.InMode (MC.Mode n
+    (MC.IsConfSet (MC.ConfDecision cc ss)))), deps)
+    | DL.length allDeps == 0 = prg'
+    | otherwise = prg''
+    where
+    origConfNode = (MC.IsConfSet (MC.ConfDecision cc ss))
+    origNode = (MC.InMode (MC.Mode n origConfNode))
+    allDeps = DT.trace ("replaceNodeForSkip" ++ show origNode) getAllDeps origNode prg
+    prg' = removeNode origNode  prg
+    prg'' = replaceOnlyDeps origNode allDeps prg'
+
 replaceNodeForSKIP _ _ = (error ("unexpected node found in the list"
             ++ " which was supposed to have only config nodes"))
 
@@ -300,15 +356,16 @@ getE1kWithMultipleModes :: [MC.Gnode MC.Computation]
 getE1kWithMultipleModes = bootstrap ++ pf' ++ vf1' ++ vf2'
 
     where
-    pf = addTagToAllPRG "PF" pnic
-    vf1 = addTagToAllPRG "VF1" vnic
-    vf2 = addTagToAllPRG "VF2" vnic
-    pnic = getE1kVF
-    vnic = getE1kVF
+    pfTag = "PF"
+    vf1Tag = "VF1"
+    vf2Tag = "VF2"
+    pf = addTagToAllPRG pfTag $ getE1kVF pfTag
+    vf1 = addTagToAllPRG vf1Tag $ getE1kVF vf1Tag
+    vf2 = addTagToAllPRG vf2Tag $ getE1kVF vf2Tag
 
-    pf' = [((MC.InMode (MC.Mode "PF" MC.ClassifiedL2Ethernet)) , [pNICConf])] ++ pf
-    vf1' = [((MC.InMode (MC.Mode "VF1" MC.ClassifiedL2Ethernet)) , [vNICConf])] ++ vf1
-    vf2' = [((MC.InMode (MC.Mode "VF2" MC.ClassifiedL2Ethernet)) , [vNICConf])] ++ vf2
+    pf' = [((MC.InMode (MC.Mode pfTag MC.ClassifiedL2Ethernet)) , [pNICConf])] ++ pf
+    vf1' = [((MC.InMode (MC.Mode vf1Tag MC.ClassifiedL2Ethernet)) , [vNICConf])] ++ vf1
+    vf2' = [((MC.InMode (MC.Mode vf2Tag  MC.ClassifiedL2Ethernet)) , [vNICConf])] ++ vf2
 
     vNICConf = (MConf.IsConfSet (MConf.ConfDecision
            MC.L2Virtualization MConf.Undecided))
@@ -343,8 +400,8 @@ addTagToAllPRG mode (x:xs) = (currentNode:(addTagToAllPRG mode xs))
  - Returns list of computations which can happen in the E1k NIC
  - and their dependencies.
  -}
-getE1kVF :: [MC.Gnode MC.Computation]
-getE1kVF = [
+getE1kVF :: MC.ModeType -> [MC.Gnode MC.Computation]
+getE1kVF mName = [
         (MC.L2EtherValidLen, [MC.ClassifiedL2Ethernet])
 
         , (etherChecksum, [MC.L2EtherValidLen])
@@ -392,11 +449,10 @@ getE1kVF = [
         ]
     where
 
-        etherChecksum = (MConf.IsConfSet  (MConf.ConfDecision
-             MC.L2EtherValidCRC MConf.Undecided))
+        etherChecksum = (MConf.IsConfSet
+            (MConf.ConfDecision MC.L2EtherValidCRC MConf.Undecided))
         ipv4Checksum = (MConf.IsConfSet  (MConf.ConfDecision
              MC.L3IPv4ValidChecksum MConf.Undecided))
-
 
         tcpChecksum = (MConf.IsConfSet (MConf.ConfDecision
             tcpChecksumPartial  MConf.Undecided))
@@ -410,7 +466,6 @@ getE1kVF = [
             ff1EmulatedPart)
         ff1EmulatedPart = MC.IsEmulated (MC.EmulatedComp (MC.IsHashFilter ff1))
         ff1 = MC.getDefaultFitlerForID 4
-
 
         l4ReadyToClassify = MC.L4ReadyToClassify
         --l4ReadyToClassify = (MConf.IsConfSet  (MConf.ConfDecision
@@ -438,7 +493,6 @@ getE1kVF = [
 
         flow3 = (MConf.IsConfSet  (MConf.ConfDecision
             (MC.IsFlow (MC.getDefaultFitlerForID 3)) MConf.Undecided))
-
 
 
 
