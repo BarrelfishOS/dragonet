@@ -18,6 +18,7 @@ import qualified E1k as E1k
 import qualified LPG as LPG
 import qualified NetworkProcessing as NP
 import qualified Embedding as EMBD
+import qualified PRG as PRG
 
 
 {-
@@ -44,12 +45,12 @@ testE1kConf =
         writeFile "E1kconf2PurgedPRG.dot" $ MG.showFlowGraph conf2PRG'
     where
         basePRG = E1k.getE1kPRG
-        conf1PRG = E1k.applyConfigList basePRG conf1
-        conf1PRG' = E1k.purgeFixedConfigs conf1PRG
-        conf1PRG'' = E1k.purgeUnreachableNodes [] conf1PRG'
+        conf1PRG = PRG.applyConfigList basePRG conf1
+        conf1PRG' = PRG.purgeFixedConfigs conf1PRG
+        conf1PRG'' = PRG.purgeUnreachableNodes [] conf1PRG'
 --        conf1PRG'' = conf1PRG'
-        conf2PRG = E1k.applyConfigList conf1PRG' conf1
-        conf2PRG' = E1k.purgeFixedConfigs conf2PRG
+        conf2PRG = PRG.applyConfigList conf1PRG' conf1
+        conf2PRG' = PRG.purgeFixedConfigs conf2PRG
 
         conf1 = E1k.getTestcaseConfiguration
         conf2 = [
@@ -72,7 +73,7 @@ genEmbeddedPraph = writeFile "Embedded.dot" $ EMBD.embedSimple lpg' prg'
     where
 
         lpg = LPG.getSampleLPG2Apps $ MC.getNetworkDependency
-        prg = E1k.purgeUnreachableNodes [] $ E1k.purgeFixedConfigs $ E1k.applyConfigList E1k.getE1kPRG E1k.getTestcaseConfiguration
+        prg = PRG.purgeUnreachableNodes [] $ PRG.purgeFixedConfigs $ PRG.applyConfigList E1k.getE1kPRG E1k.getTestcaseConfiguration
         lpg' = MC.sortGraph lpg
         prg' = MC.sortGraph prg
 
@@ -83,7 +84,7 @@ testEmbedV2:: IO ()
 testEmbedV2 = writeFile "EmbeddedV2.dot" $ EMBD.embedV2 lpg prg
     where
         lpg = LPG.getSampleLPG2Apps $ MC.getNetworkDependency
-        prg = E1k.purgeUnreachableNodes [] $ E1k.purgeFixedConfigs $ E1k.applyConfigList E1k.getE1kPRG E1k.getTestcaseConfiguration
+        prg = PRG.purgeUnreachableNodes [] $ PRG.purgeFixedConfigs $ PRG.applyConfigList E1k.getE1kPRG E1k.getTestcaseConfiguration
 
 
 {-

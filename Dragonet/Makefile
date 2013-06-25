@@ -12,7 +12,7 @@ models: dragonet
 
 
 #base: Computations.hs Configurations.hs E1k.hs LPG.hs MyGraph.hs NetworkProcessing.hs Makefile
-base: Computations.hs E1k.hs LPG.hs MyGraph.hs NetworkProcessing.hs Makefile
+base: Computations.hs E1k.hs LPG.hs PRG.hs MyGraph.hs NetworkProcessing.hs Makefile
 
 clean:
 	rm -f *.hi *.o Dragonet
