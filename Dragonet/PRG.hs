@@ -9,12 +9,10 @@ module PRG (
     , purgeFixedSTOPConfigs
     , purgeFixedSKIPConfigs
     , purgeUnreachableNodes
-    , addTagToAllPRG
 --    , compareComputeNodesForConfig
 ) where
 
 import qualified Computations as MC
-import qualified Computations as MConf
 import qualified Data.List as DL
 import qualified Debug.Trace as DT
 
@@ -23,11 +21,12 @@ import qualified Debug.Trace as DT
  - Find all the ConfDecision nodes which are dealing with same Computation Node
  - as input config node.
  -}
-matchConfigNode :: MC.Computation -> MC.Gnode MC.Computation ->  Bool
-matchConfigNode x ((MC.IsConfSet (MC.ConfDecision c _)), _)  =
-    compareComputeNodesForConfig  c x
-matchConfigNode x ((MC.InMode (MC.Mode _ c)), _)  = matchConfigNode x (c, [])
-matchConfigNode _ _ = False
+matchConfigNode :: MC.ModeType -> MC.Computation -> MC.Gnode MC.Computation ->  Bool
+matchConfigNode tag1 x ((MC.IsConfSet (MC.ConfDecision c _)), _)  =
+    compareComputeNodesForConfig c x && MC.compareModeTags tag1 MC.genericModeTag
+matchConfigNode tag1 x ((MC.InMode (MC.Mode tag2 c)), _)  =
+    matchConfigNode tag1 x (c, []) && MC.compareModeTags tag1 tag2
+matchConfigNode _ _ _ = False
 
 {-
  - Compare computations such that it will tell which two of them are same
@@ -73,19 +72,20 @@ isConfigPresent prg conf = DL.filter (matchConfigNode conf) prg
  -          update configuration node
  -          update its dependencies
  -}
-applyConfig :: [MC.Gnode MC.Computation] -> MC.ConfDecision
+applyConfig :: [MC.Gnode MC.Computation] -> MC.Computation
     -> [MC.Gnode MC.Computation]
-applyConfig prg confDes
+applyConfig prg (MC.InMode (MC.Mode tag (MC.IsConfSet (MC.ConfDecision conf stat)))) = np
+    where
+    np
         | matchedConfs == [] = prg
         | otherwise = newPRG
-    where
-            (MC.ConfDecision conf _) = confDes
-            matchedConfs = DL.filter (matchConfigNode conf) prg
-            newNode = MC.IsConfSet confDes
-            newPRG = DL.foldl (replaceNodesWith newNode) prg matchedConfs
 
+    newNode = MC.IsConfSet (MC.ConfDecision conf stat)
+    matchedConfs = DL.filter (matchConfigNode tag conf) prg
+    newPRG = DL.foldl (replaceNodesWith newNode) prg matchedConfs
+applyConfig _ conf = error ("Invalid configuration node given "  ++ show conf)
 
-applyConfigList:: [MC.Gnode MC.Computation] -> [MC.ConfDecision]
+applyConfigList:: [MC.Gnode MC.Computation] -> [MC.Computation]
     -> [MC.Gnode MC.Computation]
 applyConfigList prg [] = prg
 applyConfigList prg (x:xs) = applyConfigList prg' xs
@@ -298,23 +298,6 @@ isSpecificConfigNode val ((MC.IsConfSet (MC.ConfDecision _ stat)), _) =
 isSpecificConfigNode val ((MC.InMode (MC.Mode _ c)), _) = isSpecificConfigNode val (c, [])
 isSpecificConfigNode val ((MC.IsPartial (MC.PartialComp c _)), _) = isSpecificConfigNode val (c, [])
 isSpecificConfigNode _ _ = False
-
-
-
-
-
-{-
- - Adds specified tag as mode to all the nodes and their dependencies
- -}
-addTagToAllPRG :: MC.ModeType -> [MC.Gnode MC.Computation] ->
-    [MC.Gnode MC.Computation]
-addTagToAllPRG _ [] = []
-addTagToAllPRG mode (x:xs) = (currentNode:(addTagToAllPRG mode xs))
-    where
-    currentNode = (c', deps')
-    (c, deps) = x
-    c' = (MC.InMode (MC.Mode mode c))
-    deps' = DL.map (\p -> (MC.InMode (MC.Mode mode p))) deps
 
 
 

@@ -49,12 +49,12 @@ testE1kConf =
         conf1PRG' = PRG.purgeFixedConfigs conf1PRG
         conf1PRG'' = PRG.purgeUnreachableNodes [] conf1PRG'
 --        conf1PRG'' = conf1PRG'
-        conf2PRG = PRG.applyConfigList conf1PRG' conf1
+        conf2PRG = PRG.applyConfigList conf1PRG' conf2
         conf2PRG' = PRG.purgeFixedConfigs conf2PRG
 
         conf1 = E1k.getTestcaseConfiguration
         conf2 = [
-            (MC.ConfDecision MC.L4UDPValidChecksum MC.ENABLE)
+            MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision MC.L4UDPValidChecksum MC.ENABLE)
             ]
 
 

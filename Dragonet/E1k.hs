@@ -35,16 +35,17 @@ getE1kPRGConfTest =
         putStrLn $ show $ getTestcaseConfiguration
         putStrLn "#######################################################\n"
 
-getTestcaseConfiguration :: [MC.ConfDecision]
+getTestcaseConfiguration :: [MC.Computation]
 getTestcaseConfiguration = [
-            (MC.ConfDecision MC.L2EtherValidCRC MC.ENABLE)
-            , (MC.ConfDecision  MC.L3IPv4ValidChecksum MC.SKIP)
-            , (MC.ConfDecision (MC.ToQueue testQueue) MC.ENABLE)
-            , (MC.ConfDecision (MC.IsFlow f1) MC.ENABLE)
-            , (MC.ConfDecision (MC.IsPartial tcpChecksumPartial) MC.ENABLE)
-            , (MC.ConfDecision (MC.IsPartial hf1) MC.ENABLE)
-            , (MC.ConfDecision (MC.L2Virtualization) MC.ENABLE)
-            , (MC.ConfDecision (MC.L2NOVirtualization) MC.STOP)
+            MC.addMode "VF1" $ MC.IsConfSet (MC.ConfDecision MC.L2EtherValidCRC MC.ENABLE)
+            , MC.addMode "VF2" $ MC.IsConfSet (MC.ConfDecision MC.L2EtherValidCRC MC.SKIP)
+            , MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision  MC.L3IPv4ValidChecksum MC.SKIP)
+            , MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision (MC.ToQueue testQueue) MC.ENABLE)
+            , MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision (MC.IsFlow f1) MC.ENABLE)
+            , MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision (MC.IsPartial tcpChecksumPartial) MC.ENABLE)
+            , MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision (MC.IsPartial hf1) MC.ENABLE)
+            , MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision (MC.L2Virtualization) MC.ENABLE)
+            , MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision (MC.L2NOVirtualization) MC.STOP)
             ]
         where
         testQueue = MC.Queue 4 1
@@ -273,9 +274,9 @@ getE1kWithMultipleModes = bootstrap ++ pf' ++ vf1' ++ vf2'
     pfTag = "PF"
     vf1Tag = "VF1"
     vf2Tag = "VF2"
-    pf = PRG.addTagToAllPRG pfTag $ getE1kVF pfTag
-    vf1 = PRG.addTagToAllPRG vf1Tag $ getE1kVF vf1Tag
-    vf2 = PRG.addTagToAllPRG vf2Tag $ getE1kVF vf2Tag
+    pf = MC.addModeToAll pfTag $ getE1kVF pfTag
+    vf1 = MC.addModeToAll vf1Tag $ getE1kVF vf1Tag
+    vf2 = MC.addModeToAll vf2Tag $ getE1kVF vf2Tag
 
     pf' = [((MC.InMode (MC.Mode pfTag MC.ClassifiedL2Ethernet)) , [pNICConf])] ++ pf
     vf1' = [((MC.InMode (MC.Mode vf1Tag MC.ClassifiedL2Ethernet)) , [vNICConf])] ++ vf1

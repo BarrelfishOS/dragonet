@@ -22,6 +22,10 @@ module Computations (
     , Protocol(..)
     , Mode(..)
     , ModeType
+    , genericModeTag
+    , compareModeTags
+    , addMode
+    , addModeToAll
     , Qid
     , CoreID
     , AppName
@@ -166,6 +170,7 @@ data ConfStatus = ENABLE
 type ModeType = String
 
 
+
 data Mode = Mode {
         mName :: ModeType
         , mComp :: Computation
@@ -173,6 +178,36 @@ data Mode = Mode {
 
 instance Show Mode where
     show (Mode name c) = show c ++ " " ++ show name
+
+
+genericModeTag :: ModeType
+genericModeTag = "ANY"
+
+compareModeTags :: ModeType -> ModeType -> Bool
+compareModeTags t1 t2
+    | t1 == genericModeTag = True
+    | t2 == genericModeTag = True
+    | otherwise = t1 == t2
+
+
+
+addMode :: ModeType -> Computation -> Computation
+addMode tName (InMode _) = error "addMode: tag embedding is not allowed"
+addMode tName c = InMode (Mode tName c)
+
+{-
+ - Adds specified tag as mode to all the nodes and their dependencies
+ -}
+addModeToAll :: ModeType -> [Gnode Computation] ->
+    [Gnode Computation]
+addModeToAll _ [] = []
+addModeToAll tag (x:xs) = (currentNode:(addModeToAll tag xs))
+    where
+    currentNode = (c', deps')
+    (c, deps) = x
+    c' = addMode tag c
+    deps' = DL.map (addMode tag) deps
+
 
 data EmulatedComp = EmulatedComp  {
         eComp :: Computation
