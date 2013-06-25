@@ -1,5 +1,54 @@
 
 
+next question
+---------------------
+Qus:
+Ans:
+
+Status:
+
+
+next question
+---------------------
+Qus:
+Ans:
+
+Status:
+
+
+next question
+---------------------
+Qus:  paper idea
+Ans: we need to model the NIC and this how we do it.
+We can model the whole NIC with following abstractions
+ * Node/Computation
+ * Attributes (need to make decisions)
+    - Security (can it be done by anyone?)
+    - CPU cycles (cost, or how long it takes?)
+    - Communication (how often does the node invokes next elements)
+    - Buffers (memory location, is it userspace or kernelspace memory,
+            is the descriptor verified?)
+ * Configuration (It needs input, and based on that it alters the packet processing graph)
+ * PartialComputation (It needs some additional computation in userspace)
+ * Queues (can store some packets/buffers)
+    affects the communication with next inlined node, and how often these
+    communications are invoked.
+ * Dependencies
+    - AND dependencies
+    - OR dependencies
+ * Mode - card can behave in very different ways based on the mode.
+    - How exactly the mode is different from the configuration?
+ * Need separate dependency edges and communication edges.
+
+TODO: Try and implement Segmentation and user-space networking using
+    these abstractions.
+
+NOTE: user graph embedding as a driving example.
+
+
+Status:
+
+
 
 next question
 ---------------------
