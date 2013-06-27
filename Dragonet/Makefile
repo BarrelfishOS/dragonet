@@ -1,5 +1,5 @@
 
-all: dragonet
+all: models
 
 dragonet_compile: Dragonet.hs base
 	ghc -rtsopts Dragonet.hs -o Dragonet -Wall # -Werror

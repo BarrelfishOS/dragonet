@@ -14,6 +14,7 @@
 --module Main (
 module E1k (
     getE1kPRG
+    , getE1kPRGminimal
     , getE1kPRGConfTest
     , getTestcaseConfiguration
     , main
@@ -37,9 +38,10 @@ getE1kPRGConfTest =
 
 getTestcaseConfiguration :: [MC.Computation]
 getTestcaseConfiguration = [
-            MC.addMode "VF1" $ MC.IsConfSet (MC.ConfDecision MC.L2EtherValidCRC MC.ENABLE)
-            , MC.addMode "VF2" $ MC.IsConfSet (MC.ConfDecision MC.L2EtherValidCRC MC.SKIP)
+            MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision MC.L2EtherValidCRC MC.ENABLE)
             , MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision  MC.L3IPv4ValidChecksum MC.SKIP)
+            , MC.addMode vf1 $ MC.IsConfSet (MC.ConfDecision tcpSegmentation MC.SKIP)
+            , MC.addMode vf2 $ MC.IsConfSet (MC.ConfDecision tcpSegmentation MC.ENABLE)
             , MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision (MC.ToQueue testQueue) MC.ENABLE)
             , MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision (MC.IsFlow f1) MC.ENABLE)
             , MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision (MC.IsPartial tcpChecksumPartial) MC.ENABLE)
@@ -48,7 +50,9 @@ getTestcaseConfiguration = [
             , MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision (MC.L2NOVirtualization) MC.STOP)
             ]
         where
-        testQueue = MC.Queue 4 1
+        vf1 = "VF1"
+        vf2 = "VF2"
+        testQueue = MC.Queue 4 1 MC.getDefaultBasicQueue
         f1 = MC.Filter 1 MC.TCP MC.anyIP (MC.toIP "192.168.2.4") MC.anyPort 80
         tcpChecksumPartial = MC.PartialComp MC.L4TCPValidChecksum
             tcpEmulatedPart
@@ -59,6 +63,45 @@ getTestcaseConfiguration = [
 
         f4 = MC.Filter 4 MC.TCP (MC.toIP "192.168.2.4")
             (MC.toIP "192.168.2.1") MC.anyPort 23
+
+        tcpSegmentation = (MC.L4TCPSegmentation MC.getDefaultBasicQueue)
+
+
+getE1kVFminimum :: MC.ModeType -> [MC.Gnode MC.Computation]
+getE1kVFminimum mName = [
+        (MC.ClassifiedL2Ethernet, [])
+        , (etherChecksum, [MC.ClassifiedL2Ethernet])
+        , (MC.L2EtherValidBroadcast, [etherChecksum])
+
+        -- For buffer descriptor registration
+        , (MC.ReqBufDescregister, [])
+        , (MC.VerifyBufDesc, [MC.ReqBufDescregister])
+        , (addBufDesQ1, [MC.VerifyBufDesc])
+        , (addBufDesQ0, [MC.VerifyBufDesc])
+
+        , (generic_filter, [MC.L2EtherValidBroadcast])
+        , (flow1, [MC.L2EtherValidBroadcast])
+        , (toQ0, [generic_filter, addBufDesQ0])
+        , (toQ1, [flow1, addBufDesQ1]) -- Added just to make show the queues at proper place
+        ]
+    where
+        etherChecksum = (MConf.IsConfSet
+            (MConf.ConfDecision MC.L2EtherValidCRC MConf.Undecided))
+        toQ0 = MC.ToQueue q0
+        toQ1 = (MConf.IsConfSet  (MConf.ConfDecision
+           (MC.ToQueue q1)  MConf.Undecided))
+
+        q0 =  MC.getDefaultQueue
+        q1 = MC.Queue 1 1 MC.getDefaultBasicQueue
+
+
+        generic_filter = MC.IsFlow (MC.getDefaultFitlerForID 0)
+        flow1 = (MConf.IsConfSet  (MConf.ConfDecision
+            (MC.IsFlow (MC.getDefaultFitlerForID 1)) MConf.Undecided))
+
+        addBufDesQ1 = MC.AddBufDescToQueue q1
+        addBufDesQ0 = MC.AddBufDescToQueue q0
+
 
 
 {-
@@ -88,7 +131,8 @@ getE1kVF mName = [
         , (MC.ClassifiedL4UDP, [MC.ClassifiedL3]) -- UDP classification
 
         , (tcpChecksum, [MC.ClassifiedL3]) -- TCP checksum
-        , (MC.ClassifiedL4TCP, [tcpChecksum]) -- TCP classification
+        , (tcpSegmentation, [tcpChecksum]) -- TCP classification
+        , (MC.ClassifiedL4TCP, [tcpSegmentation]) -- TCP classification
         , (MC.UnclasifiedL4, [MC.ClassifiedL3]) -- all other packets
         , (MC.ClassifiedL4ICMP, [MC.ClassifiedL3]) -- UDP classification
 
@@ -119,6 +163,10 @@ getE1kVF mName = [
         ipv4Checksum = (MConf.IsConfSet  (MConf.ConfDecision
              MC.L3IPv4ValidChecksum MConf.Undecided))
 
+        tcpSegmentation = (MConf.IsConfSet (MConf.ConfDecision
+            (MC.L4TCPSegmentation MC.getDefaultBasicQueue) MConf.Undecided))
+
+
         tcpChecksum = (MConf.IsConfSet (MConf.ConfDecision
             tcpChecksumPartial  MConf.Undecided))
         tcpChecksumPartial = MC.IsPartial (MC.PartialComp MC.L4TCPValidChecksum
@@ -137,15 +185,15 @@ getE1kVF mName = [
         --    MC.L4ReadyToClassify MConf.Undecided))
 
 
-        q0 = MC.ToQueue (MC.Queue 0 0)
+        q0 = MC.ToQueue MC.getDefaultQueue
         q1 = (MConf.IsConfSet  (MConf.ConfDecision
-           (MC.ToQueue (MC.Queue 1 1))  MConf.Undecided))
+           (MC.ToQueue (MC.Queue 1 1 MC.getDefaultBasicQueue))  MConf.Undecided))
 
         q3 = (MConf.IsConfSet  (MConf.ConfDecision
-           (MC.ToQueue (MC.Queue 3 3))  MConf.Undecided))
+           (MC.ToQueue (MC.Queue 3 3 MC.getDefaultBasicQueue))  MConf.Undecided))
 
         q4 = (MConf.IsConfSet  (MConf.ConfDecision
-           (MC.ToQueue (MC.Queue 4 4))  MConf.Undecided))
+           (MC.ToQueue (MC.Queue 4 4 MC.getDefaultBasicQueue))  MConf.Undecided))
 
         -- sample http server filter
         generic_filter = MC.IsFlow (MC.getDefaultFitlerForID 0)
@@ -169,6 +217,10 @@ getE1kVF mName = [
 getE1kPRG :: [MC.Gnode MC.Computation]
 getE1kPRG = getE1kWithMultipleModes
 -- getE1kPRG = getE1kPRGV1
+
+getE1kPRGminimal:: [MC.Gnode MC.Computation]
+getE1kPRGminimal = getE1kWithMultipleModesMinimal
+
 
 getE1kPRGV1 :: [MC.Gnode MC.Computation]
 getE1kPRGV1 = [
@@ -244,15 +296,15 @@ getE1kPRGV1 = [
         --    MC.L4ReadyToClassify MConf.Undecided))
 
 
-        q0 = MC.ToQueue (MC.Queue 0 0)
+        q0 = MC.ToQueue MC.getDefaultQueue
         q1 = (MConf.IsConfSet  (MConf.ConfDecision
-           (MC.ToQueue (MC.Queue 1 1))  MConf.Undecided))
+           (MC.ToQueue (MC.Queue 1 1 MC.getDefaultBasicQueue))  MConf.Undecided))
 
         q3 = (MConf.IsConfSet  (MConf.ConfDecision
-           (MC.ToQueue (MC.Queue 3 3))  MConf.Undecided))
+           (MC.ToQueue (MC.Queue 3 3 MC.getDefaultBasicQueue))  MConf.Undecided))
 
         q4 = (MConf.IsConfSet  (MConf.ConfDecision
-           (MC.ToQueue (MC.Queue 4 4))  MConf.Undecided))
+           (MC.ToQueue (MC.Queue 4 4 MC.getDefaultBasicQueue))  MConf.Undecided))
 
         -- sample http server filter
         generic_filter = MC.IsFlow (MC.getDefaultFitlerForID 0)
@@ -295,6 +347,22 @@ getE1kWithMultipleModes = bootstrap ++ pf' ++ vf1' ++ vf2'
         ]
 
 
+
+getE1kWithMultipleModesMinimal :: [MC.Gnode MC.Computation]
+getE1kWithMultipleModesMinimal =  pf
+    where
+    pfTag = "PF"
+    pf = MC.addModeToAll pfTag $  getE1kVFminimum  pfTag
+
+    pf' = [((MC.InMode (MC.Mode pfTag MC.ClassifiedL2Ethernet)) , [pNICConf])] ++ pf
+
+    pNICConf = (MConf.IsConfSet (MConf.ConfDecision
+           MC.L2NOVirtualization MConf.Undecided))
+
+    bootstrap = [
+        (MC.L0Tag, [])
+        , (pNICConf, [MC.L0Tag])
+        ]
 
 
 {-

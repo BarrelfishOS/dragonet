@@ -34,6 +34,25 @@ genNetGraph = writeFile "NetDep.dot" $ MG.showFlowGraph
 genE10kPRGGraph :: IO ()
 genE10kPRGGraph = writeFile "E1kPRG.dot" $ MG.showFlowGraph E1k.getE1kPRG
 
+testE1kConfMinimal :: IO()
+testE1kConfMinimal =
+    do
+        putStrLn "####################################\n\n"
+        writeFile "E1kbasePRG.dot" $ MG.showFlowGraph basePRG
+        writeFile "E1kconf1PRG.dot" $ MG.showFlowGraph conf1PRG
+        writeFile "E1kconf1PurgedPRG.dot" $ MG.showFlowGraph conf1PRG''
+    where
+        basePRG = E1k.getE1kPRGminimal
+        conf1PRG = PRG.applyConfigList basePRG conf1
+        conf1PRG' = PRG.purgeFixedConfigs conf1PRG
+        conf1PRG'' = PRG.purgeUnreachableNodes [] conf1PRG'
+
+        conf1 = [
+            MC.addMode MC.genericModeTag $ MC.IsConfSet (MC.ConfDecision MC.L2EtherValidCRC MC.ENABLE)
+            ]
+
+
+
 testE1kConf :: IO()
 testE1kConf =
     do
@@ -108,8 +127,8 @@ testSorting =
 {-
  - main function:
  -}
-main  :: IO()
-main = do
+mainBig  :: IO()
+mainBig = do
         putStrLn "Generating NetDep.dot"
         genNetGraph
         putStrLn "Generating E1kPRG.dot with conf"
@@ -125,5 +144,12 @@ main = do
     where
         outmsg = "Done!"
 
+mainMinimal :: IO()
+mainMinimal = testE1kConfMinimal
+
 mainV2 :: IO()
 mainV2  = testE1kConf
+
+main :: IO()
+main = mainMinimal -- mainBig
+

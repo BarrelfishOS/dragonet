@@ -21,6 +21,8 @@ module Computations (
     , Queue(..)
     , Protocol(..)
     , Mode(..)
+    , BasicQueue(..)
+    , getDefaultBasicQueue
     , ModeType
     , genericModeTag
     , compareModeTags
@@ -117,13 +119,35 @@ anyPort =  0
 anyValue :: Integer
 anyValue =  0
 
+
+{-
+ - Very simple queue, which I may extend in future with list
+ - of descriptors, but for time being, it is just to show that there is a queue.
+ -}
+data BasicQueue = BasicQueue {
+        qSize :: Integer
+    } deriving (Eq, Ord,  DD.Typeable, DD.Data)
+
+type BufID = Integer
+
+data BufDesc = BufDesc {
+    bufID :: BufID
+    , owner :: Application
+}
+
+instance Show BasicQueue where
+    show (BasicQueue s) = show s
+
+
 data Queue = Queue {
         queueId :: Qid
         , coreId :: CoreID
+        , bQueue :: BasicQueue
     } deriving (Eq, Ord,  DD.Typeable, DD.Data)
 
 instance Show Queue where
-    show (Queue qid coreid) = show qid ++ " core " ++ show coreid
+    show (Queue qid coreid _) = show qid ++ " core " ++ show coreid
+
 data Filter = Filter {
         filterID :: FilterID
         , protocol :: Protocol
@@ -137,6 +161,17 @@ instance Show Filter where
     show (Filter fid proto sip dip sp dp) = show fid ++ " " ++ show proto
         ++ "_" ++ show sip ++ "_" ++ show dip  ++ "_" ++ show sp  ++ "_"
         ++ show dp
+
+getDefaultBasicQueue :: BasicQueue
+getDefaultBasicQueue = BasicQueue 5
+
+getDefaultQueue :: Queue
+getDefaultQueue = Queue 0 0 $ getDefaultBasicQueue
+
+getDefaultFitlerForID :: FilterID -> Filter
+getDefaultFitlerForID x = (Filter x ANYProtocol 0 0 0 0)
+
+
 
 type SocketId = Integer
 type AppName = String
@@ -319,6 +354,8 @@ data Computation =
         | L4TCPValidUrgent
         | L4TCPValidOffset
         | L4TCPValidState
+        | L4TCPSegmentation BasicQueue -- FIXME: when matching segmentation, size of queue should not matter
+                -- Also add segmentation into LPG
         | L4TCPUpdateProtoState -- Updates the protocol state in machine
         | VerifiedL4TCP
         | L4ReadyToClassify
@@ -335,6 +372,9 @@ data Computation =
         | ToDefaultKernelProcessing
         | ToSocket Socket
         | ToApplication Application
+        | ReqBufDescregister -- BufDesc
+        | VerifyBufDesc
+        | AddBufDescToQueue Queue
         | IsConfSet ConfDecision
         | IsPartial PartialComp
         | IsEmulated EmulatedComp
@@ -476,12 +516,6 @@ getNetworkDependency = [
        generic_filter = IsFlow (getDefaultFitlerForID 0)
        default_queue = ToQueue getDefaultQueue
 
-
-getDefaultQueue :: Queue
-getDefaultQueue = Queue 0 0
-
-getDefaultFitlerForID :: FilterID -> Filter
-getDefaultFitlerForID x = (Filter x ANYProtocol 0 0 0 0)
 
 {-
  - Small sample dependency list for testing purposes

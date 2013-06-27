@@ -28,6 +28,15 @@ matchConfigNode tag1 x ((MC.InMode (MC.Mode tag2 c)), _)  =
     matchConfigNode tag1 x (c, []) && MC.compareModeTags tag1 tag2
 matchConfigNode _ _ _ = False
 
+
+isSpecificConfigNode :: [MC.ConfStatus] -> MC.Gnode MC.Computation ->  Bool
+isSpecificConfigNode val ((MC.IsConfSet (MC.ConfDecision _ stat)), _) =
+    stat `DL.elem` val
+isSpecificConfigNode val ((MC.InMode (MC.Mode _ c)), _) = isSpecificConfigNode val (c, [])
+isSpecificConfigNode val ((MC.IsPartial (MC.PartialComp c _)), _) = isSpecificConfigNode val (c, [])
+isSpecificConfigNode _ _ = False
+
+
 {-
  - Compare computations such that it will tell which two of them are same
  - for purpose of Configuration matching
@@ -129,13 +138,18 @@ replaceNodesWith newNode prg (oldNode, _) = DL.map (myReplaceFn oldNode newNode)
  -}
 replaceNodeForENABLE ::  [MC.Gnode MC.Computation] -> MC.Gnode MC.Computation
         -> [MC.Gnode MC.Computation]
-replaceNodeForENABLE prg ((MC.IsConfSet (MC.ConfDecision comp stat)), _) =
+replaceNodeForENABLE prg ((MC.IsConfSet (MC.ConfDecision comp stat)), _) = DT.trace (
+    "replaceForEnable oldNode " ++ show oldNode ++ " newNode " ++ show newNode )
         DL.map (myReplaceFn oldNode newNode) prg
     where
     oldNode = MC.IsConfSet (MC.ConfDecision comp stat)
     newNode = comp
-replaceNodeForENABLE prg ((MC.InMode (MC.Mode n c)), _) =
-    replaceNodeForENABLE prg (c, [])
+replaceNodeForENABLE prg ((MC.InMode (MC.Mode n
+        (MC.IsConfSet (MC.ConfDecision comp stat)))), _) =
+        DL.map (myReplaceFn oldNode newNode) prg
+    where
+    oldNode = MC.InMode (MC.Mode n (MC.IsConfSet (MC.ConfDecision comp stat)))
+    newNode = comp
 replaceNodeForENABLE _ _ = error "Invalid module cropped in the replaceNodeForENABLE"
 
 
@@ -248,7 +262,7 @@ purgeFixedENABLEConfigs :: [MC.Gnode MC.Computation] -> [MC.Gnode MC.Computation
 purgeFixedENABLEConfigs prg = newPRG
     where
     selectedNodes = DL.filter (isSpecificConfigNode [MC.ENABLE]) prg
-    newPRG = DL.foldl (replaceNodeForENABLE) prg selectedNodes
+    newPRG = DT.trace ("selectedNodes " ++ show selectedNodes ) DL.foldl (replaceNodeForENABLE) prg selectedNodes
 
 purgeFixedSTOPConfigs :: [MC.Gnode MC.Computation] -> [MC.Gnode MC.Computation]
 purgeFixedSTOPConfigs prg = newPRG
@@ -290,14 +304,6 @@ getReachableNodesList [] = []
 getReachableNodesList (x:xs)
     | not (isSpecificConfigNode [MC.STOP, MC.SKIP] (x,[])) = (x:(getReachableNodesList xs))
     | otherwise = getReachableNodesList xs
-
-
-isSpecificConfigNode :: [MC.ConfStatus] -> MC.Gnode MC.Computation ->  Bool
-isSpecificConfigNode val ((MC.IsConfSet (MC.ConfDecision _ stat)), _) =
-    stat `DL.elem` val
-isSpecificConfigNode val ((MC.InMode (MC.Mode _ c)), _) = isSpecificConfigNode val (c, [])
-isSpecificConfigNode val ((MC.IsPartial (MC.PartialComp c _)), _) = isSpecificConfigNode val (c, [])
-isSpecificConfigNode _ _ = False
 
 
 
