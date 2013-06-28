@@ -10,8 +10,19 @@ Status:
 
 next question
 ---------------------
-Qus:
-Ans:
+Qus: Haskell meetup
+Ans: suggestions to understand combinotrix and Haskell better
+Text package
+Parsec package
+ blog explaining parsec package in redit Haskell subcategory
+
+Lava package -- I forgot what it does
+
+hardware description language package
+
+Haskell world - 2007
+
+Haskell wiki --> coding style guidelines
 
 Status:
 

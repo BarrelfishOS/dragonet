@@ -368,6 +368,7 @@ data Computation =
         | IsFlow Filter -- for flow filtering
         | IsHashFilter Filter -- for hash based filtering
         | InSoftware
+        | Not Computation
         | ToQueue Queue
         | ToDefaultKernelProcessing
         | ToSocket Socket
@@ -502,8 +503,13 @@ getNetworkDependency = [
         -- Filtering the packet
         , (generic_filter, [L4ReadyToClassify])
 
+        -- Verifying buffer descripters
+        , (ReqBufDescregister, [])
+        , (VerifyBufDesc, [ReqBufDescregister])
+        , (addBufDesQ0, [VerifyBufDesc])
+
         -- Copying packets into the default queue
-        , (default_queue, [generic_filter])
+        , (default_queue, [addBufDesQ0, generic_filter])
 
         , (VerifiedL4, [L4TCPUpdateProtoState])
         , (VerifiedL4, [VerifiedL4UDP])
@@ -513,9 +519,11 @@ getNetworkDependency = [
         , (ToDefaultKernelProcessing, [default_queue, VerifiedL4])
     ]
     where
-       generic_filter = IsFlow (getDefaultFitlerForID 0)
-       default_queue = ToQueue getDefaultQueue
+        generic_filter = IsFlow (getDefaultFitlerForID 0)
 
+        q0 =  getDefaultQueue
+        default_queue = ToQueue q0
+        addBufDesQ0 = AddBufDescToQueue q0
 
 {-
  - Small sample dependency list for testing purposes

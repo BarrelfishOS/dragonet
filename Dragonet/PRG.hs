@@ -138,8 +138,9 @@ replaceNodesWith newNode prg (oldNode, _) = DL.map (myReplaceFn oldNode newNode)
  -}
 replaceNodeForENABLE ::  [MC.Gnode MC.Computation] -> MC.Gnode MC.Computation
         -> [MC.Gnode MC.Computation]
-replaceNodeForENABLE prg ((MC.IsConfSet (MC.ConfDecision comp stat)), _) = DT.trace (
-    "replaceForEnable oldNode " ++ show oldNode ++ " newNode " ++ show newNode )
+replaceNodeForENABLE prg ((MC.IsConfSet (MC.ConfDecision comp stat)), _) =
+    --DT.trace (
+    -- "replaceForEnable oldNode " ++ show oldNode ++ " newNode " ++ show newNode )
         DL.map (myReplaceFn oldNode newNode) prg
     where
     oldNode = MC.IsConfSet (MC.ConfDecision comp stat)
@@ -220,7 +221,9 @@ replaceNodeForSKIP prg ((MC.InMode (MC.Mode n
     where
     origConfNode = (MC.IsConfSet (MC.ConfDecision cc ss))
     origNode = (MC.InMode (MC.Mode n origConfNode))
-    allDeps = DT.trace ("replaceNodeForSkip" ++ show origNode) getAllDeps origNode prg
+    allDeps =
+        -- DT.trace ("replaceNodeForSkip" ++ show origNode)
+        getAllDeps origNode prg
     prg' = removeNode origNode  prg
     prg'' = replaceOnlyDeps origNode allDeps prg'
 
@@ -262,7 +265,9 @@ purgeFixedENABLEConfigs :: [MC.Gnode MC.Computation] -> [MC.Gnode MC.Computation
 purgeFixedENABLEConfigs prg = newPRG
     where
     selectedNodes = DL.filter (isSpecificConfigNode [MC.ENABLE]) prg
-    newPRG = DT.trace ("selectedNodes " ++ show selectedNodes ) DL.foldl (replaceNodeForENABLE) prg selectedNodes
+    newPRG =
+        -- DT.trace ("selectedNodes " ++ show selectedNodes )
+        DL.foldl (replaceNodeForENABLE) prg selectedNodes
 
 purgeFixedSTOPConfigs :: [MC.Gnode MC.Computation] -> [MC.Gnode MC.Computation]
 purgeFixedSTOPConfigs prg = newPRG

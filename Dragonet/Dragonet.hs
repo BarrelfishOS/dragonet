@@ -151,5 +151,5 @@ mainV2 :: IO()
 mainV2  = testE1kConf
 
 main :: IO()
-main = mainMinimal -- mainBig
+main =  mainBig
 
