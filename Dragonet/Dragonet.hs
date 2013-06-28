@@ -13,6 +13,7 @@ module Main (
 
 
 import qualified Operations as OP
+import qualified NetworkProcessing as NP
 
 testOp :: IO ()
 testOp =
@@ -26,6 +27,19 @@ testOp =
         op = OP.testOperation
 
 
+testNetworkProcessing :: IO ()
+testNetworkProcessing =
+        do
+        putStrLn "Testing NetworkProcessing"
+        putStrLn $ show op
+        putStrLn lineBreak
+        putStrLn "Done..."
+        where
+        lineBreak = "\n\n"
+        op = NP.getNetworkDependency
+
+
 main :: IO()
-main =  testOp
+--main = testOp
+main = testNetworkProcessing
 

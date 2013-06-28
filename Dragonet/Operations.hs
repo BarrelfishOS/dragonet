@@ -8,10 +8,13 @@ module Operations(
     main
     , testOperation
     , DesFunction
-    , Attribute(..)
     , Implementation(..)
     , Decision(..)
+    , GNode(..)
     , Node(..)
+    , NodeEdges(..)
+    , getDecNode
+    , getOperatorNode
 ) where
 
 import qualified NetBasics as NB
@@ -30,10 +33,6 @@ type ConfSpace = String  -- FIXME: change this
 
 
 
-data Attribute = Security Bool
-    | InHardware Bool
-    deriving (Show, Eq, Ord, DD.Typeable, DD.Data)
-
 data Implementation t f  = Implementation {
     iTag        :: t -- name for the implementation
     , iFn       :: f
@@ -47,31 +46,33 @@ instance Eq t => Eq (Implementation t f) where
 
 
 -- Decision function:  based on packet, decides which outgoing edges to choose
-type DesFunction = (Decision -- GNode NB.DesLabel DesFunction
-        -> Packet -> (Packet, [Node]))
+type DesFunction = (Decision -> Packet -> (Packet, [Node]))
 
 -- Conf function: Based on the configuration, decides which outgoing edges to choose
-type ConfFunction = (Configuration --  GNode NB.ConfLabel ConfFunction
-        -> ConfSpace -> [Node])
+type ConfFunction = (Configuration -> ConfSpace -> [Node])
 
 -- opearator function: Based on the result of incoming edges,
 --  decides which outgoing edges to choose
-type OpFunction = (Operator -- GNode NB.OpLabel OpFunction
-        -> [Node] -> [Node]) -- Need better names
+type OpFunction = (Operator -> [Node] -> [Node])
 
-data GNode l f = GNode {
+data NodeEdges = BinaryNode ([Node], [Node])
+        | NaryNode [[Node]]
+        deriving (Show, Eq)
+
+data GNode l a f = GNode {
     gLabel              :: l
-    , gTag               :: TagType
-    , gEdges            :: [Node]
+    , gTag              :: TagType
+    , gAttributes       :: [a]
+    , gEdges            :: NodeEdges
     , gImplementation   :: [Implementation TagType f]
 } deriving (Show, Eq)
 
 
-data Decision =  Decision (GNode NB.DesLabel DesFunction)
+data Decision =  Decision (GNode NB.DesLabel NB.DesAttribute DesFunction)
     deriving (Show, Eq)
-data Configuration = Configuration (GNode NB.ConfLabel ConfFunction)
+data Configuration = Configuration (GNode NB.ConfLabel NB.ConfAttribute ConfFunction)
     deriving (Show, Eq)
-data Operator = Operator (GNode NB.OpLabel OpFunction)
+data Operator = Operator (GNode NB.OpLabel NB.OpAttribute OpFunction)
     deriving (Show, Eq)
 
 
@@ -80,29 +81,42 @@ data Node = Des Decision
     | Opr Operator -- (GNode NB.OpLabel OpFunction) --
     deriving (Show, Eq)
 
-testGetConfElem :: Node
-testGetConfElem = Conf $ Configuration GNode {
-        gLabel = (NB.ConfLabel "checksumConf")
-        , gTag = "tt"
-        , gEdges = []
+getConfNode :: String -> TagType -> NodeEdges -> Node
+getConfNode op tag edges = Conf $ Configuration GNode {
+        gLabel = (NB.ConfLabel op)
+        , gTag = tag
+        , gEdges = edges
+        , gAttributes = []
         , gImplementation = []
     }
 
-testGetDecElem :: Node
-testGetDecElem = Des $ Decision GNode {
-        gLabel = (NB.DesLabel "checksum")
-        , gTag = "tt"
-        , gEdges = []
+
+getDecNode :: NB.NetOperation -> TagType -> NodeEdges -> Node
+getDecNode op tag edges = Des $ Decision GNode {
+        gLabel = (NB.DesLabel op)
+        , gTag = tag
+        , gEdges = edges
+        , gAttributes = []
+        , gImplementation = []
+    }
+
+getOperatorNode :: NB.NetOperator -> TagType -> NodeEdges -> Node
+getOperatorNode op tag edges = Opr $ Operator GNode {
+        gLabel = (NB.OpLabel op)
+        , gTag = tag
+        , gEdges = edges
+        , gAttributes = []
         , gImplementation = []
     }
 
 testGetOperatorOp :: Node
-testGetOperatorOp = Opr $ Operator GNode {
-        gLabel = (NB.OpLabel "AND")
-        , gTag = "++"
-        , gEdges = []
-        , gImplementation = []
-    }
+testGetOperatorOp = getOperatorNode NB.AND "+" (NaryNode [])
+
+testGetDecElem :: Node
+testGetDecElem = getDecNode NB.ClassifiedL2Ethernet "test" (NaryNode [])
+
+testGetConfElem :: Node
+testGetConfElem = getConfNode "checksumConf" "checkIt" (BinaryNode ([], []))
 
 testOperation :: [Node]
 testOperation = [a, b, c]
