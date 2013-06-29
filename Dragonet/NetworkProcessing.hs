@@ -84,18 +84,6 @@ getNetworkDependency = etherClassified
         NB.L3IPv6ValidHops, NB.L3IPv6ValidSrc, NB.L3IPv6ValidSrc,
         NB.L3IPv6ValidDest]
 
-
-    classifiedL3 = OP.getOperatorNode NB.OR "IPL3Classify"
-        (OP.BinaryNode (
-            [],
-            []))
-
-    verifiedL3 = OP.getOperatorNode NB.OR "IPL3verify"
-        (OP.BinaryNode (
-            [],
-            []))
-
-
     toClassifiedL3 =  (OP.BinaryNode (
             [classifiedL3],
             [classifiedL3]))
@@ -111,6 +99,50 @@ getNetworkDependency = etherClassified
     classifyIPv6 = getProtoProcessing NB.ClassifiedL3IPv6
         (NB.L3IPv6ValidProtocol, toClassifiedL3) toL3Verified dropnode
         toVerifyIPv6
+
+    classifiedL3 = OP.getOperatorNode NB.OR "IPL3Classify"
+        (OP.BinaryNode (
+            [classifiedUDP, classifiedTCP],
+            []))
+
+    verifiedL3 = OP.getOperatorNode NB.OR "IPL3verify"
+        (OP.BinaryNode (
+            [],
+            []))
+
+
+    toVerifyUDP = [NB.L4UDPValidSrc, NB.L4UDPValidDest, NB.L4UDPValidLength,
+           NB.L4UDPValidChecksum]
+
+    toVerifyTCP = [NB.L4TCPValidState,  NB.L4TCPValidOffset
+        , NB.L4TCPValidUrgent, NB.L4TCPValidUrgent, NB.L4TCPValidWindow
+        , NB.L4TCPValidFlags, NB.L4TCPValidFin, NB.L4TCPValidSyn
+        , NB.L4TCPValidAck, NB.L4TCPValidAckNo, NB.L4TCPValidSequence
+        , NB.L4TCPValidSrc, NB.L4TCPValidDest, NB.L4TCPValidLength
+        , NB.L4TCPValidChecksum]
+
+
+    classifiedUDP = getProtoProcessingV2 NB.ClassifiedL4UDP
+        toL4readyToClassify toL4Verified toVerifyUDP
+
+    classifiedTCP = getProtoProcessingV2 NB.ClassifiedL4TCP
+        toL4readyToClassify toL4Verified toVerifyTCP
+
+
+    toL4readyToClassify = (OP.BinaryNode (
+            [],
+            []))
+
+    toL4Verified = (OP.BinaryNode (
+            [opORL4Verified],
+            [opORL4Verified]))
+
+
+    opORL4Verified = OP.getOperatorNode NB.OR "L4verified"
+        (OP.BinaryNode (
+            [],
+            []))
+
 
 
 {-
@@ -129,5 +161,26 @@ getProtoProcessing startNodeLabel (classifiedLabel, classifiedForward)
     validProto = OP.getDecNode classifiedLabel "PF" classifiedForward
     protoClassified = OP.getDecNode startNodeLabel "PF"
         (OP.BinaryNode (trueList ++ [validProto], [dropnode]))
+
+
+getProtoProcessingV2 :: NB.NetOperation -> OP.NodeEdges ->
+    OP.NodeEdges -> [NB.NetOperation] -> OP.Node
+getProtoProcessingV2 startNodeLabel classifiedForward
+    verifiedForward toVerify = protoClassified
+    where
+    opANDverified = OP.getOperatorNode NB.AND "verified" verifiedForward
+    toANDop =  OP.BinaryNode ([opANDverified], [opANDverified])
+    trueList = DL.map (\ x -> OP.getDecNode x "PF" toANDop) toVerify
+
+    (tlist, flist) = case classifiedForward of
+        OP.BinaryNode (a, b) ->  (a, b)
+        OP.NaryNode _ -> error "NetworkProcessing.getProtoProcessingV2: binary node merging with Nary node"
+
+    protoClassified = OP.getDecNode startNodeLabel "PF"
+        (OP.BinaryNode (trueList ++ tlist, flist))
+
+
+
+
 
 
