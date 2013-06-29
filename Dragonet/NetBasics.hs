@@ -128,6 +128,7 @@ data NetOperation = ClassifiedL2Ethernet -- Ethernet starter node
         | VerifiedL4
         | ReqBufDescregister -- BufDesc
         | VerifyBufDesc
+        | PacketDrop
         deriving (Show, Eq, Ord)
 
 data NetOperator = AND

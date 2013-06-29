@@ -21,28 +21,58 @@ import qualified NetBasics as NB
 import qualified Operations as OP
 
 
+{-
+addToTrue :: OP.GNode -> OP.Node -> OP.Node
+addToTrue nbig nsmall = case nbig of
+        ()
+-}
 
 getNetworkDependency :: OP.Node
 getNetworkDependency = etherClassified
     where
-    etherValidDest = OP.getDecNode NB.L2EtherValidDest "PF" (OP.BinaryNode ([], []))
---    orNode getOperatorNode NB.XOR "+"  [etherValidDest] (OP.BinaryNode ([], []))
-    etherLen = OP.getDecNode NB.L2EtherValidLen "PF" (OP.BinaryNode ([], []))
-    etherClassified = OP.getDecNode NB.ClassifiedL2Ethernet "PF" (OP.BinaryNode ([], []))
+    dropnode = OP.getDropNode
+    etherClassified = OP.getDecNode NB.ClassifiedL2Ethernet "PF"
+        (OP.BinaryNode (
+            [etherValidType, etherValidSrc, etherValidMulticast,
+            etherValidBroadcast, etherValidUnicast],
+            [dropnode]))
+    etherValidType = OP.getDecNode NB.L2EtherValidType "PF"
+        (OP.BinaryNode (
+            [classifyIPv4, classifyIPv6],
+            [dropnode]))
+    etherValidSrc = OP.getDecNode NB.L2EtherValidSrc "PF"
+        (OP.BinaryNode (
+            [opANDverifiedEthernet],
+            [opANDverifiedEthernet]))
+    etherValidMulticast = OP.getDecNode NB.L2EtherValidMulticast "PF"
+        (OP.BinaryNode (
+            [opORL2validDest],
+            [opORL2validDest]))
+    etherValidBroadcast = OP.getDecNode NB.L2EtherValidBroadcast "PF"
+        (OP.BinaryNode (
+            [opORL2validDest],
+            [opORL2validDest]))
+    etherValidUnicast = OP.getDecNode NB.L2EtherValidUnicast "PF"
+        (OP.BinaryNode (
+            [opORL2validDest],
+            [opORL2validDest]))
 
-{-
+    classifyIPv4 = OP.getDecNode NB.ClassifiedL3IPv4 "PF"
+        (OP.BinaryNode (
+            [],
+            []))
+    classifyIPv6 = OP.getDecNode NB.ClassifiedL3IPv6 "PF"
+        (OP.BinaryNode (
+            [],
+            []))
 
-        (ClassifiedL2Ethernet, [])
-        , (L2EtherValidLen, [ClassifiedL2Ethernet])
-        , (L2EtherValidType, [ClassifiedL2Ethernet])
-        , (L2EtherValidCRC, [ClassifiedL2Ethernet])
-        , (L2EtherValidBroadcast, [ClassifiedL2Ethernet])
-        , (L2EtherValidMulticast, [ClassifiedL2Ethernet])
-        , (L2EtherValidUnicast, [ClassifiedL2Ethernet])
-        , (L2EtherValidDest, [L2EtherValidBroadcast])
+    opORL2validDest = OP.getOperatorNode NB.OR "L2ValidDestination"
+        (OP.BinaryNode (
+            [opANDverifiedEthernet],
+            [opANDverifiedEthernet]))
 
-        , (VerifiedL2Ethernet, [L2EtherValidCRC, L2EtherValidLen, L2EtherValidType
-                       , L2EtherValidDest, L2EtherValidSrc])
--- getOperatorNode
--}
+    opANDverifiedEthernet = OP.getOperatorNode NB.AND "L2Verified"
+        (OP.BinaryNode (
+            [],
+            [dropnode]))
 

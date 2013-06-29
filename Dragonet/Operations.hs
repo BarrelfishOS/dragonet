@@ -15,11 +15,11 @@ module Operations(
     , NodeEdges(..)
     , getDecNode
     , getOperatorNode
+    , getDropNode
 ) where
 
 import qualified NetBasics as NB
 
-import qualified Data.Data as DD
 
 --import qualified Data.List as DL
 --import qualified Data.Set as Set
@@ -91,6 +91,9 @@ getConfNode op tag edges = Conf $ Configuration GNode {
     }
 
 
+
+
+
 getDecNode :: NB.NetOperation -> TagType -> NodeEdges -> Node
 getDecNode op tag edges = Des $ Decision GNode {
         gLabel = (NB.DesLabel op)
@@ -114,6 +117,11 @@ testGetOperatorOp = getOperatorNode NB.AND "+" (NaryNode [])
 
 testGetDecElem :: Node
 testGetDecElem = getDecNode NB.ClassifiedL2Ethernet "test" (NaryNode [])
+
+-- Returns the node which drops the packet
+getDropNode :: Node
+getDropNode = getDecNode NB.PacketDrop "Drop" (NaryNode [])
+
 
 testGetConfElem :: Node
 testGetConfElem = getConfNode "checksumConf" "checkIt" (BinaryNode ([], []))
