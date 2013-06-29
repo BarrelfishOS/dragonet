@@ -50,8 +50,6 @@ getE1kPRG = etherClassified
             [validCRC],
             l2AddrCheckList))
 
---    prg = OP.appendToTrue etherClassified etherValidLen
-
     validCRC = OP.getDecNode NB.L2EtherValidCRC "PF"
         (OP.BinaryNode (
             l2AddrCheckList,
@@ -70,8 +68,77 @@ getE1kPRG = etherClassified
 
     etherValidType = OP.getDecNode NB.L2EtherValidType "PF"
         (OP.BinaryNode (
+            [classifiedL3IPv4, classifiedL3IPv6],
+            [dropnode]))
+
+    classifiedL3IPv4 = OP.getDecNode NB.ClassifiedL3IPv4 "PF"
+        (OP.BinaryNode (
+            [ipv4ChecksumConf],
+            [dropnode]))
+
+    ipv4ChecksumConf = OP.getConfNode "IsIPv4ChecksumON" ""
+        (OP.BinaryNode (
+            [ipv4Checksum],
+            [l3IPv4ValidProto]))
+
+    ipv4Checksum = OP.getDecNode NB.L3IPv4ValidChecksum "PF"
+        (OP.BinaryNode (
+            [l3IPv4ValidProto],
+            [dropnode]))
+
+    l3IPv4ValidProto = OP.getDecNode NB.L3IPv4ValidProtocol "PF"
+        (OP.BinaryNode (
+            [opORclassifiedL3],
+            [opORclassifiedL3]))
+
+    classifiedL3IPv6 = OP.getDecNode NB.ClassifiedL3IPv6 "PF"
+        (OP.BinaryNode (
+            [l3IPv6ValidProto],
+            [dropnode]))
+
+    l3IPv6ValidProto = OP.getDecNode NB.L3IPv6ValidProtocol "PF"
+        (OP.BinaryNode (
+            [opORclassifiedL3],
+            [opORclassifiedL3]))
+
+    opORclassifiedL3 = OP.getOperatorNode NB.OR "L3Classified"
+        (OP.BinaryNode (
+            [classifiedUDP, classifiedTCP, classifiedICMP, unclassfiedL4],
+            [dropnode]))
+
+
+    classifiedUDP = OP.getDecNode NB.ClassifiedL4UDP "PF"
+        (OP.BinaryNode (
+            [opORl4ReadyToClassify],
+            [opORl4ReadyToClassify]))
+
+    classifiedTCP = OP.getDecNode NB.ClassifiedL4TCP "PF"
+        (OP.BinaryNode (
+            [opORl4ReadyToClassify],
+            [opORl4ReadyToClassify]))
+
+    classifiedICMP = OP.getDecNode NB.ClassifiedL4ICMP "PF"
+        (OP.BinaryNode (
+            [opORl4ReadyToClassify],
+            [opORl4ReadyToClassify]))
+
+    unclassfiedL4 = OP.getDecNode NB.UnclasifiedL4 "PF"
+        (OP.BinaryNode (
+            [opORl4ReadyToClassify],
+            [opORl4ReadyToClassify]))
+
+    opORl4ReadyToClassify = OP.getOperatorNode NB.OR "L4Classified"
+        (OP.BinaryNode (
             [],
             [dropnode]))
+
+
+
+
+
+
+
+
 
 
 
