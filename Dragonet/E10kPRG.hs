@@ -31,21 +31,47 @@ getE1kPRGminimal = etherClassified
 
 -- Get the datatype for E10k
 getE1kPRG :: OP.Node
-getE1kPRG = prg
+getE1kPRG = etherClassified
     where
 
     dropnode = OP.getDropNode
     etherClassified = OP.getDecNode NB.ClassifiedL2Ethernet ""
         (OP.BinaryNode (
-            [],
+            [etherValidLen],
             [dropnode]))
 
     etherValidLen = OP.getDecNode NB.L2EtherValidLen ""
         (OP.BinaryNode (
-            [],
+            [etherCRCconf],
             [dropnode]))
 
-    prg = OP.appendToTrue etherClassified etherValidLen
+    etherCRCconf = OP.getConfNode "IsCRCCalcON" ""
+        (OP.BinaryNode (
+            [validCRC],
+            l2AddrCheckList))
+
+--    prg = OP.appendToTrue etherClassified etherValidLen
+
+    validCRC = OP.getDecNode NB.L2EtherValidCRC "PF"
+        (OP.BinaryNode (
+            l2AddrCheckList,
+            [dropnode]))
+
+    validAddrOptions = [NB.L2EtherValidBroadcast, NB.L2EtherValidMulticast,
+        NB.L2EtherValidUnicast]
+
+    toORop =  OP.BinaryNode ([opORL2EtherValidDest], [opORL2EtherValidDest])
+    l2AddrCheckList = DL.map (\ x -> OP.getDecNode x "PF" toORop) validAddrOptions
+
+    opORL2EtherValidDest = OP.getOperatorNode NB.OR "L2ValidDest"
+        (OP.BinaryNode (
+            [etherValidType],
+            [dropnode]))
+
+    etherValidType = OP.getDecNode NB.L2EtherValidType "PF"
+        (OP.BinaryNode (
+            [],
+            [dropnode]))
 
 
 

@@ -47,6 +47,11 @@ nodeDefinition (n, nn) =
             dotNode nn (gLabelStr gn) "" (nPorts (OP.getNodeEdges n))
         (OP.Opr (OP.Operator gn)) ->
             dotNode nn (gLabelStr gn) "rounded" (nPorts (OP.getNodeEdges n))
+        (OP.Conf (OP.Configuration gn)) ->
+            dotNode nn (gLabelStr gn) "rounded" (nPorts (OP.getNodeEdges n))
+
+
+
 
 -- Get dot definition for edges starting at the specified node
 edgeDefinition :: [(OP.Node, String)] -> (OP.Node, String) -> String
@@ -68,7 +73,7 @@ edgeDefinition dict (n, nn) =
                 dbl = L.intersect ts fs
                 nts = (L.nub ts) L.\\ dbl
                 nfs = (L.nub fs) L.\\ dbl
-            
+
 
         edgesToEps f eps = concat (map (edgeTo f) eps)
         edgeTo f (n,p) = f (nn,p) (fromJust (lookup n dict))

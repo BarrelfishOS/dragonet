@@ -17,6 +17,7 @@ module Operations(
     , NodeEdges(..)
     , getDecNode
     , getOperatorNode
+    , getConfNode
     , getDropNode
     , getNodeEdges
     , setNodeEdges
@@ -97,7 +98,7 @@ nTreeNodes :: Node -> [Node]
 nTreeNodes n =
     n:children
     where
-        ep = 
+        ep =
             case (getNodeEdges n) of
                 (BinaryNode (as, bs)) -> L.nub (as ++ bs)
                 (NaryNode as) -> L.nub (concat as)
