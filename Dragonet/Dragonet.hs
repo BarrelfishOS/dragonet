@@ -33,28 +33,34 @@ testNetworkProcessing :: IO ()
 testNetworkProcessing =
         do
         putStrLn "Testing NetworkProcessing"
-        putStrLn $ DG.toDot op
-        putStrLn lineBreak
+        writeFile fileName $ DG.toDot op
+        putStrLn ("Generated " ++ fileName)
         putStrLn "Done..."
         where
-        lineBreak = "\n\n"
+        fileName = "NetProcessing.dot"
         op = NP.getNetworkDependency
 
 testE10k :: IO ()
 testE10k =
         do
         putStrLn "Testing E10kPRG"
-        putStrLn $ DG.toDot op
-        putStrLn lineBreak
+        writeFile fileName $ DG.toDot op
+        putStrLn ("Generated " ++ fileName)
         putStrLn "Done..."
         where
-        lineBreak = "\n\n"
+        fileName = "E10k.dot"
         op = E10k.getE1kPRG
 
+allTests :: IO ()
+allTests =
+        do
+        testNetworkProcessing
+        testE10k
 
 
 main :: IO()
 --main = testOp
-main = testNetworkProcessing
 --main = testE10k
+--main = testNetworkProcessing
+main = allTests
 
