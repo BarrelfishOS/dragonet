@@ -14,6 +14,7 @@ module Main (
 
 import qualified Operations as OP
 import qualified NetworkProcessing as NP
+import qualified E10kPRG as E10k
 
 testOp :: IO ()
 testOp =
@@ -38,8 +39,20 @@ testNetworkProcessing =
         lineBreak = "\n\n"
         op = NP.getNetworkDependency
 
+testE10k :: IO ()
+testE10k =
+        do
+        putStrLn "Testing E10kPRG"
+        putStrLn $ show op
+        putStrLn lineBreak
+        putStrLn "Done..."
+        where
+        lineBreak = "\n\n"
+        op = E10k.getE1kPRG
+
 
 main :: IO()
 --main = testOp
-main = testNetworkProcessing
+--main = testNetworkProcessing
+main = testE10k
 

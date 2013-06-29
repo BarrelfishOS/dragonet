@@ -10,12 +10,18 @@ module Operations(
     , DesFunction
     , Implementation(..)
     , Decision(..)
+    , Configuration(..)
+    , Operator(..)
     , GNode(..)
     , Node(..)
     , NodeEdges(..)
     , getDecNode
     , getOperatorNode
     , getDropNode
+    , getNodeEdges
+    , setNodeEdges
+    , appendToTrue
+    , appendToFalse
 ) where
 
 import qualified NetBasics as NB
@@ -92,8 +98,6 @@ getConfNode op tag edges = Conf $ Configuration GNode {
 
 
 
-
-
 getDecNode :: NB.NetOperation -> TagType -> NodeEdges -> Node
 getDecNode op tag edges = Des $ Decision GNode {
         gLabel = (NB.DesLabel op)
@@ -111,6 +115,40 @@ getOperatorNode op tag edges = Opr $ Operator GNode {
         , gAttributes = []
         , gImplementation = []
     }
+
+
+getNodeEdges :: Node -> NodeEdges
+getNodeEdges node = case node of
+    Des (Decision a)          -> gEdges a
+    Conf (Configuration a)    -> gEdges a
+    Opr (Operator a)          -> gEdges a
+
+setNodeEdges :: Node -> NodeEdges -> Node
+setNodeEdges node newEdges = case node of
+   Des (Decision a)           -> Des (Decision a { gEdges = newEdges })
+   Conf (Configuration a)     -> Conf (Configuration a { gEdges = newEdges })
+   Opr (Operator a)           -> Opr (Operator a { gEdges = newEdges })
+
+appendToTrue :: Node -> Node -> Node
+appendToTrue orig toAdd = case getNodeEdges orig of
+    BinaryNode (tl, fl) -> setNodeEdges orig $ BinaryNode (tl ++ [toAdd], fl)
+    NaryNode _          -> error "assumption about node being Binary is wrong."
+
+appendToFalse :: Node -> Node -> Node
+appendToFalse orig toAdd = case getNodeEdges orig of
+    BinaryNode (tl, fl) -> setNodeEdges orig $ BinaryNode (tl, fl ++ [toAdd] )
+    NaryNode _          -> error "assumption about node being Binary is wrong."
+
+{-
+compareNodes :: Node -> Node -> Bool
+compareNodes Des (Decision (l1 _ _ _ _)) Des (Decision (l2 _ _ _ _))  = l1 == l2
+
+insertAfterBN :: Node -> Node -> Node -> Node
+insertNodeInBinaryNode big parent toAdd = big'
+    where
+    -- FIXME: complete this implementation
+    big = case compareNodes big parent
+-}
 
 testGetOperatorOp :: Node
 testGetOperatorOp = getOperatorNode NB.AND "+" (NaryNode [])

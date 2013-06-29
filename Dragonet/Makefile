@@ -11,7 +11,7 @@ models: dragonet
 	./convertDot.sh
 
 #base: Computations.hs Configurations.hs E1k.hs LPG.hs MyGraph.hs NetworkProcessing.hs Makefile
-base: NetBasics.hs Operations.hs NetworkProcessing.hs Dragonet.hs Makefile
+base: Makefile NetBasics.hs Operations.hs NetworkProcessing.hs E10kPRG.hs Dragonet.hs
 
 clean:
 	rm -f *.hi *.o Dragonet
