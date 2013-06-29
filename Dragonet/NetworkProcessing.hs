@@ -13,8 +13,8 @@ module NetworkProcessing (
     getNetworkDependency
 ) where
 
-import qualified Data.List as DL
-import qualified Data.Set as Set
+--import qualified Data.List as DL
+--import qualified Data.Set as Set
 
 
 import qualified NetBasics as NB
@@ -27,18 +27,13 @@ addToTrue nbig nsmall = case nbig of
         ()
 -}
 
-getNetworkDependency :: OP.Node
-getNetworkDependency = etherClassified
-    where
-    dropnode = OP.getDropNode
+getEthernetProcessingLPG :: OP.NodeEdges -> OP.NodeEdges -> OP.Node -> OP.Node
+getEthernetProcessingLPG classified verified dropnode = etherClassified
+     where
     etherClassified = OP.getDecNode NB.ClassifiedL2Ethernet "PF"
         (OP.BinaryNode (
             [etherValidType, etherValidSrc, etherValidMulticast,
             etherValidBroadcast, etherValidUnicast],
-            [dropnode]))
-    etherValidType = OP.getDecNode NB.L2EtherValidType "PF"
-        (OP.BinaryNode (
-            [classifyIPv4, classifyIPv6],
             [dropnode]))
     etherValidSrc = OP.getDecNode NB.L2EtherValidSrc "PF"
         (OP.BinaryNode (
@@ -57,6 +52,24 @@ getNetworkDependency = etherClassified
             [opORL2validDest],
             [opORL2validDest]))
 
+    opORL2validDest = OP.getOperatorNode NB.OR "L2ValidDestination"
+        (OP.BinaryNode (
+            [opANDverifiedEthernet],
+            [opANDverifiedEthernet]))
+
+    opANDverifiedEthernet = OP.getOperatorNode NB.AND "L2Verified" verified
+
+    etherValidType = OP.getDecNode NB.L2EtherValidType "PF" classified
+
+
+
+getNetworkDependency :: OP.Node
+getNetworkDependency = etherClassified
+    where
+
+
+    dropnode = OP.getDropNode
+
     classifyIPv4 = OP.getDecNode NB.ClassifiedL3IPv4 "PF"
         (OP.BinaryNode (
             [],
@@ -65,14 +78,9 @@ getNetworkDependency = etherClassified
         (OP.BinaryNode (
             [],
             []))
+    l2Verified = OP.BinaryNode ([], [dropnode])
+    l2Classified = OP.BinaryNode([classifyIPv4, classifyIPv6],
+            [dropnode])
 
-    opORL2validDest = OP.getOperatorNode NB.OR "L2ValidDestination"
-        (OP.BinaryNode (
-            [opANDverifiedEthernet],
-            [opANDverifiedEthernet]))
-
-    opANDverifiedEthernet = OP.getOperatorNode NB.AND "L2Verified"
-        (OP.BinaryNode (
-            [],
-            [dropnode]))
+    etherClassified = getEthernetProcessingLPG l2Classified l2Verified dropnode
 
