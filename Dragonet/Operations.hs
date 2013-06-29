@@ -22,9 +22,11 @@ module Operations(
     , setNodeEdges
     , appendToTrue
     , appendToFalse
+    , nTreeNodes
 ) where
 
 import qualified NetBasics as NB
+import qualified Data.List as L
 
 
 --import qualified Data.List as DL
@@ -86,6 +88,21 @@ data Node = Des Decision
     | Conf Configuration -- (GNode NB.ConfLabel ConfFunction) --
     | Opr Operator -- (GNode NB.OpLabel OpFunction) --
     deriving (Show, Eq)
+
+
+-- Get list containing all nodes reachable from the specified start node.
+-- Note that nodes with multiple incoming edges might be contained more than
+-- once in the resulting list.
+nTreeNodes :: Node -> [Node]
+nTreeNodes n =
+    n:children
+    where
+        ep = 
+            case (getNodeEdges n) of
+                (BinaryNode (as, bs)) -> L.nub (as ++ bs)
+                (NaryNode as) -> L.nub (concat as)
+        children = concat (map nTreeNodes ep)
+
 
 getConfNode :: String -> TagType -> NodeEdges -> Node
 getConfNode op tag edges = Conf $ Configuration GNode {

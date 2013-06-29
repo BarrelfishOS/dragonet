@@ -15,6 +15,7 @@ module Main (
 import qualified Operations as OP
 import qualified NetworkProcessing as NP
 import qualified E10kPRG as E10k
+import qualified DotGenerator as DG
 
 testOp :: IO ()
 testOp =
@@ -32,7 +33,7 @@ testNetworkProcessing :: IO ()
 testNetworkProcessing =
         do
         putStrLn "Testing NetworkProcessing"
-        putStrLn $ show op
+        putStrLn $ DG.toDot op
         putStrLn lineBreak
         putStrLn "Done..."
         where
@@ -43,7 +44,7 @@ testE10k :: IO ()
 testE10k =
         do
         putStrLn "Testing E10kPRG"
-        putStrLn $ show op
+        putStrLn $ DG.toDot op
         putStrLn lineBreak
         putStrLn "Done..."
         where
@@ -51,8 +52,9 @@ testE10k =
         op = E10k.getE1kPRG
 
 
+
 main :: IO()
 --main = testOp
---main = testNetworkProcessing
-main = testE10k
+main = testNetworkProcessing
+--main = testE10k
 

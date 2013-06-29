@@ -19,6 +19,7 @@ module NetBasics (
     , Attribute(..)
     , NetOperation(..)
     , NetOperator(..)
+    , graphLabelStr
 ) where
 
 
@@ -136,14 +137,26 @@ data NetOperator = AND
         | OR
         deriving (Show, Eq, Ord)
 
+
+
+class GraphLabel a where
+    graphLabelStr :: a -> String
+
+
 data DesLabel = DesLabel NetOperation
     deriving (Show, Eq)
+instance GraphLabel DesLabel where
+    graphLabelStr (DesLabel no) = show no
 
 data ConfLabel = ConfLabel String
     deriving (Show, Eq)
+instance GraphLabel ConfLabel where
+    graphLabelStr (ConfLabel cl) = show cl
 
 data OpLabel = OpLabel NetOperator
     deriving (Show, Eq)
+instance GraphLabel OpLabel where
+    graphLabelStr (OpLabel no) = show no
 
 
 data DesAttribute = DesAttribute Attribute
