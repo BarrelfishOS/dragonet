@@ -39,8 +39,8 @@ quoteMyDec s = do
             case n of
                 (Node _ _) -> decNode n
                 (Boolean _ _ _) -> decNode n
-                (And _ _ _) -> opNode n "AND"
-                (Or _ _ _) -> opNode n "OR"
+                (And l _ _) -> opNode n ("AND:" ++ l)
+                (Or l _ _) -> opNode n ("OR:" ++ l)
         declare n = TH.FunD (TH.mkName (nName n)) [(TH.Clause [] (TH.NormalB (node n)) [])]
     
 -----------------------------------------------------------------------------

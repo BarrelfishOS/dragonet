@@ -30,7 +30,7 @@ dotNode name label style nPorts =
 dotEdge (from,port) to =
     "    " ++ f ++ " -> " ++ to ++ "[headport=\"w\"];\n"
     where
-        f = from ++ ":p" ++ (show port)
+        f = from ++ ":p" ++ (show port) ++ ":e"
 dotDoubleEdge (from,port) to =
     "    " ++ from ++ " -> " ++ to ++ "[color=\"black:black\"," ++
         "headport=\"w\",tailport=\"e\"];\n"
