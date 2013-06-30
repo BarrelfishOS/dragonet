@@ -29,8 +29,15 @@ module NetBasics (
     , Qid
     , CoreID
     , FilterID
+    , TupleValue
+    , TupleSelector(..)
+    , BitMaskSelecter(..)
 ) where
 
+
+import qualified Data.Maybe as MB
+import qualified Data.Char as DC
+import qualified Data.List as DL
 
 type L2Address = Integer
 type L3Address = Integer
@@ -184,8 +191,31 @@ data NetOperation = ClassifiedL2Ethernet -- Ethernet starter node
         | VerifyBufDesc
         | PacketDrop
         | ToQueue Queue
+        | FiveTupleFilter TupleSelector Queue
+        | HashFilter TupleSelector Queue
+        | SyncFilter Queue
+        | BitMaskFilter BitMaskSelecter Queue
         | IsFlow Filter -- for flow filtering
-        deriving (Show, Eq, Ord)
+        deriving (Show, Eq)
+
+
+type TupleValue = Integer -- FIXME: should be byte
+data TupleSelector = TupleSelector {
+   ts1 :: TupleValue
+   , ts2 :: TupleValue
+   , ts3 :: TupleValue
+   , ts4 :: TupleValue
+   , ts5 :: TupleValue
+   } deriving (Eq)
+
+instance Show TupleSelector where
+    show (TupleSelector t1 t2 t3 t4 t5) = show t1 ++ " " ++ show t2 ++ " "
+        ++ show t3 ++ " " ++ show t4 ++ " " ++ show t5
+
+data BitMaskSelecter = BitMaskSelecter {
+   bitPosition :: [Integer] -- FIXME: This should be fixed size list
+   , bitValue :: [Integer] -- FIXME: This should be a single bit
+   } deriving (Show, Eq)
 
 data NetOperator = AND
         | XOR
@@ -193,25 +223,30 @@ data NetOperator = AND
         deriving (Show, Eq, Ord)
 
 
-
 class GraphLabel a where
     graphLabelStr :: a -> String
 
+{-
+ - Replaces blank spaces with Underscores in given string
+ -}
+replaceSpaces :: String -> String
+replaceSpaces str = DL.map (\x-> (if DC.isAlphaNum x then x else '_' )) str
 
 data DesLabel = DesLabel NetOperation
     deriving (Show, Eq)
 instance GraphLabel DesLabel where
-    graphLabelStr (DesLabel no) = show no
+    graphLabelStr (DesLabel no) = replaceSpaces $ show no
 
-data ConfLabel = ConfLabel String
+data ConfLabel = ConfLabel (MB.Maybe NetOperation)
     deriving (Show, Eq)
+
 instance GraphLabel ConfLabel where
-    graphLabelStr (ConfLabel cl) = show cl
+    graphLabelStr (ConfLabel cl) = replaceSpaces $ show cl
 
 data OpLabel = OpLabel NetOperator
     deriving (Show, Eq)
 instance GraphLabel OpLabel where
-    graphLabelStr (OpLabel no) = show no
+    graphLabelStr (OpLabel no) = replaceSpaces $ show no
 
 
 data DesAttribute = DesAttribute Attribute

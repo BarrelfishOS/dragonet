@@ -28,7 +28,7 @@ module Operations(
 
 import qualified NetBasics as NB
 import qualified Data.List as L
-
+import qualified Data.Maybe as MB
 
 --import qualified Data.List as DL
 --import qualified Data.Set as Set
@@ -105,7 +105,7 @@ nTreeNodes n =
         children = concat (map nTreeNodes ep)
 
 
-getConfNode :: String -> TagType -> NodeEdges -> Node
+getConfNode :: MB.Maybe NB.NetOperation -> TagType -> NodeEdges -> Node
 getConfNode op tag edges = Conf $ Configuration GNode {
         gLabel = (NB.ConfLabel op)
         , gTag = tag
@@ -180,7 +180,7 @@ getDropNode = getDecNode NB.PacketDrop "Drop" (NaryNode [])
 
 
 testGetConfElem :: Node
-testGetConfElem = getConfNode "checksumConf" "checkIt" (BinaryNode ([], []))
+testGetConfElem = getConfNode (MB.Just NB.L2EtherValidCRC) "checkIt" (BinaryNode ([], []))
 
 testOperation :: [Node]
 testOperation = [a, b, c]

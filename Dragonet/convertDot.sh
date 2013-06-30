@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+#set -e
 
 flist=`ls *.dot`
 for f in ${flist} ; do

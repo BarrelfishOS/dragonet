@@ -18,7 +18,7 @@ import qualified Data.List as DL
 
 import qualified NetBasics as NB
 import qualified Operations as OP
-
+import qualified Data.Maybe as MB
 
 -- Get simplest possible datatype for E10k (for testing purpose only)
 getE1kPRGminimal :: OP.Node
@@ -45,7 +45,7 @@ getE1kPRG = etherClassified
             [etherCRCconf],
             [dropnode]))
 
-    etherCRCconf = OP.getConfNode "IsCRCCalcON" ""
+    etherCRCconf = OP.getConfNode (MB.Just NB.L2EtherValidCRC) ""
         (OP.BinaryNode (
             [validCRC],
             l2AddrCheckList))
@@ -76,7 +76,7 @@ getE1kPRG = etherClassified
             [ipv4ChecksumConf],
             [dropnode]))
 
-    ipv4ChecksumConf = OP.getConfNode "IsIPv4ChecksumON" ""
+    ipv4ChecksumConf = OP.getConfNode (MB.Just NB.L3IPv4ValidChecksum) ""
         (OP.BinaryNode (
             [ipv4Checksum],
             [l3IPv4ValidProto]))
@@ -130,9 +130,74 @@ getE1kPRG = etherClassified
     opORl4ReadyToClassify = OP.getOperatorNode NB.OR "L4Classified"
         (OP.BinaryNode (
 --            [genFilter, confFilter1, confFilter2, confFilter3],
-            [genFilter] ++ fList,
+--            [genFilter] ++ fList,
+            [confSynFilter],
             [dropnode]))
 
+    -- Support for sync filters
+    confSynFilter = toGenFilter (NB.SyncFilter q1) queue1 [conf5TupleFilter1]
+
+    ts1 = NB.TupleSelector 0 0 0 0 0
+    ts2 = NB.TupleSelector 0 0 0 0 0
+    ts3 = NB.TupleSelector 0 0 0 0 0
+
+    conf5TupleFilter1 = toGenFilter (NB.FiveTupleFilter ts1 q1) queue1 [conf5TupleFilter2]
+    conf5TupleFilter2 = toGenFilter (NB.FiveTupleFilter ts2 q2) queue2 [confhashFilter]
+
+    confhashFilter = toGenFilter (NB.HashFilter ts3  q3) queue3 [queue0]
+
+    q1 = NB.Queue 1 1 NB.getDefaultBasicQueue
+    queue1 = OP.getDecNode (NB.ToQueue q1) ""
+        (OP.BinaryNode (
+            [],
+            []))
+
+    q2 = NB.Queue 2 2 NB.getDefaultBasicQueue
+    queue2 = OP.getDecNode (NB.ToQueue q2) ""
+        (OP.BinaryNode (
+            [],
+            []))
+
+    q3 = NB.Queue 3 3 NB.getDefaultBasicQueue
+    queue3 = OP.getDecNode (NB.ToQueue q3) ""
+        (OP.BinaryNode (
+            [],
+            []))
+
+    q0 = NB.Queue 0 0 NB.getDefaultBasicQueue
+    queue0 = OP.getDecNode (NB.ToQueue q0) ""
+        (OP.BinaryNode (
+            [],
+            []))
+
+
+
+
+{-
+    OP.getConfNode  (MB.Just (NB.SyncFilter q1)) "PF"
+        (OP.BinaryNode (
+            [synFilter],
+            []))
+
+    synFilter = OP.getDecNode NB.SyncFilter ""
+        (OP.BinaryNode (
+            [defaultQueue],
+            []))
+-}
+
+--  toGenFilter <Type of Queue> <queueNode ToGo when true> <NodeList to go when false>
+toGenFilter :: NB.NetOperation -> OP.Node -> [OP.Node] -> OP.Node
+toGenFilter filtType qNode ifFalse = OP.getConfNode  (MB.Just filtType) "PF"
+        (OP.BinaryNode ( [genFilter], ifFalse))
+    where
+    genFilter = OP.getDecNode filtType ""
+        (OP.BinaryNode ( [qNode], ifFalse))
+
+--    q = case qNode of
+--        OP.Des (OP.Decision (OP.GNode (NB.DesLabel (NB.ToQueue x)) _ _ _ _ )) -> x
+--        otherwise -> error "E10kPRG.toGenFilter nonQueue element passed to filter True side"
+
+{-
     genFilter = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 0)) "PF"
         (OP.BinaryNode (
             [defaultQueue],
@@ -145,8 +210,9 @@ getE1kPRG = etherClassified
 
     filterConfList = [(1, 1, 1), (2, 2, 2), (3, 3, 3)]
     fList = DL.map (\ (f, q, c) -> getConfFilterQueue f q c) filterConfList
+-}
 
-
+{-
 getConfFilterQueue :: NB.FilterID -> NB.Qid -> NB.CoreID -> OP.Node
 getConfFilterQueue fid qid cid = confFilter
     where
@@ -167,5 +233,5 @@ getConfFilterQueue fid qid cid = confFilter
             []))
 
 
-
+-}
 
