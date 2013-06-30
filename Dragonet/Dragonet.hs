@@ -12,6 +12,7 @@ module Main (
 ) where
 
 
+import qualified NetBasics as NB
 import qualified Operations as OP
 import qualified NetworkProcessing as NP
 import qualified E10kPRG as E10k
@@ -51,12 +52,24 @@ testE10k =
         fileName = "E10k.dot"
         op = E10k.getE1kPRG
 
+testE10kConfig :: IO ()
+testE10kConfig =
+        do
+        putStrLn "Applying config to E10kPRG"
+        writeFile fileName $ DG.toDot tree'
+        putStrLn ("Generated " ++ fileName)
+        putStrLn "Done..."
+        where
+        fileName = "E10kConfig.dot"
+        tree = E10k.getE1kPRG
+        tree' = OP.applyConfigWrapper NB.L2EtherValidCRC "PF" False tree
+
 allTests :: IO ()
 allTests =
-        do
-        testNetworkProcessing
-        testE10k
-
+    do
+    testNetworkProcessing
+    testE10k
+    testE10kConfig
 
 main :: IO()
 --main = testOp

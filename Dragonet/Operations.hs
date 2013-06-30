@@ -25,13 +25,17 @@ module Operations(
     , appendToFalse
     , nTreeNodes
     , TagType
+    , applyConfigWrapper
+    , applyConfig
+    , updateNodeList
+    , updateNodeEdges
 ) where
 
 import qualified NetBasics as NB
 import qualified Data.List as L
 import qualified Data.Maybe as MB
 
---import qualified Data.List as DL
+import qualified Data.List as DL
 --import qualified Data.Set as Set
 
 --import qualified Debug.Trace as TR
@@ -91,22 +95,72 @@ data Node = Des Decision
     | Opr Operator -- (GNode NB.OpLabel OpFunction) --
     deriving (Show, Eq)
 
+
 {-
- - Apply given configuration and get the new type where the
+replaceNodeFromNodeList :: [Node] -> Node -> [Node] -> [Node]
+replaceNodeFromNodeList inList toRemove toAdd = updatedList
+    where
+    updatedList = DL.mapConcat (\ x -> if x == toRemove then toAdd else [x]) inList
+
+-- Replaces all the instances of Node with NodeList within given tree
+replaceNodeFromNodeEdges :: Node -> Node -> [Node] -> Node
+replaceNodeFromNodeEdges tree toRemove toAdd = tree'
+    where
+    tree' = case (getNodeEdges tree) of
+        BinaryNode (tlist, flist) -> setNodeEdges tree (BinaryNode
+            (replaceNodeFromNodeList tlist,  replaceNodeFromNodeList llist))
+        NaryNode nlist -> DL.map (\ x -> replaceNodeFromNodeList x toRemove toAdd) nlist
+-}
+
+
+-- apply given function on every element of the list and return resultant list
+updateNodeList :: (Node -> [Node]) -> [Node] -> [Node]
+updateNodeList fn nlist = DL.concatMap fn nlist
+
+-- replace all followup nodes of given node with lists produced by given
+-- function
+updateNodeEdges :: (Node -> [Node]) -> Node -> Node
+updateNodeEdges fn tree = tree'
+    where
+    tree' = case (getNodeEdges tree) of
+        BinaryNode (tl, fl) -> setNodeEdges tree (BinaryNode
+            ((updateNodeList fn tl),  (updateNodeList fn fl)))
+        NaryNode nlist ->  setNodeEdges tree (NaryNode
+            (DL.map (updateNodeList fn) nlist))
+
+
+-- Wrapper around applyConfig to take care of extream condition that
+-- first node itself is Configuration, and it matched with current
+-- configuration change requested
+applyConfigWrapper :: NB.NetOperation -> TagType -> Bool -> Node -> Node
+applyConfigWrapper confOp tag whichSide tree
+    | DL.length expanded == 1 = DL.head expanded
+    | expanded == [] = error ("Something went terribaly wrong somewhere,"
+            ++ " causing expanded list to be empty")
+    | otherwise  = error ("First node itself matched with given config."
+            ++ " Add a dummy node before it to simply your life")
+    where
+    expanded = applyConfig confOp tag whichSide tree
+
+{-
+ - Apply given configuration and get the new tree where the
  - configuration node does not exist anymore.
  -}
-applyConfig :: Node -> NB.NetOperation -> TagType -> Node
-applyConfig tree node tag = tree'
+applyConfig :: NB.NetOperation -> TagType -> Bool -> Node -> [Node]
+applyConfig confOp tag whichSide tree  = tree'
     where
-    tree' = tree
+    tree'' = updateNodeEdges (applyConfig confOp tag whichSide) tree
 
-    -- if node is nonConfig, then go to it's children nodes
-    -- if node is config, then compare the tag
-    --      if not matched, then go to it's children nodes
-    --      if matched, compare tag.
-    --          if matched, mark the configuration to be true
-    --              return this node
-    --          if not matched, contine to children node
+    tree' = case tree of
+        Conf (Configuration (GNode (NB.ConfLabel (MB.Just netop)) t alist nextNodes imp)) ->
+            if ( netop == confOp ) && (tag == t)  then
+                -- We found the configuration node, lets replace it
+                case nextNodes of
+                    BinaryNode (tlist, flist)   -> if whichSide then tlist
+                                                    else flist
+                    otherwise                   -> error "non binary Config node"
+            else  [tree'']
+        otherwise -> [tree'']
 
 -- Get list containing all nodes reachable from the specified start node.
 -- Note that nodes with multiple incoming edges might be contained more than
