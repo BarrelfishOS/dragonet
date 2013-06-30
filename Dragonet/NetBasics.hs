@@ -190,6 +190,7 @@ data NetOperation = ClassifiedL2Ethernet -- Ethernet starter node
         | ReqBufDescregister -- BufDesc
         | VerifyBufDesc
         | PacketDrop
+        | ToDefaultKernelProcessing
         | ToQueue Queue
         | FiveTupleFilter TupleSelector Queue
         | HashFilter TupleSelector Queue
@@ -217,10 +218,10 @@ data BitMaskSelecter = BitMaskSelecter {
    , bitValue :: [Integer] -- FIXME: This should be a single bit
    } deriving (Show, Eq)
 
-data NetOperator = AND
-        | XOR
-        | OR
-        deriving (Show, Eq, Ord)
+data NetOperator = AND String
+        | XOR String
+        | OR String
+        deriving (Show, Eq)
 
 
 class GraphLabel a where
@@ -241,12 +242,12 @@ data ConfLabel = ConfLabel (MB.Maybe NetOperation)
     deriving (Show, Eq)
 
 instance GraphLabel ConfLabel where
-    graphLabelStr (ConfLabel cl) = replaceSpaces $ show cl
+    graphLabelStr (ConfLabel cl) = replaceSpaces $ "Conf" ++ (drop 4 $ show cl)
 
 data OpLabel = OpLabel NetOperator
     deriving (Show, Eq)
 instance GraphLabel OpLabel where
-    graphLabelStr (OpLabel no) = replaceSpaces $ show no
+    graphLabelStr (OpLabel no) = replaceSpaces $ (show no)
 
 
 data DesAttribute = DesAttribute Attribute

@@ -61,7 +61,7 @@ getE1kPRG = etherClassified
     toORop =  OP.BinaryNode ([opORL2EtherValidDest], [opORL2EtherValidDest])
     l2AddrCheckList = DL.map (\ x -> OP.getDecNode x "PF" toORop) validAddrOptions
 
-    opORL2EtherValidDest = OP.getOperatorNode NB.OR "L2ValidDest"
+    opORL2EtherValidDest = OP.getOperatorNode (NB.OR "L2ValidDest") ""
         (OP.BinaryNode (
             [etherValidType],
             [dropnode]))
@@ -101,7 +101,7 @@ getE1kPRG = etherClassified
             [opORclassifiedL3],
             [opORclassifiedL3]))
 
-    opORclassifiedL3 = OP.getOperatorNode NB.OR "L3Classified"
+    opORclassifiedL3 = OP.getOperatorNode (NB.OR "L3Classified") ""
         (OP.BinaryNode (
             [classifiedUDP, classifiedTCP, classifiedICMP, unclassfiedL4],
             [dropnode]))
@@ -127,7 +127,7 @@ getE1kPRG = etherClassified
             [opORl4ReadyToClassify],
             [opORl4ReadyToClassify]))
 
-    opORl4ReadyToClassify = OP.getOperatorNode NB.OR "L4Classified"
+    opORl4ReadyToClassify = OP.getOperatorNode (NB.OR "L4Classified") ""
         (OP.BinaryNode (
 --            [genFilter, confFilter1, confFilter2, confFilter3],
 --            [genFilter] ++ fList,

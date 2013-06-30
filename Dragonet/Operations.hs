@@ -125,7 +125,7 @@ getDecNode op tag edges = Des $ Decision GNode {
         , gImplementation = []
     }
 
-getOperatorNode :: NB.NetOperator -> TagType -> NodeEdges -> Node
+getOperatorNode :: NB.NetOperator ->  TagType -> NodeEdges -> Node
 getOperatorNode op tag edges = Opr $ Operator GNode {
         gLabel = (NB.OpLabel op)
         , gTag = tag
@@ -169,7 +169,7 @@ insertNodeInBinaryNode big parent toAdd = big'
 -}
 
 testGetOperatorOp :: Node
-testGetOperatorOp = getOperatorNode NB.AND "+" (NaryNode [])
+testGetOperatorOp = getOperatorNode (NB.AND "testOp" ) "+" (NaryNode [])
 
 testGetDecElem :: Node
 testGetDecElem = getDecNode NB.ClassifiedL2Ethernet "test" (NaryNode [])

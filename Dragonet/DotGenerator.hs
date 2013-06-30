@@ -46,9 +46,9 @@ nodeDefinition (n, nn) =
         (OP.Des (OP.Decision gn)) ->
             dotNode nn (gLabelStr gn) "" (nPorts (OP.getNodeEdges n))
         (OP.Opr (OP.Operator gn)) ->
-            dotNode nn (gLabelStr gn) "rounded" (nPorts (OP.getNodeEdges n))
+            dotNode nn (gLabelStr gn) "rounded,color=gray,style=filled" (nPorts (OP.getNodeEdges n))
         (OP.Conf (OP.Configuration gn)) ->
-            dotNode nn (gLabelStr gn) "rounded" (nPorts (OP.getNodeEdges n))
+            dotNode nn (gLabelStr gn) "rounded,color=turquoise,style=filled" (nPorts (OP.getNodeEdges n))
 
 
 
