@@ -11,6 +11,7 @@ module Main (
     main
 ) where
 
+import qualified Data.List as DL
 
 import qualified NetBasics as NB
 import qualified Operations as OP
@@ -62,7 +63,9 @@ testE10kConfig =
         where
         fileName = "E10kConfig.dot"
         tree = E10k.getE1kPRG
-        tree' = OP.applyConfigWrapper NB.L2EtherValidCRC "PF" False tree
+        config = E10k.getTestcaseConfiguration
+        tree' = DL.foldl (\ acc (a, b, c) -> OP.applyConfigWrapper a b c acc) tree config
+--        tree' = OP.applyConfigWrapper NB.L2EtherValidCRC "PF" False tree
 
 allTests :: IO ()
 allTests =

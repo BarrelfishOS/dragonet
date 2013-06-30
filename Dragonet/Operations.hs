@@ -142,6 +142,25 @@ applyConfigWrapper confOp tag whichSide tree
     where
     expanded = applyConfig confOp tag whichSide tree
 
+
+-- Finds and replace a Decision node following a configuration node
+-- which has same NetOperation label as configuration node
+-- and replaces it with new NetOperation label which we got as part
+-- of the configuration
+findAndReplaceWithinDes :: NB.NetOperation -> [Node] -> [Node]
+findAndReplaceWithinDes _ [] = []
+findAndReplaceWithinDes confOp (x:xs)  = case x of
+    Des (Decision (GNode (NB.DesLabel no) t alist nextNodes imp)) ->
+        if (NB.confCompare
+            (NB.ConfLabel (MB.Just no))
+            (NB.ConfLabel (MB.Just confOp))
+           ) then  [(Des (Decision (GNode (NB.DesLabel confOp) t alist nextNodes imp)))]
+           ++ findAndReplaceWithinDes confOp xs
+        else
+            [x] ++ findAndReplaceWithinDes confOp xs
+    otherwise ->  [x] ++ findAndReplaceWithinDes confOp  xs
+
+
 {-
  - Apply given configuration and get the new tree where the
  - configuration node does not exist anymore.
@@ -152,11 +171,14 @@ applyConfig confOp tag whichSide tree  = tree'
     tree'' = updateNodeEdges (applyConfig confOp tag whichSide) tree
 
     tree' = case tree of
-        Conf (Configuration (GNode (NB.ConfLabel (MB.Just netop)) t alist nextNodes imp)) ->
-            if ( netop == confOp ) && (tag == t)  then
+        Conf (Configuration (GNode confl  t alist nextNodes imp)) ->
+            if ( NB.confCompare confl (NB.ConfLabel (MB.Just confOp)) )
+                && (tag == t)  then
+                -- (NB.ConfLabel (MB.Just netop))
                 -- We found the configuration node, lets replace it
                 case nextNodes of
-                    BinaryNode (tlist, flist)   -> if whichSide then tlist
+                    BinaryNode (tlist, flist)   -> if whichSide then
+                                        findAndReplaceWithinDes confOp tlist
                                                     else flist
                     otherwise                   -> error "non binary Config node"
             else  [tree'']

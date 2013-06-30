@@ -32,6 +32,7 @@ module NetBasics (
     , TupleValue
     , TupleSelector(..)
     , BitMaskSelecter(..)
+    , ConfigCompare(..)
 ) where
 
 
@@ -227,6 +228,11 @@ data NetOperator = AND String
 class GraphLabel a where
     graphLabelStr :: a -> String
 
+class ConfigCompare a where
+    confCompare :: a -> a -> Bool
+
+
+
 {-
  - Replaces blank spaces with Underscores in given string
  -}
@@ -240,6 +246,21 @@ instance GraphLabel DesLabel where
 
 data ConfLabel = ConfLabel (MB.Maybe NetOperation)
     deriving (Show, Eq)
+
+instance ConfigCompare ConfLabel where
+    confCompare (ConfLabel (MB.Just (FiveTupleFilter _ _)))
+        (ConfLabel (MB.Just (FiveTupleFilter _ _))) = True
+    confCompare (ConfLabel (MB.Just (HashFilter _ _)))
+        (ConfLabel (MB.Just (HashFilter _ _))) = True
+    confCompare (ConfLabel (MB.Just (SyncFilter _)))
+        (ConfLabel (MB.Just (SyncFilter _))) = True
+    confCompare (ConfLabel (MB.Just (BitMaskFilter _ _)))
+        (ConfLabel (MB.Just (BitMaskFilter _ _))) = True
+    confCompare (ConfLabel (MB.Just (ToQueue q1)))
+        (ConfLabel (MB.Just (ToQueue q2))) = queueId q1 == queueId q2
+    confCompare (ConfLabel no1) (ConfLabel no2) =  no1 == no2
+
+
 
 instance GraphLabel ConfLabel where
     graphLabelStr (ConfLabel cl) = replaceSpaces $ "Conf" ++ (drop 4 $ show cl)
