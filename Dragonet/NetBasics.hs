@@ -26,6 +26,9 @@ module NetBasics (
     , getDefaultBasicQueue
     , getDefaultQueue
     , getDefaultFitlerForID
+    , Qid
+    , CoreID
+    , FilterID
 ) where
 
 

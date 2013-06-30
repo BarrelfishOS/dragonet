@@ -129,7 +129,8 @@ getE1kPRG = etherClassified
 
     opORl4ReadyToClassify = OP.getOperatorNode NB.OR "L4Classified"
         (OP.BinaryNode (
-            [genFilter, filter1, filter2, filter3],
+--            [genFilter, confFilter1, confFilter2, confFilter3],
+            [genFilter] ++ fList,
             [dropnode]))
 
     genFilter = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 0)) "PF"
@@ -142,50 +143,28 @@ getE1kPRG = etherClassified
             [],
             []))
 
-    q1 = NB.Queue 1 1 NB.getDefaultBasicQueue
-    queue1 = OP.getDecNode (NB.ToQueue q1) "PF"
+    filterConfList = [(1, 1, 1), (2, 2, 2), (3, 3, 3)]
+    fList = DL.map (\ (f, q, c) -> getConfFilterQueue f q c) filterConfList
+
+
+getConfFilterQueue :: NB.FilterID -> NB.Qid -> NB.CoreID -> OP.Node
+getConfFilterQueue fid qid cid = confFilter
+    where
+    confFilter = OP.getConfNode ("filter" ++ show fid) ""
+        (OP.BinaryNode (
+            [f],
+            []))
+
+    f = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID fid)) "PF"
+        (OP.BinaryNode (
+            [queue],
+            []))
+
+    q = NB.Queue qid cid NB.getDefaultBasicQueue
+    queue = OP.getDecNode (NB.ToQueue q) "PF"
         (OP.BinaryNode (
             [],
             []))
-
-    q2 = NB.Queue 2 2 NB.getDefaultBasicQueue
-    queue2 = OP.getDecNode (NB.ToQueue q2) "PF"
-        (OP.BinaryNode (
-            [],
-            []))
-
-    q3 = NB.Queue 3 3 NB.getDefaultBasicQueue
-    queue3 = OP.getDecNode (NB.ToQueue q3) "PF"
-        (OP.BinaryNode (
-            [],
-            []))
-
-
-    filter1 = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 1)) "PF"
-        (OP.BinaryNode (
-            [queue1],
-            []))
-
-    filter2 = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 2)) "PF"
-        (OP.BinaryNode (
-            [queue2],
-            []))
-
-    filter3 = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 3)) "PF"
-        (OP.BinaryNode (
-            [queue3],
-            []))
-
-
-
-
-
-
-
-
-
-
-
 
 
 
