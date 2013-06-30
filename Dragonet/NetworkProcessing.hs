@@ -129,9 +129,42 @@ getNetworkDependency = etherClassified
         toL4readyToClassify toL4Verified toVerifyTCP
 
 
-    toL4readyToClassify = (OP.BinaryNode (
+    opORL4readyToClassify = OP.getOperatorNode NB.OR "L4classified"
+        (OP.BinaryNode (
+            [genFilter], -- appling filters here
+            --[genFilter, filter1, filter2, filter3],
+            [dropnode]))
+
+    genFilter = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 0)) "PF"
+        (OP.BinaryNode (
+            [defaultQueue],
+            []))
+
+    defaultQueue = OP.getDecNode (NB.ToQueue NB.getDefaultQueue) "PF"
+        (OP.BinaryNode (
             [],
             []))
+{-
+    filter1 = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 1)) "PF"
+        (OP.BinaryNode (
+            [],
+            []))
+
+    filter2 = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 2)) "PF"
+        (OP.BinaryNode (
+            [],
+            []))
+
+    filter3 = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 3)) "PF"
+        (OP.BinaryNode (
+            [],
+            []))
+-}
+
+
+    toL4readyToClassify = (OP.BinaryNode (
+            [opORL4readyToClassify],
+            [opORL4readyToClassify]))
 
     toL4Verified = (OP.BinaryNode (
             [opORL4Verified],
@@ -155,9 +188,11 @@ getProtoProcessing :: NB.NetOperation -> (NB.NetOperation, OP.NodeEdges) ->
 getProtoProcessing startNodeLabel (classifiedLabel, classifiedForward)
     verifiedForward dropnode toVerify = protoClassified
     where
+
     opANDverified = OP.getOperatorNode NB.AND "verified" verifiedForward
     toANDop =  OP.BinaryNode ([opANDverified], [opANDverified])
     trueList = DL.map (\ x -> OP.getDecNode x "PF" toANDop) toVerify
+
     validProto = OP.getDecNode classifiedLabel "PF" classifiedForward
     protoClassified = OP.getDecNode startNodeLabel "PF"
         (OP.BinaryNode (trueList ++ [validProto], [dropnode]))

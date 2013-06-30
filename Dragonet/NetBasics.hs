@@ -19,7 +19,13 @@ module NetBasics (
     , Attribute(..)
     , NetOperation(..)
     , NetOperator(..)
+    , BasicQueue(..)
+    , Queue(..)
+    , Filter(..)
     , graphLabelStr
+    , getDefaultBasicQueue
+    , getDefaultQueue
+    , getDefaultFitlerForID
 ) where
 
 
@@ -43,6 +49,50 @@ data Protocol = NONEProtocol
 type Qid = Integer
 type CoreID = Integer
 type FilterID = Integer
+
+{-
+ - Very simple queue, which I may extend in future with list
+ - of descriptors, but for time being, it is just to show that there is a queue.
+ -}
+data BasicQueue = BasicQueue {
+        qSize :: Integer
+    } deriving (Eq, Ord)
+
+instance Show BasicQueue where
+    show (BasicQueue s) = show s
+
+data Queue = Queue {
+        queueId :: Qid
+        , coreId :: CoreID
+        , bQueue :: BasicQueue
+    } deriving (Eq, Ord)
+
+instance Show Queue where
+    show (Queue qid coreid _) = show qid ++ " core " ++ show coreid
+
+data Filter = Filter {
+        filterID :: FilterID
+        , protocol :: Protocol
+        , srcIP :: L3Address
+        , dstIP :: L3Address
+        , srcPort :: L4Address
+        , dstPort :: L4Address
+    } deriving (Eq, Ord)
+
+instance Show Filter where
+    show (Filter fid proto sip dip sp dp) = show fid ++ " " ++ show proto
+        ++ "_" ++ show sip ++ "_" ++ show dip  ++ "_" ++ show sp  ++ "_"
+        ++ show dp
+
+getDefaultBasicQueue :: BasicQueue
+getDefaultBasicQueue = BasicQueue 5
+
+getDefaultQueue :: Queue
+getDefaultQueue = Queue 0 0 $ getDefaultBasicQueue
+
+getDefaultFitlerForID :: FilterID -> Filter
+getDefaultFitlerForID x = (Filter x ANYProtocol 0 0 0 0)
+
 
 data Layer = L1 -- hardware
         | L2 -- Ethernet
@@ -130,6 +180,8 @@ data NetOperation = ClassifiedL2Ethernet -- Ethernet starter node
         | ReqBufDescregister -- BufDesc
         | VerifyBufDesc
         | PacketDrop
+        | ToQueue Queue
+        | IsFlow Filter -- for flow filtering
         deriving (Show, Eq, Ord)
 
 data NetOperator = AND

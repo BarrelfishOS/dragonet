@@ -129,8 +129,56 @@ getE1kPRG = etherClassified
 
     opORl4ReadyToClassify = OP.getOperatorNode NB.OR "L4Classified"
         (OP.BinaryNode (
-            [],
+            [genFilter, filter1, filter2, filter3],
             [dropnode]))
+
+    genFilter = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 0)) "PF"
+        (OP.BinaryNode (
+            [defaultQueue],
+            []))
+
+    defaultQueue = OP.getDecNode (NB.ToQueue NB.getDefaultQueue) "PF"
+        (OP.BinaryNode (
+            [],
+            []))
+
+    q1 = NB.Queue 1 1 NB.getDefaultBasicQueue
+    queue1 = OP.getDecNode (NB.ToQueue q1) "PF"
+        (OP.BinaryNode (
+            [],
+            []))
+
+    q2 = NB.Queue 2 2 NB.getDefaultBasicQueue
+    queue2 = OP.getDecNode (NB.ToQueue q2) "PF"
+        (OP.BinaryNode (
+            [],
+            []))
+
+    q3 = NB.Queue 3 3 NB.getDefaultBasicQueue
+    queue3 = OP.getDecNode (NB.ToQueue q3) "PF"
+        (OP.BinaryNode (
+            [],
+            []))
+
+
+    filter1 = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 1)) "PF"
+        (OP.BinaryNode (
+            [queue1],
+            []))
+
+    filter2 = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 2)) "PF"
+        (OP.BinaryNode (
+            [queue2],
+            []))
+
+    filter3 = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 3)) "PF"
+        (OP.BinaryNode (
+            [queue3],
+            []))
+
+
+
+
 
 
 

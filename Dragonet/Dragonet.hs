@@ -60,7 +60,7 @@ allTests =
 
 main :: IO()
 --main = testOp
---main = testE10k
+main = testE10k
 --main = testNetworkProcessing
-main = allTests
+--main = allTests
 
