@@ -24,6 +24,7 @@ module Operations(
     , appendToTrue
     , appendToFalse
     , nTreeNodes
+    , TagType
 ) where
 
 import qualified NetBasics as NB
@@ -90,6 +91,22 @@ data Node = Des Decision
     | Opr Operator -- (GNode NB.OpLabel OpFunction) --
     deriving (Show, Eq)
 
+{-
+ - Apply given configuration and get the new type where the
+ - configuration node does not exist anymore.
+ -}
+applyConfig :: Node -> NB.NetOperation -> TagType -> Node
+applyConfig tree node tag = tree'
+    where
+    tree' = tree
+
+    -- if node is nonConfig, then go to it's children nodes
+    -- if node is config, then compare the tag
+    --      if not matched, then go to it's children nodes
+    --      if matched, compare tag.
+    --          if matched, mark the configuration to be true
+    --              return this node
+    --          if not matched, contine to children node
 
 -- Get list containing all nodes reachable from the specified start node.
 -- Note that nodes with multiple incoming edges might be contained more than
@@ -113,6 +130,8 @@ getConfNode op tag edges = Conf $ Configuration GNode {
         , gAttributes = []
         , gImplementation = []
     }
+
+
 
 
 
