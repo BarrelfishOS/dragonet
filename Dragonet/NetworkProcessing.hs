@@ -131,36 +131,14 @@ getNetworkDependency = etherClassified
 
     opORL4readyToClassify = OP.getOperatorNode NB.OR "L4classified"
         (OP.BinaryNode (
-            [genFilter], -- appling filters here
-            --[genFilter, filter1, filter2, filter3],
+            [queue0],
             [dropnode]))
 
-    genFilter = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 0)) "PF"
-        (OP.BinaryNode (
-            [defaultQueue],
-            []))
-
-    defaultQueue = OP.getDecNode (NB.ToQueue NB.getDefaultQueue) "PF"
+    q0 = NB.Queue 0 0 NB.getDefaultBasicQueue
+    queue0 = OP.getDecNode (NB.ToQueue q0) ""
         (OP.BinaryNode (
             [],
             []))
-{-
-    filter1 = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 1)) "PF"
-        (OP.BinaryNode (
-            [],
-            []))
-
-    filter2 = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 2)) "PF"
-        (OP.BinaryNode (
-            [],
-            []))
-
-    filter3 = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 3)) "PF"
-        (OP.BinaryNode (
-            [],
-            []))
--}
-
 
     toL4readyToClassify = (OP.BinaryNode (
             [opORL4readyToClassify],
@@ -170,12 +148,10 @@ getNetworkDependency = etherClassified
             [opORL4Verified],
             [opORL4Verified]))
 
-
     opORL4Verified = OP.getOperatorNode NB.OR "L4verified"
         (OP.BinaryNode (
             [],
             []))
-
 
 
 {-

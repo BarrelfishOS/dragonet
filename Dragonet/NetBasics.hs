@@ -195,7 +195,7 @@ data NetOperation = ClassifiedL2Ethernet -- Ethernet starter node
         | HashFilter TupleSelector Queue
         | SyncFilter Queue
         | BitMaskFilter BitMaskSelecter Queue
-        | IsFlow Filter -- for flow filtering
+        | IsFlow Filter Queue -- for flow filtering
         deriving (Show, Eq)
 
 
