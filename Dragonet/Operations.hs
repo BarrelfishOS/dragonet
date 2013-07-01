@@ -29,6 +29,7 @@ module Operations(
     , applyConfig
     , updateNodeList
     , updateNodeEdges
+    , embeddGraphs
 ) where
 
 import qualified NetBasics as NB
@@ -96,22 +97,33 @@ data Node = Des Decision
     deriving (Show, Eq)
 
 
-{-
-replaceNodeFromNodeList :: [Node] -> Node -> [Node] -> [Node]
-replaceNodeFromNodeList inList toRemove toAdd = updatedList
-    where
-    updatedList = DL.mapConcat (\ x -> if x == toRemove then toAdd else [x]) inList
 
--- Replaces all the instances of Node with NodeList within given tree
-replaceNodeFromNodeEdges :: Node -> Node -> [Node] -> Node
-replaceNodeFromNodeEdges tree toRemove toAdd = tree'
-    where
-    tree' = case (getNodeEdges tree) of
-        BinaryNode (tlist, flist) -> setNodeEdges tree (BinaryNode
-            (replaceNodeFromNodeList tlist,  replaceNodeFromNodeList llist))
-        NaryNode nlist -> DL.map (\ x -> replaceNodeFromNodeList x toRemove toAdd) nlist
--}
 
+getLabels :: [Node] -> ([NB.DesLabel], [NB.ConfLabel], [NB.OpLabel])
+getLabels [] = ([], [], [])
+getLabels (x:xs) = newTuple
+    where
+    xsTuples = getLabels xs
+    xTuples = case x of
+        Des (Decision (GNode label t _ _ _)) -> ([label], [], [])
+        Conf (Configuration (GNode label t _ _ _)) -> ([], [label], [])
+        Opr (Operator (GNode label t _ _ _)) -> ([], [], [label])
+    (ax, bx, cx) = xTuples
+    (axs, bxs, cxs) = xsTuples
+    newTuple = ((ax ++ axs), (bx ++ bxs), (cx ++ cxs))
+
+
+-- Simple embedding algorithm, which does embedding just by looking at names
+-- of the node and it does not care about dependencies.
+embeddGraphs :: Node -> Node -> String -- Node
+embeddGraphs prg lpg
+    | lpgConf /= [] = error "embeddGraphs: Given LPG graph has conf nodes"
+    | otherwise = embedded
+    where
+    (lpgDes, lpgConf, lpgOpr) = getLabels $ nTreeNodes lpg
+    (prgDes, prgConf, prgOpr) = getLabels $ nTreeNodes prg
+    commonDes = DL.intersect lpgDes prgDes
+    embedded = show $ DL.nub commonDes
 
 -- apply given function on every element of the list and return resultant list
 updateNodeList :: (Node -> [Node]) -> [Node] -> [Node]
@@ -127,7 +139,6 @@ updateNodeEdges fn tree = tree'
             ((updateNodeList fn tl),  (updateNodeList fn fl)))
         NaryNode nlist ->  setNodeEdges tree (NaryNode
             (DL.map (updateNodeList fn) nlist))
-
 
 -- Wrapper around applyConfig to take care of extream condition that
 -- first node itself is Configuration, and it matched with current
@@ -158,7 +169,7 @@ findAndReplaceWithinDes confOp (x:xs)  = case x of
            ++ findAndReplaceWithinDes confOp xs
         else
             [x] ++ findAndReplaceWithinDes confOp xs
-    otherwise ->  [x] ++ findAndReplaceWithinDes confOp  xs
+    _ ->  [x] ++ findAndReplaceWithinDes confOp  xs
 
 
 {-
@@ -180,9 +191,9 @@ applyConfig confOp tag whichSide tree  = tree'
                     BinaryNode (tlist, flist)   -> if whichSide then
                                         findAndReplaceWithinDes confOp tlist
                                                     else flist
-                    otherwise                   -> error "non binary Config node"
+                    _ -> error "non binary Config node"
             else  [tree'']
-        otherwise -> [tree'']
+        _ -> [tree'']
 
 -- Get list containing all nodes reachable from the specified start node.
 -- Note that nodes with multiple incoming edges might be contained more than

@@ -53,6 +53,8 @@ testE10k =
         fileName = "E10k.dot"
         op = E10k.getE1kPRG
 
+
+
 testE10kConfig :: IO ()
 testE10kConfig =
         do
@@ -67,12 +69,31 @@ testE10kConfig =
         tree' = DL.foldl (\ acc (a, b, c) -> OP.applyConfigWrapper a b c acc) tree config
 --        tree' = OP.applyConfigWrapper NB.L2EtherValidCRC "PF" False tree
 
+testE10kEmbedding :: IO ()
+testE10kEmbedding =
+        do
+        putStrLn "Applying embedding to configured E10kPRG"
+        --writeFile fileName $ DG.toDot tree'
+        --putStrLn ("Generated " ++ fileName)
+        putStrLn "common nodes are"
+        putStrLn commonNodes
+        putStrLn "Done..."
+        where
+        fileName = "E10kConfig.dot"
+        tree = E10k.getE1kPRG
+        config = E10k.getTestcaseConfiguration
+        prg = DL.foldl (\ acc (a, b, c) -> OP.applyConfigWrapper a b c acc) tree config
+        lpg = NP.getNetworkDependency
+        commonNodes = OP.embeddGraphs prg lpg
+
+
 allTests :: IO ()
 allTests =
     do
     testNetworkProcessing
     testE10k
     testE10kConfig
+    testE10kEmbedding
 
 main :: IO()
 --main = testOp
