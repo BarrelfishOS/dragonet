@@ -63,6 +63,11 @@ convert16BE w1 w2 =
     (shiftL (fromIntegral w1 :: Word16) 8) .|.
         (fromIntegral w2 :: Word16)
 
+unpack16BE :: Word16 -> [Word8]
+unpack16BE w =
+    [(fromIntegral (shiftR w 8) :: Word8) , (fromIntegral w :: Word8)]
+
+
 convert32BE w1 w2 w3 w4 =
     (shiftL (fromIntegral w1 :: Word32) 24) .|.
         (shiftL (fromIntegral w2 :: Word32) 16) .|.
@@ -227,10 +232,11 @@ ipHeaderLen = do
 ipChecksum :: [Word8] -> Word16
 ipChecksum p = cxsm
     where
+        padded = if (length p) `mod` 2 /= 0 then p ++ [0] else p
         convertSingle a b = fromIntegral (convert16BE a b) :: Word32
         convert [] = []
         convert (a:b:rest) = (convertSingle a b):(convert rest)
-        s32 = sum $ convert p
+        s32 = sum $ convert padded
         foldInt i = ((i .&. 0xffff) + (shiftR i 16))
         cxsm32 = xor 0xffff $ foldInt $ foldInt s32
         cxsm = fromIntegral cxsm32 :: Word16
@@ -263,7 +269,7 @@ l3IPv4ValidLengthImpl = do
     (AttrI off) <- getAttr "L3Offset"
     len <- packetLen
     ipLen <- readP16BE (off + 2)    
-    toPort $ pbool ((fromIntegral ipLen :: Int) + off >= len)
+    toPort $ pbool ((fromIntegral ipLen :: Int) + off <= len)
 
 l3IPv4ValidTTLImpl = toPort "true"
 
@@ -283,12 +289,49 @@ l3IPv4ClassifyImpl = do
         0x06 -> "tcp"
         0x11 -> "udp"
         _ -> "drop"
+
+
+-----------------------------------------------------------------------------
+-- IPv6
+
+l3IPv6ValidHeaderLengthImpl = toPort "true"
+
+
+
+-----------------------------------------------------------------------------
+-- UDP
+
+ipv4Pseudoheader p len = do
+    (AttrI off) <- getAttr "L3Offset"
+    sIP <- readP (off + 12) 4
+    dIP <- readP (off + 16) 4
+    return (sIP ++ dIP ++ [0] ++ [p] ++ (unpack16BE len))
+
+l4UDPValidHeaderLengthImpl = do
+    (AttrI off) <- getAttr "L4Offset"
+    len <- packetLen
+    toPort $ pbool ((len - off) >= 8)
+
+l4UDPValidLengthImpl = do
+    (AttrI off) <- getAttr "L4Offset"
+    len <- packetLen
+    udpLen <- readP16BE (off + 4)
+    toPort $ pbool (len >= (fromIntegral udpLen) + off)
+
+l4UDPValidChecksumImpl = do
+    (AttrI off) <- getAttr "L4Offset"
+    len <- packetLen
+    cxsm <- readP16BE (off + 6)
+    pkt <- readP off (len - off)
+    pheader <- ipv4Pseudoheader 0x11 (fromIntegral (len - off))
+    toPort $ pbool (cxsm == 0 || (ipChecksum (pheader ++ pkt)) == 0)
     
+    
+   
+
 
     
 
-l3IPv6ValidHeaderLengthImpl = do
-    toPort "true"
 
 -- Sinks
 packetDropImpl = toPort "Packet dropped!"
@@ -309,6 +352,11 @@ l4UDPOutImpl = toPort "Got UDP packet!"
 
 -- get LPG
 [dragonetImpl_f|lpgImpl.dragonet|]
+
+
+-----------------------------------------------------------------------------
+-- Simulation
+
 
 -- Get string label for GNode
 gLabelStr gn = OP.gLabel gn
@@ -356,6 +404,17 @@ topSort es =
         isOrphaned n = isNothing $ L.find (\x -> ((snd x) == n) || ((fst x) == n)) newEdges
         orphaned = L.nub $ filter isOrphaned $ map snd dropped
 
+
+-- Execute graph. First parameter is expected to be a topologically sorted
+-- list of the graph nodes, the second list is used to store the enablement
+-- indication, so (enabled node, origin, port), and the last argument is the
+-- context to start with. Returned is the port name returned by the
+-- implementation of the last sink node and the last state.
+--
+-- Basic idea: use topologically sorted list of nodes, this way all predecessors
+-- will have been calculated when arriving at a node (if enabled). The output
+-- port taken for a node will be stored in a list, used for implemented AND/OR
+-- nodes.
 executeNode :: [ImplNode] -> [(ImplNode,ImplNode,String)] -> Context -> (String,Context)
 executeNode [] _ ctx = ("Got stuck :-/", ctx)
 executeNode (i:is) ret ctx =
@@ -410,20 +469,22 @@ main = do
     putStrLn $ show $ getPredecessors l2EtherValidImplNode graphEdges
 
     icmpReq <- BS.readFile "packets/icmp_request"
-    putStrLn "ICMP Request"
+    putStrLn "\n\nICMP Request"
     putStrLn $ show $ execute icmpReq
 
-    icmpReq <- BS.readFile "packets/icmp_request"
-    putStrLn "ICMP Request"
-    putStrLn $ show $ execute icmpReq
+    icmpResp <- BS.readFile "packets/icmp_response"
+    putStrLn "\n\nICMP Request"
+    putStrLn $ show $ execute icmpResp
 
-    icmpReq <- BS.readFile "packets/dns_query"
-    putStrLn "DNS Request"
-    putStrLn $ show $ execute icmpReq
+    dnsQry <- BS.readFile "packets/dns_query"
+    putStrLn "\n\nDNS Request (udp checksum broken)"
+    putStrLn $ show $ execute dnsQry
 
---    putStrLn $ show $ DG.toDot l2EtherClassifyL3
---    putStr "l2EtherValidLengthImpl: "
---    putStrLn $ show $ testIt arp l2EtherValidLengthImpl
+    dnsResp <- BS.readFile "packets/dns_response"
+    putStrLn "\n\nDNS Response (udp checksum good)"
+    putStrLn $ show $ execute dnsResp
+
+
     where
         execute p = fst $ executeNode ts [(sourceImplNode,sourceImplNode,"in")] $ Context p M.empty
         ts = topSort $ graphEdges

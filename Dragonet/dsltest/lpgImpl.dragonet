@@ -87,7 +87,7 @@ boolean l3IPv4ValidChecksum {
 
 node l3IPv4Classify {
     port tcp[l4TCPValid]
-    port udp[l4UDPValid]
+    port udp[l4UDPValidHeaderLength]
     port icmp[l3ICMPValid]
     port drop[packetDrop] }
 
@@ -124,6 +124,15 @@ node l3ICMPOut { }
 
 
 
+boolean l4UDPValidHeaderLength {
+    port true[l4UDPValidLength l4UDPValidChecksum]
+    port false[packetDrop] }
+
+boolean l4UDPValidLength {
+    port true false[l4UDPValid] }
+
+boolean l4UDPValidChecksum {
+    port true false[l4UDPValid] }
 
 and l4UDPValid {
     port true[l4UDPOut]
