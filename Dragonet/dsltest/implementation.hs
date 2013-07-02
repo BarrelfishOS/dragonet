@@ -147,6 +147,9 @@ toPort = return
 
 sourceImpl = toPort "out"
 
+-----------------------------------------------------------------------------
+-- Ethernet
+
 l2EtherClassifiedImpl = do
     return "true"
 
@@ -188,23 +191,100 @@ l2EtherClassifyL3Impl = do
         0x0806 -> "arp"
         _ -> "drop"
 
+-----------------------------------------------------------------------------
+-- ARP
 
-l3IPv4ValidHeaderLengthImpl = do
-    l2EtherClassifyL3Impl
+l3ARPValidHeaderLengthImpl = do
     (AttrI off) <- getAttr "L3Offset"
     len <- packetLen
-    ihl <- if ((len - off) < 20) then
-        toPort 20 -- does not matter as long as it's long enough
+    -- hardcoded for Ethernet/IPv4
+    if len - off == 28 then do
+        hlen <- readP8 (off + 4)
+        plen <- readP8 (off + 5)
+        return $ pbool $ ((hlen == 6) && (plen == 4))
     else
-        readP8 off
-    hlen <- toPort ((fromIntegral ihl :: Int) .&. 0xf)
-    toPort $ pbool $ (hlen >= 20 && (len - off) >= 4*hlen)
+        return "false"
+        
+
+l3ARPClassifyImpl = do
+    (AttrI off) <- getAttr "L3Offset"
+    oper <- readP16BE (off + 6)
+    return $ case oper of
+        1 -> "request"
+        2 -> "reply"
+        _ -> "drop"
+
+-----------------------------------------------------------------------------
+-- IPv4
+
+ipHeaderLen = do
+    (AttrI off) <- getAttr "L3Offset"
+    ihl <- readP8 off
+    return $ 4 * ((fromIntegral ihl :: Int) .&. 0xf)
+
+-- Kind of ugly: convert pairs of bytes to 16bit integers, but use 32bit
+-- arithmetic when summing up, in the end combine the higher and lower 16 bits
+ipChecksum :: [Word8] -> Word16
+ipChecksum p = cxsm
+    where
+        convertSingle a b = fromIntegral (convert16BE a b) :: Word32
+        convert [] = []
+        convert (a:b:rest) = (convertSingle a b):(convert rest)
+        s32 = sum $ convert p
+        foldInt i = ((i .&. 0xffff) + (shiftR i 16))
+        cxsm32 = xor 0xffff $ foldInt $ foldInt s32
+        cxsm = fromIntegral cxsm32 :: Word16
+
+l3IPv4ValidHeaderLengthImpl = do
+    (AttrI off) <- getAttr "L3Offset"
+    len <- packetLen
+    if ((len - off) < 20) then
+        toPort "false"
+    else do
+        hlen <- ipHeaderLen
+        toPort $ pbool $ (hlen >= 20 && (len - off) >= hlen)
+
+l3IPv4ValidDestImpl = toPort "true"
+l3IPv4ValidSrcImpl = toPort "true"
+
+-- For now we just make sure the packet is not fragmented
+l3IPv4ValidReassemblyImpl = do
+    (AttrI off) <- getAttr "L3Offset"
+    fragOff <- readP16BE $ off + 6
+    toPort $ pbool $ ((fragOff .&. 0x2000) == 0 && (fragOff .&. 0x1fff) == 0)
+
 
 l3IPv4ValidVersionImpl = do
-    l2EtherClassifyL3Impl
     (AttrI off) <- getAttr "L3Offset"
     ver <- readP8 off
     toPort $ pbool ((shiftR ver 4) == 4)
+
+l3IPv4ValidLengthImpl = do
+    (AttrI off) <- getAttr "L3Offset"
+    len <- packetLen
+    ipLen <- readP16BE (off + 2)    
+    toPort $ pbool ((fromIntegral ipLen :: Int) + off >= len)
+
+l3IPv4ValidTTLImpl = toPort "true"
+
+l3IPv4ValidChecksumImpl = do
+    (AttrI off) <- getAttr "L3Offset"
+    hlen <- ipHeaderLen
+    pkt <- readP off hlen
+    toPort $ pbool $ (ipChecksum pkt) == 0
+
+l3IPv4ClassifyImpl = do
+    (AttrI off) <- getAttr "L3Offset"
+    hlen <- ipHeaderLen
+    setAttr "L4Offset" $ AttrI $ off + hlen
+    proto <- readP8 (off + 9)
+    toPort $ case proto of
+        0x01 -> "icmp"
+        0x06 -> "tcp"
+        0x11 -> "udp"
+        _ -> "drop"
+    
+
     
 
 l3IPv6ValidHeaderLengthImpl = do
@@ -212,23 +292,23 @@ l3IPv6ValidHeaderLengthImpl = do
 
 -- Sinks
 packetDropImpl = toPort "Packet dropped!"
-l3ARPOutImpl = toPort "Got ARP packet!"
-l3IPOutImpl = toPort "Valid IP packet!"
+l3ARPRequestImpl = toPort "Got ARP request!"
+l3ARPResponseImpl = toPort "Got ARP response!"
+l3ICMPOutImpl = toPort "Got ICMP packet!"
+l4TCPOutImpl = toPort "Got TCP packet!"
+l4UDPOutImpl = toPort "Got UDP packet!"
+
+
+
+
+
+
+
+
 
 
 -- get LPG
 [dragonetImpl_f|lpgImpl.dragonet|]
-
--- List of outgoing edges of this node
---getOutEdges :: OP.Node -> [(OP.Node,OP.Node)]
---getOutEdges n =
---    map toTup $ case n of
---        (OP.Des (OP.Decision gn)) -> convert $ OP.gEdges gn
---        (OP.Opr (OP.Operator gn)) -> convert $ OP.gEdges gn
---    where
---        toTup e = (n,e)
---        convert (OP.BinaryNode (as, bs)) = as ++ bs
---       convert (OP.NaryNode es) = concat es
 
 -- Get string label for GNode
 gLabelStr gn = OP.gLabel gn
@@ -252,7 +332,12 @@ getEdgeList n = out ++ (concat $ map getEdgeList successors)
         out = getOutEdges n
         successors = L.nub $ map snd out
 
+-- Find predecessor for specfied node in edge list
+getPredecessors :: Eq a => a -> [(a,a)] -> [a]
+getPredecessors n e =
+    L.nub $ map fst $ filter (\(_,x) -> x == n) e
 
+-- Topological sort on edge list representation
 topSort :: Eq a => [(a,a)] -> [a]
 topSort [] = []
 topSort es =
@@ -271,56 +356,77 @@ topSort es =
         isOrphaned n = isNothing $ L.find (\x -> ((snd x) == n) || ((fst x) == n)) newEdges
         orphaned = L.nub $ filter isOrphaned $ map snd dropped
 
+executeNode :: [ImplNode] -> [(ImplNode,ImplNode,String)] -> Context -> (String,Context)
 executeNode [] _ ctx = ("Got stuck :-/", ctx)
 executeNode (i:is) ret ctx =
-        if not $ null invalues then
-            T.trace ("executeNode " ++ show i) (
-            -- Node was enabled
-            if null p then
-                (port, nctx)  -- no outgoing edges -> arrived in sink
-            else
-                T.trace ("  -> port=" ++ show port) (
-                executeNode is newret nctx)
+        if not $ null invalues then -- Node was enabled
+            T.trace ("executeNode " ++ show i ++ " ") (
+            if null p then (port, nctx)  -- no outgoing edges -> arrived in sink
+            else T.trace ("  -> port=" ++ show port) (executeNode is newret nctx)
             )
-        else
-            -- Node not enabled, just skip it
+        else -- Node not enabled, just skip it
             executeNode is ret ctx
-            
             
     where
         (ImplNode n impl p) = i
-        (port, nctx) =
+        ((port, nctx), newret) =
             case n of
-                (OP.Des _) -> runState (fromJust impl) ctx
+                (OP.Des _) -> (runState (fromJust impl) ctx, updateRet)
                 (OP.Opr (OP.Operator gn)) ->
-                    -- Rather ugly
-                    if (take 4 $ OP.gLabel gn) == "AND" then
-                        (andImpl, ctx)
-                    else
-                        (orImpl, ctx)
+                    if (take 3 $ OP.gLabel gn) == "AND" then andImpl else orImpl
 
-        andImpl = pbool $ L.all ((==) "true") invalues
-        orImpl = pbool $ L.any ((==) "true") invalues
-        invalues = map snd $ filter (\(x,_) -> x == n) ret
-        outedges = fromMaybe (error ("Invalid outport " ++ port ++ " in node " ++ (show i))) $ lookup port p
-        addret = map (\x -> (inNode x, port)) outedges
-        newret = (filter (\(x,_) -> x /= n) ret) ++ addret
+
+        -- "Inputs" for this node
+        inPValues = filter (\(x,_,_) -> x == i) ret
+        invalues = map (\(_,_,x) -> x) inPValues
+
+        invalidPort pt = if pt == "" then [] else error ("Invalid outport " ++ pt ++ " in node " ++ (show i))
+        -- Outgoing edges for selected port
+        outedges = fromMaybe (invalidPort port) $ lookup port p
+        addret = map (\x -> (x, i, port)) outedges
+        updateRet = (filter (\(x,_,_) -> x /= i) ret) ++ addret
+
+        orImpl =
+            if (L.any ((==) "true") invalues) then (("true",ctx),updateRet)
+            else if depsMet then (("false",ctx),updateRet) else (("",ctx),ret)
+        andImpl =
+            if (L.any ((==) "false") invalues) then (("false",ctx),updateRet)
+            else if depsMet then (("true",ctx),updateRet) else (("",ctx),ret)
+
+        -- Check if all predecessors enabled node (required for operator nodes)
+        depsMet =
+            all (\x -> isJust $ L.find (\(y,z,_) -> (y == i) && (x == z)) inPValues) $
+                getPredecessors i graphEdges
+
+
+
+
+graphEdges = getEdgeList sourceImplNode
 
 main = do
     arpReq <- BS.readFile "packets/arp_request"
     putStrLn "ARP Request"
     putStrLn $ show $ execute arpReq
+    putStrLn $ show $ getPredecessors l2EtherValidImplNode graphEdges
 
     icmpReq <- BS.readFile "packets/icmp_request"
     putStrLn "ICMP Request"
+    putStrLn $ show $ execute icmpReq
+
+    icmpReq <- BS.readFile "packets/icmp_request"
+    putStrLn "ICMP Request"
+    putStrLn $ show $ execute icmpReq
+
+    icmpReq <- BS.readFile "packets/dns_query"
+    putStrLn "DNS Request"
     putStrLn $ show $ execute icmpReq
 
 --    putStrLn $ show $ DG.toDot l2EtherClassifyL3
 --    putStr "l2EtherValidLengthImpl: "
 --    putStrLn $ show $ testIt arp l2EtherValidLengthImpl
     where
-        execute p = fst $ executeNode ts [(source,"in")] $ Context p M.empty
-        ts = topSort $ getEdgeList sourceImplNode
+        execute p = fst $ executeNode ts [(sourceImplNode,sourceImplNode,"in")] $ Context p M.empty
+        ts = topSort $ graphEdges
         testIt p f =
             (op, ctxAttrs ctx)
             where (op,ctx) = runState f $ Context p M.empty

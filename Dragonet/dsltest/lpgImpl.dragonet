@@ -12,7 +12,6 @@ boolean l2EtherValidLength {
               l2EtherValidSrc l2EtherValidType]
     port false[packetDrop] }
 
-
 boolean l2EtherValidUnicast {
     port true false[l2EtherValidDest] }
 
@@ -35,20 +34,70 @@ boolean l2EtherValidType {
     port true[l2EtherClassifyL3]
     port false[packetDrop] }
 
-
 node l2EtherClassifyL3 {
     port ipv4[l3IPv4ValidHeaderLength]
     port ipv6[l3IPv6ValidHeaderLength]
-    port arp[l3ARPOut]
+    port arp[l3ARPValidHeaderLength]
     port drop[packetDrop] }
 
 
-node l3ARPOut {}
+
+
+node l3ARPValidHeaderLength {
+    port true[l3ARPClassify]
+    port false[packetDrop] }
+
+node l3ARPClassify {
+    port request[l3ARPRequest]
+    port response[l3ARPResponse]
+    port drop[packetDrop] }
+
+node l3ARPRequest {}
+node l3ARPResponse {}
+
+
 
 
 node l3IPv4ValidHeaderLength {
-    port true[l3IPValid]
+    port true[l3IPv4ValidDest l3IPv4ValidReassembly l3IPv4ValidVersion
+              l3IPv4ValidLength l3IPv4ValidTTL l3IPv4ValidChecksum
+              l3IPv4ValidSrc l3IPv4Classify]
     port false[packetDrop] }
+
+boolean l3IPv4ValidDest {
+    port true false[l3IPv4Valid] }
+
+boolean l3IPv4ValidSrc {
+    port true false[l3IPv4Valid] }
+
+boolean l3IPv4ValidReassembly {
+    port true false[l3IPv4Valid] }
+
+boolean l3IPv4ValidVersion {
+    port true false[l3IPv4Valid] }
+
+boolean l3IPv4ValidLength {
+    port true false[l3IPv4Valid] }
+
+boolean l3IPv4ValidTTL {
+    port true false[l3IPv4Valid] }
+
+boolean l3IPv4ValidChecksum {
+    port true false[l3IPv4Valid] }
+
+node l3IPv4Classify {
+    port tcp[l4TCPValid]
+    port udp[l4UDPValid]
+    port icmp[l3ICMPValid]
+    port drop[packetDrop] }
+
+and l3IPv4Valid {
+    port true false[l3IPValid] }
+
+
+
+
+
 node l3IPv6ValidHeaderLength {
     port true[l3IPValid]
     port false[packetDrop] }
@@ -59,9 +108,36 @@ or l3IPValid {
     port true false[l3IPAndBelowValid] }
 
 and l3IPAndBelowValid {
-    port true[l3IPOut]
+    port true[l3ICMPValid l4TCPValid l4UDPValid]
     port false[packetDrop] }
 
 
-node l3IPOut { }
+
+
+
+and l3ICMPValid {
+    port true[l3ICMPOut]
+    port false[packetDrop] }
+
+node l3ICMPOut { }
+
+
+
+
+
+and l4UDPValid {
+    port true[l4UDPOut]
+    port false[packetDrop] }
+
+node l4UDPOut { }
+
+
+
+and l4TCPValid {
+    port true[l4TCPOut]
+    port false[packetDrop] }
+
+node l4TCPOut { }
+
+
 
