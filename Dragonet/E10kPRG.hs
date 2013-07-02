@@ -30,7 +30,7 @@ getE1kPRGminimal = etherClassified
             []))
 
 
-getTestcaseConfiguration :: [(NB.NetOperation, OP.TagType, Bool)]
+getTestcaseConfiguration :: [OP.ConfWrapperType]
 getTestcaseConfiguration = [
         (NB.L2EtherValidCRC, pf1, True)
         , (NB.L3IPv4ValidChecksum, pf1, True)

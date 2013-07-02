@@ -30,6 +30,8 @@ module Operations(
     , updateNodeList
     , updateNodeEdges
     , embeddGraphs
+    , applyConfigWrapperList
+    , ConfWrapperType
 ) where
 
 import qualified NetBasics as NB
@@ -96,6 +98,13 @@ data Node = Des Decision
     | Opr Operator -- (GNode NB.OpLabel OpFunction) --
     deriving (Show, Eq)
 
+instance NB.EmbedCompare Node where
+    embedCompare (Des (Decision n1)) (Des (Decision n2)) =
+        NB.embedCompare (gLabel n1) (gLabel n2) && (gTag n1) == (gTag n2)
+    embedCompare n1 n2 = error ("embedCompare: non Decision nodes are used "
+            ++ "inside the embedding comparision")
+
+
 
 
 
@@ -115,15 +124,45 @@ getLabels (x:xs) = newTuple
 
 -- Simple embedding algorithm, which does embedding just by looking at names
 -- of the node and it does not care about dependencies.
-embeddGraphs :: Node -> Node -> String -- Node
-embeddGraphs prg lpg
-    | lpgConf /= [] = error "embeddGraphs: Given LPG graph has conf nodes"
-    | otherwise = embedded
+embeddGraphs :: Node -> Node -> Node -- Node
+embeddGraphs prg lpgOrig = lpg'
     where
-    (lpgDes, lpgConf, lpgOpr) = getLabels $ nTreeNodes lpg
-    (prgDes, prgConf, prgOpr) = getLabels $ nTreeNodes prg
-    commonDes = DL.intersect lpgDes prgDes
-    embedded = show $ DL.nub commonDes
+    lpg =  getDecNode NB.InSoftware "" (BinaryNode ([lpgOrig], []))
+    lpgForest = embeddGraphStep prg lpg
+    lpg'
+        | DL.length lpgForest == 1 = DL.head lpgForest
+        | otherwise = error "embeddedGraphs: first node got embedded!!"
+
+
+embeddGraphStep :: Node -> Node -> [Node]
+embeddGraphStep prg lpg = nlist
+    where
+    nl = removeDesNode (isNodeEmbeddible prg) lpg
+    nlist = DL.map (updateNodeEdges (embeddGraphStep prg)) nl
+-- apply on all the outgoing edges of lpg
+
+-- Decides if the given node is embeddible in given tree
+isNodeEmbeddible :: Node -> Node -> Bool
+isNodeEmbeddible tree node = case node of
+    Des (Decision d) -> (gLabel d) `DL.elem` desNodes
+        where
+        (desNodes, _, _) = getLabels $ nTreeNodes tree
+    _ -> False
+
+-- Removes a given node from recursive
+removeDesNode :: (Node -> Bool) -> Node -> [Node]
+removeDesNode checkFn tree = tree'
+    where
+    tree' = if checkFn tree then getNodeEdgesSide True tree
+        else [updateNodeEdges (removeDesNode checkFn) tree]
+
+{-
+removeDesNodeList :: Node -> [Node] -> Node
+removeDesNodeList tree nodes =
+    DL.foldl (\ acc x -> removeDesNode acc x) tree nodes
+-}
+
+-- FIXME: add a dummy node before LPG to avoid returning forest instead of tree
 
 -- apply given function on every element of the list and return resultant list
 updateNodeList :: (Node -> [Node]) -> [Node] -> [Node]
@@ -139,6 +178,11 @@ updateNodeEdges fn tree = tree'
             ((updateNodeList fn tl),  (updateNodeList fn fl)))
         NaryNode nlist ->  setNodeEdges tree (NaryNode
             (DL.map (updateNodeList fn) nlist))
+
+type ConfWrapperType = (NB.NetOperation, TagType, Bool)
+applyConfigWrapperList :: Node -> [ConfWrapperType]  -> Node
+applyConfigWrapperList tree config =
+    DL.foldl (\ acc (a, b, c) -> applyConfigWrapper a b c acc) tree config
 
 -- Wrapper around applyConfig to take care of extream condition that
 -- first node itself is Configuration, and it matched with current
@@ -241,6 +285,12 @@ getOperatorNode op tag edges = Opr $ Operator GNode {
     }
 
 
+getNodeEdgesSide :: Bool -> Node -> [Node]
+getNodeEdgesSide side node = case getNodeEdges node of
+    (BinaryNode (tSide, lSide)) -> if side then tSide else lSide
+    _ -> error ("getNodeEdgesSide: requesting side on Nary node"
+            ++ show node)
+
 getNodeEdges :: Node -> NodeEdges
 getNodeEdges node = case node of
     Des (Decision a)          -> gEdges a
@@ -282,7 +332,7 @@ testGetDecElem = getDecNode NB.ClassifiedL2Ethernet "test" (NaryNode [])
 
 -- Returns the node which drops the packet
 getDropNode :: Node
-getDropNode = getDecNode NB.PacketDrop "Drop" (NaryNode [])
+getDropNode = getDecNode NB.PacketDrop "Drop" (BinaryNode ([],[]))
 
 
 testGetConfElem :: Node

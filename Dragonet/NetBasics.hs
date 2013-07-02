@@ -33,6 +33,8 @@ module NetBasics (
     , TupleSelector(..)
     , BitMaskSelecter(..)
     , ConfigCompare(..)
+    , EmbedCompare(..)
+    , DesLabel1(..) -- added to avoid unused types warning
 ) where
 
 
@@ -40,7 +42,7 @@ import qualified Data.Maybe as MB
 import qualified Data.Char as DC
 import qualified Data.List as DL
 
-type L2Address = Integer
+--type L2Address = Integer
 type L3Address = Integer
 type L4Address = Integer
 
@@ -80,6 +82,12 @@ data Queue = Queue {
 
 instance Show Queue where
     show (Queue qid coreid _) = show qid ++ " core " ++ show coreid
+
+instance ConfigCompare Queue where
+    confCompare q1 q2 = queueId q1 == queueId q2
+
+instance EmbedCompare Queue where
+    embedCompare q1 q2 = queueId q1 == queueId q2
 
 data Filter = Filter {
         filterID :: FilterID
@@ -191,6 +199,7 @@ data NetOperation = ClassifiedL2Ethernet -- Ethernet starter node
         | ReqBufDescregister -- BufDesc
         | VerifyBufDesc
         | PacketDrop
+        | InSoftware
         | ToDefaultKernelProcessing
         | ToQueue Queue
         | FiveTupleFilter TupleSelector Queue
@@ -199,6 +208,26 @@ data NetOperation = ClassifiedL2Ethernet -- Ethernet starter node
         | BitMaskFilter BitMaskSelecter Queue
         | IsFlow Filter Queue -- for flow filtering
         deriving (Show, Eq)
+
+instance ConfigCompare NetOperation where
+    confCompare (FiveTupleFilter _ _) (FiveTupleFilter _  _) = True
+    confCompare (HashFilter _ _ ) (HashFilter _ _ ) = True
+    confCompare (SyncFilter _ ) (SyncFilter _ ) = True
+    confCompare (BitMaskFilter _ _ ) (BitMaskFilter _ _ ) = True
+    confCompare (ToQueue q1) (ToQueue q2) = queueId q1 == queueId q2
+    confCompare no1  no2 =  no1 == no2
+
+
+instance EmbedCompare NetOperation where
+    embedCompare (FiveTupleFilter f1 q1) (FiveTupleFilter f2 q2) =
+        f1 == f2 && embedCompare q1 q2
+    embedCompare (HashFilter f1 q1) (HashFilter f2 q2) =
+        f1 == f2 && embedCompare q1 q2
+    embedCompare (BitMaskFilter ms1 q1) (BitMaskFilter ms2 q2) =
+        ms1 == ms2 && embedCompare q1 q2
+    embedCompare (SyncFilter q1) (SyncFilter q2) = embedCompare q1 q2
+    embedCompare (ToQueue q1) (ToQueue q2) = embedCompare q1 q2
+    embedCompare no1 no2 = no1 == no2
 
 
 type TupleValue = Integer -- FIXME: should be byte
@@ -231,6 +260,10 @@ class GraphLabel a where
 class ConfigCompare a where
     confCompare :: a -> a -> Bool
 
+class EmbedCompare a where
+    embedCompare :: a -> a -> Bool
+
+
 
 
 {-
@@ -241,12 +274,25 @@ replaceSpaces str = DL.map (\x-> (if DC.isAlphaNum x then x else '_' )) str
 
 data DesLabel = DesLabel NetOperation
     deriving (Show, Eq)
+
+instance EmbedCompare DesLabel where
+    embedCompare (DesLabel no1) (DesLabel no2) = embedCompare no1 no2
+
+instance ConfigCompare DesLabel where
+    confCompare (DesLabel no1) (DesLabel no2) = confCompare no1 no2
+
 instance GraphLabel DesLabel where
     graphLabelStr (DesLabel no) = replaceSpaces $ show no
 
 data ConfLabel = ConfLabel (MB.Maybe NetOperation)
     deriving (Show, Eq)
 
+instance ConfigCompare ConfLabel where
+    confCompare (ConfLabel (MB.Just no1))
+        (ConfLabel (MB.Just no2)) = confCompare no1 no2
+    confCompare _ _ = error "confCompare: Incompatible nodes in confCompare"
+
+{-
 instance ConfigCompare ConfLabel where
     confCompare (ConfLabel (MB.Just (FiveTupleFilter _ _)))
         (ConfLabel (MB.Just (FiveTupleFilter _ _))) = True
@@ -259,7 +305,7 @@ instance ConfigCompare ConfLabel where
     confCompare (ConfLabel (MB.Just (ToQueue q1)))
         (ConfLabel (MB.Just (ToQueue q2))) = queueId q1 == queueId q2
     confCompare (ConfLabel no1) (ConfLabel no2) =  no1 == no2
-
+-}
 
 
 instance GraphLabel ConfLabel where
