@@ -1,0 +1,67 @@
+node source {
+  port out[l2EtherClassified] }
+
+node packetDrop { }
+
+boolean l2EtherClassified {
+    port true[l2EtherValidLength]
+    port false[packetDrop] }
+
+boolean l2EtherValidLength {
+    port true[l2EtherValidUnicast l2EtherValidMulticast l2EtherValidBroadcast
+              l2EtherValidSrc l2EtherValidType]
+    port false[packetDrop] }
+
+
+boolean l2EtherValidUnicast {
+    port true false[l2EtherValidDest] }
+
+boolean l2EtherValidMulticast {
+    port true false[l2EtherValidDest] }
+
+boolean l2EtherValidBroadcast {
+    port true false[l2EtherValidDest] }
+
+or l2EtherValidDest {
+    port true false[l2EtherValid] }
+
+boolean l2EtherValidSrc {
+    port true false[l2EtherValid] }
+
+and l2EtherValid {
+    port true false[l3IPAndBelowValid] }
+
+boolean l2EtherValidType {
+    port true[l2EtherClassifyL3]
+    port false[packetDrop] }
+
+
+node l2EtherClassifyL3 {
+    port ipv4[l3IPv4ValidHeaderLength]
+    port ipv6[l3IPv6ValidHeaderLength]
+    port arp[l3ARPOut]
+    port drop[packetDrop] }
+
+
+node l3ARPOut {}
+
+
+node l3IPv4ValidHeaderLength {
+    port true[l3IPValid]
+    port false[packetDrop] }
+node l3IPv6ValidHeaderLength {
+    port true[l3IPValid]
+    port false[packetDrop] }
+
+
+
+or l3IPValid {
+    port true false[l3IPAndBelowValid] }
+
+and l3IPAndBelowValid {
+    port true[l3IPOut]
+    port false[packetDrop] }
+
+
+node l3IPOut { }
+

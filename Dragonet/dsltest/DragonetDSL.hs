@@ -1,9 +1,14 @@
-module DragonetDSL(dragonet) where
+module DragonetDSL(
+    dragonet,
+    dragonet_f,
+    dragonetImpl,
+    dragonetImpl_f,
+
+) where
 
 import System.IO
 
 
-import Data.Generics
 import qualified Language.Haskell.TH as TH
 import Language.Haskell.TH.Quote
 import Data.Maybe
@@ -20,10 +25,35 @@ dragonet  =  QuasiQuoter { quoteExp = undefined,
                            quoteDec = quoteMyDec
 }
 
--- That's where the magic happens: we get the string representing 
+dragonetImpl  :: QuasiQuoter
+dragonetImpl  =  QuasiQuoter { quoteExp = undefined,
+                           quotePat = undefined,
+                           quoteType = undefined,
+                           quoteDec = quoteMyDecImpl
+}
+
+
+dragonet_f :: QuasiQuoter
+dragonet_f = quoteFile dragonet
+
+dragonetImpl_f :: QuasiQuoter
+dragonetImpl_f = quoteFile dragonetImpl
+
+
+
+-- That's where the magic happens: we get the string representing the DSL input
+-- and generate a Haskell AST
 quoteMyDec s = do
     nodes <- parseGraph s
     return (map declare nodes)
+
+quoteMyDecImpl s = do
+    nodes <- parseGraph s
+    return ((map declare nodes) ++ (map implMap nodes))
+
+
+declare n =
+    TH.FunD (TH.mkName (nName n)) [(TH.Clause [] (TH.NormalB (node n)) [])]
     where
         portEdge e = TH.VarE (TH.mkName e)
         port (Port _ ns) = TH.ListE (map portEdge ns)
@@ -41,7 +71,25 @@ quoteMyDec s = do
                 (Boolean _ _ _) -> decNode n
                 (And l _ _) -> opNode n ("AND:" ++ l)
                 (Or l _ _) -> opNode n ("OR:" ++ l)
-        declare n = TH.FunD (TH.mkName (nName n)) [(TH.Clause [] (TH.NormalB (node n)) [])]
+
+
+implMap n =
+    TH.FunD (implNName $ nName n) [(TH.Clause [] (TH.NormalB (code)) [])]
+    where
+        edge e = TH.VarE $ implNName e
+        port (Port pn es)  = TH.TupE [TH.LitE $ TH.StringL pn, TH.ListE $ map edge es]
+        plistExp = TH.ListE $ map port $ nPorts n
+        nodeExp = TH.VarE $ TH.mkName $ nName n
+        implExp =
+            if nIsOp n then
+                TH.ConE $ TH.mkName "Nothing"
+            else
+                TH.AppE (TH.ConE $ TH.mkName "Just") $ TH.VarE implName
+        implNodeExp = TH.ConE $ TH.mkName "ImplNode"
+        code = foldl TH.AppE implNodeExp [nodeExp, implExp, plistExp]
+        implName = TH.mkName (nName n ++ "Impl")
+        implNName m = TH.mkName  (m ++ "ImplNode")
+    
     
 -----------------------------------------------------------------------------
 -- Representing parsed code
@@ -55,10 +103,20 @@ data Node =
     Or String Port Port
     deriving Show
 
+nIsOp (And n _ _) = True
+nIsOp (Or n _ _) = True
+nIsOp _ = False
+
 nName (Node n _) = n
 nName (Boolean n _ _) = n
 nName (And n _ _) = n
 nName (Or n _ _) = n
+
+nPorts :: Node -> [Port]
+nPorts (Node _ ps) = ps
+nPorts (Boolean _ a b) = [a, b]
+nPorts (And _ a b) = [a, b]
+nPorts (Or _ a b) = [a, b]
 
 
 -----------------------------------------------------------------------------
