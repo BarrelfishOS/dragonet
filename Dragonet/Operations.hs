@@ -25,13 +25,20 @@ module Operations(
     , appendToFalse
     , nTreeNodes
     , TagType
+    , applyConfigWrapper
+    , applyConfig
+    , updateNodeList
+    , updateNodeEdges
+    , embeddGraphs
+    , applyConfigWrapperList
+    , ConfWrapperType
 ) where
 
 import qualified NetBasics as NB
 import qualified Data.List as L
 import qualified Data.Maybe as MB
 
---import qualified Data.List as DL
+import qualified Data.List as DL
 --import qualified Data.Set as Set
 
 --import qualified Debug.Trace as TR
@@ -91,22 +98,146 @@ data Node = Des Decision
     | Opr Operator -- (GNode NB.OpLabel OpFunction) --
     deriving (Show, Eq)
 
+instance NB.EmbedCompare Node where
+    embedCompare (Des (Decision n1)) (Des (Decision n2)) =
+        NB.embedCompare (gLabel n1) (gLabel n2) && (gTag n1) == (gTag n2)
+    embedCompare n1 n2 = error ("embedCompare: non Decision nodes are used "
+            ++ "inside the embedding comparision")
+
+
+
+
+
+getLabels :: [Node] -> ([NB.DesLabel], [NB.ConfLabel], [NB.OpLabel])
+getLabels [] = ([], [], [])
+getLabels (x:xs) = newTuple
+    where
+    xsTuples = getLabels xs
+    xTuples = case x of
+        Des (Decision (GNode label t _ _ _)) -> ([label], [], [])
+        Conf (Configuration (GNode label t _ _ _)) -> ([], [label], [])
+        Opr (Operator (GNode label t _ _ _)) -> ([], [], [label])
+    (ax, bx, cx) = xTuples
+    (axs, bxs, cxs) = xsTuples
+    newTuple = ((ax ++ axs), (bx ++ bxs), (cx ++ cxs))
+
+
+-- Simple embedding algorithm, which does embedding just by looking at names
+-- of the node and it does not care about dependencies.
+embeddGraphs :: Node -> Node -> Node -- Node
+embeddGraphs prg lpgOrig = lpg'
+    where
+    lpg =  getDecNode NB.InSoftware "" (BinaryNode ([lpgOrig], []))
+    lpgForest = embeddGraphStep prg lpg
+    lpg'
+        | DL.length lpgForest == 1 = DL.head lpgForest
+        | otherwise = error "embeddedGraphs: first node got embedded!!"
+
+
+embeddGraphStep :: Node -> Node -> [Node]
+embeddGraphStep prg lpg = nlist
+    where
+    nl = removeDesNode (isNodeEmbeddible prg) lpg
+    nlist = DL.map (updateNodeEdges (embeddGraphStep prg)) nl
+-- apply on all the outgoing edges of lpg
+
+-- Decides if the given node is embeddible in given tree
+isNodeEmbeddible :: Node -> Node -> Bool
+isNodeEmbeddible tree node = case node of
+    Des (Decision d) -> (gLabel d) `DL.elem` desNodes
+        where
+        (desNodes, _, _) = getLabels $ nTreeNodes tree
+    _ -> False
+
+-- Removes a given node from recursive
+removeDesNode :: (Node -> Bool) -> Node -> [Node]
+removeDesNode checkFn tree = tree'
+    where
+    tree' = if checkFn tree then getNodeEdgesSide True tree
+        else [updateNodeEdges (removeDesNode checkFn) tree]
+
 {-
- - Apply given configuration and get the new type where the
+removeDesNodeList :: Node -> [Node] -> Node
+removeDesNodeList tree nodes =
+    DL.foldl (\ acc x -> removeDesNode acc x) tree nodes
+-}
+
+-- FIXME: add a dummy node before LPG to avoid returning forest instead of tree
+
+-- apply given function on every element of the list and return resultant list
+updateNodeList :: (Node -> [Node]) -> [Node] -> [Node]
+updateNodeList fn nlist = DL.concatMap fn nlist
+
+-- replace all followup nodes of given node with lists produced by given
+-- function
+updateNodeEdges :: (Node -> [Node]) -> Node -> Node
+updateNodeEdges fn tree = tree'
+    where
+    tree' = case (getNodeEdges tree) of
+        BinaryNode (tl, fl) -> setNodeEdges tree (BinaryNode
+            ((updateNodeList fn tl),  (updateNodeList fn fl)))
+        NaryNode nlist ->  setNodeEdges tree (NaryNode
+            (DL.map (updateNodeList fn) nlist))
+
+type ConfWrapperType = (NB.NetOperation, TagType, Bool)
+applyConfigWrapperList :: Node -> [ConfWrapperType]  -> Node
+applyConfigWrapperList tree config =
+    DL.foldl (\ acc (a, b, c) -> applyConfigWrapper a b c acc) tree config
+
+-- Wrapper around applyConfig to take care of extream condition that
+-- first node itself is Configuration, and it matched with current
+-- configuration change requested
+applyConfigWrapper :: NB.NetOperation -> TagType -> Bool -> Node -> Node
+applyConfigWrapper confOp tag whichSide tree
+    | DL.length expanded == 1 = DL.head expanded
+    | expanded == [] = error ("Something went terribaly wrong somewhere,"
+            ++ " causing expanded list to be empty")
+    | otherwise  = error ("First node itself matched with given config."
+            ++ " Add a dummy node before it to simply your life")
+    where
+    expanded = applyConfig confOp tag whichSide tree
+
+
+-- Finds and replace a Decision node following a configuration node
+-- which has same NetOperation label as configuration node
+-- and replaces it with new NetOperation label which we got as part
+-- of the configuration
+findAndReplaceWithinDes :: NB.NetOperation -> [Node] -> [Node]
+findAndReplaceWithinDes _ [] = []
+findAndReplaceWithinDes confOp (x:xs)  = case x of
+    Des (Decision (GNode (NB.DesLabel no) t alist nextNodes imp)) ->
+        if (NB.confCompare
+            (NB.ConfLabel (MB.Just no))
+            (NB.ConfLabel (MB.Just confOp))
+           ) then  [(Des (Decision (GNode (NB.DesLabel confOp) t alist nextNodes imp)))]
+           ++ findAndReplaceWithinDes confOp xs
+        else
+            [x] ++ findAndReplaceWithinDes confOp xs
+    _ ->  [x] ++ findAndReplaceWithinDes confOp  xs
+
+
+{-
+ - Apply given configuration and get the new tree where the
  - configuration node does not exist anymore.
  -}
-applyConfig :: Node -> NB.NetOperation -> TagType -> Node
-applyConfig tree node tag = tree'
+applyConfig :: NB.NetOperation -> TagType -> Bool -> Node -> [Node]
+applyConfig confOp tag whichSide tree  = tree'
     where
-    tree' = tree
+    tree'' = updateNodeEdges (applyConfig confOp tag whichSide) tree
 
-    -- if node is nonConfig, then go to it's children nodes
-    -- if node is config, then compare the tag
-    --      if not matched, then go to it's children nodes
-    --      if matched, compare tag.
-    --          if matched, mark the configuration to be true
-    --              return this node
-    --          if not matched, contine to children node
+    tree' = case tree of
+        Conf (Configuration (GNode confl  t alist nextNodes imp)) ->
+            if ( NB.confCompare confl (NB.ConfLabel (MB.Just confOp)) )
+                && (tag == t)  then
+                -- (NB.ConfLabel (MB.Just netop))
+                -- We found the configuration node, lets replace it
+                case nextNodes of
+                    BinaryNode (tlist, flist)   -> if whichSide then
+                                        findAndReplaceWithinDes confOp tlist
+                                                    else flist
+                    _ -> error "non binary Config node"
+            else  [tree'']
+        _ -> [tree'']
 
 -- Get list containing all nodes reachable from the specified start node.
 -- Note that nodes with multiple incoming edges might be contained more than
@@ -154,6 +285,12 @@ getOperatorNode op tag edges = Opr $ Operator GNode {
     }
 
 
+getNodeEdgesSide :: Bool -> Node -> [Node]
+getNodeEdgesSide side node = case getNodeEdges node of
+    (BinaryNode (tSide, lSide)) -> if side then tSide else lSide
+    _ -> error ("getNodeEdgesSide: requesting side on Nary node"
+            ++ show node)
+
 getNodeEdges :: Node -> NodeEdges
 getNodeEdges node = case node of
     Des (Decision a)          -> gEdges a
@@ -195,7 +332,7 @@ testGetDecElem = getDecNode NB.ClassifiedL2Ethernet "test" (NaryNode [])
 
 -- Returns the node which drops the packet
 getDropNode :: Node
-getDropNode = getDecNode NB.PacketDrop "Drop" (NaryNode [])
+getDropNode = getDecNode NB.PacketDrop "Drop" (BinaryNode ([],[]))
 
 
 testGetConfElem :: Node

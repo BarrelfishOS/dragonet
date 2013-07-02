@@ -33,7 +33,7 @@ getEthernetProcessingLPG classified verified dropnode = etherClassified
     etherClassified = OP.getDecNode NB.ClassifiedL2Ethernet "PF"
         (OP.BinaryNode (
             [etherValidType, etherValidSrc, etherValidMulticast,
-            etherValidBroadcast, etherValidUnicast],
+            etherValidBroadcast, etherValidUnicast, etherChecksumCalc],
             [dropnode]))
     etherValidSrc = OP.getDecNode NB.L2EtherValidSrc "PF"
         (OP.BinaryNode (
@@ -51,6 +51,11 @@ getEthernetProcessingLPG classified verified dropnode = etherClassified
         (OP.BinaryNode (
             [opORL2validDest],
             [opORL2validDest]))
+
+    etherChecksumCalc = OP.getDecNode NB.L2EtherValidCRC "PF"
+        (OP.BinaryNode (
+            [opANDverifiedEthernet],
+            [opANDverifiedEthernet]))
 
     opORL2validDest = OP.getOperatorNode (NB.OR "L2ValidDestination") ""
         (OP.BinaryNode (

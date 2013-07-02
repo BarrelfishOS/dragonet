@@ -11,7 +11,9 @@ module Main (
     main
 ) where
 
+import qualified Data.List as DL
 
+import qualified NetBasics as NB
 import qualified Operations as OP
 import qualified NetworkProcessing as NP
 import qualified E10kPRG as E10k
@@ -51,12 +53,42 @@ testE10k =
         fileName = "E10k.dot"
         op = E10k.getE1kPRG
 
+
+
+testE10kConfig :: IO ()
+testE10kConfig =
+        do
+        putStrLn "Applying config to E10kPRG"
+        writeFile fileName $ DG.toDot tree'
+        putStrLn ("Generated " ++ fileName)
+        putStrLn "Done..."
+        where
+        fileName = "E10kConfig.dot"
+        tree' = OP.applyConfigWrapperList E10k.getE1kPRG E10k.getTestcaseConfiguration
+
+testE10kEmbedding :: IO ()
+testE10kEmbedding =
+        do
+        putStrLn "Applying embedding to configured E10kPRG"
+        writeFile fileName $ DG.toDot tree'
+        putStrLn ("Generated " ++ fileName)
+--        putStrLn "common nodes are"
+--        putStrLn commonNodes
+        putStrLn "Done..."
+        where
+        fileName = "LPGembedded.dot"
+        prg = OP.applyConfigWrapperList E10k.getE1kPRG E10k.getTestcaseConfiguration
+        lpg = NP.getNetworkDependency
+        tree' = OP.embeddGraphs prg lpg
+
+
 allTests :: IO ()
 allTests =
-        do
-        testNetworkProcessing
-        testE10k
-
+    do
+    testNetworkProcessing
+    testE10k
+    testE10kConfig
+    testE10kEmbedding
 
 main :: IO()
 --main = testOp
