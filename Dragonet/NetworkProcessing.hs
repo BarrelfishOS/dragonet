@@ -34,28 +34,28 @@ getEthernetProcessingLPG classified verified dropnode = etherClassified
         (OP.BinaryNode (
             [etherValidType, etherValidSrc, etherValidMulticast,
             etherValidBroadcast, etherValidUnicast, etherChecksumCalc],
-            [dropnode]))
+            [dropnode]))  []
     etherValidSrc = OP.getDecNode NB.L2EtherValidSrc "PF"
         (OP.BinaryNode (
             [opANDverifiedEthernet],
-            [opANDverifiedEthernet]))
+            [opANDverifiedEthernet]))  []
     etherValidMulticast = OP.getDecNode NB.L2EtherValidMulticast "PF"
         (OP.BinaryNode (
             [opORL2validDest],
-            [opORL2validDest]))
+            [opORL2validDest]))  []
     etherValidBroadcast = OP.getDecNode NB.L2EtherValidBroadcast "PF"
         (OP.BinaryNode (
             [opORL2validDest],
-            [opORL2validDest]))
+            [opORL2validDest])) []
     etherValidUnicast = OP.getDecNode NB.L2EtherValidUnicast "PF"
         (OP.BinaryNode (
             [opORL2validDest],
-            [opORL2validDest]))
+            [opORL2validDest])) []
 
     etherChecksumCalc = OP.getDecNode NB.L2EtherValidCRC "PF"
         (OP.BinaryNode (
             [opANDverifiedEthernet],
-            [opANDverifiedEthernet]))
+            [opANDverifiedEthernet])) []
 
     opORL2validDest = OP.getOperatorNode (NB.OR "L2ValidDestination") ""
         (OP.BinaryNode (
@@ -64,7 +64,7 @@ getEthernetProcessingLPG classified verified dropnode = etherClassified
 
     opANDverifiedEthernet = OP.getOperatorNode (NB.AND "L2Verified") "" verified
 
-    etherValidType = OP.getDecNode NB.L2EtherValidType "PF" classified
+    etherValidType = OP.getDecNode NB.L2EtherValidType "PF" classified  []
 
 
     -- ClassifiedL3
@@ -108,8 +108,7 @@ getNetworkDependency = etherClassified
 
     classifiedL3 = OP.getOperatorNode (NB.OR "IPL3Classify") ""
         (OP.BinaryNode (
-            [classifiedUDP, classifiedTCP],
-            []))
+            [classifiedUDP, classifiedTCP], []))
 
     verifiedL3 = OP.getOperatorNode (NB.OR "IPL3verify") ""
         (OP.BinaryNode (
@@ -143,7 +142,7 @@ getNetworkDependency = etherClassified
     queue0 = OP.getDecNode (NB.ToQueue q0) ""
         (OP.BinaryNode (
             [opANDL5ToKernel],
-            [opANDL5ToKernel]))
+            [opANDL5ToKernel]) ) []
 
     toL4readyToClassify = (OP.BinaryNode (
             [opORL4readyToClassify],
@@ -154,9 +153,7 @@ getNetworkDependency = etherClassified
             [opORL4Verified]))
 
     opANDL5ToKernel = OP.getOperatorNode (NB.AND "ToDefaultKernelProcessing") ""
-        (OP.BinaryNode (
-            [],
-            []))
+        (OP.BinaryNode ([], []))
 
     opORL4Verified = OP.getOperatorNode (NB.OR "L4verified") ""
         (OP.BinaryNode (
@@ -177,11 +174,11 @@ getProtoProcessing startNodeLabel (classifiedLabel, classifiedForward)
 
     opANDverified = OP.getOperatorNode (NB.AND verifiedLabel) "" verifiedForward
     toANDop =  OP.BinaryNode ([opANDverified], [opANDverified])
-    trueList = DL.map (\ x -> OP.getDecNode x "PF" toANDop) toVerify
+    trueList = DL.map (\ x -> OP.getDecNode x "PF" toANDop []) toVerify
 
-    validProto = OP.getDecNode classifiedLabel "PF" classifiedForward
+    validProto = OP.getDecNode classifiedLabel "PF" classifiedForward []
     protoClassified = OP.getDecNode startNodeLabel "PF"
-        (OP.BinaryNode (trueList ++ [validProto], [dropnode]))
+        (OP.BinaryNode (trueList ++ [validProto], [dropnode])) []
 
 
 getProtoProcessingV2 :: NB.NetOperation -> OP.NodeEdges -> String ->
@@ -191,14 +188,14 @@ getProtoProcessingV2 startNodeLabel classifiedForward
     where
     opANDverified = OP.getOperatorNode (NB.AND verifiedLabel) "" verifiedForward
     toANDop =  OP.BinaryNode ([opANDverified], [opANDverified])
-    trueList = DL.map (\ x -> OP.getDecNode x "PF" toANDop) toVerify
+    trueList = DL.map (\ x -> OP.getDecNode x "PF" toANDop  []) toVerify
 
     (tlist, flist) = case classifiedForward of
         OP.BinaryNode (a, b) ->  (a, b)
         OP.NaryNode _ -> error "NetworkProcessing.getProtoProcessingV2: binary node merging with Nary node"
 
     protoClassified = OP.getDecNode startNodeLabel "PF"
-        (OP.BinaryNode (trueList ++ tlist, flist))
+        (OP.BinaryNode (trueList ++ tlist, flist)) []
 
 
 

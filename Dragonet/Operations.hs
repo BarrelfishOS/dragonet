@@ -15,6 +15,7 @@ module Operations(
     , GNode(..)
     , Node(..)
     , NodeEdges(..)
+    , NodeCompare(..)
     , getDecNode
     , getOperatorNode
     , getConfNode
@@ -93,18 +94,28 @@ data Operator = Operator (GNode NB.OpLabel NB.OpAttribute OpFunction)
     deriving (Show, Eq)
 
 
+class NodeCompare a where
+    nCompPrgLpg :: a -> a -> Bool
+
+
+
 data Node = Des Decision
     | Conf Configuration -- (GNode NB.ConfLabel ConfFunction) --
     | Opr Operator -- (GNode NB.OpLabel OpFunction) --
     deriving (Show, Eq)
+
+
+instance NodeCompare Node where
+    nCompPrgLpg (Des (Decision n1)) (Des (Decision n2)) =
+        NB.embedCompare (gLabel n1) (gLabel n2)
+    nCompPrgLpg _ _ = False
+
 
 instance NB.EmbedCompare Node where
     embedCompare (Des (Decision n1)) (Des (Decision n2)) =
         NB.embedCompare (gLabel n1) (gLabel n2) && (gTag n1) == (gTag n2)
     embedCompare n1 n2 = error ("embedCompare: non Decision nodes are used "
             ++ "inside the embedding comparision")
-
-
 
 
 
@@ -127,7 +138,7 @@ getLabels (x:xs) = newTuple
 embeddGraphs :: Node -> Node -> Node -- Node
 embeddGraphs prg lpgOrig = lpg'
     where
-    lpg =  getDecNode NB.InSoftware "" (BinaryNode ([lpgOrig], []))
+    lpg =  getDecNode NB.InSoftware "" (BinaryNode ([lpgOrig], [])) []
     lpgForest = embeddGraphStep prg lpg
     lpg'
         | DL.length lpgForest == 1 = DL.head lpgForest
@@ -141,13 +152,46 @@ embeddGraphStep prg lpg = nlist
     nlist = DL.map (updateNodeEdges (embeddGraphStep prg)) nl
 -- apply on all the outgoing edges of lpg
 
+
+
+
 -- Decides if the given node is embeddible in given tree
 isNodeEmbeddible :: Node -> Node -> Bool
-isNodeEmbeddible tree node = case node of
-    Des (Decision d) -> (gLabel d) `DL.elem` desNodes
-        where
-        (desNodes, _, _) = getLabels $ nTreeNodes tree
-    _ -> False
+isNodeEmbeddible tree node
+    | isDesNodePresent tree node /= True = False
+    | (NB.NeedAdaptor True) `DL.elem` desAttrs = False
+    | (NB.ResultSaved False) `DL.elem` desAttrs = False
+    | (NB.InHardware False) `DL.elem` desAttrs = False
+    | otherwise = True
+    where
+    -- desAttrs = getDesOnlyAttributes $ prgNode
+    prgNode = DL.head $ DL.filter (nCompPrgLpg node) (nTreeNodes tree)
+        -- FIXME: figure out a way to find an element which matches exactly
+        --      maybe you can use tags for it.  Right now, I am just taking the head
+    desAttrs = getDesOnlyAttributes prgNode
+
+
+isElemBy :: (Eq a) => (a -> a -> Bool) -> [a] -> a -> Bool
+isElemBy fn list elem
+    | matched == [] = False
+    | otherwise = True
+    where
+    matched = DL.filter (fn elem) list
+
+
+-- Decides if the given node is present in the given tree
+isNodePresent :: Node -> Node -> Bool
+isNodePresent tree node =
+    isElemBy (nCompPrgLpg) (nTreeNodes tree) node
+
+
+isDesNodePresent :: Node -> Node -> Bool
+isDesNodePresent tree node =
+    case node of
+        Des (Decision d) -> isNodePresent tree node
+        _ -> False
+
+
 
 -- Removes a given node from recursive
 removeDesNode :: (Node -> Bool) -> Node -> [Node]
@@ -266,12 +310,13 @@ getConfNode op tag edges = Conf $ Configuration GNode {
 
 
 
-getDecNode :: NB.NetOperation -> TagType -> NodeEdges -> Node
-getDecNode op tag edges = Des $ Decision GNode {
+getDecNode :: NB.NetOperation -> TagType -> NodeEdges -> [NB.DesAttribute]
+        -> Node
+getDecNode op tag edges attrs = Des $ Decision GNode {
         gLabel = (NB.DesLabel op)
         , gTag = tag
         , gEdges = edges
-        , gAttributes = []
+        , gAttributes = attrs
         , gImplementation = []
     }
 
@@ -290,6 +335,31 @@ getNodeEdgesSide side node = case getNodeEdges node of
     (BinaryNode (tSide, lSide)) -> if side then tSide else lSide
     _ -> error ("getNodeEdgesSide: requesting side on Nary node"
             ++ show node)
+
+
+toBaseAttrDes :: NB.DesAttribute -> NB.Attribute
+toBaseAttrDes (NB.DesAttribute x) = x
+
+toBaseAttrConf :: NB.ConfAttribute -> NB.Attribute
+toBaseAttrConf (NB.ConfAttribute x) = x
+
+toBaseAttrOpr :: NB.OpAttribute -> NB.Attribute
+toBaseAttrOpr (NB.OpAttribute x) = x
+
+
+getNodeAttributes :: Node -> [NB.Attribute]
+getNodeAttributes node = case node of
+    Des (Decision (GNode _ _ a _  _)) -> DL.map (toBaseAttrDes) a
+--    Des (Decision (GNode _ _ a _  _)) -> DL.map (NB.DesAttribute) a
+    Conf (Configuration (GNode _ _ a _  _)) -> DL.map (toBaseAttrConf) a
+    Opr (Operator (GNode _ _ a _  _)) -> DL.map (toBaseAttrOpr) a
+
+getDesOnlyAttributes :: Node -> [NB.Attribute]
+getDesOnlyAttributes node = case node of
+    Des (Decision (GNode _ _ a _  _)) -> DL.map (toBaseAttrDes) a
+    _                                                   -> error
+        "non Decision node was given to get decision attributes"
+
 
 getNodeEdges :: Node -> NodeEdges
 getNodeEdges node = case node of
@@ -328,11 +398,11 @@ testGetOperatorOp :: Node
 testGetOperatorOp = getOperatorNode (NB.AND "testOp" ) "+" (NaryNode [])
 
 testGetDecElem :: Node
-testGetDecElem = getDecNode NB.ClassifiedL2Ethernet "test" (NaryNode [])
+testGetDecElem = getDecNode NB.ClassifiedL2Ethernet "test" (NaryNode []) []
 
 -- Returns the node which drops the packet
 getDropNode :: Node
-getDropNode = getDecNode NB.PacketDrop "Drop" (BinaryNode ([],[]))
+getDropNode = getDecNode NB.PacketDrop "Drop" (BinaryNode ([],[])) []
 
 
 testGetConfElem :: Node

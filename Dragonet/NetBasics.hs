@@ -326,8 +326,25 @@ data OpAttribute = OpAttribute Attribute
 data ConfAttribute = ConfAttribute Attribute
     deriving (Show, Eq, Ord)
 
-data Attribute = Security Bool
-    | InHardware Bool
+data Attribute = Security Bool -- assumed to be False
+    | InHardware Bool -- assumed to be True
+    | ResultSaved Bool -- assumed to be True
+    | NeedAdaptor Bool -- Assumed to be False
+    | IsAdaptor Bool -- Assumed to be False
     deriving (Show, Eq, Ord)
 
+{-
+canEmbed :: [Attribute] -> Bool
+canEmbed desAttr
+    | NeedAdaptor `DL.isElem` desAttr = False
+    | ResultSaved `DL.isElem` desAttr = False
+    where
+    needAdapter
+
+checkAttr :: (Attribute -> Bool) -> Attribute -> [Attribute] -> Bool
+checkAttr fn attr attrList
+    |
+    where
+    foundAttr =
+-}
 

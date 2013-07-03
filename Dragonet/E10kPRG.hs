@@ -25,9 +25,7 @@ getE1kPRGminimal :: OP.Node
 getE1kPRGminimal = etherClassified
     where
     etherClassified = OP.getDecNode NB.ClassifiedL2Ethernet "PF"
-        (OP.BinaryNode (
-            [],
-            []))
+        (OP.BinaryNode ( [], [])) []
 
 
 getTestcaseConfiguration :: [OP.ConfWrapperType]
@@ -54,6 +52,13 @@ getTestcaseConfiguration = [
     q3 = NB.Queue 3 3 NB.getDefaultBasicQueue
     q0 = NB.Queue 0 0 NB.getDefaultBasicQueue
 
+
+getIncompletePRGNodeattr :: [NB.DesAttribute]
+getIncompletePRGNodeattr = [
+        NB.DesAttribute (NB.ResultSaved False)
+        , NB.DesAttribute (NB.NeedAdaptor True)
+    ]
+
 -- Get the datatype for E10k
 getE1kPRG :: OP.Node
 getE1kPRG = etherClassified
@@ -65,11 +70,13 @@ getE1kPRG = etherClassified
         (OP.BinaryNode (
             [etherValidLen],
             [dropnode]))
+        [(NB.DesAttribute (NB.NeedAdaptor True))]
 
     etherValidLen = OP.getDecNode NB.L2EtherValidLen tagname
         (OP.BinaryNode (
             [etherCRCconf],
             [dropnode]))
+        []
 
     etherCRCconf = OP.getConfNode (MB.Just NB.L2EtherValidCRC) tagname
         (OP.BinaryNode (
@@ -80,12 +87,13 @@ getE1kPRG = etherClassified
         (OP.BinaryNode (
             l2AddrCheckList,
             [dropnode]))
+        []
 
     validAddrOptions = [NB.L2EtherValidBroadcast, NB.L2EtherValidMulticast,
         NB.L2EtherValidUnicast]
 
     toORop =  OP.BinaryNode ([opORL2EtherValidDest], [opORL2EtherValidDest])
-    l2AddrCheckList = DL.map (\ x -> OP.getDecNode x tagname toORop) validAddrOptions
+    l2AddrCheckList = DL.map (\ x -> OP.getDecNode x tagname toORop []) validAddrOptions
 
     opORL2EtherValidDest = OP.getOperatorNode (NB.OR "L2ValidDest") tagname
         (OP.BinaryNode (
@@ -96,11 +104,13 @@ getE1kPRG = etherClassified
         (OP.BinaryNode (
             [classifiedL3IPv4, classifiedL3IPv6],
             [dropnode]))
+        getIncompletePRGNodeattr
 
     classifiedL3IPv4 = OP.getDecNode NB.ClassifiedL3IPv4 tagname
         (OP.BinaryNode (
             [ipv4ChecksumConf],
             [dropnode]))
+        getIncompletePRGNodeattr
 
     ipv4ChecksumConf = OP.getConfNode (MB.Just NB.L3IPv4ValidChecksum) tagname
         (OP.BinaryNode (
@@ -111,21 +121,25 @@ getE1kPRG = etherClassified
         (OP.BinaryNode (
             [l3IPv4ValidProto],
             [dropnode]))
+        []
 
     l3IPv4ValidProto = OP.getDecNode NB.L3IPv4ValidProtocol tagname
         (OP.BinaryNode (
             [opORclassifiedL3],
             [opORclassifiedL3]))
+        []
 
     classifiedL3IPv6 = OP.getDecNode NB.ClassifiedL3IPv6 tagname
         (OP.BinaryNode (
             [l3IPv6ValidProto],
             [dropnode]))
+        getIncompletePRGNodeattr
 
     l3IPv6ValidProto = OP.getDecNode NB.L3IPv6ValidProtocol tagname
         (OP.BinaryNode (
             [opORclassifiedL3],
             [opORclassifiedL3]))
+        []
 
     opORclassifiedL3 = OP.getOperatorNode (NB.OR "L3Classified") tagname
         (OP.BinaryNode (
@@ -137,21 +151,25 @@ getE1kPRG = etherClassified
         (OP.BinaryNode (
             [opORl4ReadyToClassify],
             [opORl4ReadyToClassify]))
+        getIncompletePRGNodeattr
 
     classifiedTCP = OP.getDecNode NB.ClassifiedL4TCP tagname
         (OP.BinaryNode (
             [opORl4ReadyToClassify],
             [opORl4ReadyToClassify]))
+        getIncompletePRGNodeattr
 
     classifiedICMP = OP.getDecNode NB.ClassifiedL4ICMP tagname
         (OP.BinaryNode (
             [opORl4ReadyToClassify],
             [opORl4ReadyToClassify]))
+        getIncompletePRGNodeattr
 
     unclassfiedL4 = OP.getDecNode NB.UnclasifiedL4 tagname
         (OP.BinaryNode (
             [opORl4ReadyToClassify],
             [opORl4ReadyToClassify]))
+        getIncompletePRGNodeattr
 
     opORl4ReadyToClassify = OP.getOperatorNode (NB.OR "L4Classified") tagname
         (OP.BinaryNode (
@@ -174,28 +192,19 @@ getE1kPRG = etherClassified
 
     q1 = NB.Queue 1 1 NB.getDefaultBasicQueue
     queue1 = OP.getDecNode (NB.ToQueue q1) tagname
-        (OP.BinaryNode (
-            [],
-            []))
+        (OP.BinaryNode ([], [])) []
 
     q2 = NB.Queue 2 2 NB.getDefaultBasicQueue
     queue2 = OP.getDecNode (NB.ToQueue q2) tagname
-        (OP.BinaryNode (
-            [],
-            []))
+        (OP.BinaryNode ([], [])) []
 
     q3 = NB.Queue 3 3 NB.getDefaultBasicQueue
     queue3 = OP.getDecNode (NB.ToQueue q3) tagname
-        (OP.BinaryNode (
-            [],
-            []))
+        (OP.BinaryNode ( [], [])) []
 
     q0 = NB.Queue 0 0 NB.getDefaultBasicQueue
     queue0 = OP.getDecNode (NB.ToQueue q0) tagname
-        (OP.BinaryNode (
-            [],
-            []))
-
+        (OP.BinaryNode ( [], [])) []
 
 
 
@@ -208,7 +217,7 @@ getE1kPRG = etherClassified
     synFilter = OP.getDecNode NB.SyncFilter tagname
         (OP.BinaryNode (
             [defaultQueue],
-            []))
+            []) [])
 -}
 
 --  toGenFilter <Type of Queue> <queueNode ToGo when true> <NodeList to go when false>
@@ -217,7 +226,7 @@ toGenFilter filtType qNode ifFalse tagname = OP.getConfNode (MB.Just filtType) t
         (OP.BinaryNode ( [genFilter], ifFalse))
     where
     genFilter = OP.getDecNode filtType tagname
-        (OP.BinaryNode ( [qNode], ifFalse))
+        (OP.BinaryNode ( [qNode], ifFalse)) []
 
 --    q = case qNode of
 --        OP.Des (OP.Decision (OP.GNode (NB.DesLabel (NB.ToQueue x)) _ _ _ _ )) -> x
@@ -227,12 +236,12 @@ toGenFilter filtType qNode ifFalse tagname = OP.getConfNode (MB.Just filtType) t
     genFilter = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID 0)) tagname
         (OP.BinaryNode (
             [defaultQueue],
-            []))
+            []) [] )
 
     defaultQueue = OP.getDecNode (NB.ToQueue NB.getDefaultQueue) tagname
         (OP.BinaryNode (
             [],
-            []))
+            []) [] )
 
     filterConfList = [(1, 1, 1), (2, 2, 2), (3, 3, 3)]
     fList = DL.map (\ (f, q, c) -> getConfFilterQueue f q c) filterConfList
@@ -250,13 +259,13 @@ getConfFilterQueue fid qid cid = confFilter
     f = OP.getDecNode (NB.IsFlow (NB.getDefaultFitlerForID fid)) tagname
         (OP.BinaryNode (
             [queue],
-            []))
+            []) [])
 
     q = NB.Queue qid cid NB.getDefaultBasicQueue
     queue = OP.getDecNode (NB.ToQueue q) tagname
         (OP.BinaryNode (
             [],
-            []))
+            []) [] )
 
 
 -}
