@@ -196,6 +196,7 @@ l2EtherClassifyL3Impl = do
         0x0806 -> "arp"
         _ -> "drop"
 
+
 -----------------------------------------------------------------------------
 -- ARP
 
@@ -218,6 +219,7 @@ l3ARPClassifyImpl = do
         1 -> "request"
         2 -> "reply"
         _ -> "drop"
+
 
 -----------------------------------------------------------------------------
 -- IPv4
@@ -249,9 +251,6 @@ l3IPv4ValidHeaderLengthImpl = do
     else do
         hlen <- ipHeaderLen
         toPort $ pbool $ (hlen >= 20 && (len - off) >= hlen)
-
-l3IPv4ValidDestImpl = toPort "true"
-l3IPv4ValidSrcImpl = toPort "true"
 
 -- For now we just make sure the packet is not fragmented
 l3IPv4ValidReassemblyImpl = do
@@ -297,6 +296,10 @@ l3IPv4ClassifyImpl = do
 l3IPv6ValidHeaderLengthImpl = toPort "true"
 
 
+-----------------------------------------------------------------------------
+-- ICMP
+l3ICMPValidHeaderLengthImpl = toPort "true"
+
 
 -----------------------------------------------------------------------------
 -- UDP
@@ -325,9 +328,12 @@ l4UDPValidChecksumImpl = do
     pkt <- readP off (len - off)
     pheader <- ipv4Pseudoheader 0x11 (fromIntegral (len - off))
     toPort $ pbool (cxsm == 0 || (ipChecksum (pheader ++ pkt)) == 0)
-    
-    
-   
+
+
+-----------------------------------------------------------------------------
+-- TCP
+
+l4TCPValidHeaderLengthImpl = toPort "true"   
 
 
     
