@@ -33,6 +33,7 @@ module Operations(
     , embeddGraphs
     , applyConfigWrapperList
     , ConfWrapperType
+    , testGenConf
 ) where
 
 import qualified NetBasics as NB
@@ -142,10 +143,22 @@ getLabels (x:xs) = newTuple
  -}
 
 
+-- Test function to check the working of configuration generation
+testGenConf :: Node -> String
+testGenConf prg = show $ getConfLabels prg
+
+-- get labels of all the configuration nodes
+getConfLabels :: Node -> [NB.ConfLabel]
+getConfLabels prg = prunedCL
+    where
+    prunedCL = DL.nub cl
+    (_, cl, _) = getLabels $ getConfNodes prg
+
+-- Return all the configuration nodes from given graphnode (mostly PRG)
 getConfNodes :: Node -> [Node]
 getConfNodes tree = DL.filter (isConfNode) $ nTreeNodes tree
 
-
+-- Tells if givn node is configuration node or not
 isConfNode :: Node -> Bool
 isConfNode n = case n of
     Conf x  -> True

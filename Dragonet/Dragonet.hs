@@ -53,6 +53,18 @@ testE10k =
         fileName = "E10k.dot"
         op = E10k.getE1kPRG
 
+testConfEmbedding :: IO ()
+testConfEmbedding =
+        do
+        putStrLn "Generating minimal configuration for PRG"
+        --writeFile fileName $ DG.toDot tree'
+        --putStrLn ("Generated " ++ fileName)
+        putStrLn output
+        putStrLn "Done..."
+        where
+        output = OP.testGenConf E10k.getE1kPRG
+        -- fileName = "E10kConfig.dot"
+        -- tree' = OP.applyConfigWrapperList E10k.getE1kPRG E10k.getTestcaseConfiguration
 
 
 testE10kConfig :: IO ()
@@ -94,5 +106,6 @@ main :: IO()
 --main = testOp
 --main = testE10k
 --main = testNetworkProcessing
-main = allTests
+--main = allTests
+main = testConfEmbedding
 
