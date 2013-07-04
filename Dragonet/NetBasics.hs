@@ -328,6 +328,7 @@ data ConfAttribute = ConfAttribute Attribute
 
 data Attribute = Security Bool -- assumed to be False
     | InHardware Bool -- assumed to be True
+    | InSoft Bool -- assumed to be False
     | ResultSaved Bool -- assumed to be True
     | NeedAdaptor Bool -- Assumed to be False
     | IsAdaptor Bool -- Assumed to be False

@@ -132,6 +132,25 @@ getLabels (x:xs) = newTuple
     (axs, bxs, cxs) = xsTuples
     newTuple = ((ax ++ axs), (bx ++ bxs), (cx ++ cxs))
 
+{-
+ - Find all nodes which are config nodes
+ - For every config node, apply the config, and get the graph
+ - check the diff in the graph.
+ - for all the nodes which are diff:
+ -      find out which version (conf true/false) of the graph they are present
+ -      mark that version as dependency
+ -}
+
+
+getConfNodes :: Node -> [Node]
+getConfNodes tree = DL.filter (isConfNode) $ nTreeNodes tree
+
+
+isConfNode :: Node -> Bool
+isConfNode n = case n of
+    Conf x  -> True
+    _       -> False
+
 
 -- Simple embedding algorithm, which does embedding just by looking at names
 -- of the node and it does not care about dependencies.
@@ -159,9 +178,10 @@ embeddGraphStep prg lpg = nlist
 isNodeEmbeddible :: Node -> Node -> Bool
 isNodeEmbeddible tree node
     | isDesNodePresent tree node /= True = False
-    | (NB.NeedAdaptor True) `DL.elem` desAttrs = False
-    | (NB.ResultSaved False) `DL.elem` desAttrs = False
-    | (NB.InHardware False) `DL.elem` desAttrs = False
+    | (NB.InSoft True) `DL.elem` desAttrs = False
+--    | (NB.NeedAdaptor True) `DL.elem` desAttrs = False
+--    | (NB.ResultSaved False) `DL.elem` desAttrs = False
+--    | (NB.InHardware False) `DL.elem` desAttrs = False
     | otherwise = True
     where
     -- desAttrs = getDesOnlyAttributes $ prgNode

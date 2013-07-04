@@ -55,7 +55,8 @@ getTestcaseConfiguration = [
 
 getIncompletePRGNodeattr :: [NB.DesAttribute]
 getIncompletePRGNodeattr = [
-        NB.DesAttribute (NB.ResultSaved False)
+        NB.DesAttribute (NB.InSoft True)
+        , NB.DesAttribute (NB.ResultSaved False)
         , NB.DesAttribute (NB.NeedAdaptor True)
     ]
 
