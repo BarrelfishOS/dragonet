@@ -5,7 +5,7 @@ import DragonetDSL
 import qualified Operations as OP
 import DotGenerator as DG
 
-[dragonet_f|lpg.dragonet|]
+[dragonet_f|lpgImpl.dragonet|]
 
 main = do
     putStrLn (DG.toDot source)

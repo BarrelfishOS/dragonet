@@ -335,6 +335,18 @@ l4UDPValidChecksumImpl = do
 
 l4TCPValidHeaderLengthImpl = toPort "true"   
 
+-----------------------------------------------------------------------------
+-- Application RX
+
+toIPv4LocalImpl = do
+    (AttrI off) <- getAttr "L3Offset"
+    dIP <- readP32BE (off + 16)
+    toPort $ pbool $ dIP == 0x8184666f
+
+toUDPPortDNSImpl = do
+    (AttrI off) <- getAttr "L4Offset"
+    dPort <- readP16BE (off + 2)
+    toPort $ pbool $ dPort == 51098
 
     
 
@@ -346,6 +358,40 @@ l3ARPResponseImpl = toPort "Got ARP response!"
 l3ICMPOutImpl = toPort "Got ICMP packet!"
 l4TCPOutImpl = toPort "Got TCP packet!"
 l4UDPOutImpl = toPort "Got UDP packet!"
+dnsRXImpl = toPort "Got DNS packet!"
+
+-- Nodes for tx side
+sourceImpl = toPort "true"
+softwareTXImpl = toPort "true"
+arpTXImpl = toPort "true"
+exampleDnsTXImpl = toPort "true"
+exampleDns6TXImpl = toPort "true"
+l4UDPAddHeaderImpl = toPort "true"
+l4UDPAddHdrDPortImpl = toPort "true"
+l4UDPAddHdrSPortImpl = toPort "true"
+l4UDPAddHdrChecksumImpl = toPort "true"
+l4UDPAddHdrLengthImpl = toPort "true"
+l3IPv4AddHeaderImpl = toPort "true"
+l3IPv4AddHdrProtoImpl = toPort "true"
+l3IPv4AddHdrProtoUDP_Impl = toPort "true"
+l3IPv4AddHdrVersionImpl = toPort "true"
+l3IPv4AddHdrIHLImpl = toPort "true"
+l3IPv4AddHdrTotLenImpl = toPort "true"
+l3IPv4AddHdrTTLImpl = toPort "true"
+l3IPv4AddHdrSAddrImpl = toPort "true"
+l3IPv4AddHdrDAddrImpl = toPort "true"
+l3IPv6AddHeaderImpl = toPort "true"
+l3IPv6AddHdrVersionImpl = toPort "true"
+l3IPv6AddHdrSAddrImpl = toPort "true"
+l3IPv6AddHdrDAddrImpl = toPort "true"
+l2EtherAddHeaderImpl = toPort "true"
+l2EtherAddHdrTypeImpl = toPort "true"
+l2EtherAddHdrTypeIPv4_Impl = toPort "true"
+l2EtherAddHdrTypeIPv6_Impl = toPort "true"
+l2EtherAddHdrTypeARP_Impl = toPort "true"
+l2EtherAddHdrSAddrImpl = toPort "true"
+l2EtherAddHdrDAddrImpl = toPort "true"
+
 
 
 
@@ -411,6 +457,9 @@ topSort es =
         orphaned = L.nub $ filter isOrphaned $ map snd dropped
 
 
+--dtrace = T.trace
+dtrace _ = id
+
 -- Execute graph. First parameter is expected to be a topologically sorted
 -- list of the graph nodes, the second list is used to store the enablement
 -- indication, so (enabled node, origin, port), and the last argument is the
@@ -425,9 +474,9 @@ executeNode :: [ImplNode] -> [(ImplNode,ImplNode,String)] -> Context -> (String,
 executeNode [] _ ctx = ("Got stuck :-/", ctx)
 executeNode (i:is) ret ctx =
         if not $ null invalues then -- Node was enabled
-            T.trace ("executeNode " ++ show i ++ " ") (
+            dtrace ("executeNode " ++ show i ++ " ") (
             if null p then (port, nctx)  -- no outgoing edges -> arrived in sink
-            else T.trace ("  -> port=" ++ show port) (executeNode is newret nctx)
+            else dtrace ("  -> port=" ++ show port) (executeNode is newret nctx)
             )
         else -- Node not enabled, just skip it
             executeNode is ret ctx
@@ -469,7 +518,7 @@ executeNode (i:is) ret ctx =
 graphEdges = getEdgeList sofwareRXImplNode
 
 main = do
-    arpReq <- BS.readFile "packets/arp_request"
+    {-arpReq <- BS.readFile "packets/arp_request"
     putStrLn "ARP Request"
     putStrLn $ show $ execute arpReq
     putStrLn $ show $ getPredecessors l2EtherValidImplNode graphEdges
@@ -484,12 +533,11 @@ main = do
 
     dnsQry <- BS.readFile "packets/dns_query"
     putStrLn "\n\nDNS Request (udp checksum broken)"
-    putStrLn $ show $ execute dnsQry
+    putStrLn $ show $ execute dnsQry-}
 
     dnsResp <- BS.readFile "packets/dns_response"
-    putStrLn "\n\nDNS Response (udp checksum good)"
+    putStrLn "DNS Response (udp checksum good)"
     putStrLn $ show $ execute dnsResp
-
 
     where
         execute p = fst $ executeNode ts [(sofwareRXImplNode,sofwareRXImplNode,"in")] $ Context p M.empty
