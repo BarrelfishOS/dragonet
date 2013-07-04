@@ -73,8 +73,11 @@ type ConfFunction = (Configuration -> ConfSpace -> [Node])
 --  decides which outgoing edges to choose
 type OpFunction = (Operator -> [Node] -> [Node])
 
+type PortLabel = String
+
+--                          (trueP,  falseP)
 data NodeEdges = BinaryNode ([Node], [Node])
-        | NaryNode [[Node]]
+        | NaryNode [(PortLabel, [Node])]
         deriving (Show, Eq)
 
 data GNode l a f = GNode {
@@ -240,8 +243,9 @@ updateNodeEdges fn tree = tree'
     tree' = case (getNodeEdges tree) of
         BinaryNode (tl, fl) -> setNodeEdges tree (BinaryNode
             ((updateNodeList fn tl),  (updateNodeList fn fl)))
-        NaryNode nlist ->  setNodeEdges tree (NaryNode
-            (DL.map (updateNodeList fn) nlist))
+        NaryNode plist ->  setNodeEdges tree (NaryNode
+            (DL.map mapPort plist))
+    mapPort (l,ns) = (l, (updateNodeList fn ns))
 
 type ConfWrapperType = (NB.NetOperation, TagType, Bool)
 applyConfigWrapperList :: Node -> [ConfWrapperType]  -> Node
@@ -313,7 +317,7 @@ nTreeNodes n =
         ep =
             case (getNodeEdges n) of
                 (BinaryNode (as, bs)) -> L.nub (as ++ bs)
-                (NaryNode as) -> L.nub (concat as)
+                (NaryNode as) -> L.nub (concat $ map snd as)
         children = concat (map nTreeNodes ep)
 
 
