@@ -43,7 +43,7 @@ node l2EtherClassifyL3 {
 
 
 
-node l3ARPValidHeaderLength {
+boolean l3ARPValidHeaderLength {
     port true[l3ARPClassify]
     port false[packetDrop] }
 
@@ -58,7 +58,7 @@ node l3ARPResponse {}
 
 
 
-node l3IPv4ValidHeaderLength {
+boolean l3IPv4ValidHeaderLength {
     port true[l3IPv4ValidDest l3IPv4ValidReassembly l3IPv4ValidVersion
               l3IPv4ValidLength l3IPv4ValidTTL l3IPv4ValidChecksum
               l3IPv4ValidSrc l3IPv4Classify]
@@ -98,7 +98,7 @@ and l3IPv4Valid {
 
 
 
-node l3IPv6ValidHeaderLength {
+boolean l3IPv6ValidHeaderLength {
     port true[l3IPValid]
     port false[packetDrop] }
 

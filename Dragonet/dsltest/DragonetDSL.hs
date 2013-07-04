@@ -57,8 +57,14 @@ declare n =
     where
         portEdge e = TH.VarE (TH.mkName e)
         port (Port _ ns) = TH.ListE (map portEdge ns)
-        binEdges t f = TH.AppE (TH.ConE (TH.mkName "OP.BinaryNode")) (TH.TupE [(port t), (port f)])
-        edges (Node _ ps) = TH.AppE (TH.ConE (TH.mkName "OP.NaryNode")) (TH.ListE (map port ps))
+        binEdges t f =
+            TH.AppE (TH.ConE (TH.mkName "OP.BinaryNode")) $
+                TH.TupE [(port t), (port f)]
+        lblPort p = TH.TupE [(TH.LitE $ TH.StringL name), (port p)]
+            where (Port name _) = p
+        edges (Node l ps) =
+            TH.AppE (TH.ConE (TH.mkName "OP.NaryNode")) $
+                TH.ListE $ map lblPort ps
         edges (Boolean _ t f) = binEdges t f
         edges (And _ t f) = binEdges t f
         edges (Or _ t f) = binEdges t f
