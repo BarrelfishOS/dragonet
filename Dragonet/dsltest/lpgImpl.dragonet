@@ -1,7 +1,11 @@
-node source {
+node sofwareRX {
   port out[l2EtherClassified] }
 
 node packetDrop { }
+
+
+/*****************************************************************************/
+/* Ethernet RX                                                               */
 
 boolean l2EtherClassified {
     port true[l2EtherValidLength]
@@ -41,7 +45,8 @@ node l2EtherClassifyL3 {
     port drop[packetDrop] }
 
 
-
+/*****************************************************************************/
+/* ARP RX                                                                    */
 
 boolean l3ARPValidHeaderLength {
     port true[l3ARPClassify]
@@ -56,7 +61,8 @@ node l3ARPRequest {}
 node l3ARPResponse {}
 
 
-
+/*****************************************************************************/
+/* IPv4 RX                                                                   */
 
 boolean l3IPv4ValidHeaderLength {
     port true[l3IPv4ValidReassembly l3IPv4ValidVersion l3IPv4ValidLength
@@ -88,8 +94,8 @@ and l3IPv4Valid {
     port true false[l3IPValid] }
 
 
-
-
+/*****************************************************************************/
+/* IPv6 RX                                                                   */
 
 boolean l3IPv6ValidHeaderLength {
     port true false[l3IPValid] }
@@ -103,7 +109,8 @@ and l3IPAndBelowValid {
     port true false[l3ICMPValid l4TCPValid l4UDPValid] }
 
 
-
+/*****************************************************************************/
+/* ICMP RX                                                                   */
 
 boolean l3ICMPValidHeaderLength {
     port true false[l3ICMPValid] }
@@ -115,7 +122,8 @@ and l3ICMPValid {
 node l3ICMPOut { }
 
 
-
+/*****************************************************************************/
+/* UDP RX                                                                    */
 
 boolean l4UDPValidHeaderLength {
     port true[l4UDPValidLength l4UDPValidChecksum]
@@ -134,6 +142,8 @@ and l4UDPValid {
 node l4UDPOut { }
 
 
+/*****************************************************************************/
+/* TCP RX                                                                    */
 
 boolean l4TCPValidHeaderLength {
     port true false[l4TCPValid] }
@@ -143,6 +153,4 @@ and l4TCPValid {
     port false[packetDrop] }
 
 node l4TCPOut { }
-
-
 

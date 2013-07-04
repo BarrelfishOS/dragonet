@@ -150,7 +150,7 @@ toPort = return
 
 
 
-sourceImpl = toPort "out"
+sofwareRXImpl = toPort "out"
 
 -----------------------------------------------------------------------------
 -- Ethernet
@@ -466,7 +466,7 @@ executeNode (i:is) ret ctx =
 
 
 
-graphEdges = getEdgeList sourceImplNode
+graphEdges = getEdgeList sofwareRXImplNode
 
 main = do
     arpReq <- BS.readFile "packets/arp_request"
@@ -492,7 +492,7 @@ main = do
 
 
     where
-        execute p = fst $ executeNode ts [(sourceImplNode,sourceImplNode,"in")] $ Context p M.empty
+        execute p = fst $ executeNode ts [(sofwareRXImplNode,sofwareRXImplNode,"in")] $ Context p M.empty
         ts = topSort $ graphEdges
         testIt p f =
             (op, ctxAttrs ctx)
