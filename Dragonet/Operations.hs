@@ -34,6 +34,7 @@ module Operations(
     , applyConfigWrapperList
     , ConfWrapperType
     , testGenConf
+    , testEmbeddingV2
 ) where
 
 import qualified NetBasics as NB
@@ -97,6 +98,7 @@ data Operator = Operator (GNode NB.OpLabel NB.OpAttribute OpFunction)
 
 class NodeCompare a where
     nCompPrgLpg :: a -> a -> Bool
+    nCompFullTag :: a -> a -> Bool
 
 
 
@@ -110,6 +112,18 @@ instance NodeCompare Node where
     nCompPrgLpg (Des (Decision n1)) (Des (Decision n2)) =
         NB.embedCompare (gLabel n1) (gLabel n2)
     nCompPrgLpg _ _ = False
+
+    nCompFullTag (Des (Decision n1)) (Des (Decision n2)) =
+        (gLabel n1) == (gLabel n2) &&
+        (gTag n1) == (gTag n2)
+    nCompFullTag (Conf (Configuration n1)) (Conf (Configuration n2)) =
+        (gLabel n1) == (gLabel n2) &&
+        (gTag n1) == (gTag n2)
+    nCompFullTag (Opr (Operator n1)) (Opr (Operator n2)) =
+        (gLabel n1) == (gLabel n2) &&
+        (gTag n1) == (gTag n2)
+    nCompFullTag x1 x2 = error ("nCompFullTag: error in matching "
+        ++ show x1 ++ " and " ++ show x2)
 
 
 instance NB.EmbedCompare Node where
@@ -205,11 +219,11 @@ isNodeEmbeddible tree node
 
 
 isElemBy :: (Eq a) => (a -> a -> Bool) -> [a] -> a -> Bool
-isElemBy fn list elem
+isElemBy fn list e
     | matched == [] = False
     | otherwise = True
     where
-    matched = DL.filter (fn elem) list
+    matched = DL.filter (fn e) list
 
 
 -- Decides if the given node is present in the given tree
@@ -450,4 +464,110 @@ testOperation = [a, b, c]
 
 main :: IO()
 main = putStrLn "Hello world"
+
+
+-- ################## copied from dsltest/implementation.hs
+
+-- intermediate function to help getPredDS
+getPredDSStep :: Node -> Node -> Node -> [Node]
+getPredDSStep parent currNode toMatch
+    | nCompFullTag currNode toMatch     = [parent] ++ nextLevel
+    | otherwise                         = nextLevel
+    where
+    children = case (getNodeEdges currNode) of
+        (BinaryNode (as, bs))   -> DL.nub (as ++ bs)
+        (NaryNode as)           -> DL.nub (concat as)
+    nextLevel = DL.concatMap (\ x -> getPredDSStep currNode x toMatch) children
+
+
+-- Get all predesessor nodes for given node
+getPredDS :: Node -> Node -> [Node]
+getPredDS currNode toMatch
+    | nCompFullTag currNode toMatch     = []
+    | otherwise                         = nextLevel
+    where
+    children = case (getNodeEdges currNode) of
+        (BinaryNode (as, bs))   -> DL.nub (as ++ bs)
+        (NaryNode as)           -> DL.nub (concat as)
+    nextLevel = DL.concatMap (\ x -> getPredDSStep currNode x toMatch) children
+
+-- For given node, find all its children
+getChildren :: Node -> [Node]
+getChildren root = case (getNodeEdges root) of
+        (BinaryNode (as, bs))   -> DL.nub (as ++ bs)
+        (NaryNode as)           -> DL.nub (concat as)
+
+-- Get outgoing edegs for all nodes underneath given node
+getOutEdges :: Node -> [(Node,Node)]
+getOutEdges root = nextLevel ++ deeperLevels
+    where
+    children = getChildren root
+    nextLevel = DL.concatMap (\ x -> [(root, x)]) children
+    deeperLevels = DL.concatMap (getOutEdges) children
+
+
+-- Get outgoing edegs for all nodes underneath given node
+getDepEdges :: Node -> [(Node,Node)]
+getDepEdges root = nextLevel ++ deeperLevels
+    where
+    children = getChildren root
+    nextLevel = DL.concatMap (\ x -> [(x, root)]) children
+    deeperLevels = DL.concatMap (getOutEdges) children
+
+
+
+-- Find predecessor for specfied node in edge list
+getPredecessors :: Eq a => a -> [(a,a)] -> [a]
+getPredecessors n e =
+    L.nub $ map fst $ filter (\(_,x) -> x == n) e
+
+
+-- Topological sort on edge list representation
+topSort :: Eq a => [(a,a)] -> [a]
+topSort [] = []
+topSort es =
+    noIncoming ++ orphaned ++ (topSort newEdges)
+    where
+        -- Is n a successor of another node?
+        notSucc n = MB.isNothing $ L.find (\x -> (snd x) == n) es
+        -- All nodes without incoming edges
+        noIncoming = filter (notSucc) $ L.nub $ map fst es
+        -- edges that don't start at noIncoming nodes
+        newEdges = filter (\x -> notElem (fst x) noIncoming) es
+        -- edges that start at noIncoming nodes
+        dropped = filter (\x -> elem (fst x) noIncoming) es
+        -- Sink nodes (without outgoing edges) that lost their incoming edges
+        -- those also vanish from the edges list
+        isOrphaned n = MB.isNothing $ L.find (\x -> ((snd x) == n) || ((fst x) == n)) newEdges
+        orphaned = L.nub $ filter isOrphaned $ map snd dropped
+
+
+testEmbeddingV2 :: Node -> String
+testEmbeddingV2 root = DL.concatMap (nodeDefinition) $ topSort $ DL.reverse $ DL.nub $  getOutEdges root
+--testEmbeddingV2 root = DL.concatMap (showEdge) $ topSort  $ DL.nub $ getDepEdges root
+
+{-
+embeddingV2 :: Node -> Node -> (Node, Node)
+embeddingV2 prg lpg = (prg', lpg')
+    where
+    nextNode = DL.head $ topSort $ DL.nub $ getDepEdges lpg
+    prgNodes = DL.head $ topSort $ DL.nub $ getDepEdges prg
+-}
+
+-- Get string label for GNode
+gLabelStr gn = NB.graphLabelStr (gLabel gn)
+
+nodeDefinition :: Node -> String
+nodeDefinition n =
+    case n of
+        (Des (Decision gn))           -> ((gLabelStr gn) ++ "\n")
+        (Opr (Operator gn))           -> ((gLabelStr gn) ++ "\n")
+        (Conf (Configuration gn))     -> ((gLabelStr gn) ++ "\n")
+
+
+showEdge :: (Node, Node) -> String
+showEdge  (n1, n2) = ((nodeDefinition n1) ++ " --> " ++ (nodeDefinition n2)
+            ++ "\n")
+
+
 

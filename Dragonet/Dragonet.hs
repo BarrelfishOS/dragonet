@@ -53,19 +53,6 @@ testE10k =
         fileName = "E10k.dot"
         op = E10k.getE1kPRG
 
-testConfEmbedding :: IO ()
-testConfEmbedding =
-        do
-        putStrLn "Generating minimal configuration for PRG"
-        --writeFile fileName $ DG.toDot tree'
-        --putStrLn ("Generated " ++ fileName)
-        putStrLn output
-        putStrLn "Done..."
-        where
-        output = OP.testGenConf E10k.getE1kPRG
-        -- fileName = "E10kConfig.dot"
-        -- tree' = OP.applyConfigWrapperList E10k.getE1kPRG E10k.getTestcaseConfiguration
-
 
 testE10kConfig :: IO ()
 testE10kConfig =
@@ -93,6 +80,28 @@ testE10kEmbedding =
         lpg = NP.getNetworkDependency
         tree' = OP.embeddGraphs prg lpg
 
+testConfEmbedding :: IO ()
+testConfEmbedding =
+        do
+        putStrLn "Generating minimal configuration for PRG"
+        --writeFile fileName $ DG.toDot tree'
+        --putStrLn ("Generated " ++ fileName)
+        putStrLn output
+        putStrLn "Done..."
+        where
+        output = OP.testGenConf E10k.getE1kPRG
+        -- fileName = "E10kConfig.dot"
+        -- tree' = OP.applyConfigWrapperList E10k.getE1kPRG E10k.getTestcaseConfiguration
+
+testEmbeddingV2 :: IO ()
+testEmbeddingV2 =
+        do
+        putStrLn "Generating resursive embedding"
+        putStrLn output
+        putStrLn "Done..."
+        where
+        output = OP.testEmbeddingV2 NP.getNetworkDependency -- E10k.getE1kPRG
+
 
 allTests :: IO ()
 allTests =
@@ -107,5 +116,9 @@ main :: IO()
 --main = testE10k
 --main = testNetworkProcessing
 --main = allTests
-main = testConfEmbedding
+--main = testConfEmbedding
+main = testEmbeddingV2
+
+
+
 
