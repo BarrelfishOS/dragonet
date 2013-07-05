@@ -697,23 +697,28 @@ noDepNodes1 depList = nonDep
 embeddingV3Step sP sE sU
     | sU == [] = sE
     | sU == sU' = error "U not shrinking"
-    | otherwise = dbg $ embeddingV3Step sP sE' sU'
+    | otherwise = embeddingV3Step sP sE' sU'
     where
-        dbg a = TR.trace ("step E=") a
-        dep n s = [x | (y,x) <- s, y == n]
+        eq = nCompPrgLpgV2
+        elem' = isElemBy eq
+        edgeEq (a,b) (c,d) = a `eq` c && b `eq` d
+        union' = L.unionBy edgeEq
+
+        dep n s = [x | (y,x) <- s, y `eq` n]
         sNodes s = L.nub $ map fst s
         nodes s = L.nub $ (map fst s ++ map snd s)
-        isSubset sA sB = all (\x -> elem x sB) sA
+        isSubset :: [Node] -> [Node] -> Bool
+        isSubset sA sB = all (elem' sB) sA
 
-        sL = sE `L.union` sU
+        sL = sE `union'` sU
         sEv = (nodes sE) ++ noDepNodes1 sL
         sUv = sNodes sU
         sPv = nodes sP
 
         v = head [v' | v' <- sUv, (dep v' sL) `isSubset` sEv]
-        sE' = sE `L.union` [(v,y) | y <- dep v sP] `L.union`
-                [(x,y) | (x,y) <- sU, x == v && y `notElem` sPv]
-        sU' = [(x,y) | (x,y) <- sU, x /= v]
+        sE' = sE `union'` [(v,y) | y <- dep v sP] `union'`
+                [(x,y) | (x,y) <- sU, x `eq` v && (not $ sPv `elem'` y)]
+        sU' = [(x,y) | (x,y) <- sU, not $ x `eq` v]
 
 embeddingV2Wrapper ::  Node -> Node -> [(Node, Node)]
 embeddingV2Wrapper prg lpg =
@@ -724,7 +729,6 @@ embeddingV2Wrapper prg lpg =
     defaultQueue = getDecNode (NB.ToQueue NB.getDefaultQueue) ""
         (BinaryNode ([], [])) []
     softImplEdge =  [((getSoftStartNode), (defaultQueue))]
-
 
 removeDroppedNodes :: [(Node, Node)] -> [(Node, Node)]
 removeDroppedNodes edgeList = DL.filter (\ (x,y) ->
