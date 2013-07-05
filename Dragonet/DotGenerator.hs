@@ -5,7 +5,8 @@
 
 
 module DotGenerator(
-  toDot
+  toDot,
+  toDotFromDL
 ) where
 
 import qualified Operations as OP
@@ -33,7 +34,7 @@ dotEdge :: (String,String) -> String -> String
 dotEdge (from,port) to =
     "    " ++ f ++ ":e -> " ++ to ++ ":w;\n"
     where
-        f = from ++ ":" ++ port
+        f = from ++ (if null port then "" else (":" ++ port))
 
 -- Declare a dot double edge
 dotDoubleEdge :: (String,String) -> String -> String
@@ -102,4 +103,20 @@ toDot n =
         names = buildNames $ L.nub $ OP.nTreeNodes n
         definitions = concat $ map nodeDefinition names
         edges = concat $ map (edgeDefinition names) names
+
+edgeDefinitionDL :: [(OP.Node,String)] -> (OP.Node,OP.Node) -> String
+edgeDefinitionDL names (f,t) = dotEdge (fname,"") tname
+    where
+        fname = fromJust $ lookup f names
+        tname = fromJust $ lookup t names
+        
+
+toDotFromDL :: [(OP.Node,OP.Node)] -> String
+toDotFromDL ns =
+    "digraph G {\n" ++ "    rankdir=LR;\n" ++
+        definitions ++ "\n" ++ edges ++ "}\n"
+    where
+        names = buildNames $ L.nub $ (map fst ns) ++ (map snd ns)
+        definitions = concat $ map nodeDefinition names
+        edges = concat $ map (edgeDefinitionDL names) ns
 
