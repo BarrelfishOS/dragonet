@@ -35,6 +35,8 @@ module Operations(
     , ConfWrapperType
     , testGenConf
     , testEmbeddingV2
+    , getDepEdges
+    , removeDroppedNodes
 ) where
 
 import qualified NetBasics as NB

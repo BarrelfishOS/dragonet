@@ -11,6 +11,7 @@
 --module Main (
 module NetworkProcessing (
     getNetworkDependency
+    , getNetworkDependencySmall
 ) where
 
 import qualified Data.List as DL
@@ -65,6 +66,29 @@ getEthernetProcessingLPG classified verified dropnode = etherClassified
     opANDverifiedEthernet = OP.getOperatorNode NB.AND "L2Verified" "" verified
 
     etherValidType = OP.getDecNode NB.L2EtherValidType "PF" classified  []
+
+
+getNetworkDependencySmall :: OP.Node
+getNetworkDependencySmall = etherClassified
+    where
+    dropnode = OP.getDropNode
+
+    l2Verified = OP.BinaryNode ([opANDL5ToKernel],
+        [dropnode])
+    l2Classified = OP.BinaryNode([queue0], [dropnode])
+
+    etherClassified = getEthernetProcessingLPG l2Classified l2Verified dropnode
+
+    q0 = NB.Queue 0 0 NB.getDefaultBasicQueue
+    queue0 = OP.getDecNode (NB.ToQueue q0) ""
+        (OP.BinaryNode (
+            [opANDL5ToKernel],
+            [opANDL5ToKernel]) ) []
+
+    opANDL5ToKernel = OP.getOperatorNode NB.AND "ToDefaultKernelProcessing" ""
+        (OP.BinaryNode ([], []))
+
+
 
 
     -- ClassifiedL3

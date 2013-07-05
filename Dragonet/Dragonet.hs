@@ -107,6 +107,23 @@ testEmbeddingV2 =
         lpg = NP.getNetworkDependency
         output =  OP.testEmbeddingV2 prg lpg -- E10k.getE1kPRG
 
+testEmbeddingSmall :: IO ()
+testEmbeddingSmall =
+        do
+        putStrLn "Generating small testgraphs"
+        writeFile "LPGsmall.dot" $ DG.toDotFromDL lpgDep
+        writeFile "PRGsmall.dot" $ DG.toDotFromDL prgDep
+        writeFile "EMBEDDsmall.dot" $ DG.toDotFromDL embedded
+        putStrLn "Done..."
+        where
+        prg = OP.applyConfigWrapperList E10k.getE1kPRGSmall E10k.getTestcaseConfiguration
+        prgDep = OP.removeDroppedNodes $ OP.getDepEdges prg
+        lpg = NP.getNetworkDependencySmall
+        lpgDep = OP.removeDroppedNodes $ OP.getDepEdges lpg
+        embedded = OP.testEmbeddingV2 prg lpg
+
+
+
 allTests :: IO ()
 allTests =
     do
@@ -121,8 +138,8 @@ main :: IO()
 --main = testNetworkProcessing
 --main = allTests
 --main = testConfEmbedding
-main = testEmbeddingV2
-
+--main = testEmbeddingV2
+main = testEmbeddingSmall
 
 
 

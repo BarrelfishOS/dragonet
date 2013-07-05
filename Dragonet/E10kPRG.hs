@@ -10,6 +10,7 @@
 module E10kPRG(
     getE1kPRGminimal
     , getE1kPRG
+    , getE1kPRGSmall
     , getTestcaseConfiguration
 ) where
 
@@ -59,6 +60,55 @@ getIncompletePRGNodeattr = [
         , NB.DesAttribute (NB.ResultSaved False)
         , NB.DesAttribute (NB.NeedAdaptor True)
     ]
+
+
+-- Get the datatype for E10k
+getE1kPRGSmall :: OP.Node
+getE1kPRGSmall = etherClassified
+    where
+
+    tagname = "PF"
+    dropnode = OP.getDropNode
+    etherClassified = OP.getDecNode NB.ClassifiedL2Ethernet tagname
+        (OP.BinaryNode (
+            [etherValidLen],
+            [dropnode]))
+        [(NB.DesAttribute (NB.NeedAdaptor True))]
+
+    etherValidLen = OP.getDecNode NB.L2EtherValidLen tagname
+        (OP.BinaryNode (
+            [etherCRCconf],
+            [dropnode]))
+        []
+
+    etherCRCconf = OP.getConfNode (MB.Just NB.L2EtherValidCRC) tagname
+        (OP.BinaryNode (
+            [validCRC],
+            l2AddrCheckList))
+
+    validCRC = OP.getDecNode NB.L2EtherValidCRC tagname
+        (OP.BinaryNode (
+            l2AddrCheckList,
+            [dropnode]))
+        []
+
+    validAddrOptions = [NB.L2EtherValidBroadcast, NB.L2EtherValidMulticast,
+        NB.L2EtherValidUnicast]
+
+    toORop =  OP.BinaryNode ([opORL2EtherValidDest], [opORL2EtherValidDest])
+    l2AddrCheckList = DL.map (\ x -> OP.getDecNode x tagname toORop []) validAddrOptions
+
+    opORL2EtherValidDest = OP.getOperatorNode NB.OR "L2ValidDest" tagname
+        (OP.BinaryNode (
+            [queue0],
+            [dropnode]))
+
+    q0 = NB.Queue 0 0 NB.getDefaultBasicQueue
+    queue0 = OP.getDecNode (NB.ToQueue q0) tagname
+        (OP.BinaryNode ( [], [])) []
+
+
+
 
 -- Get the datatype for E10k
 getE1kPRG :: OP.Node
