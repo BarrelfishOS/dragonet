@@ -717,11 +717,18 @@ embeddingV2Wrapper ::  Node -> Node -> [(Node, Node)]
 embeddingV2Wrapper prg lpg =
     embeddingV3Step prgEdges [] lpgEdges
     where
-    lpgEdges = getDepEdges lpg
-    prgEdges = getDepEdges prg
+    lpgEdges = removeDroppedNodes $ getDepEdges lpg
+    prgEdges = removeDroppedNodes $ getDepEdges prg
     defaultQueue = getDecNode (NB.ToQueue NB.getDefaultQueue) ""
         (BinaryNode ([], [])) []
     softImplEdge =  [((getSoftStartNode), (defaultQueue))]
+
+
+removeDroppedNodes :: [(Node, Node)] -> [(Node, Node)]
+removeDroppedNodes edgeList = DL.filter (\ (x,y) ->
+    not ( (nCompPrgLpg x dnode) ||  (nCompPrgLpg x dnode) ) ) edgeList
+    where
+    dnode = getDropNode
 
 
 findEdgesForV :: [(Node, Node)] -> Node -> [(Node, Node)]
