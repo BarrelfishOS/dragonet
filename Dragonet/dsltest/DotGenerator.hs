@@ -16,67 +16,72 @@ import Data.Maybe
 -- Get string label for GNode
 gLabelStr gn = OP.gLabel gn
 
-dotNode name label style nPorts =
+-- Declare a dot node
+dotNode :: String -> String -> String -> [String] -> String
+dotNode name label style ports =
     "    " ++ name ++ "[label=\"" ++ l ++ "\",shape=record" ++ s ++ "];\n"
     where
-        s = if style /= "" then ",style=" ++ style else ""
-        port i = "|<p" ++ (show i) ++ "> " ++ (show (i - 1)) ++ " "
-        ports =
-            case (concat (map port [1..nPorts])) of
-                h:t -> t
-                _ -> ""
-        l = "{" ++ label ++ "|{" ++ ports ++ "}}"
+        s = if style /= "" then "," ++ style else ""
+        port :: String -> String
+        port pl = "|<" ++ pl ++ "> " ++ pl ++ " "
+        portDecs = drop 1 $ concat $ map port ports
+        l = "{" ++ label ++ "|{" ++ portDecs ++ "}}"
 
+-- Declare a single dot edge
+dotEdge :: (String,String) -> String -> String
 dotEdge (from,port) to =
-    "    " ++ f ++ " -> " ++ to ++ "[headport=\"w\"];\n"
+    "    " ++ f ++ ":e -> " ++ to ++ ":w;\n"
     where
-        f = from ++ ":p" ++ (show port) ++ ":e"
-dotDoubleEdge (from,port) to =
-    "    " ++ from ++ " -> " ++ to ++ "[color=\"black:black\"," ++
-        "headport=\"w\",tailport=\"e\"];\n"
+        f = from ++ ":" ++ port
 
--- Number of ports required for node
-nPorts (OP.BinaryNode _) = 2
-nPorts (OP.NaryNode l) = length l
+-- Declare a dot double edge
+dotDoubleEdge :: (String,String) -> String -> String
+dotDoubleEdge (from,_) to =
+    "    " ++ from ++ ":e -> " ++ to ++ ":w[color=\"black:white:black\"];\n"
 
 -- Get dot definition for specified node
 nodeDefinition :: (OP.Node, String) -> String
 nodeDefinition (n, nn) =
     case n of
         (OP.Des (OP.Decision gn)) ->
-            dotNode nn (gLabelStr gn) "" (nPorts (OP.getNodeEdges n))
+            dotNode nn (gLabelStr gn) "" $ ports $ OP.getNodeEdges n
         (OP.Opr (OP.Operator gn)) ->
-            dotNode nn (gLabelStr gn) "rounded" (nPorts (OP.getNodeEdges n))
+            dotNode nn (gLabelStr gn) "style=\"filled,rounded\",fillcolor=gray"
+                $ ports $ OP.getNodeEdges n
         (OP.Conf (OP.Configuration gn)) ->
-            dotNode nn (gLabelStr gn) "rounded" (nPorts (OP.getNodeEdges n))
+            dotNode nn (gLabelStr gn)
+                "style=\"filled,diagonals\",fillcolor=turquoise" $
+                ports $ OP.getNodeEdges n
+    where
+        -- Get port names from NodeEdges
+        ports (OP.BinaryNode _) = ["T", "F"]
+        ports (OP.NaryNode l) = map fst l
 
-
-
+-- Convert list to list of tuples with the first element being the list
+-- elements and the second element being the constant specified
+sufixL :: a -> [b] -> [(b,a)]
+sufixL p l = zip l $ replicate (length l) p
 
 -- Get dot definition for edges starting at the specified node
 edgeDefinition :: [(OP.Node, String)] -> (OP.Node, String) -> String
-edgeDefinition dict (n, nn) =
-     case OP.getNodeEdges n of
+edgeDefinition dict (node, name) =
+     case OP.getNodeEdges node of
         (OP.NaryNode es) ->
-            edgesToEps dotEdge (prefixLL (concat es))
+            edgesToEps dotEdge $ concat $ map (\(l,e) -> sufixL l e) es
         (OP.BinaryNode (ts,fs)) ->
-            (edgesToEps dotDoubleEdge (doubleEps ts fs)) ++
-            (edgesToEps dotEdge (singleEps ts fs))
+            (edgesToEps dotDoubleEdge $ doubleEps ts fs) ++
+            (edgesToEps dotEdge $ singleEps ts fs)
     where
-        prefixL (l,p) = zip l (replicate (length l) p)
-        prefixLL l = zip l [1..(length l)]
         -- endpoints in both lists
-        doubleEps ts fs = prefixL ((L.intersect ts fs),0)
+        doubleEps ts fs = sufixL "" $ L.intersect ts fs
         -- endpoints in only one list
-        singleEps ts fs = (prefixL (nfs, 1)) ++ (prefixL (nts, 2))
+        singleEps ts fs = (sufixL "F" nfs) ++ (sufixL "T" nts)
             where
                 dbl = L.intersect ts fs
                 nts = (L.nub ts) L.\\ dbl
                 nfs = (L.nub fs) L.\\ dbl
-
-
-        edgesToEps f eps = concat (map (edgeTo f) eps)
-        edgeTo f (n,p) = f (nn,p) (fromJust (lookup n dict))
+        edgesToEps f eps = concat $ map (edgeTo f) eps
+        edgeTo f (n,p) = f (name,p) $ fromJust $ lookup n dict
 
 -- Get associative list between node and their dot names, assumes each node
 -- only occurs once in the list
@@ -93,7 +98,7 @@ toDot n =
     "digraph G {\n" ++ "    rankdir=LR;\n" ++
         definitions ++ "\n" ++ edges ++ "}\n"
     where
-        names = buildNames (L.nub (OP.nTreeNodes n))
-        definitions = concat (map nodeDefinition names)
-        edges = concat (map (edgeDefinition names) names)
+        names = buildNames $ L.nub $ OP.nTreeNodes n
+        definitions = concat $ map nodeDefinition names
+        edges = concat $ map (edgeDefinition names) names
 

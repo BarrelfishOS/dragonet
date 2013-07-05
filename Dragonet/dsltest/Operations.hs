@@ -61,7 +61,7 @@ type ConfFunction = (Configuration -> ConfSpace -> [Node])
 type OpFunction = (Operator -> [Node] -> [Node])
 
 data NodeEdges = BinaryNode ([Node], [Node])
-        | NaryNode [[Node]]
+        | NaryNode [(String, [Node])]
         deriving (Show, Eq)
 
 data GNode l a f = GNode {
@@ -97,7 +97,7 @@ nTreeNodes n =
         ep =
             case (getNodeEdges n) of
                 (BinaryNode (as, bs)) -> L.nub (as ++ bs)
-                (NaryNode as) -> L.nub (concat as)
+                (NaryNode as) -> L.nub $ concat $ map snd as
         children = concat (map nTreeNodes ep)
 
 

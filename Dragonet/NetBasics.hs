@@ -248,9 +248,7 @@ data BitMaskSelecter = BitMaskSelecter {
    , bitValue :: [Integer] -- FIXME: This should be a single bit
    } deriving (Show, Eq)
 
-data NetOperator = AND String
-        | XOR String
-        | OR String
+data NetOperator = AND | XOR | OR
         deriving (Show, Eq)
 
 
@@ -312,10 +310,10 @@ instance ConfigCompare ConfLabel where
 instance GraphLabel ConfLabel where
     graphLabelStr (ConfLabel cl) = replaceSpaces $ "Conf" ++ (drop 4 $ show cl)
 
-data OpLabel = OpLabel NetOperator
+data OpLabel = OpLabel NetOperator String
     deriving (Show, Eq)
 instance GraphLabel OpLabel where
-    graphLabelStr (OpLabel no) = replaceSpaces $ (show no)
+    graphLabelStr (OpLabel no s) = replaceSpaces $ ((show no) ++ ":" ++ s)
 
 
 data DesAttribute = DesAttribute Attribute

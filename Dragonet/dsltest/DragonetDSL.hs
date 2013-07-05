@@ -8,6 +8,10 @@ module DragonetDSL(
 
 import System.IO
 
+import Text.ParserCombinators.Parsec as Parsec
+import Text.ParserCombinators.Parsec.Expr
+import Text.ParserCombinators.Parsec.Pos
+import qualified Text.ParserCombinators.Parsec.Token as P
 
 import qualified Language.Haskell.TH as TH
 import Language.Haskell.TH.Quote
@@ -16,7 +20,8 @@ import qualified Data.List as L
 
 import qualified Operations as OP
 
-import Text.ParserCombinators.Parsec
+
+
 
 dragonet  :: QuasiQuoter
 dragonet  =  QuasiQuoter { quoteExp = undefined,
@@ -57,8 +62,14 @@ declare n =
     where
         portEdge e = TH.VarE (TH.mkName e)
         port (Port _ ns) = TH.ListE (map portEdge ns)
-        binEdges t f = TH.AppE (TH.ConE (TH.mkName "OP.BinaryNode")) (TH.TupE [(port t), (port f)])
-        edges (Node _ ps) = TH.AppE (TH.ConE (TH.mkName "OP.NaryNode")) (TH.ListE (map port ps))
+        binEdges t f =
+            TH.AppE (TH.ConE (TH.mkName "OP.BinaryNode")) $
+                TH.TupE [(port t), (port f)]
+        lblPort p = TH.TupE [(TH.LitE $ TH.StringL name), (port p)]
+            where (Port name _) = p
+        edges (Node l ps) =
+            TH.AppE (TH.ConE (TH.mkName "OP.NaryNode")) $
+                TH.ListE $ map lblPort ps
         edges (Boolean _ t f) = binEdges t f
         edges (And _ t f) = binEdges t f
         edges (Or _ t f) = binEdges t f
@@ -122,40 +133,45 @@ nPorts (Or _ a b) = [a, b]
 -----------------------------------------------------------------------------
 -- Implements the actual parser
 
-comment = many (spaces >> string "--" >> manyTill anyChar newline) >> return ()
+lexer = P.makeTokenParser P.LanguageDef {
+    P.commentStart = "/*",
+    P.commentEnd = "*/",
+    P.commentLine = "//",
+    P.nestedComments = False,
+    P.identStart = Parsec.letter <|> Parsec.char '_',
+    P.identLetter = Parsec.alphaNum <|> Parsec.char '_',
+    P.opStart = Parsec.oneOf "",
+    P.opLetter = Parsec.oneOf "",
+    P.reservedNames = ["node", "boolean", "and", "or", "port"],
+    P.reservedOpNames = [],
+    P.caseSensitive = True }
+    
 
-mySpaces = spaces <|> comment
-
-identifier = do
-    id <- many1 alphaNum
-    mySpaces
-    return id
-symbol s = string s >> mySpaces
+whitespace = P.whiteSpace lexer
+identifier = P.identifier lexer
+braces = P.braces lexer
+brackets = P.brackets lexer
+reserved = P.reserved lexer
 
 port = do
-    symbol "port"
-    ns <- identifier `sepBy1` mySpaces
-    symbol "["
-    ds <- identifier `sepBy1` mySpaces
-    symbol "]"
+    reserved "port"
+    ns <- many $ identifier
+    ds <- brackets $ many identifier
     return (ports ns ds)
     where
         port ds n = Port n ds
         ports ns ds = map (port ds) ns
 
 node = do
-    symbol "node"
+    reserved "node"
     n <- identifier
-    symbol "{"
-    ps <- many port
-    symbol "}"
+    ps <- braces $ many port
     return (Node n (concat ps))
 
 genBoolean name = do
-    symbol name
+    reserved name
     n <- identifier
-    symbol "{"
-    ps <- many port
+    ps <- braces $ many port
     if (length (concat ps)) /= 2 then
         unexpected "Unexpected number of ports in boolean node, expect exactly 2"
     else
@@ -165,7 +181,7 @@ genBoolean name = do
             if isNothing (falsePort ps) then
                 unexpected "false port not found in boolean node"
             else
-                symbol "}"
+                return ()
     return (n, (head (concat ps)), (head (tail (concat ps))))
     where
         isPort n (Port m _) = (n == m)
@@ -186,9 +202,7 @@ andN = do
     return (And n t f)
   
 graph = do
-    mySpaces
     ns <- many (node <|> boolean <|> orN <|> andN)
-    mySpaces
     eof
     return ns
 
