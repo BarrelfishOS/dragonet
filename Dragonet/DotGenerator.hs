@@ -104,11 +104,19 @@ toDot n =
         definitions = concat $ map nodeDefinition names
         edges = concat $ map (edgeDefinition names) names
 
+myLookup :: OP.Node -> [(OP.Node,a)] -> Maybe a
+myLookup x l =
+    case f of
+        Nothing -> Nothing
+        Just (_,r) ->  Just r
+    where
+        f = L.find (\(y,_) -> OP.nCompPrgLpgV2 x y) l
+
 edgeDefinitionDL :: [(OP.Node,String)] -> (OP.Node,OP.Node) -> String
 edgeDefinitionDL names (f,t) = dotEdge (fname,"") tname
     where
-        fname = fromJust $ lookup f names
-        tname = fromJust $ lookup t names
+        fname = fromJust $ myLookup f names
+        tname = fromJust $ myLookup t names
         
 
 toDotFromDL :: [(OP.Node,OP.Node)] -> String
@@ -116,7 +124,7 @@ toDotFromDL ns =
     "digraph G {\n" ++ "    rankdir=LR;\n" ++
         definitions ++ "\n" ++ edges ++ "}\n"
     where
-        names = buildNames $ L.nub $ (map fst ns) ++ (map snd ns)
+        names = buildNames $ L.nubBy OP.nCompPrgLpgV2 $ (map fst ns) ++ (map snd ns)
         definitions = concat $ map nodeDefinition names
         edges = concat $ map (edgeDefinitionDL names) ns
 

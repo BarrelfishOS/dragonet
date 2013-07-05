@@ -97,7 +97,6 @@ testEmbeddingV2 :: IO ()
 testEmbeddingV2 =
         do
         putStrLn "Generating resursive embedding"
-        putStrLn (show output)
         writeFile fileName $ DG.toDotFromDL output
         putStrLn ("Generated " ++ fileName)
         putStrLn "Done..."
