@@ -110,18 +110,18 @@ testEmbeddingSmall :: IO ()
 testEmbeddingSmall =
         do
         putStrLn "Generating small testgraphs"
-        writeFile "LPGsmall.dot" $ DG.toDot lpg
+        writeFile "LPGsmall.dot" $ DG.toDotFromDL lpgDep
         writeFile "PRGsmallUnconf.dot" $ DG.toDot prgUnconf
-        writeFile "PRGsmall.dot" $ DG.toDot prg
-        --writeFile "EMBEDDsmall.dot" $ DG.toDotFromDL embedded
+        writeFile "PRGsmall.dot" $ DG.toDotFromDL prgDep
+        writeFile "EMBEDDsmall.dot" $ DG.toDotFromDL embedded
         putStrLn "Done..."
         where
         prgUnconf = E10k.getE1kPRGSmall
-        prg = OP.applyConfigWrapperList  prgUnconf E10k.getTestcaseConfigurationSmall
+        prg = OP.applyConfigWrapperList  prgUnconf E10k.getTestcaseConfiguration
         prgDep = OP.removeDroppedNodes $ OP.getDepEdges prg
         lpg = NP.getNetworkDependencySmall
         lpgDep = OP.removeDroppedNodes $ OP.getDepEdges lpg
-        --embedded = OP.testEmbeddingV2 prg lpg
+        embedded = OP.testEmbeddingV2 prg lpg
 
 
 
