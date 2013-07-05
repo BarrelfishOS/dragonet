@@ -681,19 +681,30 @@ embeddingV2Step prgEdges (lpgEmbedded, lpgUnembedded)
     lpgUnembedded' = DL.filter (\ (x, y) -> x /= nextV) lpgUnembedded
     lpgEmbedded' =  lpgEmbedded ++ newEdges
 
-embeddingV3step sP sE [] = sE
-embeddingV3Step sP sE sU
-    | sU == sU' = error "U not shrinking"
-    | otherwise = dbg $ embeddingV3step sP sE' sU'
+
+-- Get all nodes which don't have any dependencies
+noDepNodes1 :: [(Node, Node)] -> [Node]
+noDepNodes1 depList = nonDep
     where
-        dbg a = TR.trace ("step E=" ++ (show sE)) a
-        dep n s = [x | (y,x) <- s, y == v]
+    srcNodes = DL.nub $ DL.map (fst) depList
+    dstNodes = DL.nub $ DL.map (snd) depList
+    nonDep = DL.filter (\ x -> x `DL.notElem` srcNodes ) dstNodes
+
+
+--embeddingV3Step sP sE [] = sE
+embeddingV3Step sP sE sU
+    | sU == [] = sE
+    | sU == sU' = error "U not shrinking"
+    | otherwise = dbg $ embeddingV3Step sP sE' sU'
+    where
+        dbg a = TR.trace ("step E=") a
+        dep n s = [x | (y,x) <- s, y == n]
         sNodes s = L.nub $ map fst s
         nodes s = L.nub $ (map fst s ++ map snd s)
         isSubset sA sB = all (\x -> elem x sB) sA
 
         sL = sE `L.union` sU
-        sEv = nodes sE
+        sEv = (nodes sE) ++ noDepNodes1 sL
         sUv = sNodes sU
         sPv = nodes sP
 
