@@ -98,6 +98,7 @@ data Operator = Operator (GNode NB.OpLabel NB.OpAttribute OpFunction)
 
 class NodeCompare a where
     nCompPrgLpg :: a -> a -> Bool
+    nCompPrgLpgV2 :: a -> a -> Bool
     nCompFullTag :: a -> a -> Bool
 
 
@@ -113,6 +114,16 @@ instance NodeCompare Node where
         NB.embedCompare (gLabel n1) (gLabel n2)
     nCompPrgLpg _ _ = False
 
+    nCompPrgLpgV2 (Des (Decision n1)) (Des (Decision n2)) =
+        NB.embedCompare (gLabel n1) (gLabel n2)
+    nCompPrgLpgV2 (Opr (Operator n1)) (Opr (Operator n2)) =
+        (gLabel n1) == (gLabel n2)
+    nCompPrgLpgV2 (Conf (Configuration n1)) (Conf (Configuration n2)) =
+        error ("nCompPrgLpgV2: comparing two conf node for embedding...!! \n"
+            ++ "  but you are not supposed to have conf nodes in LPG!!!" )
+    nCompPrgLpgV2 _ _ = False
+
+
     nCompFullTag (Des (Decision n1)) (Des (Decision n2)) =
         (gLabel n1) == (gLabel n2) &&
         (gTag n1) == (gTag n2)
@@ -122,8 +133,8 @@ instance NodeCompare Node where
     nCompFullTag (Opr (Operator n1)) (Opr (Operator n2)) =
         (gLabel n1) == (gLabel n2) &&
         (gTag n1) == (gTag n2)
-    nCompFullTag x1 x2 = error ("nCompFullTag: error in matching "
-        ++ show x1 ++ " and " ++ show x2)
+    nCompFullTag x1 x2 = False
+        -- error ("nCompFullTag: error in matching " ++ show x1 ++ " and " ++ show x2)
 
 
 instance NB.EmbedCompare Node where
@@ -505,14 +516,9 @@ getOutEdges root = nextLevel ++ deeperLevels
     nextLevel = DL.concatMap (\ x -> [(root, x)]) children
     deeperLevels = DL.concatMap (getOutEdges) children
 
-
 -- Get outgoing edegs for all nodes underneath given node
 getDepEdges :: Node -> [(Node,Node)]
-getDepEdges root = nextLevel ++ deeperLevels
-    where
-    children = getChildren root
-    nextLevel = DL.concatMap (\ x -> [(x, root)]) children
-    deeperLevels = DL.concatMap (getOutEdges) children
+getDepEdges root =  DL.map (\ (x, y) -> (y, x)) $ getOutEdges root
 
 
 
@@ -542,17 +548,12 @@ topSort es =
         orphaned = L.nub $ filter isOrphaned $ map snd dropped
 
 
-testEmbeddingV2 :: Node -> String
-testEmbeddingV2 root = DL.concatMap (nodeDefinition) $ topSort $ DL.reverse $ DL.nub $  getOutEdges root
---testEmbeddingV2 root = DL.concatMap (showEdge) $ topSort  $ DL.nub $ getDepEdges root
+testEmbeddingV2 :: Node -> Node -> String
+--testEmbeddingV2 root = DL.concatMap (nodeDefinition) $ topSort $ DL.reverse $ DL.nub $  getOutEdges root
+--testEmbeddingV2 prg lpg = DL.concatMap (showEdge) $ DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges lpg
+testEmbeddingV2 prg lpg = DL.concatMap (showEdge) $ embeddingV2Wrapper prg lpg
 
-{-
-embeddingV2 :: Node -> Node -> (Node, Node)
-embeddingV2 prg lpg = (prg', lpg')
-    where
-    nextNode = DL.head $ topSort $ DL.nub $ getDepEdges lpg
-    prgNodes = DL.head $ topSort $ DL.nub $ getDepEdges prg
--}
+-- few deps of next node to embedd [ L2EtherValidType ]  are not embedded "ClassifiedL2Ethernet"
 
 -- Get string label for GNode
 gLabelStr gn = NB.graphLabelStr (gLabel gn)
@@ -560,14 +561,135 @@ gLabelStr gn = NB.graphLabelStr (gLabel gn)
 nodeDefinition :: Node -> String
 nodeDefinition n =
     case n of
-        (Des (Decision gn))           -> ((gLabelStr gn) ++ "\n")
-        (Opr (Operator gn))           -> ((gLabelStr gn) ++ "\n")
-        (Conf (Configuration gn))     -> ((gLabelStr gn) ++ "\n")
+        (Des (Decision gn))           -> ((gLabelStr gn) )
+        (Opr (Operator gn))           -> ((gLabelStr gn) )
+        (Conf (Configuration gn))     -> ((gLabelStr gn) )
 
 
 showEdge :: (Node, Node) -> String
 showEdge  (n1, n2) = ((nodeDefinition n1) ++ " --> " ++ (nodeDefinition n2)
             ++ "\n")
+
+
+-- Find all nodes which are sucessor of given node for given list of edges
+-- I am using to find all previous dependencies for given node
+getAllSucc :: [(Node, Node)] -> Node -> [Node]
+getAllSucc depList node = DL.concatMap (\ (x, y) -> if x == node then [y] else [] ) depList
+
+-- Get all nodes which don't have any dependencies
+noDepNodes :: [(Node, Node)] -> [Node]
+noDepNodes depList = nonDep
+    where
+    srcNodes = DL.nub $ DL.map (fst) depList
+    dstNodes = DL.nub $ DL.map (snd) depList
+    nonDep = DL.filter (\ x -> x `DL.notElem` srcNodes ) dstNodes
+
+
+-- find out all the parent nodes for given node
+getParentNodes :: [(Node, Node)] -> Node -> [Node]
+getParentNodes edgeList v = DL.concatMap (\ (x, y) -> if v == y then [x] else [] ) edgeList
+
+
+-- try and find given node into the PRG
+-- Note: Remember that the node is from LPG whereas we are searching it in PRG
+locateInPRG ::  [(Node, Node)] -> Node -> [Node]
+locateInPRG prgEdges gn = matchingPRGnodes
+    where
+    matchingPRGnodes = DL.map (fst) $ locateEdgesInPRG prgEdges gn
+--    prgNodes = DL.nub $ DL.map (\ (x, y) -> x) prgEdges
+--    matchingPRGnodes = DL.filter (\ x -> nCompPrgLpgV2 x gn) prgNodes
+
+locateEdgesInPRG ::  [(Node, Node)] -> Node -> [(Node, Node)]
+locateEdgesInPRG prgEdges gn = matchingPRGEdges
+    where
+    matchingPRGEdges = DL.filter (\ (x, y) -> nCompPrgLpgV2 x gn) prgEdges
+
+locateEdgesInLPG ::  [(Node, Node)] -> Node -> [(Node, Node)]
+locateEdgesInLPG lpgEdges gn = matchingLPGEdges
+    where
+    matchingLPGEdges = DL.filter (\ (x, y) -> nCompFullTag x gn) lpgEdges
+
+
+getSoftStartNode :: Node
+getSoftStartNode = getDecNode NB.InSoftware "" (BinaryNode ([], [])) []
+
+
+-- This node can ideally go in hardware, so try to do so
+addHWnode :: [(Node, Node)] -> ([(Node, Node)], [(Node, Node)]) -> Node
+    -> [(Node, Node)]
+addHWnode prgEdges (lpgEmbedded, lpgUnembedded) gn = gnEdges
+    where
+    allLPGEdges = lpgEmbedded ++ lpgUnembedded
+    embeddedNodes = DL.map (fst) lpgEmbedded
+    parentsInLPG = getParentNodes allLPGEdges gn
+    -- find parents which are embedded in hardware
+    parentsInHW = DL.filter (\ x -> locateInPRG prgEdges x /= []) parentsInLPG
+    parentsInSW = DL.filter (\ x -> locateInPRG prgEdges x == []) parentsInLPG
+    -- All parents in HW : it goes in H/W
+    gnEdges
+        | parentsInSW == [] = hwDepEdges
+        | parentsInHW == [] =  swDepEdges -- All parents in SW
+        | otherwise = hwDepEdges ++ swDepEdges ++ explicitSWDep
+            -- keep HW deps, SW deps, and add explicit dep marking it in SW
+            -- Also, this implies that this is an operator node
+        where
+        hwDepEdges = locateEdgesInPRG prgEdges gn
+        swDepEdges = locateEdgesInLPG allLPGEdges gn
+        explicitSWDep = [(gn, getSoftStartNode)]
+
+
+    -- If all the parents in hardware, then this goes in hardware
+
+
+embeddingV2Step :: [(Node, Node)] -> ([(Node, Node)], [(Node, Node)]) ->
+    ([(Node, Node)], [(Node, Node)])
+embeddingV2Step prgEdges (lpgEmbedded, lpgUnembedded)
+    | lpgUnembedded == []   = (lpgEmbedded, [])
+    | offendingSucc /= []   = error ("few deps of next node to embedd [ " ++
+            (nodeDefinition nextV)
+            ++ " ]  are not embedded "
+            ++ (show $ (DL.concatMap (nodeDefinition) offendingSucc)))
+    | otherwise             = embeddingV2Step prgEdges (lpgEmbedded', lpgUnembedded')
+    where
+    allLPGEdges = lpgUnembedded ++ lpgEmbedded
+    nextV = fst $ DL.head lpgUnembedded
+    -- make sure that all deps of nextV are in the embedded part
+    embeddedV = (noDepNodes allLPGEdges) ++ (DL.map (fst) lpgEmbedded)
+
+    offendingSucc = DL.filter (\ x -> x `DL.notElem` embeddedV) $
+            getAllSucc allLPGEdges nextV
+
+    -- check if this node is in hardware
+    matchingPRGnodes = locateInPRG prgEdges nextV
+
+    newEdges = if matchingPRGnodes == [] then [] -- in software
+        else addHWnode prgEdges (lpgEmbedded, lpgUnembedded) nextV  -- in hardware
+
+    -- Move the node from unembedded to embedded.
+    -- This implies that we move all the edges associated with it.
+    lpgUnembedded' = DL.filter (\ (x, y) -> x /= nextV) lpgUnembedded
+    lpgEmbedded' =  lpgEmbedded ++ newEdges
+
+
+embeddingV2Wrapper ::  Node -> Node -> [(Node, Node)]
+embeddingV2Wrapper prg lpg
+    | unEmbedded == []  = embedded
+    | otherwise         = embedded -- error ("Could not embedd all the nodes")
+    where
+    lpgEdges = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges lpg
+    prgEdges = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges prg
+    (embedded, unEmbedded) = embeddingV2Step prgEdges ([], lpgEdges)
+
+
+findEdgesForV :: [(Node, Node)] -> Node -> [(Node, Node)]
+findEdgesForV edges toMatch = DL.filter (\ x -> (fst x) == toMatch) edges
+
+
+topoSortEdges :: [(Node, Node)] -> [(Node, Node)]
+topoSortEdges unSorted = sortedE
+    where
+    sortedE = DL.concatMap (findEdgesForV unSorted) sortedV
+    sortedV = topSort unSorted
 
 
 

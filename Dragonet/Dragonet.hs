@@ -100,8 +100,9 @@ testEmbeddingV2 =
         putStrLn output
         putStrLn "Done..."
         where
-        output = OP.testEmbeddingV2 NP.getNetworkDependency -- E10k.getE1kPRG
-
+        prg = OP.applyConfigWrapperList E10k.getE1kPRG E10k.getTestcaseConfiguration
+        lpg = NP.getNetworkDependency
+        output = OP.testEmbeddingV2 prg lpg -- E10k.getE1kPRG
 
 allTests :: IO ()
 allTests =

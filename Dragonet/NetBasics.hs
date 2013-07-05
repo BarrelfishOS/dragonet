@@ -278,6 +278,7 @@ data DesLabel = DesLabel NetOperation
 instance EmbedCompare DesLabel where
     embedCompare (DesLabel no1) (DesLabel no2) = embedCompare no1 no2
 
+
 instance ConfigCompare DesLabel where
     confCompare (DesLabel no1) (DesLabel no2) = confCompare no1 no2
 
