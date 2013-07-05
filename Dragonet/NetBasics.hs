@@ -81,7 +81,8 @@ data Queue = Queue {
     } deriving (Eq, Ord)
 
 instance Show Queue where
-    show (Queue qid coreid _) = show qid ++ " core " ++ show coreid
+   -- show (Queue qid coreid _) = show qid ++ " core " ++ show coreid
+    show (Queue qid coreid _) = "" -- show qid ++ " core " ++ show coreid
 
 instance ConfigCompare Queue where
     confCompare q1 q2 = queueId q1 == queueId q2
