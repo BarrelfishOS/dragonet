@@ -44,7 +44,7 @@ import qualified Data.Maybe as MB
 import qualified Data.List as DL
 --import qualified Data.Set as Set
 
---import qualified Debug.Trace as TR
+import qualified Debug.Trace as TR
 
 type TagType = String
 
@@ -681,18 +681,36 @@ embeddingV2Step prgEdges (lpgEmbedded, lpgUnembedded)
     lpgUnembedded' = DL.filter (\ (x, y) -> x /= nextV) lpgUnembedded
     lpgEmbedded' =  lpgEmbedded ++ newEdges
 
+embeddingV3step sP sE [] = sE
+embeddingV3Step sP sE sU
+    | sU == sU' = error "U not shrinking"
+    | otherwise = dbg $ embeddingV3step sP sE' sU'
+    where
+        dbg a = TR.trace ("step E=" ++ (show sE)) a
+        dep n s = [x | (y,x) <- s, y == v]
+        sNodes s = L.nub $ map fst s
+        nodes s = L.nub $ (map fst s ++ map snd s)
+        isSubset sA sB = all (\x -> elem x sB) sA
+
+        sL = sE `L.union` sU
+        sEv = nodes sE
+        sUv = sNodes sU
+        sPv = nodes sP
+
+        v = head [v' | v' <- sUv, (dep v' sL) `isSubset` sEv]
+        sE' = sE `L.union` [(v,y) | y <- dep v sP] `L.union`
+                [(x,y) | (x,y) <- sU, x == v && y `notElem` sPv]
+        sU' = [(x,y) | (x,y) <- sU, x /= v]
 
 embeddingV2Wrapper ::  Node -> Node -> [(Node, Node)]
-embeddingV2Wrapper prg lpg
-    | unEmbedded == []  = embedded ++ softImplEdge
-    | otherwise         = error ("Could not embedd all the nodes")
+embeddingV2Wrapper prg lpg =
+    embeddingV3Step prgEdges [] lpgEdges
     where
-    lpgEdges = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges lpg
-    prgEdges = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges prg
+    lpgEdges = getDepEdges lpg
+    prgEdges = getDepEdges prg
     defaultQueue = getDecNode (NB.ToQueue NB.getDefaultQueue) ""
         (BinaryNode ([], [])) []
     softImplEdge =  [((getSoftStartNode), (defaultQueue))]
-    (embedded, unEmbedded) = embeddingV2Step prgEdges ([], (lpgEdges))
 
 
 findEdgesForV :: [(Node, Node)] -> Node -> [(Node, Node)]
@@ -704,6 +722,5 @@ topoSortEdges unSorted = sortedE
     where
     sortedE = DL.concatMap (findEdgesForV unSorted) sortedV
     sortedV = topSort unSorted
-
 
 
