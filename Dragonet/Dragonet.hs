@@ -97,12 +97,14 @@ testEmbeddingV2 :: IO ()
 testEmbeddingV2 =
         do
         putStrLn "Generating resursive embedding"
-        putStrLn output
+        writeFile fileName $ DG.toDotFromDL output
+        putStrLn ("Generated " ++ fileName)
         putStrLn "Done..."
         where
+        fileName = "LPGembeddedV2.dot"
         prg = OP.applyConfigWrapperList E10k.getE1kPRG E10k.getTestcaseConfiguration
         lpg = NP.getNetworkDependency
-        output = OP.testEmbeddingV2 prg lpg -- E10k.getE1kPRG
+        output =  OP.testEmbeddingV2 prg lpg -- E10k.getE1kPRG
 
 allTests :: IO ()
 allTests =

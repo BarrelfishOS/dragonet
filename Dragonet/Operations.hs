@@ -483,6 +483,7 @@ main = putStrLn "Hello world"
 
 -- ################## copied from dsltest/implementation.hs
 
+{-
 -- intermediate function to help getPredDS
 getPredDSStep :: Node -> Node -> Node -> [Node]
 getPredDSStep parent currNode toMatch
@@ -505,12 +506,12 @@ getPredDS currNode toMatch
         (BinaryNode (as, bs))   -> DL.nub (as ++ bs)
         (NaryNode as)           -> DL.nub (concat as)
     nextLevel = DL.concatMap (\ x -> getPredDSStep currNode x toMatch) children
-
+-}
 -- For given node, find all its children
 getChildren :: Node -> [Node]
 getChildren root = case (getNodeEdges root) of
         (BinaryNode (as, bs))   -> DL.nub (as ++ bs)
-        (NaryNode as)           -> DL.nub (concat as)
+        (NaryNode nList)        -> DL.nub $ DL.concatMap (\ (x, y) -> y) nList
 
 -- Get outgoing edegs for all nodes underneath given node
 getOutEdges :: Node -> [(Node,Node)]
@@ -552,10 +553,10 @@ topSort es =
         orphaned = L.nub $ filter isOrphaned $ map snd dropped
 
 
-testEmbeddingV2 :: Node -> Node -> String
---testEmbeddingV2 root = DL.concatMap (nodeDefinition) $ topSort $ DL.reverse $ DL.nub $  getOutEdges root
---testEmbeddingV2 prg lpg = DL.concatMap (showEdge) $ DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges lpg
-testEmbeddingV2 prg lpg = DL.concatMap (showEdge) $ embeddingV2Wrapper prg lpg
+testEmbeddingV2 :: Node -> Node -> [(Node, Node)]
+--testEmbeddingV2 prg lpg = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges lpg
+--testEmbeddingV2 prg lpg = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges prg
+testEmbeddingV2 prg lpg = embeddingV2Wrapper prg lpg
 
 -- few deps of next node to embedd [ L2EtherValidType ]  are not embedded "ClassifiedL2Ethernet"
 
@@ -626,18 +627,20 @@ addHWnode prgEdges (lpgEmbedded, lpgUnembedded) gn = gnEdges
     allLPGEdges = lpgEmbedded ++ lpgUnembedded
     embeddedNodes = DL.map (fst) lpgEmbedded
     parentsInLPG = getParentNodes allLPGEdges gn
+
     -- find parents which are embedded in hardware
     parentsInHW = DL.filter (\ x -> locateInPRG prgEdges x /= []) parentsInLPG
     parentsInSW = DL.filter (\ x -> locateInPRG prgEdges x == []) parentsInLPG
     -- All parents in HW : it goes in H/W
     gnEdges
         | parentsInSW == [] = hwDepEdges
-        | parentsInHW == [] =  swDepEdges -- All parents in SW
+        | parentsInHW == [] = swDepEdges -- All parents in SW
         | otherwise = hwDepEdges ++ swDepEdges ++ explicitSWDep
             -- keep HW deps, SW deps, and add explicit dep marking it in SW
             -- Also, this implies that this is an operator node
         where
         hwDepEdges = locateEdgesInPRG prgEdges gn
+        --hwDepEdges = []
         swDepEdges = locateEdgesInLPG allLPGEdges gn
         explicitSWDep = [(gn, getSoftStartNode)]
 
@@ -666,8 +669,12 @@ embeddingV2Step prgEdges (lpgEmbedded, lpgUnembedded)
     -- check if this node is in hardware
     matchingPRGnodes = locateInPRG prgEdges nextV
 
+    newEdges = addHWnode prgEdges (lpgEmbedded, lpgUnembedded) nextV
+
+    {-
     newEdges = if matchingPRGnodes == [] then [] -- in software
         else addHWnode prgEdges (lpgEmbedded, lpgUnembedded) nextV  -- in hardware
+    -}
 
     -- Move the node from unembedded to embedded.
     -- This implies that we move all the edges associated with it.
@@ -677,12 +684,15 @@ embeddingV2Step prgEdges (lpgEmbedded, lpgUnembedded)
 
 embeddingV2Wrapper ::  Node -> Node -> [(Node, Node)]
 embeddingV2Wrapper prg lpg
-    | unEmbedded == []  = embedded
-    | otherwise         = embedded -- error ("Could not embedd all the nodes")
+    | unEmbedded == []  = embedded ++ softImplEdge
+    | otherwise         = error ("Could not embedd all the nodes")
     where
     lpgEdges = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges lpg
     prgEdges = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges prg
-    (embedded, unEmbedded) = embeddingV2Step prgEdges ([], lpgEdges)
+    defaultQueue = getDecNode (NB.ToQueue NB.getDefaultQueue) ""
+        (BinaryNode ([], [])) []
+    softImplEdge =  [((getSoftStartNode), (defaultQueue))]
+    (embedded, unEmbedded) = embeddingV2Step prgEdges ([], (lpgEdges))
 
 
 findEdgesForV :: [(Node, Node)] -> Node -> [(Node, Node)]
