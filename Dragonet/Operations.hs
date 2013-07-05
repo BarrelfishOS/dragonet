@@ -560,6 +560,7 @@ testEmbeddingV2 :: Node -> Node -> [(Node, Node)]
 --testEmbeddingV2 prg lpg = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges prg
 testEmbeddingV2 prg lpg = embeddingV2Wrapper prg lpg
 
+
 -- few deps of next node to embedd [ L2EtherValidType ]  are not embedded "ClassifiedL2Ethernet"
 
 -- Get string label for GNode
@@ -619,6 +620,61 @@ locateEdgesInLPG lpgEdges gn = matchingLPGEdges
 
 getSoftStartNode :: Node
 getSoftStartNode = getDecNode NB.InSoftware "" (BinaryNode ([], [])) []
+
+
+
+-- Get all nodes which don't have any dependencies
+noDepNodes1 :: [(Node, Node)] -> [Node]
+noDepNodes1 depList = nonDep
+    where
+    srcNodes = DL.nub $ DL.map (fst) depList
+    dstNodes = DL.nub $ DL.map (snd) depList
+    nonDep = DL.filter (\ x -> x `DL.notElem` srcNodes ) dstNodes
+
+
+--embeddingV3Step sP sE [] = sE
+embeddingV3Step sP sE sU
+    | sU == [] = sE
+    | sU == sU' = error "U not shrinking"
+    | otherwise = embeddingV3Step sP sE' sU'
+    where
+        eq = nCompPrgLpgV2
+        elem' = isElemBy eq
+        edgeEq (a,b) (c,d) = a `eq` c && b `eq` d
+        union' = L.unionBy edgeEq
+
+        dep n s = [x | (y,x) <- s, y `eq` n]
+        sNodes s = L.nub $ map fst s
+        nodes s = L.nub $ (map fst s ++ map snd s)
+        isSubset :: [Node] -> [Node] -> Bool
+        isSubset sA sB = all (elem' sB) sA
+
+        sL = sE `union'` sU
+        sEv = (nodes sE) ++ noDepNodes1 sL
+        sUv = sNodes sU
+        sPv = nodes sP
+
+        v = head [v' | v' <- sUv, (dep v' sL) `isSubset` sEv]
+        sE' = sE `union'` [(v,y) | y <- dep v sP] `union'`
+                [(x,y) | (x,y) <- sU, x `eq` v && (not $ sPv `elem'` y)]
+        sU' = [(x,y) | (x,y) <- sU, not $ x `eq` v]
+
+embeddingV2Wrapper ::  Node -> Node -> [(Node, Node)]
+embeddingV2Wrapper prg lpg =
+    embeddingV3Step prgEdges [] lpgEdges
+    where
+    lpgEdges = removeDroppedNodes $ getDepEdges lpg
+    prgEdges = removeDroppedNodes $ getDepEdges prg
+    defaultQueue = getDecNode (NB.ToQueue NB.getDefaultQueue) ""
+        (BinaryNode ([], [])) []
+    softImplEdge =  [((getSoftStartNode), (defaultQueue))]
+
+removeDroppedNodes :: [(Node, Node)] -> [(Node, Node)]
+removeDroppedNodes edgeList = DL.filter (\ (x,y) ->
+    not ( (nCompPrgLpg x dnode) ||  (nCompPrgLpg x dnode) ) ) edgeList
+    where
+    dnode = getDropNode
+
 
 
 -- This node can ideally go in hardware, so try to do so
@@ -684,57 +740,20 @@ embeddingV2Step prgEdges (lpgEmbedded, lpgUnembedded)
     lpgEmbedded' =  lpgEmbedded ++ newEdges
 
 
--- Get all nodes which don't have any dependencies
-noDepNodes1 :: [(Node, Node)] -> [Node]
-noDepNodes1 depList = nonDep
+
+embeddingV3Wrapper ::  Node -> Node -> [(Node, Node)]
+embeddingV3Wrapper prg lpg
+    | unemb == [] = emb
+    | otherwise = error "not all nodes embedded"
     where
-    srcNodes = DL.nub $ DL.map (fst) depList
-    dstNodes = DL.nub $ DL.map (snd) depList
-    nonDep = DL.filter (\ x -> x `DL.notElem` srcNodes ) dstNodes
-
-
---embeddingV3Step sP sE [] = sE
-embeddingV3Step sP sE sU
-    | sU == [] = sE
-    | sU == sU' = error "U not shrinking"
-    | otherwise = embeddingV3Step sP sE' sU'
-    where
-        eq = nCompPrgLpgV2
-        elem' = isElemBy eq
-        edgeEq (a,b) (c,d) = a `eq` c && b `eq` d
-        union' = L.unionBy edgeEq
-
-        dep n s = [x | (y,x) <- s, y `eq` n]
-        sNodes s = L.nub $ map fst s
-        nodes s = L.nub $ (map fst s ++ map snd s)
-        isSubset :: [Node] -> [Node] -> Bool
-        isSubset sA sB = all (elem' sB) sA
-
-        sL = sE `union'` sU
-        sEv = (nodes sE) ++ noDepNodes1 sL
-        sUv = sNodes sU
-        sPv = nodes sP
-
-        v = head [v' | v' <- sUv, (dep v' sL) `isSubset` sEv]
-        sE' = sE `union'` [(v,y) | y <- dep v sP] `union'`
-                [(x,y) | (x,y) <- sU, x `eq` v && (not $ sPv `elem'` y)]
-        sU' = [(x,y) | (x,y) <- sU, not $ x `eq` v]
-
-embeddingV2Wrapper ::  Node -> Node -> [(Node, Node)]
-embeddingV2Wrapper prg lpg =
-    embeddingV3Step prgEdges [] lpgEdges
-    where
+    (emb, unemb) = embeddingV2Step prgEdges ([], lpgEdges)
     lpgEdges = removeDroppedNodes $ getDepEdges lpg
     prgEdges = removeDroppedNodes $ getDepEdges prg
     defaultQueue = getDecNode (NB.ToQueue NB.getDefaultQueue) ""
         (BinaryNode ([], [])) []
     softImplEdge =  [((getSoftStartNode), (defaultQueue))]
 
-removeDroppedNodes :: [(Node, Node)] -> [(Node, Node)]
-removeDroppedNodes edgeList = DL.filter (\ (x,y) ->
-    not ( (nCompPrgLpg x dnode) ||  (nCompPrgLpg x dnode) ) ) edgeList
-    where
-    dnode = getDropNode
+
 
 
 findEdgesForV :: [(Node, Node)] -> Node -> [(Node, Node)]

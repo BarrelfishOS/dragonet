@@ -103,6 +103,7 @@ instance Show Filter where
         ++ "_" ++ show sip ++ "_" ++ show dip  ++ "_" ++ show sp  ++ "_"
         ++ show dp
 
+
 getDefaultBasicQueue :: BasicQueue
 getDefaultBasicQueue = BasicQueue 5
 
@@ -240,8 +241,9 @@ data TupleSelector = TupleSelector {
    } deriving (Eq)
 
 instance Show TupleSelector where
-    show (TupleSelector t1 t2 t3 t4 t5) = show t1 ++ " " ++ show t2 ++ " "
-        ++ show t3 ++ " " ++ show t4 ++ " " ++ show t5
+--    show (TupleSelector t1 t2 t3 t4 t5) = show t1 ++ " " ++ show t2 ++ " "
+--        ++ show t3 ++ " " ++ show t4 ++ " " ++ show t5
+    show (TupleSelector t1 t2 t3 t4 t5) = ""
 
 data BitMaskSelecter = BitMaskSelecter {
    bitPosition :: [Integer] -- FIXME: This should be fixed size list

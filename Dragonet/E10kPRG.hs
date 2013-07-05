@@ -12,6 +12,7 @@ module E10kPRG(
     , getE1kPRG
     , getE1kPRGSmall
     , getTestcaseConfiguration
+    , getTestcaseConfigurationSmall
 ) where
 
 import qualified Data.List as DL
@@ -27,6 +28,30 @@ getE1kPRGminimal = etherClassified
     where
     etherClassified = OP.getDecNode NB.ClassifiedL2Ethernet "PF"
         (OP.BinaryNode ( [], [])) []
+
+
+getTestcaseConfigurationSmall :: [OP.ConfWrapperType]
+getTestcaseConfigurationSmall = [
+        (NB.L3IPv4ValidChecksum, pf1, True)
+        , ((NB.FiveTupleFilter ts1 q1), pf1, True)
+        , ((NB.FiveTupleFilter ts2 q2), pf1, True)
+        , ((NB.HashFilter ts3 q3), pf1, True)
+    ]
+
+    where
+    pf1 = "PF"
+    vf1 = "VF1"
+    vf2 = "VF2"
+
+    ts1 = NB.TupleSelector 2 2 2 2 4
+    ts2 = NB.TupleSelector 6 3 1 4 2
+    ts3 = NB.TupleSelector 5 7 28 13 9
+
+    q1 = NB.Queue 1 1 NB.getDefaultBasicQueue
+    q2 = NB.Queue 2 2 NB.getDefaultBasicQueue
+    q3 = NB.Queue 3 3 NB.getDefaultBasicQueue
+    q0 = NB.Queue 0 0 NB.getDefaultBasicQueue
+
 
 
 getTestcaseConfiguration :: [OP.ConfWrapperType]
@@ -71,15 +96,9 @@ getE1kPRGSmall = etherClassified
     dropnode = OP.getDropNode
     etherClassified = OP.getDecNode NB.ClassifiedL2Ethernet tagname
         (OP.BinaryNode (
-            [etherValidLen],
+            [etherCRCconf ],
             [dropnode]))
         [(NB.DesAttribute (NB.NeedAdaptor True))]
-
-    etherValidLen = OP.getDecNode NB.L2EtherValidLen tagname
-        (OP.BinaryNode (
-            [etherCRCconf],
-            [dropnode]))
-        []
 
     etherCRCconf = OP.getConfNode (MB.Just NB.L2EtherValidCRC) tagname
         (OP.BinaryNode (
@@ -100,12 +119,36 @@ getE1kPRGSmall = etherClassified
 
     opORL2EtherValidDest = OP.getOperatorNode NB.OR "L2ValidDest" tagname
         (OP.BinaryNode (
-            [queue0],
+            [confSynFilter],
             [dropnode]))
+
+    -- Support for sync filters
+    confSynFilter = toGenFilter (NB.SyncFilter q1) queue1 [conf5TupleFilter1] tagname
+
+    ts1 = NB.TupleSelector 0 0 0 0 0
+    ts2 = NB.TupleSelector 0 0 0 0 0
+    ts3 = NB.TupleSelector 0 0 0 0 0
+
+    conf5TupleFilter1 = toGenFilter (NB.FiveTupleFilter ts1 q1) queue1 [confhashFilter] tagname
+
+    confhashFilter = toGenFilter (NB.HashFilter ts3  q3) queue3 [queue0] tagname
+
+    q1 = NB.Queue 1 1 NB.getDefaultBasicQueue
+    queue1 = OP.getDecNode (NB.ToQueue q1) tagname
+        (OP.BinaryNode ([], [])) []
+
+    q2 = NB.Queue 2 2 NB.getDefaultBasicQueue
+    queue2 = OP.getDecNode (NB.ToQueue q2) tagname
+        (OP.BinaryNode ([], [])) []
+
+    q3 = NB.Queue 3 3 NB.getDefaultBasicQueue
+    queue3 = OP.getDecNode (NB.ToQueue q3) tagname
+        (OP.BinaryNode ( [], [])) []
 
     q0 = NB.Queue 0 0 NB.getDefaultBasicQueue
     queue0 = OP.getDecNode (NB.ToQueue q0) tagname
         (OP.BinaryNode ( [], [])) []
+
 
 
 
