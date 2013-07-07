@@ -2,7 +2,7 @@
 all: models
 
 dragonet_compile: Dragonet.hs base
-	ghc -rtsopts Dragonet.hs -o Dragonet -Wall # -Werror
+	ghc -rtsopts Dragonet.hs -o Dragonet -Wall -fno-warn-unused-binds # -Werror
 
 dragonet: dragonet_compile
 	./Dragonet

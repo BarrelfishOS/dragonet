@@ -81,8 +81,8 @@ data Queue = Queue {
     } deriving (Eq, Ord)
 
 instance Show Queue where
-   -- show (Queue qid coreid _) = show qid ++ " core " ++ show coreid
-    show (Queue qid coreid _) = "" -- show qid ++ " core " ++ show coreid
+    show (Queue qid coreid _) = show qid ++ " core " ++ show coreid
+--    show (Queue qid coreid _) = "" -- show qid ++ " core " ++ show coreid
 
 instance ConfigCompare Queue where
     confCompare q1 q2 = queueId q1 == queueId q2
@@ -242,9 +242,9 @@ data TupleSelector = TupleSelector {
    } deriving (Eq)
 
 instance Show TupleSelector where
---    show (TupleSelector t1 t2 t3 t4 t5) = show t1 ++ " " ++ show t2 ++ " "
---        ++ show t3 ++ " " ++ show t4 ++ " " ++ show t5
-    show (TupleSelector t1 t2 t3 t4 t5) = ""
+    show (TupleSelector t1 t2 t3 t4 t5) = show t1 ++ " " ++ show t2 ++ " "
+        ++ show t3 ++ " " ++ show t4 ++ " " ++ show t5
+--    show (TupleSelector t1 t2 t3 t4 t5) = ""
 
 data BitMaskSelecter = BitMaskSelecter {
    bitPosition :: [Integer] -- FIXME: This should be fixed size list

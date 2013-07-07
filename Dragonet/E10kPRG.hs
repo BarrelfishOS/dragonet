@@ -96,9 +96,17 @@ getE1kPRGSmall = etherClassified
     dropnode = OP.getDropNode
     etherClassified = OP.getDecNode NB.ClassifiedL2Ethernet tagname
         (OP.BinaryNode (
-            [etherCRCconf ],
+            [etherValidType],
             [dropnode]))
-        [(NB.DesAttribute (NB.NeedAdaptor True))]
+        []
+
+    etherValidType = OP.getDecNode NB.L2EtherValidType tagname
+        (OP.BinaryNode (
+            [etherCRCconf],
+            [dropnode]))
+        []
+
+
 
     etherCRCconf = OP.getConfNode (MB.Just NB.L2EtherValidCRC) tagname
         (OP.BinaryNode (
