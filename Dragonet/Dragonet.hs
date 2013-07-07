@@ -18,6 +18,7 @@ import qualified Operations as OP
 import qualified NetworkProcessing as NP
 import qualified E10kPRG as E10k
 import qualified DotGenerator as DG
+import qualified Embedding as EM
 
 testOp :: IO ()
 testOp =
@@ -65,34 +66,6 @@ testE10kConfig =
         fileName = "E10kConfig.dot"
         tree' = OP.applyConfigWrapperList E10k.getE1kPRG E10k.getTestcaseConfiguration
 
-testE10kEmbedding :: IO ()
-testE10kEmbedding =
-        do
-        putStrLn "Applying embedding to configured E10kPRG"
-        writeFile fileName $ DG.toDot tree'
-        putStrLn ("Generated " ++ fileName)
---        putStrLn "common nodes are"
---        putStrLn commonNodes
-        putStrLn "Done..."
-        where
-        fileName = "LPGembedded.dot"
-        prg = OP.applyConfigWrapperList E10k.getE1kPRG E10k.getTestcaseConfiguration
-        lpg = NP.getNetworkDependency
-        tree' = OP.embeddGraphs prg lpg
-
-testConfEmbedding :: IO ()
-testConfEmbedding =
-        do
-        putStrLn "Generating minimal configuration for PRG"
-        --writeFile fileName $ DG.toDot tree'
-        --putStrLn ("Generated " ++ fileName)
-        putStrLn output
-        putStrLn "Done..."
-        where
-        output = OP.testGenConf E10k.getE1kPRG
-        -- fileName = "E10kConfig.dot"
-        -- tree' = OP.applyConfigWrapperList E10k.getE1kPRG E10k.getTestcaseConfiguration
-
 testEmbeddingLarge :: IO ()
 testEmbeddingLarge =
         do
@@ -116,13 +89,13 @@ testEmbeddingLarge =
         prgUnconf = E10k.getE1kPRG
         prg = OP.applyConfigWrapperList prgUnconf E10k.getTestcaseConfiguration
 
-        prgDep = OP.removeDroppedNodes $ OP.getDepEdges prg
-        prgEdges = OP.testEmbeddingSTR prg
-        lpgEdges = OP.testEmbeddingSTR lpg
+        prgDep = EM.removeDroppedNodes $ EM.getDepEdges prg
+        prgEdges = EM.testEmbeddingSTR prg
+        lpgEdges = EM.testEmbeddingSTR lpg
         lpg = NP.getNetworkDependency
-        lpgDep = OP.removeDroppedNodes $ OP.getDepEdges lpg
+        lpgDep = EM.removeDroppedNodes $ EM.getDepEdges lpg
 
-        embedded = OP.testEmbeddingV2 prg lpg
+        embedded = EM.testEmbeddingV2 prg lpg
 
 
 testEmbeddingSmall :: IO ()
@@ -146,12 +119,12 @@ testEmbeddingSmall =
         prgUnconf = E10k.getE1kPRGSmall
         prg = OP.applyConfigWrapperList prgUnconf E10k.getTestcaseConfiguration
 
-        prgDep = OP.removeDroppedNodes $ OP.getDepEdges prg
-        prgEdges = OP.testEmbeddingSTR prg
-        lpgEdges = OP.testEmbeddingSTR lpg
+        prgDep = EM.removeDroppedNodes $ EM.getDepEdges prg
+        prgEdges = EM.testEmbeddingSTR prg
+        lpgEdges = EM.testEmbeddingSTR lpg
         lpg = NP.getNetworkDependencySmall
-        lpgDep = OP.removeDroppedNodes $ OP.getDepEdges lpg
-        embedded = OP.testEmbeddingV2 prg lpg
+        lpgDep = EM.removeDroppedNodes $ EM.getDepEdges lpg
+        embedded = EM.testEmbeddingV2 prg lpg
 
 
 
@@ -161,14 +134,12 @@ allTests =
     testNetworkProcessing
     testE10k
     testE10kConfig
-    testE10kEmbedding
 
 main :: IO()
 --main = testOp
 --main = testE10k
 --main = testNetworkProcessing
 --main = allTests
---main = testConfEmbedding
 --main = testEmbeddingV2
 --main = testEmbeddingSmall
 main = testEmbeddingLarge

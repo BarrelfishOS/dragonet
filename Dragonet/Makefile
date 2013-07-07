@@ -10,7 +10,7 @@ dragonet: dragonet_compile
 models: dragonet
 	./convertDot.sh
 
-base: Makefile NetBasics.hs Operations.hs NetworkProcessing.hs E10kPRG.hs Dragonet.hs DotGenerator.hs
+base: Makefile NetBasics.hs Operations.hs NetworkProcessing.hs E10kPRG.hs Dragonet.hs DotGenerator.hs Embedding.hs
 
 clean:
 	rm -f *.hi *.o Dragonet
