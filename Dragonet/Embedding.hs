@@ -280,7 +280,8 @@ embeddingV2Step swStartNode prgEdges prgFn ((embedHW, embedSW), lpgUnembedded)
     -- Find dep edges which should go in SW
     --     that is: edges in LPG with vNext as src and all the children nodes
     --                  which are not in HW
-    edgesInSW = DL.filter (\ (x, y) -> x == vNext && DL.notElem y dInHW) depEdges
+--    edgesInSW = DL.filter (\ (x, y) -> x == vNext && DL.notElem y dInHW) depEdges
+    edgesInSW = DL.filter (\ (x, y) -> x == vNext) depEdges
 
     -- Explicit dep on InSoft
     explicitSWDep = [(vNext, swStartNode)]
