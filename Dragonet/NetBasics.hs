@@ -195,8 +195,8 @@ data NetOperation = ClassifiedL2Ethernet -- Ethernet starter node
         | L4TCPUpdateProtoState -- Updates the protocol state in machine
         | VerifiedL4TCP
         | L4ReadyToClassify
-        | UnclasifiedL4
-        | ClasifiedL4
+        | UnclassifiedL4
+        | ClassifiedL4
         | VerifiedL4
         | ReqBufDescregister -- BufDesc
         | VerifyBufDesc
@@ -313,10 +313,13 @@ instance ConfigCompare ConfLabel where
 instance GraphLabel ConfLabel where
     graphLabelStr (ConfLabel cl) = replaceSpaces $ "Conf" ++ (drop 4 $ show cl)
 
-data OpLabel = OpLabel NetOperator String
-    deriving (Show, Eq)
+data OpLabel = OpLabel {
+    netOP   :: NetOperator
+    , labOP :: NetOperation
+    } deriving (Show, Eq)
+
 instance GraphLabel OpLabel where
-    graphLabelStr (OpLabel no s) = replaceSpaces $ ((show no) ++ ":" ++ s)
+    graphLabelStr (OpLabel no l) = replaceSpaces $ ((show no) ++ ":" ++ show l)
 
 
 data DesAttribute = DesAttribute Attribute

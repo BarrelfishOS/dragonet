@@ -58,12 +58,12 @@ getEthernetProcessingLPG classified verified dropnode = etherClassified
             [opANDverifiedEthernet],
             [opANDverifiedEthernet])) []
 
-    opORL2validDest = OP.getOperatorNode NB.OR "L2ValidDestination" ""
+    opORL2validDest = OP.getOperatorNode NB.OR NB.L2EtherValidDest ""
         (OP.BinaryNode (
             [opANDverifiedEthernet],
             [opANDverifiedEthernet]))
 
-    opANDverifiedEthernet = OP.getOperatorNode NB.AND "L2Verified" "" verified
+    opANDverifiedEthernet = OP.getOperatorNode NB.AND NB.VerifiedL2 "" verified
 
     etherValidType = OP.getDecNode NB.L2EtherValidType "PF" classified  []
 
@@ -85,7 +85,7 @@ getNetworkDependencySmall = etherClassified
             [opANDL5ToKernel],
             [opANDL5ToKernel]) ) []
 
-    opANDL5ToKernel = OP.getOperatorNode NB.AND "ToDefaultKernelProcessing" ""
+    opANDL5ToKernel = OP.getOperatorNode NB.AND NB.ToDefaultKernelProcessing ""
         (OP.BinaryNode ([], []))
 
 
@@ -123,18 +123,18 @@ getNetworkDependency = etherClassified
             [verifiedL3]))
 
     (classifyIPv4, verifiedL3IPv4) = getProtoProcessing NB.ClassifiedL3IPv4
-        (NB.L3IPv4ValidProtocol, toClassifiedL3) "VerifiedL3IPv4"
+        (NB.L3IPv4ValidProtocol, toClassifiedL3) NB.VerifiedL3IPv4
         toL3Verified dropnode toVerifyIPv4
 
     (classifyIPv6, verifiedL3IPv6) = getProtoProcessing NB.ClassifiedL3IPv6
-        (NB.L3IPv6ValidProtocol, toClassifiedL3) "VerifiedL3IPv6"
+        (NB.L3IPv6ValidProtocol, toClassifiedL3) NB.VerifiedL3IPv6
         toL3Verified dropnode toVerifyIPv6
 
-    classifiedL3 = OP.getOperatorNode NB.OR "IPL3Classify" ""
+    classifiedL3 = OP.getOperatorNode NB.OR NB.ClassifiedL3 ""
         (OP.BinaryNode (
             [classifiedUDP, classifiedTCP], []))
 
-    verifiedL3 = OP.getOperatorNode NB.OR "IPL3verify" ""
+    verifiedL3 = OP.getOperatorNode NB.OR NB.VerifiedL3 ""
         (OP.BinaryNode (
             [verifidTCP, verifidUDP],
             [verifidTCP, verifidUDP]))
@@ -152,12 +152,12 @@ getNetworkDependency = etherClassified
 
 
     (classifiedUDP, verifidUDP) = getProtoProcessingV2 NB.ClassifiedL4UDP
-        toL4readyToClassify "VerifiedL4UDP" toL4Verified toVerifyUDP
+        toL4readyToClassify NB.VerifiedL4UDP toL4Verified toVerifyUDP
 
     (classifiedTCP, verifidTCP) = getProtoProcessingV2 NB.ClassifiedL4TCP
-        toL4readyToClassify "VerifiedL4TCP" toL4Verified toVerifyTCP
+        toL4readyToClassify NB.VerifiedL4TCP toL4Verified toVerifyTCP
 
-    opORL4readyToClassify = OP.getOperatorNode NB.OR "L4classified" ""
+    opORL4readyToClassify = OP.getOperatorNode NB.OR NB.ClassifiedL4 ""
         (OP.BinaryNode (
             [queue0],
             [dropnode]))
@@ -176,10 +176,10 @@ getNetworkDependency = etherClassified
             [opORL4Verified],
             [opORL4Verified]))
 
-    opANDL5ToKernel = OP.getOperatorNode NB.AND "ToDefaultKernelProcessing" ""
+    opANDL5ToKernel = OP.getOperatorNode NB.AND NB.ToDefaultKernelProcessing ""
         (OP.BinaryNode ([], []))
 
-    opORL4Verified = OP.getOperatorNode NB.OR "L4verified" ""
+    opORL4Verified = OP.getOperatorNode NB.OR NB.VerifiedL4 ""
         (OP.BinaryNode (
             [opANDL5ToKernel],
             [opANDL5ToKernel]))
@@ -191,7 +191,7 @@ getNetworkDependency = etherClassified
  - the notation
  -}
 getProtoProcessing :: NB.NetOperation -> (NB.NetOperation, OP.NodeEdges) ->
-    String -> OP.NodeEdges -> OP.Node -> [NB.NetOperation] -> (OP.Node, OP.Node)
+    NB.NetOperation -> OP.NodeEdges -> OP.Node -> [NB.NetOperation] -> (OP.Node, OP.Node)
 getProtoProcessing startNodeLabel (classifiedLabel, classifiedForward)
    verifiedLabel verifiedForward dropnode toVerify = (protoClassified, opANDverified)
     where
@@ -205,7 +205,7 @@ getProtoProcessing startNodeLabel (classifiedLabel, classifiedForward)
         (OP.BinaryNode (trueList ++ [validProto], [dropnode])) []
 
 
-getProtoProcessingV2 :: NB.NetOperation -> OP.NodeEdges -> String ->
+getProtoProcessingV2 :: NB.NetOperation -> OP.NodeEdges -> NB.NetOperation ->
     OP.NodeEdges -> [NB.NetOperation] -> (OP.Node, OP.Node)
 getProtoProcessingV2 startNodeLabel classifiedForward
     verifiedLabel verifiedForward toVerify = (protoClassified, opANDverified)

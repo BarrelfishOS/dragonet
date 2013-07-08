@@ -32,6 +32,8 @@ module Operations(
     , updateNodeEdges
     , applyConfigWrapperList
     , ConfWrapperType
+    , getDesOnlyAttributes
+    , getNodeAttributes
 
 ) where
 
@@ -298,7 +300,8 @@ getDecNode op tag edges attrs = Des $ Decision GNode {
         , gImplementation = []
     }
 
-getOperatorNode :: NB.NetOperator -> String -> TagType -> NodeEdges -> Node
+getOperatorNode :: NB.NetOperator -> NB.NetOperation -> TagType
+    -> NodeEdges -> Node
 getOperatorNode op label tag edges = Opr $ Operator GNode {
         gLabel = (NB.OpLabel op label)
         , gTag = tag
@@ -363,7 +366,7 @@ appendToFalse orig toAdd = case getNodeEdges orig of
 
 
 testGetOperatorOp :: Node
-testGetOperatorOp = getOperatorNode NB.AND "testOp" "+" (NaryNode [])
+testGetOperatorOp = getOperatorNode NB.AND NB.ClassifiedL2Ethernet "+" (BinaryNode ([], []))
 
 testGetDecElem :: Node
 testGetDecElem = getDecNode NB.ClassifiedL2Ethernet "test" (NaryNode []) []
