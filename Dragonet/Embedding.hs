@@ -14,6 +14,7 @@ module Embedding(
 
 
 import qualified Data.List as L
+import qualified Data.Set as S
 import qualified Data.Maybe as MB
 import qualified Data.List as DL
 
@@ -176,43 +177,73 @@ getAllDeps graphEdges gn = deps ++ indirectDeps
 --      Node based version
 ----------------------------------------------------------------
 
+
+mkEdge a b = (a,b)
+edgeStart = fst
+edgeEnd = snd
+nodesSet s = (S.map edgeStart s) `S.union` (S.map edgeEnd s)
+inEdges n s = S.filter (\(x,y) -> n == y) s
+outEdges n s = S.filter (\(x,y) -> n == x) s
+outNeighbours n s = S.map edgeEnd $ outEdges n s
+
 --embeddingV3Step sP sE [] = sE
-embeddingV3Step sP sE sU
-    | sU == [] = sE
-    | sU == sU' = error "U not shrinking"
-    | otherwise = embeddingV3Step sP sE' sU'
+--embeddingV3Step :: ((Show a), (Ord a)) => S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a)
+embeddingV3Step sP (sE,sEv) (sU,sUv)
+    | S.null sU = sE
+    | sEv == sEv' = error "E not changing"
+    | otherwise = embeddingV3Step sP (sE',sEv') (sU',sUv')
     where
-        eq = nCompPrgLpgV2
-        elem' = isElemBy eq
-        edgeEq (a,b) (c,d) = a `eq` c && b `eq` d
-        union' = L.unionBy edgeEq
+        sPv = nodesSet sP
 
-        dep n s = [x | (y,x) <- s, y `eq` n]
-        sNodes s = L.nub $ map fst s
-        nodes s = L.nub $ (map fst s ++ map snd s)
-        isSubset :: [Node] -> [Node] -> Bool
-        isSubset sA sB = all (elem' sB) sA
+        -- Find dependencies of specified node in LPG and PRG
+        deps n = (outNeighbours n sE) `S.union` (outNeighbours n sP)
 
-        sL = sE `union'` sU
-        sEv = (nodes sE) ++ noDepNodes1 sL
-        sUv = sNodes sU
-        sPv = nodes sP
+        -- Find a node whose dependencies are already embedded
+        v = S.findMin $ S.filter (flip S.isSubsetOf sEv . deps) sUv
 
-        v = head [v' | v' <- sUv, (dep v' sL) `isSubset` sEv]
-        sE' = sE `union'` [(v,y) | y <- dep v sP] `union'`
-                [(x,y) | (x,y) <- sU, x `eq` v && (not $ sPv `elem'` y)]
-        sU' = [(x,y) | (x,y) <- sU, not $ x `eq` v]
+        -- v's dependencies from PRG
+        sEprg = S.map (mkEdge v) $ outNeighbours v sP
+        -- v's dependencies from LPG
+        sElpg = S.filter (flip S.notMember sPv . edgeEnd) $ outEdges v sU
+
+        sE' = sE `S.union` sEprg `S.union` sElpg
+        -- remove edges starting from v in 
+        sU' = sU S.\\ (outEdges v sU)
+
+        -- Move vertex from E to U
+        sEv' = S.insert v sEv
+        sUv' = S.delete v sUv
 
 
-embeddingV2Wrapper ::  Node -> Node -> [(Node, Node)]
-embeddingV2Wrapper prg lpg =
-    embeddingV3Step prgEdges [] lpgEdges
+-- Takes Nodes, converts them into String, applies the embedding algorithm
+--      convert back the results into Node format
+embeddingV3Wrapper ::  Node -> Node -> [(Node, Node)]
+embeddingV3Wrapper prg lpg =
+    result ++ softImplEdge
     where
-    lpgEdges = removeDroppedNodes $ getDepEdges lpg
-    prgEdges = removeDroppedNodes $ getDepEdges prg
+    result = convert $ embeddingV3Step prgEdges (S.empty,S.empty) (lpgEdges, allNodesSet)
+
+    allNodesSet = (nodesSet lpgEdges) `S.union` (nodesSet prgEdges)
+    prgNodes = DL.nub $ nTreeNodes prg
+    prgEmulatedNodes = DL.map (nodeDefinition) $
+        DL.filter (isNodeEmbebible) prgNodes
+
+
+
+    nodeList = DL.nub (nTreeNodes lpg  ++ prgNodes ++ [swStartNode])
+    convert n = map (\ x -> convertEdgeToNode nodeList x) $ S.toList n
+    swStartNode = getSoftStartNode
+    swStartNode1 = nodeDefinition swStartNode
+
+    lpgEdges = S.fromList $ DL.map convertEdge $ removeDroppedNodes
+            $ DL.reverse $ topoSortEdges $ getDepEdges lpg
+    prgEdges = S.fromList $ DL.map convertEdge $ removeDroppedNodes
+            $ DL.reverse $ topoSortEdges $ getDepEdges prg
     defaultQueue = getDecNode (NB.ToQueue NB.getDefaultQueue) ""
         (BinaryNode ([], [])) []
-    softImplEdge =  [((getSoftStartNode), (defaultQueue))]
+    softImplEdge =  [((swStartNode), (defaultQueue))]
+
+
 
 removeDroppedNodes :: [(Node, Node)] -> [(Node, Node)]
 removeDroppedNodes edgeList = DL.filter (\ (x,y) ->
@@ -402,8 +433,8 @@ isNodeEmbebible n
 
 -- Takes Nodes, converts them into String, applies the embedding algorithm
 --      convert back the results into Node format
-embeddingV3Wrapper ::  Node -> Node -> [(Node, Node)]
-embeddingV3Wrapper prg lpg
+embeddingV2Wrapper ::  Node -> Node -> [(Node, Node)]
+embeddingV2Wrapper prg lpg
     | unemb == [] = TR.trace ("\n\n\nDone with embedding "
             ++ "\nIn HW {{{\n" ++ ((DL.concatMap showEdgeGen (DL.nub embHW)))
             ++ "}}}\n\nIn SW {{{\n" ++ ((DL.concatMap showEdgeGen (DL.nub embSW)))
