@@ -8,6 +8,8 @@ module DragonetDSL(
 
 import System.IO
 
+import qualified Debug.Trace as T
+
 import Text.ParserCombinators.Parsec as Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Pos
@@ -142,7 +144,7 @@ lexer = P.makeTokenParser P.LanguageDef {
     P.identLetter = Parsec.alphaNum <|> Parsec.char '_',
     P.opStart = Parsec.oneOf "",
     P.opLetter = Parsec.oneOf "",
-    P.reservedNames = ["node", "boolean", "and", "or", "port"],
+    P.reservedNames = ["cluster", "node", "boolean", "and", "or", "port"],
     P.reservedOpNames = [],
     P.caseSensitive = True }
     
@@ -153,25 +155,41 @@ braces = P.braces lexer
 brackets = P.brackets lexer
 reserved = P.reserved lexer
 
-port = do
+
+globalIdentifier p = do
+    char '.'
+    if null p then
+        unexpected "Invalid cluster reference (too many .)"
+    else do
+        n <- cIdentifier $ tail p
+        return $ n
+
+localIdentifier p = do
+    n <- identifier
+    return $ (concat $ reverse p) ++ n
+
+cIdentifier p = globalIdentifier p <|> localIdentifier p
+--cIdentifier p = T.trace ("cIdentifier " ++ (show p)) (cIdentifierRec p)
+
+port p = do
     reserved "port"
     ns <- many $ identifier
-    ds <- brackets $ many identifier
+    ds <- brackets $ many $ cIdentifier p
     return (ports ns ds)
     where
         port ds n = Port n ds
         ports ns ds = map (port ds) ns
 
-node = do
+node p = do
     reserved "node"
-    n <- identifier
-    ps <- braces $ many port
-    return (Node n (concat ps))
+    n <- cIdentifier p
+    ps <- braces $ many $ port p
+    return [(Node n (concat ps))]
 
-genBoolean name = do
+genBoolean p name = do
     reserved name
-    n <- identifier
-    ps <- braces $ many port
+    n <- cIdentifier p
+    ps <- braces $ many $ port p
     if (length (concat ps)) /= 2 then
         unexpected "Unexpected number of ports in boolean node, expect exactly 2"
     else
@@ -189,20 +207,31 @@ genBoolean name = do
         truePort = findPort "true"
         falsePort = findPort "false"
 
-boolean = do
-    (n, t, f) <- genBoolean "boolean"
-    return (Boolean n t f)
+boolean p = do
+    (n, t, f) <- genBoolean p "boolean"
+    return [(Boolean n t f)]
         
-orN = do
-    (n, t, f) <- genBoolean "or"
-    return (Or n t f)
+orN p = do
+    (n, t, f) <- genBoolean p "or"
+    return [(Or n t f)]
 
-andN = do
-    (n, t, f) <- genBoolean "and"
-    return (And n t f)
+andN p = do
+    (n, t, f) <- genBoolean p "and"
+    return [(And n t f)]
   
+cluster p = do
+    reserved "cluster"
+    n <- identifier
+    ns <- braces $ clusteredNodes (n:p)
+    return ns
+
+clusteredNodes p = do
+    ns <- many (node p <|> boolean p <|> orN p <|> andN p <|> cluster p)
+    return $ concat ns
+    
+
 graph = do
-    ns <- many (node <|> boolean <|> orN <|> andN)
+    ns <- clusteredNodes []
     eof
     return ns
 
