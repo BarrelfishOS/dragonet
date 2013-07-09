@@ -86,6 +86,14 @@ getIncompletePRGNodeattr = [
         , NB.DesAttribute (NB.NeedAdaptor True)
     ]
 
+getIncompletePRGNodeattrOP :: [NB.OpAttribute]
+getIncompletePRGNodeattrOP = [
+        NB.OpAttribute (NB.InSoft True)
+        , NB.OpAttribute (NB.ResultSaved False)
+        , NB.OpAttribute (NB.NeedAdaptor True)
+    ]
+
+
 
 -- Get the datatype for E10k
 getE1kPRGSmall :: OP.Node
@@ -128,7 +136,7 @@ getE1kPRGSmall = etherClassified
     opORL2EtherValidDest = OP.getOperatorNode NB.OR NB.L2EtherValidDest tagname
         (OP.BinaryNode (
             [confSynFilter],
-            [dropnode]))
+            [dropnode])) []
 
     -- Support for sync filters
     confSynFilter = toGenFilter (NB.SyncFilter q1) queue1 [conf5TupleFilter1] tagname
@@ -200,7 +208,7 @@ getE1kPRG = etherClassified
     opORL2EtherValidDest = OP.getOperatorNode NB.OR NB.L2EtherValidDest tagname
         (OP.BinaryNode (
             [etherValidType],
-            [dropnode]))
+            [dropnode])) []
 
     etherValidType = OP.getDecNode NB.L2EtherValidType tagname
         (OP.BinaryNode (
@@ -247,6 +255,7 @@ getE1kPRG = etherClassified
         (OP.BinaryNode (
             [classifiedUDP, classifiedTCP, classifiedICMP, unclassfiedL4],
             [dropnode]))
+        getIncompletePRGNodeattrOP
 
 
     classifiedUDP = OP.getDecNode NB.ClassifiedL4UDP tagname
@@ -279,6 +288,7 @@ getE1kPRG = etherClassified
 --            [genFilter] ++ fList,
             [confSynFilter],
             [dropnode]))
+            getIncompletePRGNodeattrOP
 
     -- Support for sync filters
     confSynFilter = toGenFilter (NB.SyncFilter q1) queue1 [conf5TupleFilter1] tagname

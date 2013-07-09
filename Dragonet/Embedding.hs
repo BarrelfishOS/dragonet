@@ -273,8 +273,11 @@ embeddingV2Step swStartNode prgEdges prgFn ((embedHW, embedSW), lpgUnembedded)
     -- Find dep edges which should go in SW
     --     that is: edges in LPG with vNext as src and all the children nodes
     --                  which are not in HW
---    edgesInSW = DL.filter (\ (x, y) -> x == vNext && DL.notElem y dInHW) depEdges
-    edgesInSW = DL.filter (\ (x, y) -> x == vNext) depEdges
+
+    -- Selection if you want all edges, or only those edges which are going
+    --  to node "InSoftware"
+    edgesInSW = DL.filter (\ (x, y) -> x == vNext && DL.notElem y dInHW) depEdges
+    -- edgesInSW = DL.filter (\ (x, y) -> x == vNext) depEdges
 
     -- Explicit dep on InSoft
     explicitSWDep = [(vNext, swStartNode)]
@@ -353,6 +356,26 @@ removeNode edgesG v = edgesG''
                 else [(x, y)]) edgesG'
 
 
+--
+-- remove all the nodes which are marked for sw execution
+--      prgFn is function which tells if given node a is software node or not
+removeSWnodePRG :: (Eq a) => (Show a) => [(a, a)] -> (a -> Bool)
+    -> ([(a, a)], [a])
+removeSWnodePRG prgEdges prgFn = (prgEdges', trueV)
+    where
+
+    -- Find all the nodes
+    allV = getALLNodes prgEdges
+
+    -- Find set of nodes which should go in SW
+    trueV = DL.filter (prgFn) allV -- goes in software
+
+    -- Delete these nodes from PRG
+    prgEdges' =
+        TR.trace ("nodes in HW " ++ show trueV)
+        DL.foldl (\ acc x -> removeNode acc x) prgEdges trueV
+
+
 -- classify given edges based on some condition specified by function fn
 classifyDeps :: (Eq a) => [(a, a)] -> (a -> Bool) -> ([(a, a)], [(a, a)])
 classifyDeps graphEdges fn = (trueEdges, falseEdges)
@@ -395,6 +418,8 @@ embeddingV3Wrapper prg lpg
 
 
 
+
+
     nodeList = DL.nub (nTreeNodes lpg  ++ prgNodes ++ [swStartNode])
     emb'' = embHW' ++ embSW' ++ softImplEdge
     embHW' = DL.map (\ x -> convertEdgeToNode nodeList x) $ DL.nub embHW
@@ -402,13 +427,17 @@ embeddingV3Wrapper prg lpg
     embSW' = DL.map (\ x -> convertEdgeToNode nodeList x) $ DL.nub embSW
     swStartNode = getSoftStartNode
     swStartNode1 = nodeDefinition swStartNode
-    ((embHW, embSW), unemb) = embeddingV2Step swStartNode1 prgEdges
+    ((embHW, embSW), unemb) = embeddingV2Step swStartNode1 prgHWedges -- prgEdges
         (isPRGNodeEmulated prgEmulatedNodes)  (([], []), lpgEdges)
     --emb = DL.nub (embHW ++ embSW)
     lpgEdges = DL.nub $ DL.map convertEdge $ removeDroppedNodes
             $ DL.reverse $ topoSortEdges $ getDepEdges lpg
     prgEdges = DL.nub $ DL.map convertEdge $ removeDroppedNodes
             $ DL.reverse $ topoSortEdges $ getDepEdges prg
+
+    (prgHWedges, prgSWnodes) = removeSWnodePRG prgEdges
+                                (isPRGNodeEmulated prgEmulatedNodes)
+
     defaultQueue = getDecNode (NB.ToQueue NB.getDefaultQueue) ""
         (BinaryNode ([], [])) []
     softImplEdge =  [((swStartNode), (defaultQueue))]
@@ -452,7 +481,9 @@ testEmbeddingSTR graph = text
                 DL.reverse $ topoSortEdges $ getDepEdges graph
 
     (lastNode, _) = DL.last prgEdges
-    edgesSTR = rearrangePRG prgEdges (isPRGNodeEmulated prgEmulatedNodes) lastNode
+--    edgesSTR = rearrangePRG prgEdges (isPRGNodeEmulated prgEmulatedNodes) lastNode
+    (edgesSTR, swNodes) = removeSWnodePRG prgEdges (isPRGNodeEmulated prgEmulatedNodes)
+
     finalEdges = DL.map (\ x -> convertEdgeToNode nodeList x) $ DL.nub edgesSTR
 
     text = DL.concatMap showEdgeGen edgesSTR
@@ -477,7 +508,8 @@ testPRGrearrangement prg = finalEdges
 
     lastNode = nodeDefinition defaultQueue
 
-    edgesSTR = rearrangePRG prgEdges (isPRGNodeEmulated prgEmulatedNodes) lastNode
+--    edgesSTR = rearrangePRG prgEdges (isPRGNodeEmulated prgEmulatedNodes) lastNode
+    (edgesSTR, swNodes) = removeSWnodePRG prgEdges (isPRGNodeEmulated prgEmulatedNodes)
     finalEdges = DL.map (\ x -> convertEdgeToNode nodeList x) $ DL.nub edgesSTR
 
 ----------------------------------------------------------------
