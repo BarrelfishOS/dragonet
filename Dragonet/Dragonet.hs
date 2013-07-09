@@ -127,6 +127,29 @@ testEmbeddingSmall =
         embedded = EM.testEmbeddingV2 prg lpg
 
 
+testPRGAdjustment :: IO ()
+testPRGAdjustment =
+        do
+        putStrLn "Testing PRG readjustment"
+
+        putStrLn "Edges in PRG graph"
+        putStrLn prgEdges
+
+        writeFile "PRGAdjustUnconf.dot" $ DG.toDot prgUnconf
+        writeFile "PRGAdjustBefore.dot" $ DG.toDotFromDL prgDep
+        writeFile "PRGAdjustAfter.dot" $ DG.toDotFromDL prgAdjusted
+        putStrLn "Done..."
+
+        where
+        prgUnconf = E10k.getE1kPRG
+        prg = OP.applyConfigWrapperList prgUnconf E10k.getTestcaseConfiguration
+
+        prgDep = EM.removeDroppedNodes $ EM.getDepEdges prg
+
+        prgEdges = EM.testEmbeddingSTR prg
+
+        prgAdjusted = EM.testPRGrearrangement prg
+
 
 allTests :: IO ()
 allTests =
@@ -142,7 +165,7 @@ main :: IO()
 --main = allTests
 --main = testEmbeddingV2
 --main = testEmbeddingSmall
-main = testEmbeddingLarge
-
+--main = testEmbeddingLarge
+main = testPRGAdjustment
 
 
