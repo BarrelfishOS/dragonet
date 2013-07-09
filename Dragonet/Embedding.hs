@@ -8,7 +8,10 @@ module Embedding(
     testEmbeddingV2
     , testPRGrearrangement
     , testEmbeddingSTR
+    , testEmbeddingV3
+    , getDepEdgesP
     , getDepEdges
+    , removeDroppedNodesP
     , removeDroppedNodes
 ) where
 
@@ -17,6 +20,7 @@ import qualified Data.List as L
 import qualified Data.Set as S
 import qualified Data.Maybe as MB
 import qualified Data.List as DL
+import qualified Data.Tuple as T
 
 import qualified Debug.Trace as TR
 
@@ -33,6 +37,9 @@ showEdgeGen (n1, n2) = ((show n1) ++ " --> " ++ (show n2)
 convertEdge :: (Node, Node) -> (String, String)
 convertEdge (n1, n2) = ((nodeDefinition n1),  (nodeDefinition n2))
 
+convertEdgeP :: (Node, String, Node) -> (String, String, String)
+convertEdgeP (n1, p, n2) = ((nodeDefinition n1), p, (nodeDefinition n2))
+
 
 convertLabelToNode :: [Node] -> String -> Node
 convertLabelToNode nlist label = DL.head $
@@ -41,6 +48,12 @@ convertLabelToNode nlist label = DL.head $
 
 convertEdgeToNode :: [Node] -> (String, String) -> (Node, Node)
 convertEdgeToNode nlist (a, b) = (a', b')
+    where
+    a' = convertLabelToNode nlist a
+    b' = convertLabelToNode nlist b
+
+convertEdgeToNodeP :: [Node] -> (String, String, String) -> (Node, String, Node)
+convertEdgeToNodeP nlist (a, p, b) = (a', p, b')
     where
     a' = convertLabelToNode nlist a
     b' = convertLabelToNode nlist b
@@ -67,13 +80,19 @@ showEdge  (n1, n2) = ((nodeDefinition n1) ++ " --> " ++ (nodeDefinition n2)
 --  Node datatype manipulation
 ----------------------------------------------------------------
 
--- For given Node, find all its children
 getChildren :: Node -> [Node]
 getChildren root = case (getNodeEdges root) of
         (BinaryNode (as, bs))   -> DL.nub (as ++ bs)
         (NaryNode nList)        -> DL.nub $ DL.concatMap (\ (x, y) -> y) nList
 
--- Get outgoing edegs for all nodes underneath given Node
+-- For given Node, find all its children
+getChildrenP :: Node -> [(String,Node)]
+getChildrenP root = case (getNodeEdges root) of
+        (BinaryNode (as, bs))   -> DL.nub ((pref "T" as) ++ (pref "F" bs))
+        (NaryNode nList)        -> DL.nub $ DL.concatMap (uncurry pref) nList
+    where
+        pref i ls = map T.swap $ zip ls $ repeat i
+
 getOutEdges :: Node -> [(Node,Node)]
 getOutEdges root = nextLevel ++ deeperLevels
     where
@@ -81,12 +100,25 @@ getOutEdges root = nextLevel ++ deeperLevels
     nextLevel = DL.concatMap (\ x -> [(root, x)]) children
     deeperLevels = DL.concatMap (getOutEdges) children
 
--- Get outgoing edegs for all nodes underneath given Node
+
 getDepEdges :: Node -> [(Node,Node)]
 getDepEdges root =  DL.map (\ (x, y) -> (y, x)) $ getOutEdges root
 
+-- Get outgoing edegs for all nodes underneath given Node
+getOutEdgesP :: Node -> [(Node,String,Node)]
+getOutEdgesP root = nextLevel ++ deeperLevels
+    where
+    children = getChildrenP root
+    nextLevel = map (\(p,x) -> (root, p, x)) children
+    deeperLevels = DL.concatMap (getOutEdgesP . snd) children
+
+-- Get outgoing edegs for all nodes underneath given Node
+getDepEdgesP :: Node -> [(Node,String,Node)]
+--getDepEdges root =  DL.map (\ (x, p, y) -> (y, p, x)) $ getOutEdges root
+getDepEdgesP root = getOutEdgesP root
+
 getSoftStartNode :: Node
-getSoftStartNode = getDecNode NB.InSoftware "" (BinaryNode ([], [])) []
+getSoftStartNode = getDecNode NB.InSoftware "" (NaryNode []) []
 
 getSoftStartNode1 :: String
 getSoftStartNode1 = nodeDefinition getSoftStartNode
@@ -178,16 +210,16 @@ getAllDeps graphEdges gn = deps ++ indirectDeps
 ----------------------------------------------------------------
 
 
-mkEdge a b = (a,b)
-edgeStart = fst
-edgeEnd = snd
+edgeStart (n,_,_) = n
+edgeEnd (_,_,n) = n
 nodesSet s = (S.map edgeStart s) `S.union` (S.map edgeEnd s)
-inEdges n s = S.filter (\(x,y) -> n == y) s
-outEdges n s = S.filter (\(x,y) -> n == x) s
-outNeighbours n s = S.map edgeEnd $ outEdges n s
+inEdges n s = S.filter ((n ==) . edgeEnd) s
+outEdges n s = S.filter ((n ==) . edgeStart) s
+inNeighbours n s = S.map edgeStart $ inEdges n s
 
 --embeddingV3Step sP sE [] = sE
 --embeddingV3Step :: ((Show a), (Ord a)) => S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a)
+embeddingV3Step :: (Ord a) => S.Set (a,a,a) -> (S.Set (a,a,a), S.Set a) -> (S.Set (a,a,a), S.Set a) -> S.Set (a,a,a)
 embeddingV3Step sP (sE,sEv) (sU,sUv)
     | S.null sU = sE
     | sEv == sEv' = error "E not changing"
@@ -196,19 +228,19 @@ embeddingV3Step sP (sE,sEv) (sU,sUv)
         sPv = nodesSet sP
 
         -- Find dependencies of specified node in LPG and PRG
-        deps n = (outNeighbours n sE) `S.union` (outNeighbours n sP)
+        deps n = (inNeighbours n sE) `S.union` (inNeighbours n sP)
 
         -- Find a node whose dependencies are already embedded
         v = S.findMin $ S.filter (flip S.isSubsetOf sEv . deps) sUv
 
         -- v's dependencies from PRG
-        sEprg = S.map (mkEdge v) $ outNeighbours v sP
+        sEprg = S.filter ((v ==) . edgeEnd) sP -- S.map (mkEdge v) $ outNeighbours v sP
         -- v's dependencies from LPG
-        sElpg = S.filter (flip S.notMember sPv . edgeEnd) $ outEdges v sU
+        sElpg = S.filter (flip S.notMember sPv . edgeStart) $ inEdges v sU
 
         sE' = sE `S.union` sEprg `S.union` sElpg
         -- remove edges starting from v in 
-        sU' = sU S.\\ (outEdges v sU)
+        sU' = sU S.\\ (inEdges v sU)
 
         -- Move vertex from E to U
         sEv' = S.insert v sEv
@@ -217,7 +249,7 @@ embeddingV3Step sP (sE,sEv) (sU,sUv)
 
 -- Takes Nodes, converts them into String, applies the embedding algorithm
 --      convert back the results into Node format
-embeddingV3Wrapper ::  Node -> Node -> [(Node, Node)]
+embeddingV3Wrapper ::  Node -> Node -> [(Node, String, Node)]
 embeddingV3Wrapper prg lpg =
     result ++ softImplEdge
     where
@@ -225,29 +257,27 @@ embeddingV3Wrapper prg lpg =
 
     allNodesSet = (nodesSet lpgEdges) `S.union` (nodesSet prgEdges)
     prgNodes = DL.nub $ nTreeNodes prg
-    prgEmulatedNodes = DL.map (nodeDefinition) $
-        DL.filter (isNodeEmbebible) prgNodes
 
 
 
     nodeList = DL.nub (nTreeNodes lpg  ++ prgNodes ++ [swStartNode])
-    convert n = map (\ x -> convertEdgeToNode nodeList x) $ S.toList n
+    convert n = map (\ x -> convertEdgeToNodeP nodeList x) $ S.toList n
     swStartNode = getSoftStartNode
     swStartNode1 = nodeDefinition swStartNode
 
-    lpgEdges = S.fromList $ DL.map convertEdge $ removeDroppedNodes
-            $ DL.reverse $ topoSortEdges $ getDepEdges lpg
-    prgEdges = S.fromList $ DL.map convertEdge $ removeDroppedNodes
-            $ DL.reverse $ topoSortEdges $ getDepEdges prg
+    lpgEdges = S.fromList $ DL.map convertEdgeP $ removeDroppedNodesP
+            $  getDepEdgesP lpg
+    prgEdges = S.fromList $ DL.map convertEdgeP $ removeDroppedNodesP
+            $ getDepEdgesP prg
     defaultQueue = getDecNode (NB.ToQueue NB.getDefaultQueue) ""
         (BinaryNode ([], [])) []
-    softImplEdge =  [((swStartNode), (defaultQueue))]
+    softImplEdge =  [((defaultQueue), "", (swStartNode))]
 
 
 
-removeDroppedNodes :: [(Node, Node)] -> [(Node, Node)]
-removeDroppedNodes edgeList = DL.filter (\ (x,y) ->
-    not ( (nCompPrgLpg x dnode) ||  (nCompPrgLpg x dnode) ) ) edgeList
+removeDroppedNodesP :: [(Node, String, Node)] -> [(Node, String, Node)]
+removeDroppedNodesP edgeList = DL.filter (\ (x,_,y) ->
+    not ( (nCompPrgLpg y dnode) ||  (nCompPrgLpg y dnode) ) ) edgeList
     where
     dnode = getDropNode
 
@@ -341,6 +371,21 @@ embeddingV2Step swStartNode prgEdges prgFn ((embedHW, embedSW), lpgUnembedded)
     lpgUnembedded' = DL.filter (\ (x, y) -> x /= vNext) lpgUnembedded
     (embedHW', embedSW') = ((embedHW ++ newEdgesHW), (embedSW ++ newEdgesSW))
 
+removeDroppedNodes :: [(Node, Node)] -> [(Node, Node)]
+removeDroppedNodes edgeList = DL.filter (\ (x,y) ->
+    not ( (nCompPrgLpg x dnode) ||  (nCompPrgLpg x dnode) ) ) edgeList
+    where
+    dnode = getDropNode
+
+
+isNodeEmbebible :: Node -> Bool
+isNodeEmbebible n
+    | DL.elem (NB.InSoft True) attrs = False
+    | otherwise               = True
+    where
+    attrs = getNodeAttributes n
+
+
 ------------------------------------------------------------------
 --      Code to rearrange PRG
 ------------------------------------------------------------------
@@ -422,13 +467,6 @@ classifyDeps graphEdges fn = (trueEdges, falseEdges)
 isPRGNodeEmulated :: (Eq a) => [a] -> a -> Bool
 isPRGNodeEmulated vList v = DL.elem v vList
 
-isNodeEmbebible :: Node -> Bool
-isNodeEmbebible n
-    | DL.elem (NB.InSoft True) attrs = False
-    | otherwise               = True
-    where
-    attrs = getNodeAttributes n
-
 
 
 -- Takes Nodes, converts them into String, applies the embedding algorithm
@@ -474,7 +512,6 @@ embeddingV2Wrapper prg lpg
     softImplEdge =  [((swStartNode), (defaultQueue))]
 
 
-
 findEdgesForV :: [(Node, Node)] -> Node -> [(Node, Node)]
 findEdgesForV edges toMatch = DL.filter (\ x -> (fst x) == toMatch) edges
 
@@ -486,7 +523,6 @@ topoSortEdges unSorted = sortedE
     sortedV = topSort unSorted
 
 
-
 ----------------------------------------------------------------
 --      Testing code
 ----------------------------------------------------------------
@@ -494,7 +530,11 @@ topoSortEdges unSorted = sortedE
 testEmbeddingV2 :: Node -> Node -> [(Node, Node)]
 --testEmbeddingV2 prg lpg = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges lpg
 --testEmbeddingV2 prg lpg = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges prg
-testEmbeddingV2 prg lpg = embeddingV3Wrapper prg lpg
+testEmbeddingV2 prg lpg = embeddingV2Wrapper prg lpg
+
+testEmbeddingV3 :: Node -> Node -> [(Node, String, Node)]
+testEmbeddingV3 prg lpg = embeddingV3Wrapper prg lpg
+
 
 
 testEmbeddingSTR :: Node -> String
@@ -542,6 +582,7 @@ testPRGrearrangement prg = finalEdges
 --    edgesSTR = rearrangePRG prgEdges (isPRGNodeEmulated prgEmulatedNodes) lastNode
     (edgesSTR, swNodes) = removeSWnodePRG prgEdges (isPRGNodeEmulated prgEmulatedNodes)
     finalEdges = DL.map (\ x -> convertEdgeToNode nodeList x) $ DL.nub edgesSTR
+
 
 ----------------------------------------------------------------
 

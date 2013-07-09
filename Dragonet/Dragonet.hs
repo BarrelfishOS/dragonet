@@ -66,8 +66,40 @@ testE10kConfig =
         fileName = "E10kConfig.dot"
         tree' = OP.applyConfigWrapperList E10k.getE1kPRG E10k.getTestcaseConfiguration
 
-testEmbeddingLarge :: IO ()
-testEmbeddingLarge =
+testEmbeddingLargeV3 :: IO ()
+testEmbeddingLargeV3 =
+        do
+        putStrLn "Generating embedding for large graphs"
+
+        {-putStrLn "Edges in PRG graph"
+        putStrLn prgEdges
+
+        putStrLn "Edges in LPG graph"
+        putStrLn lpgEdges-}
+
+        writeFile "LPGsmall.dot" $ DG.toDotFromDLP lpgDep
+        writeFile "PRGsmallUnconf.dot" $ DG.toDot prgUnconf
+        writeFile "PRGsmall.dot" $ DG.toDotFromDLP prgDep
+
+        writeFile "EMBEDDsmall.dot" $ DG.toDotFromDLP embedded
+
+        putStrLn "Done..."
+
+        where
+        prgUnconf = E10k.getE1kPRG
+        prg = OP.applyConfigWrapperList prgUnconf E10k.getTestcaseConfiguration
+
+        prgDep = EM.removeDroppedNodesP $ EM.getDepEdgesP prg
+        {-prgEdges = EM.testEmbeddingSTR prg
+        lpgEdges = EM.testEmbeddingSTR lpg-}
+        lpg = NP.getNetworkDependency
+        lpgDep = EM.removeDroppedNodesP $ EM.getDepEdgesP lpg
+
+        embedded = EM.testEmbeddingV3 prg lpg
+
+
+testEmbeddingLargeV2 :: IO ()
+testEmbeddingLargeV2 =
         do
         putStrLn "Generating embedding for large graphs"
 
@@ -98,6 +130,7 @@ testEmbeddingLarge =
         embedded = EM.testEmbeddingV2 prg lpg
 
 
+
 testEmbeddingSmall :: IO ()
 testEmbeddingSmall =
         do
@@ -126,7 +159,6 @@ testEmbeddingSmall =
         lpgDep = EM.removeDroppedNodes $ EM.getDepEdges lpg
         embedded = EM.testEmbeddingV2 prg lpg
 
-
 testPRGAdjustment :: IO ()
 testPRGAdjustment =
         do
@@ -150,7 +182,6 @@ testPRGAdjustment =
 
         prgAdjusted = EM.testPRGrearrangement prg
 
-
 allTests :: IO ()
 allTests =
     do
@@ -165,7 +196,7 @@ main :: IO()
 --main = allTests
 --main = testEmbeddingV2
 --main = testEmbeddingSmall
-main = testEmbeddingLarge
+main = testEmbeddingLargeV3
 --main = testPRGAdjustment
 
 
