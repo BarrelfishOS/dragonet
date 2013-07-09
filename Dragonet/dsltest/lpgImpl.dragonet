@@ -1,406 +1,426 @@
 node sofwareRX {
-  port out[l2EtherClassified] }
+    port out[rxL2EtherClassified] }
 
 node softwareTX { }
 
 node packetDrop { }
 
 
-/*****************************************************************************/
-/* Ethernet RX                                                               */
+/******************************************************************************/
+/* Receive                                                                    */
 
-boolean l2EtherClassified {
-    port true[l2EtherValidLength]
-    port false[packetDrop] }
+cluster rx {
 
-boolean l2EtherValidLength {
-    port true[l2EtherValidUnicast l2EtherValidMulticast l2EtherValidBroadcast
-              l2EtherValidSrc l2EtherValidType]
-    port false[packetDrop] }
+    /*******************************************/
+    /* Ethernet RX                             */
 
-boolean l2EtherValidUnicast {
-    port true false[l2EtherValidDest] }
+    cluster L2Ether {
+        boolean Classified {
+            port true[ValidLength]
+            port false[..packetDrop] }
 
-boolean l2EtherValidMulticast {
-    port true false[l2EtherValidDest] }
+        boolean ValidLength {
+            port true[ValidUnicast ValidMulticast ValidBroadcast
+                      ValidSrc ValidType]
+            port false[..packetDrop] }
 
-boolean l2EtherValidBroadcast {
-    port true false[l2EtherValidDest] }
+        boolean ValidUnicast {
+            port true false[ValidDest] }
 
-or l2EtherValidDest {
-    port true false[l2EtherValid] }
+        boolean ValidMulticast {
+            port true false[ValidDest] }
 
-boolean l2EtherValidSrc {
-    port true false[l2EtherValid] }
+        boolean ValidBroadcast {
+            port true false[ValidDest] }
 
-and l2EtherValid {
-    port true false[l3IPAndBelowValid] }
+        or ValidDest {
+            port true false[Valid] }
 
-boolean l2EtherValidType {
-    port true[l2EtherClassifyL3]
-    port false[packetDrop] }
+        boolean ValidSrc {
+            port true false[Valid] }
 
-node l2EtherClassifyL3 {
-    port ipv4[l3IPv4ValidHeaderLength]
-    port ipv6[l3IPv6ValidHeaderLength]
-    port arp[l3ARPValidHeaderLength]
-    port drop[packetDrop] }
+        and Valid {
+            port true false[.L3IPAndBelowValid] }
 
+        boolean ValidType {
+            port true[ClassifyL3]
+            port false[..packetDrop] }
 
-/*****************************************************************************/
-/* ARP RX                                                                    */
+        node ClassifyL3 {
+            port ipv4[.L3IPv4ValidHeaderLength]
+            port ipv6[.L3IPv6ValidHeaderLength]
+            port arp[.L3ARPValidHeaderLength]
+            port drop[..packetDrop] }
+    }
 
-boolean l3ARPValidHeaderLength {
-    port true[l3ARPClassify]
-    port false[packetDrop] }
 
-node l3ARPClassify {
-    port request[l3ARPRequest]
-    port response[l3ARPResponse]
-    port drop[packetDrop] }
+    /*******************************************/
+    /* ARP RX                                  */
 
-node l3ARPRequest {
-    port respond[arpTX] }
-node l3ARPResponse {}
+    cluster L3ARP {
+        boolean ValidHeaderLength {
+            port true[Classify]
+            port false[..packetDrop] }
 
+        node Classify {
+            port request[Request]
+            port response[Response]
+            port drop[..packetDrop] }
 
-/*****************************************************************************/
-/* IPv4 RX                                                                   */
+        node Request {
+            port respond[..txARPTX] }
+        node Response {}
+    }
 
-boolean l3IPv4ValidHeaderLength {
-    port true[l3IPv4ValidReassembly l3IPv4ValidVersion l3IPv4ValidLength
-              l3IPv4ValidTTL l3IPv4ValidChecksum l3IPv4Classify]
-    port false[packetDrop] }
 
-boolean l3IPv4ValidReassembly {
-    port true false[l3IPv4Valid] }
+    /*******************************************/
+    /* IPv4 RX                                 */
 
-boolean l3IPv4ValidVersion {
-    port true false[l3IPv4Valid] }
+    cluster L3IPv4 {
+        boolean ValidHeaderLength {
+            port true[ValidReassembly ValidVersion ValidLength
+                      ValidTTL ValidChecksum Classify]
+            port false[..packetDrop] }
 
-boolean l3IPv4ValidLength {
-    port true false[l3IPv4Valid] }
+        boolean ValidReassembly {
+            port true false[Valid] }
 
-boolean l3IPv4ValidTTL {
-    port true false[l3IPv4Valid] }
+        boolean ValidVersion {
+            port true false[Valid] }
 
-boolean l3IPv4ValidChecksum {
-    port true false[l3IPv4Valid] }
+        boolean ValidLength {
+            port true false[Valid] }
 
-node l3IPv4Classify {
-    port tcp[l4TCPValidHeaderLength]
-    port udp[l4UDPValidHeaderLength]
-    port icmp[l3ICMPValidHeaderLength]
-    port drop[packetDrop] }
+        boolean ValidTTL {
+            port true false[Valid] }
 
-and l3IPv4Valid {
-    port true false[l3IPValid] }
+        boolean ValidChecksum {
+            port true false[Valid] }
 
+        node Classify {
+            port tcp[.L4TCPValidHeaderLength]
+            port udp[.L4UDPValidHeaderLength]
+            port icmp[.L3ICMPValidHeaderLength]
+            port drop[..packetDrop] }
 
-/*****************************************************************************/
-/* IPv6 RX                                                                   */
+        and Valid {
+            port true false[.L3IPValid] }
+    }
 
-boolean l3IPv6ValidHeaderLength {
-    port true false[l3IPValid] }
 
+    /*******************************************/
+    /* IPv6 RX                                 */
 
+    boolean L3IPv6ValidHeaderLength {
+        port true false[L3IPValid] }
 
-or l3IPValid {
-    port true false[l3IPAndBelowValid] }
 
-and l3IPAndBelowValid {
-    port true false[l3ICMPValid l4TCPValid l4UDPValid toIPv4Local] }
 
+    or L3IPValid {
+        port true false[L3IPAndBelowValid] }
 
-/*****************************************************************************/
-/* ICMP RX                                                                   */
+    and L3IPAndBelowValid {
+        port true false[L3ICMPValid L4TCPValid L4UDPValid ToIPv4Local] }
 
-boolean l3ICMPValidHeaderLength {
-    port true false[l3ICMPValid] }
 
-and l3ICMPValid {
-    port true[l3ICMPOut]
-    port false[packetDrop] }
+    /*******************************************/
+    /* ICMP RX                                 */
 
-node l3ICMPOut { }
+    cluster L3ICMP {
+        boolean ValidHeaderLength {
+            port true false[Valid] }
 
+        and Valid {
+            port true[Out]
+            port false[..packetDrop] }
 
-/*****************************************************************************/
-/* UDP RX                                                                    */
+        node Out { }
+    }
 
-boolean l4UDPValidHeaderLength {
-    port true[l4UDPValidLength l4UDPValidChecksum]
-    port false[packetDrop] }
+    /*******************************************/
+    /* UDP RX                                  */
 
-boolean l4UDPValidLength {
-    port true false[l4UDPValid] }
+    cluster L4UDP {
+        boolean ValidHeaderLength {
+            port true[ValidLength ValidChecksum]
+            port false[..packetDrop] }
 
-boolean l4UDPValidChecksum {
-    port true false[l4UDPValid] }
+        boolean ValidLength {
+            port true false[Valid] }
 
-and l4UDPValid {
-    port true[toUDPPortDNS]
-    port false[packetDrop] }
+        boolean ValidChecksum {
+            port true false[Valid] }
 
-node l4UDPOut { }
+        and Valid {
+            port true[.ToUDPPortDNS]
+            port false[..packetDrop] }
 
+        node Out { }
+    }
 
-/*****************************************************************************/
-/* TCP RX                                                                    */
 
-boolean l4TCPValidHeaderLength {
-    port true false[l4TCPValid] }
+    /*******************************************/
+    /* TCP RX                                  */
 
-and l4TCPValid {
-    port true[l4TCPOut]
-    port false[packetDrop] }
+    cluster L4TCP {
+        boolean ValidHeaderLength {
+            port true false[Valid] }
 
-node l4TCPOut { }
+        and Valid {
+            port true[Out]
+            port false[..packetDrop] }
 
+        node Out { }
+    }
 
-/*****************************************************************************/
-/* Application RX                                                            */
 
-boolean toIPv4Local {
-    port true false[dnsRXFilter] }
+    /*******************************************/
+    /* Application RX                          */
 
-boolean toUDPPortDNS {
-    port true false[dnsRXFilter] }
+    boolean ToIPv4Local {
+        port true false[DnsRXFilter] }
 
-and dnsRXFilter {
-    port true[dnsRX]
-    port false[packetDrop] }
+    boolean ToUDPPortDNS {
+        port true false[DnsRXFilter] }
 
-node dnsRX { }
+    and DnsRXFilter {
+        port true[DnsRX]
+        port false[.packetDrop] }
 
+    node DnsRX { }
 
+}
 
 
 
 
 
+/******************************************************************************/
+/* Transmit                                                                   */
 
+cluster tx {
+    /*******************************************/
+    /* Application TX                          */
 
-/*****************************************************************************/
-/* Application TX                                                            */
+    node Source {
+        port out[ExampleDnsTX ExampleDns6TX ARPTX ] }
 
-node source {
-    port out[exampleDnsTX exampleDns6TX arpTX ] }
+    node ExampleDnsTX {
+        port true[L4UDPTx L3IPv4Tx L2EtherTx] }
 
-node exampleDnsTX {
-    port true[l4UDPTx l3IPv4Tx l2EtherTx] }
+    node ExampleDns6TX {
+        port true[L4UDPTx L3IPv6Tx L2EtherTx] }
 
-node exampleDns6TX {
-    port true[l4UDPTx l3IPv6Tx l2EtherTx] }
+    node ARPTX {
+        port true[L3ARPTx L2EtherTx] }
 
-node arpTX {
-    port true[l3ARPTx l2EtherTx] }
 
 
 
+    /*******************************************/
+    /* UDP TX                                  */
 
-/*****************************************************************************/
-/* UDP TX                                                                    */
+    cluster L4UDP {
+        or Tx {
+            port true[AddHeader .L3IPv4AddHdrProtoUDP]
+            port false[] }
 
-or l4UDPTx {
-    port true[l4UDPAddHeader l3IPv4AddHdrProtoUDP]
-    port false[] }
+        node AddHeader {
+            port true[AddHdrDPort AddHdrSPort AddHdrChecksum
+                      AddHdrLength .L4HdrAdded] }
 
-node l4UDPAddHeader {
-    port true[l4UDPAddHdrDPort l4UDPAddHdrSPort l4UDPAddHdrChecksum
-              l4UDPAddHdrLength l4HdrAdded] }
+        node AddHdrDPort {
+            port true[Done] }
 
-node l4UDPAddHdrDPort {
-    port true[l4UDPDone] }
+        node AddHdrSPort {
+            port true[Done] }
 
-node l4UDPAddHdrSPort {
-    port true[l4UDPDone] }
+        node AddHdrChecksum {
+            port true[Done] }
 
-node l4UDPAddHdrChecksum {
-    port true[l4UDPDone] }
+        node AddHdrLength {
+            port true[Done] }
 
-node l4UDPAddHdrLength {
-    port true[l4UDPDone] }
+        and Done {
+            port true false[.L4Done] }
+    }
 
-and l4UDPDone {
-    port true false[l4Done] }
 
+    /*******************************************/
+    /* IPv4 TX                                 */
 
+    cluster L3IPv4 {
+        or Tx {
+            port true[AndUpperHdr .L2EtherAddHdrTypeIPv4]
+            port false[] }
 
-/*****************************************************************************/
-/* IPv4 TX                                                                   */
+        and AndUpperHdr {
+            port true[AddHeader]
+            port false[] }
 
-or l3IPv4Tx {
-    port true[l3IPv4AndUpperHdr l2EtherAddHdrTypeIPv4]
-    port false[] }
+        node AddHeader {
+            port true[AddHdrVersion AddHdrIHL AddHdrTotLen AddHdrTTL AddHdrSAddr
+                      AddHdrDAddr AddHdrProto .L3HdrAdded] }
 
-and l3IPv4AndUpperHdr {
-    port true[l3IPv4AddHeader]
-    port false[] }
 
-node l3IPv4AddHeader {
-    port true[l3IPv4AddHdrVersion l3IPv4AddHdrIHL l3IPv4AddHdrTotLen
-              l3IPv4AddHdrTTL l3IPv4AddHdrSAddr l3IPv4AddHdrDAddr 
-              l3IPv4AddHdrProto l3HdrAdded] }
+        node AddHdrProto {
+            port true[AddHdrProtoUDP] }
 
+        and AddHdrProtoUDP {
+            port true[AddHdrProtoUDP_]
+            port false[] }
+        node AddHdrProtoUDP_ {
+            port true[AddHdrProtoDone] }
 
-node l3IPv4AddHdrProto {
-    port true[l3IPv4AddHdrProtoUDP] }
+        or AddHdrProtoDone {
+            port true[Done]
+            port false[] }
 
-and l3IPv4AddHdrProtoUDP {
-    port true[l3IPv4AddHdrProtoUDP_]
-    port false[] }
-node l3IPv4AddHdrProtoUDP_ {
-    port true[l3IPv4AddHdrProtoDone] }
 
-or l3IPv4AddHdrProtoDone {
-    port true[l3IPv4Done]
-    port false[] }
+        node AddHdrVersion {
+            port true[Done] }
 
+        node AddHdrIHL {
+            port true[Done] }
 
-node l3IPv4AddHdrVersion {
-    port true[l3IPv4Done] }
+        node AddHdrTotLen {
+            port true[Done] }
 
-node l3IPv4AddHdrIHL {
-    port true[l3IPv4Done] }
+        node AddHdrTTL {
+            port true[Done] }
 
-node l3IPv4AddHdrTotLen {
-    port true[l3IPv4Done] }
+        node AddHdrSAddr {
+            port true[Done] }
 
-node l3IPv4AddHdrTTL {
-    port true[l3IPv4Done] }
+        node AddHdrDAddr {
+            port true[Done] }
 
-node l3IPv4AddHdrSAddr {
-    port true[l3IPv4Done] }
+        and Done {
+            port true[.L3Done]
+            port false[] }
+    }
 
-node l3IPv4AddHdrDAddr {
-    port true[l3IPv4Done] }
 
-and l3IPv4Done {
-    port true[l3Done]
-    port false[] }
+    /*******************************************/
+    /* IPv6 TX                                 */
 
+    cluster L3IPv6 {
+        or Tx {
+            port true[AndUpperHdr .L2EtherAddHdrTypeIPv6]
+            port false[] }
 
-/*****************************************************************************/
-/* IPv6 TX                                                                   */
+        and AndUpperHdr {
+            port true[AddHeader]
+            port false[] }
 
-or l3IPv6Tx {
-    port true[l3IPv6AndUpperHdr l2EtherAddHdrTypeIPv6]
-    port false[] }
+        node AddHeader {
+            port true[AddHdrVersion AddHdrSAddr AddHdrDAddr .L3HdrAdded] }
 
-and l3IPv6AndUpperHdr {
-    port true[l3IPv6AddHeader]
-    port false[] }
+        node AddHdrVersion {
+            port true[Done] }
 
-node l3IPv6AddHeader {
-    port true[l3IPv6AddHdrVersion l3IPv6AddHdrSAddr l3IPv6AddHdrDAddr
-              l3HdrAdded] }
+        node AddHdrSAddr {
+            port true[Done] }
 
-node l3IPv6AddHdrVersion {
-    port true[l3IPv6Done] }
+        node AddHdrDAddr {
+            port true[Done] }
 
-node l3IPv6AddHdrSAddr {
-    port true[l3IPv6Done] }
+        and Done {
+            port true[.L3Done]
+            port false[] }
+    }
 
-node l3IPv6AddHdrDAddr {
-    port true[l3IPv6Done] }
+    /*******************************************/
+    /* ARP TX                                  */
 
-and l3IPv6Done {
-    port true[l3Done]
-    port false[] }
+    or L3ARPTx {
+        port true[L2EtherAddHdrTypeARP]
+        port false[] }
 
 
-/*****************************************************************************/
-/* ARP TX                                                                    */
+    /*******************************************/
+    /* Ethernet TX                             */
 
-or l3ARPTx {
-    port true[l2EtherAddHdrTypeARP]
-    port false[] }
+    cluster L2Ether {
+        or Tx {
+            port true[AndUpperHdr]
+            port false[] }
 
+        and AndUpperHdr {
+            port true[AddHeader]
+            port false[] }
 
-/*****************************************************************************/
-/* Ethernet TX                                                               */
+        node AddHeader {
+            port true[AddHdrSAddr AddHdrDAddr AddHdrType] }
 
-or l2EtherTx {
-    port true[l2EtherAndUpperHdr]
-    port false[] }
 
-and l2EtherAndUpperHdr {
-    port true[l2EtherAddHeader]
-    port false[] }
+        node AddHdrType {
+            port true[AddHdrTypeIPv4 AddHdrTypeIPv6 AddHdrTypeARP] }
 
-node l2EtherAddHeader {
-    port true[l2EtherAddHdrSAddr l2EtherAddHdrDAddr l2EtherAddHdrType] }
+        and AddHdrTypeIPv4 {
+            port true[AddHdrTypeIPv4_]
+            port false[] }
+        node AddHdrTypeIPv4_ {
+            port true[AddHdrProtoDone] }
 
+        and AddHdrTypeIPv6 {
+            port true[AddHdrTypeIPv6_]
+            port false[] }
+        node AddHdrTypeIPv6_ {
+            port true[AddHdrProtoDone] }
 
-node l2EtherAddHdrType {
-    port true[l2EtherAddHdrTypeIPv4 l2EtherAddHdrTypeIPv6
-              l2EtherAddHdrTypeARP] }
+        and AddHdrTypeARP {
+            port true[AddHdrTypeARP_]
+            port false[] }
+        node AddHdrTypeARP_ {
+            port true[AddHdrProtoDone] }
 
-and l2EtherAddHdrTypeIPv4 {
-    port true[l2EtherAddHdrTypeIPv4_]
-    port false[] }
-node l2EtherAddHdrTypeIPv4_ {
-    port true[l2EtherAddHdrProtoDone] }
+        or AddHdrProtoDone {
+            port true[Done]
+            port false[] }
 
-and l2EtherAddHdrTypeIPv6 {
-    port true[l2EtherAddHdrTypeIPv6_]
-    port false[] }
-node l2EtherAddHdrTypeIPv6_ {
-    port true[l2EtherAddHdrProtoDone] }
 
-and l2EtherAddHdrTypeARP {
-    port true[l2EtherAddHdrTypeARP_]
-    port false[] }
-node l2EtherAddHdrTypeARP_ {
-    port true[l2EtherAddHdrProtoDone] }
+        node AddHdrSAddr {
+            port true[Done] }
 
-or l2EtherAddHdrProtoDone {
-    port true[l2EtherDone]
-    port false[] }
+        node AddHdrDAddr {
+            port true[Done] }
 
+        and Done {
+            port true[.L2Done]
+            port false[] }
+    }
 
-node l2EtherAddHdrSAddr {
-    port true[l2EtherDone] }
+    /*******************************************/
+    /* Abstract TX                             */
 
-node l2EtherAddHdrDAddr {
-    port true[l2EtherDone] }
+    or L4HdrAdded {
+        port true[L3IPv4AndUpperHdr]
+        port false[] }
 
-and l2EtherDone {
-    port true[l2Done]
-    port false[] }
+    or L4Done {
+        port true[L3AboveDone]
+        port false[] }
 
 
-/*****************************************************************************/
-/* Abstract TX                                                               */
+    or L3HdrAdded {
+        port true[L2EtherAndUpperHdr]
+        port false[] }
 
-or l4HdrAdded {
-    port true[l3IPv4AndUpperHdr]
-    port false[] }
+    or L3Done {
+        port true[L3AboveDone]
+        port false[] }
 
-or l4Done {
-    port true[l3AboveDone]
-    port false[] }
+    and L3AboveDone {
+        port true[L2AboveDone]
+        port false[] }
 
 
-or l3HdrAdded {
-    port true[l2EtherAndUpperHdr]
-    port false[] }
+    or L2Done {
+        port true[L2AboveDone]
+        port false[] }
 
-or l3Done {
-    port true[l3AboveDone]
-    port false[] }
-
-and l3AboveDone {
-    port true[l2AboveDone]
-    port false[] }
-
-
-or l2Done {
-    port true[l2AboveDone]
-    port false[] }
-
-and l2AboveDone {
-    port true[softwareTX]
-    port false[] }
-
+    and L2AboveDone {
+        port true[.softwareTX]
+        port false[] }
+}
