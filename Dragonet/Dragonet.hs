@@ -136,28 +136,28 @@ testEmbeddingSmall =
         do
         putStrLn "Generating small testgraphs"
 
-        putStrLn "Edges in PRG graph"
+        {-putStrLn "Edges in PRG graph"
         putStrLn prgEdges
 
         putStrLn "Edges in LPG graph"
-        putStrLn lpgEdges
+        putStrLn lpgEdges-}
 
-        writeFile "LPGsmall.dot" $ DG.toDotFromDL lpgDep
+        writeFile "LPGsmall.dot" $ DG.toDotFromDLP lpgDep
         writeFile "PRGsmallUnconf.dot" $ DG.toDot prgUnconf
-        writeFile "PRGsmall.dot" $ DG.toDotFromDL prgDep
-        writeFile "EMBEDDsmall.dot" $ DG.toDotFromDL embedded
+        writeFile "PRGsmall.dot" $ DG.toDotFromDLP prgDep
+        writeFile "EMBEDDsmall.dot" $ DG.toDotFromDLP embedded
         putStrLn "Done..."
 
         where
         prgUnconf = E10k.getE1kPRGSmall
         prg = OP.applyConfigWrapperList prgUnconf E10k.getTestcaseConfiguration
 
-        prgDep = EM.removeDroppedNodes $ EM.getDepEdges prg
-        prgEdges = EM.testEmbeddingSTR prg
-        lpgEdges = EM.testEmbeddingSTR lpg
+        prgDep = EM.removeDroppedNodesP $ EM.getDepEdgesP prg
+        {-prgEdges = EM.testEmbeddingSTR prg
+        lpgEdges = EM.testEmbeddingSTR lpg-}
         lpg = NP.getNetworkDependencySmall
-        lpgDep = EM.removeDroppedNodes $ EM.getDepEdges lpg
-        embedded = EM.testEmbeddingV2 prg lpg
+        lpgDep = EM.removeDroppedNodesP $ EM.getDepEdgesP lpg
+        embedded = EM.testEmbeddingV3 prg lpg
 
 testPRGAdjustment :: IO ()
 testPRGAdjustment =
@@ -195,8 +195,8 @@ main :: IO()
 --main = testNetworkProcessing
 --main = allTests
 --main = testEmbeddingV2
---main = testEmbeddingSmall
-main = testEmbeddingLargeV3
+main = testEmbeddingSmall
+--main = testEmbeddingLargeV3
 --main = testPRGAdjustment
 
 
