@@ -35,16 +35,27 @@ module NetBasics (
     , ConfigCompare(..)
     , EmbedCompare(..)
     , DesLabel1(..) -- added to avoid unused types warning
+    , Application(..)
+    , Socket(..)
+    , SocketId
+    , AppName
+    , Flow(..)
+    , L4Flow(..)
+    , L3Flow(..)
+    , L2Flow(..)
+    , Address(..)
+    , getFlow
+    , Protocol(..)
+    , toIP
+    , getANYL2Address
+    , getANYL3Address
+    , getANYL4Address
 ) where
 
 
 import qualified Data.Maybe as MB
 import qualified Data.Char as DC
 import qualified Data.List as DL
-
---type L2Address = Integer
-type L3Address = Integer
-type L4Address = Integer
 
 -- for flow filtering
 data Protocol = NONEProtocol
@@ -74,6 +85,24 @@ data BasicQueue = BasicQueue {
 instance Show BasicQueue where
     show (BasicQueue s) = show s
 
+type SocketId = Integer
+type AppName = String
+
+data Application = Application {
+        appName :: AppName
+    } deriving (Eq, Ord)
+
+instance Show Application where
+    show (Application aname) = show aname
+
+data Socket = Socket {
+      socketId :: SocketId
+    } deriving (Eq, Ord)
+
+instance Show Socket where
+    show (Socket sid) = show sid
+
+
 data Queue = Queue {
         queueId :: Qid
         , coreId :: CoreID
@@ -90,20 +119,118 @@ instance ConfigCompare Queue where
 instance EmbedCompare Queue where
     embedCompare q1 q2 = queueId q1 == queueId q2
 
+data Address = L2Address Integer
+            | L3Address Integer
+            | L4Address Integer
+        deriving (Show, Eq, Ord)
+
+data Flow = Flow {
+        fProto        :: Protocol
+        , fSRCAddr    :: Address
+        , fDSTAddr    :: Address
+    } deriving (Eq, Ord)
+
+instance Show Flow where
+    show (Flow proto src dest) = show proto ++ " " ++ show src ++ " "
+            ++ show dest
+
+data L4Flow = L4Flow Flow L3Flow -- Port numbers
+    deriving (Eq, Ord)
+
+instance Show L4Flow where
+    show (L4Flow fl4 (L3Flow fl3 (L2Flow fl2))) = show (fProto fl4) ++ " "
+            ++ show (fProto fl3) ++ " "
+--            ++ show (L4Address (fSRCAddr fl4)) ++ " "
+--            ++ show (L3Address (fSRCAddr fl3)) ++ " "
+--            ++ show (L4Address (fDSTAddr fl4)) ++ " "
+--            ++ show (L3Address (fDSTAddr fl3))
+
+
+
+data L3Flow = L3Flow Flow L2Flow -- IP Addresses
+    deriving (Show, Eq, Ord)
+
+data L2Flow = L2Flow Flow -- MAC addresses
+    deriving (Show, Eq, Ord)
+
+getL2Flow :: Protocol -> Address -> Address -> L2Flow
+getL2Flow p s d = L2Flow f
+    where
+    f = Flow {
+        fProto = p
+        , fSRCAddr = s
+        , fDSTAddr = d
+    }
+
+getL3Flow :: (Protocol, Protocol) -> (Address, Address) -> (Address, Address)
+    -> L3Flow
+getL3Flow (p3, p2) (s3, s2) (d3, d2) = L3Flow f fl2
+    where
+    f = Flow {
+        fProto = p3
+        , fSRCAddr = s3
+        , fDSTAddr = d3
+    }
+    fl2 = getL2Flow p2 s2 d2
+
+getL4Flow :: (Protocol, Protocol, Protocol) -> (Address, Address, Address)
+    -> (Address, Address, Address) -> L4Flow
+getL4Flow (p4, p3, p2) (s4, s3, s2) (d4, d3, d2) = L4Flow f fl3
+    where
+    f = Flow {
+        fProto = p4
+        , fSRCAddr = s4
+        , fDSTAddr = d4
+    }
+    fl3 = getL3Flow (p3, p2) (s3, s2) (d3, d2)
+
+getANYL2Address :: Address
+getANYL2Address = L2Address 0
+
+getANYL3Address :: Address
+getANYL3Address = L3Address 0
+
+getANYL4Address :: Address
+getANYL4Address = L4Address 0
+
+
+toIP :: String -> Address
+toIP address = L3Address val
+    where
+       val = (read octet4::Integer) + ((read octet3::Integer) * 1000) +
+            ((read octet2::Integer) * 1000000) + ((read octet1::Integer) * 1000000000)
+       (octet1, address')  = DL.break condition  address
+       (octet2, address'') = DL.break condition $ DL.dropWhile condition address'
+       (octet3, address''') = DL.break condition $ DL.dropWhile condition address''
+       (octet4, _) = DL.break condition $ DL.dropWhile condition address'''
+       condition = (\x -> x == '.')
+
+
+
+getFlow :: (Protocol, Protocol) -> (Address, Address)
+    -> (Address, Address) -> L4Flow
+getFlow (p4, p3) (s4, s3) (d4, d3) = getL4Flow (p4, p3, p2)
+        (s4, s3, s2) (d4, d3, d2)
+    where
+        p2 = Ethernet
+        s2 = getANYL2Address
+        d2 = getANYL2Address
+
+type Addr = Integer
+
 data Filter = Filter {
         filterID :: FilterID
         , protocol :: Protocol
-        , srcIP :: L3Address
-        , dstIP :: L3Address
-        , srcPort :: L4Address
-        , dstPort :: L4Address
+        , srcIP :: Addr
+        , dstIP :: Addr
+        , srcPort :: Addr
+        , dstPort :: Addr
     } deriving (Eq, Ord)
 
 instance Show Filter where
     show (Filter fid proto sip dip sp dp) = show fid ++ " " ++ show proto
         ++ "_" ++ show sip ++ "_" ++ show dip  ++ "_" ++ show sp  ++ "_"
         ++ show dp
-
 
 getDefaultBasicQueue :: BasicQueue
 getDefaultBasicQueue = BasicQueue 5
@@ -208,7 +335,10 @@ data NetOperation = ClassifiedL2Ethernet -- Ethernet starter node
         | HashFilter TupleSelector Queue
         | SyncFilter Queue
         | BitMaskFilter BitMaskSelecter Queue
-        | IsFlow Filter Queue -- for flow filtering
+        | IsL5Flow L4Flow -- Filter -- for flow filtering
+        | ToSocket Socket -- POSIX style sockets
+        | CopyTo
+        | ToApplication Application -- End applications
         deriving (Show, Eq)
 
 instance ConfigCompare NetOperation where
