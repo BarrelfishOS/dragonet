@@ -74,9 +74,9 @@ getNetworkDependencySmall = etherClassified
     where
     dropnode = OP.getDropNode
 
-    l2Verified = OP.BinaryNode ([opANDL5ToKernel],
-        [dropnode])
-    l2Classified = OP.BinaryNode([queue0], [dropnode])
+    l2Verified = OP.BinaryNode ([verifiedL3IPv4],
+        [verifiedL3IPv4])
+    l2Classified = OP.BinaryNode([classifiedL3IPv6, classifiedL3IPv4], [dropnode])
 
     etherClassified = getEthernetProcessingLPG l2Classified l2Verified dropnode
 
@@ -89,6 +89,75 @@ getNetworkDependencySmall = etherClassified
     opANDL5ToKernel = OP.getOperatorNode NB.AND NB.ToDefaultKernelProcessing ""
         (OP.BinaryNode ([], [])) []
 
+    classifiedL3IPv6 = OP.getDecNode NB.ClassifiedL3IPv6 "PF"
+        (OP.BinaryNode (
+            [],
+            [dropnode])) []
+
+    classifiedL3IPv4 = OP.getDecNode NB.ClassifiedL3IPv4 "PF"
+        (OP.BinaryNode (
+            [l3IPv4ValidProtocol, l3IPv4ValidChecksum],
+            [dropnode])) []
+
+    l3IPv4ValidProtocol = OP.getDecNode NB.L3IPv4ValidProtocol "PF"
+        (OP.BinaryNode (
+            [classifiedL3],
+            [classifiedL3])) []
+
+    l3IPv4ValidChecksum = OP.getDecNode NB.L3IPv4ValidChecksum "PF"
+        (OP.BinaryNode (
+            [verifiedL3IPv4],
+            [verifiedL3IPv4])) []
+    
+    classifiedL3 = OP.getOperatorNode NB.OR NB.ClassifiedL3 ""
+        (OP.BinaryNode (
+            [classifiedL4UDP],
+            [])) []
+
+    classifiedL4UDP = OP.getDecNode NB.ClassifiedL4UDP "PF"
+        (OP.BinaryNode (
+            [l4UDPValidChecksum, l4UDPValidSrc, l4UDPValidDest, l4UDPValidLength, classifiedL4],
+            [])) []
+
+    l4UDPValidChecksum = OP.getDecNode NB.L4UDPValidChecksum "PF"
+        (OP.BinaryNode (
+            [verifiedL4UDP],
+            [verifiedL4UDP])) []
+
+    l4UDPValidSrc = OP.getDecNode NB.L4UDPValidSrc "PF"
+        (OP.BinaryNode (
+            [verifiedL4UDP],
+            [verifiedL4UDP])) []
+
+    l4UDPValidDest = OP.getDecNode NB.L4UDPValidDest "PF"
+        (OP.BinaryNode (
+            [verifiedL4UDP],
+            [verifiedL4UDP])) []
+
+    l4UDPValidLength = OP.getDecNode NB.L4UDPValidLength "PF"
+        (OP.BinaryNode (
+            [verifiedL4UDP],
+            [verifiedL4UDP])) []
+
+    verifiedL4UDP = OP.getOperatorNode NB.AND NB.VerifiedL4UDP ""
+        (OP.BinaryNode (
+            [verifiedL4],
+            [verifiedL4])) []
+
+    verifiedL3IPv4 = OP.getOperatorNode NB.AND NB.VerifiedL3IPv4 ""
+        (OP.BinaryNode (
+            [verifiedL4UDP],
+            [verifiedL4UDP])) []
+
+    classifiedL4 = OP.getOperatorNode NB.OR NB.ClassifiedL4 ""
+        (OP.BinaryNode (
+            [queue0],
+            [])) []
+
+    verifiedL4 = OP.getOperatorNode NB.OR NB.VerifiedL4 ""
+        (OP.BinaryNode (
+            [opANDL5ToKernel],
+            [opANDL5ToKernel])) []
 
 
 

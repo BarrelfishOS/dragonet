@@ -44,6 +44,7 @@ dotDoubleEdge (from,_) to =
 
 -- use only AND/OR for Op labels
 opLabel :: String -> String
+--opLabel x = x
 opLabel x | (L.isPrefixOf "OR" x) = "OR"
           | (L.isPrefixOf "AND" x) = "AND"
 	  | otherwise = x

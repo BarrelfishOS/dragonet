@@ -125,7 +125,7 @@ getE1kPRGSmall = etherClassified
         (OP.BinaryNode (
             l2AddrCheckList,
             [dropnode]))
-        getIncompletePRGNodeattr
+        []
 
     validAddrOptions = [NB.L2EtherValidBroadcast, NB.L2EtherValidMulticast,
         NB.L2EtherValidUnicast]

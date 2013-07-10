@@ -195,8 +195,9 @@ main :: IO()
 --main = testNetworkProcessing
 --main = allTests
 --main = testEmbeddingV2
+--main = testPRGAdjustment
+
 main = testEmbeddingSmall
 --main = testEmbeddingLargeV3
---main = testPRGAdjustment
 
 
