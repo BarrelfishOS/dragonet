@@ -131,10 +131,10 @@ testEmbeddingLargeV2 =
 
 
 
-testEmbeddingSmall :: IO ()
-testEmbeddingSmall =
+testEmbeddingPaper :: IO ()
+testEmbeddingPaper =
         do
-        putStrLn "Generating small testgraphs"
+        putStrLn "Generating graphs for paper"
 
         {-putStrLn "Edges in PRG graph"
         putStrLn prgEdges
@@ -142,10 +142,10 @@ testEmbeddingSmall =
         putStrLn "Edges in LPG graph"
         putStrLn lpgEdges-}
 
-        writeFile "LPGsmall.dot" $ DG.toDotFromDLP lpgDep
-        writeFile "PRGsmallUnconf.dot" $ DG.toDot prgUnconf
-        writeFile "PRGsmall.dot" $ DG.toDotFromDLP prgDep
-        writeFile "EMBEDDsmall.dot" $ DG.toDotFromDLP embedded
+        writeFile "LPGpaper.dot" $ DG.toDotFromDLP lpgDep
+        writeFile "PRGUnconfpaper.dot" $ DG.toDot prgUnconf
+        writeFile "PRGpaper.dot" $ DG.toDotFromDLP prgDep
+        writeFile "EmbeddedPaper.dot" $ DG.toDotFromDLP embedded
         putStrLn "Done..."
 
         where
@@ -197,7 +197,7 @@ main :: IO()
 --main = testEmbeddingV2
 --main = testPRGAdjustment
 
-main = testEmbeddingSmall
+main = testEmbeddingPaper
 --main = testEmbeddingLargeV3
 
 
