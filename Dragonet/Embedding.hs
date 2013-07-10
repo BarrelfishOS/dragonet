@@ -203,6 +203,62 @@ getAllDeps graphEdges gn = deps ++ indirectDeps
     indirectDeps = DL.concatMap (\ (x, y) -> getAllDeps graphEdges y) deps
 
 
+----------------------------------------------------------------
+-- Support functions which work on edges with labels
+----------------------------------------------------------------
+
+getfst :: (a, b, c) -> a
+getfst (x, y, z) = x
+
+getThird :: (a, b, c) -> c
+getThird (x, y, z) = z
+
+
+-- Get all nodes which don't have any dependencies
+noDepNodes1P :: (Eq a) =>[(a, b, a)] -> [a]
+noDepNodes1P depList = nonDep
+    where
+    srcNodes = DL.nub $ DL.map (getfst) depList
+    dstNodes = DL.nub $ DL.map (getThird) depList
+    nonDep = DL.filter (\ x -> x `DL.notElem` srcNodes ) dstNodes
+
+
+-- For given edges get all nodes which are at source
+getSRCNodesP :: (Eq a) => [(a, b, a)] -> [a]
+getSRCNodesP gedges = DL.map (getfst) gedges
+
+-- For given edges get all nodes which are at destination
+getDESTNodesP :: (Eq a) => [(a, b, a)] -> [a]
+getDESTNodesP gedges = DL.map (getThird) gedges
+
+-- For given edges get all nodes which appear anywhere
+getALLNodesP :: (Eq a) => [(a, b, a)] -> [a]
+getALLNodesP gedges = DL.nub $ (srcNodes ++ destNodes)
+    where
+    srcNodes = getSRCNodesP gedges
+    destNodes = getDESTNodesP gedges
+
+-- Find all edges where given Node appear at source
+locateAsSRCEdgeP :: (Eq a) => [(a, b, a)] -> a -> [(a, b, a)]
+locateAsSRCEdgeP gedges gn = DL.filter (\ (x, _, _) -> gn == x ) gedges
+
+-- Find all edges where given Node appear at destination (sink)
+locateAsDESTEdgeP :: (Eq a) => [(a, b, a)] -> a -> [(a, b, a)]
+locateAsDESTEdgeP gedges gn = DL.filter (\ (_, _, z) -> gn == z ) gedges
+
+-- Find all edges where given Node appear anywhere in edge
+locateAsANYEdgeP :: (Eq a) => [(a, b, a)] -> a -> [(a, b, a)]
+locateAsANYEdgeP gedges gn = DL.filter (\ (x, _, z) -> gn == x || gn == z) gedges
+
+-- Find all direct and indirect of given Node till there are no deps left
+getAllDepsP :: (Eq a) => [(a, b, a)] -> a -> [(a, b, a)]
+getAllDepsP graphEdges gn = deps ++ indirectDeps
+    where
+    deps = locateAsSRCEdgeP graphEdges gn
+    indirectDeps = DL.concatMap (\ (_, _, z) -> getAllDepsP graphEdges z) deps
+
+
+
 
 ----------------------------------------------------------------
 --      Embedding algorithm: Set based
@@ -239,7 +295,7 @@ embeddingV3Step sP (sE,sEv) (sU,sUv)
         sElpg = S.filter (flip S.notMember sPv . edgeStart) $ inEdges v sU
 
         sE' = sE `S.union` sEprg `S.union` sElpg
-        -- remove edges starting from v in 
+        -- remove edges starting from v in
         sU' = sU S.\\ (inEdges v sU)
 
         -- Move vertex from E to U
@@ -253,11 +309,16 @@ embeddingV3Wrapper ::  Node -> Node -> [(Node, String, Node)]
 embeddingV3Wrapper prg lpg =
     result ++ softImplEdge
     where
-    result = convert $ embeddingV3Step prgEdges (S.empty,S.empty) (lpgEdges, allNodesSet)
+--    result = convert $ embeddingV3Step prgEdges (S.empty,S.empty) (lpgEdges, allNodesSet)
+--    result = convert prgHWedges'
+    result = convert $ embeddingV3Step prgHWedges' (S.empty,S.empty) (lpgEdges, allNodesSet)
 
-    allNodesSet = (nodesSet lpgEdges) `S.union` (nodesSet prgEdges)
+--    allNodesSet = (nodesSet lpgEdges) `S.union` (nodesSet prgEdges)
+    allNodesSet = (nodesSet lpgEdges) `S.union` (nodesSet prgHWedges')
     prgNodes = DL.nub $ nTreeNodes prg
 
+    prgEmulatedNodes = DL.map (nodeDefinition) $
+        DL.filter (not . isNodeEmbebible) prgNodes
 
 
     nodeList = DL.nub (nTreeNodes lpg  ++ prgNodes ++ [swStartNode])
@@ -267,8 +328,17 @@ embeddingV3Wrapper prg lpg =
 
     lpgEdges = S.fromList $ DL.map convertEdgeP $ removeDroppedNodesP
             $  getDepEdgesP lpg
-    prgEdges = S.fromList $ DL.map convertEdgeP $ removeDroppedNodesP
-            $ getDepEdgesP prg
+--    prgEdges = S.fromList $ DL.map convertEdgeP $ removeDroppedNodesP
+--            $ getDepEdgesP prg
+    prgEdges = DL.map convertEdgeP $ removeDroppedNodesP $ getDepEdgesP prg
+
+    prgHWedges' = S.fromList $ prgHWedges
+
+--    prgHWedges = prgEdges
+
+    (prgHWedges, prgSWnodes) =  removeSWnodePRGP (DL.nub prgEdges)
+                                (isPRGNodeEmulated prgEmulatedNodes)
+
     defaultQueue = getDecNode (NB.ToQueue NB.getDefaultQueue) ""
         (BinaryNode ([], [])) []
     softImplEdge =  [((defaultQueue), "", (swStartNode))]
@@ -432,6 +502,7 @@ removeNode edgesG v = edgesG''
                 else [(x, y)]) edgesG'
 
 
+
 --
 -- remove all the nodes which are marked for sw execution
 --      prgFn is function which tells if given node a is software node or not
@@ -451,13 +522,68 @@ removeSWnodePRG prgEdges prgFn = (prgEdges', trueV)
         TR.trace ("nodes in HW " ++ show trueV)
         DL.foldl (\ acc x -> removeNode acc x) prgEdges trueV
 
-
 -- classify given edges based on some condition specified by function fn
 classifyDeps :: (Eq a) => [(a, a)] -> (a -> Bool) -> ([(a, a)], [(a, a)])
 classifyDeps graphEdges fn = (trueEdges, falseEdges)
     where
     trueEdges = DL.filter (\ (x, y) -> fn y) graphEdges
     falseEdges = DL.filter (\ (x, y) -> not $ fn y) graphEdges
+
+
+------------------------------------------------------------------------
+-- Graph trimming helper functions for graphs with edge label
+------------------------------------------------------------------------
+
+{-
+ - FIXME: I need to clearly understand, what exactly it means to drop the
+ -      node from PRG.  Specially, in presence of True/False ports,
+ -      it becomes much more complicated.
+ -}
+removeNodeP :: (Eq a) => (Show a) => (Show b) => [(a, b, a)] -> a -> [(a, b, a)]
+removeNodeP edgesG v =
+    --TR.trace ("Request to remove " ++ show v ++ " from graph " ++ show edgesG)
+    edgesG''
+    where
+    -- Note: assumption: there is only one node in graph with given name
+
+    sEdges n = DL.map (\ (x', l) -> (x', l, n)) $ DL.map
+        (\ (x, y, _) -> (x, y)) $ locateAsDESTEdgeP edgesG v
+    edgesG' = DL.concatMap (\ (x, l, y) -> if x == v then (sEdges y)
+                else [(x, l, y)]) edgesG
+
+    cNodes = getDESTNodesP $ locateAsSRCEdgeP edgesG v
+    dEdges n l = DL.map (\ x' -> (n, l, x')) cNodes
+    edgesG'' = DL.concatMap (\ (x, l, y) -> if y == v then (dEdges x l)
+                else [(x, l, y)]) edgesG'
+
+
+--
+-- remove all the nodes which are marked for sw execution
+--      prgFn is function which tells if given node a is software node or not
+removeSWnodePRGP :: (Eq a) => (Show a) => (Show b) => [(a, b, a)] -> (a -> Bool)
+    -> ([(a, b, a)], [a])
+removeSWnodePRGP prgEdges prgFn = (prgEdges', trueV)
+    where
+
+    -- Find all the nodes
+    allV = getALLNodesP prgEdges
+
+    -- Find set of nodes which should go in SW
+    trueV = DL.filter (prgFn) allV -- goes in software
+
+    -- Delete these nodes from PRG
+    prgEdges' =
+        DL.foldl (\ acc x -> removeNodeP acc x) prgEdges trueV
+
+
+-- classify given edges based on some condition specified by function fn
+classifyDepsP :: (Eq a) => [(a, b, a)] -> (a -> Bool)
+        -> ([(a, b, a)], [(a, b, a)])
+classifyDepsP graphEdges fn = (trueEdges, falseEdges)
+    where
+    trueEdges = DL.filter (\ (x, y, z) -> fn z) graphEdges
+    falseEdges = DL.filter (\ (x, y, z) -> not $ fn z) graphEdges
+
 
 ------------------------------------------------------------------
 --
