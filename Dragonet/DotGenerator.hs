@@ -42,6 +42,13 @@ dotDoubleEdge :: (String,String) -> String -> String
 dotDoubleEdge (from,_) to =
     "    " ++ from ++ ":e -> " ++ to ++ ":w[color=\"black:white:black\"];\n"
 
+-- use only AND/OR for Op labels
+opLabel :: String -> String
+opLabel x | (L.isPrefixOf "OR" x) = "OR"
+          | (L.isPrefixOf "AND" x) = "AND"
+	  | otherwise = x
+
+
 -- Get dot definition for specified node
 nodeDefinition :: (OP.Node, String) -> String
 nodeDefinition (n, nn) =
@@ -49,7 +56,7 @@ nodeDefinition (n, nn) =
         (OP.Des (OP.Decision gn)) ->
             dotNode nn (gLabelStr gn) "" $ ports $ OP.getNodeEdges n
         (OP.Opr (OP.Operator gn)) ->
-            dotNode nn (gLabelStr gn) "style=\"filled,rounded\",fillcolor=gray"
+            dotNode nn (opLabel (gLabelStr gn)) "style=\"filled,rounded\",fillcolor=gray"
                 $ ports $ OP.getNodeEdges n
         (OP.Conf (OP.Configuration gn)) ->
             dotNode nn (gLabelStr gn)
