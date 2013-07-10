@@ -5,7 +5,8 @@
 
 
 module DotGenerator(
-  toDot
+  toDot,
+  toDotClustered
 ) where
 
 import qualified Operations as OP
@@ -100,5 +101,31 @@ toDot n =
     where
         names = buildNames $ L.nub $ OP.nTreeNodes n
         definitions = concat $ map nodeDefinition names
+        edges = concat $ map (edgeDefinition names) names
+
+data Cluster = Cluster String [OP.Node] [Cluster]
+
+clusterDefinition :: [(String,OP.Node)] -> [(OP.Node,String)] -> [(String,String)] -> String -> String
+clusterDefinition nodes names clusters c =
+    if null c then
+        ndecls ++ cdecls
+    else
+        "subgraph cluster" ++ c ++ " {\n" ++ ndecls ++ cdecls ++
+            "\n    label=\"" ++ c ++ "\";\n}\n"
+    where
+        findAll a as = map snd $ filter ((== a) . fst) as
+        nDec n = nodeDefinition (n, (fromJust $ lookup n names))
+        ndecls = concatMap nDec $ findAll c nodes
+        cdecls = concatMap (clusterDefinition nodes names clusters) $ findAll c clusters
+
+-- Generate DOT string for specified graph (start node)
+toDotClustered :: [(String,String)] -> [(String,OP.Node)] -> String
+toDotClustered clusters nodeMap =
+    "digraph G {\n" ++ "    rankdir=LR;\n" ++
+        definitions ++ "\n" ++ edges ++ "}\n"
+    where
+        nodes = map snd nodeMap
+        names = buildNames $ nodes
+        definitions = clusterDefinition nodeMap names clusters ""
         edges = concat $ map (edgeDefinition names) names
 

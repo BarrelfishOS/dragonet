@@ -1,11 +1,11 @@
 #!/usr/bin/env runhaskell
 {-# LANGUAGE QuasiQuotes #-}
 
-import DragonetDSL
+import Unicorn
 import qualified Operations as OP
 import DotGenerator as DG
 
-[dragonet_f|lpgImpl.dragonet|]
+[unicorn_f|lpgImpl.unicorn|]
 
 main = do
-    putStrLn (DG.toDot source)
+    putStrLn (DG.toDotClustered lpgClusters lpgNodes)

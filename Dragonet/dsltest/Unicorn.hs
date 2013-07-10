@@ -1,8 +1,8 @@
-module DragonetDSL(
-    dragonet,
-    dragonet_f,
-    dragonetImpl,
-    dragonetImpl_f,
+module Unicorn(
+    unicorn,
+    unicorn_f,
+    unicornImpl,
+    unicornImpl_f,
 
 ) where
 
@@ -18,6 +18,7 @@ import qualified Text.ParserCombinators.Parsec.Token as P
 import qualified Language.Haskell.TH as TH
 import Language.Haskell.TH.Quote
 import Data.Maybe
+import Data.Either
 import qualified Data.List as L
 
 import qualified Operations as OP
@@ -25,41 +26,64 @@ import qualified Operations as OP
 
 
 
-dragonet  :: QuasiQuoter
-dragonet  =  QuasiQuoter { quoteExp = undefined,
+unicorn  :: QuasiQuoter
+unicorn  =  QuasiQuoter { quoteExp = undefined,
                            quotePat = undefined,
                            quoteType = undefined,
                            quoteDec = quoteMyDec
 }
 
-dragonetImpl  :: QuasiQuoter
-dragonetImpl  =  QuasiQuoter { quoteExp = undefined,
+unicornImpl  :: QuasiQuoter
+unicornImpl  =  QuasiQuoter { quoteExp = undefined,
                            quotePat = undefined,
                            quoteType = undefined,
                            quoteDec = quoteMyDecImpl
 }
 
 
-dragonet_f :: QuasiQuoter
-dragonet_f = quoteFile dragonet
+unicorn_f :: QuasiQuoter
+unicorn_f = quoteFile unicorn
 
-dragonetImpl_f :: QuasiQuoter
-dragonetImpl_f = quoteFile dragonetImpl
+unicornImpl_f :: QuasiQuoter
+unicornImpl_f = quoteFile unicornImpl
 
 
 
 -- That's where the magic happens: we get the string representing the DSL input
 -- and generate a Haskell AST
 quoteMyDec s = do
-    nodes <- parseGraph s
-    return (map declare nodes)
+    graph <- parseGraph s
+    return $ declare graph
 
 quoteMyDecImpl s = do
-    nodes <- parseGraph s
-    return ((map declare nodes) ++ (map implMap nodes))
+    graph <- parseGraph s
+    return (declare graph ++ implDec graph)
 
 
-declare n =
+declare (Graph name cluster) =
+    nodesDecl ++ clustersDecl
+    where
+        nodesDecl = map declareNode $ cNodesDeep cluster
+        clustersDecl = declareClusters name cluster
+
+flattenCluster (Cluster cn cs ns) =
+    (map (\(Cluster x _ _) -> (cn, x)) cs) ++ (concatMap flattenCluster cs)
+
+nodeClusterMap (Cluster cn cs ns) =
+    (map (\n -> (cn, n)) ns) ++ (concatMap nodeClusterMap cs)
+
+declareClusters gn cluster =
+    clusters:c2nodes:[]
+    where
+        clusters = TH.FunD (TH.mkName (gn ++ "Clusters")) [(TH.Clause [] (TH.NormalB clExp) [])]
+        tDecl (a,b) = TH.TupE [(TH.LitE (TH.StringL a)), (TH.LitE (TH.StringL b))]
+        clExp = TH.ListE $ map tDecl $ flattenCluster cluster
+
+        c2nodes = TH.FunD (TH.mkName (gn ++ "Nodes")) [(TH.Clause [] (TH.NormalB c2nExp) [])]
+        cnDecl (a,n) = TH.TupE [(TH.LitE (TH.StringL a)), (TH.VarE (TH.mkName (nName n)))]
+        c2nExp = TH.ListE $ map cnDecl $ nodeClusterMap cluster
+
+declareNode n =
     TH.FunD (TH.mkName (nName n)) [(TH.Clause [] (TH.NormalB (node n)) [])]
     where
         portEdge e = TH.VarE (TH.mkName e)
@@ -86,6 +110,9 @@ declare n =
                 (Or l _ _) -> opNode n ("OR:" ++ l)
 
 
+implDec (Graph name cluster) =
+    map implMap $ cNodesDeep cluster
+
 implMap n =
     TH.FunD (implNName $ nName n) [(TH.Clause [] (TH.NormalB (code)) [])]
     where
@@ -107,6 +134,9 @@ implMap n =
 -----------------------------------------------------------------------------
 -- Representing parsed code
 
+data Graph = Graph String Cluster
+data Cluster = Cluster String [Cluster] [Node]
+
 data Port = Port String [String]
     deriving Show
 data Node =
@@ -115,6 +145,11 @@ data Node =
     And String Port Port |
     Or String Port Port
     deriving Show
+
+cNodesDeep :: Cluster -> [Node]
+cNodesDeep (Cluster _ cs ns) = ns ++ concatMap cNodesDeep cs
+
+gNodes (Graph _ cs) = cNodesDeep cs
 
 nIsOp (And n _ _) = True
 nIsOp (Or n _ _) = True
@@ -184,7 +219,7 @@ node p = do
     reserved "node"
     n <- cIdentifier p
     ps <- braces $ many $ port p
-    return [(Node n (concat ps))]
+    return (Right (Node n (concat ps)))
 
 genBoolean p name = do
     reserved name
@@ -209,31 +244,33 @@ genBoolean p name = do
 
 boolean p = do
     (n, t, f) <- genBoolean p "boolean"
-    return [(Boolean n t f)]
+    return (Right (Boolean n t f))
         
 orN p = do
     (n, t, f) <- genBoolean p "or"
-    return [(Or n t f)]
+    return (Right (Or n t f))
 
 andN p = do
     (n, t, f) <- genBoolean p "and"
-    return [(And n t f)]
+    return (Right (And n t f))
   
 cluster p = do
     reserved "cluster"
     n <- identifier
     ns <- braces $ clusteredNodes (n:p)
-    return ns
+    return (Left (Cluster ((concat $ reverse p) ++ n) (lefts ns) (rights ns)))
 
 clusteredNodes p = do
     ns <- many (node p <|> boolean p <|> orN p <|> andN p <|> cluster p)
-    return $ concat ns
+    return $ ns
     
 
 graph = do
-    ns <- clusteredNodes []
+    reserved "graph"
+    gn <- identifier
+    ns <- braces $ clusteredNodes []
     eof
-    return ns
+    return (Graph gn (Cluster "" (lefts ns) (rights ns)))
 
 parseGraph s = case runParser graph () "" s of
       Left err  -> fail $ show err

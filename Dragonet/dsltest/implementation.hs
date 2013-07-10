@@ -1,7 +1,7 @@
 #!/usr/bin/env runhaskell
 {-# LANGUAGE QuasiQuotes #-}
 
-import DragonetDSL
+import Unicorn
 import qualified Operations as OP
 import qualified DotGenerator as DG
 
@@ -150,7 +150,7 @@ toPort = return
 
 
 
-sofwareRXImpl = toPort "out"
+softwareRXImpl = toPort "out"
 
 -----------------------------------------------------------------------------
 -- Ethernet
@@ -403,7 +403,7 @@ txL2EtherAddHdrDAddrImpl = toPort "true"
 
 
 -- get LPG
-[dragonetImpl_f|lpgImpl.dragonet|]
+[unicornImpl_f|lpgImpl.unicorn|]
 
 
 -----------------------------------------------------------------------------
@@ -515,7 +515,7 @@ executeNode (i:is) ret ctx =
 
 
 
-graphEdges = getEdgeList sofwareRXImplNode
+graphEdges = getEdgeList softwareRXImplNode
 
 main = do
     {-arpReq <- BS.readFile "packets/arp_request"
@@ -540,7 +540,7 @@ main = do
     putStrLn $ show $ execute dnsResp
 
     where
-        execute p = fst $ executeNode ts [(sofwareRXImplNode,sofwareRXImplNode,"in")] $ Context p M.empty
+        execute p = fst $ executeNode ts [(softwareRXImplNode,softwareRXImplNode,"in")] $ Context p M.empty
         ts = topSort $ graphEdges
         testIt p f =
             (op, ctxAttrs ctx)
