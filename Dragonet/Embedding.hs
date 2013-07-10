@@ -292,7 +292,8 @@ embeddingV3Step sP (sE,sEv) (sU,sUv)
         -- v's dependencies from PRG
         sEprg = S.filter ((v ==) . edgeEnd) sP -- S.map (mkEdge v) $ outNeighbours v sP
         -- v's dependencies from LPG
-        sElpg = S.filter (flip S.notMember sPv . edgeStart) $ inEdges v sU
+        sElpg' = S.filter (flip S.notMember sPv . edgeStart) $ inEdges v sU
+        sElpg = if v `S.notMember` sPv then sElpg' else S.empty
 
         sE' = sE `S.union` sEprg `S.union` sElpg
         -- remove edges starting from v in
