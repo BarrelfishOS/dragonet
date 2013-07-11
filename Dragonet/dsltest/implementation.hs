@@ -150,44 +150,44 @@ toPort = return
 
 
 
-softwareRXImpl = toPort "out"
+lpgSoftwareRXImpl = toPort "out"
 
 -----------------------------------------------------------------------------
 -- Ethernet
 
-rxL2EtherClassifiedImpl = do
+lpgRxL2EtherClassifiedImpl = do
     return "true"
 
-rxL2EtherValidLengthImpl = do
+lpgRxL2EtherValidLengthImpl = do
     len <- packetLen
     --toPort $ pbool (len >= 56)
     toPort $ pbool (len >= 14) -- Actually an ethernet frame needs to be
                                -- at least 56 bytes, in our packets the padding
                                -- is removed
 
-rxL2EtherValidTypeImpl = do
+lpgRxL2EtherValidTypeImpl = do
     etype <- readP16BE 12
     toPort $ pbool (etype >= 0x0800)
 
-rxL2EtherValidMulticastImpl = do
+lpgRxL2EtherValidMulticastImpl = do
     dmac <- readP 0 6
     toPort $ pbool
         ((dmac /= ([0xff, 0xff, 0xff, 0xff, 0xff, 0xff]) &&
         (((head dmac) .&. 1) == 1)))
    
 
-rxL2EtherValidBroadcastImpl = do
+lpgRxL2EtherValidBroadcastImpl = do
     dmac <- readP 0 6
     toPort $ pbool (dmac == ([0xff, 0xff, 0xff, 0xff, 0xff, 0xff]))
 
-rxL2EtherValidUnicastImpl = do
+lpgRxL2EtherValidUnicastImpl = do
     dmac <- readP8 0
     toPort $ pbool $ ((dmac .&. 1) == 0)
 
-rxL2EtherValidSrcImpl = do
+lpgRxL2EtherValidSrcImpl = do
     toPort "true"
 
-rxL2EtherClassifyL3Impl = do
+lpgRxL2EtherClassifyL3Impl = do
     etype <- readP16BE 12
     setAttr "L3Offset" (AttrI 14)
     toPort $ case etype of
@@ -200,7 +200,7 @@ rxL2EtherClassifyL3Impl = do
 -----------------------------------------------------------------------------
 -- ARP
 
-rxL3ARPValidHeaderLengthImpl = do
+lpgRxL3ARPValidHeaderLengthImpl = do
     (AttrI off) <- getAttr "L3Offset"
     len <- packetLen
     -- hardcoded for Ethernet/IPv4
@@ -212,7 +212,7 @@ rxL3ARPValidHeaderLengthImpl = do
         return "false"
         
 
-rxL3ARPClassifyImpl = do
+lpgRxL3ARPClassifyImpl = do
     (AttrI off) <- getAttr "L3Offset"
     oper <- readP16BE (off + 6)
     return $ case oper of
@@ -243,7 +243,7 @@ ipChecksum p = cxsm
         cxsm32 = xor 0xffff $ foldInt $ foldInt s32
         cxsm = fromIntegral cxsm32 :: Word16
 
-rxL3IPv4ValidHeaderLengthImpl = do
+lpgRxL3IPv4ValidHeaderLengthImpl = do
     (AttrI off) <- getAttr "L3Offset"
     len <- packetLen
     if ((len - off) < 20) then
@@ -253,32 +253,32 @@ rxL3IPv4ValidHeaderLengthImpl = do
         toPort $ pbool $ (hlen >= 20 && (len - off) >= hlen)
 
 -- For now we just make sure the packet is not fragmented
-rxL3IPv4ValidReassemblyImpl = do
+lpgRxL3IPv4ValidReassemblyImpl = do
     (AttrI off) <- getAttr "L3Offset"
     fragOff <- readP16BE $ off + 6
     toPort $ pbool $ ((fragOff .&. 0x2000) == 0 && (fragOff .&. 0x1fff) == 0)
 
 
-rxL3IPv4ValidVersionImpl = do
+lpgRxL3IPv4ValidVersionImpl = do
     (AttrI off) <- getAttr "L3Offset"
     ver <- readP8 off
     toPort $ pbool ((shiftR ver 4) == 4)
 
-rxL3IPv4ValidLengthImpl = do
+lpgRxL3IPv4ValidLengthImpl = do
     (AttrI off) <- getAttr "L3Offset"
     len <- packetLen
     ipLen <- readP16BE (off + 2)    
     toPort $ pbool ((fromIntegral ipLen :: Int) + off <= len)
 
-rxL3IPv4ValidTTLImpl = toPort "true"
+lpgRxL3IPv4ValidTTLImpl = toPort "true"
 
-rxL3IPv4ValidChecksumImpl = do
+lpgRxL3IPv4ValidChecksumImpl = do
     (AttrI off) <- getAttr "L3Offset"
     hlen <- ipHeaderLen
     pkt <- readP off hlen
     toPort $ pbool $ (ipChecksum pkt) == 0
 
-rxL3IPv4ClassifyImpl = do
+lpgRxL3IPv4ClassifyImpl = do
     (AttrI off) <- getAttr "L3Offset"
     hlen <- ipHeaderLen
     setAttr "L4Offset" $ AttrI $ off + hlen
@@ -293,12 +293,12 @@ rxL3IPv4ClassifyImpl = do
 -----------------------------------------------------------------------------
 -- IPv6
 
-rxL3IPv6ValidHeaderLengthImpl = toPort "true"
+lpgRxL3IPv6ValidHeaderLengthImpl = toPort "true"
 
 
 -----------------------------------------------------------------------------
 -- ICMP
-rxL3ICMPValidHeaderLengthImpl = toPort "true"
+lpgRxL3ICMPValidHeaderLengthImpl = toPort "true"
 
 
 -----------------------------------------------------------------------------
@@ -310,18 +310,18 @@ ipv4Pseudoheader p len = do
     dIP <- readP (off + 16) 4
     return (sIP ++ dIP ++ [0] ++ [p] ++ (unpack16BE len))
 
-rxL4UDPValidHeaderLengthImpl = do
+lpgRxL4UDPValidHeaderLengthImpl = do
     (AttrI off) <- getAttr "L4Offset"
     len <- packetLen
     toPort $ pbool ((len - off) >= 8)
 
-rxL4UDPValidLengthImpl = do
+lpgRxL4UDPValidLengthImpl = do
     (AttrI off) <- getAttr "L4Offset"
     len <- packetLen
     udpLen <- readP16BE (off + 4)
     toPort $ pbool (len >= (fromIntegral udpLen) + off)
 
-rxL4UDPValidChecksumImpl = do
+lpgRxL4UDPValidChecksumImpl = do
     (AttrI off) <- getAttr "L4Offset"
     len <- packetLen
     cxsm <- readP16BE (off + 6)
@@ -333,17 +333,17 @@ rxL4UDPValidChecksumImpl = do
 -----------------------------------------------------------------------------
 -- TCP
 
-rxL4TCPValidHeaderLengthImpl = toPort "true"   
+lpgRxL4TCPValidHeaderLengthImpl = toPort "true"   
 
 -----------------------------------------------------------------------------
 -- Application RX
 
-rxToIPv4LocalImpl = do
+lpgRxToIPv4LocalImpl = do
     (AttrI off) <- getAttr "L3Offset"
     dIP <- readP32BE (off + 16)
     toPort $ pbool $ dIP == 0x8184666f
 
-rxToUDPPortDNSImpl = do
+lpgRxToUDPPortDNSImpl = do
     (AttrI off) <- getAttr "L4Offset"
     dPort <- readP16BE (off + 2)
     toPort $ pbool $ dPort == 51098
@@ -352,45 +352,45 @@ rxToUDPPortDNSImpl = do
 
 
 -- Sinks
-packetDropImpl = toPort "Packet dropped!"
-rxL3ARPRequestImpl = toPort "Got ARP request!"
-rxL3ARPResponseImpl = toPort "Got ARP response!"
-rxL3ICMPOutImpl = toPort "Got ICMP packet!"
-rxL4TCPOutImpl = toPort "Got TCP packet!"
-rxL4UDPOutImpl = toPort "Got UDP packet!"
-rxDnsRXImpl = toPort "Got DNS packet!"
+lpgPacketDropImpl = toPort "Packet dropped!"
+lpgRxL3ARPRequestImpl = toPort "Got ARP request!"
+lpgRxL3ARPResponseImpl = toPort "Got ARP response!"
+lpgRxL3ICMPOutImpl = toPort "Got ICMP packet!"
+lpgRxL4TCPOutImpl = toPort "Got TCP packet!"
+lpgRxL4UDPOutImpl = toPort "Got UDP packet!"
+lpgRxDnsRXImpl = toPort "Got DNS packet!"
 
 -- Nodes for tx side
-txSourceImpl = toPort "true"
-softwareTXImpl = toPort "true"
-txARPTXImpl = toPort "true"
-txExampleDnsTXImpl = toPort "true"
-txExampleDns6TXImpl = toPort "true"
-txL4UDPAddHeaderImpl = toPort "true"
-txL4UDPAddHdrDPortImpl = toPort "true"
-txL4UDPAddHdrSPortImpl = toPort "true"
-txL4UDPAddHdrChecksumImpl = toPort "true"
-txL4UDPAddHdrLengthImpl = toPort "true"
-txL3IPv4AddHeaderImpl = toPort "true"
-txL3IPv4AddHdrProtoImpl = toPort "true"
-txL3IPv4AddHdrProtoUDP_Impl = toPort "true"
-txL3IPv4AddHdrVersionImpl = toPort "true"
-txL3IPv4AddHdrIHLImpl = toPort "true"
-txL3IPv4AddHdrTotLenImpl = toPort "true"
-txL3IPv4AddHdrTTLImpl = toPort "true"
-txL3IPv4AddHdrSAddrImpl = toPort "true"
-txL3IPv4AddHdrDAddrImpl = toPort "true"
-txL3IPv6AddHeaderImpl = toPort "true"
-txL3IPv6AddHdrVersionImpl = toPort "true"
-txL3IPv6AddHdrSAddrImpl = toPort "true"
-txL3IPv6AddHdrDAddrImpl = toPort "true"
-txL2EtherAddHeaderImpl = toPort "true"
-txL2EtherAddHdrTypeImpl = toPort "true"
-txL2EtherAddHdrTypeIPv4_Impl = toPort "true"
-txL2EtherAddHdrTypeIPv6_Impl = toPort "true"
-txL2EtherAddHdrTypeARP_Impl = toPort "true"
-txL2EtherAddHdrSAddrImpl = toPort "true"
-txL2EtherAddHdrDAddrImpl = toPort "true"
+lpgTxSourceImpl = toPort "true"
+lpgSoftwareTXImpl = toPort "true"
+lpgTxARPTXImpl = toPort "true"
+lpgTxExampleDnsTXImpl = toPort "true"
+lpgTxExampleDns6TXImpl = toPort "true"
+lpgTxL4UDPAddHeaderImpl = toPort "true"
+lpgTxL4UDPAddHdrDPortImpl = toPort "true"
+lpgTxL4UDPAddHdrSPortImpl = toPort "true"
+lpgTxL4UDPAddHdrChecksumImpl = toPort "true"
+lpgTxL4UDPAddHdrLengthImpl = toPort "true"
+lpgTxL3IPv4AddHeaderImpl = toPort "true"
+lpgTxL3IPv4AddHdrProtoImpl = toPort "true"
+lpgTxL3IPv4AddHdrProtoUDP_Impl = toPort "true"
+lpgTxL3IPv4AddHdrVersionImpl = toPort "true"
+lpgTxL3IPv4AddHdrIHLImpl = toPort "true"
+lpgTxL3IPv4AddHdrTotLenImpl = toPort "true"
+lpgTxL3IPv4AddHdrTTLImpl = toPort "true"
+lpgTxL3IPv4AddHdrSAddrImpl = toPort "true"
+lpgTxL3IPv4AddHdrDAddrImpl = toPort "true"
+lpgTxL3IPv6AddHeaderImpl = toPort "true"
+lpgTxL3IPv6AddHdrVersionImpl = toPort "true"
+lpgTxL3IPv6AddHdrSAddrImpl = toPort "true"
+lpgTxL3IPv6AddHdrDAddrImpl = toPort "true"
+lpgTxL2EtherAddHeaderImpl = toPort "true"
+lpgTxL2EtherAddHdrTypeImpl = toPort "true"
+lpgTxL2EtherAddHdrTypeIPv4_Impl = toPort "true"
+lpgTxL2EtherAddHdrTypeIPv6_Impl = toPort "true"
+lpgTxL2EtherAddHdrTypeARP_Impl = toPort "true"
+lpgTxL2EtherAddHdrSAddrImpl = toPort "true"
+lpgTxL2EtherAddHdrDAddrImpl = toPort "true"
 
 
 
@@ -515,7 +515,7 @@ executeNode (i:is) ret ctx =
 
 
 
-graphEdges = getEdgeList softwareRXImplNode
+graphEdges = getEdgeList lpgSoftwareRXImplNode
 
 main = do
     {-arpReq <- BS.readFile "packets/arp_request"
@@ -540,7 +540,7 @@ main = do
     putStrLn $ show $ execute dnsResp
 
     where
-        execute p = fst $ executeNode ts [(softwareRXImplNode,softwareRXImplNode,"in")] $ Context p M.empty
+        execute p = fst $ executeNode ts [(lpgSoftwareRXImplNode,lpgSoftwareRXImplNode,"in")] $ Context p M.empty
         ts = topSort $ graphEdges
         testIt p f =
             (op, ctxAttrs ctx)
