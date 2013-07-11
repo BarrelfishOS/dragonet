@@ -57,7 +57,8 @@ nodeDefinition (n, nn) =
         (OP.Des (OP.Decision gn)) ->
             dotNode nn (gLabelStr gn) "" $ ports $ OP.getNodeEdges n
         (OP.Opr (OP.Operator gn)) ->
-            dotNode nn (opLabel (gLabelStr gn)) "style=\"filled,rounded\",fillcolor=gray"
+--            dotNode nn (opLabel (gLabelStr gn)) "style=\"filled,rounded\",fillcolor=gray"
+            dotNode nn ((gLabelStr gn)) "style=\"filled,rounded\",fillcolor=gray"
                 $ ports $ OP.getNodeEdges n
         (OP.Conf (OP.Configuration gn)) ->
             dotNode nn (gLabelStr gn)
@@ -149,7 +150,7 @@ edgeDefinitionDLP names (f,p,t) = dotEdge (fname,p) tname
     where
         fname = fromJust $ myLookup f names
         tname = fromJust $ myLookup t names
-        
+
 
 toDotFromDLP :: [(OP.Node,String,OP.Node)] -> String
 toDotFromDLP ns =
