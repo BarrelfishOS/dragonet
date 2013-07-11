@@ -95,7 +95,7 @@ testEmbeddingLargeV3 =
         lpg = NP.getNetworkDependency
         lpgDep = EM.removeDroppedNodesP $ EM.getDepEdgesP lpg
 
-        embedded = EM.testEmbeddingV3 prg lpg
+        embedded = EM.testEmbeddingSet prg lpg
 
 
 testEmbeddingLargeV2 :: IO ()
@@ -127,7 +127,50 @@ testEmbeddingLargeV2 =
         lpg = NP.getNetworkDependency
         lpgDep = EM.removeDroppedNodes $ EM.getDepEdges lpg
 
-        embedded = EM.testEmbeddingV2 prg lpg
+        embedded = EM.testEmbeddingList prg lpg
+
+
+
+
+testEmbeddingQueue :: IO ()
+testEmbeddingQueue =
+        do
+        putStrLn "Generating graphs to test queue embedding"
+
+        {-putStrLn "Edges in PRG graph"
+        putStrLn prgEdges
+
+        putStrLn "Edges in LPG graph"
+        putStrLn lpgEdges-}
+
+        writeFile ("LPG" ++ suffix  ++ ".dot") $  toDotFn lpgDep
+        writeFile ("PRGUnconf" ++ suffix  ++ ".dot") $ DG.toDot prgUnconf
+        writeFile ("PRG" ++ suffix  ++ ".dot") $ toDotFn  prgDep
+        writeFile ("Embedded" ++ suffix  ++ ".dot") $ toDotFn  embedded
+        putStrLn "Done..."
+
+        where
+        suffix = "Queue"
+        prgUnconf = E10k.getE1kPRGSmall
+        prg = OP.applyConfigWrapperList prgUnconf E10k.getTestcaseConfiguration
+
+        {-prgEdges = EM.testEmbeddingSTR prg
+        lpgEdges = EM.testEmbeddingSTR lpg-}
+        lpg = NP.getNetworkDependencyQueue
+
+        -- Set version
+        prgDep = EM.removeDroppedNodesP $ EM.getDepEdgesP prg
+        lpgDep = EM.removeDroppedNodesP $ EM.getDepEdgesP lpg
+        embedded = EM.testEmbeddingSet prg lpg
+        toDotFn = DG.toDotFromDLP
+
+{-
+        -- list version
+        prgDep = EM.removeDroppedNodes $ EM.getDepEdges prg
+        lpgDep = EM.removeDroppedNodes $ EM.getDepEdges lpg
+        embedded = EM.testEmbeddingList prg lpg
+        toDotFn = DG.toDotFromDL
+-}
 
 
 
@@ -142,22 +185,36 @@ testEmbeddingPaper =
         putStrLn "Edges in LPG graph"
         putStrLn lpgEdges-}
 
-        writeFile "LPGpaper.dot" $ DG.toDotFromDLP lpgDep
-        writeFile "PRGUnconfpaper.dot" $ DG.toDot prgUnconf
-        writeFile "PRGpaper.dot" $ DG.toDotFromDLP prgDep
-        writeFile "EmbeddedPaper.dot" $ DG.toDotFromDLP embedded
+        writeFile ("LPG" ++ suffix  ++ ".dot") $  toDotFn lpgDep
+        writeFile ("PRGUnconf" ++ suffix  ++ ".dot") $ DG.toDot prgUnconf
+        writeFile ("PRG" ++ suffix  ++ ".dot") $ toDotFn  prgDep
+        writeFile ("Embedded" ++ suffix  ++ ".dot") $ toDotFn  embedded
         putStrLn "Done..."
 
         where
+        suffix = "paper"
         prgUnconf = E10k.getE1kPRGSmall
         prg = OP.applyConfigWrapperList prgUnconf E10k.getTestcaseConfiguration
 
-        prgDep = EM.removeDroppedNodesP $ EM.getDepEdgesP prg
-        {-prgEdges = EM.testEmbeddingSTR prg
-        lpgEdges = EM.testEmbeddingSTR lpg-}
+        {-
+        prgEdges = EM.testEmbeddingSTR prg
+        lpgEdges = EM.testEmbeddingSTR lpg
+        -}
         lpg = NP.getNetworkDependencySmall
+
+        -- Set version
+        prgDep = EM.removeDroppedNodesP $ EM.getDepEdgesP prg
         lpgDep = EM.removeDroppedNodesP $ EM.getDepEdgesP lpg
-        embedded = EM.testEmbeddingV3 prg lpg
+        embedded = EM.testEmbeddingSet prg lpg
+        toDotFn = DG.toDotFromDLP
+
+{-
+        -- list version
+        prgDep = EM.removeDroppedNodes $ EM.getDepEdges prg
+        lpgDep = EM.removeDroppedNodes $ EM.getDepEdges lpg
+        embedded = EM.testEmbeddingList prg lpg
+        toDotFn = DG.toDotFromDL
+-}
 
 testPRGAdjustment :: IO ()
 testPRGAdjustment =
@@ -194,7 +251,7 @@ main :: IO()
 --main = testE10k
 --main = testNetworkProcessing
 --main = allTests
---main = testEmbeddingV2
+--main = testEmbeddingList
 --main = testPRGAdjustment
 
 main = testEmbeddingPaper
