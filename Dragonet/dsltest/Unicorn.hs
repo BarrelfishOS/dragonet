@@ -63,7 +63,7 @@ quoteMyDecImpl s = do
 declare (Graph name cluster) =
     nodesDecl ++ clustersDecl
     where
-        nodesDecl = map declareNode $ cNodesDeep cluster
+        nodesDecl = map (declareNode name) $ cNodesDeep cluster
         clustersDecl = declareClusters name cluster
 
 flattenCluster (Cluster cn cs ns) =
@@ -80,13 +80,14 @@ declareClusters gn cluster =
         clExp = TH.ListE $ map tDecl $ flattenCluster cluster
 
         c2nodes = TH.FunD (TH.mkName (gn ++ "Nodes")) [(TH.Clause [] (TH.NormalB c2nExp) [])]
-        cnDecl (a,n) = TH.TupE [(TH.LitE (TH.StringL a)), (TH.VarE (TH.mkName (nName n)))]
+        cnDecl (a,n) = TH.TupE [(TH.LitE (TH.StringL a)), (TH.VarE (TH.mkName (gn ++ (nName n))))]
         c2nExp = TH.ListE $ map cnDecl $ nodeClusterMap cluster
 
-declareNode n =
-    TH.FunD (TH.mkName (nName n)) [(TH.Clause [] (TH.NormalB (node n)) [])]
+declareNode graph n =
+    TH.FunD (TH.mkName $ fname n) [(TH.Clause [] (TH.NormalB (node n)) [])]
     where
-        portEdge e = TH.VarE (TH.mkName e)
+        fname m = graph ++ (nName m)
+        portEdge e = TH.VarE (TH.mkName $ graph ++ e)
         port (Port _ ns) = TH.ListE (map portEdge ns)
         binEdges t f =
             TH.AppE (TH.ConE (TH.mkName "OP.BinaryNode")) $
@@ -111,15 +112,16 @@ declareNode n =
 
 
 implDec (Graph name cluster) =
-    map implMap $ cNodesDeep cluster
+    map (implMap name) $ cNodesDeep cluster
 
-implMap n =
-    TH.FunD (implNName $ nName n) [(TH.Clause [] (TH.NormalB (code)) [])]
+implMap graph n =
+    TH.FunD (implNName $ fname n) [(TH.Clause [] (TH.NormalB (code)) [])]
     where
-        edge e = TH.VarE $ implNName e
+        fname m = graph ++ (nName m)
+        edge e = TH.VarE $ implNName $ graph ++ e
         port (Port pn es)  = TH.TupE [TH.LitE $ TH.StringL pn, TH.ListE $ map edge es]
         plistExp = TH.ListE $ map port $ nPorts n
-        nodeExp = TH.VarE $ TH.mkName $ nName n
+        nodeExp = TH.VarE $ TH.mkName $ fname n
         implExp =
             if nIsOp n then
                 TH.ConE $ TH.mkName "Nothing"
@@ -127,7 +129,7 @@ implMap n =
                 TH.AppE (TH.ConE $ TH.mkName "Just") $ TH.VarE implName
         implNodeExp = TH.ConE $ TH.mkName "ImplNode"
         code = foldl TH.AppE implNodeExp [nodeExp, implExp, plistExp]
-        implName = TH.mkName (nName n ++ "Impl")
+        implName = TH.mkName (fname n ++ "Impl")
         implNName m = TH.mkName  (m ++ "ImplNode")
     
     
@@ -179,7 +181,7 @@ lexer = P.makeTokenParser P.LanguageDef {
     P.identLetter = Parsec.alphaNum <|> Parsec.char '_',
     P.opStart = Parsec.oneOf "",
     P.opLetter = Parsec.oneOf "",
-    P.reservedNames = ["cluster", "node", "boolean", "and", "or", "port"],
+    P.reservedNames = ["graph", "cluster", "node", "boolean", "and", "or", "port"],
     P.reservedOpNames = [],
     P.caseSensitive = True }
     
@@ -266,6 +268,7 @@ clusteredNodes p = do
     
 
 graph = do
+    whitespace
     reserved "graph"
     gn <- identifier
     ns <- braces $ clusteredNodes []

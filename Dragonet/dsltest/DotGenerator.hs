@@ -6,7 +6,8 @@
 
 module DotGenerator(
   toDot,
-  toDotClustered
+  toDotClustered,
+  toDotFromDLP
 ) where
 
 import qualified Operations as OP
@@ -128,4 +129,60 @@ toDotClustered clusters nodeMap =
         names = buildNames $ nodes
         definitions = clusterDefinition nodeMap names clusters ""
         edges = concat $ map (edgeDefinition names) names
+
+
+
+myLookup :: OP.Node -> [(OP.Node,a)] -> Maybe a
+myLookup x l =
+    case f of
+        Nothing -> Nothing
+        Just (_,r) ->  Just r
+    where
+        f = L.find (\(y,_) -> OP.nCompPrgLpgV2 x y) l
+
+
+
+
+edgeDefinitionDL :: [(OP.Node,String)] -> (OP.Node,OP.Node) -> String
+edgeDefinitionDL names (f,t) = dotEdge (fname,"") tname
+    where
+        fname = fromJust $ myLookup f names
+        tname = fromJust $ myLookup t names
+
+
+toDotFromDL :: [(OP.Node,OP.Node)] -> String
+toDotFromDL ns =
+    "digraph G {\n" ++ "    rankdir=LR;\n" ++
+        definitions ++ "\n" ++ edges ++ "}\n"
+    where
+        names = buildNames $ L.nubBy OP.nCompPrgLpgV2 $ (map fst ns) ++ (map snd ns)
+        definitions = concat $ map nodeDefinition names
+        edges = concat $ map (edgeDefinitionDL names) ns
+
+
+
+
+
+edgeDefinitionDLP :: [(OP.Node,String)] -> (OP.Node,String,OP.Node) -> String
+edgeDefinitionDLP names (f,p,t) =
+    if null p then
+        dotDoubleEdge (fname,p) tname
+    else
+        dotEdge (fname,p) tname
+    where
+        fname = fromJust $ myLookup f names
+        tname = fromJust $ myLookup t names
+
+
+toDotFromDLP :: [(OP.Node,String,OP.Node)] -> String
+toDotFromDLP ns =
+    "digraph G {\n" ++ "    rankdir=LR;\n" ++
+        definitions ++ "\n" ++ edges ++ "}\n"
+    where
+        fst' (a,_,_) = a
+        third (_,_,a) = a
+        names = buildNames $ L.nubBy OP.nCompPrgLpgV2 $ (map fst' ns) ++ (map third ns)
+        definitions = concat $ map nodeDefinition names
+        edges = concat $ map (edgeDefinitionDLP names) ns
+
 

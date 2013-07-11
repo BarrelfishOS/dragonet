@@ -13,6 +13,7 @@ module Operations(
     , GNode(..)
     , Node(..)
     , NodeEdges(..)
+    , NodeCompare(..)
     , getDecNode
     , getOperatorNode
     , getConfNode
@@ -21,6 +22,9 @@ module Operations(
     , appendToTrue
     , appendToFalse
     , nTreeNodes
+    , getDropNode
+    , getNodeAttributes
+    , nLabel
 ) where
 
 import qualified Data.List as L
@@ -80,11 +84,34 @@ data Configuration = Configuration (GNode String String ConfFunction)
 data Operator = Operator (GNode String String OpFunction)
     deriving (Show, Eq)
 
+class NodeCompare a where
+    nCompPrgLpg :: a -> a -> Bool
+    nCompPrgLpgV2 :: a -> a -> Bool
+
 
 data Node = Des Decision
     | Conf Configuration -- (GNode NB.ConfLabel ConfFunction) --
     | Opr Operator -- (GNode NB.OpLabel OpFunction) --
     deriving (Show, Eq)
+
+instance NodeCompare Node where
+    nCompPrgLpg (Des (Decision n1)) (Des (Decision n2)) =
+        -- todo: was embedCompare
+        (gLabel n1) == (gLabel n2)
+    nCompPrgLpg _ _ = False
+
+    nCompPrgLpgV2 (Des (Decision n1)) (Des (Decision n2)) =
+        (gLabel n1) == (gLabel n2)
+    nCompPrgLpgV2 (Opr (Operator n1)) (Opr (Operator n2)) =
+        (gLabel n1) == (gLabel n2)
+    nCompPrgLpgV2 _ _ = False
+ 
+
+
+nLabel :: Node -> String
+nLabel (Des (Decision gn)) = gLabel gn
+nLabel (Conf (Configuration gn)) = gLabel gn
+nLabel (Opr (Operator gn)) = gLabel gn
 
 
 -- Get list containing all nodes reachable from the specified start node.
@@ -152,5 +179,15 @@ appendToFalse :: Node -> Node -> Node
 appendToFalse orig toAdd = case getNodeEdges orig of
     BinaryNode (tl, fl) -> setNodeEdges orig $ BinaryNode (tl, fl ++ [toAdd] )
     NaryNode _          -> error "assumption about node being Binary is wrong."
+
+
+getDropNode :: Node
+getDropNode = getDecNode "packetDrop" "Drop" (BinaryNode ([],[]))
+
+getNodeAttributes :: Node -> [String]
+getNodeAttributes node = case node of
+    Des (Decision (GNode _ _ a _  _)) -> a
+    Conf (Configuration (GNode _ _ a _  _)) -> a
+    Opr (Operator (GNode _ _ a _  _)) -> a
 
 
