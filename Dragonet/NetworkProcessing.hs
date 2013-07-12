@@ -12,6 +12,7 @@
 module NetworkProcessing (
     getNetworkDependency
     , getNetworkDependencySmall
+    , getNetworkDependencyQueue
 ) where
 
 import qualified Data.List as DL
@@ -69,6 +70,67 @@ getEthernetProcessingLPG classified verified dropnode = etherClassified
     etherValidType = OP.getDecNode NB.L2EtherValidType "PF" classified  []
 
 
+getNetworkDependencyQueue :: OP.Node
+getNetworkDependencyQueue = classifiedL4
+    where
+    dropnode = OP.getDropNode
+
+    l4f1 = NB.getFlow (NB.TCP, NB.IPv4) (NB.getANYL4Address, NB.getANYL3Address)
+            ((NB.L4Address 80), NB.getANYL3Address)
+
+
+    l4f2 = NB.getFlow (NB.UDP, NB.IPv6)
+            ((NB.L4Address 3556), (NB.toIP "192.123.2.2"))
+            ((NB.L4Address 45), (NB.toIP "192.123.2.33"))
+
+    flow1 = OP.getDecNode (NB.IsL5Flow l4f1) ""
+        (OP.BinaryNode (
+            [opANDToWebServer],
+            [opANDL5ToKernel]) ) []
+
+    flow2 = OP.getDecNode (NB.IsL5Flow l4f2) ""
+        (OP.BinaryNode (
+            [opANDToSmallApp],
+            [opANDL5ToKernel]) ) []
+
+    webApp = (NB.ToApplication (NB.Application "ApacheWebServer") )
+    webServer = OP.getDecNode (webApp) ""
+        (OP.BinaryNode (
+            [],
+            []) ) []
+
+    opANDToWebServer = OP.getOperatorNode NB.AND webApp ""
+        (OP.BinaryNode ([webServer], [])) []
+
+    smallAppL = (NB.ToApplication (NB.Application "RandomApp") )
+    smallApp = OP.getDecNode (smallAppL) ""
+        (OP.BinaryNode (
+            [],
+            []) ) []
+
+    opANDToSmallApp = OP.getOperatorNode NB.AND smallAppL ""
+        (OP.BinaryNode ([smallApp], [])) []
+
+
+    defaultKernel = (NB.ToApplication (NB.Application "Kernel") )
+    opANDL5ToKernel = OP.getOperatorNode NB.AND defaultKernel ""
+        (OP.BinaryNode ([], [])) []
+
+    classifiedL4 = OP.getOperatorNode NB.OR NB.ClassifiedL4 ""
+        (OP.BinaryNode (
+            [flow1, flow2],
+--            [queue0],
+            [])) []
+
+    verifiedL4 = OP.getOperatorNode NB.OR NB.VerifiedL4 ""
+        (OP.BinaryNode (
+            [opANDL5ToKernel, opANDToWebServer,  opANDToSmallApp],
+            [])) []
+
+
+
+
+
 getNetworkDependencySmall :: OP.Node
 getNetworkDependencySmall = etherClassified
     where
@@ -80,13 +142,54 @@ getNetworkDependencySmall = etherClassified
 
     etherClassified = getEthernetProcessingLPG l2Classified l2Verified dropnode
 
+
+    l4f1 = NB.getFlow (NB.TCP, NB.IPv4) (NB.getANYL4Address, NB.getANYL3Address)
+            ((NB.L4Address 80), NB.getANYL3Address)
+
+
+    l4f2 = NB.getFlow (NB.UDP, NB.IPv6)
+            ((NB.L4Address 3556), (NB.toIP "192.123.2.2"))
+            ((NB.L4Address 45), (NB.toIP "192.123.2.33"))
+
+    flow1 = OP.getDecNode (NB.IsL5Flow l4f1) ""
+        (OP.BinaryNode (
+            [opANDToWebServer],
+            [opANDL5ToKernel]) ) []
+
+    flow2 = OP.getDecNode (NB.IsL5Flow l4f2) ""
+        (OP.BinaryNode (
+            [opANDToSmallApp],
+            [opANDL5ToKernel]) ) []
+
     q0 = NB.Queue 0 0 NB.getDefaultBasicQueue
     queue0 = OP.getDecNode (NB.ToQueue q0) ""
         (OP.BinaryNode (
             [opANDL5ToKernel],
             [opANDL5ToKernel]) ) []
 
-    opANDL5ToKernel = OP.getOperatorNode NB.AND NB.ToDefaultKernelProcessing ""
+    webApp = (NB.ToApplication (NB.Application "ApacheWebServer") )
+    webServer = OP.getDecNode (webApp) ""
+        (OP.BinaryNode (
+            [],
+            []) ) []
+
+
+
+    opANDToWebServer = OP.getOperatorNode NB.AND webApp ""
+        (OP.BinaryNode ([webServer], [])) []
+
+    smallAppL = (NB.ToApplication (NB.Application "RandomApp") )
+    smallApp = OP.getDecNode (smallAppL) ""
+        (OP.BinaryNode (
+            [],
+            []) ) []
+
+    opANDToSmallApp = OP.getOperatorNode NB.AND smallAppL ""
+        (OP.BinaryNode ([smallApp], [])) []
+
+
+    defaultKernel = (NB.ToApplication (NB.Application "Kernel") )
+    opANDL5ToKernel = OP.getOperatorNode NB.AND defaultKernel ""
         (OP.BinaryNode ([], [])) []
 
     classifiedL3IPv6 = OP.getDecNode NB.ClassifiedL3IPv6 "PF"
@@ -108,7 +211,7 @@ getNetworkDependencySmall = etherClassified
         (OP.BinaryNode (
             [verifiedL3IPv4],
             [verifiedL3IPv4])) []
-    
+
     classifiedL3 = OP.getOperatorNode NB.OR NB.ClassifiedL3 ""
         (OP.BinaryNode (
             [classifiedL4UDP],
@@ -151,13 +254,15 @@ getNetworkDependencySmall = etherClassified
 
     classifiedL4 = OP.getOperatorNode NB.OR NB.ClassifiedL4 ""
         (OP.BinaryNode (
-            [queue0],
+            [flow1, flow2],
+--            [queue0],
             [])) []
 
     verifiedL4 = OP.getOperatorNode NB.OR NB.VerifiedL4 ""
         (OP.BinaryNode (
-            [opANDL5ToKernel],
-            [opANDL5ToKernel])) []
+            [opANDL5ToKernel, opANDToWebServer,  opANDToSmallApp],
+            [])) []
+
 
 
 

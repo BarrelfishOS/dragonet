@@ -5,10 +5,10 @@
 
 
 module Embedding(
-    testEmbeddingV2
+    testEmbeddingList
     , testPRGrearrangement
     , testEmbeddingSTR
-    , testEmbeddingV3
+    , testEmbeddingSet
     , getDepEdgesP
     , getDepEdges
     , removeDroppedNodesP
@@ -266,61 +266,186 @@ getAllDepsP graphEdges gn = deps ++ indirectDeps
 ----------------------------------------------------------------
 
 
-edgeStart (n,_,_) = n
-edgeEnd (_,_,n) = n
-nodesSet s = (S.map edgeStart s) `S.union` (S.map edgeEnd s)
-inEdges n s = S.filter ((n ==) . edgeEnd) s
-outEdges n s = S.filter ((n ==) . edgeStart) s
-inNeighbours n s = S.map edgeStart $ inEdges n s
 
---embeddingV3Step sP sE [] = sE
---embeddingV3Step :: ((Show a), (Ord a)) => S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a)
-embeddingV3Step :: (Ord a) => S.Set (a,a,a) -> (S.Set (a,a,a), S.Set a) -> (S.Set (a,a,a), S.Set a) -> S.Set (a,a,a)
-embeddingV3Step sP (sE,sEv) (sU,sUv)
+{-
+-- Get all nodes from edge set
+nodesSet s = (S.map edgeStart s) `S.union` (S.map edgeEnd s)
+
+-- set of all edges which are incoming to node n
+inEdges n s = S.filter ((n ==) . edgeEnd) s
+
+-- set of all edges which are outgoing from node n
+outEdges n s = S.filter ((n ==) . edgeStart) s
+
+-- set of all nodes which appear immediately before node n
+--      ie: they are parent of node n
+--      ie: n is dependent on them
+inNeighbours n s = S.map edgeStart $ inEdges n s
+-}
+
+{-
+--embeddingSetStep sP sE [] = sE
+--embeddingSetStep :: ((Show a), (Ord a)) => S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a)
+embeddingSetStep :: (Ord a) => S.Set (a,a,a) -> (S.Set (a,a,a), S.Set a) -> (S.Set (a,a,a), S.Set a) -> S.Set (a,a,a)
+embeddingSetStep sP (sE,sEv) (sU,sUv)
     | S.null sU = sE
     | sEv == sEv' = error "E not changing"
-    | otherwise = embeddingV3Step sP (sE',sEv') (sU',sUv')
+    | otherwise = embeddingSetStep sP (sE',sEv') (sU',sUv')
     where
-        sPv = nodesSet sP
+        sPv = nodesSet sP -- All the vertices from PRG
 
         -- Find dependencies of specified node in LPG and PRG
+        --      PS: shouldn't this be dependencies in embedded and unembedded LPG???
         deps n = (inNeighbours n sE) `S.union` (inNeighbours n sP)
 
         -- Find a node whose dependencies are already embedded
         v = S.findMin $ S.filter (flip S.isSubsetOf sEv . deps) sUv
+        -- PS: v = any {x | x elem sU ^ forAll (x, y) -> y elem sE }
 
         -- v's dependencies from PRG
-        sEprg = S.filter ((v ==) . edgeEnd) sP -- S.map (mkEdge v) $ outNeighbours v sP
-        -- v's dependencies from LPG
+        --sEprg = S.filter ((v ==) . edgeEnd) sP
+        sEprg = inEdges v sP  -- PS: this is more concise
+
+        -- v's dependencies from LPG (after removing those which are already in PRG)
         sElpg' = S.filter (flip S.notMember sPv . edgeStart) $ inEdges v sU
+
+        -- if node v does not go in hardware then take LPG deps, otherwise don't
         sElpg = if v `S.notMember` sPv then sElpg' else S.empty
 
+        -- Finally, the edges associated with v are those from prg and lpg
+        --          after filtering lpg edges
+        -- So, Lets move the selected edges in embedded
         sE' = sE `S.union` sEprg `S.union` sElpg
-        -- remove edges starting from v in
+
+        -- we will remove selected edges from unembedded part
         sU' = sU S.\\ (inEdges v sU)
 
         -- Move vertex from E to U
         sEv' = S.insert v sEv
         sUv' = S.delete v sUv
+-}
+
+-- Get all nodes from edge set
+--nodesSetC s = s.fromList $ EL.nubBy (comFn) $ DL.unionBy (comFn)
+--    (S.toList (S.map edgeStart s))  (S.toList (S.map edgeEnd s))
+
+edgeStart (n,_,_) = n -- get nodes which are at SRC of some edge
+edgeEnd (_,_,n) = n -- get nodes which are at DEST of some edge
+
+
+myUnion cmpFn s1 s2 = S.fromList $ DL.unionBy (cmpFn) (S.toList s1)
+    (S.toList s2)
+
+--myUnion3 cmpFn (s11, s12, s13) (s21, s22, s23) =
+myUnion3 cmpFn (s1) (s2) =
+    S.fromList $ DL.unionBy (\ (a, b ,c) (x, y, z) ->
+        (cmpFn a x) && (cmpFn b y) && (cmpFn c z))
+        (S.toList s1) (S.toList s2)
+
+
+-- Get all nodes from edge set
+nodesSetC cmpFn s = myUnion cmpFn (S.map edgeStart s) (S.map edgeEnd s)
+
+
+-- set of all edges which are incoming to node n
+inEdgesC cfn n s = S.filter ((cfn n) . edgeEnd) s
+
+-- set of all edges which are outgoing from node n
+outEdgesC cfn n s = S.filter (((cfn n)) . edgeStart) s
+
+-- set of all nodes which appear immediately before node n
+--      ie: they are parent of node n
+--      ie: n is dependent on them
+inNeighboursC cfn n s = S.map edgeStart $ inEdgesC cfn n s
+
+
+-- mySetDiff cmpFn = 'S.\\'
+
+mySetDiff cmpFn s1 s2 = S.fromList diff
+    where
+    u = DL.unionBy cmpFn l1 l2
+    intersect = DL.intersectBy cmpFn l1 l2
+    u' = DL.nubBy cmpFn u
+    diff = DL.deleteFirstsBy cmpFn u' intersect
+    l1 = S.toList s1
+    l2 = S.toList s2
+
+
+myNotMember cmpFn v s = [] ==  DL.filter (cmpFn v) (S.toList s)
+
+myInsert cmpFn x s1 = S.fromList uList
+    where
+    l1 = S.toList s1
+    l2 = [x]
+    uList = DL.unionBy cmpFn l1 l2
+
+
+myDelete cmpFn x s1 = S.filter (not . cmpFn x) s1
+
+embeddingSetStepV2 :: (Ord a) => (a -> a -> Bool) -> S.Set (a,a,a)
+        -> (S.Set (a,a,a), S.Set a) -> (S.Set (a,a,a), S.Set a) -> S.Set (a,a,a)
+embeddingSetStepV2 cmpFn sP (sE,sEv) (sU,sUv)
+    | S.null sU = sE
+    | sEv == sEv' = error "E not changing"
+--    | otherwise = embeddingSetStepV2 cmpFn sP (sE',sEv') (sU',sUv')
+    | otherwise = embeddingSetStepV2 cmpFn sP (sE',sEv') (sU',sUv')
+    where
+        sPv = nodesSetC cmpFn sP -- All the vertices from PRG
+
+        -- Find dependencies of specified node in LPG and PRG
+        --      PS: shouldn't this be dependencies in embedded and unembedded LPG???
+--        deps n = (inNeighbours n sE) `S.union` (inNeighbours n sP)
+        deps n = myUnion cmpFn (inNeighboursC cmpFn n sE) (inNeighboursC cmpFn n sU)
+
+        -- Find a node whose dependencies are already embedded
+        v = S.findMin $ S.filter (flip S.isSubsetOf sEv . deps) sUv
+        -- PS: v = any {x | x elem sU ^ forAll (x, y) -> y elem sE }
+
+        -- v's dependencies from PRG
+        --sEprg = S.filter ((v ==) . edgeEnd) sP
+        sEprg = inEdgesC cmpFn v sP  -- PS: this is more concise
+
+        -- v's dependencies from LPG (after removing those which are already in PRG)
+        sElpg' = S.filter (flip (myNotMember cmpFn) sPv . edgeStart) $ inEdgesC cmpFn v sU
+
+        -- if node v does not go in hardware then take LPG deps, otherwise don't
+        sElpg = if myNotMember cmpFn v sPv then sElpg' else S.empty
+
+        -- Finally, the edges associated with v are those from prg and lpg
+        --          after filtering lpg edges
+        -- So, Lets move the selected edges in embedded
+        sE' = myUnion3 cmpFn (myUnion3 cmpFn sE sEprg) sElpg
+
+        -- we will remove selected edges from unembedded part
+        -- sU' = sU mySetDiff cmpFn  (inEdgesC cmpFn v sU)
+        sU' = sU S.\\ (inEdgesC cmpFn v sU)
+
+        -- Move vertex from E to U
+        sEv' = myInsert cmpFn v sEv
+        sUv' = myDelete cmpFn v sUv
+
 
 
 -- Takes Nodes, converts them into String, applies the embedding algorithm
 --      convert back the results into Node format
-embeddingV3Wrapper ::  Node -> Node -> [(Node, String, Node)]
-embeddingV3Wrapper prg lpg =
-    result ++ softImplEdge
+embeddingSet ::  Node -> Node -> [(Node, String, Node)]
+embeddingSet prg lpg =
+    result -- ++ softImplEdge
     where
---    result = convert $ embeddingV3Step prgEdges (S.empty,S.empty) (lpgEdges, allNodesSet)
+--    result = convert $ embeddingSetStep prgEdges (S.empty,S.empty) (lpgEdges, allNodesSet)
 --    result = convert prgHWedges'
-    result = convert $ embeddingV3Step prgHWedges' (S.empty,S.empty) (lpgEdges, allNodesSet)
+--    result = convert $ embeddingSetStep prgHWedges' (S.empty,S.empty) (lpgEdges, allNodesSet)
+--
+
+    cmpFn = (==)
+    result = convert $ embeddingSetStepV2 (==) prgHWedges' (S.empty,S.empty) (lpgEdges, allNodesSet)
 
 --    allNodesSet = (nodesSet lpgEdges) `S.union` (nodesSet prgEdges)
-    allNodesSet = (nodesSet lpgEdges) `S.union` (nodesSet prgHWedges')
+    allNodesSet = (nodesSetC cmpFn lpgEdges) `S.union` (nodesSetC cmpFn prgHWedges')
     prgNodes = DL.nub $ nTreeNodes prg
 
     prgEmulatedNodes = DL.map (nodeDefinition) $
         DL.filter (not . isNodeEmbebible) prgNodes
-
 
     nodeList = DL.nub (nTreeNodes lpg  ++ prgNodes ++ [swStartNode])
     convert n = map (\ x -> convertEdgeToNodeP nodeList x) $ S.toList n
@@ -329,16 +454,17 @@ embeddingV3Wrapper prg lpg =
 
     lpgEdges = S.fromList $ DL.map convertEdgeP $ removeDroppedNodesP
             $  getDepEdgesP lpg
+
 --    prgEdges = S.fromList $ DL.map convertEdgeP $ removeDroppedNodesP
 --            $ getDepEdgesP prg
     prgEdges = DL.map convertEdgeP $ removeDroppedNodesP $ getDepEdgesP prg
 
     prgHWedges' = S.fromList $ prgHWedges
 
---    prgHWedges = prgEdges
+    prgHWedges = prgEdges
 
-    (prgHWedges, prgSWnodes) =  removeSWnodePRGP (DL.nub prgEdges)
-                                (isPRGNodeEmulated prgEmulatedNodes)
+--    (prgHWedges, prgSWnodes) =  removeSWnodePRGP (DL.nub prgEdges)
+--                                (isPRGNodeEmulated prgEmulatedNodes)
 
     defaultQueue = getDecNode (NB.ToQueue NB.getDefaultQueue) ""
         (BinaryNode ([], [])) []
@@ -347,11 +473,13 @@ embeddingV3Wrapper prg lpg =
 
 
 removeDroppedNodesP :: [(Node, String, Node)] -> [(Node, String, Node)]
+removeDroppedNodesP edgeList = edgeList
+{-
 removeDroppedNodesP edgeList = DL.filter (\ (x,_,y) ->
     not ( (nCompPrgLpg y dnode) ||  (nCompPrgLpg y dnode) ) ) edgeList
     where
     dnode = getDropNode
-
+-}
 
 
 ----------------------------------------------------------------
@@ -367,13 +495,13 @@ removeDroppedNodesP edgeList = DL.filter (\ (x,_,y) ->
  -      some children in H/W ---> (boundary case) copy PRG deps for nodes in HW
  -                                  copy LPG deps for nodes in SW
 -}
-embeddingV2Step :: (Show a) => (Eq a) => a -> [(a, a)] -> (a -> Bool) ->
+embeddingListStep :: (Show a) => (Eq a) => a -> [(a, a)] -> (a -> Bool) ->
     (([(a, a)], [(a, a)]), [(a, a)]) ->  (([(a, a)], [(a, a)]), [(a, a)])
-embeddingV2Step swStartNode prgEdges prgFn ((embedHW, embedSW), lpgUnembedded)
+embeddingListStep swStartNode prgEdges prgFn ((embedHW, embedSW), lpgUnembedded)
     | lpgUnembedded == []   = ((embedHW, embedSW), [])
     | offendingDeps /= []   = error ("few deps of next Node to embedd [ " ++
             (show vNext) ++ " ]  are not embedded ")
-    | otherwise             = embeddingV2Step swStartNode prgEdges prgFn
+    | otherwise             = embeddingListStep swStartNode prgEdges prgFn
                     ((embedHW', embedSW'), lpgUnembedded')
     where
     allLPGEdges = lpgUnembedded ++ (embedHW ++ embedSW)
@@ -598,8 +726,8 @@ isPRGNodeEmulated vList v = DL.elem v vList
 
 -- Takes Nodes, converts them into String, applies the embedding algorithm
 --      convert back the results into Node format
-embeddingV2Wrapper ::  Node -> Node -> [(Node, Node)]
-embeddingV2Wrapper prg lpg
+embeddingList ::  Node -> Node -> [(Node, Node)]
+embeddingList prg lpg
     | unemb == [] = TR.trace ("\n\n\nDone with embedding "
             ++ "\nIn HW {{{\n" ++ ((DL.concatMap showEdgeGen (DL.nub embHW)))
             ++ "}}}\n\nIn SW {{{\n" ++ ((DL.concatMap showEdgeGen (DL.nub embSW)))
@@ -623,7 +751,7 @@ embeddingV2Wrapper prg lpg
     embSW' = DL.map (\ x -> convertEdgeToNode nodeList x) $ DL.nub embSW
     swStartNode = getSoftStartNode
     swStartNode1 = nodeDefinition swStartNode
-    ((embHW, embSW), unemb) = embeddingV2Step swStartNode1 prgHWedges -- prgEdges
+    ((embHW, embSW), unemb) = embeddingListStep swStartNode1 prgHWedges -- prgEdges
         (isPRGNodeEmulated prgEmulatedNodes)  (([], []), lpgEdges)
     --emb = DL.nub (embHW ++ embSW)
     lpgEdges = DL.nub $ DL.map convertEdge $ removeDroppedNodes
@@ -654,20 +782,19 @@ topoSortEdges unSorted = sortedE
 --      Testing code
 ----------------------------------------------------------------
 
-testEmbeddingV2 :: Node -> Node -> [(Node, Node)]
---testEmbeddingV2 prg lpg = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges lpg
---testEmbeddingV2 prg lpg = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges prg
-testEmbeddingV2 prg lpg = embeddingV2Wrapper prg lpg
+testEmbeddingList :: Node -> Node -> [(Node, Node)]
+--testEmbeddingList prg lpg = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges lpg
+--testEmbeddingList prg lpg = DL.reverse $ topoSortEdges $ DL.nub $ getDepEdges prg
+testEmbeddingList prg lpg = embeddingList prg lpg
 
-testEmbeddingV3 :: Node -> Node -> [(Node, String, Node)]
-testEmbeddingV3 prg lpg = embeddingV3Wrapper prg lpg
 
+testEmbeddingSet :: Node -> Node -> [(Node, String, Node)]
+testEmbeddingSet prg lpg = embeddingSet prg lpg
 
 
 testEmbeddingSTR :: Node -> String
 testEmbeddingSTR graph = text
     where
-
     prgNodes = DL.nub $ nTreeNodes graph
     prgEmulatedNodes = DL.map (nodeDefinition) $
         DL.filter (not . isNodeEmbebible) prgNodes
