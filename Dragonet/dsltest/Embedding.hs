@@ -112,6 +112,9 @@ topSort es =
 getfst :: (a, b, c) -> a
 getfst (x, _, _) = x
 
+get3snd :: (a, b, c) -> b
+get3snd (_, p, _) = p
+
 getThird :: (a, b, c) -> c
 getThird (_, _, z) = z
 
@@ -148,16 +151,24 @@ locateAsDESTEdgeP gedges gn = L.filter (\ (_, _, z) -> gn == z ) gedges
 ----------------------------------------------------------------
 
 
+edgeStart :: (a,b,c) -> a
 edgeStart (n,_,_) = n
+edgeStart (n,_,_) = n
+
+edgeEnd :: (a,b,c) -> c
 edgeEnd (_,_,n) = n
+
+nodesSet :: ((Ord a),(Ord b)) => S.Set (a,b,a) -> S.Set a
 nodesSet s = (S.map edgeStart s) `S.union` (S.map edgeEnd s)
+
 inEdges n s = S.filter ((n ==) . edgeEnd) s
 outEdges n s = S.filter ((n ==) . edgeStart) s
 inNeighbours n s = S.map edgeStart $ inEdges n s
 
+
 --embeddingV3Step sP sE [] = sE
 --embeddingV3Step :: ((Show a), (Ord a)) => S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a)
-embeddingV3Step :: (Ord a) => S.Set (a,a,a) -> (S.Set (a,a,a), S.Set a) -> (S.Set (a,a,a), S.Set a) -> S.Set (a,a,a)
+embeddingV3Step :: ((Ord a), (Ord b)) => S.Set (a,b,a) -> (S.Set (a,b,a), S.Set a) -> (S.Set (a,b,a), S.Set a) -> S.Set (a,b,a)
 embeddingV3Step sP (sE,sEv) (sU,sUv)
     | S.null sU = sE
     | sEv == sEv' = error "E not changing"
@@ -207,7 +218,6 @@ embeddingV3Wrapper prg lpg =
     nodeList = L.nub (nTreeNodes lpg  ++ prgNodes ++ [swStartNode])
     convert n = map (\ x -> convertEdgeToNodeP nodeList x) $ S.toList n
     swStartNode = getSoftStartNode
-    swStartNode1 = nodeDefinition swStartNode
 
     lpgEdges = S.fromList $ L.map convertEdgeP $ removeDroppedNodesP
             $  getDepEdgesP lpg
@@ -234,6 +244,123 @@ removeDroppedNodesP edgeList = L.filter (\ (_,_,y) ->
     where
     dnode = getDropNode
 
+
+
+
+
+
+
+
+--class EmbeddableNode a where
+--    embIsLPG :: a -> Bool
+--    embIsPRG :: a -> Bool
+
+data ENode =
+    ELPG String |
+    EPRG String
+    deriving (Show, Eq, Ord)
+
+enLabel :: ENode -> String
+enLabel (ELPG l) = l
+enLabel (EPRG l) = l
+
+--instance (EmbeddableNode ENode) where
+--    embIsLPG (ELPG _) = True
+--    embIsLPG _ = Fasle
+
+
+matchLabel :: ENode -> ENode -> Bool
+matchLabel a b = (enLabel a) == (enLabel b)
+
+
+--embeddingV4Step :: ((Ord a), (Ord b)) => S.Set (a,b,a) -> (S.Set (a,b,a), S.Set a) -> (S.Set (a,b,a), S.Set a) -> S.Set (a,b,a)
+embeddingV4 :: ((Ord a),(Show a)) => S.Set (ENode,a,ENode) -> S.Set (ENode,a,ENode) -> S.Set (ENode,a,ENode)
+embeddingV4 prg lpg =
+    embeddingV4Step (S.empty,S.empty) lpgNodes
+    where
+    prgNodes = nodesSet prg
+    lpgNodes = nodesSet lpg
+    memberL n s = not $ S.null $ S.filter (matchLabel n) s
+    isSubsetOfL a b = all (flip memberL b) $ S.toList a
+    nodeL n s = S.findMin $ S.filter (matchLabel n) s
+    setMinusL a b = S.filter (not . flip memberL b) a
+
+    prgDeps n = inNeighbours n prg
+    lpgDeps n = inNeighbours n lpg
+
+    embeddingV4Step (sEn,sEe) sUn
+        | S.null sUn = sEe
+        | not $ sEn `S.isProperSubsetOf` sEn' = error "E not growing"
+        | otherwise = embeddingV4Step (sEn',sEe') sUn'
+        where
+            (sEn',sEe') = (sEn `S.union` newNodes, sEe `S.union` newEdges)
+            sUn' = sUn `setMinusL` newNodes
+
+            -- Find a node whose dependencies are already embedded
+            v = S.findMin $ S.filter (flip isSubsetOfL sEn . lpgDeps) sUn
+
+
+            -- Find nodes and edges to add
+            (newNodes,newEdges) = case prgEmb of
+                Just a -> a        -- Take from PRG
+                Nothing -> lpgEmb  -- Take from LPG
+
+            prgEmb =
+                if v `memberL` prgNodes then
+                    pullPRGNode (nodeL v prgNodes) (Just (S.empty,S.empty))
+                else
+                    Nothing
+
+
+            pullPRGNode _ Nothing = Nothing
+            pullPRGNode n (Just (ns,es))
+                | n `S.member` sEn = Just (ns,es) -- we arrived an an already embedded PRG node
+                | n `memberL` sEn = Nothing  -- oops, node is embedded from LPG, this won't work
+                | otherwise =
+                    S.foldr pullPRGNode (Just (ns',es')) $ prgDeps n
+                    where
+                        ns' = S.insert n ns
+                        es' = S.union es $ inEdges n prg
+                    
+            lpgNodeConvert n = nodeL n sEn
+            lpgEdgeConvert (s,p,d) = ((lpgNodeConvert s),p,d)
+            lpgEmb = (S.singleton v, S.map lpgEdgeConvert $ inEdges v lpg)
+            
+
+convertV4 :: S.Set (ENode,String,ENode) -> [(Node,String,Node)]
+convertV4 edges =
+    TR.trace ("edges = " ++ (show edges)) (map convertEdge $ S.toList edges)
+    where
+        convertEdge (a,p,b) = ((convertNode a),p,(convertNode b))
+        
+        convertNode :: ENode -> Node
+        convertNode n = nodeF l "" e
+            where
+                el = enLabel n
+                l = case n of
+                    (ELPG s) -> "LPG:" ++ s
+                    (EPRG s) -> "PRG:" ++ s
+                nodeF = if (take 3 el) == "OR:" || (take 4 el) == "AND:" then
+                        getOperatorNode
+                    else
+                        getDecNode
+                outedges = S.filter ((== n) . getfst) edges
+                ports = S.map get3snd outedges
+                edge p = (p, map (convertNode . getThird) $ S.toList $ S.filter ((== p) . get3snd) outedges)
+                epl = map edge $ S.toList ports
+                e = NaryNode epl
+
+-- Takes Nodes, converts them into String, applies the embedding algorithm
+--      convert back the results into Node format
+embeddingV4Wrapper ::  Node -> Node -> [(Node, String, Node)]
+embeddingV4Wrapper prg lpg =
+    convertV4 $ embeddingV4 prgEdges lpgEdges
+    where
+    lpgEdges = S.fromList $ map lpgConvert $ map convertEdgeP $ getDepEdgesP lpg
+    prgEdges = S.fromList $ map prgConvert $ map convertEdgeP $ getDepEdgesP prg
+
+    lpgConvert (a,p,b) = ((ELPG a),p,(ELPG b))
+    prgConvert (a,p,b) = ((EPRG a),p,(EPRG b))
 
 
 ----------------------------------------------------------------
@@ -310,7 +437,7 @@ isPRGNodeEmulated vList v = L.elem v vList
 ----------------------------------------------------------------
 
 testEmbeddingV3 :: Node -> Node -> [(Node, String, Node)]
-testEmbeddingV3 prg lpg = embeddingV3Wrapper prg lpg
+testEmbeddingV3 prg lpg = embeddingV4Wrapper prg lpg
 
 ----------------------------------------------------------------
 
