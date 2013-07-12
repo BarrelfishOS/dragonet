@@ -101,11 +101,13 @@ declareNode graph n =
         edges (And _ t f) = binEdges t f
         edges (Or _ t f) = binEdges t f
         decNode n = TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getDecNode")) (TH.LitE (TH.StringL (nName n)))) (TH.LitE (TH.StringL ""))) (edges n)
+        confNode n = TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getConfNode")) (TH.LitE (TH.StringL (nName n)))) (TH.LitE (TH.StringL ""))) (edges n)
         opNode n op = TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getOperatorNode")) (TH.LitE (TH.StringL op))) (TH.LitE (TH.StringL ""))) (edges n)
 
         node n =
             case n of
                 (Node _ _) -> decNode n
+                (Config _ _) -> confNode n
                 (Boolean _ _ _) -> decNode n
                 (And l _ _) -> opNode n ("AND:" ++ l)
                 (Or l _ _) -> opNode n ("OR:" ++ l)
@@ -143,6 +145,7 @@ data Port = Port String [String]
     deriving Show
 data Node =
     Node String [Port] |
+    Config String [Port] |
     Boolean String Port Port |
     And String Port Port |
     Or String Port Port
@@ -158,12 +161,14 @@ nIsOp (Or n _ _) = True
 nIsOp _ = False
 
 nName (Node n _) = n
+nName (Config n _) = n
 nName (Boolean n _ _) = n
 nName (And n _ _) = n
 nName (Or n _ _) = n
 
 nPorts :: Node -> [Port]
 nPorts (Node _ ps) = ps
+nPorts (Config _ ps) = ps
 nPorts (Boolean _ a b) = [a, b]
 nPorts (And _ a b) = [a, b]
 nPorts (Or _ a b) = [a, b]
@@ -181,7 +186,7 @@ lexer = P.makeTokenParser P.LanguageDef {
     P.identLetter = Parsec.alphaNum <|> Parsec.char '_',
     P.opStart = Parsec.oneOf "",
     P.opLetter = Parsec.oneOf "",
-    P.reservedNames = ["graph", "cluster", "node", "boolean", "and", "or", "port"],
+    P.reservedNames = ["graph", "cluster", "node", "config", "boolean", "and", "or", "port"],
     P.reservedOpNames = [],
     P.caseSensitive = True }
     
@@ -217,11 +222,20 @@ port p = do
         port ds n = Port n ds
         ports ns ds = map (port ds) ns
 
-node p = do
-    reserved "node"
+genNaryNode p name = do
+    reserved name
     n <- cIdentifier p
     ps <- braces $ many $ port p
-    return (Right (Node n (concat ps)))
+    return (n,(concat ps))
+
+
+node p = do
+    (name,ports) <- genNaryNode p "node"
+    return (Right (Node name ports))
+
+config p = do
+    (name,ports) <- genNaryNode p "config"
+    return (Right (Config name ports))
 
 genBoolean p name = do
     reserved name
@@ -263,7 +277,7 @@ cluster p = do
     return (Left (Cluster ((concat $ reverse p) ++ n) (lefts ns) (rights ns)))
 
 clusteredNodes p = do
-    ns <- many (node p <|> boolean p <|> orN p <|> andN p <|> cluster p)
+    ns <- many (node p <|> config p <|> boolean p <|> orN p <|> andN p <|> cluster p)
     return $ ns
     
 
