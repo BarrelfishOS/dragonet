@@ -6,6 +6,7 @@ import qualified Operations as OP
 import DotGenerator as DG
 import Embedding as E
 import qualified Data.List as L
+import Data.Maybe
 
 [unicorn|
 graph prg {
@@ -15,8 +16,12 @@ graph prg {
             port false[] }
 
         boolean ValidType {
-            port true[ValidCRC]
+            port true[CValidCRC]
             port false[] }
+
+        config CValidCRC {
+            port true[ValidCRC]
+            port false[ValidBroadcast ValidMulticast ValidUnicast] }
 
         boolean ValidCRC {
             attr "foo"
@@ -138,11 +143,60 @@ graph lpg {
 
 strEdge (a,_,b) = "(" ++ (OP.nLabel a) ++ "," ++ (OP.nLabel b) ++ ")"
 
+applyConfig :: [(String,String)] -> [(OP.Node,String,OP.Node)] -> [(OP.Node,String,OP.Node)]
+applyConfig cfg g =
+    cleaned
+    where
+        isConfN :: OP.Node -> Bool
+        isConfN (OP.Conf _) = True
+        isConfN _ = False
+
+        fst3 (a,_,_) = a
+        third3 (_,_,a) = a
+
+        sminus a b = filter (not . (flip elem b)) a
+
+        edge :: (OP.Node,String,OP.Node) -> [(OP.Node,String,OP.Node)]
+        edge (n1,p,n2) =
+            if isConfN n1 then
+                []
+            else if isConfN n2 then
+                map (\n -> (n1,p,n)) $ confDests n2
+            else
+                [(n1,p,n2)]
+
+        confDests :: OP.Node -> [OP.Node]
+        confDests n = map (\(_,_,c) -> c) $
+            filter (\(a,b,_) -> a == n && b == (fromJust $ lookup (OP.nLabel n) cfg)) g
+
+        sources g' = (map fst3 g') `sminus` (map third3 g')
+        configured = concatMap edge g
+
+        cleaned = rmNewSources configured
+
+        rmNode g' n = filter (\a -> fst3 a /= n && third3 a /= n) g'
+
+        rmNewSources g'
+            | (null newSources) = g'
+            | otherwise = rmNewSources g''
+            where
+                newSources = (sources g') `sminus` (sources g)
+                n = head newSources
+                g'' = rmNode g' n
+
 main = do
-    --putStrLn (DG.toDotClustered lpgClusters lpgNodes)
+    --putStrLn (DG.toDotClustered prgClusters prgNodes)
     putStrLn (DG.toDotFromDLP embedded)
+    --putStrLn (DG.toDotFromDLP prg)
     --putStrLn ("[" ++ (L.intercalate "\n" $ map strEdge lpgDep) ++ "]")
     where
-        embedded = E.testEmbeddingV3 prgL2EtherClassified lpgL2EtherClassified
+        embedded = E.testEmbeddingV3 prg lpg
+
+        prgU = E.getDepEdgesP prgL2EtherClassified
+        prg = applyConfig config prgU
+        lpg = E.getDepEdgesP lpgL2EtherClassified
+
+        config = [("L2EtherCValidCRC", "true")]
+
         {-prgDep = L.nub $ E.removeDroppedNodesP $ E.getDepEdgesP $ prgL2EtherClassified
         lpgDep = L.nub $ E.removeDroppedNodesP $ E.getDepEdgesP $ lpgL2EtherClassified-}

@@ -94,9 +94,12 @@ declareNode graph n =
                 TH.TupE [(port t), (port f)]
         lblPort p = TH.TupE [(TH.LitE $ TH.StringL name), (port p)]
             where (Port name _) = p
-        edges (Node l ps as) =
+        naryEdges ps = 
             TH.AppE (TH.ConE (TH.mkName "OP.NaryNode")) $
                 TH.ListE $ map lblPort ps
+
+        edges (Node l ps as) = naryEdges ps
+        edges (Config l ps as) = naryEdges ps
         edges (Boolean _ t f _) = binEdges t f
         edges (And _ t f _) = binEdges t f
         edges (Or _ t f _) = binEdges t f

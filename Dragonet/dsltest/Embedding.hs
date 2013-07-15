@@ -384,12 +384,12 @@ convertV4 edges =
 
 -- Takes Nodes, converts them into String, applies the embedding algorithm
 --      convert back the results into Node format
-embeddingV4Wrapper ::  Node -> Node -> [(Node, String, Node)]
+embeddingV4Wrapper ::  [(Node, String, Node)] -> [(Node, String, Node)] -> [(Node, String, Node)]
 embeddingV4Wrapper prg lpg =
     convertV4 $ serialized
     where
-    lpgEdges = S.fromList $ map (convertEdgeV4 ELPG) $ getDepEdgesP lpg
-    prgEdges = S.fromList $ map (convertEdgeV4 EPRG) $ getDepEdgesP prg
+    lpgEdges = S.fromList $ map (convertEdgeV4 ELPG) $ lpg
+    prgEdges = S.fromList $ map (convertEdgeV4 EPRG) $ prg
 
     embedded = embeddingV4 prgEdges lpgEdges
     serialized = serializeV4 embedded
@@ -473,7 +473,7 @@ isPRGNodeEmulated vList v = L.elem v vList
 --      Testing code
 ----------------------------------------------------------------
 
-testEmbeddingV3 :: Node -> Node -> [(Node, String, Node)]
+testEmbeddingV3 :: [(Node, String, Node)] -> [(Node, String, Node)] -> [(Node, String, Node)]
 testEmbeddingV3 prg lpg = embeddingV4Wrapper prg lpg
 
 ----------------------------------------------------------------
