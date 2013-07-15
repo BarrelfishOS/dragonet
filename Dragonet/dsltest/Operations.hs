@@ -25,6 +25,7 @@ module Operations(
     , getDropNode
     , getNodeAttributes
     , nLabel
+    , nAttributes
 ) where
 
 import qualified Data.List as L
@@ -112,6 +113,11 @@ nLabel :: Node -> String
 nLabel (Des (Decision gn)) = gLabel gn
 nLabel (Conf (Configuration gn)) = gLabel gn
 nLabel (Opr (Operator gn)) = gLabel gn
+
+nAttributes :: Node -> [String]
+nAttributes (Des (Decision gn)) = gAttributes gn
+nAttributes (Conf (Configuration gn)) = gAttributes gn
+nAttributes (Opr (Operator gn)) = gAttributes gn
 
 
 -- Get list containing all nodes reachable from the specified start node.

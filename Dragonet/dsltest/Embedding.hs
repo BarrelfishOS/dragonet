@@ -27,6 +27,7 @@ convertEdgeP :: (Node, String, Node) -> (String, String, String)
 convertEdgeP (n1, p, n2) = ((nodeDefinition n1), p, (nodeDefinition n2))
 
 
+
 convertLabelToNode :: [Node] -> String -> Node
 convertLabelToNode nlist label = L.head $
     filter (\ x -> (nodeDefinition x) == label) nlist
@@ -153,7 +154,6 @@ locateAsDESTEdgeP gedges gn = L.filter (\ (_, _, z) -> gn == z ) gedges
 
 edgeStart :: (a,b,c) -> a
 edgeStart (n,_,_) = n
-edgeStart (n,_,_) = n
 
 edgeEnd :: (a,b,c) -> c
 edgeEnd (_,_,n) = n
@@ -256,13 +256,32 @@ removeDroppedNodesP edgeList = L.filter (\ (_,_,y) ->
 --    embIsPRG :: a -> Bool
 
 data ENode =
-    ELPG String |
-    EPRG String
+    ELPG String [String] |
+    EPRG String [String]
     deriving (Show, Eq, Ord)
 
 enLabel :: ENode -> String
-enLabel (ELPG l) = l
-enLabel (EPRG l) = l
+enLabel (ELPG l _) = l
+enLabel (EPRG l _) = l
+
+enAttributes :: ENode -> [String]
+enAttributes (ELPG _ a) = a
+enAttributes (EPRG _ a) = a
+
+isLPG :: ENode -> Bool
+isLPG (ELPG _ _) = True
+isLPG _ = False
+
+isPRG :: ENode -> Bool
+isPRG = not . isLPG
+
+isSoftware :: ENode -> Bool
+isSoftware (ELPG _ _) = True
+isSoftware (EPRG _ a) = elem "software" a
+
+isHardware :: ENode -> Bool
+isHardware = not . isSoftware
+
 
 --instance (EmbeddableNode ENode) where
 --    embIsLPG (ELPG _) = True
@@ -314,8 +333,7 @@ embeddingV4 prg lpg =
 
             pullPRGNode _ Nothing = Nothing
             pullPRGNode n (Just (ns,es))
-                | n `S.member` sEn = Just (ns,es) -- we arrived an an already embedded PRG node
-                | n `memberL` sEn = Nothing  -- oops, node is embedded from LPG, this won't work
+                | n `memberL` sEn = Just (ns,es) -- we arrived an an already embedded node
                 | otherwise =
                     S.foldr pullPRGNode (Just (ns',es')) $ prgDeps n
                     where
@@ -327,9 +345,22 @@ embeddingV4 prg lpg =
             lpgEmb = (S.singleton v, S.map lpgEdgeConvert $ inEdges v lpg)
             
 
+serializeV4 :: S.Set (ENode,String,ENode) -> S.Set (ENode,String,ENode)
+serializeV4 graph =
+    graph S.\\ crossingEdges `S.union` fixedEdges
+    where
+        crossingEdges = S.filter isCrossingEdge graph
+        isCrossingEdge (s,_,e) = isHardware s && isSoftware e
+
+        fixedEdges = S.fromList $ concatMap fixEdge $ S.toList $ crossingEdges
+        fixEdge (s,p,e) = [(s,p,boundaryNode), (boundaryNode,boundaryNodePort,e)]
+        boundaryNode = ELPG "SoftwareEntry" []
+        boundaryNodePort = "out"
+
+
 convertV4 :: S.Set (ENode,String,ENode) -> [(Node,String,Node)]
 convertV4 edges =
-    TR.trace ("edges = " ++ (show edges)) (map convertEdge $ S.toList edges)
+    map convertEdge $ S.toList edges
     where
         convertEdge (a,p,b) = ((convertNode a),p,(convertNode b))
         
@@ -338,8 +369,8 @@ convertV4 edges =
             where
                 el = enLabel n
                 l = case n of
-                    (ELPG s) -> "LPG:" ++ s
-                    (EPRG s) -> "PRG:" ++ s
+                    (ELPG s _) -> "LPG:" ++ s
+                    (EPRG s _) -> "PRG:" ++ s
                 nodeF = if (take 3 el) == "OR:" || (take 4 el) == "AND:" then
                         getOperatorNode
                     else
@@ -354,15 +385,20 @@ convertV4 edges =
 --      convert back the results into Node format
 embeddingV4Wrapper ::  Node -> Node -> [(Node, String, Node)]
 embeddingV4Wrapper prg lpg =
-    convertV4 $ embeddingV4 prgEdges lpgEdges
+    convertV4 $ serialized
     where
-    lpgEdges = S.fromList $ map lpgConvert $ map convertEdgeP $ getDepEdgesP lpg
-    prgEdges = S.fromList $ map prgConvert $ map convertEdgeP $ getDepEdgesP prg
+    lpgEdges = S.fromList $ map (convertEdgeV4 ELPG) $ getDepEdgesP lpg
+    prgEdges = S.fromList $ map (convertEdgeV4 EPRG) $ getDepEdgesP prg
 
-    lpgConvert (a,p,b) = ((ELPG a),p,(ELPG b))
-    prgConvert (a,p,b) = ((EPRG a),p,(EPRG b))
+    embedded = embeddingV4 prgEdges lpgEdges
+    serialized = serializeV4 embedded
 
-
+convertEdgeV4 :: (String -> [String] -> ENode) -> (Node, String, Node) -> (ENode, String, ENode)
+convertEdgeV4 f (n1, p, n2) =
+    ((node n1),p,(node n2))
+    where
+        node n = f (nLabel n) (nAttributes n)
+        
 ----------------------------------------------------------------
 --  A version that works on the String type
 ----------------------------------------------------------------
