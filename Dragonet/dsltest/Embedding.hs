@@ -77,7 +77,7 @@ getDepEdgesP :: Node -> [(Node,String,Node)]
 getDepEdgesP root = getOutEdgesP root
 
 getSoftStartNode :: Node
-getSoftStartNode = getDecNode "inSoftware" "" (NaryNode [])
+getSoftStartNode = getDecNode "inSoftware" "" (NaryNode []) []
 
 
 ----------------------------------------------------------------
@@ -233,7 +233,7 @@ embeddingV3Wrapper prg lpg =
                                 (isPRGNodeEmulated prgEmulatedNodes)
 
     defaultQueue = getDecNode "toDefaultQueue" ""
-        (BinaryNode ([], []))
+        (BinaryNode ([], [])) []
     softImplEdge =  [((defaultQueue), "", (swStartNode))]
 
 
@@ -365,8 +365,9 @@ convertV4 edges =
         convertEdge (a,p,b) = ((convertNode a),p,(convertNode b))
         
         convertNode :: ENode -> Node
-        convertNode n = nodeF l "" e
+        convertNode n = nodeF l "" e a
             where
+                a = enAttributes n
                 el = enLabel n
                 l = case n of
                     (ELPG s _) -> "LPG:" ++ s

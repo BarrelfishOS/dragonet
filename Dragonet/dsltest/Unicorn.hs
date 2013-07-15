@@ -94,23 +94,26 @@ declareNode graph n =
                 TH.TupE [(port t), (port f)]
         lblPort p = TH.TupE [(TH.LitE $ TH.StringL name), (port p)]
             where (Port name _) = p
-        edges (Node l ps) =
+        edges (Node l ps as) =
             TH.AppE (TH.ConE (TH.mkName "OP.NaryNode")) $
                 TH.ListE $ map lblPort ps
-        edges (Boolean _ t f) = binEdges t f
-        edges (And _ t f) = binEdges t f
-        edges (Or _ t f) = binEdges t f
-        decNode n = TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getDecNode")) (TH.LitE (TH.StringL (nName n)))) (TH.LitE (TH.StringL ""))) (edges n)
-        confNode n = TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getConfNode")) (TH.LitE (TH.StringL (nName n)))) (TH.LitE (TH.StringL ""))) (edges n)
-        opNode n op = TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getOperatorNode")) (TH.LitE (TH.StringL op))) (TH.LitE (TH.StringL ""))) (edges n)
+        edges (Boolean _ t f _) = binEdges t f
+        edges (And _ t f _) = binEdges t f
+        edges (Or _ t f _) = binEdges t f
+
+        attrs n = TH.ListE $ map (TH.LitE . TH.StringL) $ nAttrs n
+
+        decNode n = TH.AppE (TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getDecNode")) (TH.LitE (TH.StringL (nName n)))) (TH.LitE (TH.StringL ""))) (edges n)) (attrs n)
+        confNode n = TH.AppE (TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getConfNode")) (TH.LitE (TH.StringL (nName n)))) (TH.LitE (TH.StringL ""))) (edges n)) (attrs n)
+        opNode n op = TH.AppE (TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getOperatorNode")) (TH.LitE (TH.StringL op))) (TH.LitE (TH.StringL ""))) (edges n)) (attrs n)
 
         node n =
             case n of
-                (Node _ _) -> decNode n
-                (Config _ _) -> confNode n
-                (Boolean _ _ _) -> decNode n
-                (And l _ _) -> opNode n ("AND:" ++ l)
-                (Or l _ _) -> opNode n ("OR:" ++ l)
+                (Node _ _ _) -> decNode n
+                (Config _ _ _) -> confNode n
+                (Boolean _ _ _ _) -> decNode n
+                (And l _ _ _) -> opNode n ("AND:" ++ l)
+                (Or l _ _ _) -> opNode n ("OR:" ++ l)
 
 
 implDec (Graph name cluster) =
@@ -144,11 +147,11 @@ data Cluster = Cluster String [Cluster] [Node]
 data Port = Port String [String]
     deriving Show
 data Node =
-    Node String [Port] |
-    Config String [Port] |
-    Boolean String Port Port |
-    And String Port Port |
-    Or String Port Port
+    Node String [Port] [String] |
+    Config String [Port] [String] |
+    Boolean String Port Port [String] |
+    And String Port Port [String] |
+    Or String Port Port [String]
     deriving Show
 
 cNodesDeep :: Cluster -> [Node]
@@ -156,22 +159,28 @@ cNodesDeep (Cluster _ cs ns) = ns ++ concatMap cNodesDeep cs
 
 gNodes (Graph _ cs) = cNodesDeep cs
 
-nIsOp (And n _ _) = True
-nIsOp (Or n _ _) = True
+nIsOp (And n _ _ _) = True
+nIsOp (Or n _ _ _) = True
 nIsOp _ = False
 
-nName (Node n _) = n
-nName (Config n _) = n
-nName (Boolean n _ _) = n
-nName (And n _ _) = n
-nName (Or n _ _) = n
+nName (Node n _ _) = n
+nName (Config n _ _) = n
+nName (Boolean n _ _ _) = n
+nName (And n _ _ _) = n
+nName (Or n _ _ _) = n
+
+nAttrs (Node _ _ as) = as
+nAttrs (Config _ _ as) = as
+nAttrs (Boolean _ _ _ as) = as
+nAttrs (And _ _ _ as) = as
+nAttrs (Or _ _ _ as) = as
 
 nPorts :: Node -> [Port]
-nPorts (Node _ ps) = ps
-nPorts (Config _ ps) = ps
-nPorts (Boolean _ a b) = [a, b]
-nPorts (And _ a b) = [a, b]
-nPorts (Or _ a b) = [a, b]
+nPorts (Node _ ps _) = ps
+nPorts (Config _ ps _) = ps
+nPorts (Boolean _ a b _) = [a, b]
+nPorts (And _ a b _) = [a, b]
+nPorts (Or _ a b _) = [a, b]
 
 
 -----------------------------------------------------------------------------
@@ -186,7 +195,7 @@ lexer = P.makeTokenParser P.LanguageDef {
     P.identLetter = Parsec.alphaNum <|> Parsec.char '_',
     P.opStart = Parsec.oneOf "",
     P.opLetter = Parsec.oneOf "",
-    P.reservedNames = ["graph", "cluster", "node", "config", "boolean", "and", "or", "port"],
+    P.reservedNames = ["graph", "cluster", "node", "config", "boolean", "and", "or", "port", "attr"],
     P.reservedOpNames = [],
     P.caseSensitive = True }
     
@@ -196,6 +205,7 @@ identifier = P.identifier lexer
 braces = P.braces lexer
 brackets = P.brackets lexer
 reserved = P.reserved lexer
+stringLiteral = P.stringLiteral lexer
 
 
 globalIdentifier p = do
@@ -222,25 +232,36 @@ port p = do
         port ds n = Port n ds
         ports ns ds = map (port ds) ns
 
+attributes = do
+    reserved "attr"
+    stringLiteral
+    
+
 genNaryNode p name = do
     reserved name
     n <- cIdentifier p
-    ps <- braces $ many $ port p
-    return (n,(concat ps))
+    (ps,as) <- braces $ do
+        as' <- many attributes
+        ps' <- many $ port p
+        return (ps',as')
+    return (n,(concat ps),as)
 
 
 node p = do
-    (name,ports) <- genNaryNode p "node"
-    return (Right (Node name ports))
+    (name,ports,attr) <- genNaryNode p "node"
+    return (Right (Node name ports attr))
 
 config p = do
-    (name,ports) <- genNaryNode p "config"
-    return (Right (Config name ports))
+    (name,ports,attr) <- genNaryNode p "config"
+    return (Right (Config name ports attr))
 
 genBoolean p name = do
     reserved name
     n <- cIdentifier p
-    ps <- braces $ many $ port p
+    (ps,as) <- braces $ do
+        as' <- many attributes
+        ps' <- many $ port p
+        return (ps',as')
     if (length (concat ps)) /= 2 then
         unexpected "Unexpected number of ports in boolean node, expect exactly 2"
     else
@@ -251,7 +272,7 @@ genBoolean p name = do
                 unexpected "false port not found in boolean node"
             else
                 return ()
-    return (n, (head (concat ps)), (head (tail (concat ps))))
+    return (n, (head (concat ps)), (head (tail (concat ps))),as)
     where
         isPort n (Port m _) = (n == m)
         findPort n ps = L.find (isPort n) (concat ps)
@@ -259,16 +280,16 @@ genBoolean p name = do
         falsePort = findPort "false"
 
 boolean p = do
-    (n, t, f) <- genBoolean p "boolean"
-    return (Right (Boolean n t f))
+    (n, t, f, a) <- genBoolean p "boolean"
+    return (Right (Boolean n t f a))
         
 orN p = do
-    (n, t, f) <- genBoolean p "or"
-    return (Right (Or n t f))
+    (n, t, f, a) <- genBoolean p "or"
+    return (Right (Or n t f a))
 
 andN p = do
-    (n, t, f) <- genBoolean p "and"
-    return (Right (And n t f))
+    (n, t, f, a) <- genBoolean p "and"
+    return (Right (And n t f a))
   
 cluster p = do
     reserved "cluster"

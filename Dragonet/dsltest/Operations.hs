@@ -134,32 +134,32 @@ nTreeNodes n =
         children = concat (map nTreeNodes ep)
 
 
-getConfNode :: String -> TagType -> NodeEdges -> Node
-getConfNode op tag edges = Conf $ Configuration GNode {
+getConfNode :: String -> TagType -> NodeEdges -> [String] -> Node
+getConfNode op tag edges attrs = Conf $ Configuration GNode {
         gLabel = op
         , gTag = tag
         , gEdges = edges
-        , gAttributes = []
+        , gAttributes = attrs
         , gImplementation = []
     }
 
 
 
-getDecNode :: String -> TagType -> NodeEdges -> Node
-getDecNode op tag edges = Des $ Decision GNode {
+getDecNode :: String -> TagType -> NodeEdges -> [String] -> Node
+getDecNode op tag edges attrs = Des $ Decision GNode {
         gLabel = op
         , gTag = tag
         , gEdges = edges
-        , gAttributes = []
+        , gAttributes = attrs
         , gImplementation = []
     }
 
-getOperatorNode :: String -> TagType -> NodeEdges -> Node
-getOperatorNode op tag edges = Opr $ Operator GNode {
+getOperatorNode :: String -> TagType -> NodeEdges -> [String] -> Node
+getOperatorNode op tag edges attrs = Opr $ Operator GNode {
         gLabel = op
         , gTag = tag
         , gEdges = edges
-        , gAttributes = []
+        , gAttributes = attrs
         , gImplementation = []
     }
 
@@ -188,7 +188,7 @@ appendToFalse orig toAdd = case getNodeEdges orig of
 
 
 getDropNode :: Node
-getDropNode = getDecNode "packetDrop" "Drop" (BinaryNode ([],[]))
+getDropNode = getDecNode "packetDrop" "Drop" (BinaryNode ([],[])) []
 
 getNodeAttributes :: Node -> [String]
 getNodeAttributes node = case node of
