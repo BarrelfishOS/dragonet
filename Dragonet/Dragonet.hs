@@ -248,13 +248,13 @@ allTests =
 
 main :: IO()
 --main = testOp
---main = testE10k
+main = testE10k
 --main = testNetworkProcessing
 --main = allTests
 --main = testEmbeddingList
 --main = testPRGAdjustment
 
-main = testEmbeddingPaper
+--main = testEmbeddingPaper
 --main = testEmbeddingLargeV3
 
 

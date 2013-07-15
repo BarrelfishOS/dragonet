@@ -1,0 +1,79 @@
+\documentclass[a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{color}
+
+
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+
+\usepackage{algorithmicx}
+\usepackage{algpseudocode}
+
+\title{Embedding Algorithm}
+\date{}
+\author{}
+
+\begin{document}
+\maketitle
+% InEdges \{(s,p,e) | (s,p,e) \in L.e \land e = v\}
+\begin{algorithmic}
+  \Function{Embedding}{$L$,$P$}
+    \State $E \gets (\emptyset,\emptyset)$
+    \State $U \gets L.v$
+    \While{$U \ne \emptyset$}
+      \State $v \gets$ pick $\{w|w \in U \land \mathrm{deps}(w,L) \subseteq E.v\}$
+      \State $N \gets \mathrm{null}$
+      \If{$v \in P.v$} \Comment{Pull from PRG}
+        \State $N \gets \mathrm{PullPRGNode}(v,(\emptyset,\emptyset))$
+      \EndIf
+      \If{$N = \mathrm{null}$} \Comment{Pull from LPG}
+        \State $N.v \gets \{v\}$
+        \State $N.e \gets \mathrm{inEdges}(v,L)$
+      \EndIf
+      \State $E \gets E \cup N$
+      \State $U \gets U \setminus N.v$
+    \EndWhile
+    \State \Return{E}
+
+    \State
+    \Function{PullPRGNode}{$w$,$G$}
+      \If{$w \notin E.v$}
+        \State $G.v \gets G.v \cup \{w\}$
+        \State $G.e \gets G.e \cup \mathrm{inEdges}(w,P)$
+        \ForAll{$c \in \mathrm{deps}(w,P)$}
+          \State $G \gets \mathrm{PullPRGNode}(c,G)$
+        \EndFor
+      \EndIf
+      \State \Return{$G$}
+    \EndFunction
+  \EndFunction
+\end{algorithmic}
+
+The algorithm works by iteratively moving nodes from the set of unembedded nodes
+$U$ to the embedded graph $E$. In every iteration a node $v$ is picked from the
+LPG for which all dependencies (start nodes of incoming edges) are already
+embedded.  Afterwards there are two possible cases. If there is no node with the
+same label as $v$ in the PRG, the respective node from the LPG is added to the
+embedded graph together with it's incoming edges. Otherwise the node is pulled
+in from the PRG by adding the respective node and its incoming edges from the
+PRG to the graph and recursively pulling in its dependency nodes from the PRG
+until either no more children are found or the node that is to be pulled in is
+already embedded.
+
+\section*{Possible Problems}
+Since the PRG is usually more sequential and since the LPG structure is used to
+pick the order of the nodes in the algorithm the following problem can occur: If
+there are multiple alternatives for $v$ in an iteration, the algorithm could
+pick any of them, which could mean that the node that is picked could come
+later in the PRG than other alternative, in the sense that there is a path from
+one of the other alternatives to $v$ in the PRG. In a later iteration when
+the other node is picked, and the algorithm is pulling it in from the PRG, this
+will lead to an edge originating from an LPG node to a PRG node, which could
+have been avoided by using another order leading to a valid embedding.
+
+\end{document}
+% vim: sw=2 ts=2 expandtab

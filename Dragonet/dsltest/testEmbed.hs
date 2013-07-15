@@ -19,6 +19,7 @@ graph prg {
             port false[] }
 
         boolean ValidCRC {
+            attr "foo"
             port true[ValidBroadcast ValidMulticast ValidUnicast]
             port false[] }
 
@@ -91,8 +92,13 @@ graph lpg {
             port true false[.L4UDPVerified] }
     }
 
-    boolean L3IPv6Classified {
-        port true false[] }
+    cluster L3IPv6 {
+        boolean Classified {
+            port true false[ValidProtocol] }
+
+        boolean ValidProtocol {
+            port true false[.L3Classified] }
+    }
 
     or L3Classified {
         port true[L4UDPClassified]
