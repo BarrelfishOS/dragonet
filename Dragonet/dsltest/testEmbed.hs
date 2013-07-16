@@ -21,21 +21,29 @@ graph prg {
 
         config CValidCRC {
             port true[ValidCRC]
-            port false[ValidBroadcast ValidMulticast ValidUnicast] }
+            port false[ValidBroadcast ValidBroadcast_
+                       ValidUnicast ValidUnicast_] }
 
         boolean ValidCRC {
-            attr "foo"
-            port true[ValidBroadcast ValidMulticast ValidUnicast]
+            port true[ValidBroadcast ValidBroadcast_
+                      ValidUnicast ValidUnicast_]
             port false[] }
 
-        boolean ValidUnicast {
+        boolean ValidUnicast_ {
             port true false[ValidDest] }
 
-        boolean ValidMulticast {
+        boolean ValidBroadcast_ {
             port true false[ValidDest] }
+
+
+        boolean ValidUnicast {
+            attr "software"
+            port true false[] }
 
         boolean ValidBroadcast {
-            port true false[ValidDest] }
+            attr "software"
+            port true false[] }
+
 
         or ValidDest {
             port true[.Queue0]
@@ -51,7 +59,7 @@ graph prg {
 graph lpg {
     cluster L2Ether {
         boolean Classified {
-            port true[ValidType ValidUnicast ValidMulticast ValidBroadcast
+            port true[ValidType ValidUnicast ValidBroadcast
                       ValidCRC ValidSrc]
             port false[] }
 
@@ -62,11 +70,8 @@ graph lpg {
         boolean ValidUnicast {
             port true false[ValidDest] }
 
-        boolean ValidMulticast {
-            port true false[ValidDest] }
-
         boolean ValidBroadcast {
-            port true false[ValidDest] }
+            port true false[ValidDest .L3APRIsRequest] }
 
         or ValidDest {
             port true false[.L2Verified] }
@@ -128,6 +133,11 @@ graph lpg {
 
         and Verified {
             port true false[.L4Verified] }
+    }
+
+    cluster L3APR {
+        boolean IsRequest {
+            port true false[] }
     }
 
     or L4Classified {
