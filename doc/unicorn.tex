@@ -59,6 +59,9 @@
 \section*{Example}
 \begin{lstlisting}
 @\label{prgex:graph}@graph prg {
+@\label{prgex:node}@    node Entry {
+        port out[L2EtherClassified] }
+
 @\label{prgex:cluster}@    cluster L2Ether {
 @\label{prgex:boolnode}@        boolean Classified {
             port true[ValidType]
@@ -97,7 +100,8 @@
             port false[] }
     }
 
-@\label{prgex:node}@    node Queue0 {
+@\label{prgex:gconfig}@    config QueueN {
+@\label{prgex:gconfigfun}@        function queueConfig
         port out[] }
 }
 \end{lstlisting}
@@ -119,19 +123,47 @@ Boolean nodes such as shown on line~\ref{prgex:boolnode} are required to have
 exactly two ports: \texttt{true} and \texttt{false}. While both general and
 boolean nodes carry node-specific implementations, the boolean operation nodes
 \texttt{and}/\texttt{or} such as defined on line~\ref{prgex:ornode} all
-implement the same logical functions. \texttt{config} nodes
-(line~\ref{prgex:confignode}) represent simplified configuration nodes, where
-applying a specific configuration will result in the node being removed and the
-incoming edges replaced by edges leading directly to the nodes referred to by
-the chosen port of the configuration node. For all node types attributes can be
+implement the same logical functions. For all node types attributes can be
 specified using \texttt{attr} as shown on line~\ref{prgex:attr}.
+
+
+\texttt{config} nodes (lines \ref{prgex:confignode} and \ref{prgex:gconfig})
+represent configuration node, that will be transformed into a specific subgraph
+depending on the configuration to be applied. There are two different types of
+configuration nodes, simplified configuration nodes as show on
+line~\ref{prgex:confignode} and general configuration node as on
+line~\ref{prgex:gconfig}. For simplified configuration nodes applying a specific
+configuration will result in the node being removed and the incoming edges
+replaced by edges leading directly to the nodes referred to by the chosen port
+of the configuration node. General configuration nodes are implemented by
+specifying a Haskell function name (line~\ref{prgex:gconfigfun}) that will
+generate the subgraph. The following listing shows an example for such a
+configuration function:
+
+\begin{lstlisting}[language=haskell]
+queueConfig ::
+    [(Node,String)] ->
+    [(String,Node)] ->
+    String ->
+    [(Node,String,Node)]
+queueConfig inE outE cfg = map (\(a,b) -> (a,b,queueN)) inE
+    where queueN = getDecNode ("Queue" ++ cfg) "" (NaryNode []) []
+\end{lstlisting}
+
+The first parameter describes the incoming edges to the configuration nodes, the
+second parameter is a list of outgoing edges, and the third parameter specifies
+the configuration value. As a result the function has to return a subgraph
+specified as a set of edges. Note that subgraph should be self-contained,
+meaning that there must be no edges leading to other nodes of the graph besides
+the incoming and outgoing edges passed as parameters.
+
 
 Nodes can be grouped into clusters as shown on line~\ref{prgex:cluster}. Node
 names in a cluster will be prefixed with the cluster name, this applies both to
 node names for node definition as well as node references for ports. This
 behaviour can be overridden by prefixing the node name by a dot as shown on
 line~\ref{prgex:cref}. Clusters can also be nested in which case each dot at the
-beginning of an identifier strips one cluster starting with the innermost node.
+beginning of an identifier strips one cluster starting with the innermost cluster.
 
 
 
