@@ -25,10 +25,14 @@ module Operations(
     , getDropNode
     , getNodeAttributes
     , nLabel
+    , nConfImpl
     , nAttributes
+    , ConfFunction
+    , applyConfig
 ) where
 
 import qualified Data.List as L
+import Data.Maybe
 
 
 --import qualified Data.List as DL
@@ -58,8 +62,7 @@ instance Eq t => Eq (Implementation t f) where
 -- Decision function:  based on packet, decides which outgoing edges to choose
 type DesFunction = (Decision -> Packet -> (Packet, [Node]))
 
--- Conf function: Based on the configuration, decides which outgoing edges to choose
-type ConfFunction = (Configuration -> ConfSpace -> [Node])
+type ConfFunction = ([(Node,String)] -> [(String,Node)] -> String -> [(Node,String,Node)])
 
 -- opearator function: Based on the result of incoming edges,
 --  decides which outgoing edges to choose
@@ -114,6 +117,11 @@ nLabel (Des (Decision gn)) = gLabel gn
 nLabel (Conf (Configuration gn)) = gLabel gn
 nLabel (Opr (Operator gn)) = gLabel gn
 
+nConfImpl :: Node -> ConfFunction
+nConfImpl (Conf (Configuration gn)) = f
+    where (Implementation _ f) = head $ gImplementation gn
+
+
 nAttributes :: Node -> [String]
 nAttributes (Des (Decision gn)) = gAttributes gn
 nAttributes (Conf (Configuration gn)) = gAttributes gn
@@ -134,13 +142,13 @@ nTreeNodes n =
         children = concat (map nTreeNodes ep)
 
 
-getConfNode :: String -> TagType -> NodeEdges -> [String] -> Node
-getConfNode op tag edges attrs = Conf $ Configuration GNode {
+getConfNode :: String -> TagType -> NodeEdges -> [String] -> ConfFunction -> Node
+getConfNode op tag edges attrs fun = Conf $ Configuration GNode {
         gLabel = op
         , gTag = tag
         , gEdges = edges
         , gAttributes = attrs
-        , gImplementation = []
+        , gImplementation = [(Implementation "" fun)]
     }
 
 
@@ -195,5 +203,44 @@ getNodeAttributes node = case node of
     Des (Decision (GNode _ _ a _  _)) -> a
     Conf (Configuration (GNode _ _ a _  _)) -> a
     Opr (Operator (GNode _ _ a _  _)) -> a
+
+
+applyConfig :: [(String,String)] -> [(Node,String,Node)] -> [(Node,String,Node)]
+applyConfig cfg g =
+    rmNewSources $ foldl handleCNode g configNodes
+    where
+        configNodes = L.nub $ filter isConfN $ (map fst3 g) ++ (map third3 g)
+
+        isConfN :: Node -> Bool
+        isConfN (Conf _) = True
+        isConfN _ = False
+
+        fst3 (a,_,_) = a
+        third3 (_,_,a) = a
+
+        sminus a b = filter (not . (flip elem b)) a
+
+        handleCNode g' cn = g'' ++ (cF inE outE c)
+            where
+                inE' = filter ((== cn) . third3) g'
+                outE' = filter ((== cn) . fst3) g'
+                g'' = g' `sminus` (inE' ++ outE')
+                inE = map (\(a,b,c) -> (a,b)) inE'
+                outE = map (\(a,b,c) -> (b,c)) outE'
+                c = fromJust $ lookup (nLabel cn) cfg 
+                cF = nConfImpl cn
+
+        sources g' = (map fst3 g') `sminus` (map third3 g')
+
+        rmNode g' n = filter (\a -> fst3 a /= n && third3 a /= n) g'
+
+        rmNewSources g'
+            | (null newSources) = g'
+            | otherwise = rmNewSources g''
+            where
+                newSources = (sources g') `sminus` (sources g)
+                n = head newSources
+                g'' = rmNode g' n
+
 
 
