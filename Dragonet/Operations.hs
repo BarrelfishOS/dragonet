@@ -121,9 +121,10 @@ instance NodeCompare Node where
         NB.embedCompare (gLabel n1) (gLabel n2)
     nCompPrgLpgV2 (Opr (Operator n1)) (Opr (Operator n2)) =
         (gLabel n1) == (gLabel n2)
-    nCompPrgLpgV2 (Conf (Configuration n1)) (Conf (Configuration n2)) =
-        error ("nCompPrgLpgV2: comparing two conf node for embedding...!! \n"
-            ++ "  but you are not supposed to have conf nodes in LPG!!!" )
+    nCompPrgLpgV2 (Conf (Configuration n1)) (Conf (Configuration n2)) = (gLabel n1) == (gLabel n2)
+--    nCompPrgLpgV2 (Conf (Configuration n1)) (Conf (Configuration n2)) =
+--        error ("nCompPrgLpgV2: comparing two conf node for embedding...!! \n"
+--            ++ "  but you are not supposed to have conf nodes in LPG!!!" )
     nCompPrgLpgV2 _ _ = False
 
 

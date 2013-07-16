@@ -152,7 +152,7 @@ testEmbeddingQueue =
         where
         suffix = "Queue"
         prgUnconf = E10k.getE1kPRGSmall
-        prg = OP.applyConfigWrapperList prgUnconf E10k.getTestcaseConfiguration
+        prg = OP.applyConfigWrapperList prgUnconf E10k.getTestcaseConfigurationQueue
 
         {-prgEdges = EM.testEmbeddingSTR prg
         lpgEdges = EM.testEmbeddingSTR lpg-}
@@ -253,8 +253,7 @@ main :: IO()
 --main = allTests
 --main = testEmbeddingList
 --main = testPRGAdjustment
-
-main = testEmbeddingPaper
+--main = testEmbeddingPaper
 --main = testEmbeddingLargeV3
-
+main = testEmbeddingQueue
 

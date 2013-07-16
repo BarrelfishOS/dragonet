@@ -13,6 +13,7 @@ module E10kPRG(
     , getE1kPRGSmall
     , getTestcaseConfiguration
     , getTestcaseConfigurationSmall
+    , getTestcaseConfigurationQueue
 ) where
 
 import qualified Data.List as DL
@@ -28,6 +29,30 @@ getE1kPRGminimal = etherClassified
     where
     etherClassified = OP.getDecNode NB.ClassifiedL2Ethernet "PF"
         (OP.BinaryNode ( [], [])) []
+
+getTestcaseConfigurationQueue :: [OP.ConfWrapperType]
+getTestcaseConfigurationQueue = [
+        (NB.L2EtherValidCRC, pf1, True)
+        , ((NB.FiveTupleFilter ts1 q1), pf1, True)
+        , ((NB.SyncFilter q1), pf1, True)
+        , ((NB.FiveTupleFilter ts2 q2), pf1, True)
+        , ((NB.HashFilter ts3 q3), pf1, True)
+    ]
+
+    where
+    pf1 = "PF"
+    vf1 = "VF1"
+    vf2 = "VF2"
+
+    ts1 = NB.TupleSelector 2 2 2 2 4
+    ts2 = NB.TupleSelector 6 3 1 4 2
+    ts3 = NB.TupleSelector 5 7 28 13 9
+
+    q1 = NB.Queue 1 1 NB.getDefaultBasicQueue
+    q2 = NB.Queue 2 2 NB.getDefaultBasicQueue
+    q3 = NB.Queue 3 3 NB.getDefaultBasicQueue
+    q0 = NB.Queue 0 0 NB.getDefaultBasicQueue
+
 
 
 getTestcaseConfigurationSmall :: [OP.ConfWrapperType]
