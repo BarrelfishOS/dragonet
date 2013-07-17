@@ -267,7 +267,6 @@ getAllDepsP graphEdges gn = deps ++ indirectDeps
 
 
 
-{-
 -- Get all nodes from edge set
 nodesSet s = (S.map edgeStart s) `S.union` (S.map edgeEnd s)
 
@@ -281,9 +280,7 @@ outEdges n s = S.filter ((n ==) . edgeStart) s
 --      ie: they are parent of node n
 --      ie: n is dependent on them
 inNeighbours n s = S.map edgeStart $ inEdges n s
--}
 
-{-
 --embeddingSetStep sP sE [] = sE
 --embeddingSetStep :: ((Show a), (Ord a)) => S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a)
 embeddingSetStep :: (Ord a) => S.Set (a,a,a) -> (S.Set (a,a,a), S.Set a) -> (S.Set (a,a,a), S.Set a) -> S.Set (a,a,a)
@@ -323,7 +320,7 @@ embeddingSetStep sP (sE,sEv) (sU,sUv)
         -- Move vertex from E to U
         sEv' = S.insert v sEv
         sUv' = S.delete v sUv
--}
+
 
 -- Get all nodes from edge set
 --nodesSetC s = s.fromList $ EL.nubBy (comFn) $ DL.unionBy (comFn)
@@ -359,8 +356,6 @@ outEdgesC cfn n s = S.filter (((cfn n)) . edgeStart) s
 inNeighboursC cfn n s = S.map edgeStart $ inEdgesC cfn n s
 
 
--- mySetDiff cmpFn = 'S.\\'
-
 mySetDiff cmpFn s1 s2 = S.fromList diff
     where
     u = DL.unionBy cmpFn l1 l2
@@ -382,13 +377,13 @@ myInsert cmpFn x s1 = S.fromList uList
 
 myDelete cmpFn x s1 = S.filter (not . cmpFn x) s1
 
-embeddingSetStepV2 :: (Ord a) => (a -> a -> Bool) -> S.Set (a,a,a)
+embeddingSetStepGeneric :: (Ord a) => (a -> a -> Bool) -> S.Set (a,a,a)
         -> (S.Set (a,a,a), S.Set a) -> (S.Set (a,a,a), S.Set a) -> S.Set (a,a,a)
-embeddingSetStepV2 cmpFn sP (sE,sEv) (sU,sUv)
+embeddingSetStepGeneric cmpFn sP (sE,sEv) (sU,sUv)
     | S.null sU = sE
     | sEv == sEv' = error "E not changing"
---    | otherwise = embeddingSetStepV2 cmpFn sP (sE',sEv') (sU',sUv')
-    | otherwise = embeddingSetStepV2 cmpFn sP (sE',sEv') (sU',sUv')
+--    | otherwise = embeddingSetStepGeneric cmpFn sP (sE',sEv') (sU',sUv')
+    | otherwise = embeddingSetStepGeneric cmpFn sP (sE',sEv') (sU',sUv')
     where
         sPv = nodesSetC cmpFn sP -- All the vertices from PRG
 
@@ -438,7 +433,7 @@ embeddingSet prg lpg =
 --
 
     cmpFn = (==)
-    result = convert $ embeddingSetStepV2 (==) prgHWedges' (S.empty,S.empty) (lpgEdges, allNodesSet)
+    result = convert $ embeddingSetStepGeneric (==) prgHWedges' (S.empty,S.empty) (lpgEdges, allNodesSet)
 
 --    allNodesSet = (nodesSet lpgEdges) `S.union` (nodesSet prgEdges)
     allNodesSet = (nodesSetC cmpFn lpgEdges) `S.union` (nodesSetC cmpFn prgHWedges')
