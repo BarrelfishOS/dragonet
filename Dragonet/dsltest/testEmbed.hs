@@ -157,6 +157,26 @@ queueConfig inE outE cfg = map (\(a,b) -> (a,b,queueN)) inE
     where queueN = OP.getDecNode ("Queue" ++ cfg) "" (OP.NaryNode []) []
 
 
+main_v2 :: IO()
+main_v2 = do
+    --putStrLn (DG.toDotClustered prgClusters prgNodes)
+    --putStrLn (DG.toDotFromDLP embedded)
+    --putStrLn (DG.toDotFromDLP prg)
+    writeFile ("embedded.dot") $ DG.toDotFromDLP embedded
+    --putStrLn ("[" ++ (L.intercalate "\n" $ map strEdge lpgDep) ++ "]")
+    where
+        embedded = E.testEmbeddingV3 prg lpg
+
+        prgU = E.getDepEdgesP prgL2EtherClassified
+        prg = OP.applyConfig config prgU
+        lpg = E.getDepEdgesP lpgL2EtherClassified
+
+        config = [("L2EtherCValidCRC", "false"),("QueueN","42")]
+
+
+main = main_v2
+
+{-
 main = do
     --putStrLn (DG.toDotClustered prgClusters prgNodes)
     --putStrLn (DG.toDotFromDLP embedded)
@@ -173,3 +193,4 @@ main = do
 
         {-prgDep = L.nub $ E.removeDroppedNodesP $ E.getDepEdgesP $ prgL2EtherClassified
         lpgDep = L.nub $ E.removeDroppedNodesP $ E.getDepEdgesP $ lpgL2EtherClassified-}
+-}
