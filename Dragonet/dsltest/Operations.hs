@@ -108,6 +108,8 @@ instance NodeCompare Node where
         (gLabel n1) == (gLabel n2)
     nCompPrgLpgV2 (Opr (Operator n1)) (Opr (Operator n2)) =
         (gLabel n1) == (gLabel n2)
+    nCompPrgLpgV2 (Conf (Configuration n1)) (Conf (Configuration n2)) =
+        (gLabel n1) == (gLabel n2)
     nCompPrgLpgV2 _ _ = False
  
 
