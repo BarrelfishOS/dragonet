@@ -46,7 +46,7 @@ nodeDefinition :: (OP.Node, String) -> String
 nodeDefinition (n, nn) =
     case n of
         (OP.Des (OP.Decision gn)) ->
-            dotNode nn (gLabelStr gn) "" $ ports $ OP.getNodeEdges n
+            dotNode nn (gLabelStr gn) ("style=\""++swdot++"\"") $ ports $ OP.getNodeEdges n
         (OP.Opr (OP.Operator gn)) ->
             dotNode nn (gLabelStr gn) "style=\"filled,rounded\",fillcolor=gray"
                 $ ports $ OP.getNodeEdges n
@@ -58,6 +58,7 @@ nodeDefinition (n, nn) =
         -- Get port names from NodeEdges
         ports (OP.BinaryNode _) = ["T", "F"]
         ports (OP.NaryNode l) = map fst l
+        swdot = if elem "software" (OP.nAttributes n) then "dotted" else ""
 
 -- Convert list to list of tuples with the first element being the list
 -- elements and the second element being the constant specified
