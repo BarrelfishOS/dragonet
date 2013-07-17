@@ -3,7 +3,7 @@ module Unicorn(
     unicorn_f,
     unicornImpl,
     unicornImpl_f,
-
+    unicornSimpleConfig
 ) where
 
 import System.IO
@@ -99,7 +99,7 @@ declareNode graph n =
                 TH.ListE $ map lblPort ps
 
         edges (Node l ps as) = naryEdges ps
-        edges (Config l ps as) = naryEdges ps
+        edges (Config l ps as _) = naryEdges ps
         edges (Boolean _ t f _) = binEdges t f
         edges (And _ t f _) = binEdges t f
         edges (Or _ t f _) = binEdges t f
@@ -107,13 +107,13 @@ declareNode graph n =
         attrs n = TH.ListE $ map (TH.LitE . TH.StringL) $ nAttrs n
 
         decNode n = TH.AppE (TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getDecNode")) (TH.LitE (TH.StringL (nName n)))) (TH.LitE (TH.StringL ""))) (edges n)) (attrs n)
-        confNode n = TH.AppE (TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getConfNode")) (TH.LitE (TH.StringL (nName n)))) (TH.LitE (TH.StringL ""))) (edges n)) (attrs n)
+        confNode n f = TH.AppE (TH.AppE (TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getConfNode")) (TH.LitE (TH.StringL (nName n)))) (TH.LitE (TH.StringL ""))) (edges n)) (attrs n)) (TH.VarE (TH.mkName f))
         opNode n op = TH.AppE (TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getOperatorNode")) (TH.LitE (TH.StringL op))) (TH.LitE (TH.StringL ""))) (edges n)) (attrs n)
 
         node n =
             case n of
                 (Node _ _ _) -> decNode n
-                (Config _ _ _) -> confNode n
+                (Config _ _ _ f) -> confNode n $ fromMaybe "unicornSimpleConfig" f
                 (Boolean _ _ _ _) -> decNode n
                 (And l _ _ _) -> opNode n ("AND:" ++ l)
                 (Or l _ _ _) -> opNode n ("OR:" ++ l)
@@ -151,7 +151,7 @@ data Port = Port String [String]
     deriving Show
 data Node =
     Node String [Port] [String] |
-    Config String [Port] [String] |
+    Config String [Port] [String] (Maybe String) |
     Boolean String Port Port [String] |
     And String Port Port [String] |
     Or String Port Port [String]
@@ -167,20 +167,20 @@ nIsOp (Or n _ _ _) = True
 nIsOp _ = False
 
 nName (Node n _ _) = n
-nName (Config n _ _) = n
+nName (Config n _ _ _) = n
 nName (Boolean n _ _ _) = n
 nName (And n _ _ _) = n
 nName (Or n _ _ _) = n
 
 nAttrs (Node _ _ as) = as
-nAttrs (Config _ _ as) = as
+nAttrs (Config _ _ as _) = as
 nAttrs (Boolean _ _ _ as) = as
 nAttrs (And _ _ _ as) = as
 nAttrs (Or _ _ _ as) = as
 
 nPorts :: Node -> [Port]
 nPorts (Node _ ps _) = ps
-nPorts (Config _ ps _) = ps
+nPorts (Config _ ps _ _) = ps
 nPorts (Boolean _ a b _) = [a, b]
 nPorts (And _ a b _) = [a, b]
 nPorts (Or _ a b _) = [a, b]
@@ -198,7 +198,8 @@ lexer = P.makeTokenParser P.LanguageDef {
     P.identLetter = Parsec.alphaNum <|> Parsec.char '_',
     P.opStart = Parsec.oneOf "",
     P.opLetter = Parsec.oneOf "",
-    P.reservedNames = ["graph", "cluster", "node", "config", "boolean", "and", "or", "port", "attr"],
+    P.reservedNames = ["graph", "cluster", "node", "config", "boolean", "and",
+                       "or", "gconfig", "port", "attr"],
     P.reservedOpNames = [],
     P.caseSensitive = True }
     
@@ -254,9 +255,21 @@ node p = do
     (name,ports,attr) <- genNaryNode p "node"
     return (Right (Node name ports attr))
 
+configFun = do
+    reserved "function"
+    f <- identifier
+    return f
+
 config p = do
-    (name,ports,attr) <- genNaryNode p "config"
-    return (Right (Config name ports attr))
+    reserved "config"
+    n <- cIdentifier p
+    (ps,as,iF) <- braces $ do
+        iF' <- optionMaybe configFun
+        as' <- many attributes
+        ps' <- many $ port p
+        return (ps',as',iF')
+    --return (n,(concat ps),as)
+    return (Right (Config n (concat ps) as iF))
 
 genBoolean p name = do
     reserved name
@@ -316,4 +329,17 @@ graph = do
 parseGraph s = case runParser graph () "" s of
       Left err  -> fail $ show err
       Right e   -> return e
+
+
+-----------------------------------------------------------------------------
+-- Helper functions
+
+
+unicornSimpleConfig :: [(OP.Node,String)] -> [(String,OP.Node)] -> String -> [(OP.Node,String,OP.Node)]
+unicornSimpleConfig inE outE cfg =
+    concatMap edge inE
+    where
+        edge :: (OP.Node,String) -> [(OP.Node,String,OP.Node)]
+        edge (n,p) = map (\x -> (n,p,x)) $ map snd $ filter ((== cfg) . fst) outE
+
 
