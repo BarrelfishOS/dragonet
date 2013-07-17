@@ -162,6 +162,9 @@ main_v2 = do
     --putStrLn (DG.toDotClustered prgClusters prgNodes)
     --putStrLn (DG.toDotFromDLP embedded)
     --putStrLn (DG.toDotFromDLP prg)
+    writeFile ("PRGUnconfig.dot") $ DG.toDotFromDLP prgU
+    writeFile ("PRG.dot") $ DG.toDotFromDLP prg
+    writeFile ("LPG.dot") $ DG.toDotFromDLP lpg
     writeFile ("embedded.dot") $ DG.toDotFromDLP embedded
     --putStrLn ("[" ++ (L.intercalate "\n" $ map strEdge lpgDep) ++ "]")
     where
