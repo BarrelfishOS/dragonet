@@ -152,8 +152,8 @@ graph lpg {
 }
 |]
 
-queueConfig :: [(OP.Node,String)] -> [(String,OP.Node)] -> String -> [(OP.Node,String,OP.Node)]
-queueConfig inE outE cfg = map (\(a,b) -> (a,b,queueN)) inE
+queueConfig :: OP.Node -> [(OP.Node,String)] -> [(String,OP.Node)] -> String -> [(OP.Node,String,OP.Node)]
+queueConfig n inE outE cfg = map (\(a,b) -> (a,b,queueN)) inE
     where queueN = OP.getDecNode ("Queue" ++ cfg) "" (OP.NaryNode []) []
 
 

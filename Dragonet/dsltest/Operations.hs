@@ -62,7 +62,7 @@ instance Eq t => Eq (Implementation t f) where
 -- Decision function:  based on packet, decides which outgoing edges to choose
 type DesFunction = (Decision -> Packet -> (Packet, [Node]))
 
-type ConfFunction = ([(Node,String)] -> [(String,Node)] -> String -> [(Node,String,Node)])
+type ConfFunction = (Node -> [(Node,String)] -> [(String,Node)] -> String -> [(Node,String,Node)])
 
 -- opearator function: Based on the result of incoming edges,
 --  decides which outgoing edges to choose
@@ -222,7 +222,7 @@ applyConfig cfg g =
 
         sminus a b = filter (not . (flip elem b)) a
 
-        handleCNode g' cn = g'' ++ (cF inE outE c)
+        handleCNode g' cn = g'' ++ (cF cn inE outE c)
             where
                 inE' = filter ((== cn) . third3) g'
                 outE' = filter ((== cn) . fst3) g'
