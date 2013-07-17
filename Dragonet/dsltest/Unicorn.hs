@@ -335,8 +335,8 @@ parseGraph s = case runParser graph () "" s of
 -- Helper functions
 
 
-unicornSimpleConfig :: [(OP.Node,String)] -> [(String,OP.Node)] -> String -> [(OP.Node,String,OP.Node)]
-unicornSimpleConfig inE outE cfg =
+unicornSimpleConfig :: OP.Node -> [(OP.Node,String)] -> [(String,OP.Node)] -> String -> [(OP.Node,String,OP.Node)]
+unicornSimpleConfig n inE outE cfg =
     concatMap edge inE
     where
         edge :: (OP.Node,String) -> [(OP.Node,String,OP.Node)]
