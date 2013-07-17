@@ -23,9 +23,9 @@ set -x
 set -e
 
 copyDiagram "LPGpaper"
-#copyDiagram "PRGUnconfpaper"
-#copyDiagram "PRGpaper"
-#copyDiagram "Embeddedpaper"
+copyDiagram "PRGUnconfpaper"
+copyDiagram "PRGpaper"
+copyDiagram "Embeddedpaper"
 
 echo "Done..."
 
