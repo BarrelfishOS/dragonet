@@ -72,7 +72,8 @@ graph lpg {
             port true false[ValidDest] }
 
         boolean ValidBroadcast {
-            port true false[ValidDest .L3APRIsRequest] }
+            port true[ValidDest .L3ARPIsRequest]
+            port false[ValidDest] }
 
         or ValidDest {
             port true false[.L2Verified] }
@@ -105,7 +106,8 @@ graph lpg {
 
     cluster L3IPv6 {
         boolean Classified {
-            port true false[ValidProtocol] }
+            port true[ValidProtocol]
+            port false[] }
 
         boolean ValidProtocol {
             port true false[.L3Classified] }
@@ -136,18 +138,33 @@ graph lpg {
             port true false[.L4Verified] }
     }
 
-    cluster L3APR {
+    cluster L3ARP {
         boolean IsRequest {
             port true false[] }
     }
 
     or L4Classified {
-        port true false[DefaultKernelProcessing] }
+        port true [IsFlow1 IsFlow2]
+        port false []}
 
     or L4Verified {
-        port true false[DefaultKernelProcessing] }
+        port true false[DefaultKernelProcessing AppNFSv2  AppBind9] }
 
     and DefaultKernelProcessing {
+        port true false[] }
+
+    boolean IsFlow1{
+        port true[AppNFSv2]
+        port false[DefaultKernelProcessing] }
+
+    boolean IsFlow2{
+        port true[AppBind9]
+        port false[DefaultKernelProcessing] }
+
+    and AppNFSv2 {
+        port true false[] }
+
+    and AppBind9 {
         port true false[] }
 }
 |]
@@ -155,6 +172,25 @@ graph lpg {
 queueConfig :: [(OP.Node,String)] -> [(String,OP.Node)] -> String -> [(OP.Node,String,OP.Node)]
 queueConfig inE outE cfg = map (\(a,b) -> (a,b,queueN)) inE
     where queueN = OP.getDecNode ("Queue" ++ cfg) "" (OP.NaryNode []) []
+
+
+mainPaper :: IO()
+mainPaper = do
+    writeFile ("PRGUnconf" ++ suffix ++ ".dot") $ DG.toDotFromDLP prgU
+    writeFile ("PRG" ++ suffix ++ ".dot") $ DG.toDotFromDLP prg
+    writeFile ("LPG" ++ suffix ++ ".dot") $ DG.toDotFromDLP lpg
+    writeFile ("Embedded" ++ suffix ++ ".dot") $ DG.toDotFromDLP embedded
+    where
+        suffix = "paper"
+        embedded = E.testEmbeddingV3 prg lpg
+
+        prgU = E.getDepEdgesP prgL2EtherClassified
+        prg = OP.applyConfig config prgU
+        lpg = E.getDepEdgesP lpgL2EtherClassified
+
+        config = [("L2EtherCValidCRC", "false"),("QueueN","42")]
+
+
 
 
 main_v2 :: IO()
@@ -177,7 +213,7 @@ main_v2 = do
         config = [("L2EtherCValidCRC", "false"),("QueueN","42")]
 
 
-main = main_v2
+main = mainPaper
 
 {-
 main = do
