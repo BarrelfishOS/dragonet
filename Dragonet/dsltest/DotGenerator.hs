@@ -20,6 +20,8 @@ filterLabel :: String -> String
 filterLabel x
   | (x == "IsDnsFlow") = "UDP/*:53"
   | (x == "IsDhcpdFlow") = "UDP/*:67"
+  | (L.isPrefixOf "OR:" x) = "OR"
+  | (L.isPrefixOf "AND" x) = "AND"
   | otherwise  = x
 
 
