@@ -164,10 +164,15 @@ graph lpg {
         port true false[dhcpd] }
 
     and named {
-        port true false[] }
+        port true [Named]
+	port false[] }
 
     and dhcpd {
-        port true false[] }
+        port true [Dhcpd]
+	port false[] }
+
+    node Named {}
+    node Dhcpd {}
 }
 |]
 
