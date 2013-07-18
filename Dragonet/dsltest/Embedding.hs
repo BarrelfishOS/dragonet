@@ -74,7 +74,7 @@ getOutEdgesP root = nextLevel ++ deeperLevels
 
 -- Get outgoing edegs for all nodes underneath given Node
 getDepEdgesP :: Node -> [(Node,String,Node)]
-getDepEdgesP root = getOutEdgesP root
+getDepEdgesP root = L.nub $ getOutEdgesP root
 
 getSoftStartNode :: Node
 getSoftStartNode = getDecNode "inSoftware" "" (NaryNode []) []
