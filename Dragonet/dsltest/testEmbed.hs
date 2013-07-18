@@ -179,8 +179,10 @@ queueConfig n inE outE cfg = map (\(a,b) -> (a,b,queueN)) inE
 mainPaper :: IO()
 mainPaper = do
     writeFile ("PRGUnconf" ++ suffix ++ ".dot") $ DG.toDotFromDLP prgU
-    writeFile ("PRG" ++ suffix ++ ".dot") $ DG.toDotFromDLP prg
-    writeFile ("LPG" ++ suffix ++ ".dot") $ DG.toDotFromDLP lpg
+    --writeFile ("PRG" ++ suffix ++ ".dot") $ DG.toDotFromDLP prg
+    --writeFile ("LPG" ++ suffix ++ ".dot") $ DG.toDotFromDLP lpg
+    writeFile ("PRG" ++ suffix ++ ".dot") $ DG.toDotClustered prgClusters prgNodes
+    writeFile ("LPG" ++ suffix ++ ".dot") $ DG.toDotClustered lpgClusters lpgNodes
     writeFile ("Embedded" ++ suffix ++ ".dot") $ DG.toDotFromDLP embedded
     where
         suffix = "paper"
