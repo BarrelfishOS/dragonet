@@ -135,7 +135,7 @@ graph lpg {
             port true false[Verified] }
 
         and Verified {
-            port true false[.L4Verified] }
+            port true false[.dhcpd .named] }
     }
 
     cluster L3ARP {
@@ -147,19 +147,21 @@ graph lpg {
         port true [IsDnsFlow IsDhcpdFlow]
         port false []}
 
+    /*
     or L4Verified {
-        port true false[Default dhcpd  named] }
+        port true false[dhcpd  named] }
 
+    */
+    /*
     and Default {
         port true false[] }
+    */
 
     boolean IsDnsFlow {
-        port true[named]
-        port false[Default] }
+        port true false[named] }
 
     boolean IsDhcpdFlow {
-        port true[dhcpd]
-        port false[Default] }
+        port true false[dhcpd] }
 
     and named {
         port true false[] }
