@@ -391,8 +391,8 @@ configDropOrDec n inE outE cfg =
 
 
 main = do
-    --putStrLn (DG.toDotClustered e10kPRGClusters e10kPRGNodes)
-    putStrLn (DG.toDotFromDLP embedded)
+    putStrLn (DG.toDotClustered e10kPRGClusters e10kPRGNodes)
+    --putStrLn (DG.toDotFromDLP embedded)
     --putStrLn (DG.toDotFromDLP prg)
     --putStrLn ("[" ++ (L.intercalate "\n" $ map strEdge lpgDep) ++ "]")
     where

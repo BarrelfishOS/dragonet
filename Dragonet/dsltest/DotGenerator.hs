@@ -21,7 +21,10 @@ filterLabel x
   | (x == "IsDnsFlow") = "UDP/*:53"
   | (x == "IsDhcpdFlow") = "UDP/*:67"
   | (L.isPrefixOf "OR:" x) = "OR"
-  | (L.isPrefixOf "AND" x) = "AND"
+  | (L.isPrefixOf "AND:" x) = "AND"
+  -- | (L.isSuffixOf "Broadcast" x) = (take ((length x) - (length "Broadcast")) x) ++ "Bcast"
+  -- | (L.isSuffixOf "Protocol" x) = (take ((length x) - (length "Protocol")) x) ++ "Prot"
+  -- | (L.isSuffixOf "Checksum" x) = (take ((length x) - (length "Checksum")) x) ++ "Csum"
   | otherwise  = x
 
 
