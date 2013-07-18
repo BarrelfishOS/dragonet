@@ -150,6 +150,9 @@ myLookup x l =
         f = L.find (\(y,_) -> OP.nCompPrgLpgV2 x y) l
 
 
+fst3 (a,_,_) = a
+third3 (_,_,a) = a
+
 
 
 edgeDefinitionDL :: [(OP.Node,String)] -> (OP.Node,OP.Node) -> String
@@ -182,16 +185,35 @@ edgeDefinitionDLP names (f,p,t) =
         fname = fromJust $ myLookup f names
         tname = fromJust $ myLookup t names
 
+makeDoubleEdgesDLP :: [(OP.Node,String,OP.Node)] -> [(OP.Node,String)] -> [(OP.Node,String,OP.Node)]
+makeDoubleEdgesDLP e names = double ++ single
+    where
+        double = concatMap doublesFrom $ map fst names
+        single = filter notPartOfDouble e
+        notPartOfDouble (a,b,c)
+            | (b == "T" || b == "F") = not $ elem (a,"",c) double
+            | otherwise = True
+        startingAt n = filter ((== n) . fst3) e
+        -- Check for each endpoint reachable from n if there is a double edge,
+        -- and if so add it to the result list
+        doublesFrom n = concatMap mkDouble $ L.nub $ map third3 $ e'
+            where
+                e' = startingAt n
+                -- Create double edge if there is both a true and a false edge
+                mkDouble m =
+                    if (elem (n,"T",m) e') && (elem (n,"F",m) e') then
+                        [(n,"",m)]
+                    else
+                        []
+                
 
 toDotFromDLP :: [(OP.Node,String,OP.Node)] -> String
 toDotFromDLP ns =
     "digraph G {\n" ++ "    rankdir=LR;\n" ++
         definitions ++ "\n" ++ edges ++ "}\n"
     where
-        fst' (a,_,_) = a
-        third (_,_,a) = a
-        names = buildNames $ L.nubBy OP.nCompPrgLpgV2 $ (map fst' ns) ++ (map third ns)
+        names = buildNames $ L.nubBy OP.nCompPrgLpgV2 $ (map fst3 ns) ++ (map third3 ns)
         definitions = concat $ map nodeDefinition names
-        edges = concat $ map (edgeDefinitionDLP names) ns
+        edges = concat $ map (edgeDefinitionDLP names) $ makeDoubleEdgesDLP ns names
 
 
