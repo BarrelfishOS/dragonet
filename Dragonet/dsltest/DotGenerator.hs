@@ -49,24 +49,31 @@ dotDoubleEdge :: (String,String) -> String -> String
 dotDoubleEdge (from,_) to =
     "    " ++ from ++ ":e -> " ++ to ++ ":w[color=\"black:white:black\"];\n"
 
--- Get dot definition for specified node
-nodeDefinition :: (OP.Node, String) -> String
-nodeDefinition (n, nn) =
+-- Get dot definition for specified node, applying the secified function to then
+-- node label
+nodeDefinitionLF :: (OP.Node, String) -> (String -> String) -> String
+nodeDefinitionLF (n, nn) lblFun =
     case n of
         (OP.Des (OP.Decision gn)) ->
-            dotNode nn (gLabelStr gn) ("style=\""++swdot++"\"") $ ports $ OP.getNodeEdges n
+            dotNode nn (label gn) ("style=\""++swdot++"\"") $ ports $ OP.getNodeEdges n
         (OP.Opr (OP.Operator gn)) ->
-            dotNode nn (gLabelStr gn) "style=\"filled,rounded\",fillcolor=gray"
+            dotNode nn (label gn) "style=\"filled,rounded\",fillcolor=gray"
                 $ ports $ OP.getNodeEdges n
         (OP.Conf (OP.Configuration gn)) ->
-            dotNode nn (gLabelStr gn)
+            dotNode nn (label gn)
                 "style=\"filled,diagonals\",fillcolor=turquoise" $
                 ports $ OP.getNodeEdges n
     where
+        label gn = lblFun $ gLabelStr gn
         -- Get port names from NodeEdges
         ports (OP.BinaryNode _) = ["T", "F"]
         ports (OP.NaryNode l) = map fst l
         swdot = if elem "software" (OP.nAttributes n) then "dotted" else ""
+
+
+-- Get dot definition for specified node
+nodeDefinition :: (OP.Node, String) -> String
+nodeDefinition a = nodeDefinitionLF a id
 
 -- Convert list to list of tuples with the first element being the list
 -- elements and the second element being the constant specified
@@ -115,6 +122,19 @@ toDot n =
 
 data Cluster = Cluster String [OP.Node] [Cluster]
 
+-- Get dot string for node in cluster (try to remove cluster prefix from label)
+clusterNodeDefinition :: String -> (OP.Node, String) -> String
+clusterNodeDefinition c a = nodeDefinitionLF a lf
+    where
+        lf l =
+            if c `L.isPrefixOf` noprefix then
+                prefix ++ (drop (length c) noprefix)
+            else l
+            where
+                prefix = if "OR:" `L.isPrefixOf` l then "OR:"
+                         else if "AND:" `L.isPrefixOf` l then "AND:" else ""
+                noprefix = drop (length prefix) l
+
 clusterDefinition :: [(String,OP.Node)] -> [(OP.Node,String)] -> [(String,String)] -> String -> String
 clusterDefinition nodes names clusters c =
     if null c then
@@ -124,7 +144,7 @@ clusterDefinition nodes names clusters c =
             "\n    label=\"" ++ c ++ "\";\n}\n"
     where
         findAll a as = map snd $ filter ((== a) . fst) as
-        nDec n = nodeDefinition (n, (fromJust $ lookup n names))
+        nDec n = clusterNodeDefinition c (n, (fromJust $ lookup n names))
         ndecls = concatMap nDec $ findAll c nodes
         cdecls = concatMap (clusterDefinition nodes names clusters) $ findAll c clusters
 
