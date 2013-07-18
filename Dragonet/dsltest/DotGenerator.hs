@@ -15,8 +15,16 @@ import qualified Data.List as L
 import Data.Maybe
 
 
+--- Filter some labels for more descriptive names
+filterLabel :: String -> String
+filterLabel x
+  | (x == "IsDnsFlow") = "UDP/*:53"
+  | (x == "IsDhcpdFlow") = "UDP/*:67"
+  | otherwise  = x
+
+
 -- Get string label for GNode
-gLabelStr gn = OP.gLabel gn
+gLabelStr gn = filterLabel $ OP.gLabel gn
 
 -- Declare a dot node
 dotNode :: String -> String -> String -> [String] -> String

@@ -144,27 +144,27 @@ graph lpg {
     }
 
     or L4Classified {
-        port true [IsFlow1 IsFlow2]
+        port true [IsDnsFlow IsDhcpdFlow]
         port false []}
 
     or L4Verified {
-        port true false[DefaultKernelProcessing AppNFSv2  AppBind9] }
+        port true false[Default dhcpd  named] }
 
-    and DefaultKernelProcessing {
+    and Default {
         port true false[] }
 
-    boolean IsFlow1{
-        port true[AppNFSv2]
-        port false[DefaultKernelProcessing] }
+    boolean IsDnsFlow {
+        port true[named]
+        port false[Default] }
 
-    boolean IsFlow2{
-        port true[AppBind9]
-        port false[DefaultKernelProcessing] }
+    boolean IsDhcpdFlow {
+        port true[dhcpd]
+        port false[Default] }
 
-    and AppNFSv2 {
+    and named {
         port true false[] }
 
-    and AppBind9 {
+    and dhcpd {
         port true false[] }
 }
 |]
