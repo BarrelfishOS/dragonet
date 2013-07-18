@@ -30,10 +30,10 @@ graph prg {
             port false[] }
 
         boolean ValidUnicast_ {
-            port true false[ValidDest] }
+            port true false[ValidDst] }
 
         boolean ValidBroadcast_ {
-            port true false[ValidDest] }
+            port true false[ValidDst] }
 
 
         boolean ValidUnicast {
@@ -45,7 +45,7 @@ graph prg {
             port true false[] }
 
 
-        or ValidDest {
+        or ValidDst {
             port true[.QueueN]
             port false[] }
     }
@@ -69,13 +69,13 @@ graph lpg {
             port false[] }
 
         boolean ValidUnicast {
-            port true false[ValidDest] }
+            port true false[ValidDst] }
 
         boolean ValidBroadcast {
-            port true[ValidDest .L3ARPIsRequest]
-            port false[ValidDest] }
+            port true[ValidDst .L3ARPIsRequest]
+            port false[ValidDst] }
 
-        or ValidDest {
+        or ValidDst {
             port true false[.L2Verified] }
 
         boolean ValidCRC {
@@ -119,7 +119,7 @@ graph lpg {
 
     cluster L4UDP {
         boolean Classified {
-            port true[ValidChecksum ValidSrc ValidDest ValidLength .L4Classified]
+            port true[ValidChecksum ValidSrc ValidDst ValidLen .L4Classified]
             port false[] }
 
         boolean ValidChecksum {
@@ -128,10 +128,10 @@ graph lpg {
         boolean ValidSrc {
             port true false[Verified] }
 
-        boolean ValidDest {
+        boolean ValidDst {
             port true false[Verified] }
 
-        boolean ValidLength {
+        boolean ValidLen {
             port true false[Verified] }
 
         and Verified {
