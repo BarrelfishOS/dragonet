@@ -22,15 +22,17 @@ graph prg {
             port false[.HWDrop] }
 
         node ClassifyL3_ {
-            port ipv4[L3IPv4Classified .L3IPv4Checksum_]
+            port ipv4[.L3IPv4Classified .L3IPv4Checksum_]
             port other[.CSynFilter] }
 
-       boolean L3IPv4Classified {
+    }
+    
+    cluster L3IPv4 {
+
+        boolean Classified {
             attr "software"
             port true false[] } 
-    }
-
-    cluster L3IPv4 {
+    
         node Checksum_ {
             port out[ValidChecksum .CSynFilter] }
 
@@ -103,12 +105,14 @@ graph lpg {
             port true false[.L2Verified] }
 
         node ClassifyL3 {
-            port out[L3IPv4Classified] }
+            port out[.L3IPv4Classified] }
 
-        node L3IPv4Classified {
+	/*
+        boolean L3IPv4Classified {
             port true[.L3IPv4Classified]
             port false[] }
 
+	*/
 
     }
 

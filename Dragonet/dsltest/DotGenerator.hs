@@ -17,15 +17,25 @@ import Data.Maybe
 
 --- Filter some labels for more descriptive names
 filterLabel :: String -> String
-filterLabel x
-  | (x == "IsDnsFlow") = "UDP/*:53"
-  | (x == "IsDhcpdFlow") = "UDP/*:67"
-  | (L.isPrefixOf "OR:" x) = "OR"
-  | (L.isPrefixOf "AND:" x) = "AND"
-  -- | (L.isSuffixOf "Broadcast" x) = (take ((length x) - (length "Broadcast")) x) ++ "Bcast"
-  -- | (L.isSuffixOf "Protocol" x) = (take ((length x) - (length "Protocol")) x) ++ "Prot"
-  -- | (L.isSuffixOf "Checksum" x) = (take ((length x) - (length "Checksum")) x) ++ "Csum"
-  | otherwise  = x
+filterLabel s = short $ removeprefix s
+  where
+  removeprefix x
+        | (L.isPrefixOf "L2EtherL3IPv3" x) = "EthIPv4" ++ (drop (length "L2Ether") x)
+        | (L.isPrefixOf "L2Ether" x) = "Eth" ++ (drop (length "L2Ether") x)
+        | (L.isPrefixOf "L3IPv4" x)  = "IPv4" ++ (drop (length "L3IPv4") x)
+        | (L.isPrefixOf "L4UDP" x)   = "UDP" ++ (drop (length "L4UDP") x)
+  	| otherwise  = x
+  short x
+       | (x == "IsUDPDest53") = "UDP/*:53"
+       | (x == "IsUDPDest67") = "UDP/*:67"
+       | (L.isPrefixOf "OR:" x) = "OR"
+       | (L.isPrefixOf "AND:" x) = "AND"
+       | (L.isPrefixOf "Queue" x) = "Q" ++ (drop (length "Queue") x)
+       | (L.isSuffixOf "Broadcast" x) = (take ((length x) - (length "Broadcast")) x) ++ "Bcast"
+       | (L.isSuffixOf "Protocol" x) = (take ((length x) - (length "Protocol")) x) ++ "Prot"
+       | (L.isSuffixOf "Checksum" x) = (take ((length x) - (length "Checksum")) x) ++ "Csum"
+       | (L.isSuffixOf "Classified" x) = "Is" ++ (take ((length x) - (length "Classified")) x)
+       | otherwise  = x
 
 
 -- Get string label for GNode
