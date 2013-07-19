@@ -13,6 +13,7 @@ module Embedding(
 
 import qualified Data.List as L
 import qualified Data.Set as S
+import qualified Data.Map as M
 import qualified Data.Maybe as MB
 import qualified Data.Tuple as T
 
@@ -155,6 +156,9 @@ locateAsDESTEdgeP gedges gn = L.filter (\ (_, _, z) -> gn == z ) gedges
 edgeStart :: (a,b,c) -> a
 edgeStart (n,_,_) = n
 
+edgeLabel :: (a,b,c) -> b
+edgeLabel (_,l,_) = l
+
 edgeEnd :: (a,b,c) -> c
 edgeEnd (_,_,n) = n
 
@@ -283,6 +287,14 @@ isHardware :: ENode -> Bool
 isHardware = not . isSoftware
 
 
+-- Not very pretty :-/
+enIsAnd :: ENode -> Bool
+enIsAnd e = "AND:" `L.isPrefixOf` (enLabel e)
+
+enIsOr :: ENode -> Bool
+enIsOr e = "OR:" `L.isPrefixOf` (enLabel e)
+
+
 --instance (EmbeddableNode ENode) where
 --    embIsLPG (ELPG _) = True
 --    embIsLPG _ = Fasle
@@ -309,11 +321,12 @@ embeddingV4 prg lpg =
 
     embeddingV4Step (sEn,sEe) sUn
         | S.null sUn = sEe
-        | not $ sEn `S.isProperSubsetOf` sEn' = error "E not growing"
+        {-| not $ sEn `S.isProperSubsetOf` sEn' = error "E not growing"-}
         | otherwise = embeddingV4Step (sEn',sEe') sUn'
         where
             (sEn',sEe') = (sEn `S.union` newNodes, sEe `S.union` newEdges)
-            sUn' = sUn `setMinusL` newNodes
+            --sUn' = sUn `setMinusL` newNodes
+            sUn' = S.delete v sUn
 
             -- Find a node whose dependencies are already embedded
             v = S.findMin $ S.filter (flip isSubsetOfL sEn . lpgDeps) sUn
@@ -347,13 +360,18 @@ embeddingV4 prg lpg =
 
 serializeV4 :: S.Set (ENode,String,ENode) -> S.Set (ENode,String,ENode)
 serializeV4 graph =
-    graph S.\\ crossingEdges `S.union` fixedEdges
+    graph S.\\ crossingEdges `S.union` fixedEdges `S.union` queueEdges
     where
         crossingEdges = S.filter isCrossingEdge graph
         isCrossingEdge (s,_,e) = isHardware s && isSoftware e
 
+        nodes = (S.map edgeStart graph) `S.union` (S.map edgeEnd graph)
+        isQueue q = (isHardware q) && (L.isPrefixOf "Queue" $ enLabel q)
+        queueEdges = S.map queueEdge $ S.filter isQueue $ nodes
+        queueEdge  q = (q,"out",boundaryNode)
         fixedEdges = S.fromList $ concatMap fixEdge $ S.toList $ crossingEdges
-        fixEdge (s,p,e) = [(s,p,boundaryNode), (boundaryNode,boundaryNodePort,e)]
+        --fixEdge (s,p,e) = [(s,p,boundaryNode), (boundaryNode,boundaryNodePort,e)]
+        fixEdge (s,p,e) = [(boundaryNode,boundaryNodePort,e)]
         boundaryNode = ELPG "SoftwareEntry" []
         boundaryNodePort = "out"
 
@@ -382,17 +400,97 @@ convertV4 edges =
                 epl = map edge $ S.toList ports
                 e = NaryNode epl
 
+getConstraints :: S.Set (ENode,String,ENode) -> M.Map ENode (S.Set (ENode,String))
+getConstraints g =
+    gcStep nodes M.empty
+    where
+        nodes = (S.map edgeStart g) `S.union` (S.map edgeEnd g)
+        gcStep ns a
+            | S.null ns = a
+            | otherwise = gcStep ns' a'
+            where
+                directConstraints = S.map (\(a,b,_) -> (a,b)) $ inEdges n g
+                indirectConstraints = S.foldr S.union S.empty $ S.map (\x -> MB.fromJust $ M.lookup x a) $ inNeighbours n g
+                constraints = directConstraints `S.union` indirectConstraints
+                a' = M.insert n constraints a
+
+                ns' = n `S.delete` ns
+                n = S.findMin $ S.filter isSatisfied ns
+                isSatisfied m = S.null $ inNeighbours m g `S.intersection` ns
+
+data Ternary = TTrue | TFalse | TZ
+    deriving (Show, Eq, Ord)
+
+tcombine TTrue TTrue = TTrue
+tcombine TTrue TZ = TTrue
+tcombine TZ TTrue = TTrue
+tcombine TFalse TFalse = TFalse
+tcombine TZ TFalse = TFalse
+tcombine TFalse TZ = TFalse
+tcombine TZ TZ = TZ
+tcombine TTrue TFalse = error "Contradiction"
+tcombine TFalse TTrue = error "Contradiction"
+
+tLabel TTrue = "T"
+tLabel TFalse = "F"
+
+fixedValue :: ENode -> S.Set (ENode,String) -> Ternary
+fixedValue n c
+    | isHardware n = TZ
+    | (prefix `L.isPrefixOf` lbl) = check
+    | otherwise = TZ
+    where
+        lbl = enLabel n
+        prefix = "IsUDPDest"
+        check = S.foldl tcombine TZ $ S.map val $ S.filter (L.isPrefixOf ("HW" ++ prefix) . enLabel . fst) c
+        val (en,l)  =
+            if el == "HW" ++ lbl then
+                if l == "T" then
+                    TTrue
+                else if l == "F" then
+                    TFalse
+                else
+                    TZ
+            else if l == "T" then
+                TFalse
+            else
+                TZ
+            where
+                el = enLabel en
+
+applyConstraints :: S.Set (ENode,String,ENode) -> S.Set (ENode,String,ENode)
+applyConstraints g =
+    S.foldl step g nodes
+    where
+        nodes :: S.Set ENode
+        nodes = (S.map edgeStart g) `S.union` (S.map edgeEnd g)
+        constraints = getConstraints g
+        step :: S.Set (ENode,String,ENode) -> ENode -> S.Set (ENode,String,ENode)
+        step g' n
+            | fv == TZ = g'
+            | otherwise = TR.trace("fixed node " ++ (show n) ++ " to " ++ (show fv)) (g'')
+            where
+                c = MB.fromJust $ M.lookup n constraints
+                fv = fixedValue n c
+                l = tLabel fv
+                g'' = (g' S.\\ dropEdges) --`S.union` addEdges
+                dropEdges = S.filter (\e -> (edgeStart e == n) && (edgeLabel e /= l)) g'
+                --addEdges = S.foldl S.union S.empty $ S.map edge $ inEdges n g'
+                edge (a,b,_) = S.map (\e -> (a,b,e)) $ S.map edgeEnd $ S.filter ((== l) . edgeLabel) $ outEdges n g'
+
+
 -- Takes Nodes, converts them into String, applies the embedding algorithm
 --      convert back the results into Node format
 embeddingV4Wrapper ::  [(Node, String, Node)] -> [(Node, String, Node)] -> [(Node, String, Node)]
 embeddingV4Wrapper prg lpg =
-    convertV4 $ serialized
+    convertV4 $ constrained
     where
     lpgEdges = S.fromList $ map (convertEdgeV4 ELPG) $ lpg
     prgEdges = S.fromList $ map (convertEdgeV4 EPRG) $ prg
 
     embedded = embeddingV4 prgEdges lpgEdges
     serialized = serializeV4 embedded
+    constrained = applyConstraints serialized
 
 convertEdgeV4 :: (String -> [String] -> ENode) -> (Node, String, Node) -> (ENode, String, ENode)
 convertEdgeV4 f (n1, p, n2) =
