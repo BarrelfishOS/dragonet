@@ -84,7 +84,7 @@ nodeDefinitionLF (n, nn) lblFun =
                 $ ports $ OP.getNodeEdges n
         (OP.Conf (OP.Configuration gn)) ->
             dotNode nn (label gn)
-                "style=\"filled,diagonals\",fillcolor=turquoise" $
+                "style=\"filled,diagonals\",fillcolor=paleturquoise" $
                 ports $ OP.getNodeEdges n
     where
         label gn = lblFun $ gLabelStr gn
