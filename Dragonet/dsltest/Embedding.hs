@@ -8,6 +8,7 @@ module Embedding(
     testEmbeddingV3
     , getDepEdgesP
     , removeDroppedNodesP
+    , topSort3
 ) where
 
 
@@ -105,6 +106,29 @@ topSort es =
                 (\x -> ((snd x) == n) || ((fst x) == n)) newEdges
         orphaned = L.nub $ filter isOrphaned $ map snd dropped
 
+
+-- Topological sort on edge list representation
+topSort3 :: Eq a => [(a,b,a)] -> [a]
+topSort3 [] = []
+topSort3 es =
+    noIncoming ++ orphaned ++ (topSort3 newEdges)
+    where
+        fst3 (a,_,_) = a
+        third3 (_,_,a) = a
+
+        -- Is n a successor of another Node?
+        notSucc n = MB.isNothing $ L.find (\x -> (third3 x) == n) es
+        -- All nodes without incoming edges
+        noIncoming = filter (notSucc) $ L.nub $ map fst3 es
+        -- edges that don't start at noIncoming nodes
+        newEdges = filter (\x -> notElem (fst3 x) noIncoming) es
+        -- edges that start at noIncoming nodes
+        dropped = filter (\x -> elem (fst3 x) noIncoming) es
+        -- Sink nodes (without outgoing edges) that lost their incoming edges
+        -- those also vanish from the edges list
+        isOrphaned n = MB.isNothing $ L.find
+                (\x -> ((third3 x) == n) || ((fst3 x) == n)) newEdges
+        orphaned = L.nub $ filter isOrphaned $ map third3 dropped
 
 
 ----------------------------------------------------------------

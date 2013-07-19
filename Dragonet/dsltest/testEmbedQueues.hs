@@ -210,6 +210,12 @@ graph lpg {
 queueConfig n inE outE cfg = map (\(a,b) -> (a,b,queueN)) inE
     where queueN = OP.getDecNode ("Queue" ++ cfg) "" (OP.NaryNode []) []-}
 
+dropBeforeQ :: [(OP.Node,String,OP.Node)] -> [(OP.Node,String,OP.Node)]
+dropBeforeQ g =
+    filter (\(n,_,m) -> (n `L.notElem` dropN) && (m `L.notElem` dropN)) g
+    where
+        ts = E.topSort3 g
+        dropN = takeWhile (\x -> not $ L.isPrefixOf "PRG:Queue" $ OP.nLabel x) ts
 
 mainPaper :: IO()
 mainPaper = do
@@ -218,7 +224,7 @@ mainPaper = do
     writeFile ("LPG" ++ suffix ++ ".dot") $ DG.toDotFromDLP lpg
     writeFile ("PRG" ++ suffix ++ "-clustered.dot") $ DG.toDotClustered prgClusters prgNodes
     writeFile ("LPG" ++ suffix ++ "-clustered.dot") $ DG.toDotClustered lpgClusters lpgNodes
-    writeFile ("Embedded" ++ suffix ++ ".dot") $ DG.toDotFromDLP embedded
+    writeFile ("Embedded" ++ suffix ++ ".dot") $ DG.toDotFromDLP $ dropBeforeQ embedded
     where
         suffix = "paper"
         embedded = E.testEmbeddingV3 prg lpg
