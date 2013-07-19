@@ -231,7 +231,7 @@ mainPaper = do
 
         prgU = E.getDepEdgesP prgL2EtherClassified
         prg = OP.applyConfig config prgU
-        lpg = E.getDepEdgesP lpgQueue0
+        lpg = E.getDepEdgesP lpgQueue1
 
         config = [("CSynFilter", "true"), ("CSynOutput", "Q2")]
 
