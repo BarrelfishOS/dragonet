@@ -15,23 +15,31 @@ import qualified Data.List as L
 import Data.Maybe
 
 
---- Filter some labels for more descriptive names
+--- Filter some labels for more descriptive/shorter names
 filterLabel :: String -> String
-filterLabel s = short $ removeprefix s
+filterLabel nodename = t ++ (short $ removeprefix s)
   where
+  (t,s) = splittype nodename
+  splittype x
+        | (L.isPrefixOf "PRG:" x)  = ("P:", (drop (length "PRG:") x))
+        | (L.isPrefixOf "LPG:" x)  = ("L:", (drop (length "LPG:") x))
+	| otherwise  = ("", x)
   removeprefix x
         | (L.isPrefixOf "L2EtherL3IPv3" x) = "EthIPv4" ++ (drop (length "L2Ether") x)
         | (L.isPrefixOf "L2Ether" x) = "Eth" ++ (drop (length "L2Ether") x)
         | (L.isPrefixOf "L3IPv4" x)  = "IPv4" ++ (drop (length "L3IPv4") x)
+        | (L.isPrefixOf "L3ARP" x)  = "ARP" ++ (drop (length "L3ARP") x)
         | (L.isPrefixOf "L4UDP" x)   = "UDP" ++ (drop (length "L4UDP") x)
   	| otherwise  = x
   short x
        | (x == "IsUDPDest53") = "UDP/*:53"
        | (x == "IsUDPDest67") = "UDP/*:67"
+       | (x == "SoftwareEntry") = "SW"
        | (L.isPrefixOf "OR:" x) = "OR"
        | (L.isPrefixOf "AND:" x) = "AND"
        | (L.isPrefixOf "Queue" x) = "Q" ++ (drop (length "Queue") x)
        | (L.isSuffixOf "Broadcast" x) = (take ((length x) - (length "Broadcast")) x) ++ "Bcast"
+       | (L.isSuffixOf "IsRequest" x) = (take ((length x) - (length "IsRequest")) x) ++ "Req"
        | (L.isSuffixOf "Protocol" x) = (take ((length x) - (length "Protocol")) x) ++ "Prot"
        | (L.isSuffixOf "Checksum" x) = (take ((length x) - (length "Checksum")) x) ++ "Csum"
        | (L.isSuffixOf "Classified" x) = "Is" ++ (take ((length x) - (length "Classified")) x)
