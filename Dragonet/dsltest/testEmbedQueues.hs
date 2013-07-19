@@ -23,7 +23,7 @@ graph prg {
 
         node ClassifyL3_ {
             port ipv4[L3IPv4Classified .L3IPv4Checksum_]
-            port other[.HWIsTCPSyn] }
+            port other[.CSynFilter] }
 
        boolean L3IPv4Classified {
             attr "software"
@@ -32,16 +32,25 @@ graph prg {
 
     cluster L3IPv4 {
         node Checksum_ {
-            port out[ValidChecksum .HWIsTCPSyn] }
+            port out[ValidChecksum .CSynFilter] }
 
         boolean ValidChecksum {
             attr "software"
             port true false[] }
     }
 
-    boolean HWIsTCPSyn {
-        port true[Queue2]
+    config CSynFilter {
+        port true[HWIsTCPSyn]
         port false[HWIsUDPDest53] }
+
+    boolean HWIsTCPSyn {
+        port true[CSynOutput]
+        port false[HWIsUDPDest53] }
+
+    config CSynOutput {
+        port Q0[Queue0]
+        port Q1[Queue1]
+        port Q2[Queue2] }
 
     boolean HWIsUDPDest53 {
         port true[Queue1]
@@ -214,48 +223,7 @@ mainPaper = do
         prg = OP.applyConfig config prgU
         lpg = E.getDepEdgesP lpgQueue0
 
-        config = [("L2EtherCValidCRC", "false"),("QueueN","42")]
-
-
-
-
-main_v2 :: IO()
-main_v2 = do
-    --putStrLn (DG.toDotClustered prgClusters prgNodes)
-    --putStrLn (DG.toDotFromDLP embedded)
-    --putStrLn (DG.toDotFromDLP prg)
-    writeFile ("PRGUnconfig.dot") $ DG.toDotFromDLP prgU
-    writeFile ("PRG.dot") $ DG.toDotFromDLP prg
-    writeFile ("LPG.dot") $ DG.toDotFromDLP lpg
-    writeFile ("embedded.dot") $ DG.toDotFromDLP embedded
-    --putStrLn ("[" ++ (L.intercalate "\n" $ map strEdge lpgDep) ++ "]")
-    where
-        embedded = E.testEmbeddingV3 prg lpg
-
-        prgU = E.getDepEdgesP prgL2EtherClassified
-        prg = OP.applyConfig config prgU
-        lpg = E.getDepEdgesP lpgQueue1
-
-        config = [("L2EtherCValidCRC", "false"),("QueueN","42")]
+        config = [("CSynFilter", "true"), ("CSynOutput", "Q2")]
 
 
 main = mainPaper
-
-{-
-main = do
-    --putStrLn (DG.toDotClustered prgClusters prgNodes)
-    --putStrLn (DG.toDotFromDLP embedded)
-    putStrLn (DG.toDotFromDLP prg)
-    --putStrLn ("[" ++ (L.intercalate "\n" $ map strEdge lpgDep) ++ "]")
-    where
-        embedded = E.testEmbeddingV3 prg lpg
-
-        prgU = E.getDepEdgesP prgL2EtherClassified
-        prg = OP.applyConfig config prgU
-        lpg = E.getDepEdgesP lpgL2EtherClassified
-
-        config = [("L2EtherCValidCRC", "false"),("QueueN","42")]
-
-        {-prgDep = L.nub $ E.removeDroppedNodesP $ E.getDepEdgesP $ prgL2EtherClassified
-        lpgDep = L.nub $ E.removeDroppedNodesP $ E.getDepEdgesP $ lpgL2EtherClassified-}
--}
