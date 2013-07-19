@@ -32,6 +32,7 @@ filterLabel nodename = t ++ (short $ removeprefix s)
         | (L.isPrefixOf "L4UDP" x)   = "UDP" ++ (drop (length "L4UDP") x)
   	| otherwise  = x
   short x
+       | (x == "CSynOutput") = "CSynOut"
        | (x == "IsUDPDest53") = "UDP/*:53"
        | (x == "IsUDPDest67") = "UDP/*:67"
        | (x == "SoftwareEntry") = "SW"
