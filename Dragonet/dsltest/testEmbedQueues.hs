@@ -150,7 +150,7 @@ graph lpg {
     cluster L4UDP {
         boolean Classified {
             port true[ValidChecksum ValidSrc ValidDst ValidLen .L4Classified]
-            port false[] }
+            port false[.L4Classified] }
 
         boolean ValidChecksum {
             port true false[Verified] }
