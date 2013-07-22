@@ -55,9 +55,12 @@ graph prg {
         port Q2[Queue2] }
 
     boolean HWIsUDPDest53 {
-        port true[Queue1]
+        port true[L2EtherValidUnicast]
         port false[Queue0] }
 
+    boolean L2EtherValidUnicast {
+        port true[Queue1]
+        port false[] }
 
     node Queue0 {
         port out[] }
@@ -72,10 +75,7 @@ graph prg {
 
 [unicorn|
 graph lpg {
-    node Queue0 {
-        port out[L2EtherClassified] }
-
-    node Queue1 {
+    node Queue {
         port out[L2EtherClassified] }
 
     cluster L2Ether {
@@ -224,14 +224,14 @@ mainPaper = do
     writeFile ("LPG" ++ suffix ++ ".dot") $ DG.toDotFromDLP lpg
     writeFile ("PRG" ++ suffix ++ "-clustered.dot") $ DG.toDotClustered prgClusters prgNodes
     writeFile ("LPG" ++ suffix ++ "-clustered.dot") $ DG.toDotClustered lpgClusters lpgNodes
-    writeFile ("Embedded" ++ suffix ++ ".dot") $ DG.toDotFromDLP $ dropBeforeQ embedded
+    writeFile ("Embedded" ++ suffix ++ ".dot") $ DG.toDotFromDLP $ embedded --dropBeforeQ embedded
     where
         suffix = "paper"
         embedded = E.testEmbeddingV3 prg lpg
 
         prgU = E.getDepEdgesP prgL2EtherClassified
         prg = OP.applyConfig config prgU
-        lpg = E.getDepEdgesP lpgQueue1
+        lpg = E.getDepEdgesP lpgQueue
 
         config = [("CSynFilter", "true"), ("CSynOutput", "Q2")]
 

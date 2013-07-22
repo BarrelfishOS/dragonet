@@ -193,6 +193,9 @@ inEdges n s = S.filter ((n ==) . edgeEnd) s
 outEdges n s = S.filter ((n ==) . edgeStart) s
 inNeighbours n s = S.map edgeStart $ inEdges n s
 
+edgeNMap :: (a -> c) -> (a, b, a) -> (c, b, c)
+edgeNMap f (a,b,c) = (f a, b, f c)
+
 
 --embeddingV3Step sP sE [] = sE
 --embeddingV3Step :: ((Show a), (Ord a)) => S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a) -> S.Set (a,a)
@@ -284,28 +287,32 @@ removeDroppedNodesP edgeList = L.filter (\ (_,_,y) ->
 --    embIsPRG :: a -> Bool
 
 data ENode =
-    ELPG String [String] |
-    EPRG String [String]
+    ELPG String [String] String |
+    EPRG String [String] String
     deriving (Show, Eq, Ord)
 
 enLabel :: ENode -> String
-enLabel (ELPG l _) = l
-enLabel (EPRG l _) = l
+enLabel (ELPG l _ _) = l
+enLabel (EPRG l _ _) = l
 
 enAttributes :: ENode -> [String]
-enAttributes (ELPG _ a) = a
-enAttributes (EPRG _ a) = a
+enAttributes (ELPG _ a _) = a
+enAttributes (EPRG _ a _) = a
+
+enTag :: ENode -> String
+enTag (ELPG _ _ t) = t
+enTag (EPRG _ _ t) = t
 
 isLPG :: ENode -> Bool
-isLPG (ELPG _ _) = True
+isLPG (ELPG _ _ _) = True
 isLPG _ = False
 
 isPRG :: ENode -> Bool
 isPRG = not . isLPG
 
 isSoftware :: ENode -> Bool
-isSoftware (ELPG _ _) = True
-isSoftware (EPRG _ a) = elem "software" a
+isSoftware (ELPG _ _ _) = True
+isSoftware (EPRG _ a _) = elem "software" a
 
 isHardware :: ENode -> Bool
 isHardware = not . isSoftware
@@ -392,11 +399,11 @@ serializeV4 graph =
         nodes = (S.map edgeStart graph) `S.union` (S.map edgeEnd graph)
         isQueue q = (isHardware q) && (L.isPrefixOf "Queue" $ enLabel q)
         queueEdges = S.map queueEdge $ S.filter isQueue $ nodes
-        queueEdge  q = (q,"out",boundaryNode)
+        queueEdge  q = (q,"out",boundaryNode $ enLabel q)
         fixedEdges = S.fromList $ concatMap fixEdge $ S.toList $ crossingEdges
         --fixEdge (s,p,e) = [(s,p,boundaryNode), (boundaryNode,boundaryNodePort,e)]
-        fixEdge (s,p,e) = [(boundaryNode,boundaryNodePort,e)]
-        boundaryNode = ELPG "SoftwareEntry" []
+        fixEdge (s,p,e) = [(boundaryNode $ enTag e,boundaryNodePort,e)]
+        boundaryNode l = ELPG (l ++ "SoftwareEntry") [] ""
         boundaryNodePort = "out"
 
 
@@ -407,13 +414,14 @@ convertV4 edges =
         convertEdge (a,p,b) = ((convertNode a),p,(convertNode b))
         
         convertNode :: ENode -> Node
-        convertNode n = nodeF l "" e a
+        convertNode n = nodeF l t e a
             where
                 a = enAttributes n
                 el = enLabel n
                 l = case n of
-                    (ELPG s _) -> "LPG:" ++ s
-                    (EPRG s _) -> "PRG:" ++ s
+                    (ELPG s _ _) -> "LPG:" ++ s
+                    (EPRG s _ _) -> "PRG:" ++ s
+                t = enTag n
                 nodeF = if (take 3 el) == "OR:" || (take 4 el) == "AND:" then
                         getOperatorNode
                     else
@@ -503,24 +511,68 @@ applyConstraints g =
                 edge (a,b,_) = S.map (\e -> (a,b,e)) $ S.map edgeEnd $ S.filter ((== l) . edgeLabel) $ outEdges n g'
 
 
+-- Track recursively backwards along incoming edges to specified node and
+-- collect edges
+prgRevReachable :: S.Set (ENode,String,ENode) -> ENode -> S.Set (ENode,String,ENode)
+prgRevReachable g n
+    | S.null edges = S.empty
+    | otherwise = S.union edges $ S.fold S.union S.empty $ S.map (prgRevReachable g) nodes
+    where
+        edges = inEdges n g
+        nodes = inNeighbours n g
+
+
 -- Takes Nodes, converts them into String, applies the embedding algorithm
 --      convert back the results into Node format
 embeddingV4Wrapper ::  [(Node, String, Node)] -> [(Node, String, Node)] -> [(Node, String, Node)]
 embeddingV4Wrapper prg lpg =
-    convertV4 $ constrained
+    convertV4 $ serialized
     where
     lpgEdges = S.fromList $ map (convertEdgeV4 ELPG) $ lpg
     prgEdges = S.fromList $ map (convertEdgeV4 EPRG) $ prg
 
-    embedded = embeddingV4 prgEdges lpgEdges
+    -- Replace 'Queue' node in LPG with specific queue label
+    lpgQueue q = S.map replE lpgEdges
+        where
+            replE (a,b,c) = ((replN a),b,(replN c))
+            replN (ELPG l a t)
+                | l == "Queue" = ELPG q a t
+                | otherwise = ELPG l a t
+
+    -- Get prg for a particular queue (basically go recursively and get all
+    -- nodes reachable from the queue node. This is necessary to avoid embedding
+    -- functionality that is not available on a particular queue
+    prgQueue q = prgRevReachable prgEdges n
+        where n = S.findMin $ S.filter ((== q) . enLabel) $ nodesSet prgEdges
+
+    -- Queue labels in PRG
+    queues = map enLabel $ S.toList $ S.filter (L.isPrefixOf "Queue" . enLabel) $ nodesSet prgEdges
+
+    -- Tag software node with queue label
+    tagLPG q n
+        | isHardware n = n
+        | enIsAnd n = f ("AND:" ++ (q ++ (drop 4 l))) a q
+        | enIsOr n = f ("OR:" ++ (q ++ (drop 3 l))) a q
+        | otherwise = f (q ++ l) a q
+        where
+            f = if isLPG n then ELPG else EPRG
+            l = enLabel n
+            a = enAttributes n
+
+    -- Calculate embedding for a particular queue
+    embeddedSWQ q = S.map (edgeNMap $ tagLPG q) $ embeddingV4 (prgQueue q) (lpgQueue q)
+
+    -- Get union of embeddings of each queue
+    embedded = foldl S.union S.empty $ map embeddedSWQ $ queues
+
     serialized = serializeV4 embedded
     constrained = applyConstraints serialized
 
-convertEdgeV4 :: (String -> [String] -> ENode) -> (Node, String, Node) -> (ENode, String, ENode)
+convertEdgeV4 :: (String -> [String] -> String -> ENode) -> (Node, String, Node) -> (ENode, String, ENode)
 convertEdgeV4 f (n1, p, n2) =
     ((node n1),p,(node n2))
     where
-        node n = f (nLabel n) (nAttributes n)
+        node n = f (nLabel n) (nAttributes n) ""
         
 ----------------------------------------------------------------
 --  A version that works on the String type
