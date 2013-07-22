@@ -403,7 +403,7 @@ serializeV4 graph =
         fixedEdges = S.fromList $ concatMap fixEdge $ S.toList $ crossingEdges
         --fixEdge (s,p,e) = [(s,p,boundaryNode), (boundaryNode,boundaryNodePort,e)]
         fixEdge (s,p,e) = [(boundaryNode $ enTag e,boundaryNodePort,e)]
-        boundaryNode l = ELPG (l ++ "SoftwareEntry") [] ""
+        boundaryNode l = ELPG "SoftwareEntry" [] l
         boundaryNodePort = "out"
 
 
@@ -551,9 +551,13 @@ embeddingV4Wrapper prg lpg =
     -- Tag software node with queue label
     tagLPG q n
         | isHardware n = n
-        | enIsAnd n = f ("AND:" ++ (q ++ (drop 4 l))) a q
+        {-| enIsAnd n = f ("AND:" ++ (q ++ (drop 4 l))) a q
         | enIsOr n = f ("OR:" ++ (q ++ (drop 3 l))) a q
-        | otherwise = f (q ++ l) a q
+        | otherwise = f (q ++ l) a q-}
+        | enIsAnd n = f l a q
+        | enIsOr n = f l a q
+        | otherwise = f l a q
+
         where
             f = if isLPG n then ELPG else EPRG
             l = enLabel n

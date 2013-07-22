@@ -105,11 +105,11 @@ instance NodeCompare Node where
     nCompPrgLpg _ _ = False
 
     nCompPrgLpgV2 (Des (Decision n1)) (Des (Decision n2)) =
-        (gLabel n1) == (gLabel n2)
+        (gLabel n1) == (gLabel n2) && (gTag n1) == (gTag n2)
     nCompPrgLpgV2 (Opr (Operator n1)) (Opr (Operator n2)) =
-        (gLabel n1) == (gLabel n2)
+        (gLabel n1) == (gLabel n2) && (gTag n1) == (gTag n2)
     nCompPrgLpgV2 (Conf (Configuration n1)) (Conf (Configuration n2)) =
-        (gLabel n1) == (gLabel n2)
+        (gLabel n1) == (gLabel n2) && (gTag n1) == (gTag n2)
     nCompPrgLpgV2 _ _ = False
  
 
