@@ -7,6 +7,7 @@ import DotGenerator as DG
 import Embedding as E
 import qualified Data.List as L
 import Data.Maybe
+import qualified Data.Char as C
 import qualified Debug.Trace as TR
 import qualified BoolExp as BE
 
@@ -205,15 +206,16 @@ simplify = recInOut simplifyN-}
 
 
 
-type CExp = BE.BExp
+type CExp = BE.CNFBExp
 
-cAnd = BE.BEAnd
-cOr = BE.BEOr
-cNot = BE.BENot
-cVar = BE.BEVar
+cAnd = BE.cnfAnd
+cOr = BE.cnfOr
+cNot = BE.cnfNot
+cVar = BE.cnfVar
+cImpl a b = (cNot a) `cOr` b
 
-cAndL = BE.andL
-cOrL = BE.andL
+cAndL = BE.cnfAndL
+cOrL = BE.cnfOrL
 
 -- Get constraints for specific port on node
 nConst :: OP.Node -> String -> Maybe CExp
@@ -230,6 +232,11 @@ nConst n p =
         _ -> Nothing
     where
         stripL s = drop 4 s
+
+additionalConstraints = cAndL [
+        ((cVar "DestPort53") `cImpl` (cNot $ cVar "DestPort67")),
+        ((cVar "DestPort67") `cImpl` (cNot $ cVar "DestPort53"))
+    ]
 
 fst3 (a,_,_) = a
 snd3 (_,a,_) = a
@@ -273,9 +280,16 @@ generateConstraints g = foldl node []  $ E.topSort3 g
                 opT = opFun $ map (\(n',p',_) -> evaluate (n',p')) $ filter ((== "T") . snd3) inE
                 opF = cNot opT
 
+
+addAdditional :: [((OP.Node,String),CExp)] -> [((OP.Node,String),CExp)]
+addAdditional cs = map (\(a,e) -> (a,(cAnd e additionalConstraints))) cs
+
 showNode n = (OP.nLabel n) ++ "[" ++ (OP.nTag n) ++ "]"
 showEdge (a,b,c) = "(" ++ (showNode a) ++ "," ++ b ++ "," ++ (showNode c) ++ ")"
 showConstr ((n,p),e) = "(" ++ (showNode n) ++ "." ++ p ++ " = " ++ (show e) ++ ")"
+
+cLookup :: String -> String -> String -> [((OP.Node,String),CExp)] -> ((OP.Node,String),CExp)
+cLookup l t p cs = head $ filter (\((n,p'),e) -> (OP.nLabel n == l) && (OP.nTag n == t) && (p' == p)) cs
 
 
 mainPaper :: IO()
@@ -286,8 +300,9 @@ mainPaper = do
     writeFile ("PRG" ++ suffix ++ "-clustered.dot") $ DG.toDotClustered prgClusters prgNodes
     writeFile ("LPG" ++ suffix ++ "-clustered.dot") $ DG.toDotClustered lpgClusters lpgNodes-}
     --writeFile ("Embedded" ++ suffix ++ ".dot") $ DG.toDotFromDLP $ embedded
-    putStrLn $ unlines $ map (showConstr) $ reverse $ generateConstraints embedded
-    --putStrLn $ unwords $ map showNode $ topSort3 embedded
+    --putStrLn $ unlines $ map (showConstr) $ reverse $ addAdditional $ generateConstraints embedded
+    --putStrLn $ BE.toDIMACS $ snd $ cLookup "LPG:IsUDPDest67" "Queue1" "T" constraints
+    mapM_ genF constraints
     where
         suffix = "paper"
         embedded = E.testEmbeddingV3 prg lpg
@@ -297,6 +312,11 @@ mainPaper = do
         lpg = E.getDepEdgesP lpgQueue
 
         config = [("CSynFilter", "true"), ("CSynOutput", "Q2")]
+
+        constraints = addAdditional $ generateConstraints embedded
+        genF (a,e) = writeFile ("satout/" ++ (fname a)) $ BE.toDIMACS e
+        sanitizeFN fn = filter (\c -> C.isAlphaNum c || (c == '_')) fn
+        fname (n,p) = sanitizeFN ((OP.nLabel n) ++ "_" ++ (OP.nTag n) ++ "_" ++ p)
 
 
 main = mainPaper
