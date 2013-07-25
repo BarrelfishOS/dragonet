@@ -25,6 +25,8 @@ module Operations(
     , getDropNode
     , getNodeAttributes
     , nLabel
+    , nTag
+    , nIsOP
     , nConfImpl
     , nAttributes
     , ConfFunction
@@ -119,6 +121,11 @@ nLabel (Des (Decision gn)) = gLabel gn
 nLabel (Conf (Configuration gn)) = gLabel gn
 nLabel (Opr (Operator gn)) = gLabel gn
 
+nTag :: Node -> String
+nTag (Des (Decision gn)) = gTag gn
+nTag (Conf (Configuration gn)) = gTag gn
+nTag (Opr (Operator gn)) = gTag gn
+
 nConfImpl :: Node -> ConfFunction
 nConfImpl (Conf (Configuration gn)) = f
     where (Implementation _ f) = head $ gImplementation gn
@@ -128,6 +135,10 @@ nAttributes :: Node -> [String]
 nAttributes (Des (Decision gn)) = gAttributes gn
 nAttributes (Conf (Configuration gn)) = gAttributes gn
 nAttributes (Opr (Operator gn)) = gAttributes gn
+
+nIsOP :: Node -> Bool
+nIsOP (Opr _) = True
+nIsOP _ = False
 
 
 -- Get list containing all nodes reachable from the specified start node.
