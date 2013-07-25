@@ -412,7 +412,12 @@ convertV4 edges =
     map convertEdge $ S.toList edges
     where
         convertEdge (a,p,b) = ((convertNode a),p,(convertNode b))
-        
+        outMap = S.foldl addTo M.empty edges
+        addTo m (x,y,z) =
+            case M.lookup x m of
+                Nothing -> M.insert x (S.singleton (x,y,z)) m
+                Just l -> M.insert x (S.insert (x,y,z) l) m
+
         convertNode :: ENode -> Node
         convertNode n = nodeF l t e a
             where
@@ -426,7 +431,7 @@ convertV4 edges =
                         getOperatorNode
                     else
                         getDecNode
-                outedges = S.filter ((== n) . getfst) edges
+                outedges = M.findWithDefault S.empty n outMap
                 ports = S.map get3snd outedges
                 edge p = (p, map (convertNode . getThird) $ S.toList $ S.filter ((== p) . get3snd) outedges)
                 epl = map edge $ S.toList ports
