@@ -10,6 +10,12 @@ import Data.Maybe
 import qualified Data.Char as C
 import qualified Debug.Trace as TR
 import qualified BoolExp as BE
+--import qualified MiniSat2 as MS
+import qualified Data.Set as S
+import qualified System.IO as SI
+import qualified System.Cmd as SC
+import System.IO.Temp
+import System.Exit
 
 [unicorn|
 graph prg {
@@ -229,13 +235,17 @@ nConst n p =
         ("HWIsUDPDest53","F") -> Just $ cNot $ fromJust $ nConst n "T"
         ("L4UDPClassified","T") -> Just $ (cVar "UDP")
         ("L4UDPClassified","F") -> Just $ cNot $ fromJust $ nConst n "T"
+        ("HWIsTCPSyn","T") -> Just $ cAnd (cVar "TCP") (cVar "TCPSYNFlag")
+        ("HWIsTCPSyn","F") -> Just $ cNot $ fromJust $ nConst n "T"
         _ -> Nothing
     where
         stripL s = drop 4 s
 
 additionalConstraints = cAndL [
         ((cVar "DestPort53") `cImpl` (cNot $ cVar "DestPort67")),
-        ((cVar "DestPort67") `cImpl` (cNot $ cVar "DestPort53"))
+        ((cVar "DestPort67") `cImpl` (cNot $ cVar "DestPort53")),
+        ((cVar "TCP") `cImpl` (cNot $ cVar "UDP")),
+        ((cVar "UDP") `cImpl` (cNot $ cVar "TCP"))
     ]
 
 fst3 (a,_,_) = a
@@ -291,18 +301,55 @@ showConstr ((n,p),e) = "(" ++ (showNode n) ++ "." ++ p ++ " = " ++ (show e) ++ "
 cLookup :: String -> String -> String -> [((OP.Node,String),CExp)] -> ((OP.Node,String),CExp)
 cLookup l t p cs = head $ filter (\((n,p'),e) -> (OP.nLabel n == l) && (OP.nTag n == t) && (p' == p)) cs
 
+data Ternary = TTrue | TFalse | TZ
+    deriving (Show, Eq)
+
+
+{-isSAT :: BE.CNFBExp -> IO Bool
+isSAT cs = do
+    s <- MS.newSolver
+    msvars <- mapM (\_ -> MS.newVar s) vars
+    varmap <- return (zip vars msvars)
+    mapM_ (\c -> MS.addClause s $ convertClause varmap c) $ S.toList cs
+    MS.solve s
+    where
+        vars = S.toList $ BE.cnfVariables cs
+        convertClause :: [(String,MS.Var)] -> BE.CNFClause -> [MS.Lit]
+        convertClause vm c = map (convertLiteral vm) $ S.toList c
+        convertLiteral vm (BE.CNFLitPos l) = MS.Pos $ fromJust $ lookup l vm-}
+
+isSAT :: BE.CNFBExp -> IO Ternary
+isSAT e = withSystemTempFile "toMinisat.dimac" toMinisat
+    where
+        toMinisat fp h = do
+            SI.hPutStr h (BE.toDIMACS e)
+            SI.hFlush h
+            rc <- SC.system ("minisat " ++ fp ++ " >/dev/null")
+            return (case rc of
+                (ExitFailure 10) -> TTrue
+                (ExitFailure 20) -> TFalse
+                _ -> TZ)
+                
+
+-- Apply list of unsatisfiable ports to graph
+applyConstraints :: [(OP.Node,String,OP.Node)] -> [(OP.Node,String)] -> [(OP.Node,String,OP.Node)]
+applyConstraints g u = filter (\(n,p,_) -> notElem (n,p) u) g
+
 
 mainPaper :: IO()
 mainPaper = do
-    {-writeFile ("PRGUnconf" ++ suffix ++ ".dot") $ DG.toDotFromDLP prgU
-    writeFile ("PRG" ++ suffix ++ ".dot") $ DG.toDotFromDLP prg
-    writeFile ("LPG" ++ suffix ++ ".dot") $ DG.toDotFromDLP lpg
-    writeFile ("PRG" ++ suffix ++ "-clustered.dot") $ DG.toDotClustered prgClusters prgNodes
-    writeFile ("LPG" ++ suffix ++ "-clustered.dot") $ DG.toDotClustered lpgClusters lpgNodes-}
-    --writeFile ("Embedded" ++ suffix ++ ".dot") $ DG.toDotFromDLP $ embedded
-    --putStrLn $ unlines $ map (showConstr) $ reverse $ addAdditional $ generateConstraints embedded
-    --putStrLn $ BE.toDIMACS $ snd $ cLookup "LPG:IsUDPDest67" "Queue1" "T" constraints
-    mapM_ genF constraints
+    putStrLn ("Writing Embedded Graph to Embedded.dot")
+    writeFile ("Embedded.dot") $ DG.toDotFromDLPTagClustered $ embedded
+
+    putStrLn ("Calculating constraints and checking satisfiability")
+    sats <- mapM checkSatNode constraints
+
+    putStrLn ("Non-satisfiable ports:")
+    satsFiltered <- (return $ filter ((== TFalse) . snd) sats)
+    putStrLn $ unlines $ map (\((n,p),t) -> "    " ++ (showNode n) ++ "." ++ p ++ ": " ++ (show t)) satsFiltered
+
+    putStrLn ("Writing constrained Embededd Graph to EmbeddedConstr.dot")
+    writeFile ("EmbeddedConstr.dot") $ DG.toDotFromDLPTagClustered $ applyConstraints embedded $ map fst satsFiltered
     where
         suffix = "paper"
         embedded = E.testEmbeddingV3 prg lpg
@@ -317,6 +364,10 @@ mainPaper = do
         genF (a,e) = writeFile ("satout/" ++ (fname a)) $ BE.toDIMACS e
         sanitizeFN fn = filter (\c -> C.isAlphaNum c || (c == '_')) fn
         fname (n,p) = sanitizeFN ((OP.nLabel n) ++ "_" ++ (OP.nTag n) ++ "_" ++ p)
+
+        checkSatNode (a,e) = do
+            t <- isSAT e
+            return (a,t)
 
 
 main = mainPaper

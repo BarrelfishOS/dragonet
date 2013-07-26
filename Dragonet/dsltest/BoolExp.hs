@@ -3,7 +3,10 @@ module BoolExp(
     andL,
     orL,
 
-    CNFBExp,
+    CNFBExp(..),
+    CNFClause(..),
+    CNFLiteral(..),
+    
     cnfAnd,
     cnfOr,
     cnfNot,
@@ -11,7 +14,8 @@ module BoolExp(
     cnfAndL,
     cnfOrL,
 
-    toDIMACS
+    cnfVariables,
+    toDIMACS,
 ) where
 
 import qualified Data.Set as S
