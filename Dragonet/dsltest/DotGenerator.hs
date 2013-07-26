@@ -7,7 +7,8 @@
 module DotGenerator(
   toDot,
   toDotClustered,
-  toDotFromDLP
+  toDotFromDLP,
+  toDotFromDLPTagClustered
 ) where
 
 import qualified Operations as OP
@@ -256,8 +257,30 @@ toDotFromDLP ns =
     "digraph G {\n" ++ "    rankdir=LR;\n" ++
         definitions ++ "\n" ++ edges ++ "}\n"
     where
-        names = buildNames $ L.nubBy OP.nCompPrgLpgV2 $ (map fst3 ns) ++ (map third3 ns)
+        nodes = L.nubBy OP.nCompPrgLpgV2 $ (map fst3 ns) ++ (map third3 ns)
+        names = buildNames $ nodes
         definitions = concat $ map nodeDefinition names
         edges = concat $ map (edgeDefinitionDLP names) $ makeDoubleEdgesDLP ns names
+
+-- Cluster nodes by tag
+toDotFromDLPTagClustered :: [(OP.Node,String,OP.Node)] -> String
+toDotFromDLPTagClustered ns =
+    "digraph G {\n" ++ "    rankdir=LR;\n" ++
+        definitions ++ "\n" ++ edges ++ "}\n"
+    where
+        nodes = L.nubBy OP.nCompPrgLpgV2 $ (map fst3 ns) ++ (map third3 ns)
+        names = buildNames $ nodes
+        --definitions = concat $ map nodeDefinition names
+        definitions = clusterDefinition nodeMap names clusters ""
+        edges = concat $ map (edgeDefinitionDLP names) $ makeDoubleEdgesDLP ns names
+
+        tag2c "" = "Untagged"
+        tag2c a = a
+
+        tags = L.nub $ map OP.nTag nodes
+        clusters = (map (\t -> ("",tag2c t)) tags)
+        nodeMap = map (\n -> (tag2c $ OP.nTag n,n)) nodes
+        
+
 
 
