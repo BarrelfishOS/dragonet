@@ -10,8 +10,6 @@ import Data.Maybe
 import qualified Data.Char as C
 import qualified Debug.Trace as TR
 import qualified BoolExp as BE
---import qualified MiniSat2 as MS
-import qualified Data.Set as S
 import qualified System.IO as SI
 import qualified System.Cmd as SC
 import System.IO.Temp
@@ -198,29 +196,44 @@ graph lpg {
 |]
 
 
-{-simplifyN (BEOr BETrue _) = BETrue
-simplifyN (BEOr _ BETrue) = BETrue
-simplifyN (BEAnd BETrue e) = e
-simplifyN (BEAnd e BETrue) = e
-simplifyN e = e
+fst3 :: (a,b,c) -> a
+fst3 (a,_,_) = a
+snd3 :: (a,b,c) -> b
+snd3 (_,a,_) = a
+third3 :: (a,b,c) -> c
+third3 (_,_,a) = a
 
-{-simplify (BEAnd a b) = simplifyN (BEAnd (simplify a) (simplify b))
-simplify (BEOr a b) = simplifyN (BEOr (simplify a) (simplify b))
-simplify (BENot a) = simplifyN (BENot (simplify a))
-simplify e = simplifyN e-}
-simplify = recInOut simplifyN-}
+-- Check if an OP node is an AND node (not very pretty :-( )
+nOPIsAnd :: OP.Node -> Bool
+nOPIsAnd n = L.isInfixOf ":AND:" $ OP.nLabel n
+
+-- Helpers for making displaying these things less messy
+showNode :: OP.Node -> String
+showNode n = (OP.nLabel n) ++ "[" ++ (OP.nTag n) ++ "]"
+showEdge :: (OP.Node,String,OP.Node) -> String
+showEdge (a,b,c) = "(" ++ (showNode a) ++ "," ++ b ++ "," ++ (showNode c) ++ ")"
+showConstr :: ((OP.Node,String),CExp) -> String
+showConstr ((n,p),e) = "(" ++ (showNode n) ++ "." ++ p ++ " = " ++ (show e) ++ ")"
 
 
 
+-- Wrappers for building logical expressions
+-- Can be used to switch between generating CNF on the fly and generating the
+-- raw expression.
 type CExp = BE.CNFBExp
-
+cAnd :: CExp -> CExp -> CExp
 cAnd = BE.cnfAnd
+cOr :: CExp -> CExp -> CExp
 cOr = BE.cnfOr
+cNot :: CExp -> CExp
 cNot = BE.cnfNot
+cVar :: String -> CExp
 cVar = BE.cnfVar
+cImpl :: CExp -> CExp -> CExp
 cImpl a b = (cNot a) `cOr` b
-
+cAndL :: [CExp] -> CExp
 cAndL = BE.cnfAndL
+cOrL :: [CExp] -> CExp
 cOrL = BE.cnfOrL
 
 -- Get constraints for specific port on node
@@ -241,25 +254,18 @@ nConst n p =
     where
         stripL s = drop 4 s
 
-additionalConstraints = cAndL [
+-- Additional constraints (that are not non-specific
+additionalConstraints :: [((OP.Node,String),CExp)] -> CExp
+additionalConstraints _ = cAndL [
         ((cVar "DestPort53") `cImpl` (cNot $ cVar "DestPort67")),
         ((cVar "DestPort67") `cImpl` (cNot $ cVar "DestPort53")),
         ((cVar "TCP") `cImpl` (cNot $ cVar "UDP")),
         ((cVar "UDP") `cImpl` (cNot $ cVar "TCP"))
     ]
 
-fst3 (a,_,_) = a
-snd3 (_,a,_) = a
-third3 (_,_,a) = a
-
-nOPIsAnd :: OP.Node -> Bool
-nOPIsAnd n = L.isInfixOf ":AND:" $ OP.nLabel n
-
-findSources :: [(OP.Node,String,OP.Node)] -> [OP.Node]
-findSources g = (map fst3 g) `lminus` (map third3 g)
-    where
-        lminus a b = filter (not . (flip elem b)) a
-
+-- Build up constraints for all nodes
+-- This is done by topologically sorting the nodes and iteratively adding
+-- constraints to the list while using the constraints of the predecessors.
 generateConstraints :: [(OP.Node,String,OP.Node)] -> [((OP.Node,String),CExp)]
 generateConstraints g = foldl node []  $ E.topSort3 g
     where
@@ -273,7 +279,6 @@ generateConstraints g = foldl node []  $ E.topSort3 g
 
                 -- specific for F nodes
                 ports = L.nub $ map snd3 outE
-                [inEdge] = inE
                 inC =
                     case inE of
                         [] -> cVar "Dummy"
@@ -290,34 +295,16 @@ generateConstraints g = foldl node []  $ E.topSort3 g
                 opT = opFun $ map (\(n',p',_) -> evaluate (n',p')) $ filter ((== "T") . snd3) inE
                 opF = cNot opT
 
-
+-- Add the additionalConstraints to all constraints
 addAdditional :: [((OP.Node,String),CExp)] -> [((OP.Node,String),CExp)]
-addAdditional cs = map (\(a,e) -> (a,(cAnd e additionalConstraints))) cs
+addAdditional cs = map (\(a,e) -> (a,(cAnd e $ additionalConstraints cs))) cs
 
-showNode n = (OP.nLabel n) ++ "[" ++ (OP.nTag n) ++ "]"
-showEdge (a,b,c) = "(" ++ (showNode a) ++ "," ++ b ++ "," ++ (showNode c) ++ ")"
-showConstr ((n,p),e) = "(" ++ (showNode n) ++ "." ++ p ++ " = " ++ (show e) ++ ")"
-
-cLookup :: String -> String -> String -> [((OP.Node,String),CExp)] -> ((OP.Node,String),CExp)
-cLookup l t p cs = head $ filter (\((n,p'),e) -> (OP.nLabel n == l) && (OP.nTag n == t) && (p' == p)) cs
 
 data Ternary = TTrue | TFalse | TZ
     deriving (Show, Eq)
 
-
-{-isSAT :: BE.CNFBExp -> IO Bool
-isSAT cs = do
-    s <- MS.newSolver
-    msvars <- mapM (\_ -> MS.newVar s) vars
-    varmap <- return (zip vars msvars)
-    mapM_ (\c -> MS.addClause s $ convertClause varmap c) $ S.toList cs
-    MS.solve s
-    where
-        vars = S.toList $ BE.cnfVariables cs
-        convertClause :: [(String,MS.Var)] -> BE.CNFClause -> [MS.Lit]
-        convertClause vm c = map (convertLiteral vm) $ S.toList c
-        convertLiteral vm (BE.CNFLitPos l) = MS.Pos $ fromJust $ lookup l vm-}
-
+-- Takes an expression and checks if it is satisfiable by writing it to a
+-- file and passing it to minisat.
 isSAT :: BE.CNFBExp -> IO Ternary
 isSAT e = withSystemTempFile "toMinisat.dimac" toMinisat
     where
@@ -326,8 +313,8 @@ isSAT e = withSystemTempFile "toMinisat.dimac" toMinisat
             SI.hFlush h
             rc <- SC.system ("minisat " ++ fp ++ " >/dev/null")
             return (case rc of
-                (ExitFailure 10) -> TTrue
-                (ExitFailure 20) -> TFalse
+                (ExitFailure 10) -> TTrue  -- Satisfiable
+                (ExitFailure 20) -> TFalse -- Not satisfiable
                 _ -> TZ)
                 
 
@@ -336,8 +323,8 @@ applyConstraints :: [(OP.Node,String,OP.Node)] -> [(OP.Node,String)] -> [(OP.Nod
 applyConstraints g u = filter (\(n,p,_) -> notElem (n,p) u) g
 
 
-mainPaper :: IO()
-mainPaper = do
+main :: IO()
+main = do
     putStrLn ("Writing Embedded Graph to Embedded.dot")
     writeFile ("Embedded.dot") $ DG.toDotFromDLPTagClustered $ embedded
 
@@ -346,28 +333,17 @@ mainPaper = do
 
     putStrLn ("Non-satisfiable ports:")
     satsFiltered <- (return $ filter ((== TFalse) . snd) sats)
-    putStrLn $ unlines $ map (\((n,p),t) -> "    " ++ (showNode n) ++ "." ++ p ++ ": " ++ (show t)) satsFiltered
+    putStrLn $ unlines $ map (\((n,p),_) -> "    " ++ (showNode n) ++ "." ++ p) satsFiltered
 
     putStrLn ("Writing constrained Embededd Graph to EmbeddedConstr.dot")
     writeFile ("EmbeddedConstr.dot") $ DG.toDotFromDLPTagClustered $ applyConstraints embedded $ map fst satsFiltered
     where
-        suffix = "paper"
-        embedded = E.testEmbeddingV3 prg lpg
-
+        config = [("CSynFilter", "true"), ("CSynOutput", "Q2")]
         prgU = E.getDepEdgesP prgL2EtherClassified
         prg = OP.applyConfig config prgU
         lpg = E.getDepEdgesP lpgQueue
-
-        config = [("CSynFilter", "true"), ("CSynOutput", "Q2")]
+        embedded = E.testEmbeddingV3 prg lpg
 
         constraints = addAdditional $ generateConstraints embedded
-        genF (a,e) = writeFile ("satout/" ++ (fname a)) $ BE.toDIMACS e
-        sanitizeFN fn = filter (\c -> C.isAlphaNum c || (c == '_')) fn
-        fname (n,p) = sanitizeFN ((OP.nLabel n) ++ "_" ++ (OP.nTag n) ++ "_" ++ p)
+        checkSatNode (a,e) = do { t <- isSAT e ; return (a,t) }
 
-        checkSatNode (a,e) = do
-            t <- isSAT e
-            return (a,t)
-
-
-main = mainPaper

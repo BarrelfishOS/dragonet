@@ -3,8 +3,8 @@ module BoolExp(
     andL,
     orL,
 
-    CNFBExp(..),
-    CNFClause(..),
+    CNFBExp,
+    CNFClause,
     CNFLiteral(..),
     
     cnfAnd,
@@ -22,45 +22,38 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.Maybe
 
+
+-- Boolean expression
 data BExp = BEVar String |
             BENot BExp |
             BEOr BExp BExp |
             BEAnd BExp BExp
     deriving (Show,Eq)
 
+-- Convert list of expressions to tree of ANDs of those expressions
 andL :: [BExp] -> BExp
 andL es = foldl1 BEAnd es
 
+-- Convert list of expressions to tree of ORs of those expressions
 orL :: [BExp] -> BExp
 orL es = foldl1 BEOr es
 
 
+-- Map f to tree by applying it recursively from the inside out
+recInOut :: (BExp -> BExp) -> BExp -> BExp
 recInOut f (BEAnd a b) = f (BEAnd (recInOut f a) (recInOut f b))
 recInOut f (BEOr a b) = f (BEOr (recInOut f a) (recInOut f b))
 recInOut f (BENot a) = f (BENot (recInOut f a))
 recInOut f e = f e
 
+-- Map f to tree by applying it from the outside in
+recOutIn :: (BExp -> BExp) -> BExp -> BExp
 recOutIn f e =
     case f e of
         (BEAnd a b) -> (BEAnd (recOutIn f a) (recOutIn f b))
         (BEOr a b) -> (BEOr (recOutIn f a) (recOutIn f b))
         (BENot a) -> (BENot (recOutIn f a))
-        e -> e
-
-
-
-
-
-
-type CNFBExp = S.Set CNFClause
-type CNFClause = S.Set CNFLiteral
-data CNFLiteral = CNFLitPos String | CNFLitNeg String
-    deriving (Show,Eq,Ord)
-
-
-litLabel :: CNFLiteral -> String
-litLabel (CNFLitPos a) = a
-litLabel (CNFLitNeg a) = a
+        a -> a
 
 
 -- Distribute ORs over ANDs
@@ -88,39 +81,47 @@ distr (BEAnd a b) = f (BEAnd a' b')
 distr a = (a,False)
 
 -- Convert expression to CNF
+toCNF :: BExp -> BExp
 toCNF e = fst $ distr $ recOutIn demorgan e
     where
         demorgan (BENot (BEAnd a b)) = BEOr (BENot a) (BENot b)
         demorgan (BENot (BEOr a b)) = BEAnd (BENot a) (BENot b)
         demorgan (BENot (BENot a)) = a
         demorgan a = a
-        
-        dedupl (BEAnd a b) = if (a == b) then a else (BEAnd a b)
-        dedupl (BEOr a b) = if (a == b) then a else (BEOr a b)
-        dedupl a = a
 
-toLiteral (BENot (BEVar n)) = CNFLitNeg n
-toLiteral (BEVar n) = CNFLitPos n
-toLiteral e = error ("Invalid literal: (" ++ (show e) ++ ")")
 
-toClause (BEOr a b) = (toClause a) `S.union` (toClause b)
-toClause e = S.singleton $ toLiteral e
+------------------------------------------------------------------------------
+-- CNF expressions in set-of-clauses representation
 
-toClauses (BEAnd a b) = (toClauses a) `S.union` (toClauses b)
-toClauses e = S.singleton $ toClause e
+-- CNF expression represented as Set of clauses
+type CNFBExp = S.Set CNFClause
+-- CNF clause represented as Set of literals
+type CNFClause = S.Set CNFLiteral
+data CNFLiteral = CNFLitPos String | CNFLitNeg String
+    deriving (Show,Eq,Ord)
 
+-- Return the variable name for a literal
+litLabel :: CNFLiteral -> String
+litLabel (CNFLitPos a) = a
+litLabel (CNFLitNeg a) = a
+
+
+-- Convert a boolean expression to the Set-of-clauses representation
+bexp2cnf :: BExp -> CNFBExp
 bexp2cnf a = toClauses $ toCNF a
     where
         toLiteral (BENot (BEVar n)) = CNFLitNeg n
         toLiteral (BEVar n) = CNFLitPos n
         toLiteral e = error ("Invalid literal: (" ++ (show e) ++ ")")
 
-        toClause (BEOr a b) = (toClause a) `S.union` (toClause b)
+        toClause (BEOr b c) = (toClause b) `S.union` (toClause c)
         toClause e = S.singleton $ toLiteral e
 
-        toClauses (BEAnd a b) = (toClauses a) `S.union` (toClauses b)
+        toClauses (BEAnd b c) = (toClauses b) `S.union` (toClauses c)
         toClauses e = S.singleton $ toClause e
 
+-- Convert CNF expression in Set-of-clauses representation to BExp format
+cnf2bexp :: CNFBExp -> BExp
 cnf2bexp a =
     andL $ map fromClause $ S.toList a
     where
@@ -129,12 +130,25 @@ cnf2bexp a =
 
         fromClause c = orL $ map fromLiteral $ S.toList c
         
+-- Get set with names of all variables ocurring in a CNF expression
+cnfVariables :: CNFBExp -> S.Set String
+cnfVariables e = clauses e
+    where
+        clauses :: CNFBExp -> S.Set String
+        clauses f = S.foldl S.union S.empty $ S.map clause f
+        clause :: CNFClause -> S.Set String
+        clause f = S.map litLabel f
 
 
-    
+
+------------------------------------------------------------------------------
+-- Helpers for manipulating and combining CNF expressions and keeping them CNF
+
+-- AND of two CNF expressions
 cnfAnd :: CNFBExp -> CNFBExp -> CNFBExp
 cnfAnd a b = a `S.union` b
 
+-- OR of two CNF expressions
 cnfOr :: CNFBExp -> CNFBExp -> CNFBExp
 cnfOr a b = bexp2cnf $ BEOr (cnf2bexp a) (cnf2bexp b)
     {- Can be optimized
@@ -150,32 +164,27 @@ cnfOr a b = bexp2cnf $ BEOr (cnf2bexp a) (cnf2bexp b)
         bexp = BEOr (BEOr (cnf2bexp a) (cnf2bexp b')) (BEOr (cnf2bexp a') (cnf2bexp b))
         different = bexp2cnf bexp-}
 
-
+-- Not of a CNF expression
 cnfNot :: CNFBExp -> CNFBExp
 cnfNot a = bexp2cnf $ BENot $ cnf2bexp a
 
+-- CNF expression for a single variable
 cnfVar :: String -> CNFBExp
 cnfVar a = S.singleton $ S.singleton $ CNFLitPos a
 
-
+-- Combine multiple CNF expressions using and
 cnfAndL :: [CNFBExp] -> CNFBExp
 cnfAndL es = foldl1 cnfAnd es
 
+-- Combine multiple CNF expressions using or
 cnfOrL :: [CNFBExp] -> CNFBExp
 cnfOrL es = foldl1 cnfOr es
 
 
--- Get set with names of all variables
-cnfVariables :: CNFBExp -> S.Set String
-cnfVariables e = clauses e
-    where
-        clauses :: CNFBExp -> S.Set String
-        clauses e = S.foldl S.union S.empty $ S.map clause e
-        clause :: CNFClause -> S.Set String
-        clause e = S.map litLabel e
 
+------------------------------------------------------------------------------
 
--- Convert expression into DIMACS format (can be fed to minisat)
+-- Convert CNF expression into DIMACS format (can be fed to minisat)
 toDIMACS :: CNFBExp -> String
 toDIMACS e = unlines (header:cs)
     where
@@ -197,6 +206,4 @@ toDIMACS e = unlines (header:cs)
         varMap = M.fromList $ zip (S.toList $ cnfVariables e) [1..]
 
         lID s = fromJust $ M.lookup s varMap
-
-
 
