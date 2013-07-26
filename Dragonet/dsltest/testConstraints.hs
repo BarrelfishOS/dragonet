@@ -209,11 +209,11 @@ nOPIsAnd n = L.isInfixOf ":AND:" $ OP.nLabel n
 
 -- Helpers for making displaying these things less messy
 showNode :: OP.Node -> String
-showNode n = (OP.nLabel n) ++ "[" ++ (OP.nTag n) ++ "]"
+showNode n = OP.nLabel n ++ "[" ++ OP.nTag n ++ "]"
 showEdge :: (OP.Node,String,OP.Node) -> String
-showEdge (a,b,c) = "(" ++ (showNode a) ++ "," ++ b ++ "," ++ (showNode c) ++ ")"
+showEdge (a,b,c) = "(" ++ showNode a ++ "," ++ b ++ "," ++ showNode c ++ ")"
 showConstr :: ((OP.Node,String),CExp) -> String
-showConstr ((n,p),e) = "(" ++ (showNode n) ++ "." ++ p ++ " = " ++ (show e) ++ ")"
+showConstr ((n,p),e) = "(" ++ showNode n ++ "." ++ p ++ " = " ++ show e ++ ")"
 
 
 
@@ -230,7 +230,7 @@ cNot = BE.cnfNot
 cVar :: String -> CExp
 cVar = BE.cnfVar
 cImpl :: CExp -> CExp -> CExp
-cImpl a b = (cNot a) `cOr` b
+cImpl a b = cNot a `cOr` b
 cAndL :: [CExp] -> CExp
 cAndL = BE.cnfAndL
 cOrL :: [CExp] -> CExp
@@ -246,21 +246,21 @@ nConst n p =
         ("IsUDPDest67","F") -> Just $ cNot $ fromJust $ nConst n "T"
         ("HWIsUDPDest53","T") -> Just $ cAnd (cVar "UDP") (cVar "DestPort53")
         ("HWIsUDPDest53","F") -> Just $ cNot $ fromJust $ nConst n "T"
-        ("L4UDPClassified","T") -> Just $ (cVar "UDP")
+        ("L4UDPClassified","T") -> Just $ cVar "UDP"
         ("L4UDPClassified","F") -> Just $ cNot $ fromJust $ nConst n "T"
         ("HWIsTCPSyn","T") -> Just $ cAnd (cVar "TCP") (cVar "TCPSYNFlag")
         ("HWIsTCPSyn","F") -> Just $ cNot $ fromJust $ nConst n "T"
         _ -> Nothing
     where
-        stripL s = drop 4 s
+        stripL = drop 4
 
 -- Additional constraints (that are not non-specific
 additionalConstraints :: [((OP.Node,String),CExp)] -> CExp
 additionalConstraints _ = cAndL [
-        ((cVar "DestPort53") `cImpl` (cNot $ cVar "DestPort67")),
-        ((cVar "DestPort67") `cImpl` (cNot $ cVar "DestPort53")),
-        ((cVar "TCP") `cImpl` (cNot $ cVar "UDP")),
-        ((cVar "UDP") `cImpl` (cNot $ cVar "TCP"))
+        cVar "DestPort53" `cImpl` cNot (cVar "DestPort67"),
+        cVar "DestPort67" `cImpl` cNot (cVar "DestPort53"),
+        cVar "TCP" `cImpl` cNot (cVar "UDP"),
+        cVar "UDP" `cImpl` cNot (cVar "TCP")
     ]
 
 -- Build up constraints for all nodes
@@ -271,20 +271,20 @@ generateConstraints g = foldl node []  $ E.topSort3 g
     where
         node l n
             | OP.nIsOP n = ((n,"T"),opT) : ((n,"F"),opF) : l
-            | otherwise = (foldl handlePort l ports)
+            | otherwise = foldl handlePort l ports
             where
                 inE = filter ((== n) . third3) g
                 outE = filter ((== n) . fst3) g
-                evaluate a = fromJust $ lookup a l
+                getConst a = fromJust $ lookup a l
 
                 -- specific for F nodes
                 ports = L.nub $ map snd3 outE
                 inC =
                     case inE of
                         [] -> cVar "Dummy"
-                        [(a,b,_)] -> evaluate (a,b)
-                        _ -> TR.trace ("Warning: Multiple incoming edges on F node " ++ (OP.nLabel n)) (
-                            cOrL $ map (\(n',p',_) -> evaluate (n',p')) inE)
+                        [(a,b,_)] -> getConst (a,b)
+                        _ -> TR.trace ("Warning: Multiple incoming edges on F node " ++ OP.nLabel n) (
+                            cOrL $ map (\(n',p',_) -> getConst (n',p')) inE)
                 handlePort l' p =
                     case nConst n p of
                         Nothing -> ((n,p),inC):l'
@@ -292,12 +292,12 @@ generateConstraints g = foldl node []  $ E.topSort3 g
 
                 -- specific for OP nodes
                 opFun = if nOPIsAnd n then cAndL else cOrL
-                opT = opFun $ map (\(n',p',_) -> evaluate (n',p')) $ filter ((== "T") . snd3) inE
+                opT = opFun $ map (\(n',p',_) -> getConst (n',p')) $ filter ((== "T") . snd3) inE
                 opF = cNot opT
 
 -- Add the additionalConstraints to all constraints
 addAdditional :: [((OP.Node,String),CExp)] -> [((OP.Node,String),CExp)]
-addAdditional cs = map (\(a,e) -> (a,(cAnd e $ additionalConstraints cs))) cs
+addAdditional cs = map (\(a,e) -> (a, cAnd e $ additionalConstraints cs)) cs
 
 
 data Ternary = TTrue | TFalse | TZ
@@ -325,18 +325,20 @@ applyConstraints g u = filter (\(n,p,_) -> notElem (n,p) u) g
 
 main :: IO()
 main = do
-    putStrLn ("Writing Embedded Graph to Embedded.dot")
-    writeFile ("Embedded.dot") $ DG.toDotFromDLPTagClustered $ embedded
+    putStrLn "Writing Embedded Graph to Embedded.dot"
+    writeFile "Embedded.dot" $ DG.toDotFromDLPTagClustered embedded
 
-    putStrLn ("Calculating constraints and checking satisfiability")
+    putStrLn "Calculating constraints and checking satisfiability"
     sats <- mapM checkSatNode constraints
 
-    putStrLn ("Non-satisfiable ports:")
-    satsFiltered <- (return $ filter ((== TFalse) . snd) sats)
-    putStrLn $ unlines $ map (\((n,p),_) -> "    " ++ (showNode n) ++ "." ++ p) satsFiltered
+    putStrLn "Non-satisfiable ports:"
+    let satsFiltered = filter ((== TFalse) . snd) sats
+    putStrLn $ unlines $
+        map (\((n,p),_) -> "    " ++ showNode n ++ "." ++ p) satsFiltered
 
-    putStrLn ("Writing constrained Embededd Graph to EmbeddedConstr.dot")
-    writeFile ("EmbeddedConstr.dot") $ DG.toDotFromDLPTagClustered $ applyConstraints embedded $ map fst satsFiltered
+    putStrLn "Writing constrained Embededd Graph to EmbeddedConstr.dot"
+    writeFile "EmbeddedConstr.dot" $ DG.toDotFromDLPTagClustered $
+        applyConstraints embedded $ map fst satsFiltered
     where
         config = [("CSynFilter", "true"), ("CSynOutput", "Q2")]
         prgU = E.getDepEdgesP prgL2EtherClassified

@@ -32,11 +32,11 @@ data BExp = BEVar String |
 
 -- Convert list of expressions to tree of ANDs of those expressions
 andL :: [BExp] -> BExp
-andL es = foldl1 BEAnd es
+andL = foldl1 BEAnd 
 
 -- Convert list of expressions to tree of ORs of those expressions
 orL :: [BExp] -> BExp
-orL es = foldl1 BEOr es
+orL = foldl1 BEOr
 
 
 -- Map f to tree by applying it recursively from the inside out
@@ -50,9 +50,9 @@ recInOut f e = f e
 recOutIn :: (BExp -> BExp) -> BExp -> BExp
 recOutIn f e =
     case f e of
-        (BEAnd a b) -> (BEAnd (recOutIn f a) (recOutIn f b))
-        (BEOr a b) -> (BEOr (recOutIn f a) (recOutIn f b))
-        (BENot a) -> (BENot (recOutIn f a))
+        (BEAnd a b) -> BEAnd (recOutIn f a) (recOutIn f b)
+        (BEOr a b) -> BEOr (recOutIn f a) (recOutIn f b)
+        (BENot a) -> BENot (recOutIn f a)
         a -> a
 
 
@@ -112,12 +112,12 @@ bexp2cnf a = toClauses $ toCNF a
     where
         toLiteral (BENot (BEVar n)) = CNFLitNeg n
         toLiteral (BEVar n) = CNFLitPos n
-        toLiteral e = error ("Invalid literal: (" ++ (show e) ++ ")")
+        toLiteral e = error ("Invalid literal: (" ++ show e ++ ")")
 
-        toClause (BEOr b c) = (toClause b) `S.union` (toClause c)
+        toClause (BEOr b c) = toClause b `S.union` toClause c
         toClause e = S.singleton $ toLiteral e
 
-        toClauses (BEAnd b c) = (toClauses b) `S.union` (toClauses c)
+        toClauses (BEAnd b c) = toClauses b `S.union` toClauses c
         toClauses e = S.singleton $ toClause e
 
 -- Convert CNF expression in Set-of-clauses representation to BExp format
@@ -132,12 +132,10 @@ cnf2bexp a =
         
 -- Get set with names of all variables ocurring in a CNF expression
 cnfVariables :: CNFBExp -> S.Set String
-cnfVariables e = clauses e
+cnfVariables e = S.foldl S.union S.empty $ S.map clause e
     where
-        clauses :: CNFBExp -> S.Set String
-        clauses f = S.foldl S.union S.empty $ S.map clause f
         clause :: CNFClause -> S.Set String
-        clause f = S.map litLabel f
+        clause = S.map litLabel
 
 
 
@@ -174,11 +172,11 @@ cnfVar a = S.singleton $ S.singleton $ CNFLitPos a
 
 -- Combine multiple CNF expressions using and
 cnfAndL :: [CNFBExp] -> CNFBExp
-cnfAndL es = foldl1 cnfAnd es
+cnfAndL = foldl1 cnfAnd
 
 -- Combine multiple CNF expressions using or
 cnfOrL :: [CNFBExp] -> CNFBExp
-cnfOrL es = foldl1 cnfOr es
+cnfOrL = foldl1 cnfOr
 
 
 
@@ -190,18 +188,17 @@ toDIMACS e = unlines (header:cs)
     where
         nVars = M.size varMap
         nClauses = S.size e
-        header = "p cnf " ++ (show nVars) ++ " " ++ (show nClauses)
+        header = "p cnf " ++ show nVars ++ " " ++ show nClauses
 
         cs :: [String]
         cs = map clause $ S.toList e
 
         clause :: CNFClause -> String
-        clause c = unwords ((map literal $ S.toList c) ++ ["0"])
+        clause c = unwords (map literal (S.toList c) ++ ["0"])
 
         literal :: CNFLiteral -> String
         literal (CNFLitPos l) = show $ lID l
-        literal (CNFLitNeg l) = "-" ++ (show $ lID l)
-
+        literal (CNFLitNeg l) = '-' : show (lID l)
         varMap :: M.Map String Int
         varMap = M.fromList $ zip (S.toList $ cnfVariables e) [1..]
 
