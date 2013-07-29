@@ -13,12 +13,13 @@
 \usepackage{algorithmicx}
 \usepackage{algpseudocode}
 
-\title{Embedding Algorithm}
+\title{Embedding}
 \date{}
 \author{}
 
 \begin{document}
 \maketitle
+\section{Embedding Algorithm}
 % InEdges \{(s,p,e) | (s,p,e) \in L.e \land e = v\}
 \begin{algorithmic}
   \Function{Embedding}{$L$,$P$}
@@ -64,7 +65,7 @@ PRG to the graph and recursively pulling in its dependency nodes from the PRG
 until either no more children are found or the node that is to be pulled in is
 already embedded.
 
-\section*{Possible Problems}
+\subsection{Possible Problems}
 Since the PRG is usually more sequential and since the LPG structure is used to
 pick the order of the nodes in the algorithm the following problem can occur: If
 there are multiple alternatives for $v$ in an iteration, the algorithm could
@@ -74,6 +75,99 @@ one of the other alternatives to $v$ in the PRG. In a later iteration when
 the other node is picked, and the algorithm is pulling it in from the PRG, this
 will lead to an edge originating from an LPG node to a PRG node, which could
 have been avoided by using another order leading to a valid embedding.
+
+
+
+
+\section{Multiple Hardware Queues}
+In the general case multiple hardware queues are not necessarily configured in
+the same way. This means that different protocol processing steps might be done
+in hardware, leading to different software processing requirements i.e.
+different embeddings. A natural way to handle this is to perform the embedding
+for each queue independently. This also captures the fact that different
+hardware queues provide different software entry-points that could lead to
+totally different processing.
+
+For this we fix a known entry node for the LPG with the label \texttt{Queue},
+which basically represents fetching the packet from the hardware queue. The
+corresponding sink nodes in the PRG are labeled \texttt{QueueN} where \texttt{N}
+stands for a unique queue ID.
+
+The actual embedding is implemented as follows: For every \texttt{QueueN} node
+in the PRG a separate embedding using the embedding algorithm from above is
+calculated. In detail this means modifying both the LPG and the PRG first. In
+the LPG the label of the \texttt{Queue} node is changed to \texttt{QueueN}. In
+the PRG we need to drop all nodes that are not on the path from the start node
+to the \texttt{QueueN} node \footnote{Note that this currently breaks software
+nodes that are just "hanging" in the PRG without outgoing edges.}. Removing the
+other queues from the PRG is necessary to avoid embedding nodes from other
+queues. Using these modified versions of the LPG and PRG the embedding can now
+be computed by applying the algorithm. This will result in a separate embedded
+graph for each queue. The final step is to merge these graphs into one graph. In
+order to distinguish LPG nodes for different queues, the LPG nodes in each of
+the graphs are tagged with the respective queue number. After that the graphs
+can be merged by simply taking the union of the graphs.
+
+
+
+
+\section{Constraints}
+Depending on the configuration of hardware filters that control the assignment
+of packets to queues, it might not be necessary to check for certain conditions
+in the software processing. E.g. if there is a filter that only steers packets
+for TCP port 80, the software path for that queue does not need to do full
+demultiplexing and check if the incoming packet arrived for port 22. For another
+example assume that both TCP ports 80 and 22 are steered to the same queue; here
+demultiplexing cannot just be dropped but it can be simplified. In this case we
+can also drop other parts such as UDP protocol processing since we know that the
+packet will definitely be TCP. Note that this is purely an optimization and does
+not affect correctness if omitted or only done partially.
+
+This can be modelled by allowing nodes (or rather output ports of nodes) to
+specify constraints that provide some information about the conditions that are
+guaranteed when a particular port is enabled. These constraints can be expressed
+as boolean formulas. An example for a filter node is this formula for the "true"
+port: $(\text{UDP} \land \text{DestPort}=53)$. Another example for the
+\texttt{ClassifiedTCP} node might be just TCP for the true port. There is also a
+set of global constraints that are not specific to a particular node that
+capture facts such as $(\lnot\text{UDP}\lor\lnot\text{TCP})$ and
+$(\lnot\text{DestPort=53}\lor\lnot\text{DestPort=56})$
+
+Now that we know for each node the constraints it induces for its different
+port, we can recursively calculate the effective constraints for a particular
+port. For a source node without incoming edges the effective constraints for
+each port are the constraints induced by the node. For an F-node with an
+incoming edge, the effective constraints for each port are the effective
+constraints of the port where the incoming edge originates combined using
+$\land$ with the constraints induced by the current node for that port. For
+and/or nodes the effective constraints of the true port are the effective
+constraints of the incoming true edges combined using the appropriate logical
+operator, for the false port the incoming false edges are used and combined
+using the other operator (and for or and vice versa). For each node the
+effective constraints also include the global constraints (again combined with
+$\land$).
+
+The result of this process will be a logical expression for every port on every
+node. And by construction we know statically that only if the expression can be
+satisfied this port can be enabled. Or equivalent that if the formula is not
+satisfiable the port cannot be enabled. Thus if we know that a particular port
+cannot be enabled, its outgoing edges can be dropped along with any nodes
+only reachable from this port. And using some additional annotations that
+specify that a node has no side effects (neither modifies the packet nor state)
+we can also drop such a node if we figure out that only one outgoing port
+remains and just combine the incoming and outgoing edges. This might also lead
+to additional simplification opportunities in the graph such as dropping
+operator nodes with only one pair of incoming edges.
+
+Figuring out if the effective constraints for a port can be satisfied requires a
+solving the SAT problem and thus in the general case computationally expensive.
+The current implementation uses \texttt{minisat} to check satisfiability for
+each port independently. Note though that multiple optimizations are possible.
+An obvious one is incrementally checking constraints starting from the source,
+since the constraints of predecessor nodes are included in the constraints of
+successors nodes. The result can also be approximated, assuming the
+approximation makes conservative decisions in the sense that it never replies
+"unsatisfiable" if the formula might be satisfiable.
 
 \end{document}
 % vim: sw=2 ts=2 expandtab
