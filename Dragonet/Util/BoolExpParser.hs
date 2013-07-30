@@ -1,8 +1,8 @@
-module BoolExpParser(
+module Util.BoolExpParser(
     parseExp,
 ) where
 
-import BoolExp
+import Util.BoolExp
 import Data.Maybe
 import Data.Either
 import Text.ParserCombinators.Parsec

@@ -1,4 +1,4 @@
-module BoolExp(
+module Util.BoolExp(
     BExp(..),
     andL,
     orL,

@@ -11,8 +11,8 @@ import Data.Either
 import qualified Data.Char as C
 import qualified Data.Set as S
 import qualified Debug.Trace as TR
-import qualified BoolExp as BE
-import qualified BoolExpParser as BEP
+import qualified Util.BoolExp as BE
+import qualified Util.BoolExpParser as BEP
 import qualified System.IO as SI
 import qualified System.Cmd as SC
 import System.IO.Temp
