@@ -7,9 +7,12 @@ import DotGenerator as DG
 import Embedding as E
 import qualified Data.List as L
 import Data.Maybe
+import Data.Either
 import qualified Data.Char as C
+import qualified Data.Set as S
 import qualified Debug.Trace as TR
 import qualified BoolExp as BE
+import qualified BoolExpParser as BEP
 import qualified System.IO as SI
 import qualified System.Cmd as SC
 import System.IO.Temp
@@ -54,7 +57,9 @@ graph prg {
 
     boolean HWIsTCPSyn {
         port true[CSynOutput]
-        port false[HWIsUDPDest53] }
+        port false[HWIsUDPDest53]
+        constraint true "TCP&TCPSYNFlag"
+        constraint false "!(TCP&TCPSYNFlag)" }
 
     config CSynOutput {
         port Q0[Queue0]
@@ -63,7 +68,9 @@ graph prg {
 
     boolean HWIsUDPDest53 {
         port true[L2EtherValidUnicast]
-        port false[Queue0] }
+        port false[Queue0]
+        constraint true "UDP&DestPort=53"
+        constraint false "!(UDP&DestPort=53)" }
 
     boolean L2EtherValidUnicast {
         port true[Queue1]
@@ -149,7 +156,9 @@ graph lpg {
     cluster L4UDP {
         boolean Classified {
             port true[ValidChecksum ValidSrc ValidDst ValidLen .L4Classified]
-            port false[.L4Classified] }
+            port false[.L4Classified]
+            constraint true "UDP"
+            constraint false "!UDP" }
 
         boolean ValidChecksum {
             port true false[Verified] }
@@ -177,10 +186,14 @@ graph lpg {
         port false []}
 
     boolean IsUDPDest53 {
-        port true false[named] }
+        port true false[named]
+        constraint true "UDP&DestPort=53"
+        constraint false "!(UDP&DestPort=53)" }
 
     boolean IsUDPDest67 {
-        port true false[dhcpd] }
+        port true false[dhcpd]
+        constraint true "UDP&DestPort=67"
+        constraint false "!(UDP&DestPort=67)" }
 
     and named {
         port true [Named]
@@ -235,33 +248,46 @@ cAndL :: [CExp] -> CExp
 cAndL = BE.cnfAndL
 cOrL :: [CExp] -> CExp
 cOrL = BE.cnfOrL
+cVariables :: CExp -> [String]
+cVariables = S.toList . BE.cnfVariables
 
 -- Get constraints for specific port on node
 nConst :: OP.Node -> String -> Maybe CExp
-nConst n p =
-    case (stripL $ OP.nLabel n,p) of
-        ("IsUDPDest53","T") -> Just $ cAnd (cVar "UDP") (cVar "DestPort53")
-        ("IsUDPDest53","F") -> Just $ cNot $ fromJust $ nConst n "T"
-        ("IsUDPDest67","T") -> Just $ cAnd (cVar "UDP") (cVar "DestPort67")
-        ("IsUDPDest67","F") -> Just $ cNot $ fromJust $ nConst n "T"
-        ("HWIsUDPDest53","T") -> Just $ cAnd (cVar "UDP") (cVar "DestPort53")
-        ("HWIsUDPDest53","F") -> Just $ cNot $ fromJust $ nConst n "T"
-        ("L4UDPClassified","T") -> Just $ cVar "UDP"
-        ("L4UDPClassified","F") -> Just $ cNot $ fromJust $ nConst n "T"
-        ("HWIsTCPSyn","T") -> Just $ cAnd (cVar "TCP") (cVar "TCPSYNFlag")
-        ("HWIsTCPSyn","F") -> Just $ cNot $ fromJust $ nConst n "T"
-        _ -> Nothing
+nConst n p = if hasAttr then Just $ BE.bexp2cnf $ parse attr else Nothing
     where
-        stripL = drop 4
+        port =
+            case p of
+                "T" -> "true"
+                "F" -> "false"
+                s -> s
+        prefix = "C." ++ port ++ ":"
+        attrs = filter (L.isPrefixOf prefix) $ OP.nAttributes n
+        hasAttr = not $ null attrs
+        attr = drop (length prefix) $ head attrs
+        parse :: String -> BE.BExp
+        parse s =
+            case BEP.parseExp s of
+                Left e -> error ("Error parsing constraint for node '" ++
+                            OP.nLabel n ++ "'.'" ++ p ++ "'")
+                Right e -> e
 
 -- Additional constraints (that are not non-specific
 additionalConstraints :: [((OP.Node,String),CExp)] -> CExp
-additionalConstraints _ = cAndL [
-        cVar "DestPort53" `cImpl` cNot (cVar "DestPort67"),
-        cVar "DestPort67" `cImpl` cNot (cVar "DestPort53"),
-        cVar "TCP" `cImpl` cNot (cVar "UDP"),
-        cVar "UDP" `cImpl` cNot (cVar "TCP")
-    ]
+additionalConstraints e = cAndL (global ++ varConstr)
+    where
+        -- Global constraints
+        global = ["TCP" `mutex` "UDP"]
+        -- Look for variable constraints in the form a=b, and build list of a's
+        varPrefixes =
+            L.nub $ map (takeWhile ((/=) '=')) $ filter (elem '=') varnames
+
+        -- Variables in the formula
+        varnames = L.nub $ concatMap cVariables $ map snd e
+        varByPref p = filter (L.isPrefixOf p) varnames
+        varConstr = concatMap (mutexL . varByPref) varPrefixes
+        mapPairs f l = map (uncurry f) $ [(a,b) | a <- l, b <- l, a < b] -- a bit ugly
+        mutex a b = cNot (cVar a) `cOr` cNot (cVar b)
+        mutexL = mapPairs mutex
 
 -- Build up constraints for all nodes
 -- This is done by topologically sorting the nodes and iteratively adding

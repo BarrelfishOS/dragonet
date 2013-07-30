@@ -240,6 +240,14 @@ attributes = do
     reserved "attr"
     stringLiteral
     
+constraint = do
+    reserved "constraint"
+    p <- identifier
+    exp <- stringLiteral
+    return (p,exp)
+
+constraintAttrs :: [(String,String)] -> [String]
+constraintAttrs = map (\(p,e) -> "C." ++ p ++ ":" ++ e)
 
 genNaryNode p name = do
     reserved name
@@ -247,7 +255,9 @@ genNaryNode p name = do
     (ps,as) <- braces $ do
         as' <- many attributes
         ps' <- many $ port p
-        return (ps',as')
+        cs <- many constraint
+        let attrs = as' ++ constraintAttrs cs
+        return (ps',attrs)
     return (n,(concat ps),as)
 
 
@@ -271,13 +281,15 @@ config p = do
     --return (n,(concat ps),as)
     return (Right (Config n (concat ps) as iF))
 
-genBoolean p name = do
+genBoolean p name hasConstraints = do
     reserved name
     n <- cIdentifier p
     (ps,as) <- braces $ do
         as' <- many attributes
         ps' <- many $ port p
-        return (ps',as')
+        cs <- if hasConstraints then many constraint else return []
+        let attrs = as' ++ constraintAttrs cs
+        return (ps',attrs)
     if (length (concat ps)) /= 2 then
         unexpected "Unexpected number of ports in boolean node, expect exactly 2"
     else
@@ -296,15 +308,15 @@ genBoolean p name = do
         falsePort = findPort "false"
 
 boolean p = do
-    (n, t, f, a) <- genBoolean p "boolean"
+    (n, t, f, a) <- genBoolean p "boolean" True
     return (Right (Boolean n t f a))
         
 orN p = do
-    (n, t, f, a) <- genBoolean p "or"
+    (n, t, f, a) <- genBoolean p "or" False
     return (Right (Or n t f a))
 
 andN p = do
-    (n, t, f, a) <- genBoolean p "and"
+    (n, t, f, a) <- genBoolean p "and" False
     return (Right (And n t f a))
   
 cluster p = do

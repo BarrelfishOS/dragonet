@@ -15,6 +15,8 @@ module BoolExp(
     cnfOrL,
 
     cnfVariables,
+    bexp2cnf,
+    cnf2bexp,
     toDIMACS,
 ) where
 
@@ -203,4 +205,5 @@ toDIMACS e = unlines (header:cs)
         varMap = M.fromList $ zip (S.toList $ cnfVariables e) [1..]
 
         lID s = fromJust $ M.lookup s varMap
+
 
