@@ -16,7 +16,7 @@ DIAGRAMSLOCATION="${PAPERREPO}/figs/"
 function copyDiagram() {
     fname=$1
     cp "${fname}.dot" "${DIAGRAMSLOCATION}"
-    cp "${fname}.pdf" "${DIAGRAMSLOCATION}"
+    cp "${fname}-crop.pdf" "${DIAGRAMSLOCATION}"
 }
 
 set -x
@@ -25,7 +25,7 @@ set -e
 copyDiagram "LPGpaper"
 copyDiagram "PRGUnconfpaper"
 copyDiagram "PRGpaper"
-copyDiagram "EmbeddedPaper"
-
+copyDiagram "Embeddedpaper"
 
 echo "Done..."
+

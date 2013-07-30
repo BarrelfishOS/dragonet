@@ -5,9 +5,7 @@
 
 
 module Operations(
-    main
-    , testOperation
-    , DesFunction
+      DesFunction
     , Implementation(..)
     , Decision(..)
     , Configuration(..)
@@ -19,32 +17,30 @@ module Operations(
     , getDecNode
     , getOperatorNode
     , getConfNode
-    , getDropNode
     , getNodeEdges
     , setNodeEdges
     , appendToTrue
     , appendToFalse
     , nTreeNodes
-    , TagType
-    , applyConfigWrapper
-    , applyConfig
-    , updateNodeList
-    , updateNodeEdges
-    , applyConfigWrapperList
-    , ConfWrapperType
-    , getDesOnlyAttributes
+    , getDropNode
     , getNodeAttributes
-
+    , nLabel
+    , nTag
+    , nIsOP
+    , nConfImpl
+    , nAttributes
+    , ConfFunction
+    , applyConfig
 ) where
 
-import qualified NetBasics as NB
 import qualified Data.List as L
-import qualified Data.Maybe as MB
+import Data.Maybe
 
-import qualified Data.List as DL
+
+--import qualified Data.List as DL
 --import qualified Data.Set as Set
 
-import qualified Debug.Trace as TR
+--import qualified Debug.Trace as TR
 
 type TagType = String
 
@@ -68,18 +64,14 @@ instance Eq t => Eq (Implementation t f) where
 -- Decision function:  based on packet, decides which outgoing edges to choose
 type DesFunction = (Decision -> Packet -> (Packet, [Node]))
 
--- Conf function: Based on the configuration, decides which outgoing edges to choose
-type ConfFunction = (Configuration -> ConfSpace -> [Node])
+type ConfFunction = (Node -> [(Node,String)] -> [(String,Node)] -> String -> [(Node,String,Node)])
 
 -- opearator function: Based on the result of incoming edges,
 --  decides which outgoing edges to choose
 type OpFunction = (Operator -> [Node] -> [Node])
 
-type PortLabel = String
-
---                          (trueP,  falseP)
 data NodeEdges = BinaryNode ([Node], [Node])
-        | NaryNode [(PortLabel, [Node])]
+        | NaryNode [(String, [Node])]
         deriving (Show, Eq)
 
 data GNode l a f = GNode {
@@ -91,19 +83,16 @@ data GNode l a f = GNode {
 } deriving (Show, Eq)
 
 
-data Decision =  Decision (GNode NB.DesLabel NB.DesAttribute DesFunction)
+data Decision =  Decision (GNode String String DesFunction)
     deriving (Show, Eq)
-data Configuration = Configuration (GNode NB.ConfLabel NB.ConfAttribute ConfFunction)
+data Configuration = Configuration (GNode String String ConfFunction)
     deriving (Show, Eq)
-data Operator = Operator (GNode NB.OpLabel NB.OpAttribute OpFunction)
+data Operator = Operator (GNode String String OpFunction)
     deriving (Show, Eq)
-
 
 class NodeCompare a where
     nCompPrgLpg :: a -> a -> Bool
     nCompPrgLpgV2 :: a -> a -> Bool
-    nCompFullTag :: a -> a -> Bool
-
 
 
 data Node = Des Decision
@@ -111,158 +100,46 @@ data Node = Des Decision
     | Opr Operator -- (GNode NB.OpLabel OpFunction) --
     deriving (Show, Eq)
 
-
 instance NodeCompare Node where
     nCompPrgLpg (Des (Decision n1)) (Des (Decision n2)) =
-        NB.embedCompare (gLabel n1) (gLabel n2)
+        -- todo: was embedCompare
+        (gLabel n1) == (gLabel n2)
     nCompPrgLpg _ _ = False
 
     nCompPrgLpgV2 (Des (Decision n1)) (Des (Decision n2)) =
-        NB.embedCompare (gLabel n1) (gLabel n2)
+        (gLabel n1) == (gLabel n2) && (gTag n1) == (gTag n2)
     nCompPrgLpgV2 (Opr (Operator n1)) (Opr (Operator n2)) =
-        (gLabel n1) == (gLabel n2)
-    nCompPrgLpgV2 (Conf (Configuration n1)) (Conf (Configuration n2)) = (gLabel n1) == (gLabel n2)
---    nCompPrgLpgV2 (Conf (Configuration n1)) (Conf (Configuration n2)) =
---        error ("nCompPrgLpgV2: comparing two conf node for embedding...!! \n"
---            ++ "  but you are not supposed to have conf nodes in LPG!!!" )
+        (gLabel n1) == (gLabel n2) && (gTag n1) == (gTag n2)
+    nCompPrgLpgV2 (Conf (Configuration n1)) (Conf (Configuration n2)) =
+        (gLabel n1) == (gLabel n2) && (gTag n1) == (gTag n2)
     nCompPrgLpgV2 _ _ = False
+ 
 
 
-    nCompFullTag (Des (Decision n1)) (Des (Decision n2)) =
-        (gLabel n1) == (gLabel n2) &&
-        (gTag n1) == (gTag n2)
-    nCompFullTag (Conf (Configuration n1)) (Conf (Configuration n2)) =
-        (gLabel n1) == (gLabel n2) &&
-        (gTag n1) == (gTag n2)
-    nCompFullTag (Opr (Operator n1)) (Opr (Operator n2)) =
-        (gLabel n1) == (gLabel n2) &&
-        (gTag n1) == (gTag n2)
-    nCompFullTag x1 x2 = False
-        -- error ("nCompFullTag: error in matching " ++ show x1 ++ " and " ++ show x2)
+nLabel :: Node -> String
+nLabel (Des (Decision gn)) = gLabel gn
+nLabel (Conf (Configuration gn)) = gLabel gn
+nLabel (Opr (Operator gn)) = gLabel gn
+
+nTag :: Node -> String
+nTag (Des (Decision gn)) = gTag gn
+nTag (Conf (Configuration gn)) = gTag gn
+nTag (Opr (Operator gn)) = gTag gn
+
+nConfImpl :: Node -> ConfFunction
+nConfImpl (Conf (Configuration gn)) = f
+    where (Implementation _ f) = head $ gImplementation gn
 
 
-instance NB.EmbedCompare Node where
-    embedCompare (Des (Decision n1)) (Des (Decision n2)) =
-        NB.embedCompare (gLabel n1) (gLabel n2) && (gTag n1) == (gTag n2)
-    embedCompare n1 n2 = error ("embedCompare: non Decision nodes are used "
-            ++ "inside the embedding comparision")
+nAttributes :: Node -> [String]
+nAttributes (Des (Decision gn)) = gAttributes gn
+nAttributes (Conf (Configuration gn)) = gAttributes gn
+nAttributes (Opr (Operator gn)) = gAttributes gn
 
+nIsOP :: Node -> Bool
+nIsOP (Opr _) = True
+nIsOP _ = False
 
-
-getLabels :: [Node] -> ([NB.DesLabel], [NB.ConfLabel], [NB.OpLabel])
-getLabels [] = ([], [], [])
-getLabels (x:xs) = newTuple
-    where
-    xsTuples = getLabels xs
-    xTuples = case x of
-        Des (Decision (GNode label t _ _ _)) -> ([label], [], [])
-        Conf (Configuration (GNode label t _ _ _)) -> ([], [label], [])
-        Opr (Operator (GNode label t _ _ _)) -> ([], [], [label])
-    (ax, bx, cx) = xTuples
-    (axs, bxs, cxs) = xsTuples
-    newTuple = ((ax ++ axs), (bx ++ bxs), (cx ++ cxs))
-
-{-
- - Find all nodes which are config nodes
- - For every config node, apply the config, and get the graph
- - check the diff in the graph.
- - for all the nodes which are diff:
- -      find out which version (conf true/false) of the graph they are present
- -      mark that version as dependency
- -}
-
-
-
--- Removes a given node from recursive
-removeDesNode :: (Node -> Bool) -> Node -> [Node]
-removeDesNode checkFn tree = tree'
-    where
-    tree' = if checkFn tree then getNodeEdgesSide True tree
-        else [updateNodeEdges (removeDesNode checkFn) tree]
-
-{-
-removeDesNodeList :: Node -> [Node] -> Node
-removeDesNodeList tree nodes =
-    DL.foldl (\ acc x -> removeDesNode acc x) tree nodes
--}
-
--- FIXME: add a dummy node before LPG to avoid returning forest instead of tree
-
--- apply given function on every element of the list and return resultant list
-updateNodeList :: (Node -> [Node]) -> [Node] -> [Node]
-updateNodeList fn nlist = DL.concatMap fn nlist
-
--- replace all followup nodes of given node with lists produced by given
--- function
-updateNodeEdges :: (Node -> [Node]) -> Node -> Node
-updateNodeEdges fn tree = tree'
-    where
-    tree' = case (getNodeEdges tree) of
-        BinaryNode (tl, fl) -> setNodeEdges tree (BinaryNode
-            ((updateNodeList fn tl),  (updateNodeList fn fl)))
-        NaryNode plist ->  setNodeEdges tree (NaryNode
-            (DL.map mapPort plist))
-    mapPort (l,ns) = (l, (updateNodeList fn ns))
-
-type ConfWrapperType = (NB.NetOperation, TagType, Bool)
-applyConfigWrapperList :: Node -> [ConfWrapperType]  -> Node
-applyConfigWrapperList tree config =
-    DL.foldl (\ acc (a, b, c) -> applyConfigWrapper a b c acc) tree config
-
--- Wrapper around applyConfig to take care of extream condition that
--- first node itself is Configuration, and it matched with current
--- configuration change requested
-applyConfigWrapper :: NB.NetOperation -> TagType -> Bool -> Node -> Node
-applyConfigWrapper confOp tag whichSide tree
-    | DL.length expanded == 1 = DL.head expanded
-    | expanded == [] = error ("Something went terribaly wrong somewhere,"
-            ++ " causing expanded list to be empty")
-    | otherwise  = error ("First node itself matched with given config."
-            ++ " Add a dummy node before it to simply your life")
-    where
-    expanded = applyConfig confOp tag whichSide tree
-
-
--- Finds and replace a Decision node following a configuration node
--- which has same NetOperation label as configuration node
--- and replaces it with new NetOperation label which we got as part
--- of the configuration
-findAndReplaceWithinDes :: NB.NetOperation -> [Node] -> [Node]
-findAndReplaceWithinDes _ [] = []
-findAndReplaceWithinDes confOp (x:xs)  = case x of
-    Des (Decision (GNode (NB.DesLabel no) t alist nextNodes imp)) ->
-        if (NB.confCompare
-            (NB.ConfLabel (MB.Just no))
-            (NB.ConfLabel (MB.Just confOp))
-           ) then  [(Des (Decision (GNode (NB.DesLabel confOp) t alist nextNodes imp)))]
-           ++ findAndReplaceWithinDes confOp xs
-        else
-            [x] ++ findAndReplaceWithinDes confOp xs
-    _ ->  [x] ++ findAndReplaceWithinDes confOp  xs
-
-
-{-
- - Apply given configuration and get the new tree where the
- - configuration node does not exist anymore.
- -}
-applyConfig :: NB.NetOperation -> TagType -> Bool -> Node -> [Node]
-applyConfig confOp tag whichSide tree  = tree'
-    where
-    tree'' = updateNodeEdges (applyConfig confOp tag whichSide) tree
-
-    tree' = case tree of
-        Conf (Configuration (GNode confl  t alist nextNodes imp)) ->
-            if ( NB.confCompare confl (NB.ConfLabel (MB.Just confOp)) )
-                && (tag == t)  then
-                -- (NB.ConfLabel (MB.Just netop))
-                -- We found the configuration node, lets replace it
-                case nextNodes of
-                    BinaryNode (tlist, flist)   -> if whichSide then
-                                        findAndReplaceWithinDes confOp tlist
-                                                    else flist
-                    _ -> error "non binary Config node"
-            else  [tree'']
-        _ -> [tree'']
 
 -- Get list containing all nodes reachable from the specified start node.
 -- Note that nodes with multiple incoming edges might be contained more than
@@ -274,73 +151,38 @@ nTreeNodes n =
         ep =
             case (getNodeEdges n) of
                 (BinaryNode (as, bs)) -> L.nub (as ++ bs)
-                (NaryNode as) -> L.nub (concat $ map snd as)
+                (NaryNode as) -> L.nub $ concat $ map snd as
         children = concat (map nTreeNodes ep)
 
 
-getConfNode :: MB.Maybe NB.NetOperation -> TagType -> NodeEdges -> Node
-getConfNode op tag edges = Conf $ Configuration GNode {
-        gLabel = (NB.ConfLabel op)
+getConfNode :: String -> TagType -> NodeEdges -> [String] -> ConfFunction -> Node
+getConfNode op tag edges attrs fun = Conf $ Configuration GNode {
+        gLabel = op
         , gTag = tag
         , gEdges = edges
-        , gAttributes = []
-        , gImplementation = []
+        , gAttributes = attrs
+        , gImplementation = [(Implementation "" fun)]
     }
 
 
 
-
-
-getDecNode :: NB.NetOperation -> TagType -> NodeEdges -> [NB.DesAttribute]
-        -> Node
+getDecNode :: String -> TagType -> NodeEdges -> [String] -> Node
 getDecNode op tag edges attrs = Des $ Decision GNode {
-        gLabel = (NB.DesLabel op)
+        gLabel = op
         , gTag = tag
         , gEdges = edges
         , gAttributes = attrs
         , gImplementation = []
     }
 
-getOperatorNode :: NB.NetOperator -> NB.NetOperation -> TagType -> NodeEdges
-        -> [NB.OpAttribute] -> Node
-getOperatorNode op label tag edges attrs = Opr $ Operator GNode {
-        gLabel = (NB.OpLabel op label)
+getOperatorNode :: String -> TagType -> NodeEdges -> [String] -> Node
+getOperatorNode op tag edges attrs = Opr $ Operator GNode {
+        gLabel = op
         , gTag = tag
         , gEdges = edges
         , gAttributes = attrs
         , gImplementation = []
     }
-
-
-getNodeEdgesSide :: Bool -> Node -> [Node]
-getNodeEdgesSide side node = case getNodeEdges node of
-    (BinaryNode (tSide, lSide)) -> if side then tSide else lSide
-    _ -> error ("getNodeEdgesSide: requesting side on Nary node"
-            ++ show node)
-
-
-toBaseAttrDes :: NB.DesAttribute -> NB.Attribute
-toBaseAttrDes (NB.DesAttribute x) = x
-
-toBaseAttrConf :: NB.ConfAttribute -> NB.Attribute
-toBaseAttrConf (NB.ConfAttribute x) = x
-
-toBaseAttrOpr :: NB.OpAttribute -> NB.Attribute
-toBaseAttrOpr (NB.OpAttribute x) = x
-
-
-getNodeAttributes :: Node -> [NB.Attribute]
-getNodeAttributes node = case node of
-    Des (Decision (GNode _ _ a _  _)) -> DL.map (toBaseAttrDes) a
---    Des (Decision (GNode _ _ a _  _)) -> DL.map (NB.DesAttribute) a
-    Conf (Configuration (GNode _ _ a _  _)) -> DL.map (toBaseAttrConf) a
-    Opr (Operator (GNode _ _ a _  _)) -> DL.map (toBaseAttrOpr) a
-
-getDesOnlyAttributes :: Node -> [NB.Attribute]
-getDesOnlyAttributes node = case node of
-    Des (Decision (GNode _ _ a _  _)) -> DL.map (toBaseAttrDes) a
-    _                                                   -> error
-        "non Decision node was given to get decision attributes"
 
 
 getNodeEdges :: Node -> NodeEdges
@@ -366,30 +208,52 @@ appendToFalse orig toAdd = case getNodeEdges orig of
     NaryNode _          -> error "assumption about node being Binary is wrong."
 
 
-testGetOperatorOp :: Node
-testGetOperatorOp = getOperatorNode NB.AND NB.ClassifiedL2Ethernet "+"
-    (BinaryNode ([], [])) []
-
-testGetDecElem :: Node
-testGetDecElem = getDecNode NB.ClassifiedL2Ethernet "test" (NaryNode []) []
-
--- Returns the node which drops the packet
 getDropNode :: Node
-getDropNode = getDecNode NB.PacketDrop "Drop" (BinaryNode ([],[])) []
+getDropNode = getDecNode "packetDrop" "Drop" (BinaryNode ([],[])) []
+
+getNodeAttributes :: Node -> [String]
+getNodeAttributes node = case node of
+    Des (Decision (GNode _ _ a _  _)) -> a
+    Conf (Configuration (GNode _ _ a _  _)) -> a
+    Opr (Operator (GNode _ _ a _  _)) -> a
 
 
-testGetConfElem :: Node
-testGetConfElem = getConfNode (MB.Just NB.L2EtherValidCRC) "checkIt" (BinaryNode ([], []))
-
-testOperation :: [Node]
-testOperation = [a, b, c]
+applyConfig :: [(String,String)] -> [(Node,String,Node)] -> [(Node,String,Node)]
+applyConfig cfg g =
+    rmNewSources $ foldl handleCNode g configNodes
     where
-    a = testGetConfElem
-    b = testGetDecElem
-    c = testGetOperatorOp
+        configNodes = L.nub $ filter isConfN $ (map fst3 g) ++ (map third3 g)
 
-main :: IO()
-main = putStrLn "Hello world"
+        isConfN :: Node -> Bool
+        isConfN (Conf _) = True
+        isConfN _ = False
+
+        fst3 (a,_,_) = a
+        third3 (_,_,a) = a
+
+        sminus a b = filter (not . (flip elem b)) a
+
+        handleCNode g' cn = g'' ++ (cF cn inE outE c)
+            where
+                inE' = filter ((== cn) . third3) g'
+                outE' = filter ((== cn) . fst3) g'
+                g'' = g' `sminus` (inE' ++ outE')
+                inE = map (\(a,b,c) -> (a,b)) inE'
+                outE = map (\(a,b,c) -> (b,c)) outE'
+                c = fromJust $ lookup (nLabel cn) cfg 
+                cF = nConfImpl cn
+
+        sources g' = (map fst3 g') `sminus` (map third3 g')
+
+        rmNode g' n = filter (\a -> fst3 a /= n && third3 a /= n) g'
+
+        rmNewSources g'
+            | (null newSources) = g'
+            | otherwise = rmNewSources g''
+            where
+                newSources = (sources g') `sminus` (sources g)
+                n = head newSources
+                g'' = rmNode g' n
 
 
 

@@ -1,8 +1,10 @@
 
+#all: dragonet
 all: models
 
-dragonet_compile: Dragonet.hs base
-	ghc -rtsopts Dragonet.hs -o Dragonet -Wall -fno-warn-unused-binds # -Werror
+dragonet_compile: base
+#	ghc -XQuasiQuotes -Wall testConstraints.hs -o Dragonet
+	ghc -XQuasiQuotes testConstraints.hs -o Dragonet
 
 dragonet: dragonet_compile
 	./Dragonet
@@ -10,7 +12,7 @@ dragonet: dragonet_compile
 models: dragonet
 	./convertDot.sh
 
-base: Makefile NetBasics.hs Operations.hs NetworkProcessing.hs E10kPRG.hs Dragonet.hs DotGenerator.hs Embedding.hs
+base: Makefile *.hs *.unicorn
 
 clean:
 	rm -f *.hi *.o Dragonet
