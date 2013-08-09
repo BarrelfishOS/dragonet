@@ -48,6 +48,12 @@ data Personality i =
     ONode Operator | 
     FNode
 
+instance Eq (Personality i) where
+    CNode _ == CNode _ = True
+    ONode oa == ONode ob = oa == ob
+    FNode == FNode = True
+    _ == _ = False
+
 instance Show (Personality i) where
     show (CNode _) = "CNode"
     show (ONode op) = "ONode " ++ (show op)
@@ -67,7 +73,15 @@ data Node i = Node {
 }-- deriving (Show)
 
 instance Show (Node i) where
-    show n = nLabel n
+    show n = nLabel n ++ "[" ++ nTag n ++ "]"
+
+instance Eq (Node i) where
+    a == b =
+        (nLabel a == nLabel b)
+        && (nTag a == nTag b)
+        && (nGraphType a == nGraphType b)
+        && (nAttributes a == nAttributes b)
+        && (nPorts a == nPorts b)
 
 
 type PGraph i = DGI.Gr (Node i) Port

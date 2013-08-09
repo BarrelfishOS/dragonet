@@ -5,6 +5,7 @@ import Dragonet.ProtocolGraph
 import Dragonet.Unicorn
 import Dragonet.Configuration
 import Dragonet.DotGenerator
+import Dragonet.Embedding
 import qualified Data.Graph.Inductive.Graphviz as DGIG
 
 [unicorn|
@@ -110,7 +111,7 @@ graph lpg {
             port true false[.L2Verified] }
 
         node ClassifyL3 {
-            port out[.L3IPv4Classified] }
+            port out[.L3IPv4Classified .L3IPv6Classified] }
     }
 
     and L2Verified {
@@ -204,7 +205,8 @@ graph lpg {
 main = do
     putStrLn "Configured:"
     --putStrLn $ toDotClustered lpg lpgClusters
-    putStrLn $ toDot lpg
+    --putStrLn $ toDot prgConfigured
+    putStrLn $ toDot $ fullEmbedding prgConfigured lpg
     where
         prgConfigured = applyConfig config prg
         config = [("CSynFilter", "true"), ("CSynOutput","Q2")]
