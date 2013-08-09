@@ -67,12 +67,15 @@ graph prg {
         port false[] }
 
     node Queue0 {
+        attr "software"
         port out[] }
 
     node Queue1 {
+        attr "software"
         port out[] }
 
     node Queue2 {
+        attr "software"
         port out[] }
 }
 |]
@@ -204,9 +207,13 @@ graph lpg {
 
 main = do
     putStrLn "Configured:"
-    --putStrLn $ toDotClustered lpg lpgClusters
-    --putStrLn $ toDot prgConfigured
-    putStrLn $ toDot $ fullEmbedding prgConfigured lpg
+    writeFile "lpg.dot" $ toDotClustered lpgT lpgClusters
+    writeFile "prg.dot" $ toDot prg
+    writeFile "prg_conf.dot" $ toDot prgTConf
+    writeFile "embedded.dot" $ toDot $ fullEmbedding prgTConf lpgT
     where
+        lpgT = pgSetType GTLpg lpg
+        prgTConf = pgSetType GTPrg prgConfigured
+
         prgConfigured = applyConfig config prg
         config = [("CSynFilter", "true"), ("CSynOutput","Q2")]

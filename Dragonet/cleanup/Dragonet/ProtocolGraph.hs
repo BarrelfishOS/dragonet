@@ -10,6 +10,7 @@ module Dragonet.ProtocolGraph(
 
     Operator(..),
     Personality(..),
+    GraphType(..),
 
     Node(..),
 
@@ -19,12 +20,16 @@ module Dragonet.ProtocolGraph(
     nIsCNode,
     nConfFun,
 
+    nIsSoftware,
+
     opToString,
 
     PGraph,
     PGNode,
     PGEdge,
     PGContext,
+
+    pgSetType,
 
     baseFNode,
     baseONode,
@@ -73,7 +78,12 @@ data Node i = Node {
 }-- deriving (Show)
 
 instance Show (Node i) where
-    show n = nLabel n ++ "[" ++ nTag n ++ "]"
+    show n = pref ++ nLabel n ++ "[" ++ nTag n ++ "]"
+        where
+            pref = case nGraphType n of
+                GTLpg -> "L:"
+                GTPrg -> "P:"
+                _ -> ""
 
 instance Eq (Node i) where
     a == b =
@@ -150,7 +160,20 @@ nIsFNode n = persIsFNode $ nPersonality n
 
 nIsONode :: Node i -> Bool
 nIsONode n = persIsONode $ nPersonality n
+
+-- Returns true iff node is a LPG node, or a PRG node with the software
+-- attribute
+nIsSoftware :: Node i -> Bool
+nIsSoftware n
+    | elem "software" $ nAttributes n = True
+    | otherwise = nGraphType n == GTLpg
+
    
+-------------------------------------------------------------------------------
+-- Protocol graph functions
+
+pgSetType :: GraphType -> PGraph i -> PGraph i
+pgSetType t g = DGI.nmap (\n -> n { nGraphType = t }) g
 
 
 -------------------------------------------------------------------------------

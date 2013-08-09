@@ -90,24 +90,77 @@ queueEmbedding prg' lpg = embeddingStep DGI.empty lpgNodes
                 where g = DGI.insNode v emb
 
 
+-- Get list of queue nodes in graph
+queues ::  PG.PGraph i -> [PG.PGNode i]
+queues g = filter (L.isPrefixOf "Queue" . PG.nLabel . snd) $ DGI.labNodes g
 
+-- Find SW-Entry node for specified queue
+findSWE :: String -> PG.PGraph i -> Maybe (DGI.Node,PG.Port)
+findSWE q g = do
+    (n,_) <- GH.findNodeByL isSWE g
+    return (n,"out")
+    where
+        --isSWE n = (PG.nLabel n == "SoftwareEntry") && (PG.nTag n == q)
+        isSWE n = (PG.nLabel n == q)
 
+-- Serialize graph (introduces SoftwareEntry node for each queue, and fixes
+-- edges crossing from PRG-Nodes to LPG-Nodes)
+serialize :: PG.PGraph i -> PG.PGraph i
+serialize g =
+    GH.delDupEdges $ DGI.insEdges fixedEdges $ GH.delLEdges crossingEdges g
+    where
+        -- List of queue names
+        qls = map (PG.nLabel . snd) $ queues g
+        -- Generate association tuple for specified queue (q,(node,port))
+        genSWE q = (q, fromMaybe err $ findSWE q g)
+            where err = (error "serialize: SoftwareEntry node not found in LPG")
+        -- Association list from queue names to sw entry nodes/ports
+        swEMap = map genSWE qls
+        -- Map node to respective SW entry node
+        swEN n = fromJust $ lookup tag swEMap
+            where tag = PG.nTag $ fromJust $ DGI.lab g n
+
+        -- List of edges crossing from HW to SW nodes
+        crossingEdges = filter isCrossingEdge $ DGI.labEdges g
+        isCrossingEdge (a,b,l) = (not $ sw a) && (sw b)
+            where sw n = PG.nIsSoftware $ fromJust $ DGI.lab g n
+
+        -- List of fixed edges
+        fixedEdges = concatMap fixEdge crossingEdges
+        --fixEdge (a,b,l) = [(a,swn,l), (swn,b,swp)]
+        fixEdge (a,b,l) = if b /= swn then [(swn,b,swp)] else [(a,b,l)]
+            where (swn,swp) = swEN b
+
+-- Get LPG for specified queue (tag nodes and rename "Queue")
+lpgQ :: PG.PGNode i -> PG.PGraph i -> PG.PGraph i
+lpgQ q lpg = DGI.nmap (lpgQNode q) lpg
+
+-- Relabel node to q if its label is "Queue", and tag the node with q
+lpgQNode :: PG.PGNode i -> PG.Node i -> PG.Node i
+lpgQNode (_,qn) n = if lbl == "Queue" then n' { PG.nLabel = ql } else n'
+    where
+        ql = PG.nLabel qn
+        n' = n { PG.nTag = ql }
+        lbl = PG.nLabel n
+
+-- Get prg for a particular queue (basically go recursively and get all
+-- nodes reachable from the queue node. This is necessary to avoid embedding
+-- functionality that is not available on a particular queue.
+-- We also need to tag software nodes, so they are introduced once for each
+-- queue.
+prgQ :: PG.PGNode i -> PG.PGraph i -> PG.PGraph i
+prgQ (qn,ql) prg = DGI.nmap tagSWN g'
+    where
+        g' = GH.reduceNodes prg $ DGIDFS.reachable qn $ DGI.grev prg
+        qlab = PG.nLabel ql
+        tagSWN n = if PG.nIsSoftware n then n { PG.nTag = qlab } else n
 
 fullEmbedding :: PG.PGraph i -> PG.PGraph i -> PG.PGraph i
-fullEmbedding prg lpg = foldl1 (GH.mergeGraphsBy (==)) embeddings
+fullEmbedding prg lpg = serialized
     where
-        -- String labels of all queue nodes in PRG
-        queues = filter (L.isPrefixOf "Queue") $ map (PG.nLabel . snd) $
-                    DGI.labNodes prg
+        embedQueue q = queueEmbedding (prgQ q prg) (lpgQ q lpg)
+        embeddings = map embedQueue $ queues prg
 
-        -- Get LPG for specified queue (tag nodes and rename "Queue")
-        lpgQ q = DGI.nmap (lpgQNode q) lpg
-
-        -- Relabel node to q if its label is "Queue", and tag the node with q
-        lpgQNode q n = if lbl == "Queue" then n' { PG.nLabel = q } else n'
-            where
-                n' = n { PG.nTag = q }
-                lbl = PG.nLabel n
-
-        embeddings = map (\q -> queueEmbedding prg $ lpgQ q) queues
+        merged = foldl1 (GH.mergeGraphsBy (==)) embeddings
+        serialized = serialize merged
 

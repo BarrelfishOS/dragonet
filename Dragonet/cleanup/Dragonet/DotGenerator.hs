@@ -60,12 +60,17 @@ nodeLabel n
     | otherwise = lbl
     where
         (PG.ONode op) = PG.nPersonality n
-        lbl = PG.nLabel n
+        pf = case PG.nGraphType n of
+            PG.GTPrg -> "P:"
+            PG.GTLpg -> "L:"
+            _ -> ""
+        lbl = pf ++ PG.nLabel n
 
 -- Build record label for node
 nodeRecord :: PG.Node i -> GA.Label
-nodeRecord n = GA.RecordLabel [GA.FieldLabel $ t $ nodeLabel n,
-                               GA.FlipFields portFields]
+nodeRecord n = GA.RecordLabel [GA.FlipFields
+                                [GA.FieldLabel $ t $ nodeLabel n,
+                                 GA.FlipFields portFields]]
     where
         port p = GA.LabelledTarget (GA.PN $ t p) (t p)
         portFields = map port $ PG.nPorts n
@@ -121,7 +126,8 @@ params = GV.defaultParams {
     GV.fmtCluster = const [],
     GV.isDotCluster = (\_ -> True),
     GV.clusterID = clusterId,
-    GV.clusterBy = clusterByTag
+    GV.clusterBy = clusterByTag,
+    GV.globalAttributes = [GV.GraphAttrs [GA.RankDir GA.FromLeft]]
 }
 
 -- Parameters for clustering by a given cluster map

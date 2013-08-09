@@ -1,5 +1,8 @@
 module Util.GraphHelpers(
+    delLEdges,
+    delDupEdges,
     filterCtx,
+    reduceNodes,
     labelNode,
     findNodeByL,
     elliminateConflicts,
@@ -11,6 +14,16 @@ import Data.Either
 import Data.Maybe
 import qualified Data.List as L
 import qualified Debug.Trace as TR
+
+delLEdges :: (DynGraph gr, Eq b) => [LEdge b] -> gr a b -> gr a b
+delLEdges es g = foldr delLEdge g es
+
+-- Removes duplicate edges between two nodes (if the edges have the same label)
+delDupEdges :: (DynGraph gr, Eq b) => gr a b -> gr a b
+delDupEdges = gmap fixC
+    where
+        fixA l = L.nub l
+        fixC (i,n,l,o) = (fixA i,n,l,fixA o)
 
 -- Convert Node to LNode in graph (node must be in graph)
 labelNode :: Graph gr => gr a b -> Node -> Maybe (LNode a)
@@ -34,9 +47,14 @@ filterCtx p g = ufold f [] g
     where
         f ctx l = if p ctx then ctx:l else l
 
+-- Remove all nodes not in the specified list
+reduceNodes :: DynGraph gr => gr a b -> [Node] -> gr a b
+reduceNodes g ns = delNodes toDelete g
+    where
+        toDelete = filter (flip notElem ns) $ nodes g
 
 -- Integrate second graph into first graph, combining nodes according to predicate
-mergeGraphsBy :: (DynGraph gr, Show a, Show b, Show (gr a b)) => (a -> a -> Bool) -> gr a b -> gr a b -> gr a b
+mergeGraphsBy :: DynGraph gr => (a -> a -> Bool) -> gr a b -> gr a b -> gr a b
 mergeGraphsBy nC a b = flip insEdges gNodes $ map convertEdge $ labEdges b
     where
         na = labNodes a
