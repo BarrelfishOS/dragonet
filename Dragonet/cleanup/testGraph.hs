@@ -6,6 +6,7 @@ import Dragonet.Unicorn
 import Dragonet.Configuration
 import Dragonet.DotGenerator
 import Dragonet.Embedding
+import Dragonet.Constraints
 import qualified Data.Graph.Inductive.Graphviz as DGIG
 
 [unicorn|
@@ -206,14 +207,18 @@ graph lpg {
 |]
 
 main = do
-    putStrLn "Configured:"
+    putStrLn "Generating .dot files..."
     writeFile "lpg.dot" $ toDotClustered lpgT lpgClusters
     writeFile "prg.dot" $ toDot prg
     writeFile "prg_conf.dot" $ toDot prgTConf
-    writeFile "embedded.dot" $ toDot $ fullEmbedding prgTConf lpgT
+    writeFile "embedded.dot" $ toDot $ embedded
+    constrained <- constrain embedded
+    writeFile "constrained.dot" $ toDot $ constrained
     where
         lpgT = pgSetType GTLpg lpg
         prgTConf = pgSetType GTPrg prgConfigured
 
         prgConfigured = applyConfig config prg
         config = [("CSynFilter", "true"), ("CSynOutput","Q2")]
+
+        embedded = fullEmbedding prgTConf lpgT

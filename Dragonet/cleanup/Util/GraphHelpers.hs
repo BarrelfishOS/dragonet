@@ -7,9 +7,12 @@ module Util.GraphHelpers(
     findNodeByL,
     elliminateConflicts,
     mergeGraphsBy,
+    RecContext,
+    recurseNFW,
 ) where
 
 import Data.Graph.Inductive
+import qualified Data.Graph.Inductive.Query.DFS as DFS
 import Data.Either
 import Data.Maybe
 import qualified Data.List as L
@@ -85,4 +88,26 @@ mergeGraphsBy nC a b = flip insEdges gNodes $ map convertEdge $ labEdges b
         convertNode n = either id id $ fromJust $ lookup n nMap
         convertEdge (nA,nB,l) = (convertNode nA, convertNode nB, l)
 
+-- Adjacency list for context
+type LAdj n e = [(e,n)]
+
+
+type RecContext i ie n o oe = (LAdj (LNode i) ie,LNode n,LAdj (LNode o) oe)
+
+-- Similar to nmap, but passes context (includes new labels of predecessors and
+-- old labels of successors).
+recurseNFW :: (DynGraph gr, Show nn, Show e, Show on) => (RecContext nn e on on e -> nn) -> gr on e
+                                -> gr nn e
+recurseNFW f g = gmap (\(ia,n,_,oa) -> (ia,n,fromJust $ lookup n assocL,oa)) g
+    where
+        -- Association list from nodes to new labels
+        assocL = foldl nfun [] $ DFS.topsort g
+        -- Helper for generating association list of node to new label
+        nfun l n = l ++ [(n,f $ recCtx l n)]
+        recCtx l n = (inA',(n,nl),outA')
+            where
+                lblAdj lf = map (\(e,m) -> (e,(m,lf m))) inA
+                inA' = lblAdj (\m -> fromJust $ lookup m l)
+                outA' = lblAdj (\m -> fromJust $ lab g n)
+                (inA,_,nl,outA) = context g n
 
