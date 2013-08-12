@@ -1,3 +1,4 @@
+-- Generic FGL graph helpers
 module Util.GraphHelpers(
     delLEdges,
     delDupEdges,
@@ -13,10 +14,8 @@ module Util.GraphHelpers(
 
 import Data.Graph.Inductive
 import qualified Data.Graph.Inductive.Query.DFS as DFS
-import Data.Either
 import Data.Maybe
 import qualified Data.List as L
-import qualified Debug.Trace as TR
 
 delLEdges :: (DynGraph gr, Eq b) => [LEdge b] -> gr a b -> gr a b
 delLEdges es g = foldr delLEdge g es
@@ -35,12 +34,13 @@ labelNode g n = do { a <- lab g n; return (n,a) }
 findNodeByL :: Graph gr => (a -> Bool) -> gr a b -> Maybe (LNode a)
 findNodeByL f g = L.find (\(_,l) -> f l) $ labNodes g
 
+-- Make sure the node set of graph a is disjoint with the node set of b
 elliminateConflicts :: DynGraph gr => gr a b -> gr a b -> gr a b
 elliminateConflicts a b = gmap fixC a
     where
         diff = (snd $ nodeRange b) - (fst $ nodeRange a) + 1
         fixN n = n + diff
-        fixA l = map (\(l,n) -> (l,fixN n)) l
+        fixA l = map (\(k,n) -> (k,fixN n)) l
         fixC (i,n,l,o) = (fixA i,fixN n,l,fixA o)
 
 
@@ -60,7 +60,6 @@ reduceNodes g ns = delNodes toDelete g
 mergeGraphsBy :: DynGraph gr => (a -> a -> Bool) -> gr a b -> gr a b -> gr a b
 mergeGraphsBy nC a b = flip insEdges gNodes $ map convertEdge $ labEdges b
     where
-        na = labNodes a
         nb = labNodes b
 
         -- Build tuple with node ID the second graph and
@@ -106,8 +105,8 @@ recurseNFW f g = gmap (\(ia,n,_,oa) -> (ia,n,fromJust $ lookup n assocL,oa)) g
         nfun l n = l ++ [(n,f $ recCtx l n)]
         recCtx l n = (inA',(n,nl),outA')
             where
-                lblAdj lf = map (\(e,m) -> (e,(m,lf m))) inA
-                inA' = lblAdj (\m -> fromJust $ lookup m l)
-                outA' = lblAdj (\m -> fromJust $ lab g n)
+                lblAdj lf = map (\(e,m) -> (e,(m,lf m)))
+                inA' = lblAdj (\m -> fromJust $ lookup m l) inA
+                outA' = lblAdj (\m -> fromJust $ lab g m) outA
                 (inA,_,nl,outA) = context g n
 

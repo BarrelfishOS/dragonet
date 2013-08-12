@@ -9,7 +9,6 @@ import qualified Util.GraphHelpers as GH
 
 import qualified Data.Graph.Inductive as DGI
 
-import Data.Maybe
 import qualified Data.List as L
 import qualified Data.Set as S
 import qualified Debug.Trace as TR
@@ -31,8 +30,6 @@ cNot :: CExp -> CExp
 cNot = BE.cnfNot
 cVar :: String -> CExp
 cVar = BE.cnfVar
-cImpl :: CExp -> CExp -> CExp
-cImpl a b = cNot a `cOr` b
 cAndL :: [CExp] -> CExp
 cAndL = BE.cnfAndL
 cOrL :: [CExp] -> CExp
@@ -48,7 +45,7 @@ getNPConstraints n p = do
     where
         prefix = "C." ++ p ++ ":"
         parse a = case BEP.parseExp a of
-            Left e -> error ("Error parsing constraint for node '" ++
+            Left _ -> error ("Error parsing constraint for node '" ++
                         PG.nLabel n ++ "'.'" ++ p ++ "'")
             Right e -> Just $ BE.bexp2cnf e
 
@@ -58,11 +55,13 @@ combineN (pr,(_,n),_) = map port $ PG.nPorts n
     where
         port p = (p,case PG.nPersonality n of
             PG.ONode op -> opPort op (findIn "true") (findIn "false") p
-            PG.FNode -> maybe fInExp (cAnd fInExp) (fExp p))
+            PG.FNode -> maybe fInExp (cAnd fInExp) (fExp p)
+            PG.CNode _ -> error "Encountered CNode")
 
-        opPort PG.OpAnd ts fs "true" = cAndL ts
-        opPort PG.OpOr ts fs "true" = cOrL ts
+        opPort PG.OpAnd ts _ "true" = cAndL ts
+        opPort PG.OpOr ts _ "true" = cOrL ts
         opPort op ts fs "false" = cNot $ opPort op ts fs "true"
+        opPort _ _ _ p = error ("Unexpected port p=" ++ p ++ " on ONode")
 
         fExp p = getNPConstraints n p
         fInExp = case inExps of
@@ -72,7 +71,7 @@ combineN (pr,(_,n),_) = map port $ PG.nPorts n
                                    ++ show n) e
 
         findIn p = map snd $ filter ((== p) . fst) inExps
-        inExps = concatMap (\(e,(_,n)) -> filter ((== e) . fst) n) pr
+        inExps = concatMap (\(e,(_,m)) -> filter ((== e) . fst) m) pr
 
 -- Generate constraints for each node/port
 generateConstraints :: PG.PGraph i -> [((DGI.Node,PG.Port),CExp)]

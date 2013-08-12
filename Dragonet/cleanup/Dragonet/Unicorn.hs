@@ -11,13 +11,7 @@ module Dragonet.Unicorn(
     unicornGraph,
 ) where
 
-import System.IO
-
-import qualified Debug.Trace as T
-
 import Text.ParserCombinators.Parsec as Parsec
-import Text.ParserCombinators.Parsec.Expr
-import Text.ParserCombinators.Parsec.Pos
 import qualified Text.ParserCombinators.Parsec.Token as P
 
 import qualified Language.Haskell.TH as TH
@@ -57,15 +51,17 @@ unicornImpl_f = quoteFile unicornImpl
 
 -- That's where the magic happens: we get the string representing the DSL input
 -- and generate a Haskell AST
+quoteMyDec :: String -> TH.Q [TH.Dec]
 quoteMyDec s = do
-    graph <- parseGraph s
-    return $ declare graph
+    gr <- parseGraph s
+    return $ declare gr
 
+quoteMyDecImpl :: String -> TH.Q [TH.Dec]
 quoteMyDecImpl s = do
-    graph <- parseGraph s
-    return (declare graph ++ implDec graph)
+    gr <- parseGraph s
+    return (declare gr ++ implDec gr)
 
-
+declare :: Graph -> [TH.Dec]
 declare (Graph name cluster) =
     --nodesDecl ++ clustersDecl
     clustersDecl
@@ -82,6 +78,7 @@ clusterMap (Cluster cn cs ns) l =
     where l' = if null cn then l else (l ++ [cn])
 
 
+declareClusters :: String -> Cluster -> [TH.Dec]
 declareClusters gn cluster =
     --clusters:c2nodes:[]
     clusters:nodes:edges:graph:[]
@@ -414,7 +411,7 @@ parseGraph s = case runParser graph () "" s of
 
 
 unicornSimpleConfig :: PG.ConfFunction i
-unicornSimpleConfig n inE outE cfg =
+unicornSimpleConfig _ inE outE cfg =
     return $ concatMap edge inE
     where
         -- Only the out-endpoints that match the configuration

@@ -9,7 +9,7 @@ for f in ${flist} ; do
     pngFile="${justFile}.png"
     dot -Gconcentrate=true -Tpng -o "${pngFile}" "${f}"
     dot -Gconcentrate=true -Tpdf -o "${pdfFile}" "${f}"
-    pdfcrop ${pdfFile}
+    #pdfcrop ${pdfFile}
     echo converted "${f} to ${pngFile} and ${pdfFile}"
 done
 

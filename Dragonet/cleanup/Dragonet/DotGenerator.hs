@@ -12,22 +12,24 @@ import qualified Data.Text.Lazy as T
 import qualified Data.List as L
 import Data.Maybe
 
+t :: String -> T.Text
 t = T.pack
 
 -- Edge labels, mainly used to create double edges
 data ELabel = SingleEdge String | DoubleEdge
 
+-- Mark edges in adjacency list as double edges (if the case)
 fixAdj :: [(String,DGI.Node)] -> [(ELabel,DGI.Node)]
 fixAdj l = singleEdges ++ doubleEdges
     where
         n = L.nub $ map snd l
         -- Endpoints for double edges
         dblN = filter (\x -> (elem ("true",x) l) && (elem ("false",x) l)) n
-        doubleEdges = map (\n -> (DoubleEdge,n)) dblN
+        doubleEdges = map (\m -> (DoubleEdge,m)) dblN
         -- Original edges with double edges removed
-        lSingle = filter (\(p,n) -> (notElem n dblN) ||
+        lSingle = filter (\(p,m) -> (notElem m dblN) ||
                                     (p /= "true" && p /= "false")) l
-        singleEdges = map (\(p,n) -> (SingleEdge p,n)) lSingle
+        singleEdges = map (\(p,m) -> (SingleEdge p,m)) lSingle
 
 -- Mark double edges in the graph
 getELs :: PG.PGraph i -> DGI.Gr (PG.Node i) ELabel
@@ -55,6 +57,7 @@ formatEdge (_,_,DoubleEdge) = [tailP,headP,double]
                          
         
 -- Get string label for a node
+nodeLabel :: PG.Node i -> String
 nodeLabel n
     | PG.nIsONode n = PG.opToString op ++ ":" ++ lbl
     | otherwise = lbl
@@ -86,6 +89,7 @@ nodeStyle n
     | PG.nIsCNode n =
         [GA.Style [GA.SItem GA.Filled [], GA.SItem GA.Diagonals []],
          GA.FillColor [GA.WC (GA.X11Color GC.PaleTurquoise) Nothing]]
+    | otherwise = undefined
     where
         isSW = elem "software" $ PG.nAttributes n
 

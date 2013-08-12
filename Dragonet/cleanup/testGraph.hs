@@ -7,7 +7,6 @@ import Dragonet.Configuration
 import Dragonet.DotGenerator
 import Dragonet.Embedding
 import Dragonet.Constraints
-import qualified Data.Graph.Inductive.Graphviz as DGIG
 
 [unicorn|
 graph prg {
@@ -206,6 +205,7 @@ graph lpg {
 }
 |]
 
+main :: IO ()
 main = do
     putStrLn "Generating .dot files..."
     writeFile "lpg.dot" $ toDotClustered lpgT lpgClusters

@@ -124,6 +124,7 @@ nConfFun n = fun
 -------------------------------------------------------------------------------
 -- Node functions
 
+baseFNode :: Label -> [Attribute] -> [Port] -> Node ()
 baseFNode label attr ports = Node {
         nLabel = label,
         nTag = "",
@@ -133,6 +134,7 @@ baseFNode label attr ports = Node {
         nPorts = ports,
         nImplementation = () }
 
+baseONode :: Label -> [Attribute] -> [Port] -> Operator -> Node ()
 baseONode label attr ports op = Node {
         nLabel = label,
         nTag = "",
@@ -142,6 +144,7 @@ baseONode label attr ports op = Node {
         nPorts = ports,
         nImplementation = () }
 
+baseCNode :: Label -> [Attribute] -> [Port] -> ConfFunction () -> Node ()
 baseCNode label attr ports cnf = Node {
         nLabel = label,
         nTag = "",

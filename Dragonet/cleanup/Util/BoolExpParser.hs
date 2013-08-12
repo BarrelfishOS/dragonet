@@ -3,8 +3,6 @@ module Util.BoolExpParser(
 ) where
 
 import Util.BoolExp
-import Data.Maybe
-import Data.Either
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 
