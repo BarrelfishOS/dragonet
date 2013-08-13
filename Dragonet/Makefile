@@ -16,7 +16,7 @@ plos13_run: plos13
 
 
 models: graph_run
-	../convertDot.sh
+	./convertDot.sh
 
 base: Makefile *.hs */*.hs
 
