@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+
 module Dragonet.Unicorn(
     unicorn,
     unicorn_f,
@@ -62,13 +64,9 @@ quoteMyDecImpl s = do
     return (declare gr ++ implDec gr)
 
 declare :: Graph -> [TH.Dec]
-declare (Graph name cluster) =
-    --nodesDecl ++ clustersDecl
-    clustersDecl
-    where
-        nodesDecl = map (declareNode name) $ flip zip [1..] $ cNodesDeep cluster
-        clustersDecl = declareClusters name cluster
+declare (Graph name cl) = declareClusters name cl
 
+nodeClusterMap :: Cluster -> [(String, Node)]
 nodeClusterMap (Cluster cn cs ns) =
     (map (\n -> (cn, n)) ns) ++ (concatMap nodeClusterMap cs)
 
@@ -77,37 +75,72 @@ clusterMap (Cluster cn cs ns) l =
     map (\n -> (n,l')) ns ++ concatMap (\c -> clusterMap c l') cs
     where l' = if null cn then l else (l ++ [cn])
 
+fdec :: TH.Name -> TH.Exp -> TH.Dec
+fdec n e = TH.FunD n [TH.Clause [] (TH.NormalB e) []]
+
+callE :: TH.Exp -> [TH.Exp] -> TH.Exp
+callE = foldl TH.AppE 
+
+-- Helpers to make types more readable:
+-- Type for list of t
+tListOf :: TH.Type -> TH.Type
+tListOf t = TH.AppT TH.ListT t
+-- Type for a tuple with entries ts
+tTupleOf :: [TH.Type] -> TH.Type
+tTupleOf ts = foldl TH.AppT (TH.TupleT $ length ts) ts
 
 declareClusters :: String -> Cluster -> [TH.Dec]
-declareClusters gn cluster =
-    --clusters:c2nodes:[]
-    clusters:nodes:edges:graph:[]
+declareClusters gn cl =
+    signatures ++ definitions
     where
-        fdec n e = TH.FunD (TH.mkName n) [TH.Clause [] (TH.NormalB e) []]
+        -- Type signatures for the generated definitions
+        --signatures = [clSig,nlSig,elSig,gSig]
+        signatures = [clSig,nlSig,elSig,gSig]
+        gSig = TH.SigD graphName gType
+        gType = TH.ConT (TH.mkName "PGraph") `TH.AppT` TH.TupleT 0
+        nlSig = TH.SigD nodesName nlType
+        nlType = tListOf $ tTupleOf [TH.ConT $ TH.mkName "Int",
+                    (TH.ConT $TH.mkName "Node") `TH.AppT` (TH.TupleT 0)]
+        elSig = TH.SigD edgesName elType
+        elType = tListOf $ tTupleOf [TH.ConT $ TH.mkName "Int",
+                                    TH.ConT $ TH.mkName "Int",
+                                    TH.ConT $ TH.mkName "String"]
+        clSig = TH.SigD clustersName clType
+        clType = tListOf $ tTupleOf [TH.ConT $ TH.mkName "Int",
+                    tListOf $ TH.ConT $ TH.mkName "String"]
 
-        nodeIdMap = zip [1..] $ nodeClusterMap cluster
-        lookupNode n = fst $ head $ filter (\(i,(_,n')) -> nName n' == n) nodeIdMap
+        -- Actual definitions
+        definitions = [cDef,nDef,eDef,gDef]
 
-        nodesName = gn ++ "Nodes"
-        nodes = fdec nodesName nExps
-        nDecl (i,(a,n)) = TH.TupE [TH.LitE $ TH.IntegerL i, nodeExp gn n]
+
+        nodeIdMap = zip [1..] $ nodeClusterMap cl
+        lookupNode n = fst $ head $ filter (\(_,(_,n')) -> nName n' == n) nodeIdMap
+
+        -- "g"Nodes, list of nodes
+        nodesName = TH.mkName (gn ++ "Nodes")
+        nDef = fdec nodesName nExps
+        nDecl (i,(_,n)) = TH.TupE [TH.LitE $ TH.IntegerL i, nodeExp gn n]
         nExps = TH.ListE $ map nDecl nodeIdMap
 
-        edgesName = gn ++ "Edges"
-        edges = fdec edgesName eExps
+        -- "g"Edges, list of edges
+        edgesName = TH.mkName (gn ++ "Edges")
+        eDef = fdec edgesName eExps
         eDecl (s,n,e) = TH.TupE $ map TH.LitE [TH.IntegerL s, TH.IntegerL e,
                                                TH.StringL n]
         pDecl i (Port n ds) = map (\d -> eDecl (i,n,lookupNode d)) ds
         eDecls (i,(_,n)) = concatMap (pDecl i) $ nPorts n
         eExps = TH.ListE $ concatMap eDecls nodeIdMap
 
-        graph = fdec gn $ callE (TH.VarE $ TH.mkName "unicornGraph")
-                [TH.VarE $ TH.mkName nodesName, TH.VarE $ TH.mkName edgesName]
+        -- "g", the full graph
+        graphName = TH.mkName gn
+        gDef = fdec graphName $ callE (TH.VarE $ TH.mkName "unicornGraph")
+                [TH.VarE nodesName, TH.VarE edgesName]
 
-        clustersName = gn ++ "Clusters"
-        clusters = fdec clustersName cExps
-        cExps = TH.ListE $ map cDef $ clusterMap cluster []
-        cDef (n,cs) = TH.TupE [TH.LitE $ TH.IntegerL $ lookupNode $ nName n,
+        -- "g"Clusters, List of clusters
+        clustersName = TH.mkName (gn ++ "Clusters")
+        cDef = fdec clustersName cExps
+        cExps = TH.ListE $ map clDef $ clusterMap cl []
+        clDef (n,cs) = TH.TupE [TH.LitE $ TH.IntegerL $ lookupNode $ nName n,
                                TH.ListE $ map (TH.LitE . TH.StringL) cs]
 
 
@@ -127,7 +160,6 @@ unicornOrNode l a p = PG.baseONode l a p PG.OpOr
 unicornGraph :: [(Int, PG.Node ())] -> [(Int, Int, PG.Port)] -> PG.PGraph ()
 unicornGraph nodes edges = DGI.mkGraph nodes edges
 
-callE = foldl TH.AppE 
 
 nodeExp graph n =
     callE (TH.VarE $ TH.mkName ntFun) ([labelE, attrE, portsE] ++ ntE)
@@ -221,20 +253,22 @@ data Node =
 cNodesDeep :: Cluster -> [Node]
 cNodesDeep (Cluster _ cs ns) = ns ++ concatMap cNodesDeep cs
 
-gNodes (Graph _ cs) = cNodesDeep cs
-
+pName :: Port -> String
 pName (Port n _) = n
 
-nIsOp (And n _ _ _) = True
-nIsOp (Or n _ _ _) = True
+nIsOp :: Node -> Bool
+nIsOp (And _ _ _ _) = True
+nIsOp (Or _ _ _ _) = True
 nIsOp _ = False
 
+nName :: Node -> String
 nName (Node n _ _) = n
 nName (Config n _ _ _) = n
 nName (Boolean n _ _ _) = n
 nName (And n _ _ _) = n
 nName (Or n _ _ _) = n
 
+nAttrs :: Node -> [String]
 nAttrs (Node _ _ as) = as
 nAttrs (Config _ _ as _) = as
 nAttrs (Boolean _ _ _ as) = as
@@ -276,7 +310,7 @@ stringLiteral = P.stringLiteral lexer
 
 
 globalIdentifier p = do
-    char '.'
+    _ <- char '.'
     if null p then
         unexpected "Invalid cluster reference (too many .)"
     else do
@@ -296,8 +330,7 @@ port p = do
     ds <- brackets $ many $ cIdentifier p
     return (ports ns ds)
     where
-        port ds n = Port n ds
-        ports ns ds = map (port ds) ns
+        ports ns ds = map (flip Port ds) ns
 
 attributes = do
     reserved "attr"
@@ -306,8 +339,8 @@ attributes = do
 constraint = do
     reserved "constraint"
     p <- identifier
-    exp <- stringLiteral
-    return (p,exp)
+    e <- stringLiteral
+    return (p,e)
 
 constraintAttrs :: [(String,String)] -> [String]
 constraintAttrs = map (\(p,e) -> "C." ++ p ++ ":" ++ e)

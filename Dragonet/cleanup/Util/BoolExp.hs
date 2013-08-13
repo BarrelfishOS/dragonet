@@ -41,13 +41,6 @@ orL :: [BExp] -> BExp
 orL = foldl1 BEOr
 
 
--- Map f to tree by applying it recursively from the inside out
-recInOut :: (BExp -> BExp) -> BExp -> BExp
-recInOut f (BEAnd a b) = f (BEAnd (recInOut f a) (recInOut f b))
-recInOut f (BEOr a b) = f (BEOr (recInOut f a) (recInOut f b))
-recInOut f (BENot a) = f (BENot (recInOut f a))
-recInOut f e = f e
-
 -- Map f to tree by applying it from the outside in
 recOutIn :: (BExp -> BExp) -> BExp -> BExp
 recOutIn f e =

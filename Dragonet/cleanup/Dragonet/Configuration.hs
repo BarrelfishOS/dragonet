@@ -1,5 +1,6 @@
 module Dragonet.Configuration(
-    applyConfig
+    applyConfig,
+    confMNewNode,
 ) where
 
 import Dragonet.ProtocolGraph
@@ -7,16 +8,15 @@ import qualified Data.Graph.Inductive as DGI
 import qualified Util.GraphHelpers as GH
 import qualified Control.Monad.State as ST
 import Data.Maybe
-import qualified Debug.Trace as DT
 
 
 -- Create new node
 confMNewNode :: Node i -> ConfMonad i (PGNode i)
 confMNewNode n = do
     (m,ns) <- ST.get
-    let id = m + 1
-    let node = (id,n)
-    ST.put (id,node:ns)
+    let i = m + 1
+    let node = (i,n)
+    ST.put (i,node:ns)
     return node
 
 -- Add edges and nodes from configuration function to graph
@@ -53,7 +53,7 @@ applyCNode config g ctx = confMRun g' newEM
         -- Get new edges (in conf monad)
         newEM = fun node inE outE conf
 
-        lblPair (n,a) = ((n,fromJust $ DGI.lab g n), a)
+        lblPair (m,a) = ((m,fromJust $ DGI.lab g m), a)
 
 
 -- Apply specified configuration to graph
