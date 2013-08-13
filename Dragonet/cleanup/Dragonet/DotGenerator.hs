@@ -10,6 +10,7 @@ import qualified Data.GraphViz.Attributes.Complete as GA
 import qualified Data.GraphViz.Attributes.Colors.X11 as GC
 import qualified Data.Text.Lazy as T
 import qualified Data.List as L
+import qualified Control.Arrow as A
 import Data.Maybe
 
 t :: String -> T.Text
@@ -24,16 +25,16 @@ fixAdj l = singleEdges ++ doubleEdges
     where
         n = L.nub $ map snd l
         -- Endpoints for double edges
-        dblN = filter (\x -> (elem ("true",x) l) && (elem ("false",x) l)) n
+        dblN = filter (\x -> elem ("true",x) l && elem ("false",x) l) n
         doubleEdges = map (\m -> (DoubleEdge,m)) dblN
         -- Original edges with double edges removed
-        lSingle = filter (\(p,m) -> (notElem m dblN) ||
+        lSingle = filter (\(p,m) -> notElem m dblN ||
                                     (p /= "true" && p /= "false")) l
-        singleEdges = map (\(p,m) -> (SingleEdge p,m)) lSingle
+        singleEdges = map (A.first SingleEdge) lSingle
 
 -- Mark double edges in the graph
 getELs :: PG.PGraph i -> DGI.Gr (PG.Node i) ELabel
-getELs g = DGI.gmap conv g
+getELs = DGI.gmap conv
     where
         conv (i,n,m,o) = (fixAdj i,n,m,fixAdj o)
 
@@ -82,7 +83,7 @@ nodeRecord n = GA.RecordLabel [GA.FlipFields
 nodeStyle :: PG.Node i -> GA.Attributes
 nodeStyle n
     | PG.nIsFNode n =
-        if isSW then [GA.Style [GA.SItem GA.Dotted []]] else []
+        [GA.Style [GA.SItem GA.Dotted []] | isSW]
     | PG.nIsONode n =
         [GA.Style [GA.SItem GA.Filled [], GA.SItem GA.Rounded []],
          GA.FillColor [GA.WC (GA.X11Color GC.Gray) Nothing]]
@@ -128,7 +129,7 @@ params = GV.defaultParams {
     GV.fmtEdge = formatEdge,
     GV.fmtNode = formatNode,
     GV.fmtCluster = const [],
-    GV.isDotCluster = (\_ -> True),
+    GV.isDotCluster = const True,
     GV.clusterID = clusterId,
     GV.clusterBy = clusterByTag,
     GV.globalAttributes = [GV.GraphAttrs [GA.RankDir GA.FromLeft]]
@@ -137,7 +138,7 @@ params = GV.defaultParams {
 -- Parameters for clustering by a given cluster map
 paramsCluster :: [(DGI.Node, [String])] -> GV.GraphvizParams DGI.Node (PG.Node i) ELabel String (PG.Node i)
 paramsCluster cm = params { GV.clusterBy = clusterByMap cm,
-                            GV.isDotCluster = (\_ -> True),
+                            GV.isDotCluster = const True,
                             GV.clusterID = clusterId,
                             GV.fmtCluster = formatCluster }
 

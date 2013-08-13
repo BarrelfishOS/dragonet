@@ -61,7 +61,7 @@ instance Eq (Personality i) where
 
 instance Show (Personality i) where
     show (CNode _) = "CNode"
-    show (ONode op) = "ONode " ++ (show op)
+    show (ONode op) = "ONode " ++ show op
     show (FNode) = "FNode"
 
 data GraphType = GTUnknown | GTPrg | GTLpg
@@ -176,7 +176,7 @@ nIsSoftware n
 -- Protocol graph functions
 
 pgSetType :: GraphType -> PGraph i -> PGraph i
-pgSetType t g = DGI.nmap (\n -> n { nGraphType = t }) g
+pgSetType t = DGI.nmap (\n -> n { nGraphType = t })
 
 
 -------------------------------------------------------------------------------

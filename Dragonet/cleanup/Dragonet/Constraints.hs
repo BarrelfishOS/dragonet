@@ -63,7 +63,7 @@ combineN (pr,(_,n),_) = map port $ PG.nPorts n
         opPort op ts fs "false" = cNot $ opPort op ts fs "true"
         opPort _ _ _ p = error ("Unexpected port p=" ++ p ++ " on ONode")
 
-        fExp p = getNPConstraints n p
+        fExp = getNPConstraints n
         fInExp = case inExps of
             [] -> cVar "Dummy"
             ((_,e):[]) -> e
@@ -87,13 +87,13 @@ additionalConstraints es = cAndL (global ++ varConstr)
         global = ["TCP" `mutex` "UDP"]
         -- Look for variable constraints in the form a=b, and build list of a's
         varPrefixes =
-            L.nub $ map (takeWhile ((/=) '=')) $ filter (elem '=') varnames
+            L.nub $ map (takeWhile ('=' /=)) $ filter (elem '=') varnames
 
         -- Variables in the formula
         varnames = L.nub $ concatMap cVariables $ map snd es
         varByPref p = filter (L.isPrefixOf p) varnames
         varConstr = concatMap (mutexL . varByPref) varPrefixes
-        mapPairs f l = map (uncurry f) $ [(a,b) | a <- l, b <- l, a < b] -- a bit ugly
+        mapPairs f l = map (uncurry f) [(a,b) | a <- l, b <- l, a < b] -- a bit ugly
         mutex a b = cNot (cVar a) `cOr` cNot (cVar b)
         mutexL = mapPairs mutex
 
@@ -142,7 +142,7 @@ removeUnsatisfiable g u = DGI.delEdges edges g
 simplifyGraph :: PG.PGraph i -> PG.PGraph i
 simplifyGraph g = DGI.delNodes orphaned g
     where
-        orphaned = filter ((== 0) . (DGI.deg g)) $ DGI.nodes g
+        orphaned = filter ((== 0) . DGI.deg g) $ DGI.nodes g
 
 
 -- Apply constraints to graph

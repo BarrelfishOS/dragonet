@@ -38,8 +38,8 @@ convertEdge gFr gTo (a,b,l) = do
     where convN n = convertN2LN n gFr gTo
 
 convertEdges :: PG.PGraph i -> PG.PGraph i -> [DGI.LEdge PG.Port]
-                    -> Maybe ([DGI.LEdge PG.Port])
-convertEdges gFr gTo es = mapM (convertEdge gFr gTo) es
+                    -> Maybe [DGI.LEdge PG.Port]
+convertEdges gFr gTo = mapM (convertEdge gFr gTo)
 
 convInsEdges :: PG.PGraph i -> PG.PGraph i -> [DGI.LEdge PG.Port]
                     -> Maybe (PG.PGraph i)
@@ -59,7 +59,7 @@ queueEmbedding prg' lpg = embeddingStep DGI.empty lpgNodes
 
     lpgNodes = map (fromJust . GH.labelNode lpg) $ DGIDFS.topsort lpg
 
-    deps (n,_) g = map (fromJust . (GH.labelNode g)) $ DGI.pre g n
+    deps (n,_) g = map (fromJust . GH.labelNode g) $ DGI.pre g n
     lpgDeps n = deps n lpg
     prgDeps n = deps n prg
 
@@ -115,7 +115,7 @@ findSWE q g = do
     return (n,"out")
     where
         --isSWE n = (PG.nLabel n == "SoftwareEntry") && (PG.nTag n == q)
-        isSWE n = (PG.nLabel n == q)
+        isSWE n = PG.nLabel n == q
 
 -- Serialize graph (introduces SoftwareEntry node for each queue, and fixes
 -- edges crossing from PRG-Nodes to LPG-Nodes)
@@ -127,7 +127,7 @@ serialize g =
         qls = map (PG.nLabel . snd) $ queues g
         -- Generate association tuple for specified queue (q,(node,port))
         genSWE q = (q, fromMaybe err $ findSWE q g)
-            where err = (error "serialize: SoftwareEntry node not found in LPG")
+            where err = error "serialize: SoftwareEntry node not found in LPG"
         -- Association list from queue names to sw entry nodes/ports
         swEMap = map genSWE qls
         -- Map node to respective SW entry node
@@ -136,7 +136,7 @@ serialize g =
 
         -- List of edges crossing from HW to SW nodes
         crossingEdges = filter isCrossingEdge $ DGI.labEdges g
-        isCrossingEdge (a,b,_) = (not $ sw a) && (sw b)
+        isCrossingEdge (a,b,_) = not (sw a) && sw b
             where sw n = PG.nIsSoftware $ fromJust $ DGI.lab g n
 
         -- List of fixed edges
@@ -147,7 +147,7 @@ serialize g =
 
 -- Get LPG for specified queue (tag nodes and rename "Queue")
 lpgQ :: PG.PGNode i -> PG.PGraph i -> PG.PGraph i
-lpgQ q lpg = DGI.nmap (lpgQNode q) lpg
+lpgQ q = DGI.nmap (lpgQNode q)
 
 -- Relabel node to q if its label is "Queue", and tag the node with q
 lpgQNode :: PG.PGNode i -> PG.Node i -> PG.Node i
