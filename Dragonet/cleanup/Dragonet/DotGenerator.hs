@@ -1,6 +1,8 @@
 module Dragonet.DotGenerator(
     toDot,
+    toDotWith,
     toDotClustered,
+    toDotClusteredWith,
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG
@@ -71,12 +73,13 @@ nodeLabel n
         lbl = pf ++ PG.nLabel n
 
 -- Build record label for node
-nodeRecord :: PG.Node i -> GA.Label
-nodeRecord n = GA.RecordLabel [GA.FlipFields
-                                [GA.FieldLabel $ t $ nodeLabel n,
-                                 GA.FlipFields portFields]]
+nodeRecord :: (String -> String) -> (String -> String) -> PG.Node i -> GA.Label
+nodeRecord nlf plf n = GA.RecordLabel [GA.FlipFields
+                                        [GA.FieldLabel $ t nl,
+                                         GA.FlipFields portFields]]
     where
-        port p = GA.LabelledTarget (GA.PN $ t p) (t p)
+        nl = nlf $ nodeLabel n
+        port p = GA.LabelledTarget (GA.PN $ t p) (t $ plf p)
         portFields = map port $ PG.nPorts n
 
 -- Build style attributes for node depending on node personality
@@ -95,11 +98,12 @@ nodeStyle n
         isSW = elem "software" $ PG.nAttributes n
 
 -- Generate node attributes
-formatNode :: (n,PG.Node i) -> GA.Attributes
-formatNode (_,n) = [lbl,record] ++ nodeStyle n
+formatNode :: (String -> String) -> (String -> String) -> (n,PG.Node i)
+                 -> GA.Attributes
+formatNode nlf plf (_,n) = [lbl,record] ++ nodeStyle n
     where
         record = GA.Shape GA.Record
-        lbl = GA.Label $ nodeRecord n
+        lbl = GA.Label $ nodeRecord nlf plf n
 
 
 
@@ -124,10 +128,11 @@ formatCluster l = [GV.GraphAttrs [GA.Label $ GA.StrLabel $ t l]]
 
 
 -- Parameters for graphs clustered by node tags
-params :: GV.GraphvizParams DGI.Node (PG.Node i) ELabel String (PG.Node i)
-params = GV.defaultParams {
+params :: (String -> String) -> (String -> String)
+    -> GV.GraphvizParams DGI.Node (PG.Node i) ELabel String (PG.Node i)
+params nlf plf = GV.defaultParams {
     GV.fmtEdge = formatEdge,
-    GV.fmtNode = formatNode,
+    GV.fmtNode = formatNode nlf plf,
     GV.fmtCluster = const [],
     GV.isDotCluster = const True,
     GV.clusterID = clusterId,
@@ -136,8 +141,11 @@ params = GV.defaultParams {
 }
 
 -- Parameters for clustering by a given cluster map
-paramsCluster :: [(DGI.Node, [String])] -> GV.GraphvizParams DGI.Node (PG.Node i) ELabel String (PG.Node i)
-paramsCluster cm = params { GV.clusterBy = clusterByMap cm,
+paramsCluster :: (String -> String) -> (String -> String)
+    -> [(DGI.Node, [String])]
+    -> GV.GraphvizParams DGI.Node (PG.Node i) ELabel String (PG.Node i)
+paramsCluster nlf plf cm = (params nlf plf)
+                          { GV.clusterBy = clusterByMap cm,
                             GV.isDotCluster = const True,
                             GV.clusterID = clusterId,
                             GV.fmtCluster = formatCluster }
@@ -145,9 +153,21 @@ paramsCluster cm = params { GV.clusterBy = clusterByMap cm,
 
 -- Get dot source for graph
 toDot :: PG.PGraph i -> String
-toDot g = T.unpack $ GV.printDotGraph $ GV.graphToDot params $ getELs g
+toDot = toDotWith id id
+
+-- Get dot source for graph, applying the mappings to generated node/port labels
+toDotWith :: (String -> String) -> (String -> String) -> PG.PGraph i -> String
+toDotWith nlf plf g = T.unpack $ GV.printDotGraph $ GV.graphToDot p $ getELs g
+    where p = params nlf plf
 
 -- Get dot source for graph and cluster nodes
 toDotClustered :: PG.PGraph i -> [(DGI.Node, [String])] -> String
-toDotClustered g cs = T.unpack $ GV.printDotGraph $
-                        GV.graphToDot (paramsCluster cs) $ getELs g
+toDotClustered = toDotClusteredWith id id
+
+-- Get dot source for graph and cluster nodes, apply mapping to node/port labels
+toDotClusteredWith :: (String -> String) -> (String -> String) -> PG.PGraph i
+                        -> [(DGI.Node, [String])] -> String
+toDotClusteredWith nlf plf g cs =
+    T.unpack $ GV.printDotGraph $ GV.graphToDot p $ getELs g
+    where p = paramsCluster nlf plf cs
+
