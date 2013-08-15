@@ -1,4 +1,4 @@
-BINARIES=graph plos13
+BINARIES=graph plos13 impl
 GHCFLAGS=-Wall -O2 -XRankNTypes
 # Debuging for DSL -> Haskell process
 #GHCFLAGS+=-ddump-splices
