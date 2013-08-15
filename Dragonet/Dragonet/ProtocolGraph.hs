@@ -48,18 +48,18 @@ type Port = String
 data Operator = OpAnd | OpOr
     deriving (Show, Eq)
 
-data Personality i = 
-    CNode (ConfFunction i) |
+data Personality = 
+    CNode ConfFunction |
     ONode Operator | 
     FNode
 
-instance Eq (Personality i) where
+instance Eq Personality where
     CNode _ == CNode _ = True
     ONode oa == ONode ob = oa == ob
     FNode == FNode = True
     _ == _ = False
 
-instance Show (Personality i) where
+instance Show Personality where
     show (CNode _) = "CNode"
     show (ONode op) = "ONode " ++ show op
     show (FNode) = "FNode"
@@ -70,11 +70,11 @@ data GraphType = GTUnknown | GTPrg | GTLpg
 data Node i = Node {
     nLabel          :: Label,
     nTag            :: Tag,
-    nPersonality    :: Personality i,
+    nPersonality    :: Personality,
     nGraphType      :: GraphType,
     nAttributes     :: [Attribute],
     nPorts          :: [Port],
-    nImplementation :: i
+    nImplementation :: Maybe i
 }-- deriving (Show)
 
 instance Show (Node i) where
@@ -106,7 +106,8 @@ type PGContext i = DGI.Context (Node i) Port
 -- Configuration
 type ConfSpace = String
 type ConfMonad i a = ST.State (Int,[PGNode i]) a 
-type ConfFunction i =
+type ConfFunction =
+    forall i.
     Node i ->
     [(DGI.LNode (Node i), Port)] ->
     [(DGI.LNode (Node i), Port)] ->
@@ -115,7 +116,7 @@ type ConfFunction i =
 
 
 -- Get configuration function from node (assumes node is CNode)
-nConfFun :: Node i -> ConfFunction i
+nConfFun :: Node i -> ConfFunction
 nConfFun n = fun
     where (CNode fun) = nPersonality n
 
@@ -124,35 +125,36 @@ nConfFun n = fun
 -------------------------------------------------------------------------------
 -- Node functions
 
-baseFNode :: Label -> [Attribute] -> [Port] -> Node ()
-baseFNode label attr ports = Node {
+baseFNode :: Label -> [Attribute] -> [Port] -> Maybe i -> Node i
+baseFNode label attr ports impl = Node {
         nLabel = label,
         nTag = "",
         nPersonality = FNode,
         nGraphType = GTUnknown,
         nAttributes = attr,
         nPorts = ports,
-        nImplementation = () }
+        nImplementation = impl }
 
-baseONode :: Label -> [Attribute] -> [Port] -> Operator -> Node ()
-baseONode label attr ports op = Node {
+baseONode :: Label -> [Attribute] -> [Port] -> Operator -> Maybe i -> Node i
+baseONode label attr ports op impl = Node {
         nLabel = label,
         nTag = "",
         nPersonality = ONode op,
         nGraphType = GTUnknown,
         nAttributes = attr,
         nPorts = ports,
-        nImplementation = () }
+        nImplementation = impl }
 
-baseCNode :: Label -> [Attribute] -> [Port] -> ConfFunction () -> Node ()
-baseCNode label attr ports cnf = Node {
+baseCNode :: Label -> [Attribute] -> [Port] -> ConfFunction -> Maybe i
+                -> Node i
+baseCNode label attr ports cnf impl = Node {
         nLabel = label,
         nTag = "",
         nPersonality = CNode cnf,
         nGraphType = GTUnknown,
         nAttributes = attr,
         nPorts = ports,
-        nImplementation = () }
+        nImplementation = impl }
 
 
 nIsCNode :: Node i -> Bool
@@ -171,6 +173,8 @@ nIsSoftware n
     | elem "software" $ nAttributes n = True
     | otherwise = nGraphType n == GTLpg
 
+
+
    
 -------------------------------------------------------------------------------
 -- Protocol graph functions
@@ -183,15 +187,15 @@ pgSetType t = DGI.nmap (\n -> n { nGraphType = t })
 -- Misc functions
 
 
-persIsCNode :: Personality i -> Bool
+persIsCNode :: Personality -> Bool
 persIsCNode (CNode _) = True
 persIsCNode _ = False
 
-persIsONode :: Personality i -> Bool
+persIsONode :: Personality -> Bool
 persIsONode (ONode _) = True
 persIsONode _ = False
 
-persIsFNode :: Personality i -> Bool
+persIsFNode :: Personality -> Bool
 persIsFNode (FNode) = True
 persIsFNode _ = False
 

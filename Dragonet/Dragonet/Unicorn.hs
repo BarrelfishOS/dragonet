@@ -56,15 +56,15 @@ unicornImpl_f = quoteFile unicornImpl
 quoteMyDec :: String -> TH.Q [TH.Dec]
 quoteMyDec s = do
     gr <- parseGraph s
-    return $ declare gr
+    return $ declare gr False
 
 quoteMyDecImpl :: String -> TH.Q [TH.Dec]
 quoteMyDecImpl s = do
     gr <- parseGraph s
-    return (declare gr ++ implDec gr)
+    return (declare gr True)
 
-declare :: Graph -> [TH.Dec]
-declare (Graph name cl) = declareClusters name cl
+declare :: Graph -> Bool -> [TH.Dec]
+declare (Graph name cl) impl = declareClusters name cl impl
 
 nodeClusterMap :: Cluster -> [(String, Node)]
 nodeClusterMap (Cluster cn cs ns) =
@@ -89,13 +89,13 @@ tListOf t = TH.AppT TH.ListT t
 tTupleOf :: [TH.Type] -> TH.Type
 tTupleOf ts = foldl TH.AppT (TH.TupleT $ length ts) ts
 
-declareClusters :: String -> Cluster -> [TH.Dec]
-declareClusters gn cl =
+declareClusters :: String -> Cluster -> Bool -> [TH.Dec]
+declareClusters gn cl impl =
     signatures ++ definitions
     where
         -- Type signatures for the generated definitions
         --signatures = [clSig,nlSig,elSig,gSig]
-        signatures = [clSig,nlSig,elSig,gSig]
+        signatures = if impl then [] else [clSig,nlSig,elSig,gSig]
         gSig = TH.SigD graphName gType
         gType = TH.ConT (TH.mkName "PGraph") `TH.AppT` TH.TupleT 0
         nlSig = TH.SigD nodesName nlType
@@ -119,7 +119,7 @@ declareClusters gn cl =
         -- "g"Nodes, list of nodes
         nodesName = TH.mkName (gn ++ "Nodes")
         nDef = fdec nodesName nExps
-        nDecl (i,(_,n)) = TH.TupE [TH.LitE $ TH.IntegerL i, nodeExp gn n]
+        nDecl (i,(_,n)) = TH.TupE [TH.LitE $ TH.IntegerL i, nodeExp gn n impl]
         nExps = TH.ListE $ map nDecl nodeIdMap
 
         -- "g"Edges, list of edges
@@ -145,95 +145,47 @@ declareClusters gn cl =
 
 
 
-unicornNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> PG.Node ()
+unicornNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> Maybe i -> PG.Node i
 unicornNode = PG.baseFNode
 
-unicornConfNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> PG.ConfFunction () -> PG.Node ()
+unicornConfNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> PG.ConfFunction
+                    -> Maybe i -> PG.Node i
 unicornConfNode = PG.baseCNode
 
-unicornAndNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> PG.Node ()
+unicornAndNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> Maybe i
+                    -> PG.Node i
 unicornAndNode l a p = PG.baseONode l a p PG.OpAnd
 
-unicornOrNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> PG.Node ()
+unicornOrNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> Maybe i -> PG.Node i
 unicornOrNode l a p = PG.baseONode l a p PG.OpOr
 
-unicornGraph :: [(Int, PG.Node ())] -> [(Int, Int, PG.Port)] -> PG.PGraph ()
+unicornGraph :: [(Int, PG.Node i)] -> [(Int, Int, PG.Port)] -> PG.PGraph i
 unicornGraph nodes edges = DGI.mkGraph nodes edges
 
 
-nodeExp graph n =
-    callE (TH.VarE $ TH.mkName ntFun) ([labelE, attrE, portsE] ++ ntE)
+nodeExp gn n impl =
+    callE (TH.VarE $ TH.mkName ntFun) ([labelE, attrE, portsE] ++ ntE ++ [i])
     where
-        (ntFun,ntE) =
+        (ntFun,ntE,isfnode) =
             case n of
-                (Node _ _ _) -> ("unicornNode", [])
-                (Config _ _ _ c) -> ("unicornConfNode", [confFE c])
-                (Boolean _ _ _ _) -> ("unicornNode", [])
-                (And _ _ _ _) -> ("unicornAndNode", [])
-                (Or _ _ _ _) -> ("unicornOrNode", [])
+                (Node _ _ _) -> ("unicornNode", [],True)
+                (Config _ _ _ c) -> ("unicornConfNode", [confFE c],False)
+                (Boolean _ _ _ _) -> ("unicornNode", [],True)
+                (And _ _ _ _) -> ("unicornAndNode", [],False)
+                (Or _ _ _ _) -> ("unicornOrNode", [],False)
 
         labelE = TH.LitE $ TH.StringL $ nName n
         attrE = TH.ListE $ map (TH.LitE . TH.StringL) $ nAttrs n
         portsE = TH.ListE $ map (TH.LitE . TH.StringL . pName) $ nPorts n
         confFE f = TH.VarE $ TH.mkName $ fromMaybe "unicornSimpleConfig" f
+
+        i = if impl && isfnode then
+                TH.AppE (TH.ConE $ TH.mkName "Just")
+                    (TH.VarE $ TH.mkName $ gn ++ nName n ++ "Impl")
+            else
+                TH.ConE $ TH.mkName "Nothing"
         
 
-
-declareNode graph (n,i) =
-    TH.FunD (TH.mkName $ fname n) [(TH.Clause [] (TH.NormalB (node n)) [])]
-    where
-        fname m = graph ++ (nName m)
-        portEdge e = TH.VarE (TH.mkName $ graph ++ e)
-        port (Port _ ns) = TH.ListE (map portEdge ns)
-        lblPort p = TH.TupE [(TH.LitE $ TH.StringL name), (port p)]
-            where (Port name _) = p
-        naryEdges ps = 
-            TH.AppE (TH.ConE (TH.mkName "OP.NaryNode")) $
-                TH.ListE $ map lblPort ps
-
-        edges (Node l ps as) = naryEdges ps
-        edges (Config l ps as _) = naryEdges ps
-        edges (Boolean _ t f _) = naryEdges [t, f]
-        edges (And _ t f _) = naryEdges [t, f]
-        edges (Or _ t f _) = naryEdges [t, f]
-
-        attrs n = TH.ListE $ map (TH.LitE . TH.StringL) $ nAttrs n
-
-        decNode n = TH.AppE (TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getDecNode")) (TH.LitE (TH.StringL (nName n)))) (TH.LitE (TH.StringL ""))) (edges n)) (attrs n)
-        confNode n f = TH.AppE (TH.AppE (TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getConfNode")) (TH.LitE (TH.StringL (nName n)))) (TH.LitE (TH.StringL ""))) (edges n)) (attrs n)) (TH.VarE (TH.mkName f))
-        opNode n op = TH.AppE (TH.AppE (TH.AppE (TH.AppE (TH.VarE (TH.mkName "OP.getOperatorNode")) (TH.LitE (TH.StringL op))) (TH.LitE (TH.StringL ""))) (edges n)) (attrs n)
-
-        node n =
-            case n of
-                (Node _ _ _) -> decNode n
-                (Config _ _ _ f) -> confNode n $ fromMaybe "unicornSimpleConfig" f
-                (Boolean _ _ _ _) -> decNode n
-                (And l _ _ _) -> opNode n ("AND:" ++ l)
-                (Or l _ _ _) -> opNode n ("OR:" ++ l)
-
-
-implDec (Graph name cluster) =
-    map (implMap name) $ cNodesDeep cluster
-
-implMap graph n =
-    TH.FunD (implNName $ fname n) [(TH.Clause [] (TH.NormalB (code)) [])]
-    where
-        fname m = graph ++ (nName m)
-        edge e = TH.VarE $ implNName $ graph ++ e
-        port (Port pn es)  = TH.TupE [TH.LitE $ TH.StringL pn, TH.ListE $ map edge es]
-        plistExp = TH.ListE $ map port $ nPorts n
-        nodeExp = TH.VarE $ TH.mkName $ fname n
-        implExp =
-            if nIsOp n then
-                TH.ConE $ TH.mkName "Nothing"
-            else
-                TH.AppE (TH.ConE $ TH.mkName "Just") $ TH.VarE implName
-        implNodeExp = TH.ConE $ TH.mkName "ImplNode"
-        code = foldl TH.AppE implNodeExp [nodeExp, implExp, plistExp]
-        implName = TH.mkName (fname n ++ "Impl")
-        implNName m = TH.mkName  (m ++ "ImplNode")
-    
-    
 -----------------------------------------------------------------------------
 -- Representing parsed code
 
@@ -250,16 +202,9 @@ data Node =
     Or String Port Port [String]
     deriving Show
 
-cNodesDeep :: Cluster -> [Node]
-cNodesDeep (Cluster _ cs ns) = ns ++ concatMap cNodesDeep cs
 
 pName :: Port -> String
 pName (Port n _) = n
-
-nIsOp :: Node -> Bool
-nIsOp (And _ _ _ _) = True
-nIsOp (Or _ _ _ _) = True
-nIsOp _ = False
 
 nName :: Node -> String
 nName (Node n _ _) = n
@@ -443,7 +388,7 @@ parseGraph s = case runParser graph () "" s of
 -- Helper functions
 
 
-unicornSimpleConfig :: PG.ConfFunction i
+unicornSimpleConfig :: PG.ConfFunction
 unicornSimpleConfig _ inE outE cfg =
     return $ concatMap edge inE
     where

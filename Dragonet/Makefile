@@ -1,7 +1,8 @@
 BINARIES=graph plos13
-GHCFLAGS=-Wall -O2
+GHCFLAGS=-Wall -O2 -XRankNTypes
+# Debuging for DSL -> Haskell process
+#GHCFLAGS+=-ddump-splices
 
-#all: dragonet
 all: models
 
 graph: base
@@ -13,6 +14,11 @@ plos13: base
 	ghc $(GHCFLAGS) testPLOS13.hs -o plos13
 plos13_run: plos13
 	./plos13
+
+impl: base
+	ghc $(GHCFLAGS) testImpl.hs -o impl
+impl_run: impl
+	./impl
 
 
 models: graph_run
