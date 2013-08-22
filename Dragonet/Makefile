@@ -1,7 +1,7 @@
 BINARIES=graph plos13 impl
 GHCFLAGS=-Wall -O2 -XRankNTypes
 # Debuging for DSL -> Haskell process
-#GHCFLAGS+=-ddump-splices
+# GHCFLAGS+=-ddump-splices
 
 all: models
 
@@ -27,6 +27,6 @@ models: graph_run
 base: Makefile *.hs */*.hs
 
 clean:
-	rm -f *.hi *.o */*.hi */*.o $(BINARIES)
+	rm -f *.hi *.o */*.hi */*.o */*/*.hi */*/*.o $(BINARIES)
 	rm -f *.pdf *.dot *.png
 

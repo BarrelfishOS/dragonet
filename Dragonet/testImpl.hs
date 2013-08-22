@@ -5,132 +5,22 @@
 import Dragonet.ProtocolGraph
 import Dragonet.Unicorn
 import Dragonet.DotGenerator
+import Dragonet.Implementation
+
+import qualified Util.GraphHelpers as GH
+import qualified Data.Graph.Inductive as DGI
 
 import Debug.Trace as T
 import Control.Monad.State
-import Data.Word
 import Data.Bits
 import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.List as L
 import qualified Data.ByteString as BS
 
-
-
-
-type Packet = BS.ByteString
-
-data AttrValue = AttrS String | AttrI Int
-    deriving Show
-data Context = Context {
-    ctxPacket :: Packet,
-    ctxAttrs  :: M.Map String AttrValue
-}
-    deriving Show
-data BoolPort = Ptrue | Pfalse
-    deriving Show
-
-
-
-
-packetLen :: State Context Int
-packetLen = do
-    ctx <- get
-    return $ BS.length $ ctxPacket ctx
-
-setAttr :: String -> AttrValue -> State Context ()
-setAttr n v = do
-    (Context p a) <- get
-    put $ Context p $ M.insert n v a
-
-getAttr :: String -> State Context AttrValue
-getAttr n = do
-    ctx <- get
-    return $ attr ctx
-    where
-        attr c = fromJust $ M.lookup n $ ctxAttrs c
-
-
-convert16BE w1 w2 =
-    (shiftL (fromIntegral w1 :: Word16) 8) .|.
-        (fromIntegral w2 :: Word16)
-
-unpack16BE :: Word16 -> [Word8]
-unpack16BE w =
-    [(fromIntegral (shiftR w 8) :: Word8) , (fromIntegral w :: Word8)]
-
-
-convert32BE w1 w2 w3 w4 =
-    (shiftL (fromIntegral w1 :: Word32) 24) .|.
-        (shiftL (fromIntegral w2 :: Word32) 16) .|.
-        (shiftL (fromIntegral w3 :: Word32) 8) .|.
-        (fromIntegral w4 :: Word32)
-
-
-
-readPsafe :: Int -> Int -> State Context [Word8]
-readPsafe offset len = do
-    ctx <- get
-    return $ BS.unpack $ BS.take len $ BS.drop offset $ ctxPacket ctx
-
-readP8safe :: Int -> State Context (Maybe Word8)
-readP8safe offset = do
-    ctx <- get
-    ws <- readPsafe offset 1
-    case ws of
-        w:[] -> return (Just w)
-        _ -> return Nothing
-
-readP16BEsafe :: Int -> State Context (Maybe Word16)
-readP16BEsafe offset = do
-    ctx <- get
-    ws <- readPsafe offset 2
-    case ws of
-        w1:w2:[] -> return (Just $ convert16BE w1 w2)
-        _ -> return Nothing
-
-readP32BEsafe :: Int -> State Context (Maybe Word32)
-readP32BEsafe offset = do
-    ctx <- get
-    ws <- readPsafe offset 4
-    case ws of
-        w1:w2:w3:w4:[] -> return (Just $ convert32BE w1 w2 w3 w4)
-        _ -> return Nothing
-
-
-
-
-readP :: Int -> Int -> State Context [Word8]
-readP offset len = do
-    ctx <- get
-    if (length $ l ctx) /= len then
-        error "Invalid read"
-    else
-        return (l ctx)
-    where
-        l ctx = BS.unpack $ BS.take len $ BS.drop offset $ ctxPacket ctx
-
-readP8 :: Int -> State Context Word8
-readP8 offset = do
-    ctx <- get
-    w:[] <- readP offset 1
-    return w
-
-readP16BE :: Int -> State Context Word16
-readP16BE offset = do
-    ctx <- get
-    w1:w2:[] <- readP offset 2
-    return (convert16BE w1 w2)
-
-readP32BE :: Int -> State Context Word32
-readP32BE offset = do
-    ctx <- get
-    w1:w2:w3:w4:[] <- readP offset 4
-    return (convert32BE w1 w2 w3 w4)
-
-
-
-
+import qualified Dragonet.Implementation.Ethernet as ETH
+import qualified Dragonet.Implementation.IPv4 as IP4
+import qualified Dragonet.Implementation.UDP as UDP
 
 
 
@@ -146,8 +36,9 @@ lpgSoftwareRXImpl = toPort "out"
 
 -----------------------------------------------------------------------------
 -- Ethernet
-
+lpgRxL2EtherClassifiedImpl :: State Context String
 lpgRxL2EtherClassifiedImpl = do
+    setAttr "L2Offset" $ AttrI 0
     return "true"
 
 lpgRxL2EtherValidLengthImpl = do
@@ -158,29 +49,29 @@ lpgRxL2EtherValidLengthImpl = do
                                -- is removed
 
 lpgRxL2EtherValidTypeImpl = do
-    etype <- readP16BE 12
+    etype <- ETH.etypeRd
     toPort $ pbool (etype >= 0x0800)
 
 lpgRxL2EtherValidMulticastImpl = do
-    dmac <- readP 0 6
+    dmac <- ETH.sourceRd
     toPort $ pbool
         ((dmac /= ([0xff, 0xff, 0xff, 0xff, 0xff, 0xff]) &&
         (((head dmac) .&. 1) == 1)))
    
 
 lpgRxL2EtherValidBroadcastImpl = do
-    dmac <- readP 0 6
+    dmac <- ETH.sourceRd
     toPort $ pbool (dmac == ([0xff, 0xff, 0xff, 0xff, 0xff, 0xff]))
 
 lpgRxL2EtherValidUnicastImpl = do
-    dmac <- readP8 0
-    toPort $ pbool $ ((dmac .&. 1) == 0)
+    dmac <- ETH.sourceRd
+    toPort $ pbool $ (((head dmac) .&. 1) == 0)
 
 lpgRxL2EtherValidSrcImpl = do
     toPort "true"
 
 lpgRxL2EtherClassifyL3Impl = do
-    etype <- readP16BE 12
+    etype <- ETH.etypeRd
     setAttr "L3Offset" (AttrI 14)
     toPort $ case etype of
         0x0800 -> "ipv4"
@@ -216,70 +107,50 @@ lpgRxL3ARPClassifyImpl = do
 -----------------------------------------------------------------------------
 -- IPv4
 
-ipHeaderLen = do
-    (AttrI off) <- getAttr "L3Offset"
-    ihl <- readP8 off
-    return $ 4 * ((fromIntegral ihl :: Int) .&. 0xf)
-
--- Kind of ugly: convert pairs of bytes to 16bit integers, but use 32bit
--- arithmetic when summing up, in the end combine the higher and lower 16 bits
-ipChecksum :: [Word8] -> Word16
-ipChecksum p = cxsm
-    where
-        padded = if (length p) `mod` 2 /= 0 then p ++ [0] else p
-        convertSingle a b = fromIntegral (convert16BE a b) :: Word32
-        convert [] = []
-        convert (a:b:rest) = (convertSingle a b):(convert rest)
-        s32 = sum $ convert padded
-        foldInt i = ((i .&. 0xffff) + (shiftR i 16))
-        cxsm32 = xor 0xffff $ foldInt $ foldInt s32
-        cxsm = fromIntegral cxsm32 :: Word16
-
 lpgRxL3IPv4ValidHeaderLengthImpl = do
-    (AttrI off) <- getAttr "L3Offset"
+    off <- IP4.headerOff
     len <- packetLen
-    if ((len - off) < 20) then
+    if ((len - off) < IP4.headerMinLen) then
         toPort "false"
     else do
-        hlen <- ipHeaderLen
-        toPort $ pbool $ (hlen >= 20 && (len - off) >= hlen)
+        hlen <- IP4.headerLen
+        toPort $ pbool $ (hlen >= IP4.headerMinLen && (len - off) >= hlen)
 
 -- For now we just make sure the packet is not fragmented
 lpgRxL3IPv4ValidReassemblyImpl = do
-    (AttrI off) <- getAttr "L3Offset"
-    fragOff <- readP16BE $ off + 6
-    toPort $ pbool $ ((fragOff .&. 0x2000) == 0 && (fragOff .&. 0x1fff) == 0)
+    flags <- IP4.flagsRd
+    frag <- IP4.fragmentRd
+    toPort $ pbool $ (flags .&. IP4.flagsMF) == 0 && (frag == 0)
 
 
 lpgRxL3IPv4ValidVersionImpl = do
-    (AttrI off) <- getAttr "L3Offset"
-    ver <- readP8 off
-    toPort $ pbool ((shiftR ver 4) == 4)
+    ver <- IP4.versionRd
+    toPort $ pbool $ ver == 4
 
 lpgRxL3IPv4ValidLengthImpl = do
-    (AttrI off) <- getAttr "L3Offset"
     len <- packetLen
-    ipLen <- readP16BE (off + 2)    
+    off <- IP4.headerOff
+    ipLen <- IP4.lengthRd
     toPort $ pbool ((fromIntegral ipLen :: Int) + off <= len)
 
 lpgRxL3IPv4ValidTTLImpl = toPort "true"
 
 lpgRxL3IPv4ValidChecksumImpl = do
-    (AttrI off) <- getAttr "L3Offset"
-    hlen <- ipHeaderLen
-    pkt <- readP off hlen
-    toPort $ pbool $ (ipChecksum pkt) == 0
+    off <- IP4.headerOff
+    hlen <- IP4.headerLen
+    pkt <- readP hlen off
+    toPort $ pbool $ (IP4.checksum pkt) == 0
 
 lpgRxL3IPv4ClassifyImpl = do
-    (AttrI off) <- getAttr "L3Offset"
-    hlen <- ipHeaderLen
-    setAttr "L4Offset" $ AttrI $ off + hlen
-    proto <- readP8 (off + 9)
-    toPort $ case proto of
-        0x01 -> "icmp"
-        0x06 -> "tcp"
-        0x11 -> "udp"
-        _ -> "drop"
+    l4off <- IP4.payloadOff
+    setAttr "L4Offset" $ AttrI $ l4off
+    proto <- IP4.protocolRd
+    toPort $
+        -- FIXME: Can't this be turned into a case?
+        if proto == IP4.protocolICMP then "icmp"
+        else if proto == IP4.protocolTCP then "tcp"
+        else if proto == IP4.protocolUDP then "udp"
+        else "drop"
 
 
 -----------------------------------------------------------------------------
@@ -296,30 +167,24 @@ lpgRxL3ICMPValidHeaderLengthImpl = toPort "true"
 -----------------------------------------------------------------------------
 -- UDP
 
-ipv4Pseudoheader p len = do
-    (AttrI off) <- getAttr "L3Offset"
-    sIP <- readP (off + 12) 4
-    dIP <- readP (off + 16) 4
-    return (sIP ++ dIP ++ [0] ++ [p] ++ (unpack16BE len))
-
 lpgRxL4UDPValidHeaderLengthImpl = do
-    (AttrI off) <- getAttr "L4Offset"
+    off <- UDP.headerOff
     len <- packetLen
-    toPort $ pbool ((len - off) >= 8)
+    toPort $ pbool ((len - off) >= UDP.headerLen)
 
 lpgRxL4UDPValidLengthImpl = do
-    (AttrI off) <- getAttr "L4Offset"
+    off <- UDP.headerOff
     len <- packetLen
-    udpLen <- readP16BE (off + 4)
+    udpLen <- UDP.lengthRd
     toPort $ pbool (len >= (fromIntegral udpLen) + off)
 
 lpgRxL4UDPValidChecksumImpl = do
-    (AttrI off) <- getAttr "L4Offset"
+    off <- UDP.headerOff
     len <- packetLen
-    cxsm <- readP16BE (off + 6)
-    pkt <- readP off (len - off)
-    pheader <- ipv4Pseudoheader 0x11 (fromIntegral (len - off))
-    toPort $ pbool (cxsm == 0 || (ipChecksum (pheader ++ pkt)) == 0)
+    cxsm <- UDP.checksumRd
+    pkt <- readP (len - off) off
+    ipPH <- IP4.pseudoheader
+    toPort $ pbool (cxsm == 0 || (IP4.checksum (ipPH ++ pkt)) == 0)
 
 
 -----------------------------------------------------------------------------
@@ -331,13 +196,11 @@ lpgRxL4TCPValidHeaderLengthImpl = toPort "true"
 -- Application RX
 
 lpgRxToIPv4LocalImpl = do
-    (AttrI off) <- getAttr "L3Offset"
-    dIP <- readP32BE (off + 16)
-    toPort $ pbool $ dIP == 0x8184666f
+    dIP <- IP4.destIPRd
+    toPort $ pbool $ dIP == fromJust (IP4.ipFromString "129.132.102.111")
 
 lpgRxToUDPPortDNSImpl = do
-    (AttrI off) <- getAttr "L4Offset"
-    dPort <- readP16BE (off + 2)
+    dPort <- UDP.destPortRd
     toPort $ pbool $ dPort == 51098
 
     
@@ -353,6 +216,7 @@ lpgRxL4UDPOutImpl = toPort "Got UDP packet!"
 lpgRxDnsRXImpl = toPort "Got DNS packet!"
 
 -- Nodes for tx side
+
 lpgTxSourceImpl = toPort "true"
 lpgSoftwareTXImpl = toPort "true"
 lpgTxARPTXImpl = toPort "true"
@@ -389,6 +253,69 @@ lpgTxL2EtherAddHdrDAddrImpl = toPort "true"
 
 
 
+-- Execute graph. First parameter is expected to be a topologically sorted
+-- list of the graph nodes, the second list is used to store the enablement
+-- indication, so (enabled node, origin, port), and the last argument is the
+-- context to start with. Returned is the port name returned by the
+-- implementation of the last sink node and the last state.
+--
+-- Basic idea: use topologically sorted list of nodes, this way all predecessors
+-- will have been calculated when arriving at a node (if enabled). The output
+-- port taken for a node will be stored in a list, used for implemented AND/OR
+-- nodes.
+executeNodes :: PGraph Implementation -> [PGNode Implementation] -> [(DGI.Node,(PGNode Implementation,Port))] -> Context -> (String,Context)
+executeNodes _ [] _ _ = error ("Got Stuck :-/")
+executeNodes g ((n,l):ns) ret ctx =
+    T.trace ("Node " ++ show l) (
+        if not $ null inNodes then          -- Node was enabled
+            --T.trace ("  Port='" ++ outport ++ "'") (
+            if null successors then
+                (outport,ctx')              -- Sink node -> stop execution
+            else
+                executeNodes g ns ret' ctx' -- Regular node
+            --)
+        else
+            executeNodes g ns ret ctx       -- Skip disabled node
+        )
+    where
+        inPValues = filter ((== n) . fst) ret
+        inValues = map (snd . snd) inPValues
+        inNodes = map (fst . fst . snd) inPValues
+
+        -- Check if all predecessor nodes were enabled (for O-Nodes)
+        depsMet = DGI.pre g n `lSubset` L.nub inNodes
+        lSubset a b = all (`elem` b) a
+
+        successors = DGI.lsuc g n
+        nextnodes = filter ((== outport) . snd) $ successors
+
+        -- Enable successors connected to outport
+        ret' = ret ++ map (\(n',p) -> (n',((n,l),p))) nextnodes
+
+        -- Execute implementation for this node
+        (outport,ctx') = executeNode
+        executeNode
+            | nIsFNode l = runState (fromJust $ nImplementation l) ctx
+            | nIsONode l = executeOpNode
+            | otherwise = error "C-Nodes not supported while executing graph"
+    
+        -- Implementation 
+        executeOpNode
+            | op == OpAnd =
+                ((if L.any (== "false") inValues then "false"
+                    else if depsMet then "true" else ""), ctx)
+            | op == OpOr =
+                ((if L.any (== "true") inValues then "true"
+                    else if depsMet then "false" else ""), ctx)
+            | otherwise = undefined
+            where (ONode op) = nPersonality l
+
+execute graph packet =
+    executeNodes graph (GH.topsortLN graph) [(fst n,(n,"in"))] ctx
+    where
+        n = fromJust $ GH.findNodeByL ((== "SoftwareRX") . nLabel) graph
+        ctx = Context packet M.empty
+
 
 -- The protocol graph
 [unicornImpl_f|lpgImpl.unicorn|]
@@ -397,5 +324,10 @@ main :: IO ()
 main = do
     putStrLn "Generating .dot files..."
     writeFile "lpg.dot" $ toDotClustered lpgT lpgClusters
+
+    putStrLn "DNS Response (udp checksum good)"
+    dnsResp <- BS.readFile "packets/dns_response"
+    putStrLn $ show $ execute lpg dnsResp
     where
         lpgT = pgSetType GTLpg lpg
+

@@ -11,7 +11,6 @@ module Dragonet.ProtocolGraph(
     Operator(..),
     Personality(..),
     GraphType(..),
-
     Node(..),
 
     nIsFNode,

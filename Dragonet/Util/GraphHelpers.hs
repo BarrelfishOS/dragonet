@@ -11,6 +11,7 @@ module Util.GraphHelpers(
     mergeGraphsBy,
     RecContext,
     recurseNFW,
+    topsortLN,
 ) where
 
 import Data.Graph.Inductive
@@ -113,4 +114,9 @@ recurseNFW f g = gmap (\(ia,n,_,oa) -> (ia,n,fromJust $ lookup n assocL,oa)) g
                 inA' = lblAdj (\m -> fromJust $ lookup m l) inA
                 outA' = lblAdj (fromJust . lab g) outA
                 (inA,_,nl,outA) = context g n
+
+-- Get lnodes in graph sorted in topological order
+topsortLN :: Graph gr => gr a b -> [LNode a]
+topsortLN g = map (\x -> fromJust $ L.find ((== x) . fst) ln) $ topsort g
+    where ln = labNodes g
 
