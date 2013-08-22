@@ -3,7 +3,10 @@ module Dragonet.Implementation(
     Packet,
     AttrValue(..),
     Context(..), 
+    GlobalState(..),
     ImplM,
+
+    emptyGS,
 
     packetLen,
     setAttr,
@@ -22,6 +25,8 @@ module Dragonet.Implementation(
     readP8,
     readP16BE,
     readP32BE,
+
+    debug,
 ) where
 
 
@@ -39,13 +44,23 @@ data AttrValue = AttrS String | AttrI Int
 
 data Context = Context {
     ctxPacket :: Packet,
-    ctxAttrs  :: M.Map String AttrValue
+    ctxAttrs  :: M.Map String AttrValue,
+    ctxState  :: GlobalState
+} deriving Show
+
+data GlobalState = GlobalState {
+    gsDebug :: [String]
 } deriving Show
 
 type Implementation = State Context String
 
 type ImplM a = State Context a
 
+
+emptyGS :: GlobalState
+emptyGS = GlobalState {
+        gsDebug = []
+    }
 
 
 packetLen :: State Context Int
@@ -55,8 +70,8 @@ packetLen = do
 
 setAttr :: String -> AttrValue -> State Context ()
 setAttr n v = do
-    (Context p a) <- get
-    put $ Context p $ M.insert n v a
+    (Context p a g) <- get
+    put $ Context p (M.insert n v a) g
 
 getAttr :: String -> State Context AttrValue
 getAttr n = do
@@ -158,3 +173,8 @@ readP32BE offset = do
     return (convert32BE w1 w2 w3 w4)
 
 
+debug :: String -> ImplM ()
+debug s = do
+    ctx <- get
+    let gs = ctxState ctx
+    put $ ctx { ctxState = gs { gsDebug = gsDebug gs ++ [s] } }

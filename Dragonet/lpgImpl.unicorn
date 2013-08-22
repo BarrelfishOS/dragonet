@@ -80,7 +80,7 @@ graph lpg {
         cluster L3IPv4 {
             boolean ValidHeaderLength {
                 port true[ValidReassembly ValidVersion ValidLength
-                          ValidTTL ValidChecksum Classify]
+                          ValidTTL ValidChecksum Classify .ToIPv4Local]
                 port false[..PacketDrop] }
 
             boolean ValidReassembly {
@@ -121,7 +121,7 @@ graph lpg {
             port true false[L3IPAndBelowValid] }
 
         and L3IPAndBelowValid {
-            port true false[L3ICMPValid L4TCPValid L4UDPValid ToIPv4Local] }
+            port true false[L3ICMPValid L4TCPValid L4UDPValid] }
 
 
         /*******************************************/

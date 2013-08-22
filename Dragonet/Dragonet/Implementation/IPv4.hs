@@ -8,6 +8,7 @@ module Dragonet.Implementation.IPv4(
 ) where
 
 import Dragonet.Implementation
+import Util.Misc
 import Data.Word
 import Data.Bits
 
@@ -171,12 +172,6 @@ pseudoheader = do
     let l = fromIntegral len
     return (unpack32BE src ++ unpack32BE dst ++ [0,proto] ++ unpack16BE l)
 
-
-splitBy :: Eq a => a -> [a] -> [[a]]
-splitBy delimiter = foldr f [[]] 
-    where f c l@(x:xs) | c == delimiter = []:l
-                       | otherwise = (c:x):xs
-          f _ _ = undefined
 
 -- Convert IP as string to 32-bit word
 ipFromString :: String -> Maybe Word32

@@ -1,9 +1,11 @@
 module Dragonet.Implementation.Ethernet(
     destRd, sourceRd, etypeRd, checksumRd,
     etypeIPV4, etypeIPV6, etypeARP,
+    macFromString,
 ) where
 
 import Dragonet.Implementation
+import Util.Misc
 import Data.Word
 
 
@@ -51,4 +53,13 @@ etypeIPV6 = 0x86DD
 
 etypeARP :: Word16
 etypeARP = 0x0806
+
+
+
+-- Parse MAC address from String
+macFromString :: String -> Maybe [Word8]
+macFromString s
+    | length parts /= 6 = Nothing
+    | otherwise = Just $ (map read parts :: [Word8])
+    where parts = splitBy ':' s :: [String]
 
