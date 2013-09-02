@@ -114,7 +114,10 @@ declareClusters gn cl impl =
 
 
         nodeIdMap = zip [1..] $ nodeClusterMap cl
-        lookupNode n = fst $ head $ filter (\(_,(_,n')) -> nName n' == n) nodeIdMap
+        lookupNode n = fst $ head' $ filter (\(_,(_,n')) -> nName n' == n) nodeIdMap
+            where
+                head' [] = error ("Node " ++ n ++ " not found")
+                head' l = head l
 
         -- "g"Nodes, list of nodes
         nodesName = TH.mkName (gn ++ "Nodes")

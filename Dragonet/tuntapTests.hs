@@ -5,27 +5,17 @@ import qualified Control.Monad as M
 import qualified Network.TUNTAP as TAP
 
 import qualified Data.ByteString as BS
-import qualified Data.Map as M
 
-import Implementation
+import Dragonet.Implementation
+import Dragonet.Implementation.Algorithm
 
-
-data SimStateEntry = PQueue 
-
-type SimState = M.Map String SimStateEntry
+import LPGImpl
 
 
 
+initialState = emptyGS
 
-
-
-
-
-
-
-initialState = M.empty
-
-receivedPacket :: SimState -> Packet
+receivedPacket state packet = execute lpg packet state
 
 
 
@@ -37,7 +27,8 @@ data NetEvent =
 
 rxThread c tap = M.forever $ do
     p <- TAP.readTAP tap
-    STM.atomically $ TC.writeTChan c (RXEvent p)
+    putStrLn ("Got packet " ++ show p)
+    --STM.atomically $ TC.writeTChan c (RXEvent p)
 
 txThread c tap = M.forever $ M.join $ STM.atomically $ do
     (TXEvent p) <- TC.readTChan c
@@ -45,14 +36,16 @@ txThread c tap = M.forever $ M.join $ STM.atomically $ do
 
 simStep rxC txC state = do
     e <- TC.readTChan rxC
-    let (tx,state') = case e of
-        RXEvent p -> receivedPacket state p
-    return state'
+    return $ case e of
+            RXEvent p -> (p,receivedPacket state p)
     
 
 simThread rxC txC state = do
-    state' <- STM.atomically $ simStep rxC txC state
-    simThread rxC txC state'
+    (p,state') <- STM.atomically $ simStep rxC txC state
+    putStrLn ("SimStep " ++ show p)
+    putStrLn $ unlines $ map ("    " ++) $ gsDebug state'
+    let state'' = state' { gsDebug = [] }
+    simThread rxC txC state''
     
 
 main = do
@@ -62,6 +55,7 @@ main = do
     rxC <- TC.newTChanIO
     txC <- TC.newTChanIO
 
+    rxThread rxC tap
     rxT <- CC.forkIO $ rxThread rxC tap
     txT <- CC.forkIO $ txThread txC tap
 

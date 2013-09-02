@@ -11,9 +11,11 @@ import Dragonet.Implementation
 import qualified Dragonet.Implementation.Ethernet as ETH
 import qualified Dragonet.Implementation.IPv4 as IP4
 import qualified Dragonet.Implementation.UDP as UDP
+import qualified Dragonet.Implementation.ARP as ARP
 
 import Data.Maybe
 import Data.Bits
+import qualified Debug.Trace as T
 
 
 pbool b = if b then "true" else "false"
@@ -21,7 +23,8 @@ pbool b = if b then "true" else "false"
 toPort = return
 
 cfgLocalMAC = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
-cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
+--cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
+cfgLocalIP = fromJust $ IP4.ipFromString "129.132.102.111"
 
 
 
@@ -77,24 +80,32 @@ lpgRxL2EtherClassifyL3Impl = do
 -- ARP
 
 lpgRxL3ARPValidHeaderLengthImpl = do
-    (AttrI off) <- getAttr "L3Offset"
+    off <- ARP.headerOff
     len <- packetLen
-    -- hardcoded for Ethernet/IPv4
-    if len - off == 28 then do
-        hlen <- readP8 (off + 4)
-        plen <- readP8 (off + 5)
-        return $ pbool $ ((hlen == 6) && (plen == 4))
+    let plen = len - off
+    if plen >= ARP.headerMinLen then do
+        hlen <- ARP.headerLen
+        toPort $ pbool (plen == hlen)
     else
-        return "false"
+        toPort "false"
         
-
 lpgRxL3ARPClassifyImpl = do
-    (AttrI off) <- getAttr "L3Offset"
-    oper <- readP16BE (off + 6)
-    return $ case oper of
-        1 -> "request"
-        2 -> "reply"
-        _ -> "drop"
+    oper <- ARP.operRd
+    toPort $
+        if oper == ARP.operRequest then "request"
+        else if oper == ARP.operReply then "reply"
+        else "drop"
+
+-- Make sure the request is for Ethernet/IPv4
+lpgRxL3ARPValidRequestImpl = do
+    htype <- ARP.htypeRd
+    ptype <- ARP.ptypeRd
+    toPort $ pbool (htype == ARP.htypeEthernet && ptype == ARP.ptypeIPV4)
+
+lpgRxL3ARPLocalIPDestImpl = do
+    tpa <- ARP.tpaRd
+    toPort $ pbool (pack32BE tpa == cfgLocalIP)
+
 
 
 -----------------------------------------------------------------------------
@@ -190,7 +201,7 @@ lpgRxL4TCPValidHeaderLengthImpl = toPort "true"
 
 lpgRxToIPv4LocalImpl = do
     dIP <- IP4.destIPRd
-    toPort $ pbool $ dIP == cfgLocalIP
+    toPort $ pbool $ T.trace("dIP=" ++ show dIP ++ "  lIP=" ++ show cfgLocalIP) (dIP == cfgLocalIP)
 
 lpgRxToUDPPortDNSImpl = do
     dPort <- UDP.destPortRd
@@ -201,7 +212,6 @@ lpgRxToUDPPortDNSImpl = do
 
 -- Sinks
 lpgPacketDropImpl = do { debug "Packet dropped!" ; toPort "" }
-lpgRxL3ARPRequestImpl = do { debug "Got ARP request!" ; toPort "" }
 lpgRxL3ARPResponseImpl = do { debug "Got ARP response!" ; toPort "" }
 lpgRxL3ICMPOutImpl = do { debug "Got ICMP packet!" ; toPort "" }
 lpgRxL4TCPOutImpl = do { debug "Got TCP packet!" ; toPort "" }
@@ -210,9 +220,8 @@ lpgRxDnsRXImpl = do { debug "Got DNS packet!" ; toPort "" }
 
 -- Nodes for tx side
 
-lpgTxSourceImpl = toPort "true"
 lpgSoftwareTXImpl = toPort "true"
-lpgTxARPTXImpl = toPort "true"
+lpgTxL3ARPBuildResponseImpl = toPort "true"
 lpgTxExampleDnsTXImpl = toPort "true"
 lpgTxExampleDns6TXImpl = toPort "true"
 lpgTxL4UDPAddHeaderImpl = toPort "true"

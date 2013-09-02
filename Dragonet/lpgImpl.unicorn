@@ -60,17 +60,25 @@ graph lpg {
 
         cluster L3ARP {
             boolean ValidHeaderLength {
-                port true[Classify]
+                port true[Classify LocalIPDest]
                 port false[..PacketDrop] }
 
             node Classify {
-                port request[Request]
+                port request[ValidRequest]
                 port response[Response]
                 port drop[..PacketDrop] }
 
-            node Request {
-                port respond[..TxARPTX] }
+            boolean LocalIPDest {
+                port true false[NeedsResponse] }
+
+            boolean ValidRequest {
+                port true false[NeedsResponse] }
             node Response {}
+
+            and NeedsResponse {
+                port true[..TxL3ARPBuildResponse]
+                port false[] }
+
         }
 
 
@@ -203,18 +211,11 @@ graph lpg {
         /*******************************************/
         /* Application TX                          */
 
-        node Source {
-            port out[ExampleDnsTX ExampleDns6TX ARPTX ] }
-
         node ExampleDnsTX {
             port true[L4UDPTx L3IPv4Tx L2EtherTx] }
 
         node ExampleDns6TX {
             port true[L4UDPTx L3IPv6Tx L2EtherTx] }
-
-        node ARPTX {
-            port true[L3ARPTx L2EtherTx] }
-
 
 
 
@@ -334,10 +335,10 @@ graph lpg {
         /*******************************************/
         /* ARP TX                                  */
 
-        or L3ARPTx {
-            port true[L2EtherAddHdrTypeARP]
-            port false[] }
-
+	cluster L3ARP {
+            node BuildResponse {
+                port out[.L2EtherAddHdrTypeARP] }
+        }
 
         /*******************************************/
         /* Ethernet TX                             */

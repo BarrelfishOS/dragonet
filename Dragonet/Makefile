@@ -20,6 +20,11 @@ impl: base
 impl_run: impl
 	./impl
 
+tuntap : base
+	ghc $(GHCFLAGS) tuntapTests.hs -o tuntap
+tuntap_run: tuntap
+	./tuntap
+
 
 models: graph_run
 	./convertDot.sh
