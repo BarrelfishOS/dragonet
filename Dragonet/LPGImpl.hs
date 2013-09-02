@@ -23,8 +23,8 @@ pbool b = if b then "true" else "false"
 toPort = return
 
 cfgLocalMAC = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
---cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
-cfgLocalIP = fromJust $ IP4.ipFromString "129.132.102.111"
+cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
+--cfgLocalIP = fromJust $ IP4.ipFromString "129.132.102.111"
 
 
 
@@ -220,8 +220,8 @@ lpgRxDnsRXImpl = do { debug "Got DNS packet!" ; toPort "" }
 
 -- Nodes for tx side
 
-lpgSoftwareTXImpl = toPort "true"
-lpgTxL3ARPBuildResponseImpl = toPort "true"
+lpgSoftwareTXImpl = do { debug "SoftwareTX" ; toPort "true" }
+lpgTxL3ARPBuildResponseImpl = do { debug "ARPBuildResponse" ; toPort "true" }
 lpgTxExampleDnsTXImpl = toPort "true"
 lpgTxExampleDns6TXImpl = toPort "true"
 lpgTxL4UDPAddHeaderImpl = toPort "true"
