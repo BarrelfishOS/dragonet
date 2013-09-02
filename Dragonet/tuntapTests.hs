@@ -27,12 +27,11 @@ data NetEvent =
 
 rxThread c tap = M.forever $ do
     p <- TAP.readTAP tap
-    putStrLn ("Got packet " ++ show p)
-    --STM.atomically $ TC.writeTChan c (RXEvent p)
+    STM.atomically $ TC.writeTChan c (RXEvent p)
 
-txThread c tap = M.forever $ M.join $ STM.atomically $ do
-    (TXEvent p) <- TC.readTChan c
-    return $ TAP.writeTAP tap p
+txThread c tap = M.forever $ do
+    (TXEvent p) <- STM.atomically $ TC.readTChan c
+    TAP.writeTAP tap p
 
 simStep rxC txC state = do
     e <- TC.readTChan rxC
@@ -42,8 +41,8 @@ simStep rxC txC state = do
 
 simThread rxC txC state = do
     (p,state') <- STM.atomically $ simStep rxC txC state
-    putStrLn ("SimStep " ++ show p)
-    putStrLn $ unlines $ map ("    " ++) $ gsDebug state'
+    putStrLn ("SimStep")
+    putStr $ unlines $ map ("    " ++) $ gsDebug state'
     let state'' = state' { gsDebug = [] }
     simThread rxC txC state''
     
@@ -55,7 +54,6 @@ main = do
     rxC <- TC.newTChanIO
     txC <- TC.newTChanIO
 
-    rxThread rxC tap
     rxT <- CC.forkIO $ rxThread rxC tap
     txT <- CC.forkIO $ txThread txC tap
 
@@ -63,4 +61,4 @@ main = do
 
     TAP.closeTAP tap
     TAP.finish tap
-    
+       
