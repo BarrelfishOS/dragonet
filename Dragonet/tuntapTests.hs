@@ -31,6 +31,7 @@ rxThread c tap = M.forever $ do
 
 txThread c tap = M.forever $ do
     (TXEvent p) <- STM.atomically $ TC.readTChan c
+    putStrLn "Send Packet"
     TAP.writeTAP tap p
 
 simStep rxC txC state = do
@@ -41,9 +42,18 @@ simStep rxC txC state = do
 
 simThread rxC txC state = do
     (p,state') <- STM.atomically $ simStep rxC txC state
-    putStrLn ("SimStep")
-    putStr $ unlines $ map ("    " ++) $ gsDebug state'
-    let state'' = state' { gsDebug = [] }
+
+    -- Show Debug output
+    putStrLn "SimStep"
+    if not $ null $ gsDebug state' then
+        putStr $ unlines $ map ("    " ++) $ gsDebug state'
+    else return ()
+
+    -- Send out packets on TX queue
+    let send p = STM.atomically $ TC.writeTChan txC (TXEvent p)
+    mapM_ send $ gsTXQueue state'
+
+    let state'' = state' { gsDebug = [], gsTXQueue = [] }
     simThread rxC txC state''
     
 

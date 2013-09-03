@@ -1,6 +1,9 @@
 module Dragonet.Implementation.ARP(
     htypeRd, ptypeRd, hlenRd, plenRd, operRd,
     shaRd, spaRd, thaRd, tpaRd,
+    htypeWr, ptypeWr, hlenWr, plenWr, operWr,
+    shaWr, spaWr, thaWr, tpaWr,
+
     headerMinLen, headerLen, headerOff, allocLen,
     operRequest, operReply, htypeEthernet, ptypeIPV4,
 ) where
@@ -30,12 +33,18 @@ htypeOff = fieldOff 0
 htypeRd :: ImplM Word16
 htypeRd = htypeOff >>= readP16BE
 
+htypeWr :: Word16 -> ImplM ()
+htypeWr v = htypeOff >>= writeP16BE v
+
 
 ptypeOff :: ImplM Int
 ptypeOff = fieldOff 2
 
 ptypeRd :: ImplM Word16
 ptypeRd = ptypeOff >>= readP16BE
+
+ptypeWr :: Word16 -> ImplM ()
+ptypeWr v = ptypeOff >>= writeP16BE v
 
 
 hlenOff :: ImplM Int
@@ -44,6 +53,9 @@ hlenOff = fieldOff 4
 hlenRd :: ImplM Word8
 hlenRd = hlenOff >>= readP8
 
+hlenWr :: Word8 -> ImplM ()
+hlenWr v = hlenOff >>= writeP8 v
+
 
 plenOff :: ImplM Int
 plenOff = fieldOff 5
@@ -51,12 +63,18 @@ plenOff = fieldOff 5
 plenRd :: ImplM Word8
 plenRd = plenOff >>= readP8
 
+plenWr :: Word8 -> ImplM ()
+plenWr v = plenOff >>= writeP8 v
+
 
 operOff :: ImplM Int
 operOff = fieldOff 6
 
 operRd :: ImplM Word16
 operRd = operOff >>= readP16BE
+
+operWr :: Word16 -> ImplM ()
+operWr v = operOff >>= writeP16BE v
 
 
 shaOff :: ImplM Int
@@ -67,6 +85,9 @@ shaRd = do
     o <- shaOff
     l <- hlenRd
     readP (fromIntegral l) o
+
+shaWr :: [Word8] -> ImplM ()
+shaWr v = shaOff >>= writeP v
 
 
 spaOff :: ImplM Int
@@ -81,6 +102,9 @@ spaRd = do
     l <- plenRd
     readP (fromIntegral l) o
 
+spaWr :: [Word8] -> ImplM ()
+spaWr v = spaOff >>= writeP v
+
 
 thaOff :: ImplM Int
 thaOff = do
@@ -94,6 +118,9 @@ thaRd = do
     l <- hlenRd
     readP (fromIntegral l) o
 
+thaWr :: [Word8] -> ImplM ()
+thaWr v = thaOff >>= writeP v
+
 
 tpaOff :: ImplM Int
 tpaOff = do
@@ -106,6 +133,9 @@ tpaRd = do
     o <- tpaOff
     l <- plenRd
     readP (fromIntegral l) o
+
+tpaWr :: [Word8] -> ImplM ()
+tpaWr v = tpaOff >>= writeP v
 
 
 operRequest :: Word16

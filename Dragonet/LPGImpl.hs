@@ -201,7 +201,7 @@ lpgRxL4TCPValidHeaderLengthImpl = toPort "true"
 
 lpgRxToIPv4LocalImpl = do
     dIP <- IP4.destIPRd
-    toPort $ pbool $ T.trace("dIP=" ++ show dIP ++ "  lIP=" ++ show cfgLocalIP) (dIP == cfgLocalIP)
+    toPort $ pbool $ dIP == cfgLocalIP
 
 lpgRxToUDPPortDNSImpl = do
     dPort <- UDP.destPortRd
@@ -218,9 +218,105 @@ lpgRxL4TCPOutImpl = do { debug "Got TCP packet!" ; toPort "" }
 lpgRxL4UDPOutImpl = do { debug "Got UDP packet!" ; toPort "" }
 lpgRxDnsRXImpl = do { debug "Got DNS packet!" ; toPort "" }
 
--- Nodes for tx side
 
-lpgSoftwareTXImpl = do { debug "SoftwareTX" ; toPort "true" }
+
+
+
+-----------------------------------------------------------------------------
+-- Transmit Side 
+
+lpgTxQueueImpl = do
+    debug "TxQueue"
+    pkt <- getPacket
+    gs <- getGS
+    putGS (gs { gsTXQueue = gsTXQueue gs ++ [pkt] })
+    toPort ""
+
+
+-----------------------------------------------------------------------------
+-- Ethernet TX
+
+lpgTxL2EtherAllocateHeaderImpl = do
+    debug "TxL2EtherAllocateHeader"
+    insertP ETH.headerLen 0
+    shiftOffset "L4" ETH.headerLen
+    shiftOffset "L3" ETH.headerLen
+    setAttr "L2Offset" $ AttrI 0
+    toPort "out"
+
+lpgTxL2EtherFillHeaderImpl = do
+    debug "TxL2EtherFillHeader"
+    (AttrD smac) <- getAttr "ETHSrcMAC"
+    (AttrD dmac) <- getAttr "ETHDstMAC"
+    (AttrW16 etype) <- getAttr "ETHType"
+    ETH.destWr dmac
+    ETH.sourceWr smac
+    ETH.etypeWr etype
+    toPort "out"
+
+
+-----------------------------------------------------------------------------
+-- ARP TX
+
+lpgTxL3ARPInitiateResponseImpl = do
+    debug "TxL3ARPInitiateResponse"
+    srcMAC <- ARP.shaRd
+    srcIP <- ARP.spaRd
+    dstIP <- ARP.tpaRd
+    forkPkt $ (do
+        setAttr "ARPDstMAC" $ AttrD srcMAC
+        setAttr "ARPDstIP" $ AttrD srcIP
+        setAttr "ARPSrcIP" $ AttrD dstIP
+        toPort "out")
+    toPort "drop"
+
+lpgTxL3ARPAllocateHeaderImpl = do
+    debug "TxL3ARPAllocateHeader"
+    insertP (ARP.allocLen 6 4) 0
+    setAttr "L3Offset" $ AttrI 0
+    toPort "out"
+
+lpgTxL3ARPFillHeaderImpl = do
+    debug "TxL3ARPFillHeader"
+    (AttrD dstMAC) <- getAttr "ARPDstMAC"
+    (AttrD dstIP) <- getAttr "ARPDstIP"
+    (AttrD srcIP) <- getAttr "ARPSrcIP"
+
+    ARP.htypeWr ARP.htypeEthernet
+    ARP.ptypeWr ARP.ptypeIPV4
+    ARP.hlenWr 6
+    ARP.plenWr 4
+    ARP.operWr ARP.operReply
+    ARP.thaWr dstMAC
+    ARP.tpaWr dstIP
+    ARP.shaWr cfgLocalMAC
+    ARP.spaWr srcIP
+
+    setAttr "ETHSrcMAC" $ AttrD cfgLocalMAC
+    setAttr "ETHDstMAC" $ AttrD dstMAC 
+    setAttr "ETHType" $ AttrW16 ETH.etypeARP
+
+    toPort "out"
+    
+
+        
+
+
+
+
+
+shiftOffset :: String -> Int -> ImplM ()
+shiftOffset layer off = do
+    let l = layer ++ "Offset"
+    a <- getAttrM l
+    case a of
+        (Just (AttrI i)) -> setAttr l $ AttrI (i + off)
+        _ -> return ()
+
+
+
+
+{-lpgSoftwareTXImpl = do { debug "SoftwareTX" ; toPort "true" }
 lpgTxL3ARPBuildResponseImpl = do { debug "ARPBuildResponse" ; toPort "true" }
 lpgTxExampleDnsTXImpl = toPort "true"
 lpgTxExampleDns6TXImpl = toPort "true"
@@ -248,7 +344,7 @@ lpgTxL2EtherAddHdrTypeIPv4_Impl = toPort "true"
 lpgTxL2EtherAddHdrTypeIPv6_Impl = toPort "true"
 lpgTxL2EtherAddHdrTypeARP_Impl = toPort "true"
 lpgTxL2EtherAddHdrSAddrImpl = toPort "true"
-lpgTxL2EtherAddHdrDAddrImpl = toPort "true"
+lpgTxL2EtherAddHdrDAddrImpl = toPort "true"-}
 
 
 lpgClusters :: [(Int, [String])]

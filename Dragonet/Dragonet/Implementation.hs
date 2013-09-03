@@ -11,13 +11,12 @@ module Dragonet.Implementation(
     initSimState,
     emptyGS,
 
-    getGS,
-    putGS,
-    forkPkt,
+    getCtx, putCtx,
+    getGS, putGS,
+    forkPkt, getPacket,
 
     packetLen,
-    setAttr,
-    getAttr,
+    setAttr, getAttr, getAttrM,
 
     convert16BE,
     unpack16BE,
@@ -52,7 +51,8 @@ import Data.Bits
 
 type Packet = BS.ByteString
 
-data AttrValue = AttrS String | AttrI Int
+data AttrValue = AttrS String | AttrI Int | AttrD [Word8] | AttrW32 Word32
+        | AttrW16 Word16
     deriving Show
 
 data Context = Context {
@@ -62,7 +62,8 @@ data Context = Context {
 } deriving Show
 
 data GlobalState = GlobalState {
-    gsDebug :: [String]
+    gsDebug :: [String],
+    gsTXQueue :: [Packet]
 } deriving Show
 
 type ContextID = Int
@@ -96,7 +97,8 @@ initSimState gs p = SimState {
 
 emptyGS :: GlobalState
 emptyGS = GlobalState {
-        gsDebug = []
+        gsDebug = [],
+        gsTXQueue = []
     }
 
 
@@ -137,10 +139,16 @@ setAttr n v = do
 
 getAttr :: String -> ImplM AttrValue
 getAttr n = do
+    a <- getAttrM n
+    return $ fromJust a
+
+getAttrM :: String -> ImplM (Maybe AttrValue)
+getAttrM n = do
     ctx <- getCtx
     return $ attr ctx
     where
-        attr c = fromJust $ M.lookup n $ ctxAttrs c
+        attr c = M.lookup n $ ctxAttrs c
+
 
 forkPkt :: ImplM String -> ImplM ()
 forkPkt fp = do
@@ -251,8 +259,8 @@ readP32BE offset = do
 
 
 
-writeP :: Int -> [Word8] -> ImplM ()
-writeP offset dat = do
+writeP :: [Word8] -> Int -> ImplM ()
+writeP dat offset = do
     pkt <- getPacket
     let dat' = BS.pack  dat
     if BS.length pkt < offset + BS.length dat' then
@@ -260,17 +268,17 @@ writeP offset dat = do
     putPacket (BS.take offset pkt `BS.append` dat' `BS.append`
         BS.drop (offset + BS.length dat') pkt)
 
-writeP8 :: Int -> Word8 -> ImplM ()
-writeP8 off val = writeP off [val]
+writeP8 :: Word8 -> Int -> ImplM ()
+writeP8 val = writeP [val]
 
-writeP16BE :: Int -> Word16 -> ImplM ()
-writeP16BE off val = writeP off $ unpack16BE val
+writeP16BE :: Word16 -> Int -> ImplM ()
+writeP16BE val = writeP (unpack16BE val)
 
-writeP32BE :: Int -> Word32 -> ImplM ()
-writeP32BE off val = writeP off $ unpack32BE val
+writeP32BE :: Word32 -> Int -> ImplM ()
+writeP32BE val = writeP (unpack32BE val)
 
 insertP :: Int -> Int -> ImplM ()
-insertP off len = do
+insertP len off = do
     pkt <- getPacket
     let (pre,suf) = BS.splitAt off pkt
     let zs = BS.pack $ replicate len 0

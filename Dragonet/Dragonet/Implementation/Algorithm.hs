@@ -9,7 +9,7 @@ import qualified Util.GraphHelpers as GH
 import qualified Data.Graph.Inductive as DGI
 
 import Util.Misc
-import Debug.Trace as T
+--import Debug.Trace as T
 import Control.Monad.State
 import Data.Maybe
 import qualified Data.List as L

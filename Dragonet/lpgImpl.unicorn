@@ -2,8 +2,6 @@ graph lpg {
     node SoftwareRX {
         port out[RxL2EtherClassified] }
 
-    node SoftwareTX { }
-
     node PacketDrop { }
 
 
@@ -76,7 +74,7 @@ graph lpg {
             node Response {}
 
             and NeedsResponse {
-                port true[..TxL3ARPBuildResponse]
+                port true[..TxL3ARPInitiateResponse]
                 port false[] }
 
         }
@@ -204,226 +202,28 @@ graph lpg {
 
 
 
-    /**************************************************************************/
-    /* Transmit                                                               */
 
     cluster Tx {
-        /*******************************************/
-        /* Application TX                          */
+        cluster L3ARP {
+            node InitiateResponse {
+                port out[AllocateHeader]
+		port drop[] }
+            
+            node AllocateHeader {
+                port out[FillHeader] }
 
-        node ExampleDnsTX {
-            port true[L4UDPTx L3IPv4Tx L2EtherTx] }
-
-        node ExampleDns6TX {
-            port true[L4UDPTx L3IPv6Tx L2EtherTx] }
-
-
-
-        /*******************************************/
-        /* UDP TX                                  */
-
-        cluster L4UDP {
-            or Tx {
-                port true[AddHeader .L3IPv4AddHdrProtoUDP]
-                port false[] }
-
-            node AddHeader {
-                port true[AddHdrDPort AddHdrSPort AddHdrChecksum
-                          AddHdrLength .L4HdrAdded] }
-
-            node AddHdrDPort {
-                port true[Done] }
-
-            node AddHdrSPort {
-                port true[Done] }
-
-            node AddHdrChecksum {
-                port true[Done] }
-
-            node AddHdrLength {
-                port true[Done] }
-
-            and Done {
-                port true false[.L4Done] }
+            node FillHeader {
+                port out[.L2EtherAllocateHeader] }
         }
-
-
-        /*******************************************/
-        /* IPv4 TX                                 */
-
-        cluster L3IPv4 {
-            or Tx {
-                port true[AndUpperHdr .L2EtherAddHdrTypeIPv4]
-                port false[] }
-
-            and AndUpperHdr {
-                port true[AddHeader]
-                port false[] }
-
-            node AddHeader {
-                port true[AddHdrVersion AddHdrIHL AddHdrTotLen AddHdrTTL
-                          AddHdrSAddr AddHdrDAddr AddHdrProto .L3HdrAdded] }
-
-
-            node AddHdrProto {
-                port true[AddHdrProtoUDP] }
-
-            and AddHdrProtoUDP {
-                port true[AddHdrProtoUDP_]
-                port false[] }
-            node AddHdrProtoUDP_ {
-                port true[AddHdrProtoDone] }
-
-            or AddHdrProtoDone {
-                port true[Done]
-                port false[] }
-
-
-            node AddHdrVersion {
-                port true[Done] }
-
-            node AddHdrIHL {
-                port true[Done] }
-
-            node AddHdrTotLen {
-                port true[Done] }
-
-            node AddHdrTTL {
-                port true[Done] }
-
-            node AddHdrSAddr {
-                port true[Done] }
-
-            node AddHdrDAddr {
-                port true[Done] }
-
-            and Done {
-                port true[.L3Done]
-                port false[] }
-        }
-
-
-        /*******************************************/
-        /* IPv6 TX                                 */
-
-        cluster L3IPv6 {
-            or Tx {
-                port true[AndUpperHdr .L2EtherAddHdrTypeIPv6]
-                port false[] }
-
-            and AndUpperHdr {
-                port true[AddHeader]
-                port false[] }
-
-            node AddHeader {
-                port true[AddHdrVersion AddHdrSAddr AddHdrDAddr .L3HdrAdded] }
-
-            node AddHdrVersion {
-                port true[Done] }
-
-            node AddHdrSAddr {
-                port true[Done] }
-
-            node AddHdrDAddr {
-                port true[Done] }
-
-            and Done {
-                port true[.L3Done]
-                port false[] }
-        }
-
-        /*******************************************/
-        /* ARP TX                                  */
-
-	cluster L3ARP {
-            node BuildResponse {
-                port out[.L2EtherAddHdrTypeARP] }
-        }
-
-        /*******************************************/
-        /* Ethernet TX                             */
 
         cluster L2Ether {
-            or Tx {
-                port true[AndUpperHdr]
-                port false[] }
+            node AllocateHeader {
+                port out[FillHeader] }
 
-            and AndUpperHdr {
-                port true[AddHeader]
-                port false[] }
-
-            node AddHeader {
-                port true[AddHdrSAddr AddHdrDAddr AddHdrType] }
-
-
-            node AddHdrType {
-                port true[AddHdrTypeIPv4 AddHdrTypeIPv6 AddHdrTypeARP] }
-
-            and AddHdrTypeIPv4 {
-                port true[AddHdrTypeIPv4_]
-                port false[] }
-            node AddHdrTypeIPv4_ {
-                port true[AddHdrProtoDone] }
-
-            and AddHdrTypeIPv6 {
-                port true[AddHdrTypeIPv6_]
-                port false[] }
-            node AddHdrTypeIPv6_ {
-                port true[AddHdrProtoDone] }
-
-            and AddHdrTypeARP {
-                port true[AddHdrTypeARP_]
-                port false[] }
-            node AddHdrTypeARP_ {
-                port true[AddHdrProtoDone] }
-
-            or AddHdrProtoDone {
-                port true[Done]
-                port false[] }
-
-
-            node AddHdrSAddr {
-                port true[Done] }
-
-            node AddHdrDAddr {
-                port true[Done] }
-
-            and Done {
-                port true[.L2Done]
-                port false[] }
+            node FillHeader {
+                port out[.Queue] }
         }
 
-        /*******************************************/
-        /* Abstract TX                             */
-
-        or L4HdrAdded {
-            port true[L3IPv4AndUpperHdr]
-            port false[] }
-
-        or L4Done {
-            port true[L3AboveDone]
-            port false[] }
-
-
-        or L3HdrAdded {
-            port true[L2EtherAndUpperHdr]
-            port false[] }
-
-        or L3Done {
-            port true[L3AboveDone]
-            port false[] }
-
-        and L3AboveDone {
-            port true[L2AboveDone]
-            port false[] }
-
-
-        or L2Done {
-            port true[L2AboveDone]
-            port false[] }
-
-        and L2AboveDone {
-            port true[.SoftwareTX]
-            port false[] }
+        node Queue { }
     }
 }
