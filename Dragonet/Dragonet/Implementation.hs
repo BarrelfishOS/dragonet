@@ -52,7 +52,7 @@ import Data.Bits
 type Packet = BS.ByteString
 
 data AttrValue = AttrS String | AttrI Int | AttrD [Word8] | AttrW32 Word32
-        | AttrW16 Word16
+        | AttrW16 Word16 | AttrW8 Word8
     deriving Show
 
 data Context = Context {
@@ -63,7 +63,9 @@ data Context = Context {
 
 data GlobalState = GlobalState {
     gsDebug :: [String],
-    gsTXQueue :: [Packet]
+    gsTXQueue :: [Packet],
+    gsARPPending :: [(Word32,Context)],
+    gsARPCache :: M.Map Word32 [Word8]
 } deriving Show
 
 type ContextID = Int
@@ -98,7 +100,9 @@ initSimState gs p = SimState {
 emptyGS :: GlobalState
 emptyGS = GlobalState {
         gsDebug = [],
-        gsTXQueue = []
+        gsTXQueue = [],
+        gsARPPending = [],
+        gsARPCache = M.empty
     }
 
 

@@ -1,6 +1,9 @@
 module Dragonet.Implementation.IPv4(
     versionRd, ihlRd, lengthRd, identificationRd, flagsRd, fragmentRd, ttlRd,
     protocolRd, checksumRd, sourceIPRd, destIPRd,
+    versionWr, ihlWr, lengthWr, identificationWr, flagsWr, fragmentWr, ttlWr,
+    protocolWr, checksumWr, sourceIPWr, destIPWr,
+
     flagsDF, flagsMF,
     protocolICMP, protocolTCP, protocolUDP,
     headerMinLen, headerLen, headerOff, payloadOff, payloadLen, checksum,
@@ -44,6 +47,12 @@ versionRd = do
     b <- readP8 o
     return (shift (b .&. 0xf0) (-4))
 
+versionWr :: Word8 -> ImplM ()
+versionWr v = do
+    o <- versionOff
+    b <- readP8 o
+    writeP8 ((b .&. 0x0f) .|. (shift v 4)) o
+
 
 ihlOff :: ImplM Int
 ihlOff = fieldOff 0
@@ -54,6 +63,12 @@ ihlRd = do
     b <- readP8 o
     return (b .&. 0xf)
 
+ihlWr :: Word8 -> ImplM ()
+ihlWr v = do
+    o <- ihlOff
+    b <- readP8 o
+    writeP8 ((b .&. 0xf0) .|. v) o
+
 
 lengthOff :: ImplM Int
 lengthOff = fieldOff 2
@@ -61,12 +76,18 @@ lengthOff = fieldOff 2
 lengthRd :: ImplM Word16
 lengthRd = lengthOff >>= readP16BE
 
+lengthWr :: Word16 -> ImplM ()
+lengthWr v = lengthOff >>= writeP16BE v
+
 
 identificationOff :: ImplM Int
 identificationOff = fieldOff 4
 
 identificationRd :: ImplM Word16
 identificationRd = identificationOff >>= readP16BE
+
+identificationWr :: Word16 -> ImplM ()
+identificationWr v = identificationOff >>= writeP16BE v
 
 
 flagsOff :: ImplM Int
@@ -78,6 +99,12 @@ flagsRd = do
     b <- readP8 o
     return (shift (b .&. 0xe0) (-5))
 
+flagsWr :: Word8 -> ImplM ()
+flagsWr v = do
+    o <- flagsOff
+    b <- readP8 o
+    writeP8 ((b .&. 0x1f) .|. (shift v 5)) o
+
 
 fragmentOff :: ImplM Int
 fragmentOff = fieldOff 6
@@ -88,12 +115,21 @@ fragmentRd = do
     b <- readP16BE o
     return (b .&. 0x1fff)
 
+fragmentWr :: Word16 -> ImplM ()
+fragmentWr v = do
+    o <- fragmentOff
+    b <- readP16BE o
+    writeP16BE ((b .&. 0xe000) .|. v) o
+
 
 ttlOff :: ImplM Int
 ttlOff = fieldOff 8
 
 ttlRd :: ImplM Word8
 ttlRd = ttlOff >>= readP8
+
+ttlWr :: Word8 -> ImplM ()
+ttlWr v = ttlOff >>= writeP8 v
 
 
 protocolOff :: ImplM Int
@@ -102,12 +138,18 @@ protocolOff = fieldOff 9
 protocolRd :: ImplM Word8
 protocolRd = protocolOff >>= readP8
 
+protocolWr :: Word8 -> ImplM ()
+protocolWr v = protocolOff >>= writeP8 v
+
 
 checksumOff :: ImplM Int
 checksumOff = fieldOff 10
 
 checksumRd :: ImplM Word16
 checksumRd = checksumOff >>= readP16BE
+
+checksumWr :: Word16 -> ImplM ()
+checksumWr v = checksumOff >>= writeP16BE v
 
 
 sourceIPOff :: ImplM Int
@@ -116,12 +158,18 @@ sourceIPOff = fieldOff 12
 sourceIPRd :: ImplM Word32
 sourceIPRd = sourceIPOff >>= readP32BE
 
+sourceIPWr :: Word32 -> ImplM ()
+sourceIPWr v = sourceIPOff >>= writeP32BE v
+
 
 destIPOff :: ImplM Int
 destIPOff = fieldOff 16
 
 destIPRd :: ImplM Word32
 destIPRd = destIPOff >>= readP32BE
+
+destIPWr :: Word32 -> ImplM ()
+destIPWr v = destIPOff >>= writeP32BE v
 
 
 

@@ -3,12 +3,13 @@ module Dragonet.Implementation.Ethernet(
     destWr, sourceWr, etypeWr, checksumWr,
 
     etypeIPV4, etypeIPV6, etypeARP,
-    headerLen, macFromString,
+    headerLen, macFromString, macBroadcast,
 ) where
 
 import Dragonet.Implementation
 import Util.Misc
 import Data.Word
+import Data.Maybe
 
 headerLen :: Int
 headerLen = 14
@@ -82,5 +83,8 @@ macFromString s
     where
         parts = splitBy ':' s :: [String]
         parsePart p = read ("0x" ++ p)
+
+macBroadcast :: [Word8]
+macBroadcast = fromJust $ macFromString "ff:ff:ff:ff:ff:ff"
 
 

@@ -10,11 +10,15 @@ import Dragonet.Implementation
 
 import qualified Dragonet.Implementation.Ethernet as ETH
 import qualified Dragonet.Implementation.IPv4 as IP4
+import qualified Dragonet.Implementation.ICMP as ICMP
 import qualified Dragonet.Implementation.UDP as UDP
 import qualified Dragonet.Implementation.ARP as ARP
 
 import Data.Maybe
 import Data.Bits
+import Data.Word
+import qualified Data.Map as M
+import qualified Data.List as L
 import qualified Debug.Trace as T
 
 
@@ -80,6 +84,7 @@ lpgRxL2EtherClassifyL3Impl = do
 -- ARP
 
 lpgRxL3ARPValidHeaderLengthImpl = do
+    debug "RxL3ARPValidHeaderLength"
     off <- ARP.headerOff
     len <- packetLen
     let plen = len - off
@@ -90,10 +95,12 @@ lpgRxL3ARPValidHeaderLengthImpl = do
         toPort "false"
         
 lpgRxL3ARPClassifyImpl = do
+    debug "RxL3ARPClassify"
     oper <- ARP.operRd
+    debug ("  " ++ show oper)
     toPort $
         if oper == ARP.operRequest then "request"
-        else if oper == ARP.operReply then "reply"
+        else if oper == ARP.operReply then "response"
         else "drop"
 
 -- Make sure the request is for Ethernet/IPv4
@@ -105,6 +112,37 @@ lpgRxL3ARPValidRequestImpl = do
 lpgRxL3ARPLocalIPDestImpl = do
     tpa <- ARP.tpaRd
     toPort $ pbool (pack32BE tpa == cfgLocalIP)
+
+lpgRxL3ARPValidResponseImpl = do
+    debug "RxL3ARPValidResponse"
+    htype <- ARP.htypeRd
+    ptype <- ARP.ptypeRd
+    toPort $ pbool (htype == ARP.htypeEthernet && ptype == ARP.ptypeIPV4)
+
+lpgRxL3ARPIsPendingImpl = do
+    debug "RxL3ARPIsPending"
+    gs <- getGS
+    ip <- fmap pack32BE ARP.spaRd
+    let pending = gsARPPending gs
+    toPort $ pbool $ not $ null $ filter ((== ip) . fst) pending
+
+lpgRxL3ARPProcessPendingResponseImpl = do
+    debug "RxL3ARPProcessPendingResponse"
+    ip <- fmap pack32BE ARP.spaRd
+    mac <- ARP.shaRd
+
+    -- Look for pending contexts and update state
+    gs <- getGS
+    let (curP,newP) = L.partition ((== ip) . fst) $ gsARPPending gs
+    let cache = M.insert ip mac $ gsARPCache gs
+    let gs' = gs { gsARPCache = cache, gsARPPending = newP }
+    putGS gs'
+
+    -- Reenable pending contexts for this IP
+    let restart (_,ctx) = do { putCtx ctx ; debug ("  " ++ show (ctxAttrs ctx)) ; toPort "true" }
+    mapM_ (forkPkt . restart) curP
+    toPort "drop"
+   
 
 
 
@@ -130,7 +168,7 @@ lpgRxL3IPv4ValidReassemblyImpl = do
 lpgRxL3IPv4ValidVersionImpl = do
     ver <- IP4.versionRd
     toPort $ pbool $ ver == 4
-
+    
 lpgRxL3IPv4ValidLengthImpl = do
     len <- packetLen
     off <- IP4.headerOff
@@ -165,7 +203,26 @@ lpgRxL3IPv6ValidHeaderLengthImpl = toPort "true"
 
 -----------------------------------------------------------------------------
 -- ICMP
-lpgRxL3ICMPValidHeaderLengthImpl = toPort "true"
+
+lpgRxL3ICMPValidHeaderLengthImpl = do
+    debug "RxL3ICMPValidHeaderLength"
+    len <- packetLen
+    off <- ICMP.headerOff
+    toPort $ pbool (len - off >= ICMP.headerLen)
+
+lpgRxL3ICMPValidChecksumImpl = do
+    debug "RxL3ICMPValidChecksum"
+    len <- packetLen
+    off <- ICMP.headerOff
+    pkt <- readP (len - off) off
+    debug ("   "  ++ show (IP4.checksum pkt == 0))
+    toPort $ pbool (IP4.checksum pkt == 0)
+
+lpgRxL3ICMPIsTypeRequestImpl = do
+    debug "RxL3ICMPIsTypeRequest"
+    t <- ICMP.typeRd
+    c <- ICMP.codeRd
+    toPort $ pbool (t == ICMP.typeEchoRequest && c == 0x0)
 
 
 -----------------------------------------------------------------------------
@@ -212,8 +269,6 @@ lpgRxToUDPPortDNSImpl = do
 
 -- Sinks
 lpgPacketDropImpl = do { debug "Packet dropped!" ; toPort "" }
-lpgRxL3ARPResponseImpl = do { debug "Got ARP response!" ; toPort "" }
-lpgRxL3ICMPOutImpl = do { debug "Got ICMP packet!" ; toPort "" }
 lpgRxL4TCPOutImpl = do { debug "Got TCP packet!" ; toPort "" }
 lpgRxL4UDPOutImpl = do { debug "Got UDP packet!" ; toPort "" }
 lpgRxDnsRXImpl = do { debug "Got DNS packet!" ; toPort "" }
@@ -266,8 +321,11 @@ lpgTxL3ARPInitiateResponseImpl = do
     forkPkt $ (do
         setAttr "ARPDstMAC" $ AttrD srcMAC
         setAttr "ARPDstIP" $ AttrD srcIP
+        setAttr "ARPSrcMAC" $ AttrD cfgLocalMAC
         setAttr "ARPSrcIP" $ AttrD dstIP
-        toPort "out")
+        setAttr "ARPOper" $ AttrW16 ARP.operReply
+        setAttr "ETHDstMAC" $ AttrD srcMAC
+        toPort "true")
     toPort "drop"
 
 lpgTxL3ARPAllocateHeaderImpl = do
@@ -280,24 +338,139 @@ lpgTxL3ARPFillHeaderImpl = do
     debug "TxL3ARPFillHeader"
     (AttrD dstMAC) <- getAttr "ARPDstMAC"
     (AttrD dstIP) <- getAttr "ARPDstIP"
+    (AttrD srcMAC) <- getAttr "ARPSrcMAC"
     (AttrD srcIP) <- getAttr "ARPSrcIP"
+    (AttrW16 oper) <- getAttr "ARPOper"
 
     ARP.htypeWr ARP.htypeEthernet
     ARP.ptypeWr ARP.ptypeIPV4
     ARP.hlenWr 6
     ARP.plenWr 4
-    ARP.operWr ARP.operReply
+    ARP.operWr oper
     ARP.thaWr dstMAC
     ARP.tpaWr dstIP
-    ARP.shaWr cfgLocalMAC
+    ARP.shaWr srcMAC
     ARP.spaWr srcIP
 
-    setAttr "ETHSrcMAC" $ AttrD cfgLocalMAC
-    setAttr "ETHDstMAC" $ AttrD dstMAC 
+    setAttr "ETHSrcMAC" $ AttrD srcMAC
     setAttr "ETHType" $ AttrW16 ETH.etypeARP
 
+    toPort "true"
+
+lpgTxL3ARPLookup_Impl = do
+    debug "TxL3ARPLookup"
+    cache <- fmap gsARPCache getGS
+    (AttrW32 ip) <- getAttr "IP4Dest"
+    case M.lookup ip cache of
+        (Just mac) -> do { debug "  hit" ; setAttr "ETHDstMAC" $ AttrD mac ; toPort "true" }
+        _ -> do { debug "  miss" ; toPort "miss" }
+
+lpgTxL3ARPSendRequestImpl = do
+    debug "TxL3ARPSendRequest"
+    ctx <- getCtx
+    debug ("  " ++ show (ctxAttrs ctx))
+    (AttrW32 srcIP) <- getAttr "IP4Source"
+    (AttrW32 dstIP) <- getAttr "IP4Dest"
+    (AttrD srcMAC) <- getAttr "ETHSrcMAC"
+    forkPkt $ do
+        setAttr "ARPDstMAC" $ AttrD [0,0,0,0,0,0]
+        setAttr "ARPDstIP" $ AttrD $ unpack32BE dstIP
+        setAttr "ARPSrcMAC" $ AttrD srcMAC
+        setAttr "ARPSrcIP" $ AttrD $ unpack32BE srcIP
+        setAttr "ARPOper" $ AttrW16 ARP.operRequest
+        setAttr "ETHDstMAC" $ AttrD ETH.macBroadcast
+        gs <- getGS
+        putGS (gs { gsARPPending = gsARPPending gs ++ [(dstIP,ctx)] })
+        toPort "true"
+    toPort "drop"
+
+-----------------------------------------------------------------------------
+-- IPv4 TX
+
+lpgTxL3IPv4AllocateHeaderImpl = do
+    debug "TxL3IPv4AllocateHeader"
+    let len = IP4.headerMinLen
+    insertP len 0
+    shiftOffset "L4" len
+    setAttr "L3Offset" $ AttrI 0
+    IP4.ihlWr (fromIntegral (len `quot` 4) :: Word8)
     toPort "out"
-    
+
+lpgTxL3IPv4FillHeaderImpl = do
+    (AttrW32 dstIP) <- getAttr "IP4Dest"
+    (AttrW32 srcIP) <- getAttr "IP4Source"
+    (AttrW8 proto) <- getAttr "IP4Proto"
+    hlen <- IP4.headerLen
+    hoff <- IP4.headerOff
+    plen <- IP4.payloadLen
+
+    IP4.versionWr 4
+    IP4.lengthWr (fromIntegral (hlen + plen) :: Word16)
+    IP4.identificationWr 0
+    IP4.flagsWr 0
+    IP4.fragmentWr 0
+    IP4.ttlWr 64
+    IP4.protocolWr proto
+    IP4.sourceIPWr srcIP
+    IP4.destIPWr dstIP
+
+    -- calculate checksum
+    cs <- fmap IP4.checksum $ readP hlen hoff
+    IP4.checksumWr cs
+
+    setAttr "ETHType" $ AttrW16 ETH.etypeIPV4
+    toPort "out"
+
+lpgTxL3IPv4RoutingImpl = do
+    setAttr "ETHSrcMAC" $ AttrD cfgLocalMAC
+    toPort "true"
+
+
+
+-----------------------------------------------------------------------------
+-- ICMP TX
+
+lpgTxL3ICMPInitiateResponseImpl = do
+    debug "TxL3ICMPInitiateResponse"
+    i <- ICMP.miscRd
+    debug ("  i=" ++ show i)
+    poff <- ICMP.payloadOff
+    plen <- ICMP.payloadLen
+    payload <- readP plen poff
+    dstIP <- IP4.sourceIPRd
+    srcIP <- IP4.destIPRd
+
+    forkPkt $ (do
+        setAttr "IP4Dest" $ AttrW32 dstIP
+        setAttr "IP4Source" $ AttrW32 srcIP
+        setAttr "ICMPId" $ AttrW32 i
+        insertP plen 0
+        writeP payload 0
+        toPort "out")
+    toPort "drop"
+
+lpgTxL3ICMPAllocateHeaderImpl = do
+    debug "TxL3ICMPAllocateHeader"
+    insertP ICMP.headerLen 0
+    setAttr "L4Offset" $ AttrI 0
+    toPort "out"
+
+lpgTxL3ICMPFillHeaderImpl = do
+    debug "TxL3ICMPFillHeader"
+    (AttrW32 i) <- getAttr "ICMPId"
+    ICMP.typeWr ICMP.typeEchoReply
+    ICMP.codeWr 0
+    debug ("  i=" ++ show i)
+    ICMP.miscWr i
+    -- calculate checksum
+    len <- packetLen
+    off <- ICMP.headerOff
+    pkt <- readP (len - off) off
+    ICMP.checksumWr $ IP4.checksum pkt
+
+    setAttr "IP4Proto" $ AttrW8 IP4.protocolICMP
+    toPort "true"
+
 
         
 
