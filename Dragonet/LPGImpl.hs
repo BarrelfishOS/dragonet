@@ -97,7 +97,6 @@ lpgRxL3ARPValidHeaderLengthImpl = do
 lpgRxL3ARPClassifyImpl = do
     debug "RxL3ARPClassify"
     oper <- ARP.operRd
-    debug ("  " ++ show oper)
     toPort $
         if oper == ARP.operRequest then "request"
         else if oper == ARP.operReply then "response"
@@ -139,7 +138,7 @@ lpgRxL3ARPProcessPendingResponseImpl = do
     putGS gs'
 
     -- Reenable pending contexts for this IP
-    let restart (_,ctx) = do { putCtx ctx ; debug ("  " ++ show (ctxAttrs ctx)) ; toPort "true" }
+    let restart (_,ctx) = do { putCtx ctx ; toPort "true" }
     mapM_ (forkPkt . restart) curP
     toPort "drop"
    
@@ -362,8 +361,8 @@ lpgTxL3ARPLookup_Impl = do
     cache <- fmap gsARPCache getGS
     (AttrW32 ip) <- getAttr "IP4Dest"
     case M.lookup ip cache of
-        (Just mac) -> do { debug "  hit" ; setAttr "ETHDstMAC" $ AttrD mac ; toPort "true" }
-        _ -> do { debug "  miss" ; toPort "miss" }
+        (Just mac) -> do { setAttr "ETHDstMAC" $ AttrD mac ; toPort "true" }
+        _ -> toPort "miss"
 
 lpgTxL3ARPSendRequestImpl = do
     debug "TxL3ARPSendRequest"
@@ -402,12 +401,12 @@ lpgTxL3IPv4FillHeaderImpl = do
     (AttrW8 proto) <- getAttr "IP4Proto"
     hlen <- IP4.headerLen
     hoff <- IP4.headerOff
-    plen <- IP4.payloadLen
+    pktLen <- packetLen
 
     IP4.versionWr 4
-    IP4.lengthWr (fromIntegral (hlen + plen) :: Word16)
+    IP4.lengthWr (fromIntegral (pktLen - hoff) :: Word16)
     IP4.identificationWr 0
-    IP4.flagsWr 0
+    IP4.flagsWr IP4.flagsDF
     IP4.fragmentWr 0
     IP4.ttlWr 64
     IP4.protocolWr proto
@@ -433,7 +432,6 @@ lpgTxL3IPv4RoutingImpl = do
 lpgTxL3ICMPInitiateResponseImpl = do
     debug "TxL3ICMPInitiateResponse"
     i <- ICMP.miscRd
-    debug ("  i=" ++ show i)
     poff <- ICMP.payloadOff
     plen <- ICMP.payloadLen
     payload <- readP plen poff
@@ -460,7 +458,6 @@ lpgTxL3ICMPFillHeaderImpl = do
     (AttrW32 i) <- getAttr "ICMPId"
     ICMP.typeWr ICMP.typeEchoReply
     ICMP.codeWr 0
-    debug ("  i=" ++ show i)
     ICMP.miscWr i
     -- calculate checksum
     len <- packetLen
