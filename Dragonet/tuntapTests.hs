@@ -2,20 +2,18 @@ import qualified Control.Concurrent as CC
 import qualified Control.Concurrent.STM as STM
 import qualified Control.Concurrent.STM.TChan as TC
 import qualified Control.Monad as M
-import qualified Network.TUNTAP as TAP
+import qualified Util.Tap as TAP
 
 import qualified Data.ByteString as BS
 
-import Dragonet.Implementation
-import Dragonet.Implementation.Algorithm
+import qualified Dragonet.Implementation as DNET
+import qualified Dragonet.Implementation.Algorithm as DNET.Alg
 
-import LPGImpl
+import qualified LPGImpl
 
+initialState = DNET.emptyGS
 
-
-initialState = emptyGS
-
-receivedPacket state packet = execute lpg packet state
+receivedPacket state packet = DNET.Alg.execute LPGImpl.lpg packet state
 
 
 
@@ -26,13 +24,13 @@ data NetEvent =
     TXEvent BS.ByteString
 
 rxThread c tap = M.forever $ do
-    p <- TAP.readTAP tap
+    p <- TAP.readbs tap
     STM.atomically $ TC.writeTChan c (RXEvent p)
 
 txThread c tap = M.forever $ do
     (TXEvent p) <- STM.atomically $ TC.readTChan c
     putStrLn "Send Packet"
-    TAP.writeTAP tap p
+    TAP.writebs tap p
 
 simStep rxC txC state = do
     e <- TC.readTChan rxC
@@ -44,31 +42,32 @@ simThread rxC txC state = do
     (p,state') <- STM.atomically $ simStep rxC txC state
 
     -- Show Debug output
-    putStrLn "SimStep"
-    if not $ null $ gsDebug state' then
-        putStr $ unlines $ map ("    " ++) $ gsDebug state'
+    putStrLn "SimStepDNET.Alg."
+    if not $ null $ DNET.gsDebug state' then
+        putStr $ unlines $ map ("    " ++) $ DNET.gsDebug state'
     else return ()
 
     -- Send out packets on TX queue
     let send p = STM.atomically $ TC.writeTChan txC (TXEvent p)
-    mapM_ send $ gsTXQueue state'
+    mapM_ send $ DNET.gsTXQueue state'
 
-    let state'' = state' { gsDebug = [], gsTXQueue = [] }
+    let state'' = state' { DNET.gsDebug = [], DNET.gsTXQueue = [] }
     simThread rxC txC state''
     
 
 main = do
-    tap <- TAP.start
-    fd <- TAP.openTAP tap "dragonet0"
+    -- create and open a TAP device
+    tap <- TAP.create "dragonet0"
+    TAP.set_ip tap "192.168.123.100"
+    TAP.set_mask tap "255.255.255.0"
+    TAP.up tap
 
+    -- create rx/tx channels
     rxC <- TC.newTChanIO
     txC <- TC.newTChanIO
 
-    rxT <- CC.forkIO $ rxThread rxC tap
-    txT <- CC.forkIO $ txThread txC tap
+    -- spawn rx/tx threads
+    _ <- CC.forkIO $ rxThread rxC tap
+    _ <- CC.forkIO $ txThread txC tap
 
     simThread rxC txC initialState
-
-    TAP.closeTAP tap
-    TAP.finish tap
-       

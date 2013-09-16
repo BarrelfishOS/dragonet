@@ -17,14 +17,26 @@ plos13_run: plos13
 
 impl: base
 	ghc $(GHCFLAGS) testImpl.hs -o impl
+
 impl_run: impl
 	./impl
 
-tuntap : base
+tuntap : base Util/Tap.o
 	ghc $(GHCFLAGS) tuntapTests.hs -o tuntap
+
 tuntap_run: tuntap
 	./tuntap
 
+## Util/Tap
+
+Util/tap.o: Util/tap.c
+	gcc $(CFLAGS) -c $< -o $@
+
+Util/Tap_.o: Util/Tap.hs
+	ghc $(GHCFLAGS) -c $< -o $@
+
+Util/Tap.o: Util/Tap_.o Util/tap.o
+	ld -i $^ -o $@
 
 models: graph_run
 	./convertDot.sh
