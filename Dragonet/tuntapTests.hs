@@ -3,6 +3,7 @@ import qualified Control.Concurrent.STM as STM
 import qualified Control.Concurrent.STM.TChan as TC
 import qualified Control.Monad as M
 import qualified Util.Tap as TAP
+import qualified System.Posix.User as SPU
 
 import qualified Data.ByteString as BS
 
@@ -58,9 +59,16 @@ simThread rxC txC state = do
 main = do
     -- create and open a TAP device
     tap <- TAP.create "dragonet0"
-    TAP.set_ip tap "192.168.123.100"
-    TAP.set_mask tap "255.255.255.0"
-    TAP.up tap
+
+    -- Initialize tap device on linux side
+    uid <- SPU.getRealUserID
+    if uid == 0 then do
+        TAP.set_ip tap "192.168.123.100"
+        TAP.set_mask tap "255.255.255.0"
+        TAP.up tap
+    else do
+        putStrLn ("Warning: Cannot configure Linux-side of TAP device as " ++
+                  "non-root user.")
 
     -- create rx/tx channels
     rxC <- TC.newTChanIO
