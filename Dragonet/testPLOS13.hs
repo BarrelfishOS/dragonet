@@ -6,6 +6,7 @@ import Dragonet.Unicorn
 import Dragonet.Configuration
 import Dragonet.DotGenerator
 import Dragonet.Embedding
+import Dragonet.Constraints
 
 import qualified Util.GraphHelpers as GH
 import qualified Data.Graph.Inductive as DGI
@@ -51,7 +52,9 @@ graph prg {
 
     boolean HWIsTCPSyn {
         port true[CSynOutput]
-        port false[HWIsUDPDest53] }
+        port false[HWIsUDPDest53]
+        constraint true "TCP&TCPSYNFlag"
+        constraint false "!(TCP&TCPSYNFlag)" }
 
     config CSynOutput {
         port Q0[Queue0]
@@ -60,19 +63,24 @@ graph prg {
 
     boolean HWIsUDPDest53 {
         port true[L2EtherValidUnicast]
-        port false[Queue0] }
+        port false[Queue0]
+        constraint true "UDP&DestPort=53"
+        constraint false "!(UDP&DestPort=53)" }
 
     boolean L2EtherValidUnicast {
         port true[Queue1]
         port false[] }
 
     node Queue0 {
+        attr "software"
         port out[] }
 
     node Queue1 {
+        attr "software"
         port out[] }
 
     node Queue2 {
+        attr "software"
         port out[] }
 }
 |]
@@ -154,7 +162,9 @@ graph lpg {
     cluster L4UDP {
         boolean Classified {
             port true[ValidChecksum ValidSrc ValidDst ValidLen .L4Classified]
-            port false[.L4Classified] }
+            port false[.L4Classified]
+            constraint true "UDP"
+            constraint false "!UDP" }
 
         boolean ValidChecksum {
             port true false[Verified] }
@@ -192,10 +202,14 @@ graph lpg {
     */
 
     boolean IsUDPDest53 {
-        port true false[named] }
+        port true false[named]
+        constraint true "UDP&DestPort=53"
+        constraint false "!(UDP&DestPort=53)" }
 
     boolean IsUDPDest67 {
-        port true false[dhcpd] }
+        port true false[dhcpd]
+        constraint true "UDP&DestPort=67"
+        constraint false "!(UDP&DestPort=67)" }
 
     and named {
         port true [Named]
@@ -262,6 +276,8 @@ main = do
     writeFile ("PRG" ++ suffix ++ "-clustered.dot") $ dotClustered prg prgClusters
     writeFile ("LPG" ++ suffix ++ "-clustered.dot") $ dotClustered lpg lpgClusters
     writeFile ("Embedded" ++ suffix ++ ".dot") $ dot $ dropBeforeQ embedded
+    constrained <- constrain embedded
+    writeFile ("EmbeddedFull" ++ suffix ++ ".dot") $ dot constrained
     where
         suffix = "paper"
 
