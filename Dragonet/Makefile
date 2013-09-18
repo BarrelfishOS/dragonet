@@ -22,7 +22,7 @@ impl_run: impl
 	./impl
 
 tuntap : base Util/Tap.o
-	ghc $(GHCFLAGS) tuntapTests.hs -o tuntap
+	ghc $(GHCFLAGS) -threaded tuntapTests.hs -o tuntap
 
 tuntap_run: tuntap
 	./tuntap
