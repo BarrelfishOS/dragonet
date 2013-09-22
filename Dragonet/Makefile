@@ -1,4 +1,4 @@
-BINARIES=graph plos13 impl tuntap
+BINARIES=graph plos13 impl tuntap confgen
 GHCFLAGS=-Wall -O2 -XRankNTypes
 # Debuging for DSL -> Haskell process
 # GHCFLAGS+=-ddump-splices
@@ -9,6 +9,12 @@ graph: base
 	ghc $(GHCFLAGS) testGraph.hs -o graph
 graph_run: graph
 	./graph
+
+confgen: base
+	ghc $(GHCFLAGS) testConfGen.hs -o confgen
+
+confgen_run: confgen
+	./confgen
 
 plos13: base
 	ghc $(GHCFLAGS) testPLOS13.hs -o plos13

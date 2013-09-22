@@ -1,5 +1,5 @@
 module Util.Misc (
-    splitBy,
+    splitBy, minusL,
     fst3, snd3, thd3,
 ) where
 
@@ -10,6 +10,10 @@ splitBy delimiter = foldr f [[]]
     where f c l@(x:xs) | c == delimiter = []:l
                        | otherwise = (c:x):xs
           f _ _ = undefined
+
+-- Setminus on unordered lists (inefficient)
+minusL :: (Eq a) => [a] -> [a] -> [a]
+minusL a b = filter (not . (flip elem b)) a
 
 fst3 :: (a,b,c) -> a
 fst3 (a,_,_) = a
