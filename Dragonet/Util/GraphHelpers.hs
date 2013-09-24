@@ -16,7 +16,6 @@ module Util.GraphHelpers(
 
 import Data.Graph.Inductive
 import qualified Data.Graph.Inductive.Query.DFS as DFS
-import Data.Maybe
 import qualified Data.List as L
 import qualified Control.Arrow as A
 
@@ -89,7 +88,8 @@ mergeGraphsBy nC a b = flip insEdges gNodes $ map convertEdge $ labEdges b
         -- nodes.
         nMap :: [(Node,Either Node Node)]
         (gNodes,nMap) = foldl mapNode (a,[]) $ map assocN nb
-        convertNode n = either id id $ fromJust $ lookup n nMap
+        convertNode n = either id id e'
+            where (Just e') = lookup n nMap
         convertEdge (nA,nB,l) = (convertNode nA, convertNode nB, l)
 
 -- Adjacency list for context
@@ -102,7 +102,8 @@ type RecContext i ie n o oe = (LAdj (LNode i) ie,LNode n,LAdj (LNode o) oe)
 -- old labels of successors).
 recurseNFW :: (DynGraph gr, Show nn, Show e, Show on) => (RecContext nn e on on e -> nn) -> gr on e
                                 -> gr nn e
-recurseNFW f g = gmap (\(ia,n,_,oa) -> (ia,n,fromJust $ lookup n assocL,oa)) g
+recurseNFW f g = gmap (\(ia,n,_,oa) -> let (Just lbl) = lookup n assocL
+                                           in (ia,n,lbl,oa)) g
     where
         -- Association list from nodes to new labels
         assocL = foldl nfun [] $ DFS.topsort g
@@ -111,12 +112,12 @@ recurseNFW f g = gmap (\(ia,n,_,oa) -> (ia,n,fromJust $ lookup n assocL,oa)) g
         recCtx l n = (inA',(n,nl),outA')
             where
                 lblAdj lf = map (\(e,m) -> (e,(m,lf m)))
-                inA' = lblAdj (\m -> fromJust $ lookup m l) inA
-                outA' = lblAdj (fromJust . lab g) outA
+                inA' = lblAdj (\m -> let (Just a) = lookup m l in a) inA
+                outA' = lblAdj (\m -> let (Just a) = lab g m in a) outA
                 (inA,_,nl,outA) = context g n
 
 -- Get lnodes in graph sorted in topological order
 topsortLN :: Graph gr => gr a b -> [LNode a]
-topsortLN g = map (\x -> fromJust $ L.find ((== x) . fst) ln) $ topsort g
+topsortLN g = map (\x -> let (Just y) = L.find ((== x) . fst) ln in y) $ topsort g
     where ln = labNodes g
 
