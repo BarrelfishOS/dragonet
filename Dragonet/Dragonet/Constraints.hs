@@ -160,10 +160,10 @@ getUnsatisfiable es = do
 
 -- Remove edges originating from ports with unsatisfiable constraints
 removeUnsatisfiable :: PG.PGraph i -> [(DGI.Node, PG.Port)] -> PG.PGraph i
-removeUnsatisfiable g u = DGI.delEdges edges g
+removeUnsatisfiable g u = TR.trace (show edges) (GH.delLEdges edges g)
     where
         edges = concatMap handlePort u
-        handlePort (n,p) = map (\(m,_) -> (n,m)) $
+        handlePort (n,p) = map (\(m,_) -> (n,m,p)) $
                                 filter ((== p) . snd) $ DGI.lsuc g n
 
 -- Simplify graph:
@@ -178,6 +178,8 @@ simplifyGraph g = DGI.delNodes orphaned g
 constrain :: PG.PGraph i -> IO (PG.PGraph i)
 constrain g = do
     let constraints = addAdditionalConstraints $ generateConstraints g
-    unsatisifiable <- getUnsatisfiable constraints
-    return (simplifyGraph $ removeUnsatisfiable g unsatisifiable)
+    unsatisfiable <- getUnsatisfiable constraints
+    putStrLn $ show g
+    putStrLn $ show unsatisfiable
+    return (simplifyGraph $ removeUnsatisfiable g unsatisfiable)
 
