@@ -18,6 +18,35 @@ import qualified Util.Misc as UM
 import qualified Util.GraphHelpers as GH
 import qualified Util.GraphMonad as GM
 import Control.Monad
+import Control.Monad.Trans.State as TS
+import Control.Monad.IO.Class as MTIO
+
+
+type IPv4Address = Word32
+type UDPPort = Word16
+
+data Flow =
+    UDPIPv4Listen IPv4Address UDPPort |
+    UDPIPv4Flow IPv4Address IPv4Address UDPPort UDPPort
+
+type SocketID = Int
+data SocketDesc = SocketDesc {
+    sdID :: SocketID,
+    sdFlow :: Flow,
+    sdNodes :: [DGI.Node],
+    sdQueue :: Int
+}
+
+data StackState = StackState {
+    ssQueues :: Int,
+    ssNextSock :: SocketID,
+    ssSockets :: [SocketDesc],
+    ssConfig :: [(String,String)]
+}
+
+
+
+
 
 [unicorn|
 graph prg {
@@ -25,6 +54,7 @@ graph prg {
 
     cluster L2Ether {
         boolean Classified {
+            attr "source"
             port true[ValidCRC]
             port false[] }
 
@@ -65,6 +95,7 @@ graph prg {
         port false[] }
     node Queue0 {
         attr "software"
+        attr "sink"
         port out[] }
 
     or Q1Valid {
@@ -72,6 +103,7 @@ graph prg {
         port false[] }
     node Queue1 {
         attr "software"
+        attr "sink"
         port out[] }
 
     or Q2Valid {
@@ -79,6 +111,7 @@ graph prg {
         port false[] }
     node Queue2 {
         attr "software"
+        attr "sink"
         port out[] }
 }
 |]
@@ -126,7 +159,9 @@ graph lpg {
     cluster L3IPv4 {
         boolean Classified {
             port true[ValidChecksum ValidProtocol]
-            port false[] }
+            port false[]
+            constraint true "IPv4"
+            constraint false "!IPv4" }
 
         boolean ValidChecksum {
             port true false[Verified] }
@@ -141,7 +176,9 @@ graph lpg {
     cluster L3IPv6 {
         boolean Classified {
             port true[ValidProtocol]
-            port false[] }
+            port false[]
+            constraint true "IPv6"
+            constraint false "!IPv6" }
 
         boolean ValidProtocol {
             port true false[.L3Classified] }
@@ -187,8 +224,9 @@ graph lpg {
 }
 |]
 
-type IPv4Address = Word32
-type UDPPort = Word16
+
+-------------------------------------------------------------------------------
+-- Implementation of configuration of 5-tuple filters
 
 data C5TL3Proto = C5TPL3IPv4 | C5TPL3IPv6
 instance Show C5TL3Proto where
@@ -238,6 +276,7 @@ c5tAttr c =
             
 
 parse5tCFG :: String -> [C5Tuple]
+parse5tCFG [] = []
 parse5tCFG s = map parseTuple $ UM.splitBy '#' s
     where
         parseTuple s' = C5Tuple {
@@ -297,26 +336,17 @@ config5tuple _ inE outE cfg = do
 
 
 
+--------------------------------------------------------------------------------
+-- Adapting LPG
 
-data Flow =
-    UDPIPv4Listen IPv4Address UDPPort |
-    UDPIPv4Flow IPv4Address IPv4Address UDPPort UDPPort
-
-type SocketID = Int
-data SocketDesc = SocketDesc {
-    sdID :: SocketID,
-    sdFlow :: Flow,
-    sdNodes :: [DGI.Node],
-    sdQueue :: Int
-}
-
+-- Adds a new socket to the specified LPG
 lpgAddSocket :: PGraph () -> SocketDesc -> (SocketDesc,PGraph ())
 lpgAddSocket g sd = GM.runOn (do
     let boolP = ["true","false"]
     let sockL = "Socket" ++ show sockID
     let validL = sockL ++ "Valid"
 
-    sockN <- GM.newNode $ baseFNode sockL [] [] Nothing
+    sockN <- GM.newNode $ baseFNode sockL ["sink"] [] Nothing
     validN <- GM.newNode $ baseONode validL [] boolP OpAnd Nothing
     GM.newEdge (validN, sockN, "true")
 
@@ -359,16 +389,14 @@ lpgAddSocket g sd = GM.runOn (do
         findN l = GM.withGr (\g' -> fst $ fromJust $
                              GH.findNodeByL ((== l) . nLabel) g')
 
+-- Remove a socket from the LPG
 lpgDelSocket :: PGraph () -> SocketDesc -> PGraph ()
 lpgDelSocket g sd = DGI.delNodes (sdNodes sd) g
 
 
-data StackState = StackState {
-    ssQueues :: Int,
-    ssNextSock :: SocketID,
-    ssSockets :: [SocketDesc],
-    ssConfig :: [(String,String)]
-}
+--------------------------------------------------------------------------------
+-- State of the whole network stack
+
 
 emptyStackState :: Int -> [(String,String)] -> StackState
 emptyStackState queues cfg = StackState {
@@ -378,6 +406,7 @@ emptyStackState queues cfg = StackState {
     ssConfig = cfg
 }
 
+-- Add a new socket
 ssAddFlow :: StackState -> Flow -> (StackState,SocketID)
 ssAddFlow ss flow =
     (ss { ssNextSock = sid + 1, ssSockets = ssSockets ss ++ [sd] },sid)
@@ -390,14 +419,17 @@ ssAddFlow ss flow =
         qMap = M.toList $ foldl accumSock (M.fromList qInit) $ ssSockets ss
         queue = fst $ L.minimumBy (\a b -> compare (snd a) (snd b)) qMap
 
+-- Remove a socket
 ssDelSocket :: StackState -> SocketID -> StackState
 ssDelSocket ss sock =
     ss { ssSockets = filter (\s -> sdID s /= sock) $ ssSockets ss }
 
+-- Generate LPG corresponding to the specified LPG
 ssLPG :: StackState -> PGraph ()
 ssLPG ss =
     foldl (\a b -> snd $ lpgAddSocket a b) lpg $ ssSockets ss
 
+-- Generate configuration for PRG
 ssPRGConfig :: StackState -> [(String,String)]
 ssPRGConfig ss = 
         ssConfig ss ++ [("C5TupleFilter",config)]
@@ -412,6 +444,17 @@ ssPRGConfig ss =
               show dPort ]
                 
 
+-- Iteratively drop all sink nodes that don't have the sink attribute
+dropNonsinks :: PGraph () -> PGraph ()
+dropNonsinks graph =
+        foldl dropNS graph ts
+    where
+        ts = reverse $ GH.topsortLN graph
+        dropNS g (n,l) =
+            if (null $ DGI.suc g n) && (notElem "sink" $ nAttributes l) then
+                DGI.delNode n g
+            else g
+
 ssGraphs :: StackState -> String -> IO ()
 ssGraphs ss prefix = do
     putStrLn ("Generating " ++ prefix ++ " graphs...")
@@ -419,7 +462,8 @@ ssGraphs ss prefix = do
     let cfg = ssPRGConfig ss
     let prgC = pgSetType GTPrg $ applyConfig cfg prg
     let lpg' = pgSetType GTLpg $ ssLPG ss
-    let embedded = fullEmbedding prgC lpg'
+    let prgR = dropUnreachable prgC
+    let embedded = fullEmbedding prgR lpg'
 
     writeFile (prefix ++ "_lpg.dot") $ toDot lpg'
     writeFile (prefix ++ "_prg.dot") $ toDot prgC
@@ -428,27 +472,72 @@ ssGraphs ss prefix = do
     putStrLn "  Constraining..."
     constrained <- constrain embedded
     putStrLn "  Constrained"
-    writeFile "constrained.dot" $ toDot constrained
+    writeFile (prefix ++ "_constrained.dot") $ toDot constrained
+    writeFile (prefix ++ "_final.dot") $ toDot $ dropNonsinks constrained
 
     return ()
+    where
+        dropUnreachable g =
+            foldl dropZeroIndeg g $ GH.topsortLN g
+        dropZeroIndeg g (n,l) =
+            if null (DGI.pre g n) && (notElem "source" $ nAttributes l) then
+                DGI.delNode n g
+            else g
+
+------------------------------------------------------------------------------
+-- Config generation monad to simplify things
+
+type ConfigGenM a = TS.StateT StackState IO a
+
+cgmIO :: IO a -> ConfigGenM a
+cgmIO = MTIO.liftIO
+
+cgmNewSocket :: Flow -> ConfigGenM SocketID
+cgmNewSocket f = do
+    ss <- get
+    let (ss',sock) = ssAddFlow ss f
+    put ss'
+    return sock
+
+cgmDelSocket :: SocketID -> ConfigGenM ()
+cgmDelSocket sock = do
+    ss <- get
+    put $ ssDelSocket ss sock
+
+cgmGraphs :: String -> ConfigGenM ()
+cgmGraphs pref = do
+    ss <- get
+    cgmIO $ ssGraphs ss pref
+
+cgmRun :: Int -> [(String,String)] -> ConfigGenM () -> IO ()
+cgmRun queues config c = do
+    let ss = emptyStackState queues config
+    TS.evalStateT c ss
+
 
 
 main :: IO ()
 main = do
+    let cgm = do
+        cgmGraphs "0"
+        s0 <- cgmNewSocket $ UDPIPv4Listen 0 56
+        cgmGraphs "1"
+        s1 <- cgmNewSocket $ UDPIPv4Flow
+                                (fromJust $ IP4.ipFromString "192.168.1.1")
+                                (fromJust $ IP4.ipFromString "8.8.8.8") 1234 53
+        cgmGraphs "2"
+        s2 <- cgmNewSocket $ UDPIPv4Listen 0 54
+        cgmGraphs "3"
+        cgmDelSocket s0
+        cgmGraphs "4"
+        s3 <- cgmNewSocket $ UDPIPv4Listen 0 55
+        cgmGraphs "5"
+        s4 <- cgmNewSocket $ UDPIPv4Listen 0 57
+        cgmGraphs "6"
+
     putStrLn "Generating .dot files..."
     writeFile "prgU.dot" $ toDot prg
-
-    let ss0 = emptyStackState 3 config
-    let (ss1,s0) = ssAddFlow ss0 (UDPIPv4Listen 0 56)
-    let (ss2,s1) = ssAddFlow ss1 (UDPIPv4Flow
-                                (fromJust $ IP4.ipFromString "192.168.1.1")
-                                (fromJust $ IP4.ipFromString "8.8.8.8") 1234 53)
-    let (ss3,s2) = ssAddFlow ss2 (UDPIPv4Listen 0 54)
-    let (ss4,s3) = ssAddFlow ss3 (UDPIPv4Listen 0 55)
-    let (ss5,s4) = ssAddFlow ss4 (UDPIPv4Listen 0 57)
-    let ss6 = ssDelSocket ss5 s3
-
-    ssGraphs ss5 "first"
+    cgmRun 3 config cgm
 
     where
         config = [("CSynFilter", "false"), ("CSynOutput","drop")]

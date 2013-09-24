@@ -113,7 +113,7 @@ additionalConstraints :: [((DGI.Node,PG.Port),CExp)] -> CExp
 additionalConstraints es = cAndL (global ++ varConstr)
     where
         -- Global constraints
-        global = ["TCP" `mutex` "UDP"]
+        global = ["TCP" `mutex` "UDP", "IPv4" `mutex` "IPv6"]
         -- Look for variable constraints in the form a=b, and build list of a's
         varPrefixes =
             L.nub $ map (takeWhile ('=' /=)) $ filter (elem '=') varnames
@@ -160,7 +160,7 @@ getUnsatisfiable es = do
 
 -- Remove edges originating from ports with unsatisfiable constraints
 removeUnsatisfiable :: PG.PGraph i -> [(DGI.Node, PG.Port)] -> PG.PGraph i
-removeUnsatisfiable g u = TR.trace (show edges) (GH.delLEdges edges g)
+removeUnsatisfiable g u = GH.delLEdges edges g
     where
         edges = concatMap handlePort u
         handlePort (n,p) = map (\(m,_) -> (n,m,p)) $
@@ -179,7 +179,5 @@ constrain :: PG.PGraph i -> IO (PG.PGraph i)
 constrain g = do
     let constraints = addAdditionalConstraints $ generateConstraints g
     unsatisfiable <- getUnsatisfiable constraints
-    putStrLn $ show g
-    putStrLn $ show unsatisfiable
     return (simplifyGraph $ removeUnsatisfiable g unsatisfiable)
 
