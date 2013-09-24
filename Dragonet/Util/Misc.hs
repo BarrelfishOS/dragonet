@@ -1,8 +1,9 @@
 module Util.Misc (
-    splitBy, minusL,
+    splitBy, joinBy, minusL,
     fst3, snd3, thd3,
 ) where
 
+import qualified Data.List as L
 
 -- Split list by delimiter into multiple lists
 splitBy :: Eq a => a -> [a] -> [[a]]
@@ -10,6 +11,12 @@ splitBy delimiter = foldr f [[]]
     where f c l@(x:xs) | c == delimiter = []:l
                        | otherwise = (c:x):xs
           f _ _ = undefined
+
+-- Concatenate lists with delimiter
+joinBy :: [[a]] -> [a] -> [a]
+joinBy [] _ = []
+joinBy l sep = L.foldl1 (\a b -> a ++ sep ++ b) l
+
 
 -- Setminus on unordered lists (inefficient)
 minusL :: (Eq a) => [a] -> [a] -> [a]

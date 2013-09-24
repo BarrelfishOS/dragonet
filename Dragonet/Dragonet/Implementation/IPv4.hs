@@ -7,7 +7,7 @@ module Dragonet.Implementation.IPv4(
     flagsDF, flagsMF,
     protocolICMP, protocolTCP, protocolUDP,
     headerMinLen, headerLen, headerOff, payloadOff, payloadLen, checksum,
-    pseudoheader, ipFromString,
+    pseudoheader, ipFromString, ipToString
 ) where
 
 import Dragonet.Implementation
@@ -227,4 +227,8 @@ ipFromString s
     | length parts /= 4 = Nothing
     | otherwise = Just $ pack32BE (map read parts :: [Word8])
     where parts = splitBy '.' s :: [String]
+
+-- Convert IP to a string
+ipToString :: Word32 -> String
+ipToString ip = (map show $ unpack32BE ip) `joinBy` "."
 
