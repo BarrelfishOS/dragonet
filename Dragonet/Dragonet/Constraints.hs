@@ -10,7 +10,6 @@ import qualified Util.GraphHelpers as GH
 import qualified Data.Graph.Inductive as DGI
 
 import qualified Data.List as L
-import qualified Data.Set as S
 import qualified Debug.Trace as TR
 import Control.Monad
 
@@ -20,22 +19,52 @@ import System.IO.Temp
 import System.Exit
 
 
+-- Options for generating constraint expressions:
+--   - Build normal BExp expressions, tend to get large because of redundancy,
+--       expression basically doubles for each and node, but can be converted to
+--       equisatisfiable CNF which should only grow it linearly
+--   - CNFExp: Keeps the expression in CNF format, uses naive equivalent
+--       transformation -> possibly exponential increase for not/ors,
+--       but tends to reduce redundancy, because identical clauses in the CNF
+--       will only be included once.
+--
+--  Need to enable corresponding set of functions below
 
-type CExp = BE.CNFBExp
+--type CExp = BE.CNFBExp
+type CExp = BE.BExp
+
 cAnd :: CExp -> CExp -> CExp
-cAnd = BE.cnfAnd
 cOr :: CExp -> CExp -> CExp
-cOr = BE.cnfOr
 cNot :: CExp -> CExp
-cNot = BE.cnfNot
 cVar :: String -> CExp
-cVar = BE.cnfVar
 cAndL :: [CExp] -> CExp
-cAndL = BE.cnfAndL
 cOrL :: [CExp] -> CExp
-cOrL = BE.cnfOrL
 cVariables :: CExp -> [String]
+cFromBE :: BE.BExp -> CExp
+cToCNF :: CExp -> BE.CNFBExp
+
+-- CNF exps
+{-cAnd = BE.cnfAnd
+cOr = BE.cnfOr
+cNot = BE.cnfNot
+cVar = BE.cnfVar
+cAndL = BE.cnfAndL
+cOrL = BE.cnfOrL
 cVariables = S.toList . BE.cnfVariables
+cFromBE = BE.bexp2cnf
+cToCNF = id-}
+
+-- Normal expressions
+cAnd = BE.BEAnd
+cOr = BE.BEOr
+cNot = BE.BENot
+cVar = BE.BEVar
+cAndL = BE.andL
+cOrL = BE.orL
+cVariables = BE.variables
+cFromBE = id
+cToCNF = BE.toECNF
+
 
 -- Constraints induced by a particular port on a node
 getNPConstraints :: PG.Node i -> PG.Port -> Maybe CExp
@@ -47,7 +76,7 @@ getNPConstraints n p = do
         parse a = case BEP.parseExp a of
             Left _ -> error ("Error parsing constraint for node '" ++
                         PG.nLabel n ++ "'.'" ++ p ++ "'")
-            Right e -> Just $ BE.bexp2cnf e
+            Right e -> Just $ cFromBE e
 
 -- Generates the constraints for a specific node
 combineN :: GH.RecContext [(PG.Port,CExp)] PG.Port (PG.Node i) (PG.Node i) PG.Port -> [(PG.Port,CExp)]
@@ -111,7 +140,7 @@ isSAT :: CExp -> IO Ternary
 isSAT e = withSystemTempFile "toMinisat.dimac" toMinisat
     where
         toMinisat fp h = do
-            SI.hPutStr h (BE.toDIMACS e)
+            SI.hPutStr h (BE.toDIMACS $ cToCNF e)
             SI.hFlush h
             rc <- SC.system ("minisat " ++ fp ++ " >/dev/null")
             return (case rc of

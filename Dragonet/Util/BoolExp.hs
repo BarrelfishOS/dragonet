@@ -2,6 +2,7 @@ module Util.BoolExp(
     BExp(..),
     andL,
     orL,
+    variables,
 
     CNFBExp,
     CNFClause,
@@ -18,11 +19,12 @@ module Util.BoolExp(
     bexp2cnf,
     cnf2bexp,
     toDIMACS,
+    toECNF,
 ) where
 
 import qualified Data.Set as S
 import qualified Data.Map as M
-import Data.Maybe
+import qualified Data.List as L
 
 
 -- Boolean expression
@@ -30,15 +32,33 @@ data BExp = BEVar String |
             BENot BExp |
             BEOr BExp BExp |
             BEAnd BExp BExp
-    deriving (Show,Eq)
+    deriving (Eq,Ord)
+
+instance Show BExp where
+    show (BEVar v) = v
+    show (BENot n) = "!" ++ show n
+    show (BEAnd a b) = "(" ++ show a ++ "&" ++ show b ++ ")"
+    show (BEOr a b) = "(" ++ show a ++ "|" ++ show b ++ ")"
 
 -- Convert list of expressions to tree of ANDs of those expressions
 andL :: [BExp] -> BExp
-andL = foldl1 BEAnd 
+andL [] = error "andL on empty list"
+andL l = foldl1 BEAnd l
 
 -- Convert list of expressions to tree of ORs of those expressions
 orL :: [BExp] -> BExp
-orL = foldl1 BEOr
+orL [] = error "andL on empty list"
+orL l = foldl1 BEOr l
+
+-- Get all variable names
+variables :: BExp -> [String]
+variables ex =
+    L.nub $ var' ex
+    where
+        var' (BEVar n) = [n]
+        var' (BENot e) = variables e
+        var' (BEAnd a b) = variables a ++ variables b
+        var' (BEOr a b) = variables a ++ variables b
 
 
 -- Map f to tree by applying it from the outside in
@@ -83,7 +103,6 @@ toCNF e = fst $ distr $ recOutIn demorgan e
         demorgan (BENot (BEOr a b)) = BEAnd (BENot a) (BENot b)
         demorgan (BENot (BENot a)) = a
         demorgan a = a
-
 
 ------------------------------------------------------------------------------
 -- CNF expressions in set-of-clauses representation
@@ -132,6 +151,52 @@ cnfVariables e = S.foldl S.union S.empty $ S.map clause e
         clause :: CNFClause -> S.Set String
         clause = S.map litLabel
 
+-- Convert expression to equisatisfiable (but not equivalent) CNF
+-- (implements the Tseitin-Transformation)
+toECNF :: BExp -> CNFBExp
+toECNF bexp = convert finalExp
+    where
+        finalExp = finalClauses ++ [[CNFLitPos finalName]]
+        ((_,finalClauses),finalName) = rec (M.empty,[]) bexp
+        convert = S.fromList . (map S.fromList)
+        newvar m = "__tseT" ++ (show $ M.size m)
+        rec ctx (BEVar n) = (ctx,n)
+        rec ctx e =
+            case M.lookup e m of
+                Just n -> (ctx,n)
+                Nothing ->
+                    let n = newvar m
+                        m' = M.insert e n m
+                        ((m'',c'),e') = genFormula (m',c) n e
+                        in ((m'', c' ++ e'),n)
+            where (m,c) = ctx
+
+        genFormula ctx n (BENot e) = (ctx',ex)
+            where
+                (ctx',eN) = rec ctx e
+                ex = [[CNFLitNeg eN, CNFLitNeg n],
+                      [CNFLitPos eN, CNFLitPos n]]
+
+        genFormula ctx n (BEOr a b) = (ctx'',ex)
+            where
+                (ctx',aN) = rec ctx a
+                (ctx'',bN) = rec ctx' b
+                ex = [[CNFLitPos aN, CNFLitPos bN, CNFLitNeg n],
+                      [CNFLitNeg aN, CNFLitPos n],
+                      [CNFLitNeg bN, CNFLitPos n]]
+
+        genFormula ctx n (BEAnd a b) = (ctx'',ex)
+            where
+                (ctx',aN) = rec ctx a
+                (ctx'',bN) = rec ctx' b
+                ex = [[CNFLitNeg aN, CNFLitNeg bN, CNFLitPos n],
+                      [CNFLitPos aN, CNFLitNeg n],
+                      [CNFLitPos bN, CNFLitNeg n]]
+
+        genFormula _ _ (BEVar _) = undefined
+
+
+
 
 
 ------------------------------------------------------------------------------
@@ -167,11 +232,13 @@ cnfVar a = S.singleton $ S.singleton $ CNFLitPos a
 
 -- Combine multiple CNF expressions using and
 cnfAndL :: [CNFBExp] -> CNFBExp
-cnfAndL = foldl1 cnfAnd
+cnfAndL [] = error "cnfAndL on empty list"
+cnfAndL l = foldl1 cnfAnd l
 
 -- Combine multiple CNF expressions using or
 cnfOrL :: [CNFBExp] -> CNFBExp
-cnfOrL = foldl1 cnfOr
+cnfOrL [] = error "cnfAndL on empty list"
+cnfOrL l = foldl1 cnfOr l
 
 
 
@@ -197,6 +264,6 @@ toDIMACS e = unlines (header:cs)
         varMap :: M.Map String Int
         varMap = M.fromList $ zip (S.toList $ cnfVariables e) [1..]
 
-        lID s = fromJust $ M.lookup s varMap
+        lID s = varMap M.! s
 
 
