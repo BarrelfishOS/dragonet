@@ -15,6 +15,7 @@ confgen: base
 
 confgen_run: confgen
 	./confgen
+	./convertConfGen.sh
 
 plos13: base
 	ghc $(GHCFLAGS) testPLOS13.hs -o plos13
