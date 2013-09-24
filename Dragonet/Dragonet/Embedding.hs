@@ -4,6 +4,7 @@ module Dragonet.Embedding(
 
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Util.GraphHelpers as GH
+import qualified Util.Misc as UM
 
 import qualified Data.Graph.Inductive as DGI
 import qualified Data.Graph.Inductive.Query.DFS as DGIDFS
@@ -165,7 +166,16 @@ lpgQNode (_,qn) n = if lbl == "Queue" then n' { PG.nLabel = ql } else n'
 prgQ :: PG.PGNode i -> PG.PGraph i -> PG.PGraph i
 prgQ (qn,ql) prg = DGI.nmap tagSWN g'
     where
-        g' = GH.reduceNodes prg $ DGIDFS.reachable qn $ DGI.grev prg
+        prgNodes q = DGIDFS.reachable q $ DGI.grev prg
+        allQNodes = concatMap (prgNodes . fst) $ queues prg
+        -- TODO: This is really ulgy. We want to avoid losing software nodes that
+        -- only have incoming edges. This is currently done by looking at the
+        -- nodes reachable from every queue, and adding the nodes that are not
+        -- reachable from any node also for each queue. This could be done
+        -- cleaner by taking the graph for each queue, and prune away the nodes
+        -- only reachable from each of the other queues.
+        nonQNodes = (DGI.nodes prg) `UM.minusL` allQNodes
+        g' = GH.reduceNodes prg $ (prgNodes qn ++ nonQNodes)
         qlab = PG.nLabel ql
         tagSWN n = if PG.nIsSoftware n then n { PG.nTag = qlab } else n
 
