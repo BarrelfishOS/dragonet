@@ -21,6 +21,8 @@ import Control.Monad
 import Control.Monad.Trans.State as TS
 import Control.Monad.IO.Class as MTIO
 
+import qualified Debug.Trace as T
+
 
 type IPv4Address = Word32
 type UDPPort = Word16
@@ -28,6 +30,18 @@ type UDPPort = Word16
 data Flow =
     UDPIPv4Listen IPv4Address UDPPort |
     UDPIPv4Flow IPv4Address IPv4Address UDPPort UDPPort
+
+flowDest :: Flow -> (IPv4Address,UDPPort)
+flowDest (UDPIPv4Listen ip port) = (ip,port)
+flowDest (UDPIPv4Flow _ ip _ port) = (ip,port)
+
+flowIsListen :: Flow -> Bool
+flowIsListen (UDPIPv4Listen _ _) = True
+flowIsListen _ = False
+
+destCovers :: (IPv4Address,UDPPort) -> (IPv4Address,UDPPort) -> Bool
+destCovers (0,pL) (_,pF) = pL == pF
+destCovers (ipL,pL) (ipF,pF) = ipL == ipF && pL == pF
 
 type SocketID = Int
 data SocketDesc = SocketDesc {
@@ -39,6 +53,7 @@ data SocketDesc = SocketDesc {
 
 data StackState = StackState {
     ssQueues :: Int,
+    ss5Tuples :: Int,
     ssNextSock :: SocketID,
     ssSockets :: [SocketDesc],
     ssConfig :: [(String,String)]
@@ -84,6 +99,11 @@ graph prg {
 
     config C5TupleFilter {
         function config5tuple
+        port queues[Q0Valid Q1Valid Q2Valid]
+        port default[CFDirFilter] }
+
+    config CFDirFilter {
+        function configFDir
         port queues[Q0Valid Q1Valid Q2Valid]
         port default[ToDefaultQueue] }
 
@@ -330,7 +350,91 @@ config5tuple _ inE outE cfg = do
             let tEdge = (n,queue $ c5tQueue c,"true")
             let fEdge = (n,queue $ c5tQueue c,"false")
             return ((n,"false"), es ++ [inEdge,tEdge,fEdge])
-            
+
+
+-------------------------------------------------------------------------------
+-- Implementation of configuration of the flow director filters
+
+data CFDirTuple = CFDirTuple {
+    cfdtQueue    :: Int,
+    cfdtL3Proto  :: C5TL3Proto,
+    cfdtL4Proto  :: C5TL4Proto,
+    cfdtL3Src    :: String,
+    cfdtL3Dst    :: String,
+    cfdtL4Src    :: UDPPort,
+    cfdtL4Dst    :: UDPPort
+}
+
+cFDtString :: CFDirTuple -> String
+cFDtString c = "FDir("++l3p++"/"++l4p++","++l3s++","++l3d++","++l4s++","++l4d++")"
+    where
+        l3p = show $ cfdtL3Proto c
+        l4p = show $ cfdtL4Proto c
+        l3s = cfdtL3Src c
+        l3d = cfdtL3Dst c
+        l4s = show $ cfdtL4Src c
+        l4d = show $ cfdtL4Dst c
+
+cFDtAttr :: CFDirTuple -> [String]
+cFDtAttr c =
+    [aTrue, aFalse]
+    where
+        constr :: [String]
+        constr = [show $ cfdtL3Proto c, show $ cfdtL4Proto c,
+                  ("SourceIP=" ++ cfdtL3Src c), ("DestIP=" ++ cfdtL3Dst c),
+                  ("SourcePort=" ++ (show $ cfdtL4Src c)),
+                  ("DestPort=" ++ (show $ cfdtL4Dst c)) ]
+        cT = constr `UM.joinBy` "&"
+        aTrue = "C.true:" ++ cT
+        aFalse = "C.false:!(" ++ cT ++ ")"
+
+parseFDirCFG :: String -> [CFDirTuple]
+parseFDirCFG [] = []
+parseFDirCFG s = map parseTuple $ UM.splitBy '#' s
+    where
+        parseTuple s' = CFDirTuple {
+            cfdtQueue   = read (parts !! 0),
+            cfdtL3Proto = if (parts !! 1) == "IPv4" then C5TPL3IPv4 else
+                           if (parts !! 1) == "IPv6" then C5TPL3IPv6 else
+                               error "Invalid L3 protocol",
+            cfdtL4Proto = if (parts !! 2) == "TCP" then C5TPL4TCP else
+                           if (parts !! 2) == "UDP" then C5TPL4UDP else
+                               error "Invalid L4 protocol",
+            cfdtL3Src   = parts !! 3,
+            cfdtL3Dst   = parts !! 4,
+            cfdtL4Src   = read (parts !! 5),
+            cfdtL4Dst   = read (parts !! 6) }
+            where
+            parts = UM.splitBy ',' s'
+
+configFDir :: ConfFunction
+configFDir _ inE outE cfg = do
+    ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
+    let lastEdge = (endN,defaultN,endP)
+    return (edges ++ [lastEdge])
+    where
+        -- Node and Port for the incoming edge for the first node
+        start = (fst $ fst $ head inE, snd $ head inE)
+        -- Node for default queue
+        (Just ((defaultN,_),_)) = L.find ((== "default") . snd) outE
+        -- Lookup node id for specified queue
+        queue i = queueN
+            where
+                (Just ((queueN,_),_)) =
+                    L.find (\((_,n),_) -> nLabel n == "Q" ++ show i ++ "Valid") outE
+
+        -- Get filter configurations
+        cfgs = parseFDirCFG cfg
+
+        -- Generate node and edges for one filter
+        bports = ["true","false"]
+        nodeL c = baseFNode (cFDtString c) (cFDtAttr c) bports Nothing
+        addFilter ((iN,iE),es) c = do
+            (n,_) <- confMNewNode $ nodeL c
+            let inEdge = (iN,n,iE)
+            let tEdge = (n,queue $ cfdtQueue c,"true")
+            let fEdge = (n,queue $ cfdtQueue c,"false")
+            return ((n,"false"), es ++ [inEdge,tEdge,fEdge])
 
 
 
@@ -398,9 +502,10 @@ lpgDelSocket g sd = DGI.delNodes (sdNodes sd) g
 -- State of the whole network stack
 
 
-emptyStackState :: Int -> [(String,String)] -> StackState
-emptyStackState queues cfg = StackState {
+emptyStackState :: Int -> Int -> [(String,String)] -> StackState
+emptyStackState queues n5tuples cfg = StackState {
     ssQueues = queues,
+    ss5Tuples = n5tuples,
     ssNextSock = 0,
     ssSockets = [],
     ssConfig = cfg
@@ -429,20 +534,75 @@ ssLPG :: StackState -> PGraph ()
 ssLPG ss =
     foldl (\a b -> snd $ lpgAddSocket a b) lpg $ ssSockets ss
 
+
+-- Generate a 5-tuple filter configuration for the specified socket list
+generate5TConfig :: StackState -> [SocketDesc] -> String
+generate5TConfig ss sockets =
+    map genTuple sockets `UM.joinBy` "#"
+    where
+        genTuple sd = genParts sd `UM.joinBy` ","
+        genParts (SocketDesc _ (UDPIPv4Listen 0 port) _ q) =
+            [ "2", show q, "IPv4", "UDP", "", "", "", show port ]
+        genParts (SocketDesc _ (UDPIPv4Listen ip port) _ q) =
+            [ "1", show q, "IPv4", "UDP", "", show ip, "", show port ]
+        genParts (SocketDesc _ (UDPIPv4Flow sAddr dAddr sPort dPort) _ q) =
+            [ "0", show q, "IPv4", "UDP", show sAddr, show dAddr, show sPort,
+              show dPort ]
+
+-- Generate a FlowDir filter configuration for the specified socket list
+generateFDirConfig :: StackState -> [SocketDesc] -> String
+generateFDirConfig ss sockets =
+    map genTuple sockets `UM.joinBy` "#"
+    where
+        genTuple sd = genParts sd `UM.joinBy` ","
+        genParts (SocketDesc _ (UDPIPv4Listen _ _) _ _) =
+            error "Listening sockets not supported in FlowDir filters"
+        genParts (SocketDesc _ (UDPIPv4Flow sAddr dAddr sPort dPort) _ q) =
+            [ show q, "IPv4", "UDP", show sAddr, show dAddr, show sPort,
+              show dPort ]
+
+
 -- Generate configuration for PRG
 ssPRGConfig :: StackState -> [(String,String)]
 ssPRGConfig ss = 
-        ssConfig ss ++ [("C5TupleFilter",config)]
+        ssConfig ss ++ [("C5TupleFilter",config5T),("CFDirFilter",configFD)]
     where
-        config = (map sdCfg $ ssSockets ss)`UM.joinBy` "#"
-        sdCfg sd = sdConfigP sd `UM.joinBy` ","
-        sdConfigP (SocketDesc _ (UDPIPv4Listen ip port) _ q) =
-            [ "1", show q, "IPv4", "UDP", "", if ip == 0 then "" else show ip,
-              "", show port ]
-        sdConfigP (SocketDesc _ (UDPIPv4Flow sAddr dAddr sPort dPort) _ q) =
-            [ "0", show q, "IPv4", "UDP", show sAddr, show dAddr, show sPort,
-              show dPort ]
-                
+        -- Divide sockets up into listening and flows
+        (listens,flows) = L.partition (flowIsListen . sdFlow) $ ssSockets ss
+        -- Conflicts: Flows with same destination as listening sockets
+        rawConflicts = map (\l -> (l,badS $ flowDest $ sdFlow l)) listens
+            where
+                badS l = filter ((l `destCovers`) . flowDest . sdFlow) flows
+
+        cleanListens = map fst $ filter (null . snd) rawConflicts
+        --conflicts = filter (not . null . snd) rawConflicts
+
+        -- Destinations for all listen sockets
+        listenDests = L.nub $ map (flowDest . sdFlow) listens
+
+        -- Mixed flows are flows that have the same destination as a listening
+        -- socket. These flows can't just be moved to FDir filters
+        isMixedFlow f = any (`destCovers` (flowDest $ sdFlow f)) listenDests
+        (mixedFlows,cleanFlows) = L.partition isMixedFlow flows
+
+        -- Assign flows to filters
+        (flows5T,flowsFD) =
+            if (length listens) + (length mixedFlows) <= ss5Tuples ss then
+                -- No problem, can use 5-tuples for listens and mixed flows
+                (listens ++ mixedFlows, cleanFlows)
+            else if (length cleanListens) > ss5Tuples ss then
+                T.trace ("More listens than 5-tuples, handling arbitrary " ++
+                         "listens in software")
+                        (take (ss5Tuples ss) cleanListens, cleanFlows)
+            else
+                T.trace ("Too many mixed flows and listens, dropping all " ++
+                         "mixed flows and listens in software")
+                        (cleanListens, cleanFlows)
+
+        config5T = generate5TConfig ss flows5T
+        configFD = generateFDirConfig ss flowsFD
+
+
 
 -- Iteratively drop all sink nodes that don't have the sink attribute
 dropNonsinks :: PGraph () -> PGraph ()
@@ -509,9 +669,9 @@ cgmGraphs pref = do
     ss <- get
     cgmIO $ ssGraphs ss pref
 
-cgmRun :: Int -> [(String,String)] -> ConfigGenM () -> IO ()
-cgmRun queues config c = do
-    let ss = emptyStackState queues config
+cgmRun :: Int -> Int -> [(String,String)] -> ConfigGenM () -> IO ()
+cgmRun queues n5tuples config c = do
+    let ss = emptyStackState queues n5tuples config
     TS.evalStateT c ss
 
 
@@ -524,7 +684,7 @@ main = do
         cgmGraphs "1"
         s1 <- cgmNewSocket $ UDPIPv4Flow
                                 (fromJust $ IP4.ipFromString "192.168.1.1")
-                                (fromJust $ IP4.ipFromString "8.8.8.8") 1234 53
+                                (fromJust $ IP4.ipFromString "8.8.8.8") 1234 54
         cgmGraphs "2"
         s2 <- cgmNewSocket $ UDPIPv4Listen 0 54
         cgmGraphs "3"
@@ -537,7 +697,9 @@ main = do
 
     putStrLn "Generating .dot files..."
     writeFile "prgU.dot" $ toDot prg
-    cgmRun 3 config cgm
+    let queues = 3
+        n5tuples = 3
+    cgmRun queues n5tuples config cgm
 
     where
         config = [("CSynFilter", "false"), ("CSynOutput","drop")]
