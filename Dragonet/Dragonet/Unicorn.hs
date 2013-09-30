@@ -9,7 +9,9 @@ module Dragonet.Unicorn(
     unicornNode,
     unicornConfNode,
     unicornAndNode,
+    unicornNAndNode,
     unicornOrNode,
+    unicornNOrNode,
     unicornGraph,
 ) where
 
@@ -159,8 +161,15 @@ unicornAndNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> Maybe i
                     -> PG.Node i
 unicornAndNode l a p = PG.baseONode l a p PG.OpAnd
 
+unicornNAndNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> Maybe i
+                    -> PG.Node i
+unicornNAndNode l a p = PG.baseONode l a p PG.OpNAnd
+
 unicornOrNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> Maybe i -> PG.Node i
 unicornOrNode l a p = PG.baseONode l a p PG.OpOr
+
+unicornNOrNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> Maybe i -> PG.Node i
+unicornNOrNode l a p = PG.baseONode l a p PG.OpNOr
 
 unicornGraph :: [(Int, PG.Node i)] -> [(Int, Int, PG.Port)] -> PG.PGraph i
 unicornGraph nodes edges = DGI.mkGraph nodes edges
@@ -175,7 +184,9 @@ nodeExp gn n impl =
                 (Config _ _ _ c) -> ("unicornConfNode", [confFE c],False)
                 (Boolean _ _ _ _) -> ("unicornNode", [],True)
                 (And _ _ _ _) -> ("unicornAndNode", [],False)
+                (NAnd _ _ _ _) -> ("unicornNAndNode", [],False)
                 (Or _ _ _ _) -> ("unicornOrNode", [],False)
+                (NOr _ _ _ _) -> ("unicornNOrNode", [],False)
 
         labelE = TH.LitE $ TH.StringL $ nName n
         attrE = TH.ListE $ map (TH.LitE . TH.StringL) $ nAttrs n
@@ -202,7 +213,9 @@ data Node =
     Config String [Port] [String] (Maybe String) |
     Boolean String Port Port [String] |
     And String Port Port [String] |
-    Or String Port Port [String]
+    NAnd String Port Port [String] |
+    Or String Port Port [String] |
+    NOr String Port Port [String]
     deriving Show
 
 
@@ -214,21 +227,27 @@ nName (Node n _ _) = n
 nName (Config n _ _ _) = n
 nName (Boolean n _ _ _) = n
 nName (And n _ _ _) = n
+nName (NAnd n _ _ _) = n
 nName (Or n _ _ _) = n
+nName (NOr n _ _ _) = n
 
 nAttrs :: Node -> [String]
 nAttrs (Node _ _ as) = as
 nAttrs (Config _ _ as _) = as
 nAttrs (Boolean _ _ _ as) = as
 nAttrs (And _ _ _ as) = as
+nAttrs (NAnd _ _ _ as) = as
 nAttrs (Or _ _ _ as) = as
+nAttrs (NOr _ _ _ as) = as
 
 nPorts :: Node -> [Port]
 nPorts (Node _ ps _) = ps
 nPorts (Config _ ps _ _) = ps
 nPorts (Boolean _ a b _) = [a, b]
 nPorts (And _ a b _) = [a, b]
+nPorts (NAnd _ a b _) = [a, b]
 nPorts (Or _ a b _) = [a, b]
+nPorts (NOr _ a b _) = [a, b]
 
 
 -----------------------------------------------------------------------------
@@ -244,7 +263,7 @@ lexer = P.makeTokenParser P.LanguageDef {
     P.opStart = Parsec.oneOf "",
     P.opLetter = Parsec.oneOf "",
     P.reservedNames = ["graph", "cluster", "node", "config", "boolean", "and",
-                       "or", "gconfig", "port", "attr"],
+                       "nand", "or", "nor", "gconfig", "port", "attr"],
     P.reservedOpNames = [],
     P.caseSensitive = True }
     
@@ -359,10 +378,18 @@ orN p = do
     (n, t, f, a) <- genBoolean p "or" False
     return (Right (Or n t f a))
 
+norN p = do
+    (n, t, f, a) <- genBoolean p "nor" False
+    return (Right (NOr n t f a))
+
 andN p = do
     (n, t, f, a) <- genBoolean p "and" False
     return (Right (And n t f a))
-  
+
+nandN p = do
+    (n, t, f, a) <- genBoolean p "nand" False
+    return (Right (NAnd n t f a))
+
 cluster p = do
     reserved "cluster"
     n <- identifier
@@ -370,7 +397,8 @@ cluster p = do
     return (Left (Cluster ((concat $ reverse p) ++ n) (lefts ns) (rights ns)))
 
 clusteredNodes p = do
-    ns <- many (node p <|> config p <|> boolean p <|> orN p <|> andN p <|> cluster p)
+    ns <- many (node p <|> config p <|> boolean p <|> orN p <|> norN p <|>
+                andN p <|> nandN p <|> cluster p)
     return $ ns
     
 

@@ -89,6 +89,8 @@ combineN (pr,(_,n),_) = map port $ PG.nPorts n
 
         opPort PG.OpAnd ts _ "true" = cAndL ts
         opPort PG.OpOr ts _ "true" = cOrL ts
+        opPort PG.OpNAnd ts _ "true" = cNot $ cAndL ts
+        opPort PG.OpNOr ts _ "true" = cNot $ cOrL ts
         opPort op ts fs "false" = cNot $ opPort op ts fs "true"
         opPort _ _ _ p = error ("Unexpected port p=" ++ p ++ " on ONode")
 

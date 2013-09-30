@@ -44,7 +44,7 @@ type Attribute = String
 type Port = String
 
 
-data Operator = OpAnd | OpOr
+data Operator = OpAnd | OpOr | OpNAnd | OpNOr
     deriving (Show, Eq)
 
 data Personality = 
@@ -201,6 +201,8 @@ persIsFNode _ = False
 
 opToString :: Operator -> String
 opToString OpAnd = "AND"
+opToString OpNAnd = "NAND"
 opToString OpOr = "OR"
+opToString OpNOr = "NOR"
 
 
