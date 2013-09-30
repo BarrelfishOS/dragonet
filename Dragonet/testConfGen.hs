@@ -20,6 +20,7 @@ import qualified Util.GraphMonad as GM
 import Control.Monad
 import Control.Monad.Trans.State as TS
 import Control.Monad.IO.Class as MTIO
+import Control.Arrow
 
 import qualified Debug.Trace as T
 
@@ -30,6 +31,7 @@ type UDPPort = Word16
 data Flow =
     UDPIPv4Listen IPv4Address UDPPort |
     UDPIPv4Flow IPv4Address IPv4Address UDPPort UDPPort
+    deriving Eq
 
 flowDest :: Flow -> (IPv4Address,UDPPort)
 flowDest (UDPIPv4Listen ip port) = (ip,port)
@@ -49,7 +51,7 @@ data SocketDesc = SocketDesc {
     sdFlow :: Flow,
     sdNodes :: [DGI.Node],
     sdQueue :: Int
-}
+} deriving Eq
 
 data StackState = StackState {
     ssQueues :: Int,
@@ -87,7 +89,9 @@ graph prg {
 
         boolean Classified {
             attr "software"
-            port true false[] } 
+            port true false[]
+            constraint true "IPv4"
+            constraint false "!IPv4" }
     
         node Checksum_ {
             port out[ValidChecksum .C5TupleFilter] }
@@ -187,7 +191,7 @@ graph lpg {
             port true false[Verified] }
 
         boolean ValidProtocol {
-            port true false[.L3Classified] }
+            port true false[Verified .L3Classified] }
 
         and Verified {
             port true false[.L4UDPVerified] }
@@ -239,8 +243,7 @@ graph lpg {
     }
 
     or L4Classified {
-        port true []
-        port false []}
+        port true false[] }
 }
 |]
 
@@ -443,59 +446,108 @@ configFDir _ inE outE cfg = do
 --------------------------------------------------------------------------------
 -- Adapting LPG
 
--- Adds a new socket to the specified LPG
-lpgAddSocket :: PGraph () -> SocketDesc -> (SocketDesc,PGraph ())
-lpgAddSocket g sd = GM.runOn (do
-    let boolP = ["true","false"]
-    let sockL = "Socket" ++ show sockID
-    let validL = sockL ++ "Valid"
+-- Generate LPG corresponding to the specified LPG
+ssLPG :: StackState -> PGraph ()
+ssLPG ss = snd $ GM.runOn (do
+    -- Create socket and validS-nodes
+    vns <- mapM (\sd -> do
+            validN <- GM.newNode $ baseONode (vLbl sd) [] boolP OpAnd Nothing
+            sockN <- GM.newNode $ baseFNode (sLbl sd) ["sink"] [] Nothing
+            GM.newEdge (validN, sockN, "true")
+            return (sd,validN)) $ ssSockets ss
 
-    sockN <- GM.newNode $ baseFNode sockL ["sink"] [] Nothing
-    validN <- GM.newNode $ baseONode validL [] boolP OpAnd Nothing
-    GM.newEdge (validN, sockN, "true")
+    -- Add dependencies between validS nodes depending on how many fields are
+    -- to be matched.
+    let addDeps (sd,vN) = do
+        let dst = flowDest $ sdFlow sd
+        -- Look for flows that are covered by our destination
+        let isCovered (sd',_) = sd /= sd' && (dst `destCovers` (flowDest $ sdFlow sd'))
+        let covered = filter isCovered vns
+        if not $ null covered then do
+            nor <- GM.newNode $ baseONode (exLbl sd) [] boolP OpNOr Nothing
+            newDblEdge nor vN
+            mapM_ (\(_,n) -> newDblEdge n nor) covered
+        else
+            return ()
+    mapM_ addDeps vns
 
-    l4C <- findN "L4Classified"
+    -- Nodes for matching source and dest IP
+    let mIPNode dir ip = do
+        let lbl = "IPv4" ++ dir ++ IP4.ipToString ip
+            cAttr = boolCA ("IPv4&" ++ dir ++ "IP=" ++ show ip)
+        node <- GM.newNode $ baseFNode lbl cAttr boolP Nothing
+        cN <- findN "L3IPv4Classified"
+        GM.newEdge (cN, node, "true")
+        return (ip,node)
+    sIPs <- mapM (mIPNode "Source") $ L.nub $ catMaybes $ map fSrcIP flows
+    dIPs <- mapM (mIPNode "Dest") $ L.nub $ catMaybes $ map fDstIP flows
 
-    let udpNode l cT = do
-        let constrF = "!(" ++ cT ++ ")"
-        let attrs = ["C.true:" ++ cT, "C.false:" ++ constrF]
-        fN <- GM.newNode $ baseFNode l attrs boolP Nothing
-        GM.newEdge (l4C, fN, "true")
+    -- Nodes for matching source and dest UDP
+    let mUDPNode dir p = do
+        let lbl = "UDP" ++ dir ++ show p
+            cAttr = boolCA ("UDP&" ++ dir ++ "Port=" ++ show p)
+        node <- GM.newNode $ baseFNode lbl cAttr boolP Nothing
+        cN <- findN "L4UDPClassified"
+        GM.newEdge (cN, node, "true")
+        return (p,node)
+    sUPs <- mapM (mUDPNode "Source") $ L.nub $ catMaybes $ map fUDPSrcP flows
+    dUPs <- mapM (mUDPNode "Dest") $ L.nub $ catMaybes $ map fUDPDstP flows
 
-        GM.newEdge (fN, validN, "true")
-        GM.newEdge (fN, validN, "false")
 
-        l4uvN <- findN "L4UDPVerified"
-        GM.newEdge (l4uvN, validN, "true")
-        GM.newEdge (l4uvN, validN, "false")
-        return [fN]
 
-    let handleFlow (UDPIPv4Listen addr port) = do
-            let ipL = if addr == 0 then "*" else IP4.ipToString addr
-            let filterL = "UDP/" ++ ipL ++ ":" ++ show port
-            let ipC = if addr == 0 then "" else ("&DestIP=" ++ show addr)
-            let constrT = "IPv4&UDP&DestPort=" ++ show port ++ ipC
-            udpNode filterL constrT
+    -- Add edges from the ip/udp port nodes to the socket valid nodes
+    l4uv <- findN "L4UDPVerified"
+    l3ip4v <- findN "L3IPv4Verified"
+    let addEdges (UDPIPv4Listen 0 p,vN) = do
+            let (Just pN) = lookup p dUPs
+            newDblEdge l3ip4v vN
+            newDblEdge l4uv vN
+            newDblEdge pN vN
+        addEdges (UDPIPv4Listen ip p,vN) = do
+            let (Just ipN) = lookup ip dIPs
+            let (Just pN) = lookup p dUPs
+            newDblEdge l3ip4v vN
+            newDblEdge l4uv vN
+            newDblEdge pN vN
+            newDblEdge ipN vN
+        addEdges (UDPIPv4Flow sIP dIP sP dP,vN) = do
+            let (Just sIPn) = lookup sIP sIPs
+            let (Just dIPn) = lookup dIP dIPs
+            let (Just sPn) = lookup sP sUPs
+            let (Just dPn) = lookup dP dUPs
+            newDblEdge l3ip4v vN
+            newDblEdge l4uv vN
+            newDblEdge sIPn vN
+            newDblEdge dIPn vN
+            newDblEdge sPn vN
+            newDblEdge dPn vN
+    mapM_ addEdges $ map (first sdFlow) vns
 
-        handleFlow (UDPIPv4Flow sAddr dAddr sPort dPort) = do
-            let filterL = "UDP/" ++ IP4.ipToString sAddr ++ ":" ++ show sPort ++
-                            "/" ++ IP4.ipToString dAddr ++ ":" ++ show dPort
-            let constrT = "IPv4&UDP&SourceIP=" ++ show sAddr ++ "&SourcePort="
-                            ++ show sPort ++ "&DestIP=" ++ show dAddr
-                            ++ "&DestPort=" ++ show dPort
-            udpNode filterL constrT
-
-    fNodes <- handleFlow flow
-    return (sd { sdNodes = fNodes ++ [sockN, validN] })
-    ) g
+    return ()) lpg
     where
-        (SocketDesc sockID flow _ _) = sd
-        findN l = GM.withGr (\g' -> fst $ fromJust $
-                             GH.findNodeByL ((== l) . nLabel) g')
+        boolP = ["true","false"]
+        boolCA cT = ["C.true:" ++ cT, "C.false:!(" ++ cT ++ ")"]
+        sLbl sd = "Socket" ++ (show $ sdID sd)
+        vLbl sd = "ValidS" ++ (show $ sdID sd)
+        exLbl sd = "ExcludeS" ++ (show $ sdID sd)
 
--- Remove a socket from the LPG
-lpgDelSocket :: PGraph () -> SocketDesc -> PGraph ()
-lpgDelSocket g sd = DGI.delNodes (sdNodes sd) g
+        flows = map sdFlow $ ssSockets ss
+        fSrcIP (UDPIPv4Flow ip _ _ _) = Just ip
+        fSrcIP _ = Nothing
+        fDstIP (UDPIPv4Listen 0 _) = Nothing
+        fDstIP (UDPIPv4Listen ip _) = Just ip
+        fDstIP (UDPIPv4Flow _ ip _ _) = Just ip
+        fUDPSrcP (UDPIPv4Flow _ _ p _) = Just p
+        fUDPSrcP _ = Nothing
+        fUDPDstP (UDPIPv4Listen _ p) = Just p
+        fUDPDstP (UDPIPv4Flow _ _ _ p) = Just p
+
+        findN l = GM.withGr (\g' ->
+                    let Just (n,_) = GH.findNodeByL ((== l) . nLabel) g' in n)
+
+        newDblEdge n1 n2 =
+            do { GM.newEdge (n1,n2,"true") ; GM.newEdge (n1,n2,"false") }
+
 
 
 --------------------------------------------------------------------------------
@@ -528,12 +580,6 @@ ssAddFlow ss flow =
 ssDelSocket :: StackState -> SocketID -> StackState
 ssDelSocket ss sock =
     ss { ssSockets = filter (\s -> sdID s /= sock) $ ssSockets ss }
-
--- Generate LPG corresponding to the specified LPG
-ssLPG :: StackState -> PGraph ()
-ssLPG ss =
-    foldl (\a b -> snd $ lpgAddSocket a b) lpg $ ssSockets ss
-
 
 -- Generate a 5-tuple filter configuration for the specified socket list
 generate5TConfig :: StackState -> [SocketDesc] -> String
@@ -574,7 +620,8 @@ ssPRGConfig ss =
             where
                 badS l = filter ((l `destCovers`) . flowDest . sdFlow) flows
 
-        cleanListens = map fst $ filter (null . snd) rawConflicts
+        (cleanListens,mixedListens) = join (***) (map fst) $
+            L.partition (null . snd) rawConflicts
         --conflicts = filter (not . null . snd) rawConflicts
 
         -- Destinations for all listen sockets
@@ -597,7 +644,8 @@ ssPRGConfig ss =
             else
                 T.trace ("Too many mixed flows and listens, dropping all " ++
                          "mixed flows and listens in software")
-                        (cleanListens, cleanFlows)
+                        (take (ss5Tuples ss) (cleanListens ++ mixedListens),
+                         cleanFlows)
 
         config5T = generate5TConfig ss flows5T
         configFD = generateFDirConfig ss flowsFD
@@ -694,6 +742,7 @@ main = do
         cgmGraphs "5"
         s4 <- cgmNewSocket $ UDPIPv4Listen 0 57
         cgmGraphs "6"
+        return ()
 
     putStrLn "Generating .dot files..."
     writeFile "prgU.dot" $ toDot prg
