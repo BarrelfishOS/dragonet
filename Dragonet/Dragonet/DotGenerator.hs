@@ -1,6 +1,7 @@
 module Dragonet.DotGenerator(
     toDot,
     toDotWith,
+    toDotWith',
     toDotClustered,
     toDotClusteredWith,
 ) where
@@ -151,14 +152,24 @@ paramsCluster nlf plf cm = (params nlf plf)
                             GV.fmtCluster = formatCluster }
 
 
+dotString :: GV.DotGraph DGI.Node -> String
+dotString d = T.unpack $ GV.printDotGraph d
+
 -- Get dot source for graph
 toDot :: PG.PGraph i -> String
 toDot = toDotWith id id
 
 -- Get dot source for graph, applying the mappings to generated node/port labels
 toDotWith :: (String -> String) -> (String -> String) -> PG.PGraph i -> String
-toDotWith nlf plf g = T.unpack $ GV.printDotGraph $ GV.graphToDot p $ getELs g
+toDotWith nlf plf g = dotString $ GV.graphToDot p $ getELs g
     where p = params nlf plf
+
+-- Get dot source for graph, applying a mapping to the parameters
+toDotWith' :: (GV.GraphvizParams DGI.Node (PG.Node i) ELabel String (PG.Node i)
+        -> GV.GraphvizParams DGI.Node (PG.Node i) ELabel String (PG.Node i))
+        -> PG.PGraph i -> String
+toDotWith' pm g = dotString $ GV.graphToDot (pm p) $ getELs g
+    where p = params id id
 
 -- Get dot source for graph and cluster nodes
 toDotClustered :: PG.PGraph i -> [(DGI.Node, [String])] -> String
