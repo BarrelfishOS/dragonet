@@ -74,7 +74,7 @@ queueEmbedding prg' lpg = embeddingStep DGI.empty lpgNodes
             depsSat v' = subsetLBy (\(_,a) (_,b) -> embMatch a b) (lpgDeps v') embNL
 
             -- Find a node whose LPG dependencies are already embedded
-            v = fromJust $ L.find depsSat uem
+            (Just v) = L.find depsSat uem
             (vN,vL) = v
 
             -- Use PRG embedding unless it is Nothing
@@ -101,7 +101,7 @@ queueEmbedding prg' lpg = embeddingStep DGI.empty lpgNodes
 
             -- The LPG embedding is trivial, just add the node and the incoming
             -- edges
-            lpgEmb = fromJust $ convInsEdges lpg g $ DGI.inn lpg vN
+            (Just lpgEmb) = convInsEdges lpg g $ DGI.inn lpg vN
                 where g = DGI.insNode v emb
 
 
@@ -132,13 +132,18 @@ serialize g =
         -- Association list from queue names to sw entry nodes/ports
         swEMap = map genSWE qls
         -- Map node to respective SW entry node
-        swEN n = fromJust $ lookup tag swEMap
-            where tag = PG.nTag $ fromJust $ DGI.lab g n
+        swEN n = swe
+            where
+                (Just tag') = DGI.lab g n
+                tag = PG.nTag tag'
+                (Just swe) = lookup tag swEMap
 
         -- List of edges crossing from HW to SW nodes
         crossingEdges = filter isCrossingEdge $ DGI.labEdges g
         isCrossingEdge (a,b,_) = not (sw a) && sw b
-            where sw n = PG.nIsSoftware $ fromJust $ DGI.lab g n
+            where
+                sw n = PG.nIsSoftware l
+                    where (Just l) = DGI.lab g n
 
         -- List of fixed edges
         fixedEdges = concatMap fixEdge crossingEdges
