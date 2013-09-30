@@ -21,6 +21,10 @@ import Control.Monad
 import Control.Monad.Trans.State as TS
 import Control.Monad.IO.Class as MTIO
 import Control.Arrow
+import System.Random as R
+import qualified Data.Text.Lazy as T
+import qualified Data.GraphViz as GV
+import qualified Data.GraphViz.Attributes.Complete as GA
 
 import qualified Debug.Trace as T
 
@@ -40,6 +44,14 @@ flowDest (UDPIPv4Flow _ ip _ port) = (ip,port)
 flowIsListen :: Flow -> Bool
 flowIsListen (UDPIPv4Listen _ _) = True
 flowIsListen _ = False
+
+flowCovers :: Flow -> Flow -> Bool
+flowCovers (UDPIPv4Listen ipL pL) (UDPIPv4Listen ipF pF) =
+    (ipL,pL) `destCovers` (ipF,pF)
+flowCovers (UDPIPv4Listen ipL pL) (UDPIPv4Flow _ ipF _ pF) =
+    (ipL,pL) `destCovers` (ipF,pF)
+flowCovers _ _ = False
+
 
 destCovers :: (IPv4Address,UDPPort) -> (IPv4Address,UDPPort) -> Bool
 destCovers (0,pL) (_,pF) = pL == pF
@@ -459,9 +471,9 @@ ssLPG ss = snd $ GM.runOn (do
     -- Add dependencies between validS nodes depending on how many fields are
     -- to be matched.
     let addDeps (sd,vN) = do
-        let dst = flowDest $ sdFlow sd
+        let dst = sdFlow sd
         -- Look for flows that are covered by our destination
-        let isCovered (sd',_) = sd /= sd' && (dst `destCovers` (flowDest $ sdFlow sd'))
+        let isCovered (sd',_) = sd /= sd' && (dst `flowCovers` sdFlow sd')
         let covered = filter isCovered vns
         if not $ null covered then do
             nor <- GM.newNode $ baseONode (exLbl sd) [] boolP OpNOr Nothing
@@ -475,7 +487,8 @@ ssLPG ss = snd $ GM.runOn (do
     let mIPNode dir ip = do
         let lbl = "IPv4" ++ dir ++ IP4.ipToString ip
             cAttr = boolCA ("IPv4&" ++ dir ++ "IP=" ++ show ip)
-        node <- GM.newNode $ baseFNode lbl cAttr boolP Nothing
+            attr = cAttr ++ ["decision"]
+        node <- GM.newNode $ baseFNode lbl attr boolP Nothing
         cN <- findN "L3IPv4Classified"
         GM.newEdge (cN, node, "true")
         return (ip,node)
@@ -486,7 +499,8 @@ ssLPG ss = snd $ GM.runOn (do
     let mUDPNode dir p = do
         let lbl = "UDP" ++ dir ++ show p
             cAttr = boolCA ("UDP&" ++ dir ++ "Port=" ++ show p)
-        node <- GM.newNode $ baseFNode lbl cAttr boolP Nothing
+            attr = cAttr ++ ["decision"]
+        node <- GM.newNode $ baseFNode lbl attr boolP Nothing
         cN <- findN "L4UDPClassified"
         GM.newEdge (cN, node, "true")
         return (p,node)
@@ -616,9 +630,9 @@ ssPRGConfig ss =
         -- Divide sockets up into listening and flows
         (listens,flows) = L.partition (flowIsListen . sdFlow) $ ssSockets ss
         -- Conflicts: Flows with same destination as listening sockets
-        rawConflicts = map (\l -> (l,badS $ flowDest $ sdFlow l)) listens
+        rawConflicts = map (\l -> (l,badS $ sdFlow l)) listens
             where
-                badS l = filter ((l `destCovers`) . flowDest . sdFlow) flows
+                badS l = filter ((l `flowCovers`) . sdFlow) flows
 
         (cleanListens,mixedListens) = join (***) (map fst) $
             L.partition (null . snd) rawConflicts
@@ -663,8 +677,8 @@ dropNonsinks graph =
                 DGI.delNode n g
             else g
 
-ssGraphs :: StackState -> String -> IO ()
-ssGraphs ss prefix = do
+ssGraphs :: StackState -> String -> String -> IO ()
+ssGraphs ss prefix title = do
     putStrLn ("Generating " ++ prefix ++ " graphs...")
 
     let cfg = ssPRGConfig ss
@@ -673,15 +687,15 @@ ssGraphs ss prefix = do
     let prgR = dropUnreachable prgC
     let embedded = fullEmbedding prgR lpg'
 
-    writeFile (prefix ++ "_lpg.dot") $ toDot lpg'
-    writeFile (prefix ++ "_prg.dot") $ toDot prgC
-    writeFile (prefix ++ "_embedded.dot") $ toDot embedded
+    writeFile (prefix ++ "_lpg.dot") $ myToDot lpg'
+    writeFile (prefix ++ "_prg.dot") $ myToDot prgC
+    writeFile (prefix ++ "_embedded.dot") $ myToDot embedded
 
     putStrLn "  Constraining..."
     constrained <- constrain embedded
     putStrLn "  Constrained"
-    writeFile (prefix ++ "_constrained.dot") $ toDot constrained
-    writeFile (prefix ++ "_final.dot") $ toDot $ dropNonsinks constrained
+    writeFile (prefix ++ "_constrained.dot") $ myToDot constrained
+    writeFile (prefix ++ "_final.dot") $ myToDot $ dropNonsinks $ constrained
 
     return ()
     where
@@ -691,6 +705,9 @@ ssGraphs ss prefix = do
             if null (DGI.pre g n) && (notElem "source" $ nAttributes l) then
                 DGI.delNode n g
             else g
+        myToDot g = toDotWith' addTitle g
+        addTitle p = p { GV.globalAttributes = GV.globalAttributes p ++
+                        [GV.GraphAttrs [GA.Label $ GA.StrLabel $ T.pack title]] }
 
 ------------------------------------------------------------------------------
 -- Config generation monad to simplify things
@@ -699,6 +716,9 @@ type ConfigGenM a = TS.StateT StackState IO a
 
 cgmIO :: IO a -> ConfigGenM a
 cgmIO = MTIO.liftIO
+
+cgmStackState :: ConfigGenM StackState
+cgmStackState = get
 
 cgmNewSocket :: Flow -> ConfigGenM SocketID
 cgmNewSocket f = do
@@ -713,15 +733,89 @@ cgmDelSocket sock = do
     put $ ssDelSocket ss sock
 
 cgmGraphs :: String -> ConfigGenM ()
-cgmGraphs pref = do
+cgmGraphs pref = cgmGraphs' pref ""
+
+cgmGraphs' :: String -> String -> ConfigGenM ()
+cgmGraphs' pref title = do
     ss <- get
-    cgmIO $ ssGraphs ss pref
+    cgmIO $ ssGraphs ss pref title
 
 cgmRun :: Int -> Int -> [(String,String)] -> ConfigGenM () -> IO ()
 cgmRun queues n5tuples config c = do
     let ss = emptyStackState queues n5tuples config
     TS.evalStateT c ss
 
+
+rndStep :: ConfigGenM String
+rndStep = do
+    ss <- cgmStackState
+    let socks = ssSockets ss
+    let dests = map flowDest $ filter flowIsListen $ map sdFlow socks
+
+    range <- rndR (0 :: Int,2)
+    case range of
+        -- New listening socket
+        0 -> do
+            hasIP <- rnd
+            dIP <- if hasIP then rndIP else return 0
+            dPort <- rndPort
+            s <- cgmNewSocket $ UDPIPv4Listen dIP dPort
+            return ("New listening socket (" ++ show dIP ++ "," ++
+                        show dPort ++ ") = " ++ show s)
+
+        -- New flow
+        1 -> do
+            exDest <- rnd
+            (dIP,dPort) <-
+                if exDest && (not $ null dests) then rndPick dests
+                else rndEP
+            (sIP,sPort) <- rndEP
+            s <- cgmNewSocket $ UDPIPv4Flow sIP dIP sPort dPort
+            return ("New flow (" ++ show sIP ++ "," ++ show dIP ++
+                        "," ++ show sPort ++ "," ++ show dPort ++ ") = " ++
+                        show s)
+
+        -- Close socket
+        _ -> do
+            if null socks then rndStep
+            else do
+                sock <- rndPick socks
+                cgmDelSocket $ sdID sock
+                return ("Closing socket " ++ (show $ sdID sock))
+
+    where
+        rnd :: Random a => ConfigGenM a
+        rnd = cgmIO R.randomIO
+
+        rndR :: Random a => (a,a) -> ConfigGenM a
+        rndR a = cgmIO $ R.randomRIO a
+
+        rndPick :: [a] -> ConfigGenM a
+        rndPick l = do { i <- rndR (0, (length l) - 1); return (l !! i) }
+
+        rndIP :: ConfigGenM Word32
+        rndIP = rnd
+
+        rndPort :: ConfigGenM Word16
+        rndPort = rndR (1,1024)
+
+        rndEP :: ConfigGenM (Word32,Word16)
+        rndEP = do
+            ip <- rndIP
+            port <- rndPort
+            return (ip,port)
+
+
+rndScenario :: Int -> ConfigGenM ()
+rndScenario steps = do
+    cgmGraphs $ toLbl 0
+    mapM_ (\i -> do { s <- rndStep ; cgmGraphs' (toLbl i) s }) [1..steps]
+    where
+        toLbl :: Int -> String
+        toLbl i
+            | steps < 10 = show i
+            | i < 10     = "0" ++ show i
+            | otherwise  =  show i
 
 
 main :: IO ()
@@ -748,7 +842,8 @@ main = do
     writeFile "prgU.dot" $ toDot prg
     let queues = 3
         n5tuples = 3
-    cgmRun queues n5tuples config cgm
+    let rndS = rndScenario 10
+    cgmRun queues n5tuples config rndS
 
     where
         config = [("CSynFilter", "false"), ("CSynOutput","drop")]
