@@ -134,7 +134,8 @@ params :: (String -> String) -> (String -> String)
 params nlf plf = GV.defaultParams {
     GV.fmtEdge = formatEdge,
     GV.fmtNode = formatNode nlf plf,
-    GV.fmtCluster = const [],
+    GV.fmtCluster = const [GV.GraphAttrs [
+                        GA.Label $ GA.StrLabel $ t ""]],
     GV.isDotCluster = const True,
     GV.clusterID = clusterId,
     GV.clusterBy = clusterByTag,
