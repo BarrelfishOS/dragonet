@@ -289,8 +289,9 @@ c5tString c = "5T("++l3p++"/"++l4p++","++l3s++","++l3d++","++l4s++","++l4d++")"
     where
         l3p = fromMaybe "*" $ liftM show $ c5tL3Proto c
         l4p = fromMaybe "*" $ liftM show $ c5tL4Proto c
-        l3s = fromMaybe "*" $ c5tL3Src c
-        l3d = fromMaybe "*" $ c5tL3Dst c
+        showIP s = IP4.ipToString $ read s
+        l3s = maybe "*" showIP $ c5tL3Src c
+        l3d = maybe "*" showIP $ c5tL3Dst c
         l4s = fromMaybe "*" $ liftM show $ c5tL4Src c
         l4d = fromMaybe "*" $ liftM show $ c5tL4Dst c
 
@@ -385,8 +386,8 @@ cFDtString c = "FDir("++l3p++"/"++l4p++","++l3s++","++l3d++","++l4s++","++l4d++"
     where
         l3p = show $ cfdtL3Proto c
         l4p = show $ cfdtL4Proto c
-        l3s = cfdtL3Src c
-        l3d = cfdtL3Dst c
+        l3s = IP4.ipToString $ read $ cfdtL3Src c
+        l3d = IP4.ipToString $ read $ cfdtL3Dst c
         l4s = show $ cfdtL4Src c
         l4d = show $ cfdtL4Dst c
 
@@ -760,7 +761,7 @@ rndStep = do
             dIP <- if hasIP then rndIP else return 0
             dPort <- rndPort
             s <- cgmNewSocket $ UDPIPv4Listen dIP dPort
-            return ("New listening socket (" ++ show dIP ++ "," ++
+            return ("New listening socket (" ++ IP4.ipToString dIP ++ "," ++
                         show dPort ++ ") = " ++ show s)
 
         -- New flow
@@ -771,9 +772,9 @@ rndStep = do
                 else rndEP
             (sIP,sPort) <- rndEP
             s <- cgmNewSocket $ UDPIPv4Flow sIP dIP sPort dPort
-            return ("New flow (" ++ show sIP ++ "," ++ show dIP ++
-                        "," ++ show sPort ++ "," ++ show dPort ++ ") = " ++
-                        show s)
+            return ("New flow (" ++ IP4.ipToString sIP ++ "," ++
+                        IP4.ipToString dIP ++ "," ++ show sPort ++ "," ++
+                        show dPort ++ ") = " ++ show s)
 
         -- Close socket
         _ -> do
@@ -847,3 +848,4 @@ main = do
 
     where
         config = [("CSynFilter", "false"), ("CSynOutput","drop")]
+
