@@ -187,6 +187,16 @@ graph lpg {
 -- Policies
 
 
+data Policy a b = Policy {
+    --pLPGSocketQueue :: SocketDesc -> PolicyM a b QueueID,
+    pPRGAddSocket :: SocketDesc -> QueueID -> PolicyM a b QueueID,
+    pPRGRemoveSocket :: SocketDesc -> PolicyM a b (),
+    pPRGRebalance :: QueueID -> QueueID -> PolicyM a b Bool
+}
+
+instance (Show (Policy a b)) where
+    show _ = "Policy"
+
 data PolicyAction a =
     PActLPGAddSocket SocketDesc QueueID |
     PActLPGDelSocket SocketID QueueID |
@@ -198,16 +208,18 @@ data PolicyState a b = PolicyState {
     psFlows  :: M.Map SocketID QueueID,
     psQueues :: M.Map QueueID Int,
     psPRGSt  :: a,
-    psEvents :: [PolicyAction b]
+    psEvents :: [PolicyAction b],
+    psPolicy :: Policy a b
 } deriving (Show)
 
-policyStateInit :: Int -> a -> PolicyState a b
-policyStateInit nQ p = PolicyState {
+policyStateInit :: Int -> a -> Policy a b -> PolicyState a b
+policyStateInit nQ p policy = PolicyState {
     psSockets = M.empty,
     psFlows = M.empty,
     psQueues = M.fromList $ zip ids $ repeat 0,
     psPRGSt = p,
-    psEvents = [] }
+    psEvents = [],
+    psPolicy = policy }
     where ids = [0..(nQ - 1)]
 
 
@@ -262,15 +274,14 @@ addEvent e = do
 isConnection :: SocketDesc -> Bool
 isConnection sd = not $ flowIsListen $ sdFlow sd
 
-policyAddSocket :: (SocketDesc -> QueueID -> PolicyM a b QueueID) -> Flow -> PolicyM a b SocketID
-policyAddSocket prgF f = do
+policyAddSocket :: Flow -> PolicyM a b SocketID
+policyAddSocket f = do
     s <- get
     let sm = psSockets s
     let sid = if M.null sm then 0 else ((fst $ M.findMax sm) + 1)
     let sd = SocketDesc { sdID = sid, sdFlow = f, sdNodes = [], sdQueue = -1 }
-    let evs = psEvents s
     let (qmin,_) = L.minimumBy (compare `on` snd) $ M.toList $ psQueues s
-    q <- prgF sd qmin
+    q <- (pPRGAddSocket $ psPolicy s) sd qmin
     addEvent $ PActLPGAddSocket sd q
     s' <- get
     put $ s' {
@@ -279,11 +290,11 @@ policyAddSocket prgF f = do
         psQueues = M.adjust (+1) q $ psQueues s' }
     return sid
 
-policyRemoveSocket :: (SocketDesc -> PolicyM a b ()) -> (QueueID -> QueueID -> PolicyM a b Bool) -> SocketID -> PolicyM a b ()
-policyRemoveSocket prgF prgR sid = do
+policyRemoveSocket :: SocketID -> PolicyM a b ()
+policyRemoveSocket sid = do
     s <- get
     let sd = (psSockets s) M.! sid
-    prgF sd
+    (pPRGRemoveSocket $ psPolicy s) sd
     let qid = (psFlows s) M.! sid
     addEvent $ PActLPGDelSocket sid qid
     s' <- get
@@ -294,16 +305,11 @@ policyRemoveSocket prgF prgR sid = do
     let nCur = (psQueues s') M.! qid
     let (qM,nM) = L.maximumBy (compare `on` snd) $ M.toList $ psQueues s'
     if (nM - nCur) > 1 then do
-        _ <- prgR qM qid
+        _ <- (pPRGRebalance $ psPolicy s) qM qid
         return ()
     else
         return ()
 
-
-
-{-policyStep :: PolicyM a b c -> PolicyState a b -> (c, PolicyState a b,[PolicyAction b])
-policyStep f ps = (a, ps' { psEvents = [] }, psEvents ps')
-    where (a,ps') = runState f ps -}
 
 
 ------------------------------------------------------------------------------
@@ -418,7 +424,7 @@ tryAndFreeFtf sd = do
                 e10k5TF p
     case fts of
         [] -> return False
-        ((i,ft):_) -> do
+        ((i,_):_) -> do
             let sd' = id2sd i
             ftfDrop i
             --addEvent $ PActHWAction $ E10kPAct5TDel i
@@ -430,9 +436,6 @@ filterForSocket :: SocketDesc -> E10kPolicyM (Maybe E10kFilterRef)
 filterForSocket sd = do
     p <- getPRG
     return $ M.lookup (sdID sd) (e10kSockets p)
-        
-    
-
 
 e10kAddSocket :: SocketDesc -> QueueID -> E10kPolicyM QueueID
 e10kAddSocket sd qid = do
@@ -455,7 +458,7 @@ e10kAddSocket sd qid = do
                     q <- findMatchingQueue sd
                     return q
         else do
-            lConflicts <- coveredSockets sd
+            --lConflicts <- coveredSockets sd
             success <- tryAndFreeFtf sd
             if success then do
                 sd `ftfToQueue` qid
@@ -474,10 +477,10 @@ e10kDelSocket sd = do
         Just (E10kFilter5T i) -> ftfDrop i
 
 e10kRebalance :: QueueID -> QueueID -> E10kPolicyM Bool
-e10kRebalance s d = return False
+e10kRebalance _ _ = return False
     {-s <- get
     let id2sd = ((psSockets s) M.!)
-    let isCandidate sid = 
+    let isCandidate sid =
     let cs = filter isCandidate $ map fst $ filter ((== s) . snd) $
                 M.toList $ psFlows s-}
 
@@ -488,34 +491,34 @@ e10kRebalance s d = return False
 ------------------------------------------------------------------------------
 -- Config generation monad to simplify things
 
-type ConfigGenM = MR.RandT R.StdGen (MW.WriterT [((String,String),[PolicyAction E10kPAction])] E10kPolicyM)
+type ConfigGenM a b =
+    MR.RandT R.StdGen (MW.WriterT [((String,String),[PolicyAction b])]
+                       (PolicyM a b))
 
-cgmP :: E10kPolicyM a -> ConfigGenM a
+cgmP :: PolicyM a b c -> ConfigGenM a b c
 cgmP = MT.lift . MT.lift
 
-cgmStackState :: ConfigGenM [SocketDesc]
-cgmStackState = cgmP $ pSockets
+cgmNewSocket :: Flow -> ConfigGenM a b SocketID
+cgmNewSocket f = cgmP $ policyAddSocket f
 
-cgmNewSocket :: Flow -> ConfigGenM SocketID
-cgmNewSocket f = cgmP $ policyAddSocket e10kAddSocket f
+cgmDelSocket :: SocketID -> ConfigGenM a b ()
+cgmDelSocket sock = cgmP $ policyRemoveSocket sock
 
-cgmDelSocket :: SocketID -> ConfigGenM ()
-cgmDelSocket sock = cgmP $ policyRemoveSocket e10kDelSocket e10kRebalance sock
-
-cgmStep :: String -> String -> ConfigGenM ()
+cgmStep :: String -> String -> ConfigGenM a b ()
 cgmStep pref title = do
     ps <- get
     MW.tell [((pref,title), psEvents ps)]
     put $ ps { psEvents = [] }
 
 
-cgmRun :: Int -> Int -> Int -> ConfigGenM () -> [((String,String),[PolicyAction E10kPAction])]
-cgmRun queues n5tuples seed c = ev
+cgmRun :: Int -> Int -> a -> Policy a b ->
+    ConfigGenM a b () -> [((String,String),[PolicyAction b])]
+cgmRun queues seed prgPS policy c = ev
     where
         wm = MW.execWriterT $ MR.evalRandT c $ R.mkStdGen seed
-        ev = MS.evalState wm $ policyStateInit queues $ e10kPStateInit n5tuples
+        ev = MS.evalState wm $ policyStateInit queues prgPS policy
 
-rndStep :: ConfigGenM String
+rndStep :: ConfigGenM a b String
 rndStep = do
     socks <- cgmP pSockets
     let dests = map flowDest $ filter flowIsListen $ map sdFlow socks
@@ -552,23 +555,16 @@ rndStep = do
                 return ("Closing socket " ++ (show $ sdID sock))
 
     where
-        rndPick :: [a] -> ConfigGenM a
         rndPick l = do { i <- MR.getRandomR (0, (length l) - 1); return (l !! i) }
-
-        rndIP :: ConfigGenM Word32
         rndIP = MR.getRandom
-
-        rndPort :: ConfigGenM Word16
         rndPort = MR.getRandomR (1,1024)
-
-        rndEP :: ConfigGenM (Word32,Word16)
         rndEP = do
             ip <- rndIP
             port <- rndPort
             return (ip,port)
 
 
-rndScenario :: Int -> ConfigGenM ()
+rndScenario :: Int -> ConfigGenM a b ()
 rndScenario steps = do
     cgmStep (toLbl 0) ""
     mapM_ (\i -> do { s <- rndStep ; cgmStep (toLbl i) s }) [1..steps]
@@ -587,7 +583,11 @@ main = do
     let queues = 3
         n5tuples = 3
     let rndS = rndScenario 10
-    let events = cgmRun queues n5tuples 42 rndS
+    let policy = Policy {
+        pPRGAddSocket = e10kAddSocket,
+        pPRGRemoveSocket = e10kDelSocket,
+        pPRGRebalance = e10kRebalance }
+    let events = cgmRun queues 42 (e10kPStateInit n5tuples) policy rndS
     putStrLn $ show events
     where
         config = [("CSynFilter", "false"), ("CSynOutput","drop")]
