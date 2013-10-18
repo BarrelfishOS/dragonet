@@ -12,10 +12,15 @@ graph_run: graph
 
 confgen: base
 	ghc $(GHCFLAGS) testConfGen.hs -o confgen
-
 confgen_run: confgen
 	./confgen
 	./convertConfGen.sh
+
+incremental: base
+	ghc $(GHCFLAGS) testIncremental.hs -o incremental
+incremental_run: incremental
+	./incremental
+
 
 plos13: base
 	ghc $(GHCFLAGS) testPLOS13.hs -o plos13
