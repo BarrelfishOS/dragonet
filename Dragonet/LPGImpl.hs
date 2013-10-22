@@ -1,7 +1,31 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module LPGImpl (
-    lpg, lpgClusters, pbool
+    lpg, lpgClusters, pbool,
+
+    lpgSoftwareRXImpl, lpgRxL2EtherClassifiedImpl, lpgRxL2EtherValidLengthImpl,
+    lpgRxL2EtherValidTypeImpl, lpgRxL2EtherValidMulticastImpl,
+    lpgRxL2EtherValidBroadcastImpl, lpgRxL2EtherValidUnicastImpl,
+    lpgRxL2EtherValidSrcImpl, lpgRxL2EtherClassifyL3Impl,
+    lpgRxL3ARPValidHeaderLengthImpl, lpgRxL3ARPClassifyImpl,
+    lpgRxL3ARPValidRequestImpl, lpgRxL3ARPLocalIPDestImpl,
+    lpgRxL3ARPValidResponseImpl, lpgRxL3ARPIsPendingImpl,
+    lpgRxL3ARPProcessPendingResponseImpl, lpgRxL3IPv4ValidHeaderLengthImpl,
+    lpgRxL3IPv4ValidReassemblyImpl, lpgRxL3IPv4ValidVersionImpl,
+    lpgRxL3IPv4ValidLengthImpl, lpgRxL3IPv4ValidTTLImpl,
+    lpgRxL3IPv4ValidChecksumImpl, lpgRxL3IPv4ClassifyImpl,
+    lpgRxL3IPv6ValidHeaderLengthImpl, lpgRxL3ICMPValidHeaderLengthImpl,
+    lpgRxL3ICMPValidChecksumImpl, lpgRxL3ICMPIsTypeRequestImpl,
+    lpgRxL4UDPValidHeaderLengthImpl, lpgRxL4UDPValidLengthImpl,
+    lpgRxL4UDPValidChecksumImpl, lpgRxL4TCPValidHeaderLengthImpl,
+    lpgRxToIPv4LocalImpl, lpgRxToUDPPortDNSImpl, lpgPacketDropImpl,
+    lpgRxL4TCPOutImpl, lpgRxL4UDPOutImpl, lpgRxDnsRXImpl,
+    lpgTxQueueImpl, lpgTxL2EtherAllocateHeaderImpl, lpgTxL2EtherFillHeaderImpl,
+    lpgTxL3ARPInitiateResponseImpl, lpgTxL3ARPAllocateHeaderImpl,
+    lpgTxL3ARPFillHeaderImpl, lpgTxL3ARPLookup_Impl, lpgTxL3ARPSendRequestImpl,
+    lpgTxL3IPv4AllocateHeaderImpl, lpgTxL3IPv4FillHeaderImpl,
+    lpgTxL3IPv4RoutingImpl, lpgTxL3ICMPInitiateResponseImpl,
+    lpgTxL3ICMPAllocateHeaderImpl, lpgTxL3ICMPFillHeaderImpl,
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG

@@ -76,7 +76,7 @@ data SimState = SimState {
     ssNextCtx :: ContextID,
     ssForked :: M.Map ContextID String,
     ssGState :: GlobalState
-}
+} deriving Show
 
 type Implementation = State SimState String
 
