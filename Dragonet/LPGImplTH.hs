@@ -35,12 +35,19 @@ nodeS g prefix (n,l) = BindS varP $ CondE ce te fe
             | nIsFNode l = inEE $ head ps
             | nIsONode l = ceOp
             | otherwise = error "CNodes not supported while executing graph"
-        ceOp = andLE $ map (\n' -> orE (inEE (n',"true")) (inEE (n',"false")))
-                $ DGI.pre g n
+        ceOp =
+            case op of
+                OpAnd -> (andLE tpes) `orE` (orLE fpes)
+                OpOr -> (orLE tpes) `orE` (andLE fpes)
+            where
+                (ONode op) = nPersonality l
 
         fe = returnE $ TupE $ map (const $ ConE $ mkName "False") ss
         te = DoE [BindS (VarP $ mkName "p") nodeExp,
                   NoBindS $ returnE $ tExp]
+
+        tpes = map inEE $ filter ((== "true") . snd) ps
+        fpes = map inEE $ filter ((== "false") . snd) ps
 
         nodeExp
             | nIsFNode l = VarE $ mkName (prefix ++ nLabel l ++ "Impl")
@@ -49,7 +56,6 @@ nodeS g prefix (n,l) = BindS varP $ CondE ce te fe
             | otherwise = error "CNodes not supported while executing graph"
             where
                 (ONode op) = nPersonality l
-                tpes = map inEE $ filter ((== "true") . snd) ps
                 retS s = returnE $ LitE $ StringL s
                 boolNE e = returnE $
                             CondE e (LitE $ StringL "true")

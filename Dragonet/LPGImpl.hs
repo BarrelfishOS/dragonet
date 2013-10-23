@@ -162,9 +162,15 @@ lpgRxL3ARPProcessPendingResponseImpl = do
     putGS gs'
 
     -- Reenable pending contexts for this IP
-    let restart (_,ctx) = do { putCtx ctx ; toPort "true" }
+    let restart (_,ctx) = do { return $ setAttr' "reenabled" (AttrI 1) ctx }
     mapM_ (forkPkt . restart) curP
-    toPort "drop"
+
+    re <- getAttrM "reenabled"
+    if isJust re then do
+        dropAttr "reenabled"
+        toPort "true"
+    else
+        toPort "drop"
    
 
 
@@ -341,15 +347,22 @@ lpgTxL3ARPInitiateResponseImpl = do
     srcMAC <- ARP.shaRd
     srcIP <- ARP.spaRd
     dstIP <- ARP.tpaRd
-    forkPkt $ (do
-        setAttr "ARPDstMAC" $ AttrD srcMAC
-        setAttr "ARPDstIP" $ AttrD srcIP
-        setAttr "ARPSrcMAC" $ AttrD cfgLocalMAC
-        setAttr "ARPSrcIP" $ AttrD dstIP
-        setAttr "ARPOper" $ AttrW16 ARP.operReply
-        setAttr "ETHDstMAC" $ AttrD srcMAC
-        toPort "true")
-    toPort "drop"
+    forkPkt $ (return $
+        (setAttr' "ARPDstMAC" $ AttrD srcMAC) $
+        (setAttr' "ARPDstIP" $ AttrD srcIP) $
+        (setAttr' "ARPSrcMAC" $ AttrD cfgLocalMAC) $
+        (setAttr' "ARPSrcIP" $ AttrD dstIP) $
+        (setAttr' "ARPOper" $ AttrW16 ARP.operReply) $
+        (setAttr' "ETHDstMAC" $ AttrD srcMAC) $
+        initContext emptyPacket)
+
+    adm <- getAttrM "ARPDstMAC"
+    if isJust adm then do
+        debug "forked"
+        toPort "true"
+    else do
+        debug "unforked"
+        toPort "drop"
 
 lpgTxL3ARPAllocateHeaderImpl = do
     debug "TxL3ARPAllocateHeader"
@@ -395,17 +408,21 @@ lpgTxL3ARPSendRequestImpl = do
     (AttrW32 srcIP) <- getAttr "IP4Source"
     (AttrW32 dstIP) <- getAttr "IP4Dest"
     (AttrD srcMAC) <- getAttr "ETHSrcMAC"
-    forkPkt $ do
-        setAttr "ARPDstMAC" $ AttrD [0,0,0,0,0,0]
-        setAttr "ARPDstIP" $ AttrD $ unpack32BE dstIP
-        setAttr "ARPSrcMAC" $ AttrD srcMAC
-        setAttr "ARPSrcIP" $ AttrD $ unpack32BE srcIP
-        setAttr "ARPOper" $ AttrW16 ARP.operRequest
-        setAttr "ETHDstMAC" $ AttrD ETH.macBroadcast
-        gs <- getGS
-        putGS (gs { gsARPPending = gsARPPending gs ++ [(dstIP,ctx)] })
+    gs <- getGS
+    putGS (gs { gsARPPending = gsARPPending gs ++ [(dstIP,ctx)] })
+    forkPkt $ return $
+        (setAttr' "ARPDstMAC" $ AttrD [0,0,0,0,0,0]) $
+        (setAttr' "ARPDstIP" $ AttrD $ unpack32BE dstIP) $
+        (setAttr' "ARPSrcMAC" $ AttrD srcMAC) $
+        (setAttr' "ARPSrcIP" $ AttrD $ unpack32BE srcIP) $
+        (setAttr' "ARPOper" $ AttrW16 ARP.operRequest) $
+        (setAttr' "ETHDstMAC" $ AttrD ETH.macBroadcast) $
+        initContext emptyPacket
+    adm <- getAttrM "ARPDstMAC"
+    if isJust adm then
         toPort "true"
-    toPort "drop"
+    else
+        toPort "drop"
 
 -----------------------------------------------------------------------------
 -- IPv4 TX
@@ -462,14 +479,20 @@ lpgTxL3ICMPInitiateResponseImpl = do
     dstIP <- IP4.sourceIPRd
     srcIP <- IP4.destIPRd
 
-    forkPkt $ (do
-        setAttr "IP4Dest" $ AttrW32 dstIP
-        setAttr "IP4Source" $ AttrW32 srcIP
-        setAttr "ICMPId" $ AttrW32 i
+    forkPkt $ return $
+        (setAttr' "IP4Dest" $ AttrW32 dstIP) $
+        (setAttr' "IP4Source" $ AttrW32 srcIP) $
+        (setAttr' "ICMPId" $ AttrW32 i) $
+        (setAttr' "forked" $ AttrI 1) $
+        initContext emptyPacket
+    f <- getAttrM "forked"
+    if isJust f then do
+        dropAttr "forked"
         insertP plen 0
         writeP payload 0
-        toPort "out")
-    toPort "drop"
+        toPort "out"
+    else
+        toPort "drop"
 
 lpgTxL3ICMPAllocateHeaderImpl = do
     debug "TxL3ICMPAllocateHeader"

@@ -253,7 +253,7 @@ graph lpg {
 
         cluster L3ARP {
             node InitiateResponse {
-                port true false[AllocateHeader]
+                port true false[Prepare]
 		port drop[] }
             
             or Prepare {
@@ -275,7 +275,7 @@ graph lpg {
                 port miss[SendRequest] }
 
             node SendRequest {
-                port true false[AllocateHeader]
+                port true false[Prepare]
                 port drop[] }
         }
 

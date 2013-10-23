@@ -1,20 +1,26 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 import qualified Control.Concurrent as CC
 import qualified Control.Concurrent.STM as STM
 import qualified Control.Concurrent.STM.TChan as TC
 import qualified Control.Monad as M
 import qualified Util.Tap as TAP
+import qualified Util.ConcState as CS
 import qualified System.Posix.User as SPU
 
 import qualified Data.ByteString as BS
 
-import qualified Dragonet.Implementation as DNET
-import qualified Dragonet.Implementation.Algorithm as DNET.Alg
+import Dragonet.Implementation as DNET
+--import qualified Dragonet.Implementation.Algorithm as DNET.Alg
 
-import qualified LPGImpl
+import LPGImplTH
+import LPGImpl
 
 initialState = DNET.emptyGS
 
-receivedPacket state packet = DNET.Alg.execute LPGImpl.lpg packet state
+--receivedPacket state packet = DNET.Alg.execute LPGImpl.lpg packet state
+receivedPacket state packet = fst $ CS.runConcSM f $ DNET.initSimState state packet
+    where f = $(return $ generateFCall lpg "lpg")
 
 
 
@@ -30,7 +36,7 @@ rxThread c tap = M.forever $ do
 
 txThread c tap = M.forever $ do
     (TXEvent p) <- STM.atomically $ TC.readTChan c
-    putStrLn "Send Packet"
+    --putStrLn "Send Packet"
     TAP.writebs tap p
 
 simStep rxC txC state = do
@@ -43,10 +49,10 @@ simThread rxC txC state = do
     (p,state') <- STM.atomically $ simStep rxC txC state
 
     -- Show Debug output
-    putStrLn "SimStepDNET.Alg."
-    if not $ null $ DNET.gsDebug state' then
-        putStr $ unlines $ map ("    " ++) $ DNET.gsDebug state'
-    else return ()
+    --putStrLn "SimStepDNET.Alg."
+    --if not $ null $ DNET.gsDebug state' then
+    --    putStr $ unlines $ map ("    " ++) $ DNET.gsDebug state'
+    --else return ()
 
     -- Send out packets on TX queue
     let send p = STM.atomically $ TC.writeTChan txC (TXEvent p)
@@ -78,4 +84,6 @@ main = do
     _ <- CC.forkIO $ rxThread rxC tap
     _ <- CC.forkIO $ txThread txC tap
 
-    simThread rxC txC initialState
+    _ <- CC.forkIO $ simThread rxC txC initialState
+    l <- getLine
+    print l

@@ -4,10 +4,10 @@ module Dragonet.Implementation(
     AttrValue(..),
     Context(..), 
     GlobalState(..),
-    SimState(..),
-    ContextID,
     ImplM,
 
+    emptyPacket,
+    initContext,
     initSimState,
     emptyGS,
 
@@ -16,7 +16,7 @@ module Dragonet.Implementation(
     forkPkt, getPacket,
 
     packetLen,
-    setAttr, getAttr, getAttrM,
+    setAttr', setAttr, getAttr, getAttrM, dropAttr,
 
     convert16BE,
     unpack16BE,
@@ -43,7 +43,7 @@ module Dragonet.Implementation(
 
 
 import qualified Data.ByteString as BS
-import Control.Monad.State
+import qualified Util.ConcState as CS
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Word
@@ -51,8 +51,11 @@ import Data.Bits
 
 type Packet = BS.ByteString
 
+emptyPacket :: Packet
+emptyPacket = BS.empty
+
 data AttrValue = AttrS String | AttrI Int | AttrD [Word8] | AttrW32 Word32
-        | AttrW16 Word16 | AttrW8 Word8
+        | AttrW16 Word16 | AttrW8 Word8 | AttrB Bool
     deriving Show
 
 data Context = Context {
@@ -68,19 +71,9 @@ data GlobalState = GlobalState {
     gsARPCache :: M.Map Word32 [Word8]
 } deriving Show
 
-type ContextID = Int
 
-data SimState = SimState {
-    ssContexts :: M.Map ContextID Context,
-    ssCurCtx :: ContextID,
-    ssNextCtx :: ContextID,
-    ssForked :: M.Map ContextID String,
-    ssGState :: GlobalState
-} deriving Show
-
-type Implementation = State SimState String
-
-type ImplM a = State SimState a
+type ImplM a = CS.ConcSM GlobalState Context a
+type Implementation = ImplM String
 
 initContext :: Packet -> Context
 initContext p = Context {
@@ -88,14 +81,8 @@ initContext p = Context {
         ctxAttrs = M.empty,
         ctxDebug = [] }
 
-initSimState :: GlobalState -> Packet -> SimState
-initSimState gs p = SimState {
-        ssContexts = M.singleton 0 ctx,
-        ssCurCtx = 0,
-        ssNextCtx = 1,
-        ssForked = M.empty,
-        ssGState = gs }
-    where ctx = initContext p
+initSimState :: GlobalState -> Packet -> (GlobalState,Context)
+initSimState gs p = (gs, initContext p)
 
 emptyGS :: GlobalState
 emptyGS = GlobalState {
@@ -108,20 +95,16 @@ emptyGS = GlobalState {
 
 
 getCtx :: ImplM Context
-getCtx = do
-    ss <- get
-    return (fromJust $ M.lookup (ssCurCtx ss) $ ssContexts ss)
+getCtx = CS.getLS
 
 putCtx :: Context -> ImplM ()
-putCtx ctx = do
-    ss <- get
-    put $ ss { ssContexts = M.insert (ssCurCtx ss) ctx (ssContexts ss) }
+putCtx = CS.putLS
 
 getGS :: ImplM GlobalState
-getGS = do { ss <- get ; return (ssGState ss) }
+getGS = CS.getGS
 
 putGS :: GlobalState -> ImplM ()
-putGS gs = do { ss <- get ; put (ss { ssGState = gs }) }
+putGS = CS.putGS
 
 getPacket :: ImplM Packet
 getPacket = do { ctx <- getCtx ; return (ctxPacket ctx) }
@@ -136,10 +119,13 @@ packetLen = do
     ctx <- getCtx
     return $ BS.length $ ctxPacket ctx
 
+setAttr' :: String -> AttrValue -> Context -> Context
+setAttr' n v (Context p a g) = Context p (M.insert n v a) g
+
 setAttr :: String -> AttrValue -> ImplM ()
 setAttr n v = do
-    (Context p a g) <- getCtx
-    putCtx $ Context p (M.insert n v a) g
+    ctx <- getCtx
+    putCtx $ setAttr' n v ctx
 
 getAttr :: String -> ImplM AttrValue
 getAttr n = do
@@ -153,22 +139,14 @@ getAttrM n = do
     where
         attr c = M.lookup n $ ctxAttrs c
 
+dropAttr :: String -> ImplM ()
+dropAttr n = do
+    (Context p a g) <- getCtx
+    putCtx $ Context p (M.delete n a) g
 
-forkPkt :: ImplM String -> ImplM ()
-forkPkt fp = do
-    ss <- get
-    let ctx = initContext BS.empty
-    let oldCid = ssCurCtx ss
-    let newCid = ssNextCtx ss
-    put $ ss {  -- Enable new context
-            ssCurCtx = newCid,
-            ssNextCtx = newCid + 1,
-            ssContexts = M.insert newCid ctx $ ssContexts ss }
-    port <- fp  -- Execute new handler
-    ss' <- get
-    put (ss' { -- Switch back to original context
-        ssCurCtx = oldCid,
-        ssForked = M.insert newCid port $ ssForked ss' })
+
+forkPkt :: ImplM Context -> ImplM ()
+forkPkt = CS.fork
 
 
 

@@ -1,58 +1,63 @@
 BINARIES=graph plos13 impl tuntap confgen incremental impl_th
-GHCFLAGS=-Wall -O2 -XRankNTypes
+#OSUF=p_o
+#GHCFLAGS=-fllvm -Wall -O2 -XRankNTypes -rtsopts -prof -fprof-auto -osuf p_o
+OSUF=o
+GHCFLAGS=-fllvm -Wall -O2 -XRankNTypes -rtsopts
+GHC=ghc
+CC=clang
 # Debuging for DSL -> Haskell process
 # GHCFLAGS+=-ddump-splices
 
 all: models
 
 graph: base
-	ghc $(GHCFLAGS) testGraph.hs -o graph
+	$(GHC) $(GHCFLAGS) testGraph.hs -o graph
 graph_run: graph
 	./graph
 
 confgen: base
-	ghc $(GHCFLAGS) testConfGen.hs -o confgen
+	$(GHC) $(GHCFLAGS) testConfGen.hs -o confgen
 confgen_run: confgen
 	./confgen
 	./convertConfGen.sh
 
 incremental: base
-	ghc $(GHCFLAGS) testIncremental.hs -o incremental
+	$(GHC) $(GHCFLAGS) testIncremental.hs -o incremental
 incremental_run: incremental
 	./incremental
 
 
 plos13: base
-	ghc $(GHCFLAGS) testPLOS13.hs -o plos13
+	$(GHC) $(GHCFLAGS) testPLOS13.hs -o plos13
 plos13_run: plos13
 	./plos13
 
 impl: base
-	ghc $(GHCFLAGS) testImpl.hs -o impl
+	$(GHC) $(GHCFLAGS) testImpl.hs -o impl
 impl_run: impl
 	./impl
 
 impl_th: base
-	ghc $(GHCFLAGS) testImplTH.hs -o impl_th
+	$(GHC) $(GHCFLAGS) testImplTH.hs -o impl_th
 impl_th_run: impl_th
 	./impl_th
 
 
-tuntap : base Util/Tap.o
-	ghc $(GHCFLAGS) -threaded tuntapTests.hs -o tuntap
+tuntap : base Util/Tap.$(OSUF)
+	$(GHC) $(GHCFLAGS) -threaded tuntapTests.hs -o tuntap
 
 tuntap_run: tuntap
 	./tuntap
 
 ## Util/Tap
 
-Util/tap.o: Util/tap.c
-	gcc $(CFLAGS) -c $< -o $@
+Util/tap.$(OSUF): Util/tap.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-Util/Tap_.o: Util/Tap.hs
-	ghc $(GHCFLAGS) -c $< -o $@
+Util/Tap_.$(OSUF): Util/Tap.hs
+	$(GHC) $(GHCFLAGS) -c $< -o $@
 
-Util/Tap.o: Util/Tap_.o Util/tap.o
+Util/Tap.$(OSUF): Util/Tap_.$(OSUF) Util/tap.$(OSUF)
 	ld -i $^ -o $@
 
 models: graph_run
