@@ -147,17 +147,14 @@ s32 ixgbe_setup_sfp_modules_82599(struct ixgbe_hw *hw)
 
 		ret_val = ixgbe_get_sfp_init_sequence_offsets(hw, &list_offset,
 							      &data_offset);
-		if (ret_val != IXGBE_SUCCESS) {
-                    DEBUGFUNC("ixgbe_setup_sfp_modules_82599: failed in ixgbe_get_sfp_init_sequence_offsets #######\n\n");
+		if (ret_val != IXGBE_SUCCESS)
 			goto setup_sfp_out;
-                }
 
 		/* PHY config will finish before releasing the semaphore */
 		ret_val = hw->mac.ops.acquire_swfw_sync(hw,
 							IXGBE_GSSR_MAC_CSR_SM);
 		if (ret_val != IXGBE_SUCCESS) {
 			ret_val = IXGBE_ERR_SWFW_SYNC;
-                        DEBUGFUNC("ixgbe_setup_sfp_modules_82599: failed in acquire_swfw_sync ###########\n\n");
 			goto setup_sfp_out;
 		}
 
@@ -182,7 +179,6 @@ s32 ixgbe_setup_sfp_modules_82599(struct ixgbe_hw *hw)
 							IXGBE_GSSR_MAC_CSR_SM);
 			if (ret_val != IXGBE_SUCCESS) {
 				ret_val = IXGBE_ERR_SWFW_SYNC;
-                                DEBUGFUNC("ixgbe_setup_sfp_modules_82599: failed acquire_swfw_sync #######\n\n");
 				goto setup_sfp_out;
 			}
 
@@ -202,9 +198,8 @@ s32 ixgbe_setup_sfp_modules_82599(struct ixgbe_hw *hw)
 		}
 
 		if (ret_val) {
-			DEBUGOUT("sfp module setup not complete ###########\n\n");
+			DEBUGOUT("sfp module setup not complete\n");
 			ret_val = IXGBE_ERR_SFP_SETUP_NOT_COMPLETE;
-                        DEBUGFUNC("ixgbe_setup_sfp_modules_82599: failed ixgbe_reset_pipeline_82599 ######\n\n");
 			goto setup_sfp_out;
 		}
 
@@ -1044,14 +1039,6 @@ s32 ixgbe_reset_hw_82599(struct ixgbe_hw *hw)
 	/* Identify PHY and related function pointers */
 	status = hw->phy.ops.init(hw);
 
-	if (status != IXGBE_SUCCESS) {
-            DEBUGFUNC("######## ixgbe_reset_hw_82599: phy.ops.init failed ##### ");
-        } else {
-            DEBUGFUNC("######## ixgbe_reset_hw_82599: phy.ops.init passed #####");
-        }
-
-
-	DEBUGFUNC("######## ixgbe_reset_hw_82599: came here 1042");
 	if (status == IXGBE_ERR_SFP_NOT_SUPPORTED)
 		goto reset_hw_out;
 
@@ -1061,18 +1048,9 @@ s32 ixgbe_reset_hw_82599(struct ixgbe_hw *hw)
 		hw->phy.sfp_setup_needed = false;
 	}
 
-	DEBUGFUNC("######## ixgbe_reset_hw_82599: ##########################");
-	DEBUGFUNC("######## ixgbe_reset_hw_82599: came here 1052");
 	if (status == IXGBE_ERR_SFP_NOT_SUPPORTED)
 		goto reset_hw_out;
 
-	if (status != IXGBE_SUCCESS) {
-            DEBUGFUNC("######## ixgbe_reset_hw_82599: setup_sfp failed ##### ");
-        } else {
-            DEBUGFUNC("######## ixgbe_reset_hw_82599: setup_sfp passed #####");
-        }
-
-	DEBUGFUNC("######## ixgbe_reset_hw_82599: came here 1056");
 	/* Reset PHY */
 	if (hw->phy.reset_disable == false && hw->phy.ops.reset != NULL)
 		hw->phy.ops.reset(hw);
@@ -1095,7 +1073,6 @@ mac_reset_top:
 	IXGBE_WRITE_REG(hw, IXGBE_CTRL, ctrl);
 	IXGBE_WRITE_FLUSH(hw);
 
-	DEBUGFUNC("######## ixgbe_reset_hw_82599: came here 1079");
 	/* Poll for reset bit to self-clear indicating reset is complete */
 	for (i = 0; i < 10; i++) {
 		usec_delay(1);
@@ -1106,12 +1083,11 @@ mac_reset_top:
 
 	if (ctrl & IXGBE_CTRL_RST_MASK) {
 		status = IXGBE_ERR_RESET_FAILED;
-		DEBUGOUT("@@@@@@@@@@@@@@@@@@@ Reset polling failed to complete.\n");
+		DEBUGOUT("Reset polling failed to complete.\n");
 	}
 
 	msec_delay(50);
 
-	DEBUGFUNC("######## ixgbe_reset_hw_82599: came here 1095");
 	/*
 	 * Double resets are required for recovery from certain error
 	 * conditions.  Between resets, it is necessary to stall to allow time
@@ -1122,7 +1098,6 @@ mac_reset_top:
 		goto mac_reset_top;
 	}
 
-	DEBUGFUNC("######## ixgbe_reset_hw_82599: came here 1106");
 	/*
 	 * Store the original AUTOC/AUTOC2 values if they have not been
 	 * stored off yet.  Otherwise restore the stored original
@@ -1154,11 +1129,8 @@ mac_reset_top:
 							IXGBE_GSSR_MAC_CSR_SM);
 				if (status != IXGBE_SUCCESS) {
 					status = IXGBE_ERR_SWFW_SYNC;
-	                                DEBUGFUNC("######## ixgbe_reset_hw_82599: ERROR here 1138 " );
 					goto reset_hw_out;
-				} else {
-	                                DEBUGFUNC("######## ixgbe_reset_hw_82599: IXGBE_SUCCESS here 1138,  " );
-                                }
+				}
 
 				got_lock = true;
 			}
@@ -1183,7 +1155,6 @@ mac_reset_top:
 	/* Store the permanent mac address */
 	hw->mac.ops.get_mac_addr(hw, hw->mac.perm_addr);
 
-        DEBUGFUNC("######## ixgbe_reset_hw_82599: came here 1165");
 	/*
 	 * Store MAC address from RAR0, clear receive address registers, and
 	 * clear the multicast table.  Also reset num_rar_entries to 128,
@@ -1210,13 +1181,6 @@ mac_reset_top:
 	/* Store the alternative WWNN/WWPN prefix */
 	hw->mac.ops.get_wwn_prefix(hw, &hw->mac.wwnn_prefix,
 				   &hw->mac.wwpn_prefix);
-
-        DEBUGFUNC("######## ixgbe_reset_hw_82599: returning");
-	if (status != IXGBE_SUCCESS) {
-            DEBUGFUNC("######## ixgbe_reset_hw_82599: line 1195, somehow there is still error");
-        } else {
-            DEBUGFUNC("######## ixgbe_reset_hw_82599: line 1197, returning success");
-        }
 
 reset_hw_out:
 	return status;

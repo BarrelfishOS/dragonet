@@ -152,10 +152,8 @@ s32 ixgbe_set_mac_type(struct ixgbe_hw *hw)
  *
  *  Initialize the hardware by resetting and then starting the hardware
  **/
-#include <stdio.h>
 s32 ixgbe_init_hw(struct ixgbe_hw *hw)
 {
-        printf("ixgbe_init_hw called in librte_pmd\n");
 	return ixgbe_call_func(hw, hw->mac.ops.init_hw, (hw),
 			       IXGBE_NOT_IMPLEMENTED);
 }

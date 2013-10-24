@@ -312,8 +312,6 @@ run_testpmd_app()
 	echo -n "bitmask: "
 	read Bitmask
 	echo "Launching app"
-	echo "RTE_TARGET =$RTE_TARGET"
-	echo "sudo ${RTE_TARGET}/app/testpmd -c $Bitmask $EAL_PARAMS -- -i"
 	sudo ${RTE_TARGET}/app/testpmd -c $Bitmask $EAL_PARAMS -- -i
 }
 
@@ -325,7 +323,7 @@ grep_meminfo()
 	grep -i huge /proc/meminfo
 }
 
-
+#
 # Calls pci_unbind.py --status to show the NIC and what they
 # are all bound to, in terms of drivers.
 #
