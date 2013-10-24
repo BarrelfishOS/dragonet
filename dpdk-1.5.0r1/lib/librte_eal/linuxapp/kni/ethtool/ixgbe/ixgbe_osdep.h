@@ -53,11 +53,14 @@
 
 #undef ASSERT
 
+#define hw_dbg(hw, S, A...)	printk(KERN_DEBUG S, ## A)
+/*
 #ifdef DBG
 #define hw_dbg(hw, S, A...)	printk(KERN_DEBUG S, ## A)
 #else
 #define hw_dbg(hw, S, A...)	do {} while (0)
 #endif
+*/
 
 #define e_dev_info(format, arg...) \
 	dev_info(pci_dev_to_dev(adapter->pdev), format, ## arg)

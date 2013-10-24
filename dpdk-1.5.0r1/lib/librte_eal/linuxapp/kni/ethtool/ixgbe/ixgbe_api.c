@@ -135,8 +135,11 @@ s32 ixgbe_set_mac_type(struct ixgbe_hw *hw)
  **/
 s32 ixgbe_init_hw(struct ixgbe_hw *hw)
 {
+//        printf("ixgbe_init_hw called in librte_eal\n");
+	hw_dbg(hw, "ixgbe_init_hw called in librte_eal\n");
 	return ixgbe_call_func(hw, hw->mac.ops.init_hw, (hw),
 			       IXGBE_NOT_IMPLEMENTED);
+
 }
 
 /**

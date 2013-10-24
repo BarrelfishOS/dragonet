@@ -1706,6 +1706,7 @@ main(int argc, char** argv)
 		rte_panic("Cannot probe PCI\n");
 
 	nb_ports = (portid_t) rte_eth_dev_count();
+        printf("### nb_ports has value of %d\n", (int)nb_ports);
 	if (nb_ports == 0)
 		rte_exit(EXIT_FAILURE, "No probed ethernet devices - "
 							"check that "

@@ -429,14 +429,18 @@ s32 ixgbe_init_hw_generic(struct ixgbe_hw *hw)
 	s32 status;
 
 	DEBUGFUNC("ixgbe_init_hw_generic");
+        printf("##### ixgbe_init_hw_generic called from PMD...\n");
 
 	/* Reset the hardware */
 	status = hw->mac.ops.reset_hw(hw);
 
 	if (status == IXGBE_SUCCESS) {
 		/* Start the HW */
+                printf("##### resetting done, starting hardware...\n");
 		status = hw->mac.ops.start_hw(hw);
-	}
+	} else {
+            printf("##### ixgbe_init_hw_generic could not reset hardware...\n");
+        }
 
 	return status;
 }
