@@ -2,7 +2,8 @@ BINARIES=graph plos13 impl tuntap confgen incremental impl_th
 #OSUF=p_o
 #GHCFLAGS=-fllvm -Wall -O2 -XRankNTypes -rtsopts -prof -fprof-auto -osuf p_o
 OSUF=o
-GHCFLAGS=-fllvm -Wall -O2 -XRankNTypes -rtsopts
+#GHCFLAGS=-fllvm -Wall -O2 -XRankNTypes -rtsopts
+GHCFLAGS=-Wall -O2 -XRankNTypes -rtsopts
 GHC=ghc
 CC=clang
 # Debuging for DSL -> Haskell process
@@ -10,6 +11,7 @@ CC=clang
 
 all: models
 
+# generates graphs (lpg, prg, prg_conf, embedded, constrained)
 graph: base
 	$(GHC) $(GHCFLAGS) testGraph.hs -o graph
 graph_run: graph
@@ -27,11 +29,13 @@ incremental_run: incremental
 	./incremental
 
 
+# generates graphs for plos paper (lpg, prg, prgUnconf, embedded, embeddedFull, clustered)
 plos13: base
 	$(GHC) $(GHCFLAGS) testPLOS13.hs -o plos13
 plos13_run: plos13
 	./plos13
 
+# checks a packet by executing it (dns packet)
 impl: base
 	$(GHC) $(GHCFLAGS) testImpl.hs -o impl
 impl_run: impl
@@ -42,7 +46,7 @@ impl_th: base
 impl_th_run: impl_th
 	./impl_th
 
-
+# Runs the simulator against tuntap interface
 tuntap : base Util/Tap.$(OSUF)
 	$(GHC) $(GHCFLAGS) -threaded tuntapTests.hs -o tuntap
 
@@ -60,6 +64,7 @@ Util/Tap_.$(OSUF): Util/Tap.hs
 Util/Tap.$(OSUF): Util/Tap_.$(OSUF) Util/tap.$(OSUF)
 	ld -i $^ -o $@
 
+# Converts graphs into pdfs
 models: graph_run
 	./convertDot.sh
 
