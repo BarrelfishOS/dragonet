@@ -74,8 +74,29 @@
 
 #define RTE_LOGTYPE_L2FWD RTE_LOGTYPE_USER1
 
+#define GOTO_FAIL(str, ...) do {					\
+		printf("%s FAILED (%s: l.%d): <" str ">\n",		\
+		       __func__, __FILE__, __LINE__,  ##__VA_ARGS__);			\
+		goto fail;						\
+} while(0)
+
+
+size_t get_packet(char *pkt_out, size_t buf_len);
+void send_packet(char *pkt_tx, size_t len);
+
 #define MBUF_SIZE (2048 + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
-#define NB_MBUF   8192
+
+static char pkt_data_buff[MBUF_SIZE]; // packet will be stored here
+//static char pkt_data_buff_tx[MBUF_SIZE]; // packet to be sent will be stored here
+static unsigned portid_tx = 0;   // port id to be used for sending
+static struct lcore_queue_conf *qconf_rx = NULL;
+    // qconf ds which will be used for receiving
+
+//#define NB_MBUF   8192
+//#define NB_MBUF  64   //  does not initialize
+//#define NB_MBUF  128  // initializes, but does not accept packets
+#define NB_MBUF  256    // initializes, accepts packet
+//#define NB_MBUF  512    // initializes, accepts packets
 
 /*
  * RX and TX Prefetch, Host, and Write-back threshold values should be
@@ -96,7 +117,8 @@
 #define TX_HTHRESH 0  /**< Default values of TX host threshold reg. */
 #define TX_WTHRESH 0  /**< Default values of TX write-back threshold reg. */
 
-#define MAX_PKT_BURST 32
+//#define MAX_PKT_BURST 32
+#define MAX_PKT_BURST 1
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
 
 /*
@@ -181,8 +203,9 @@ struct l2fwd_port_statistics port_statistics[RTE_MAX_ETHPORTS];
 static int64_t timer_period = 10 * TIMER_MILLISECOND * 1000; /* default period is 10 seconds */
 
 /* Print out statistics on packets dropped */
-static void
-print_stats(void)
+//static
+void print_stats(void);
+void print_stats(void)
 {
 	uint64_t total_packets_dropped, total_packets_tx, total_packets_rx;
 	unsigned portid;
@@ -191,11 +214,10 @@ print_stats(void)
 	total_packets_tx = 0;
 	total_packets_rx = 0;
 
-	const char clr[] = { 27, '[', '2', 'J', '\0' };
-	const char topLeft[] = { 27, '[', '1', ';', '1', 'H','\0' };
-
 		/* Clear screen and move to top left */
-	printf("%s%s", clr, topLeft);
+	//const char clr[] = { 27, '[', '2', 'J', '\0' };
+	//const char topLeft[] = { 27, '[', '1', ';', '1', 'H','\0' };
+	//printf("%s%s", clr, topLeft);
 
 	printf("\nPort statistics ====================================");
 
@@ -272,20 +294,48 @@ l2fwd_send_packet(struct rte_mbuf *m, uint8_t port)
 	return 0;
 }
 
-static void
-l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid)
+void send_packet(char *pkt_tx, size_t len)
 {
 	struct ether_hdr *eth;
-	void *tmp;
-	unsigned dst_port;
+//	void *tmp;
 
-        // PS: gets port here
-	dst_port = l2fwd_dst_ports[portid];
+	unsigned dst_port;
+        struct rte_mbuf *m = rte_pktmbuf_alloc(l2fwd_pktmbuf_pool);
+
+	if (m == NULL) {
+		GOTO_FAIL("Cannot allocate mbuf");
+//		printf("ERROR: (%s:%d:%s) Cannot allocate mbuf\n",
+//                        __FILE__, __LINE__, __func__);
+//                return;
+        }
+	if (rte_pktmbuf_pkt_len(m) != 0) {
+		GOTO_FAIL("Bad length");
+//		printf("ERROR: (%s:%d:%s) Bad length of allocated mbuf\n",
+//                        __FILE__, __LINE__, __func__);
+//		rte_pktmbuf_free(m);
+                return;
+        }
+
+	char *data = rte_pktmbuf_append(m, len);
+	if (data == NULL)
+		GOTO_FAIL("Cannot append data");
+	if (rte_pktmbuf_pkt_len(m) != len)
+		GOTO_FAIL("Bad pkt length");
+//	if (rte_pktmbuf_data_len(m) != MBUF_TEST_DATA_LEN)
+//		GOTO_FAIL("Bad data length");
+	memcpy(data, pkt_tx, len);
+	if (!rte_pktmbuf_is_contiguous(m))
+		GOTO_FAIL("Buffer should be continuous");
+
+
+        // PS: assuming last used portid
+	dst_port = l2fwd_dst_ports[portid_tx];
+
 	eth = rte_pktmbuf_mtod(m, struct ether_hdr *);
 
 	/* 02:00:00:00:00:xx */
-	tmp = &eth->d_addr.addr_bytes[0];
-	*((uint64_t *)tmp) = 0x000000000002 + ((uint64_t)dst_port << 40);
+	//tmp = &eth->d_addr.addr_bytes[0];
+	//*((uint64_t *)tmp) = 0x000000000002 + ((uint64_t)dst_port << 40);
 
         // PS: for time being, I will keep this code which adds our address
         // instead of original address
@@ -293,107 +343,115 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid)
 	ether_addr_copy(&l2fwd_ports_eth_addr[dst_port], &eth->s_addr);
 
 	l2fwd_send_packet(m, (uint8_t) dst_port);
+
+fail:
+	if (m)
+		rte_pktmbuf_free(m);
+	return;
 }
+
+
+size_t get_packet(char *pkt_out, size_t buf_len)
+{
+    struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
+    struct rte_mbuf *m;
+    unsigned i, j, portid, nb_rx;
+    size_t pkt_size = 0;
+
+    if (qconf_rx == NULL) {
+        printf("ERROR: (%s:%d:%s) RX side not initialized\n",
+                __FILE__, __LINE__, __func__);
+        return pkt_size;
+    }
+
+    while (1) {
+        /*
+         * Read packet from RX queues
+         */
+        for (i = 0; i < qconf_rx->n_rx_port; i++) {
+
+            portid = qconf_rx->rx_port_list[i];
+            nb_rx = rte_eth_rx_burst((uint8_t) portid, 0,
+                    pkts_burst, MAX_PKT_BURST);
+
+            port_statistics[portid].rx += nb_rx;
+            if (nb_rx > 1) {
+                printf("ERROR: (%s:%d:%s) Multiple pkts (%d) in queue %d"
+                        "in brust, processing only one pkt\n",
+                        __FILE__, __LINE__, __func__,
+                        nb_rx, i);
+            }
+            //        printf("Received %d packets on queue %d\n", nb_rx, i);
+            for (j = 0; j < nb_rx; j++) {
+                m = pkts_burst[j];
+                rte_prefetch0(rte_pktmbuf_mtod(m, void *));
+
+                //printf("Packet of len %d received at %p\n", m->pkt.pkt_len, m->pkt.data);
+                if (m->pkt.pkt_len > 0 && m->pkt.pkt_len < buf_len) {
+                    // rte_pktmbuf_dump(m, 0);
+                    pkt_size = m->pkt.pkt_len;
+                } else {
+                    printf("ERROR: (%s:%d:%s) too small buffer to copy packet."
+                            "pkt_len %"PRIu32", buf_len = %zd\n",
+                            __FILE__, __LINE__, __func__,
+                            m->pkt.pkt_len, buf_len);
+                    pkt_size =  buf_len;
+                }
+                memcpy(pkt_out, m->pkt.data, pkt_size);
+                rte_pktmbuf_free(m);
+                return pkt_size;
+            } // end for : for each packet in packet_brust
+        } // end for: for each port, receive
+
+    } // end while: infinite
+
+    return pkt_size;
+} // end function : get_packet
+
+
 
 /* main processing loop */
 static void
 l2fwd_main_loop(void)
 {
-	struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
-	struct rte_mbuf *m;
-	unsigned lcore_id;
-	uint64_t prev_tsc, diff_tsc, cur_tsc, timer_tsc;
-	unsigned i, j, portid, nb_rx;
-	struct lcore_queue_conf *qconf;
-	const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S * BURST_TX_DRAIN_US;
 
-	prev_tsc = 0;
-	timer_tsc = 0;
-
-	lcore_id = rte_lcore_id();
-	qconf = &lcore_queue_conf[lcore_id];
-
-	if (qconf->n_rx_port == 0) {
-		RTE_LOG(INFO, L2FWD, "lcore %u has nothing to do\n", lcore_id);
-		return;
-	}
-
-	RTE_LOG(INFO, L2FWD, "entering main loop on lcore %u\n", lcore_id);
-
-	for (i = 0; i < qconf->n_rx_port; i++) {
-
-		portid = qconf->rx_port_list[i];
-		RTE_LOG(INFO, L2FWD, " -- lcoreid=%u portid=%u\n", lcore_id,
-			portid);
-	}
-
+        int in_pkt_len = 0, in_pkt_count = 0;
 	while (1) {
 
-		cur_tsc = rte_rdtsc();
+            // get an incoming packet
+            in_pkt_len = get_packet(pkt_data_buff, sizeof(pkt_data_buff));
+            printf("%d:incoming packet of len %d\n", in_pkt_count, in_pkt_len);
+            ++in_pkt_count;
 
-		/*
-		 * TX burst queue drain
-		 */
-		diff_tsc = cur_tsc - prev_tsc;
-		if (unlikely(diff_tsc > drain_tsc)) {
-
-                        // Send out unsent packets
-			for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++) {
-				if (qconf->tx_mbufs[portid].len == 0)
-					continue;
-				l2fwd_send_burst(&lcore_queue_conf[lcore_id],
-						 qconf->tx_mbufs[portid].len,
-						 (uint8_t) portid);
-				qconf->tx_mbufs[portid].len = 0;
-			}
-
-                        // Print the statistics
-			/* if timer is enabled */
-			if (timer_period > 0) {
-
-				/* advance the timer */
-				timer_tsc += diff_tsc;
-
-				/* if timer has reached its timeout */
-				if (unlikely(timer_tsc >= (uint64_t) timer_period)) {
-
-					/* do this only on master core */
-					if (lcore_id == rte_get_master_lcore()) {
-						print_stats();
-						/* reset the timer */
-						timer_tsc = 0;
-					}
-				}
-			}
-
-			prev_tsc = cur_tsc;
-		}
-
-		/*
-		 * Read packet from RX queues
-		 */
-		for (i = 0; i < qconf->n_rx_port; i++) {
-
-			portid = qconf->rx_port_list[i];
-			nb_rx = rte_eth_rx_burst((uint8_t) portid, 0,
-						 pkts_burst, MAX_PKT_BURST);
-
-			port_statistics[portid].rx += nb_rx;
-
-			for (j = 0; j < nb_rx; j++) {
-				m = pkts_burst[j];
-				rte_prefetch0(rte_pktmbuf_mtod(m, void *));
-                                // This is the place when packet
-                                // should be handed to calling process
-				l2fwd_simple_forward(m, portid);
-			}
-		} // end for: for each port, receive
+            // send out the same packet
+            send_packet(pkt_data_buff, in_pkt_len);
 	} // end while: infinite while loop
+
 } // end function: l2fwd_main_loop
 
 static int
 l2fwd_launch_one_lcore(__attribute__((unused)) void *dummy)
 {
+	unsigned lcore_id;
+
+	lcore_id = rte_lcore_id();
+	qconf_rx = &lcore_queue_conf[lcore_id];
+
+	if (qconf_rx->n_rx_port == 0) {
+		RTE_LOG(INFO, L2FWD, "lcore %u has nothing to do\n", lcore_id);
+		return -1;
+	}
+
+	RTE_LOG(INFO, L2FWD, "entering main loop on lcore %u for %u queues\n",
+                lcore_id, qconf_rx->n_rx_port);
+
+        unsigned i = 0;
+	for (i = 0; i < qconf_rx->n_rx_port; i++) {
+		portid_tx = qconf_rx->rx_port_list[i];
+		RTE_LOG(INFO, L2FWD, " -- lcoreid=%u portid=%u\n", lcore_id,
+			portid_tx);
+	}
+
 	l2fwd_main_loop();
 	return 0;
 }
