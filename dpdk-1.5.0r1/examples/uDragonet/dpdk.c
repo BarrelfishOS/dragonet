@@ -1,3 +1,5 @@
+
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -15,6 +17,11 @@
 
 #define TUNDEV "/dev/net/tun"
 
+size_t get_packet(char *pkt_out, size_t buf_len);
+void send_packet(char *pkt_tx, size_t len);
+void init_dpdk_setup(void);
+
+
 struct tap_handler {
 	int tun_fd;
 	int ctl_fd;
@@ -30,13 +37,17 @@ ssize_t tap_read(struct tap_handler *tap, char *buff, size_t len);
 void tap_write(struct tap_handler *tap, char *buff, size_t len);
 struct tap_handler * tap_create(char *name);
 
+
+
 static struct ifreq ifr_zero;
 
 void
 tap_open(struct tap_handler *tap, const char *name)
 {
-	struct ifreq ifr = ifr_zero;
 
+        init_dpdk_setup();
+	struct ifreq ifr = ifr_zero;
+        printf("Opening the tap with name %s\n", name);
 	if (name)
 		strncpy(tap->name, name, sizeof(tap->name));
 	strncpy(ifr.ifr_name, tap->name, sizeof(ifr.ifr_name));
@@ -101,6 +112,9 @@ tap_set_mask(struct tap_handler *tap, const char *mask)
 ssize_t
 tap_read(struct tap_handler *tap, char *buff, size_t len)
 {
+
+        return get_packet(buff, len);
+
 	ssize_t ret;
 
 	/*
@@ -122,6 +136,9 @@ tap_read(struct tap_handler *tap, char *buff, size_t len)
 void
 tap_write(struct tap_handler *tap, char *buff, size_t len)
 {
+
+        return send_packet (buff, len);
+
 	ssize_t ret;
 
 	if ((ret = write(tap->tun_fd, buff, len)) < 0)
@@ -443,6 +460,7 @@ l2fwd_send_packet(struct rte_mbuf *m, uint8_t port)
 
 void send_packet(char *pkt_tx, size_t len)
 {
+        printf("sending packet of size %zu\n", len);
 	struct ether_hdr *eth;
 //	void *tmp;
 
@@ -546,6 +564,7 @@ size_t get_packet(char *pkt_out, size_t buf_len)
                 }
                 memcpy(pkt_out, m->pkt.data, pkt_size);
                 rte_pktmbuf_free(m);
+                printf("received packet of size %zu\n", pkt_size);
                 return pkt_size;
             } // end for : for each packet in packet_brust
         } // end for: for each port, receive
@@ -970,11 +989,31 @@ int MAIN(int argc, char **argv)
 	return 0;
 }
 
+
+void init_dpdk_setup(void) {
+        const char *myArgs[13] = {"./a.out",
+                    "-c", "1", "-n",
+                    "1", "--", "-q",
+                    "1", "-p", "1", ""};
+
+        char *myArgs2[13];
+        int i;
+        for (i = 0; i < 11; ++i) {
+            printf("copying %dth string [%s]\n", i, myArgs[i]);
+            myArgs2[i] = malloc(12);
+            strncpy(myArgs2[i], myArgs[i], 12);
+        }
+
+        printf("Hello world from DPDK....\n");
+        MAIN(11, myArgs2);
+}
+
 //#define TUNTAP_MAIN  1
 
 #if defined(TUNTAP_MAIN)
 int main(__attribute__((unused))int argc, __attribute__((unused))const char *argv[])
 {
+
 
         const char *myArgs[13] = {"./a.out",
                     "-c", "1", "-n",
@@ -988,6 +1027,8 @@ int main(__attribute__((unused))int argc, __attribute__((unused))const char *arg
             myArgs2[i] = malloc(12);
             strncpy(myArgs2[i], myArgs[i], 12);
         }
+
+        printf("Hello world from DPDK....\n");
         MAIN(11, myArgs2);
 	struct tap_handler tap;
 	char buf[4096];

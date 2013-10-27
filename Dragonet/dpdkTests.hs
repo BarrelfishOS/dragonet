@@ -33,11 +33,12 @@ data NetEvent =
 
 rxThread c tap = M.forever $ do
     p <- TAP.readbs tap
+    putStrLn "received Packet"
     STM.atomically $ TC.writeTChan c (RXEvent p)
 
 txThread c tap = M.forever $ do
     (TXEvent p) <- STM.atomically $ TC.readTChan c
-    --putStrLn "Send Packet"
+    putStrLn "Send Packet"
     TAP.writebs tap p
 
 simStep rxC txC state = do

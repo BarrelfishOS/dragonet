@@ -50,8 +50,12 @@ pbool b = if b then "true" else "false"
 
 toPort = return
 
-cfgLocalMAC = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
-cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
+
+cfgLocalMAC = fromJust $ ETH.macFromString "00:0f:53:07:48:d5"
+cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.36"
+
+--cfgLocalMAC = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
+--cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
 --cfgLocalIP = fromJust $ IP4.ipFromString "129.132.102.111"
 
 
@@ -81,7 +85,7 @@ lpgRxL2EtherValidMulticastImpl = do
     toPort $ pbool
         ((dmac /= ([0xff, 0xff, 0xff, 0xff, 0xff, 0xff]) &&
         (((head dmac) .&. 1) == 1)))
-   
+
 
 lpgRxL2EtherValidBroadcastImpl = do
     dmac <- ETH.sourceRd
@@ -117,7 +121,7 @@ lpgRxL3ARPValidHeaderLengthImpl = do
         toPort $ pbool (plen == hlen)
     else
         toPort "false"
-        
+
 lpgRxL3ARPClassifyImpl = do
     debug "RxL3ARPClassify"
     oper <- ARP.operRd
@@ -171,7 +175,7 @@ lpgRxL3ARPProcessPendingResponseImpl = do
         toPort "true"
     else
         toPort "drop"
-   
+
 
 
 
@@ -197,7 +201,7 @@ lpgRxL3IPv4ValidReassemblyImpl = do
 lpgRxL3IPv4ValidVersionImpl = do
     ver <- IP4.versionRd
     toPort $ pbool $ ver == 4
-    
+
 lpgRxL3IPv4ValidLengthImpl = do
     len <- packetLen
     off <- IP4.headerOff
@@ -280,7 +284,7 @@ lpgRxL4UDPValidChecksumImpl = do
 -----------------------------------------------------------------------------
 -- TCP
 
-lpgRxL4TCPValidHeaderLengthImpl = toPort "true"   
+lpgRxL4TCPValidHeaderLengthImpl = toPort "true"
 
 -----------------------------------------------------------------------------
 -- Application RX
@@ -293,7 +297,7 @@ lpgRxToUDPPortDNSImpl = do
     dPort <- UDP.destPortRd
     toPort $ pbool $ dPort == 51098
 
-    
+
 
 
 -- Sinks
@@ -307,7 +311,7 @@ lpgRxDnsRXImpl = do { debug "Got DNS packet!" ; toPort "" }
 
 
 -----------------------------------------------------------------------------
--- Transmit Side 
+-- Transmit Side
 
 lpgTxQueueImpl = do
     debug "TxQueue"
@@ -516,7 +520,7 @@ lpgTxL3ICMPFillHeaderImpl = do
     toPort "true"
 
 
-        
+
 
 
 

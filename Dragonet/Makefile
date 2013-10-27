@@ -72,20 +72,10 @@ Util/Tap.$(OSUF): Util/Tap_.$(OSUF) Util/tap.$(OSUF)
 
 # Runs the simulator against dpdk userspace network
 dpdk: base Util/Dpdk.$(OSUF)
-	echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
-#	cp `find  ../dpdk-1.5.0r1/x86_64-default-linuxapp-gcc/build/lib/librte_eal/linuxapp/eal/ -name "*.o"` ofiles/  2> /dev/null || pwd
-#	rm -f ofiles/built-in.o
-	#cp `ls  ../dpdk-1.5.0r1/build/build/lib/*.o | sort | uniq` ofiles/
-	#cp `cat  ../dpdk-1.5.0r1/examples/uDragonet/mydepsFiltered.txt | sort | uniq` ofiles/
-	#cp `cat  ../dpdk-1.5.0r1/examples/uDragonet/mydeps.txt` ofiles/
-	#$(GHC) $(GHCFLAGS) -threaded dpdkTests.hs ofiles/*.o -o dpdkDragonet #-L../dpdk-1.5.0r1/x86_64-default-linuxapp-gcc/lib/ -Lofiles/
-
 	$(GHC) $(GHCFLAGS) -threaded dpdkTests.hs -o dpdkDragonet -L../dpdk-1.5.0r1/build/lib/ -lintel_dpdk
-#	$(GHC) $(GHCFLAGS) -threaded dpdkTests.hs -o dpdkDragonet -L../dpdk-1.5.0r1/x86_64-default-linuxapp-gcc/lib/
-#	$(GHC) $(GHCFLAGS) -threaded dpdkTests.hs -o dpdkDragonet -L  $(wildcard ../dpdk-1.5.0r1/x86_64-default-linuxapp-gcc/lib/*.a)
 
 dpdk_run: dpdk
-	./dpdkDragonet
+	export LD_LIBRARY_PATH=/home/ubuntu/dragonet/dpdk-1.5.0r1/build/lib/ ; ./dpdkDragonet
 
 ## Util/Dpdk
 
@@ -93,24 +83,19 @@ RTE_TARGET ?= x86_64-default-linuxapp-gcc
 RTE_SDK ?= ../dpdk-1.5.0r1/
 
 
-#Util/dpdk.$(OSUF): Util/dpdk.c
 #../dpdk-1.5.0r1/examples/uDragonet/build/dpdk.$(OSUF): ../dpdk-1.5.0r1/examples/uDragonet/dpdk.c
 Util/dpdk.$(OSUF): ../dpdk-1.5.0r1/examples/uDragonet/dpdk.c
-	echo "################################################"
-#	cd ../dpdk-1.5.0r1/examples/uDragonet  && $(MAKE)
+	echo "##########################"
+	cd ../dpdk-1.5.0r1/examples/uDragonet  && $(MAKE)
 	cp ../dpdk-1.5.0r1/examples/uDragonet/build/dpdk.$(OSUF) Util/
 
-#	$(CC) $(CFLAGS) -c $< -o $@
 
 Util/Dpdk_.$(OSUF): Util/Dpdk.hs
 	echo $(GHC) $(GHCFLAGS) -c $< -o $@
 	$(GHC) $(GHCFLAGS) -c $< -o $@
 
 Util/Dpdk.$(OSUF): Util/Dpdk_.$(OSUF) Util/dpdk.$(OSUF)
-	echo "################################################"
-	#ld -i $(wildcard ../dpdk-1.5.0r1/x86_64-default-linuxapp-gcc/lib/*.a) $^ -o $@
-	ld -i $(wildcard ofiles/*.o) $^ -o $@
-	#ld -i  $^ -o $@
+	ld -i  $^ -o $@
 
 
 # Converts graphs into pdfs
