@@ -75,11 +75,13 @@ dpdk: base Util/Dpdk.$(OSUF)
 	echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 #	cp `find  ../dpdk-1.5.0r1/x86_64-default-linuxapp-gcc/build/lib/librte_eal/linuxapp/eal/ -name "*.o"` ofiles/  2> /dev/null || pwd
 #	rm -f ofiles/built-in.o
-	cp `cat  ../dpdk-1.5.0r1/examples/uDragonet/mydepsFiltered.txt | sort | uniq` ofiles/
+	#cp `ls  ../dpdk-1.5.0r1/build/build/lib/*.o | sort | uniq` ofiles/
+	#cp `cat  ../dpdk-1.5.0r1/examples/uDragonet/mydepsFiltered.txt | sort | uniq` ofiles/
 	#cp `cat  ../dpdk-1.5.0r1/examples/uDragonet/mydeps.txt` ofiles/
 	#$(GHC) $(GHCFLAGS) -threaded dpdkTests.hs ofiles/*.o -o dpdkDragonet #-L../dpdk-1.5.0r1/x86_64-default-linuxapp-gcc/lib/ -Lofiles/
 
-	$(GHC) $(GHCFLAGS) -threaded dpdkTests.hs -o dpdkDragonet -L../dpdk-1.5.0r1/x86_64-default-linuxapp-gcc/lib/
+	$(GHC) $(GHCFLAGS) -threaded dpdkTests.hs -o dpdkDragonet -L../dpdk-1.5.0r1/build/lib/ -lintel_dpdk
+#	$(GHC) $(GHCFLAGS) -threaded dpdkTests.hs -o dpdkDragonet -L../dpdk-1.5.0r1/x86_64-default-linuxapp-gcc/lib/
 #	$(GHC) $(GHCFLAGS) -threaded dpdkTests.hs -o dpdkDragonet -L  $(wildcard ../dpdk-1.5.0r1/x86_64-default-linuxapp-gcc/lib/*.a)
 
 dpdk_run: dpdk

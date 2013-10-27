@@ -216,10 +216,6 @@ LDLIBS_FILES := $(wildcard $(foreach dir,$(LDLIBS_PATH),\
 # Compile executable file if needed
 #
 $(APP): $(OBJS-y) $(LDLIBS_FILES) $(DEP_$(APP)) $(LDSCRIPT) FORCE
-	echo "OBJs-y::: "  $(OBJS-y)
-	echo "LDLIBS::: " $(LDLIBS_FILES) > /home/ubuntu/dragonet/dpdk-1.5.0r1/myDeps.txt
-	echo "DEP::: " $(DEP_$(APP))
-	echo "LDSCRIPT:: " $(LDSCRIPT)
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
 	$(if $(D),\
 		@echo -n "$< -> $@ " ; \
