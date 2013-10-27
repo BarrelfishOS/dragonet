@@ -40,8 +40,7 @@ RTE_TARGET ?= x86_64-default-linuxapp-gcc
 include $(RTE_SDK)/mk/rte.vars.mk
 
 # binary name
-LIB = uDragonetLib
-#APP = uDragonet
+APP = uDragonet
 
 # all source are stored in SRCS-y
 SRCS-y := dpdk.c
@@ -49,4 +48,4 @@ SRCS-y := dpdk.c
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)
 
-include $(RTE_SDK)/mk/rte.extlib.mk
+include $(RTE_SDK)/mk/rte.extapp.mk
