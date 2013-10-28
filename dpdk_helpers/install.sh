@@ -32,6 +32,15 @@ prepare_machine() {
     echo 'apt-get install -y build-essential' | on_machine ${MACHINE}
     echo 'apt-get install -y linux-headers-$(uname -r)' | on_machine ${MACHINE}
     echo 'apt-get install -y linux-headers-generic' | on_machine ${MACHINE}
+
+    # for Dragonet
+    echo 'apt-get install -y ghc cabal-install clang graphviz pdftk libghc-parsec2-dev libghc-stm-dev minisat' | on_machine ${MACHINE}
+    echo 'cabal update' | on_machine ${MACHINE}
+    echo 'cabal install graphviz' | on_machine ${MACHINE}
+
+
+
+    # my vim configuration
     scp  "vimconf.tar" "${HOST}:"
     echo 'tar -xvf vimconf.tar' | on_machine_nosudo ${MACHINE}
     echo 'cd /root/ ; tar -xvf /home/ubuntu/vimconf.tar' | on_machine ${MACHINE}
@@ -39,17 +48,21 @@ prepare_machine() {
 
 copy_code() {
 
-    # removing old code (if any)
     echo "rm -rf ${SOURCE_DIR}" | on_machine ${MACHINE}
-    echo "rm -rf ${SRC_ARCHIVE}" | on_machine ${MACHINE}
+    echo 'hg clone ssh://shindep@129.132.186.96:8006/hg/dragonet' | on_machine_nosudo ${MACHINE}
+
+    # removing old code (if any)
+#    echo "rm -rf ${SOURCE_DIR}" | on_machine ${MACHINE}
+#    echo "rm -rf ${SRC_ARCHIVE}" | on_machine ${MACHINE}
 
     # Copying new codebase
-    scp  "../${SRC_ARCHIVE}" "${HOST}:"
-    echo "tar -xf ${SRC_ARCHIVE}" | on_machine ${MACHINE}
+#    scp  "../${SRC_ARCHIVE}" "${HOST}:"
+#    echo "tar -xf ${SRC_ARCHIVE}" | on_machine ${MACHINE}
 
     # Copying the updated file to take care of the compile error
-    scp "../${SOURCE_DIR}/${updatedFile}"  "${HOST}:"
-    echo "cp `basename ${updatedFile}` ${SOURCE_DIR}/${updatedFile}" | on_machine ${MACHINE}
+#    scp "../${SOURCE_DIR}/${updatedFile}"  "${HOST}:"
+#    echo "cp `basename ${updatedFile}` ${SOURCE_DIR}/${updatedFile}" | on_machine ${MACHINE}
+
 }
 
 compile_code() {
@@ -97,6 +110,7 @@ HOST="ubuntu@${MACHINE}"
 SSH="ssh ${HOST}"
 SRC_ARCHIVE="dpdk-1.5.0r1.tar.gz"
 SOURCE_DIR="dpdk-1.5.0r1"
+SOURCE_DIR="dragonet/dpdk-1.5.0r1"
 updatedFile="lib/librte_sched/Makefile"
 
 

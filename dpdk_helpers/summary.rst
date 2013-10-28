@@ -1,3 +1,113 @@
+================================================
+STEP : Thinking "Why not click?"
+================================================
+
+My use-case:
+ - A packet can go out on one or more ports
+ - All elements will always have only one input, except operators
+ - Operators:
+   - Operators can have more than one input
+   - They synchronize the inputs before generating the output
+
+================================================
+STEP : Building new application with DPDK
+================================================
+
+My current problem is that I am not able to compile completely new application
+with DPDK.  Their build system is very complex and I am not able to understand
+where all I need to do modifications to compile new app.
+
+For example, I can't compile dpdk+Dragonet code because Dragonet is in
+haskell and I don't know which libraries are needed to be linked in compilation
+process to be able to generate final binary.  With GHC, I am always getting
+these missing symbols which I have no idea how to include in compilation.
+
+
+When I include all possible files which can be included from dpdk, I get
+following error ::
+
+  final link ... ghc: ofiles/virtio_rxtx.o: unknown symbol `per_lcore__lcore_id'
+  linking extra libraries/objects failed
+
+http://stackoverflow.com/questions/15004383/linking-extra-libraries-objects-failed
+
+On other hand, if I want to move my code in DPDK then their Makefile
+infrastructure is too complex that I would not know how to configure it
+to compile something completely new and include correct libraries.
+
+
+As a solution to this, I tried to compile the whole intel_dpdk as single
+big library (by modifying global configuration) then I get following error ::
+
+  undefined reference to `ceil'
+
+I don't know how something as simple as ceiling function will be missing.  Also
+this happens only when I am trying generate one big image, otherwise it works.
+Also, this error comes only when I try to build with
+``CONFIG_RTE_BUILD_SHARED_LIB=y``.  Otherwise it compiles.
+
+
+I am worried that I will run into same problem when I work with click router.
+I won't be able to compile the click router while calling functionality
+from DPDK.
+
+
+I couldn't take care of whatever library dependency issues DPDK had in static
+compilation.  I just re-implemented the 'ceil' function and then code worked.
+Luckly no other function from these conflicting library was used, which
+helped me a bit in getting the work-around.
+
+
+================================================
+STEP : Integrating DPDK with Haskell simulator
+================================================
+
+ * I need to convert the DPDK l2fwd code into the which sends/receives single
+    packet with one function call.
+ * Add initialization code which needs to get called only once.
+ * Eventually make it as a library
+ * Write wrapper functions which will look like the the function in
+   haskell wrapper ``tun.c``
+
+
+================================================
+STEP : Sending actual packets with E10K card
+================================================
+
+Aim is to send/receive packets while knowing what exactly is going on in the
+code.  I should be able to control the memory used, callbacks involved, etc.
+
+There are some UDP packets sent which it reports.  Which code is doing that?
+
+ * Monitering the traffic on ziger2 (needs rewiring)
+ * Reviewing the source code to see what exactly is happening
+
+ziger1:
+0000:81:00.0 '82599EB 10-Gigabit SFI/SFP+ Network Connection' if=eth1 drv=ixgbe
+unused=igb_uio *Active*
+eth1      Link encap:Ethernet  HWaddr 00:1b:21:8f:18:64
+          inet addr:10.111.4.37  Bcast:10.255.255.255  Mask:255.0.0.0
+
+
+ziger2:
+eth2:     Link encap:Ethernet  HWaddr 00:0f:53:07:48:d5
+          inet addr:10.111.4.36  Bcast:10.255.255.255  Mask:255.0.0.0
+
+
+start tx_first
+show port stats all
+
+tcpdump -i eth2 -A -n -N -w packetCapture
+
+
+So, the code is sending the packets.  I just need to find the code.
+
+What is a port in this context?
+--> They are talking about NIC ports.  So, I would assume that they are usual
+NIC ports.
+
+I have a code which sends/receives packets over DPDK and now I need to
+integrate this code with haskell based simulator.
 
 ================================================
 STEP : Running sample application on E10K card
