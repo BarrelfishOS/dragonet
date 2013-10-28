@@ -52,7 +52,8 @@ toPort = return
 
 
 cfgLocalMAC = fromJust $ ETH.macFromString "00:0f:53:07:48:d5"
-cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.36"
+--cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.36"
+cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.37"
 
 --cfgLocalMAC = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
 --cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
@@ -78,6 +79,7 @@ lpgRxL2EtherValidLengthImpl = do
 
 lpgRxL2EtherValidTypeImpl = do
     etype <- ETH.etypeRd
+    debug ("etype is " ++ show(etype))
     toPort $ pbool (etype >= 0x0800)
 
 lpgRxL2EtherValidMulticastImpl = do
@@ -88,11 +90,18 @@ lpgRxL2EtherValidMulticastImpl = do
 
 
 lpgRxL2EtherValidBroadcastImpl = do
+    smac <- ETH.destRd
     dmac <- ETH.sourceRd
+    debug ("llpgRxL2EtherValidBroadcastImpl destMac " ++ show (dmac)
+            ++ " , srcMac " ++ show(smac) )
     toPort $ pbool (dmac == ([0xff, 0xff, 0xff, 0xff, 0xff, 0xff]))
 
 lpgRxL2EtherValidUnicastImpl = do
+    smac <- ETH.destRd
     dmac <- ETH.sourceRd
+    debug ("lpgRxL2EtherValidUnicastImpl  destMac " ++ show (dmac)
+            ++ " , srcMac " ++ show(smac) )
+
     toPort $ pbool $ (((head dmac) .&. 1) == 0)
 
 lpgRxL2EtherValidSrcImpl = do
@@ -116,28 +125,40 @@ lpgRxL3ARPValidHeaderLengthImpl = do
     off <- ARP.headerOff
     len <- packetLen
     let plen = len - off
+    debug ("len is " ++ show(len))
+    debug ("off is " ++ show(off))
+    debug ("plen is "  ++ show (plen))
     if plen >= ARP.headerMinLen then do
         hlen <- ARP.headerLen
-        toPort $ pbool (plen == hlen)
+        debug ("toport is "  ++ show (plen) ++ " == " ++ show(hlen))
+        toPort $ pbool (plen >= hlen)
     else
         toPort "false"
 
 lpgRxL3ARPClassifyImpl = do
     debug "RxL3ARPClassify"
     oper <- ARP.operRd
+    debug ("RxL3ARPClassify oper is " ++ show(oper) ++ " Req is "
+            ++ show(ARP.operRequest) ++ " and res is " ++ show(ARP.operReply) )
+
     toPort $
         if oper == ARP.operRequest then "request"
         else if oper == ARP.operReply then "response"
-        else "drop"
+        else
+            "drop"
+            --debug "RxL3ARPClassify its not request or response, so dropping"
 
 -- Make sure the request is for Ethernet/IPv4
 lpgRxL3ARPValidRequestImpl = do
+    debug "L3ARPValidRequest"
     htype <- ARP.htypeRd
     ptype <- ARP.ptypeRd
     toPort $ pbool (htype == ARP.htypeEthernet && ptype == ARP.ptypeIPV4)
 
 lpgRxL3ARPLocalIPDestImpl = do
     tpa <- ARP.tpaRd
+    debug ("lpgRxL3ARPLocalIPDestImpl " ++ show (tpa) ++ " "++ show (pack32BE tpa) ++ " " ++ show (cfgLocalIP)  ++ " selectedPort " ++
+        show (pack32BE tpa == cfgLocalIP))
     toPort $ pbool (pack32BE tpa == cfgLocalIP)
 
 lpgRxL3ARPValidResponseImpl = do
@@ -220,6 +241,8 @@ lpgRxL3IPv4ClassifyImpl = do
     l4off <- IP4.payloadOff
     setAttr "L4Offset" $ AttrI $ l4off
     proto <- IP4.protocolRd
+    debug("lpgRxL3IPv4ClassifyImpl l4Proto, ICMP, TCP, UDP "
+        ++ show(proto) ++ " " ++ show(IP4.protocolTCP) ++ " " ++ show(IP4.protocolUDP)  )
     toPort $
         -- FIXME: Can't this be turned into a case?
         if proto == IP4.protocolICMP then "icmp"

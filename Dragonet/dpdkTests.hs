@@ -51,10 +51,10 @@ simThread rxC txC state = do
     (p,state') <- STM.atomically $ simStep rxC txC state
 
     -- Show Debug output
-    --putStrLn "SimStepDNET.Alg."
-    --if not $ null $ DNET.gsDebug state' then
-    --    putStr $ unlines $ map ("    " ++) $ DNET.gsDebug state'
-    --else return ()
+    putStrLn "SimStepDNET.Alg."
+    if not $ null $ DNET.gsDebug state' then
+        putStr $ unlines $ map ("    " ++) $ DNET.gsDebug state'
+    else return ()
 
     -- Send out packets on TX queue
     let send p = STM.atomically $ TC.writeTChan txC (TXEvent p)
