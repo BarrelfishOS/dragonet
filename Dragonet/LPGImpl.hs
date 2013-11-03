@@ -326,7 +326,7 @@ lpgRxToUDPPortDNSImpl = do
 -- Sinks
 lpgPacketDropImpl = do { debug "Packet dropped!" ; toPort "" }
 lpgRxL4TCPOutImpl = do { debug "Got TCP packet!" ; toPort "" }
-lpgRxL4UDPOutImpl = do { debug "Got UDP packet!" ; toPort "" }
+lpgRxL4UDPOutImpl = do { debug "!" ; toPort "" }
 lpgRxDnsRXImpl = do { debug "Got DNS packet!" ; toPort "" }
 
 
