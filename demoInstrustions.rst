@@ -23,6 +23,10 @@ Here are the instructions for setting up server (ziger1) part ::
     # In case you want to re-run the whole make process
  make dpdk_run
 
+Please note that currently the Makefile does not take care of setting up
+the NIC, kernel module, huge pages, buffers, and other things. For that,
+you need to run ``dragonet/dpdk-1.5.0r1/tools/mySetup.sh``
+
 ----------------------
 Client side setup
 ----------------------
@@ -101,6 +105,24 @@ should be selected when running a sample dpdk application :
  * 10: Bind Ethernet device to IGB UIO module (bind "82574L if=eth0 drv=e1000e")
  * 13: Make sure that all huge pages are actually free
  * 12: To actually run the application (core mask used: 0xf)
+
+
+The compilation process generates a file called ``libintel_dpdk.so`` which
+is needed by the Haskell code to be able to compile.  You can generate this
+with following steps ::
+
+    cd dragonet/dpdk-1.5.0r1
+    ./doConfig.sh
+    make
+
+To verify if this step worked or not, use following command ::
+
+    find ./ -name "*intel_dpdk.so"
+    ./x86_64-default-linuxapp-gcc/lib/libintel_dpdk.so
+    ./build/lib/libintel_dpdk.so
+
+You specially want the second entry as this is hardcoded in the Makefile
+of ``Dragonet/Makefile`` for ``make dpdk_run`` rule.
 
 
 

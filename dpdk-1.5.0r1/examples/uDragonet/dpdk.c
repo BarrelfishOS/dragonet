@@ -1,167 +1,3 @@
-
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <linux/if.h>
-#include <linux/if_tun.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdlib.h>
-#include <err.h>
-
-#define TUNDEV "/dev/net/tun"
-
-size_t get_packet(char *pkt_out, size_t buf_len);
-void send_packet(char *pkt_tx, size_t len);
-void init_dpdk_setup(void);
-
-
-struct tap_handler {
-	int tun_fd;
-	int ctl_fd;
-	char name[IFNAMSIZ];
-};
-
-void tap_open(struct tap_handler *tap, const char *name);
-void tap_up(struct tap_handler *tap);
-int tap_set_addr(struct tap_handler *tap, int cmd, const char *addr_str);
-void tap_set_ip(struct tap_handler *tap, const char *ip);
-void tap_set_mask(struct tap_handler *tap, const char *mask);
-ssize_t tap_read(struct tap_handler *tap, char *buff, size_t len);
-void tap_write(struct tap_handler *tap, char *buff, size_t len);
-struct tap_handler * tap_create(char *name);
-
-
-
-static struct ifreq ifr_zero;
-
-void
-tap_open(struct tap_handler *tap, const char *name)
-{
-
-        init_dpdk_setup();
-	struct ifreq ifr = ifr_zero;
-        printf("Opening the tap with name %s\n", name);
-	if (name)
-		strncpy(tap->name, name, sizeof(tap->name));
-	strncpy(ifr.ifr_name, tap->name, sizeof(ifr.ifr_name));
-	ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
-
-	tap->tun_fd = open(TUNDEV, O_RDWR);
-	if (tap->tun_fd < 0)
-		err(1, TUNDEV);
-
-	if (ioctl(tap->tun_fd, TUNSETIFF, &ifr) < 0)
-		err(1, "TUNSETIFF");
-
-	if ((tap->ctl_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP)) < 0)
-		err(1, "socket");
-}
-
-void
-tap_up(struct tap_handler *tap)
-{
-	struct ifreq ifr = ifr_zero;
-
-	strncpy(ifr.ifr_name, tap->name, sizeof(ifr.ifr_name));
-	if (ioctl(tap->ctl_fd, SIOCGIFFLAGS, &ifr) < 0)
-		err(1, "ioctl: SIOCGIFFLAGS");
-
-	ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
-
-	if (ioctl(tap->ctl_fd, SIOCSIFFLAGS, &ifr) < 0)
-		err(1, "ioctl: SIOCSIFFLAGS");
-}
-
-int
-tap_set_addr(struct tap_handler *tap, int cmd, const char *addr_str)
-{
-	struct ifreq ifr = ifr_zero;//  {{{0}}};
-	struct sockaddr_in addr;
-
-	strncpy(ifr.ifr_name, tap->name, sizeof(ifr.ifr_name));
-
-	addr.sin_family = AF_INET;
-	if (!inet_aton(addr_str, &addr.sin_addr))
-		err(1, "inet_aton: %s\n", addr_str);
-	memcpy(&ifr.ifr_addr, &addr, sizeof(addr));
-
-	return ioctl(tap->ctl_fd, cmd, &ifr);
-}
-
-void
-tap_set_ip(struct tap_handler *tap, const char *ip)
-{
-	if (tap_set_addr(tap, SIOCSIFADDR, ip) < 0)
-		err(1, "SIOCGIFFLAGS: %s", ip);
-}
-
-void
-tap_set_mask(struct tap_handler *tap, const char *mask)
-{
-	if (tap_set_addr(tap, SIOCSIFNETMASK, mask) < 0)
-		err(1, "SIOCSIFNETMASK: %s", mask);
-}
-
-ssize_t
-tap_read(struct tap_handler *tap, char *buff, size_t len)
-{
-
-        return get_packet(buff, len);
-
-	ssize_t ret;
-
-	/*
-	struct tun_pi *pi;
-	pi = (struct tun_pi *)buff;
-	pi->flags = 0;
-	pi->proto = 666;
-	*/
-
-	// we will want to handle some (e.g., EAGAIN), but for now just die
-	if ((ret = read(tap->tun_fd, buff, len)) < 0)
-		err(1, "read failed");
-	else if (ret == 0)    // ditto for EOF
-		err(1, "read returned 0");
-
-	return ret;
-}
-
-void
-tap_write(struct tap_handler *tap, char *buff, size_t len)
-{
-
-        return send_packet (buff, len);
-
-	ssize_t ret;
-
-	if ((ret = write(tap->tun_fd, buff, len)) < 0)
-		err(1, "write failed");
-	else if (((size_t)ret) < len)
-		err(1, "short write");
-}
-
-struct tap_handler *
-tap_create(char *name)
-{
-	struct tap_handler *tap;
-
-	tap = malloc(sizeof(*tap));
-	if (!tap)
-		err(1, "malloc");
-
-	tap_open(tap, name);
-	return tap;
-}
-
-
-
 /*-
  *   BSD LICENSE
  *
@@ -208,6 +44,7 @@ tap_create(char *name)
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
+#include <assert.h>
 
 #include <rte_common.h>
 #include <rte_log.h>
@@ -245,10 +82,25 @@ tap_create(char *name)
 } while(0)
 
 
-size_t get_packet(char *pkt_out, size_t buf_len);
-void send_packet(char *pkt_tx, size_t len);
-
 #define MBUF_SIZE (2048 + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
+#define     IFNAMSIZDPDK        1023
+
+struct dpdk_handler {
+	int dpdk_fd;
+	int ctl_fd;
+	char name[IFNAMSIZDPDK];
+        char pkt_data_buff[MBUF_SIZE]; // packet will be stored here
+        uint32_t portid_tx;   // port id to be used for sending
+        struct lcore_queue_conf *qconf_rx;
+};
+
+size_t get_packet(struct dpdk_handler *dpdk, char *pkt_out, size_t buf_len);
+void send_packet(struct dpdk_handler *dpdk, char *pkt_tx, size_t len);
+struct dpdk_handler *init_dpdk_setup(const char *name);
+
+struct dpdk_handler *g_dpdk_if;
+
+
 
 static char pkt_data_buff[MBUF_SIZE]; // packet will be stored here
 //static char pkt_data_buff_tx[MBUF_SIZE]; // packet to be sent will be stored here
@@ -458,9 +310,10 @@ l2fwd_send_packet(struct rte_mbuf *m, uint8_t port)
 	return 0;
 }
 
-void send_packet(char *pkt_tx, size_t len)
+void send_packet(struct dpdk_handler *dpdk, char *pkt_tx, size_t len)
 {
-        printf("sending packet of size %zu\n", len);
+        assert(dpdk != NULL);
+        printf("%s:sending packet of size %zu\n", dpdk->name, len);
 	struct ether_hdr *eth;
 //	void *tmp;
 
@@ -516,16 +369,17 @@ fail:
 }
 
 
-size_t get_packet(char *pkt_out, size_t buf_len)
+size_t get_packet(struct dpdk_handler *dpdk, char *pkt_out, size_t buf_len)
 {
     struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
     struct rte_mbuf *m;
     unsigned i, j, portid, nb_rx;
     size_t pkt_size = 0;
 
+    assert(dpdk != NULL);
     if (qconf_rx == NULL) {
-        printf("ERROR: (%s:%d:%s) RX side not initialized\n",
-                __FILE__, __LINE__, __func__);
+        printf("ERROR: (%s:%d:%s) %s: RX side not initialized\n",
+                __FILE__, __LINE__, __func__, dpdk->name);
         return pkt_size;
     }
 
@@ -578,20 +432,21 @@ size_t get_packet(char *pkt_out, size_t buf_len)
 
 /* main processing loop */
 //static
-void l2fwd_main_loop(void);
-void l2fwd_main_loop(void)
+void l2fwd_main_loop(struct dpdk_handler *dpdk);
+void l2fwd_main_loop(struct dpdk_handler *dpdk)
 {
 
+    assert(dpdk != NULL);
         int in_pkt_len = 0, in_pkt_count = 0;
 	while (1) {
 
             // get an incoming packet
-            in_pkt_len = get_packet(pkt_data_buff, sizeof(pkt_data_buff));
+            in_pkt_len = get_packet(dpdk, pkt_data_buff, sizeof(pkt_data_buff));
             printf("%d:incoming packet of len %d\n", in_pkt_count, in_pkt_len);
             ++in_pkt_count;
 
             // send out the same packet
-            send_packet(pkt_data_buff, in_pkt_len);
+            send_packet(dpdk, pkt_data_buff, in_pkt_len);
 	} // end while: infinite while loop
 
 } // end function: l2fwd_main_loop
@@ -989,8 +844,16 @@ int MAIN(int argc, char **argv)
 	return 0;
 }
 
+static struct dpdk_handler dpdk_if_1;
 
-void init_dpdk_setup(void) {
+struct dpdk_handler *init_dpdk_setup(const char *name)
+{
+        g_dpdk_if = &dpdk_if_1;
+	if (name)
+            strncpy(g_dpdk_if->name, name, sizeof(g_dpdk_if->name));
+        else
+            g_dpdk_if->name[0] = '\0';
+
         const char *myArgs[13] = {"./a.out",
                     "-c", "1", "-n",
                     "1", "--", "-q",
@@ -1006,6 +869,7 @@ void init_dpdk_setup(void) {
 
         printf("Hello world from DPDK....\n");
         MAIN(11, myArgs2);
+        return g_dpdk_if;
 }
 
 //#define TUNTAP_MAIN  1

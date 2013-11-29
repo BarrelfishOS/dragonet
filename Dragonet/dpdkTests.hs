@@ -5,7 +5,8 @@ import qualified Control.Concurrent.STM as STM
 import qualified Control.Concurrent.STM.TChan as TC
 import qualified Control.Monad as M
 --import qualified Util.Tap as TAP
-import qualified Util.Dpdk as TAP
+--import qualified Util.Dpdk as TAP
+import qualified Util.Dpdk as Dpdk
 import qualified Util.ConcState as CS
 import qualified System.Posix.User as SPU
 
@@ -31,15 +32,15 @@ data NetEvent =
     RXEvent BS.ByteString |
     TXEvent BS.ByteString
 
-rxThread c tap = M.forever $ do
-    p <- TAP.readbs tap
+rxThread c dpdk = M.forever $ do
+    p <- Dpdk.getPacket dpdk
     putStrLn "received Packet"
     STM.atomically $ TC.writeTChan c (RXEvent p)
 
-txThread c tap = M.forever $ do
+txThread c dpdk = M.forever $ do
     (TXEvent p) <- STM.atomically $ TC.readTChan c
     putStrLn "Send Packet"
-    TAP.writebs tap p
+    Dpdk.sendPacket dpdk p
 
 simStep rxC txC state = do
     e <- TC.readTChan rxC
@@ -65,26 +66,23 @@ simThread rxC txC state = do
 
 
 main = do
-    -- create and open a TAP device
-    tap <- TAP.create "dragonet0"
+    -- create and open a DPDK device
+    dpdk1 <- Dpdk.init_dpdk_setup "dragonet01"
 
-    -- Initialize tap device on linux side
+    -- Initialize dpdk device on linux side
     uid <- SPU.getRealUserID
     if uid == 0 then do
-        TAP.set_ip tap "192.168.123.100"
-        TAP.set_mask tap "255.255.255.0"
-        TAP.up tap
+        putStrLn ("Dpdk device created, everything should be fine ")
     else do
-        putStrLn ("Warning: Cannot configure Linux-side of TAP device as " ++
-                  "non-root user.")
+        putStrLn ("Warning: You are a non-root user. So DPDK may not work!")
 
     -- create rx/tx channels
     rxC <- TC.newTChanIO
     txC <- TC.newTChanIO
 
     -- spawn rx/tx threads
-    _ <- CC.forkIO $ rxThread rxC tap
-    _ <- CC.forkIO $ txThread txC tap
+    _ <- CC.forkIO $ rxThread rxC dpdk1
+    _ <- CC.forkIO $ txThread txC dpdk1
 
     _ <- CC.forkIO $ simThread rxC txC initialState
     l <- getLine

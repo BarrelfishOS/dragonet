@@ -1,12 +1,9 @@
 {-# LANGUAGE CPP, ForeignFunctionInterface #-}
 
 module Util.Dpdk (
-	create,
-	set_ip,
-	set_mask,
-	up,
-	readbs,
-	writebs
+        init_dpdk_setup,
+        getPacket,
+        sendPacket
 ) where
 
 import Foreign (Ptr)
@@ -77,3 +74,46 @@ writebs tap bstr = do
 	where
 		(fptr, off, len) = BI.toForeignPtr bstr
 		c_len = fromIntegral len
+
+-- ##########################################################################
+
+-- opaque tap handler
+data DpdkHandle
+newtype Dpdk = Dpdk (Ptr DpdkHandle)
+
+foreign import ccall "init_dpdk_setup"
+	c_init_dpdk_setup :: CString -> IO Dpdk
+
+foreign import ccall "get_packet"
+	c_get_packet :: Dpdk -> Ptr Word8 -> CInt -> IO (CInt)
+
+foreign import ccall "send_packet"
+	c_send_packet :: Dpdk -> Ptr Word8 -> CInt -> IO ()
+
+-- Create a DPDK device
+init_dpdk_setup :: String -> IO Dpdk
+init_dpdk_setup name = withCString name c_init_dpdk_setup
+
+--
+getPacket :: Dpdk -> IO BS.ByteString
+getPacket dpdk = do
+	buf <- mallocForeignPtrBytes blen
+	len <- withForeignPtr buf $ \b -> c_get_packet dpdk b c_blen
+	case len of
+		0 -> error "c_get_packet() should not return an empty buffer"
+		_ -> let len'    = fromIntegral len
+		         bytestr = BI.fromForeignPtr buf 0 len'
+		     in return bytestr
+	where
+		blen = 4096
+		c_blen = fromIntegral blen
+
+-- write a bytestring
+sendPacket:: Dpdk -> BS.ByteString -> IO ()
+sendPacket dpdk bstr = do
+	withForeignPtr fptr $ \ptr -> c_send_packet dpdk (ptr `plusPtr` off) c_len
+	where
+		(fptr, off, len) = BI.toForeignPtr bstr
+		c_len = fromIntegral len
+
+
