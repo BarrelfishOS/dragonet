@@ -58,7 +58,7 @@ The directory /home/ubuntu/dragonet is essentially the clone of the ``dragonet``
 repository.  I normally checkout from my home directory, but you should be able
 to check it out from netos home directory as well.
 
-    hg clone ssh://shindep@129.132.186.96:8006//home/netos/hg/dragonet
+    git clone ssh://shindep@129.132.186.96:8006//home/netos/git/dragonet
 
 The dpdk related code is in ``dragonet/dpdk-1.5.0r1`` directory. Hopefully you
 don't have to deal with this code for demo.
