@@ -98,9 +98,14 @@ size_t get_packet(struct dpdk_handler *dpdk, char *pkt_out, size_t buf_len);
 void send_packet(struct dpdk_handler *dpdk, char *pkt_tx, size_t len);
 struct dpdk_handler *init_dpdk_setup(const char *name);
 
+int fdir_add_perfect_filter_wrapper(int queue_id, char *srcIP, int srcPort,
+        char *dstIP, int dstPort, int type);
+int fdir_add_perfect_filter2_wrapper(int queue_id);
+int fdir_del_perfect_filter_wrapper(int queue_id);
+int fdir_add_flow_filter_wrapper(int queue_id);
+int fdir_del_flow_filter_wrapper(int queue_id);
+
 struct dpdk_handler *g_dpdk_if;
-
-
 
 static char pkt_data_buff[MBUF_SIZE]; // packet will be stored here
 //static char pkt_data_buff_tx[MBUF_SIZE]; // packet to be sent will be stored here
@@ -309,6 +314,8 @@ l2fwd_send_packet(struct rte_mbuf *m, uint8_t port)
 	qconf->tx_mbufs[port].len = len;
 	return 0;
 }
+
+
 
 void send_packet(struct dpdk_handler *dpdk, char *pkt_tx, size_t len)
 {
@@ -872,9 +879,9 @@ struct dpdk_handler *init_dpdk_setup(const char *name)
         return g_dpdk_if;
 }
 
-//#define TUNTAP_MAIN  1
+//#define DPDK_MAIN  1
 
-#if defined(TUNTAP_MAIN)
+#if defined(DPDK_MAIN)
 int main(__attribute__((unused))int argc, __attribute__((unused))const char *argv[])
 {
 
@@ -894,18 +901,86 @@ int main(__attribute__((unused))int argc, __attribute__((unused))const char *arg
 
         printf("Hello world from DPDK....\n");
         MAIN(11, myArgs2);
-	struct tap_handler tap;
-	char buf[4096];
-
-	tap_open(&tap, "dragonet");
-	tap_set_ip(&tap, "192.168.10.100");
-	tap_set_mask(&tap, "255.255.255.0");
-	tap_up(&tap);
-	for (;;)
-		tap_read(&tap, buf, sizeof(buf));
 	return 0;
 }
-#endif
+#endif  // DPDK_MAIN
+
+typedef uint8_t  lcoreid_t;
+typedef uint8_t  portid_t;
+typedef uint16_t queueid_t;
+typedef uint16_t streamid_t;
+
+#if 0
+static void __attribute__((unused))
+fdir_add_perfect_filter(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
+			uint8_t drop, struct rte_fdir_filter *fdir_filter)
+{
+	int diag;
+
+	if (port_id_is_invalid(port_id))
+		return;
+
+	diag = rte_eth_dev_fdir_add_perfect_filter(port_id, fdir_filter,
+						   soft_id, queue_id, drop);
+	if (diag == 0)
+		return;
+
+	printf("rte_eth_dev_fdir_add_perfect_filter for port_id=%d failed "
+	       "diag=%d\n", port_id, diag);
+}
+#endif // 0
+
+
+
+int
+fdir_add_perfect_filter_wrapper(int queue_id, char *srcIP, int srcPort,
+        char *dstIP, int dstPort, int type)
+{
+    printf("%s:%s: for queue %d filter [srcIP=%s, scrPort=%d, dstIP=%s, dstPort =%d, type =%d]\n",
+            __FILE__, __func__,
+            queue_id, srcIP, srcPort, dstIP, dstPort, type);
+
+    return 0;
+}
+
+int
+fdir_add_perfect_filter2_wrapper(int queue_id)
+{
+    printf("%s:%s: for queue %d filter add\n",
+            __FILE__, __func__,
+            queue_id);
+    return 0;
+}
+
+int
+fdir_del_perfect_filter_wrapper(int queue_id)
+{
+    printf("%s:%s: for queue %d filter del\n",
+            __FILE__, __func__,
+            queue_id);
+    return 0;
+}
+
+int
+fdir_add_flow_filter_wrapper(int queue_id)
+{
+    printf("%s:%s: for queue %d flow-filter add\n",
+            __FILE__, __func__,
+            queue_id);
+    return 0;
+}
+
+
+
+int
+fdir_del_flow_filter_wrapper(int queue_id)
+{
+    printf("%s:%s: for queue %d flow-filter del\n",
+            __FILE__, __func__,
+            queue_id);
+    return 0;
+}
+
 
 
 

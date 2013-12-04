@@ -8,6 +8,7 @@ import Dragonet.DotGenerator
 import Dragonet.Embedding
 import Dragonet.Constraints
 import Dragonet.Implementation.IPv4 as IP4
+import qualified Util.Dpdk as Dpdk
 
 import Data.Word
 import Data.Maybe
@@ -31,6 +32,8 @@ import qualified Data.GraphViz as GV
 import qualified Data.GraphViz.Attributes.Complete as GA
 
 import qualified Debug.Trace as T
+
+import qualified Text.Show.Pretty as Pr
 
 import E10k
 
@@ -575,6 +578,33 @@ rndScenario steps = do
             | i < 10     = "0" ++ show i
             | otherwise  =  show i
 
+isHWaction :: PolicyAction a -> Bool
+isHWaction (PActHWAction _) = True
+isHWaction _ = False
+
+findAllHWActions :: ((String,String),[PolicyAction b]) ->
+    [PolicyAction b]
+findAllHWActions (_, pa) = filter isHWaction pa
+
+-- Calls the function which will actually configure the hardware based on
+-- the PolicyAction
+execHWAction :: PolicyAction E10kPAction -> IO ()
+execHWAction (PActHWAction (E10kPAct5TSet ftID c5tuple)) = do
+    Dpdk.e10k5TAdd ftID
+        (fromMaybe "" $ c5tL3Src c5tuple)
+        (fromMaybe 0 $ c5tL4Src c5tuple)
+        (fromMaybe "" $ c5tL3Dst c5tuple)
+        (fromMaybe 0 $ c5tL4Dst c5tuple)
+        (0) -- FIXME: Protocol type.  For time being I am assuming that it is UDP
+execHWAction (PActHWAction (E10kPAct5TDel ftID)) = do
+    Dpdk.e10k5TDel ftID
+execHWAction (PActHWAction (E10kPActFDirAdd fdt)) = do
+    Dpdk.e10kFDirAdd (cfdtQueue fdt)
+execHWAction (PActHWAction (E10kPActFDirDel fdt)) = do
+    Dpdk.e10kFDirDel (cfdtQueue fdt)
+execHWAction _ = error "non HWaction crypted in"
+
+
 
 main :: IO ()
 main = do
@@ -588,7 +618,11 @@ main = do
         pPRGRemoveSocket = e10kDelSocket,
         pPRGRebalance = e10kRebalance }
     let events = cgmRun queues 42 (e10kPStateInit n5tuples) policy rndS
-    putStrLn $ show events
+    --putStrLn $ show events
+    --mapM_ putStrLn $ map (\ x -> show x ) events
+    let actionList = concatMap findAllHWActions events
+    putStrLn $ Pr.ppShow actionList
+    mapM_ execHWAction actionList
     where
         config = [("CSynFilter", "false"), ("CSynOutput","drop")]
 
