@@ -11,6 +11,14 @@ CC=clang
 # Debuging for DSL -> Haskell process
 # GHCFLAGS+=-ddump-splices
 
+
+incremental: base Util/Dpdk.$(OSUF)
+	$(GHC) $(GHCFLAGS) -threaded testIncremental.hs -o incremental  -L../dpdk-1.5.0r1/build/lib/ -lintel_dpdk
+
+
+incremental_run: incremental
+	export LD_LIBRARY_PATH=/home/ubuntu/dragonet/dpdk-1.5.0r1/build/lib/ ;   ./incremental
+
 all: models
 
 # generates graphs (lpg, prg, prg_conf, embedded, constrained)
@@ -24,11 +32,6 @@ confgen: base
 confgen_run: confgen
 	./confgen
 	./convertConfGen.sh
-
-incremental: base
-	$(GHC) $(GHCFLAGS) testIncremental.hs -o incremental
-incremental_run: incremental
-	./incremental
 
 
 # generates graphs for plos paper (lpg, prg, prgUnconf, embedded, embeddedFull, clustered)
