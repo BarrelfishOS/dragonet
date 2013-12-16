@@ -71,8 +71,6 @@
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
 
-//#include "main.h"
-
 #define RTE_LOGTYPE_L2FWD RTE_LOGTYPE_USER1
 
 #define GOTO_FAIL(str, ...) do {					\
@@ -104,33 +102,31 @@ size_t get_packet(struct dpdk_handler *dpdk, char *pkt_out, size_t buf_len);
 void send_packet(struct dpdk_handler *dpdk, char *pkt_tx, size_t len);
 struct dpdk_handler *init_dpdk_setup(const char *name);
 
-int fdir_add_perfect_filter_wrapper(int queue_id, char *srcIP, int srcPort,
+int fdir_add_perfect_filter_wrapper_dummy(int queue_id, char *srcIP, int srcPort,
         char *dstIP, int dstPort, int type);
-int fdir_add_perfect_filter2_wrapper(int queue_id);
-int fdir_del_perfect_filter_wrapper(int queue_id);
-int fdir_add_flow_filter_wrapper(int queue_id);
-int fdir_del_flow_filter_wrapper(int queue_id);
+int fdir_add_perfect_filter2_wrapper_dummy(int queue_id);
+int fdir_del_perfect_filter_wrapper_dummy(int queue_id);
+int fdir_add_flow_filter_wrapper_dummy(int queue_id);
+int fdir_del_flow_filter_wrapper_dummy(int queue_id);
 
 
-void tx_cksum_set(portid_t port_id, uint8_t cksum_mask);
-void fdir_add_signature_filter(portid_t port_id, uint8_t queue_id,
+void tx_cksum_set_dummy(portid_t port_id, uint8_t cksum_mask);
+void fdir_add_signature_filter_dummy(portid_t port_id, uint8_t queue_id,
 			       struct rte_fdir_filter *fdir_filter);
-void fdir_update_signature_filter(portid_t port_id, uint8_t queue_id,
+void fdir_update_signature_filter_dummy(portid_t port_id, uint8_t queue_id,
 				  struct rte_fdir_filter *fdir_filter);
-void fdir_remove_signature_filter(portid_t port_id,
+void fdir_remove_signature_filter_dummy(portid_t port_id,
 				  struct rte_fdir_filter *fdir_filter);
-void fdir_get_infos(portid_t port_id);
-void fdir_add_perfect_filter(portid_t port_id, uint16_t soft_id,
+void fdir_get_infos_dummy(portid_t port_id);
+void fdir_add_perfect_filter_dummy(portid_t port_id, uint16_t soft_id,
 			     uint8_t queue_id, uint8_t drop,
 			     struct rte_fdir_filter *fdir_filter);
-void fdir_update_perfect_filter(portid_t port_id, uint16_t soft_id,
+void fdir_update_perfect_filter_dummy(portid_t port_id, uint16_t soft_id,
 				uint8_t queue_id, uint8_t drop,
 				struct rte_fdir_filter *fdir_filter);
-void fdir_remove_perfect_filter(portid_t port_id, uint16_t soft_id,
+void fdir_remove_perfect_filter_dummy(portid_t port_id, uint16_t soft_id,
 				struct rte_fdir_filter *fdir_filter);
-void fdir_set_masks(portid_t port_id, struct rte_fdir_masks *fdir_masks);
-
-
+void fdir_set_masks_dummy(portid_t port_id, struct rte_fdir_masks *fdir_masks);
 
 
 struct dpdk_handler *g_dpdk_if;
@@ -940,7 +936,7 @@ typedef uint16_t streamid_t;
 
 #if 0
 static void __attribute__((unused))
-fdir_add_perfect_filter(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
+fdir_add_perfect_filter_dummy(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
 			uint8_t drop, struct rte_fdir_filter *fdir_filter)
 {
 	int diag;
@@ -959,7 +955,7 @@ fdir_add_perfect_filter(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
 #endif // 0
 
 static int
-port_id_is_invalid(portid_t port_id)
+port_id_is_invalid_dummy(portid_t port_id)
 {
 	if (port_id < nb_ports)
 		return 0;
@@ -970,7 +966,7 @@ port_id_is_invalid(portid_t port_id)
 
 /*
 void
-tx_cksum_set(portid_t port_id, uint8_t cksum_mask)
+tx_cksum_set_dummy(portid_t port_id, uint8_t cksum_mask)
 {
 	uint16_t tx_ol_flags;
 	if (port_id_is_invalid(port_id))
@@ -983,12 +979,12 @@ tx_cksum_set(portid_t port_id, uint8_t cksum_mask)
 
 
 void
-fdir_add_signature_filter(portid_t port_id, uint8_t queue_id,
+fdir_add_signature_filter_dummy(portid_t port_id, uint8_t queue_id,
 			  struct rte_fdir_filter *fdir_filter)
 {
 	int diag;
 
-	if (port_id_is_invalid(port_id))
+	if (port_id_is_invalid_dummy(port_id))
 		return;
 
 	diag = rte_eth_dev_fdir_add_signature_filter(port_id, fdir_filter,
@@ -1001,12 +997,12 @@ fdir_add_signature_filter(portid_t port_id, uint8_t queue_id,
 }
 
 void
-fdir_update_signature_filter(portid_t port_id, uint8_t queue_id,
+fdir_update_signature_filter_dummy(portid_t port_id, uint8_t queue_id,
 			     struct rte_fdir_filter *fdir_filter)
 {
 	int diag;
 
-	if (port_id_is_invalid(port_id))
+	if (port_id_is_invalid_dummy(port_id))
 		return;
 
 	diag = rte_eth_dev_fdir_update_signature_filter(port_id, fdir_filter,
@@ -1019,12 +1015,12 @@ fdir_update_signature_filter(portid_t port_id, uint8_t queue_id,
 }
 
 void
-fdir_remove_signature_filter(portid_t port_id,
+fdir_remove_signature_filter_dummy(portid_t port_id,
 			     struct rte_fdir_filter *fdir_filter)
 {
 	int diag;
 
-	if (port_id_is_invalid(port_id))
+	if (port_id_is_invalid_dummy(port_id))
 		return;
 
 	diag = rte_eth_dev_fdir_remove_signature_filter(port_id, fdir_filter);
@@ -1037,13 +1033,13 @@ fdir_remove_signature_filter(portid_t port_id,
 }
 
 void
-fdir_get_infos(portid_t port_id)
+fdir_get_infos_dummy(portid_t port_id)
 {
 	struct rte_eth_fdir fdir_infos;
 
 	static const char *fdir_stats_border = "########################";
 
-	if (port_id_is_invalid(port_id))
+	if (port_id_is_invalid_dummy(port_id))
 		return;
 
 	rte_eth_dev_fdir_get_infos(port_id, &fdir_infos);
@@ -1064,12 +1060,12 @@ fdir_get_infos(portid_t port_id)
 }
 
 void
-fdir_add_perfect_filter(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
+fdir_add_perfect_filter_dummy(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
 			uint8_t drop, struct rte_fdir_filter *fdir_filter)
 {
 	int diag;
 
-	if (port_id_is_invalid(port_id))
+	if (port_id_is_invalid_dummy(port_id))
 		return;
 
 	diag = rte_eth_dev_fdir_add_perfect_filter(port_id, fdir_filter,
@@ -1082,12 +1078,12 @@ fdir_add_perfect_filter(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
 }
 
 void
-fdir_update_perfect_filter(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
+fdir_update_perfect_filter_dummy(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
 			   uint8_t drop, struct rte_fdir_filter *fdir_filter)
 {
 	int diag;
 
-	if (port_id_is_invalid(port_id))
+	if (port_id_is_invalid_dummy(port_id))
 		return;
 
 	diag = rte_eth_dev_fdir_update_perfect_filter(port_id, fdir_filter,
@@ -1100,12 +1096,12 @@ fdir_update_perfect_filter(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
 }
 
 void
-fdir_remove_perfect_filter(portid_t port_id, uint16_t soft_id,
+fdir_remove_perfect_filter_dummy(portid_t port_id, uint16_t soft_id,
 			   struct rte_fdir_filter *fdir_filter)
 {
 	int diag;
 
-	if (port_id_is_invalid(port_id))
+	if (port_id_is_invalid_dummy(port_id))
 		return;
 
 	diag = rte_eth_dev_fdir_remove_perfect_filter(port_id, fdir_filter,
@@ -1118,11 +1114,11 @@ fdir_remove_perfect_filter(portid_t port_id, uint16_t soft_id,
 }
 
 void
-fdir_set_masks(portid_t port_id, struct rte_fdir_masks *fdir_masks)
+fdir_set_masks_dummy(portid_t port_id, struct rte_fdir_masks *fdir_masks)
 {
 	int diag;
 
-	if (port_id_is_invalid(port_id))
+	if (port_id_is_invalid_dummy(port_id))
 		return;
 
 	diag = rte_eth_dev_fdir_set_masks(port_id, fdir_masks);
@@ -1135,7 +1131,7 @@ fdir_set_masks(portid_t port_id, struct rte_fdir_masks *fdir_masks)
 
 
 int
-fdir_add_perfect_filter_wrapper(int queue_id, char *srcIP, int srcPort,
+fdir_add_perfect_filter_wrapper_dummy(int queue_id, char *srcIP, int srcPort,
         char *dstIP, int dstPort, int type)
 {
     printf("%s:%s: for queue %d filter [srcIP=%s, scrPort=%d, dstIP=%s, dstPort =%d, type =%d]\n",
@@ -1160,16 +1156,16 @@ fdir_add_perfect_filter_wrapper(int queue_id, char *srcIP, int srcPort,
 }
 
 int
-fdir_add_perfect_filter2_wrapper(int queue_id)
+fdir_add_perfect_filter2_wrapper_dummy(int queue_id)
 {
     printf("%s:%s: for queue %d filter add\n",
             __FILE__, __func__,
             queue_id);
-    return fdir_add_perfect_filter_wrapper(queue_id, NULL, 0, NULL, 0, 0);
+    return fdir_add_perfect_filter_wrapper_dummy(queue_id, NULL, 0, NULL, 0, 0);
 }
 
 int
-fdir_del_perfect_filter_wrapper(int queue_id)
+fdir_del_perfect_filter_wrapper_dummy(int queue_id)
 {
     printf("%s:%s: for queue %d filter del\n",
             __FILE__, __func__,
@@ -1178,7 +1174,7 @@ fdir_del_perfect_filter_wrapper(int queue_id)
 }
 
 int
-fdir_add_flow_filter_wrapper(int queue_id)
+fdir_add_flow_filter_wrapper_dummy(int queue_id)
 {
     printf("%s:%s: for queue %d flow-filter add\n",
             __FILE__, __func__,
@@ -1189,14 +1185,12 @@ fdir_add_flow_filter_wrapper(int queue_id)
 
 
 int
-fdir_del_flow_filter_wrapper(int queue_id)
+fdir_del_flow_filter_wrapper_dummy(int queue_id)
 {
     printf("%s:%s: for queue %d flow-filter del\n",
             __FILE__, __func__,
             queue_id);
     return 0;
 }
-
-
 
 

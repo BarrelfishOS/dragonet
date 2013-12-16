@@ -37,13 +37,13 @@ endif
 # Default target, can be overriden by command line or environment
 RTE_TARGET ?= x86_64-default-linuxapp-gcc
 
-
 include $(RTE_SDK)/mk/rte.vars.mk
 
 #
 # library name
 #
-APP = testpmd
+#APP = testpmd
+LIB = testpmdLib
 
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)
@@ -55,15 +55,16 @@ endif
 #
 # all source are stored in SRCS-y
 #
-SRCS-$(CONFIG_RTE_TEST_PMD) := testpmd.c
+SRCS-$(CONFIG_RTE_TEST_PMD) := cmdline.c
 SRCS-$(CONFIG_RTE_TEST_PMD) += parameters.c
-SRCS-$(CONFIG_RTE_TEST_PMD) += cmdline.c
+SRCS-$(CONFIG_RTE_TEST_PMD) += testpmd.c
 SRCS-$(CONFIG_RTE_TEST_PMD) += config.c
 SRCS-$(CONFIG_RTE_TEST_PMD) += iofwd.c
 SRCS-$(CONFIG_RTE_TEST_PMD) += macfwd.c
 SRCS-$(CONFIG_RTE_TEST_PMD) += rxonly.c
 SRCS-$(CONFIG_RTE_TEST_PMD) += txonly.c
 SRCS-$(CONFIG_RTE_TEST_PMD) += csumonly.c
+SRCS-$(CONFIG_RTE_TEST_PMD) += dpdk.c
 ifeq ($(CONFIG_RTE_LIBRTE_IEEE1588),y)
 SRCS-$(CONFIG_RTE_TEST_PMD) += ieee1588fwd.c
 endif
@@ -71,4 +72,6 @@ endif
 # this application needs libraries first
 DEPDIRS-$(CONFIG_RTE_TEST_PMD) += lib
 
-include $(RTE_SDK)/mk/rte.app.mk
+include $(RTE_SDK)/mk/rte.extlib.mk
+#include $(RTE_SDK)/mk/rte.app.mk
+#####include $(RTE_SDK)/mk/rte.extapp.mk

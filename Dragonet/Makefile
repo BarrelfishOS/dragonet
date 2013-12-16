@@ -86,11 +86,16 @@ RTE_TARGET ?= x86_64-default-linuxapp-gcc
 RTE_SDK ?= ../dpdk-1.5.0r1/
 
 
-#../dpdk-1.5.0r1/examples/uDragonet/build/dpdk.$(OSUF): ../dpdk-1.5.0r1/examples/uDragonet/dpdk.c
 Util/dpdk.$(OSUF): ../dpdk-1.5.0r1/examples/uDragonet/dpdk.c intel_dpdk
 	echo "##########################"
 	cd ../dpdk-1.5.0r1/examples/uDragonet  && $(MAKE)
 	cp ../dpdk-1.5.0r1/examples/uDragonet/build/dpdk.$(OSUF) Util/
+
+objfiles: ../dpdk-1.5.0r1/app/test-pmd/dpdk.c #intel_dpdk
+	echo "##########################"
+	cd ../dpdk-1.5.0r1/app/test-pmd/ && ./myMake.sh
+	cp ../dpdk-1.5.0r1/app/test-pmd/build/*.$(OSUF) Util/
+
 
 intel_dpdk: ../dpdk-1.5.0r1/build/lib/libintel_dpdk.so
 	cd ../dpdk-1.5.0r1/ && ./doConfig.sh && $(MAKE)
@@ -99,9 +104,9 @@ Util/Dpdk_.$(OSUF): Util/Dpdk.hs
 	echo $(GHC) $(GHCFLAGS) -c $< -o $@
 	$(GHC) $(GHCFLAGS) -c $< -o $@
 
-Util/Dpdk.$(OSUF): Util/Dpdk_.$(OSUF) Util/dpdk.$(OSUF)
-	ld -i  $^ -o $@
-
+#Util/Dpdk.$(OSUF): Util/Dpdk_.$(OSUF) Util/dpdk.$(OSUF)
+Util/Dpdk.$(OSUF): Util/Dpdk_.$(OSUF) objfiles
+	ld -i  Util/Dpdk_.$(OSUF) Util/cmdline.o Util/dpdk.o Util/config.o Util/csumonly.o Util/iofwd.o Util/macfwd.o Util/parameters.o Util/rxonly.o Util/testpmd.o Util/txonly.o -o $@
 
 # Converts graphs into pdfs
 models: graph_run

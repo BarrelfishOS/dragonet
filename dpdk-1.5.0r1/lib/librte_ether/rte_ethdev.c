@@ -1,13 +1,13 @@
 /*-
  *   BSD LICENSE
- * 
+ *
  *   Copyright(c) 2010-2013 Intel Corporation. All rights reserved.
  *   All rights reserved.
- * 
+ *
  *   Redistribution and use in source and binary forms, with or without
  *   modification, are permitted provided that the following conditions
  *   are met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above copyright
@@ -17,7 +17,7 @@
  *     * Neither the name of Intel Corporation nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -68,6 +68,7 @@
 #include "rte_ether.h"
 #include "rte_ethdev.h"
 
+//#define RTE_LIBRTE_ETHDEV_DEBUG 1
 #ifdef RTE_LIBRTE_ETHDEV_DEBUG
 #define PMD_DEBUG_TRACE(fmt, args...) do {                        \
 		RTE_LOG(ERR, PMD, "%s: " fmt, __func__, ## args); \
@@ -338,13 +339,13 @@ rte_eth_dev_check_mq_mode(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 
 	if (RTE_ETH_DEV_SRIOV(dev).active != 0) {
 		/* check multi-queue mode */
-		if ((dev_conf->rxmode.mq_mode == ETH_MQ_RX_RSS) || 
+		if ((dev_conf->rxmode.mq_mode == ETH_MQ_RX_RSS) ||
 		    (dev_conf->rxmode.mq_mode == ETH_MQ_RX_DCB) ||
 		    (dev_conf->rxmode.mq_mode == ETH_MQ_RX_DCB_RSS) ||
 		    (dev_conf->txmode.mq_mode == ETH_MQ_TX_DCB)) {
 			/* SRIOV only works in VMDq enable mode */
 			PMD_DEBUG_TRACE("ethdev port_id=%d SRIOV active, "
-					"wrong VMDQ mq_mode rx %d tx %d\n", 
+					"wrong VMDQ mq_mode rx %d tx %d\n",
 					port_id, dev_conf->rxmode.mq_mode,
 					dev_conf->txmode.mq_mode);
 			return (-EINVAL);
@@ -356,7 +357,7 @@ rte_eth_dev_check_mq_mode(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 		case ETH_MQ_RX_VMDQ_DCB_RSS:
 			/* DCB/RSS VMDQ in SRIOV mode, not implement yet */
 			PMD_DEBUG_TRACE("ethdev port_id=%d SRIOV active, "
-					"unsupported VMDQ mq_mode rx %d\n", 
+					"unsupported VMDQ mq_mode rx %d\n",
 					port_id, dev_conf->rxmode.mq_mode);
 			return (-EINVAL);
 		default: /* ETH_MQ_RX_VMDQ_ONLY or ETH_MQ_RX_NONE */
@@ -371,7 +372,7 @@ rte_eth_dev_check_mq_mode(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 		case ETH_MQ_TX_VMDQ_DCB:
 			/* DCB VMDQ in SRIOV mode, not implement yet */
 			PMD_DEBUG_TRACE("ethdev port_id=%d SRIOV active, "
-					"unsupported VMDQ mq_mode tx %d\n", 
+					"unsupported VMDQ mq_mode tx %d\n",
 					port_id, dev_conf->txmode.mq_mode);
 			return (-EINVAL);
 		default: /* ETH_MQ_TX_VMDQ_ONLY or ETH_MQ_TX_NONE */
@@ -386,7 +387,7 @@ rte_eth_dev_check_mq_mode(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 		if ((nb_rx_q > RTE_ETH_DEV_SRIOV(dev).nb_q_per_pool) ||
 		    (nb_tx_q > RTE_ETH_DEV_SRIOV(dev).nb_q_per_pool)) {
 			PMD_DEBUG_TRACE("ethdev port_id=%d SRIOV active, "
-				    "queue number must less equal to %d\n", 
+				    "queue number must less equal to %d\n",
 					port_id, RTE_ETH_DEV_SRIOV(dev).nb_q_per_pool);
 			return (-EINVAL);
 		}
@@ -394,7 +395,7 @@ rte_eth_dev_check_mq_mode(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 		/* For vmdb+dcb mode check our configuration before we go further */
 		if (dev_conf->rxmode.mq_mode == ETH_MQ_RX_VMDQ_DCB) {
 			const struct rte_eth_vmdq_dcb_conf *conf;
-			
+
 			if (nb_rx_q != ETH_VMDQ_DCB_NUM_QUEUES) {
 				PMD_DEBUG_TRACE("ethdev port_id=%d VMDQ+DCB, nb_rx_q "
 						"!= %d\n",
@@ -412,7 +413,7 @@ rte_eth_dev_check_mq_mode(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 		}
 		if (dev_conf->txmode.mq_mode == ETH_MQ_TX_VMDQ_DCB) {
 			const struct rte_eth_vmdq_dcb_tx_conf *conf;
-			
+
 			if (nb_tx_q != ETH_VMDQ_DCB_NUM_QUEUES) {
 				PMD_DEBUG_TRACE("ethdev port_id=%d VMDQ+DCB, nb_tx_q "
 						"!= %d\n",
@@ -429,11 +430,11 @@ rte_eth_dev_check_mq_mode(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 				return (-EINVAL);
 			}
 		}
-		
+
 		/* For DCB mode check our configuration before we go further */
 		if (dev_conf->rxmode.mq_mode == ETH_MQ_RX_DCB) {
 			const struct rte_eth_dcb_rx_conf *conf;
-			
+
 			if (nb_rx_q != ETH_DCB_NUM_QUEUES) {
 				PMD_DEBUG_TRACE("ethdev port_id=%d DCB, nb_rx_q "
 						"!= %d\n",
@@ -450,10 +451,10 @@ rte_eth_dev_check_mq_mode(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 				return (-EINVAL);
 			}
 		}
-		
+
 		if (dev_conf->txmode.mq_mode == ETH_MQ_TX_DCB) {
 			const struct rte_eth_dcb_tx_conf *conf;
-			
+
 			if (nb_tx_q != ETH_DCB_NUM_QUEUES) {
 				PMD_DEBUG_TRACE("ethdev port_id=%d DCB, nb_tx_q "
 						"!= %d\n",
@@ -1128,7 +1129,7 @@ rte_eth_dev_set_vlan_offload(uint8_t port_id, int offload_mask)
 	int ret = 0;
 	int mask = 0;
 	int cur, org = 0;
-	
+
 	if (port_id >= nb_ports) {
 		PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
 		return (-ENODEV);
@@ -1143,7 +1144,7 @@ rte_eth_dev_set_vlan_offload(uint8_t port_id, int offload_mask)
 		dev->data->dev_conf.rxmode.hw_vlan_strip = (uint8_t)cur;
 		mask |= ETH_VLAN_STRIP_MASK;
 	}
-	
+
 	cur = !!(offload_mask & ETH_VLAN_FILTER_OFFLOAD);
 	org = !!(dev->data->dev_conf.rxmode.hw_vlan_filter);
 	if (cur != org){
@@ -1161,7 +1162,7 @@ rte_eth_dev_set_vlan_offload(uint8_t port_id, int offload_mask)
 	/*no change*/
 	if(mask == 0)
 		return ret;
-	
+
 	FUNC_PTR_OR_ERR_RET(*dev->dev_ops->vlan_offload_set, -ENOTSUP);
 	(*dev->dev_ops->vlan_offload_set)(dev, mask);
 
@@ -1329,6 +1330,9 @@ rte_eth_dev_fdir_add_perfect_filter(uint8_t port_id,
 		PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
 		return (-ENODEV);
 	}
+        if (fdir_filter == NULL) {
+		return (-EINVAL);
+        }
 
 	dev = &rte_eth_devices[port_id];
 
@@ -1522,16 +1526,16 @@ rte_eth_dev_rss_reta_update(uint8_t port_id, struct rte_eth_rss_reta *reta_conf)
 					"queue=%d\n",port_id,reta_conf->reta[i]);
 
 				return (-EINVAL);
-			} 
+			}
 		}
 	}
 
 	if (reta_conf->mask_hi != 0) {
-		for (i = 0; i< ETH_RSS_RETA_NUM_ENTRIES/2; i++) {	
+		for (i = 0; i< ETH_RSS_RETA_NUM_ENTRIES/2; i++) {
 			j = (uint8_t)(i + ETH_RSS_RETA_NUM_ENTRIES/2);
 
 			/* Check if the max entry >= 128 */
-			if ((reta_conf->mask_hi & (1ULL << i)) && 
+			if ((reta_conf->mask_hi & (1ULL << i)) &&
 				(reta_conf->reta[j] >= ETH_RSS_RETA_MAX_QUEUE)) {
 				PMD_DEBUG_TRACE("RETA hash index output"
 					"configration for port=%d,invalid"
@@ -1548,11 +1552,11 @@ rte_eth_dev_rss_reta_update(uint8_t port_id, struct rte_eth_rss_reta *reta_conf)
 	return (*dev->dev_ops->reta_update)(dev, reta_conf);
 }
 
-int 
+int
 rte_eth_dev_rss_reta_query(uint8_t port_id, struct rte_eth_rss_reta *reta_conf)
 {
 	struct rte_eth_dev *dev;
-	
+
 	if (port_id >= nb_ports) {
 		PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
 		return (-ENODEV);
@@ -1636,7 +1640,7 @@ rte_eth_dev_mac_addr_add(uint8_t port_id, struct ether_addr *addr,
 	FUNC_PTR_OR_ERR_RET(*dev->dev_ops->mac_addr_add, -ENOTSUP);
 
 	if (is_zero_ether_addr(addr)) {
-		PMD_DEBUG_TRACE("port %d: Cannot add NULL MAC address\n", 
+		PMD_DEBUG_TRACE("port %d: Cannot add NULL MAC address\n",
 			port_id);
 		return (-EINVAL);
 	}
@@ -1644,7 +1648,7 @@ rte_eth_dev_mac_addr_add(uint8_t port_id, struct ether_addr *addr,
 		PMD_DEBUG_TRACE("pool id must be 0-%d\n",ETH_64_POOLS - 1);
 		return (-EINVAL);
 	}
-	
+
 	index = get_mac_addr_index(port_id, addr);
 	if (index < 0) {
 		index = get_mac_addr_index(port_id, &null_mac_addr);
@@ -1655,7 +1659,7 @@ rte_eth_dev_mac_addr_add(uint8_t port_id, struct ether_addr *addr,
 		}
 	} else {
 		pool_mask = dev->data->mac_pool_sel[index];
-		
+
 		/* Check if both MAC address and pool is alread there, and do nothing */
 		if (pool_mask & (1ULL << pool))
 			return 0;
@@ -1666,7 +1670,7 @@ rte_eth_dev_mac_addr_add(uint8_t port_id, struct ether_addr *addr,
 
 	/* Update address in NIC data structure */
 	ether_addr_copy(addr, &dev->data->mac_addrs[index]);
-	
+
 	/* Update pool bitmap in NIC data structure */
 	dev->data->mac_pool_sel[index] |= (1ULL << pool);
 
@@ -1702,7 +1706,7 @@ rte_eth_dev_mac_addr_remove(uint8_t port_id, struct ether_addr *addr)
 	return 0;
 }
 
-int 
+int
 rte_eth_dev_set_vf_rxmode(uint8_t port_id,  uint16_t vf,
 				uint16_t rx_mode, uint8_t on)
 {
@@ -1714,8 +1718,8 @@ rte_eth_dev_set_vf_rxmode(uint8_t port_id,  uint16_t vf,
 		PMD_DEBUG_TRACE("set VF RX mode:Invalid port_id=%d\n",
 				port_id);
 		return (-ENODEV);
-	}	
-	
+	}
+
 	dev = &rte_eth_devices[port_id];
 	rte_eth_dev_info_get(port_id, &dev_info);
 
@@ -1728,7 +1732,7 @@ rte_eth_dev_set_vf_rxmode(uint8_t port_id,  uint16_t vf,
 	if (rx_mode == 0)
 	{
 		PMD_DEBUG_TRACE("set VF RX mode:mode mask ca not be zero\n");
-		return (-EINVAL);	
+		return (-EINVAL);
 	}
 	FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_vf_rx_mode, -ENOTSUP);
 	return (*dev->dev_ops->set_vf_rx_mode)(dev, vf, rx_mode, on);
@@ -1764,16 +1768,16 @@ rte_eth_dev_uc_hash_table_set(uint8_t port_id, struct ether_addr *addr,
 	int index;
 	int ret;
 	struct rte_eth_dev *dev;
-	
+
 	if (port_id >= nb_ports) {
 		PMD_DEBUG_TRACE("unicast hash setting:Invalid port_id=%d\n",
 			port_id);
 		return (-ENODEV);
 	}
-	
+
 	dev = &rte_eth_devices[port_id];
 	if (is_zero_ether_addr(addr)) {
-		PMD_DEBUG_TRACE("port %d: Cannot add NULL MAC address\n", 
+		PMD_DEBUG_TRACE("port %d: Cannot add NULL MAC address\n",
 			port_id);
 		return (-EINVAL);
 	}
@@ -1782,22 +1786,22 @@ rte_eth_dev_uc_hash_table_set(uint8_t port_id, struct ether_addr *addr,
 	/* Check if it's already there, and do nothing */
 	if ((index >= 0) && (on))
 		return 0;
-	
+
 	if (index < 0) {
 		if (!on) {
-			PMD_DEBUG_TRACE("port %d: the MAC address was not" 
+			PMD_DEBUG_TRACE("port %d: the MAC address was not"
 				"set in UTA\n", port_id);
 			return (-EINVAL);
 		}
-			
+
 		index = get_hash_mac_addr_index(port_id, &null_mac_addr);
 		if (index < 0) {
 			PMD_DEBUG_TRACE("port %d: MAC address array full\n",
 					port_id);
 			return (-ENOSPC);
 		}
-	} 
-	 
+	}
+
 	FUNC_PTR_OR_ERR_RET(*dev->dev_ops->uc_hash_table_set, -ENOTSUP);
 	ret = (*dev->dev_ops->uc_hash_table_set)(dev, addr, on);
 	if (ret == 0) {
@@ -1805,11 +1809,11 @@ rte_eth_dev_uc_hash_table_set(uint8_t port_id, struct ether_addr *addr,
 		if (on)
 			ether_addr_copy(addr,
 					&dev->data->hash_mac_addrs[index]);
-		else 
+		else
 			ether_addr_copy(&null_mac_addr,
 					&dev->data->hash_mac_addrs[index]);
 	}
-	
+
 	return ret;
 }
 
@@ -1817,20 +1821,20 @@ int
 rte_eth_dev_uc_all_hash_table_set(uint8_t port_id, uint8_t on)
 {
 	struct rte_eth_dev *dev;
-	
+
 	if (port_id >= nb_ports) {
 		PMD_DEBUG_TRACE("unicast hash setting:Invalid port_id=%d\n",
 			port_id);
 		return (-ENODEV);
 	}
-	
+
 	dev = &rte_eth_devices[port_id];
 
 	FUNC_PTR_OR_ERR_RET(*dev->dev_ops->uc_all_hash_table_set, -ENOTSUP);
 	return (*dev->dev_ops->uc_all_hash_table_set)(dev, on);
 }
 
-int 
+int
 rte_eth_dev_set_vf_rx(uint8_t port_id,uint16_t vf, uint8_t on)
 {
 	uint16_t num_vfs;
@@ -1841,22 +1845,22 @@ rte_eth_dev_set_vf_rx(uint8_t port_id,uint16_t vf, uint8_t on)
 		PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
 		return (-ENODEV);
 	}
-	
+
 	dev = &rte_eth_devices[port_id];
 	rte_eth_dev_info_get(port_id, &dev_info);
-	
+
 	num_vfs = dev_info.max_vfs;
-	if (vf > num_vfs) 
+	if (vf > num_vfs)
 	{
 		PMD_DEBUG_TRACE("port %d: invalid vf id\n", port_id);
 		return (-EINVAL);
-	}	
-	
+	}
+
 	FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_vf_rx, -ENOTSUP);
 	return (*dev->dev_ops->set_vf_rx)(dev, vf,on);
 }
 
-int 
+int
 rte_eth_dev_set_vf_tx(uint8_t port_id,uint16_t vf, uint8_t on)
 {
 	uint16_t num_vfs;
@@ -1867,23 +1871,23 @@ rte_eth_dev_set_vf_tx(uint8_t port_id,uint16_t vf, uint8_t on)
 		PMD_DEBUG_TRACE("set pool tx:Invalid port_id=%d\n", port_id);
 		return (-ENODEV);
 	}
-	
+
 	dev = &rte_eth_devices[port_id];
 	rte_eth_dev_info_get(port_id, &dev_info);
 
 	num_vfs = dev_info.max_vfs;
-	if (vf > num_vfs) 
+	if (vf > num_vfs)
 	{
 		PMD_DEBUG_TRACE("set pool tx:invalid pool id=%d\n", vf);
 		return (-EINVAL);
 	}
-	
+
 	FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_vf_tx, -ENOTSUP);
 	return (*dev->dev_ops->set_vf_tx)(dev, vf,on);
 }
 
 int
-rte_eth_dev_set_vf_vlan_filter(uint8_t port_id, uint16_t vlan_id, 
+rte_eth_dev_set_vf_vlan_filter(uint8_t port_id, uint16_t vlan_id,
 				 uint64_t vf_mask,uint8_t vlan_on)
 {
 	struct rte_eth_dev *dev;
@@ -1906,14 +1910,14 @@ rte_eth_dev_set_vf_vlan_filter(uint8_t port_id, uint16_t vlan_id,
 		PMD_DEBUG_TRACE("VF VLAN filter:pool_mask can not be 0\n");
 		return (-EINVAL);
 	}
-	
+
 	FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_vf_vlan_filter, -ENOTSUP);
 	return (*dev->dev_ops->set_vf_vlan_filter)(dev, vlan_id,
 						vf_mask,vlan_on);
 }
 
 int
-rte_eth_mirror_rule_set(uint8_t port_id, 
+rte_eth_mirror_rule_set(uint8_t port_id,
 			struct rte_eth_vmdq_mirror_conf *mirror_conf,
 			uint8_t rule_id, uint8_t on)
 {
@@ -1923,25 +1927,25 @@ rte_eth_mirror_rule_set(uint8_t port_id,
 		PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
 		return (-ENODEV);
 	}
-	
+
 	if (mirror_conf->rule_type_mask == 0) {
 		PMD_DEBUG_TRACE("mirror rule type can not be 0.\n");
 		return (-EINVAL);
 	}
-	
+
 	if (mirror_conf->dst_pool >= ETH_64_POOLS) {
 		PMD_DEBUG_TRACE("Invalid dst pool, pool id must"
 			"be 0-%d\n",ETH_64_POOLS - 1);
 		return (-EINVAL);
 	}
-	
-	if ((mirror_conf->rule_type_mask & ETH_VMDQ_POOL_MIRROR) && 
+
+	if ((mirror_conf->rule_type_mask & ETH_VMDQ_POOL_MIRROR) &&
 		(mirror_conf->pool_mask == 0)) {
 		PMD_DEBUG_TRACE("Invalid mirror pool, pool mask can not"
-				"be 0.\n");		
+				"be 0.\n");
 		return (-EINVAL);
 	}
-	
+
 	if(rule_id >= ETH_VMDQ_NUM_MIRROR_RULE)
 	{
 		PMD_DEBUG_TRACE("Invalid rule_id, rule_id must be 0-%d\n",
@@ -2031,7 +2035,7 @@ rte_eth_rx_queue_count(uint8_t port_id, uint16_t queue_id)
 	}
 	dev = &rte_eth_devices[port_id];
 	FUNC_PTR_OR_ERR_RET(*dev->dev_ops->rx_queue_count, -ENOTSUP);
-	return (*dev->dev_ops->rx_queue_count)(dev, queue_id);	
+	return (*dev->dev_ops->rx_queue_count)(dev, queue_id);
 }
 
 int

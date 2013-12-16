@@ -1685,26 +1685,31 @@ init_port_dcb_config(portid_t pid,struct dcb_config *dcb_conf)
 	return 0;
 }
 
-#ifdef RTE_EXEC_ENV_BAREMETAL
-#define main _main
-#endif
+//#ifdef RTE_EXEC_ENV_BAREMETAL
+//#define main _main
+//#endif
 
-int
-main(int argc, char** argv)
+//int main(int argc, char** argv)
+int main_test(int argc, char** argv);
+int main_test(int argc, char** argv)
 {
 	int  diag;
 	uint8_t port_id;
 
+        printf("####################################### eal done 1 ###\n");
 	diag = rte_eal_init(argc, argv);
 	if (diag < 0)
 		rte_panic("Cannot init EAL\n");
 
+        printf("####################################### eal done ###\n");
 	if (rte_pmd_init_all())
 		rte_panic("Cannot init PMD\n");
 
+        printf("####################################### eal done 2###\n");
 	if (rte_eal_pci_probe())
 		rte_panic("Cannot probe PCI\n");
 
+        printf("####################################### eal done 2###\n");
 	nb_ports = (portid_t) rte_eth_dev_count();
 	if (nb_ports == 0)
 		rte_exit(EXIT_FAILURE, "No probed ethernet devices - "

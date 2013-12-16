@@ -35,10 +35,10 @@
 #define _TESTPMD_H_
 
 /* icc on baremetal gives us troubles with function named 'main' */
-#ifdef RTE_EXEC_ENV_BAREMETAL
-#define main _main
-int main(int argc, char **argv);
-#endif
+//#ifdef RTE_EXEC_ENV_BAREMETAL
+//#define main _main
+//int main(int argc, char **argv);
+//#endif
 
 #define RTE_PORT_ALL            (~(portid_t)0x0)
 

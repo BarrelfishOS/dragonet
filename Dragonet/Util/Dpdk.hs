@@ -52,19 +52,19 @@ foreign import ccall "fdir_add_perfect_filter_wrapper"
         -> CInt -- type
         -> IO (CInt) -- Return value: sucess/failure
 
-foreign import ccall "fdir_add_perfect_filter2_wrapper"
+foreign import ccall "fdir_add_perfect_filter2_wrapper_dummy"
 	c_fdir_add_perfect_filter2_wrapper :: CInt -- qid
         -> IO (CInt) -- Return value: sucess/failure
 
-foreign import ccall "fdir_del_perfect_filter_wrapper"
+foreign import ccall "fdir_del_perfect_filter_wrapper_dummy"
 	c_fdir_del_perfect_filter_wrapper :: CInt -- qid
         -> IO (CInt) -- Return value: sucess/failure
 
-foreign import ccall "fdir_add_flow_filter_wrapper"
+foreign import ccall "fdir_add_flow_filter_wrapper_dummy"
 	c_fdir_add_flow_filter_wrapper :: CInt -- qid
         -> IO (CInt) -- Return value: sucess/failure
 
-foreign import ccall "fdir_del_flow_filter_wrapper"
+foreign import ccall "fdir_del_flow_filter_wrapper_dummy"
 	c_fdir_del_flow_filter_wrapper :: CInt -- qid
         -> IO (CInt) -- Return value: sucess/failure
 

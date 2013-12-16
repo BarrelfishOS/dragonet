@@ -50,3 +50,4 @@ CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)
 
 include $(RTE_SDK)/mk/rte.extlib.mk
+#include $(RTE_SDK)/mk/rte.extapp.mk
