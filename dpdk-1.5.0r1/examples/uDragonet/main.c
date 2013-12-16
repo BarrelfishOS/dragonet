@@ -676,6 +676,7 @@ MAIN(int argc, char **argv)
 		rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
 
 	/* init driver(s) */
+        // This creates a list of struct full of function pointers for each device supported
 	if (rte_pmd_init_all() < 0)
 		rte_exit(EXIT_FAILURE, "Cannot init pmd\n");
 
