@@ -91,13 +91,13 @@ Util/dpdk.$(OSUF): ../dpdk-1.5.0r1/examples/uDragonet/dpdk.c intel_dpdk
 	cd ../dpdk-1.5.0r1/examples/uDragonet  && $(MAKE)
 	cp ../dpdk-1.5.0r1/examples/uDragonet/build/dpdk.$(OSUF) Util/
 
-objfiles: ../dpdk-1.5.0r1/app/test-pmd/dpdk.c #intel_dpdk
+objfiles: ../dpdk-1.5.0r1/app/test-pmd/dpdk.c intel_dpdk
 	echo "##########################"
-	cd ../dpdk-1.5.0r1/app/test-pmd/ && ./myMake.sh
-	cp ../dpdk-1.5.0r1/app/test-pmd/build/*.$(OSUF) Util/
+	cd ../dpdk-1.5.0r1/app/dpdkDriver/ && ./myMake.sh
+	cp ../dpdk-1.5.0r1/app/dpdkDriver/build/*.$(OSUF) Util/
 
 
-intel_dpdk: ../dpdk-1.5.0r1/build/lib/libintel_dpdk.so
+intel_dpdk: # ../dpdk-1.5.0r1/build/lib/libintel_dpdk.so
 	cd ../dpdk-1.5.0r1/ && ./doConfig.sh && $(MAKE)
 
 Util/Dpdk_.$(OSUF): Util/Dpdk.hs
@@ -106,7 +106,7 @@ Util/Dpdk_.$(OSUF): Util/Dpdk.hs
 
 #Util/Dpdk.$(OSUF): Util/Dpdk_.$(OSUF) Util/dpdk.$(OSUF)
 Util/Dpdk.$(OSUF): Util/Dpdk_.$(OSUF) objfiles
-	ld -i  Util/Dpdk_.$(OSUF) Util/cmdline.o Util/dpdk.o Util/config.o Util/csumonly.o Util/iofwd.o Util/macfwd.o Util/parameters.o Util/rxonly.o Util/testpmd.o Util/txonly.o -o $@
+	ld -i  Util/Dpdk_.$(OSUF) Util/cmdline.o Util/dpdkData.o Util/config.o Util/csumonly.o Util/iofwd.o Util/macfwd.o Util/parameters.o Util/rxonly.o Util/dpdkControl.o Util/txonly.o -o $@
 
 # Converts graphs into pdfs
 models: graph_run
