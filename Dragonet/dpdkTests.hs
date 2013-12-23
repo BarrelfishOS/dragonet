@@ -33,14 +33,16 @@ data NetEvent =
     TXEvent BS.ByteString
 
 rxThread c dpdk = M.forever $ do
-    p <- Dpdk.getPacket dpdk
+--    p <- Dpdk.getPacket
+    p <- Dpdk.getPacket_v2 0 0 0
     putStrLn "received Packet"
     STM.atomically $ TC.writeTChan c (RXEvent p)
 
 txThread c dpdk = M.forever $ do
     (TXEvent p) <- STM.atomically $ TC.readTChan c
     putStrLn "Send Packet"
-    Dpdk.sendPacket dpdk p
+--    Dpdk.sendPacket p
+    Dpdk.sendPacket_v2 0 0 0 p
 
 simStep rxC txC state = do
     e <- TC.readTChan rxC
@@ -67,7 +69,8 @@ simThread rxC txC state = do
 
 main = do
     -- create and open a DPDK device
-    dpdk1 <- Dpdk.init_dpdk_setup "dragonet01"
+    --dpdk1 <- Dpdk.init_dpdk_setup "dragonet01"
+    dpdk1 <- Dpdk.init_dpdk_setup_v2
 
     -- Initialize dpdk device on linux side
     uid <- SPU.getRealUserID

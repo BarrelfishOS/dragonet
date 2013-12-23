@@ -34,6 +34,10 @@
 #ifndef _DPDKCONTROL_H_
 #define _DPDKCONTROL_H_
 
+
+#include <rte_byteorder.h>
+#include <rte_string_fns.h>
+
 /* icc on baremetal gives us troubles with function named 'main' */
 //#ifdef RTE_EXEC_ENV_BAREMETAL
 //#define main _main
@@ -511,6 +515,11 @@ void port_rss_reta_info(portid_t port_id, struct rte_eth_rss_reta *reta_conf);
 void set_vf_traffic(portid_t port_id, uint8_t is_rx, uint16_t vf, uint8_t on);
 void set_vf_rx_vlan(portid_t port_id, uint16_t vlan_id,
 		uint64_t vf_mask, uint8_t on);
+
+
+
+int init_dpdkControl(int argc, char** argv);
+
 
 /*
  * Work-around of a compilation error with ICC on invocations of the

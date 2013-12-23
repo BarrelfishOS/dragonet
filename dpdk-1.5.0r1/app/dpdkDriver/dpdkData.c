@@ -70,6 +70,7 @@
 #include <rte_ring.h>
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
+#include "dpdkControl.h"
 
 #define RTE_LOGTYPE_L2FWD RTE_LOGTYPE_USER1
 
@@ -96,11 +97,20 @@ typedef uint8_t  lcoreid_t;
 typedef uint8_t  portid_t;
 typedef uint16_t queueid_t;
 
-static portid_t nb_ports;             /**< Number of probed ethernet ports. */
-
-size_t get_packet(struct dpdk_handler *dpdk, char *pkt_out, size_t buf_len);
-void send_packet(struct dpdk_handler *dpdk, char *pkt_tx, size_t len);
+size_t get_packet(char *pkt_out, size_t buf_len);
+void send_packet(char *pkt_tx, size_t len);
 struct dpdk_handler *init_dpdk_setup(const char *name);
+
+
+// TODO: Implement these
+size_t get_packetV2(int core_id, int port_id, int queue_id,
+        char *pkt_out, size_t buf_len);
+void send_packetV2(int core_id, int port_id, int queue_id,
+        char *pkt_tx, size_t len);
+int init_dpdk_setupV2(void);
+
+
+//  ###################### TO DELETE ########################
 
 int fdir_add_perfect_filter_wrapper_dummy(int queue_id, char *srcIP, int srcPort,
         char *dstIP, int dstPort, int type);
@@ -128,6 +138,7 @@ void fdir_remove_perfect_filter_dummy(portid_t port_id, uint16_t soft_id,
 				struct rte_fdir_filter *fdir_filter);
 void fdir_set_masks_dummy(portid_t port_id, struct rte_fdir_masks *fdir_masks);
 
+//  ###################### ########################
 
 struct dpdk_handler *g_dpdk_if;
 
@@ -163,7 +174,7 @@ static struct lcore_queue_conf *qconf_rx = NULL;
 #define TX_WTHRESH 0  /**< Default values of TX write-back threshold reg. */
 
 //#define MAX_PKT_BURST 32
-#define MAX_PKT_BURST 1
+#define MAX_PKT_BURST_V1 1
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
 
 /*
@@ -171,8 +182,6 @@ static struct lcore_queue_conf *qconf_rx = NULL;
  */
 #define RTE_TEST_RX_DESC_DEFAULT 128
 #define RTE_TEST_TX_DESC_DEFAULT 512
-static uint16_t nb_rxd = RTE_TEST_RX_DESC_DEFAULT;
-static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
 
 /* ethernet addresses of ports */
 static struct ether_addr l2fwd_ports_eth_addr[RTE_MAX_ETHPORTS];
@@ -187,7 +196,7 @@ static unsigned int l2fwd_rx_queue_per_lcore = 1;
 
 struct mbuf_table {
 	unsigned len;
-	struct rte_mbuf *m_table[MAX_PKT_BURST];
+	struct rte_mbuf *m_table[MAX_PKT_BURST_V1];
 };
 
 #define MAX_RX_QUEUE_PER_LCORE 16
@@ -330,8 +339,8 @@ l2fwd_send_packet(struct rte_mbuf *m, uint8_t port)
 	len++;
 
 	/* enough pkts to be sent */
-	if (unlikely(len == MAX_PKT_BURST)) {
-		l2fwd_send_burst(qconf, MAX_PKT_BURST, port);
+	if (unlikely(len == MAX_PKT_BURST_V1)) {
+		l2fwd_send_burst(qconf, MAX_PKT_BURST_V1, port);
 		len = 0;
 	}
 
@@ -340,11 +349,69 @@ l2fwd_send_packet(struct rte_mbuf *m, uint8_t port)
 }
 
 
-
-void send_packet(struct dpdk_handler *dpdk, char *pkt_tx, size_t len)
+void send_packetV2(int core_id, int port_id, int queue_id,
+        char *pkt_tx, size_t len)
 {
-        assert(dpdk != NULL);
-        printf("%s:sending packet of size %zu\n", dpdk->name, len);
+	struct ether_hdr *eth;
+
+        struct rte_mbuf *m = rte_pktmbuf_alloc(fwd_lcores[core_id]->mbp);
+
+	if (m == NULL) {
+		GOTO_FAIL("Cannot allocate mbuf");
+//		printf("ERROR: (%s:%d:%s) Cannot allocate mbuf\n",
+//                        __FILE__, __LINE__, __func__);
+//                return;
+        }
+	if (rte_pktmbuf_pkt_len(m) != 0) {
+		GOTO_FAIL("Bad length");
+//		printf("ERROR: (%s:%d:%s) Bad length of allocated mbuf\n",
+//                        __FILE__, __LINE__, __func__);
+//		rte_pktmbuf_free(m);
+                return;
+        }
+
+	char *data = rte_pktmbuf_append(m, len);
+	if (data == NULL)
+		GOTO_FAIL("Cannot append data");
+	if (rte_pktmbuf_pkt_len(m) != len)
+		GOTO_FAIL("Bad pkt length");
+//	if (rte_pktmbuf_data_len(m) != MBUF_TEST_DATA_LEN)
+//		GOTO_FAIL("Bad data length");
+	memcpy(data, pkt_tx, len);
+	if (!rte_pktmbuf_is_contiguous(m))
+		GOTO_FAIL("Buffer should be continuous");
+
+
+	eth = rte_pktmbuf_mtod(m, struct ether_hdr *);
+
+	/* src addr */
+        // ether_addr_copy(&l2fwd_ports_eth_addr[port_id], &eth->s_addr);
+	ether_addr_copy(&ports[port_id].eth_addr, &eth->s_addr);
+
+	struct rte_mbuf *m_table[2];
+        m_table[0] = m;
+        m_table[1] = NULL;
+        uint16_t nb_pkts = 1;
+	unsigned ret = rte_eth_tx_burst(port_id, (uint16_t) queue_id,
+                m_table, nb_pkts);
+
+	if (unlikely(ret < nb_pkts)) {
+                printf("failed to send packet\n");
+                assert(ret == nb_pkts); // FIXME: I need better way to handle errors
+		port_statistics[port_id].dropped += (nb_pkts - ret);
+		do {
+			rte_pktmbuf_free(m_table[ret]);
+		} while (++ret < nb_pkts);
+	}
+
+fail:
+	if (m)
+		rte_pktmbuf_free(m);
+	return;
+} // end function: send_packetV2
+
+void send_packet(char *pkt_tx, size_t len)
+{
 	struct ether_hdr *eth;
 //	void *tmp;
 
@@ -399,30 +466,96 @@ fail:
 	return;
 }
 
-
-size_t get_packet(struct dpdk_handler *dpdk, char *pkt_out, size_t buf_len)
+size_t get_packetV2(int core_id, int port_id, int queue_id,
+        char *pkt_out, size_t buf_len)
 {
-    struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
+    struct rte_mbuf *pkts_burst[2];
+    struct rte_mbuf *m;
+    unsigned portid, nb_rx;
+    size_t pkt_size = 0;
+
+//    while (1) {  // FIXME: Do I really need this infinite loop?
+
+        /*
+         * Read packet from RX queues
+         */
+        portid = port_id; // qconf_rx->rx_port_list[i];
+
+        do {
+        nb_rx = rte_eth_rx_burst((uint8_t) portid, (uint16_t) queue_id,
+                pkts_burst, 1); // MAX_PKT_BURST_V1);
+        } while (nb_rx <= 0);
+//        if (nb_rx == 0) continue;
+
+        assert(nb_rx == 1);
+        port_statistics[portid].rx += nb_rx;
+        if (nb_rx > 1) {
+            printf("ERROR: (%s:%d:%s) Multiple pkts (%d) in queue %d"
+                    "for core %d, in brust, processing only one pkt\n",
+                    __FILE__, __LINE__, __func__,
+                    nb_rx, port_id, core_id);
+        }
+
+        printf("Received %d packets on queue %d\n", nb_rx, queue_id);
+
+        // Taking out the fist packet from the brust
+        m = pkts_burst[0];
+        rte_prefetch0(rte_pktmbuf_mtod(m, void *));
+
+        printf("Packet of len %d received at %p\n", m->pkt.pkt_len, m->pkt.data);
+        if (m->pkt.pkt_len > 0 && m->pkt.pkt_len < buf_len) {
+            // rte_pktmbuf_dump(m, 0);
+            pkt_size = m->pkt.pkt_len;
+        } else {
+            printf("ERROR: (%s:%d:%s) too small buffer to copy packet."
+                    "pkt_len %"PRIu32", buf_len = %zd\n",
+                    __FILE__, __LINE__, __func__,
+                    m->pkt.pkt_len, buf_len);
+            pkt_size =  buf_len;
+        }
+        memcpy(pkt_out, m->pkt.data, pkt_size);
+        rte_pktmbuf_free(m);
+        printf("received packet of size %zu\n", pkt_size);
+        return pkt_size;
+
+//    } // end while: infinite
+
+    return pkt_size;
+
+} // end function: get_packetV2
+
+size_t get_packet(char *pkt_out, size_t buf_len)
+{
+    struct rte_mbuf *pkts_burst[MAX_PKT_BURST_V1];
     struct rte_mbuf *m;
     unsigned i, j, portid, nb_rx;
     size_t pkt_size = 0;
 
-    assert(dpdk != NULL);
+/*
     if (qconf_rx == NULL) {
-        printf("ERROR: (%s:%d:%s) %s: RX side not initialized\n",
-                __FILE__, __LINE__, __func__, dpdk->name);
+        printf("ERROR: (%s:%d:%s): RX side not initialized\n",
+                __FILE__, __LINE__, __func__);
         return pkt_size;
     }
+*/
 
     while (1) {
         /*
          * Read packet from RX queues
          */
-        for (i = 0; i < qconf_rx->n_rx_port; i++) {
+        //for (i = 0; i < qconf_rx->n_rx_port; i++)
+        {
 
-            portid = qconf_rx->rx_port_list[i];
+            portid = 0 ;//  qconf_rx->rx_port_list[i];
+
+//            printf("INFO: (%s:%d:%s) waiting for packet on port %d\n",
+//                        __FILE__, __LINE__, __func__, portid);
+
             nb_rx = rte_eth_rx_burst((uint8_t) portid, 0,
-                    pkts_burst, MAX_PKT_BURST);
+                    pkts_burst, MAX_PKT_BURST_V1);
+
+//            printf("INFO: (%s:%d:%s) %d packets received on port %d\n",
+//                        __FILE__, __LINE__, __func__, nb_rx, portid);
 
             port_statistics[portid].rx += nb_rx;
             if (nb_rx > 1) {
@@ -449,7 +582,7 @@ size_t get_packet(struct dpdk_handler *dpdk, char *pkt_out, size_t buf_len)
                 }
                 memcpy(pkt_out, m->pkt.data, pkt_size);
                 rte_pktmbuf_free(m);
-                printf("received packet of size %zu\n", pkt_size);
+                printf("received packet of size %zu on port %d\n", pkt_size, portid);
                 return pkt_size;
             } // end for : for each packet in packet_brust
         } // end for: for each port, receive
@@ -472,12 +605,12 @@ void l2fwd_main_loop(struct dpdk_handler *dpdk)
 	while (1) {
 
             // get an incoming packet
-            in_pkt_len = get_packet(dpdk, pkt_data_buff, sizeof(pkt_data_buff));
+            in_pkt_len = get_packet(pkt_data_buff, sizeof(pkt_data_buff));
             printf("%d:incoming packet of len %d\n", in_pkt_count, in_pkt_len);
             ++in_pkt_count;
 
             // send out the same packet
-            send_packet(dpdk, pkt_data_buff, in_pkt_len);
+            send_packet(pkt_data_buff, in_pkt_len);
 	} // end while: infinite while loop
 
 } // end function: l2fwd_main_loop
@@ -877,6 +1010,8 @@ int MAIN(int argc, char **argv)
 
 static struct dpdk_handler dpdk_if_1;
 
+int init_dpdkControl(int argc, char** argv);
+
 struct dpdk_handler *init_dpdk_setup(const char *name)
 {
         g_dpdk_if = &dpdk_if_1;
@@ -890,6 +1025,7 @@ struct dpdk_handler *init_dpdk_setup(const char *name)
                     "1", "--", "-q",
                     "1", "-p", "1", ""};
 
+
         char *myArgs2[13];
         int i;
         for (i = 0; i < 11; ++i) {
@@ -902,6 +1038,27 @@ struct dpdk_handler *init_dpdk_setup(const char *name)
         MAIN(11, myArgs2);
         return g_dpdk_if;
 }
+
+
+int init_dpdk_setupV2(void)
+{
+
+        const char *myArgs[13] = {"./a.out",
+                    "-c", "0xf", "-n",
+                    "1", ""};
+
+        char *myArgs2[13];
+        int i;
+        for (i = 0; i < 6; ++i) {
+            printf("copying %dth string [%s]\n", i, myArgs[i]);
+            myArgs2[i] = malloc(12);
+            strncpy(myArgs2[i], myArgs[i], 12);
+        }
+
+        printf("Hello world from DPDK....\n");
+        return init_dpdkControl(6, myArgs2);
+}
+
 
 //#define DPDK_MAIN  1
 
@@ -928,6 +1085,9 @@ int main(__attribute__((unused))int argc, __attribute__((unused))const char *arg
 	return 0;
 }
 #endif  // DPDK_MAIN
+
+
+//  ###################### TO DELETE ########################
 
 typedef uint8_t  lcoreid_t;
 typedef uint8_t  portid_t;
@@ -1194,3 +1354,4 @@ fdir_del_flow_filter_wrapper_dummy(int queue_id)
 }
 
 
+//  ###################### ########################

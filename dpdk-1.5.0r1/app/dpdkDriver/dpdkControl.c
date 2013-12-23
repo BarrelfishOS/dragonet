@@ -1690,7 +1690,6 @@ init_port_dcb_config(portid_t pid,struct dcb_config *dcb_conf)
 //#endif
 
 //int main(int argc, char** argv)
-int init_dpdkControl(int argc, char** argv);
 int init_dpdkControl(int argc, char** argv)
 {
 	int  diag;
@@ -1741,6 +1740,8 @@ int init_dpdkControl(int argc, char** argv)
 	for (port_id = 0; port_id < nb_ports; port_id++)
 		rte_eth_promiscuous_enable(port_id);
 
+
+        /*
 	if (interactive == 1)
 		prompt();
 	else {
@@ -1754,6 +1755,7 @@ int init_dpdkControl(int argc, char** argv)
 		if (rc < 0)
 			return 1;
 	}
+        */
 
 	return 0;
 }
