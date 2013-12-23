@@ -1,11 +1,7 @@
 {-# LANGUAGE CPP, ForeignFunctionInterface #-}
 
 module Util.Dpdk (
-        init_dpdk_setup
-        , getPacket
-        , sendPacket
-
-        , init_dpdk_setup_v2
+        init_dpdk_setup_v2
         , getPacket_v2
         , sendPacket_v2
 
@@ -41,24 +37,6 @@ foreign import ccall "get_packetV2"
 
 foreign import ccall "send_packetV2"
 	c_send_packet_v2 :: CInt -> CInt -> CInt -> Ptr Word8 -> CInt -> IO ()
-
--- ##########################################################################
-
--- opaque tap handler
-data DpdkHandle
-newtype Dpdk = Dpdk (Ptr DpdkHandle)
-
-
--- C function bindings for device setup
-foreign import ccall "init_dpdk_setup"
-	c_init_dpdk_setup :: CString -> IO Dpdk
-
--- C function bindings for sending and receiving packets
-foreign import ccall "get_packet"
-	c_get_packet :: Ptr Word8 -> CInt -> IO (CInt)
-
-foreign import ccall "send_packet"
-	c_send_packet :: Ptr Word8 -> CInt -> IO ()
 
 -- ##########################################################################
 
@@ -124,36 +102,6 @@ sendPacket_v2 coreid portid queueid bstr = do
 
 -- ###############################################################
 
-
--- Create a DPDK device
-init_dpdk_setup :: String -> IO Dpdk
-init_dpdk_setup name = withCString name c_init_dpdk_setup
-
---
-getPacket :: IO BS.ByteString
-getPacket = do
-	buf <- mallocForeignPtrBytes blen
-	len <- withForeignPtr buf $ \b -> c_get_packet b c_blen
-	case len of
-		0 -> error "c_get_packet() should not return an empty buffer"
-		_ -> let len'    = fromIntegral len
-		         bytestr = BI.fromForeignPtr buf 0 len'
-		     in return bytestr
-	where
-		blen = 4096
-		c_blen = fromIntegral blen
-
--- write a bytestring
-sendPacket:: BS.ByteString -> IO ()
-sendPacket bstr = do
-	withForeignPtr fptr $ \ptr -> c_send_packet (ptr `plusPtr` off) c_len
-	where
-		(fptr, off, len) = BI.toForeignPtr bstr
-		c_len = fromIntegral len
-
-
-
--- ###############################################################
 
 e10k5TAdd ::  Int -> String -> Word16 -> String -> Word16 -> Int -> IO ()
 e10k5TAdd qid srcIP srcPort dstIP dstPort tp = do
