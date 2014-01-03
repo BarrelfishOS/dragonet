@@ -246,22 +246,34 @@ int init_dpdk_setupV2(void)
 {
 
         const char *myArgs[13] = {"./a.out",
-                    "-c", "0xf", "-n",
-                    "1", ""};
+                    "-c", "0xf",  // coremask
+                    "-n", "1",  // no of ports
+                    "--",
+                    "--pkt-filter-mode=perfect",
+                    ""};
 
         char *myArgs2[13];
         int i;
-        for (i = 0; i < 6; ++i) {
+        for (i = 0; i < 13; ++i) {
             printf("copying %dth string [%s]\n", i, myArgs[i]);
-            myArgs2[i] = malloc(12);
-            strncpy(myArgs2[i], myArgs[i], 12);
+            myArgs2[i] = malloc(127);
+            if (myArgs[i] == NULL) {
+                myArgs2[i] = NULL;
+            } else {
+                strncpy(myArgs2[i], myArgs[i], 126);
+            }
         }
 
         printf("Hello world from DPDK....\n");
-        return init_dpdkControl(6, myArgs2);
+        return init_dpdkControl(8, myArgs2);
 }
 
-
+#if 0
+int main(int __attribute__((unused)) argc, char __attribute__((unused)) *argv[])
+{
+    return init_dpdk_setupV2();
+}
+#endif // 0
 
 //  ###################### TO DELETE ########################
 
@@ -432,56 +444,138 @@ fdir_set_masks_dummy(portid_t port_id, struct rte_fdir_masks *fdir_masks)
 }
 
 
-int
-fdir_add_perfect_filter_wrapper_dummy(int queue_id, char *srcIP, int srcPort,
-        char *dstIP, int dstPort, int type)
+/*
+void set_filter_values()
 {
-    printf("%s:%s: for queue %d filter [srcIP=%s, scrPort=%d, dstIP=%s, dstPort =%d, type =%d]\n",
+
+    memset(&fdir_filter, 0, sizeof(struct rte_fdir_filter));
+
+    // PS: Added to parse the IP address................
+    cmdline_parse_token_ipaddr_t token;
+    char buf[CMDLINE_TEST_BUFSIZE];
+    cmdline_ipaddr_t result;
+
+    // clear out everything
+    memset(buf, 0, sizeof(buf));
+    memset(&result, 0, sizeof(result));
+    memset(&token, 0, sizeof(token));
+    token.ipaddr_data.flags = CMDLINE_IPADDR_V4;
+    ret = cmdline_parse_ipaddr((cmdline_parse_token_hdr_t*)&token,
+        ipaddr_valid_strs[i].str, (void*)&result);
+    // ####################################################
+
+
+    if (res->ip_src.family == AF_INET)
+        fdir_filter.ip_src.ipv4_addr = res->ip_src.addr.ipv4.s_addr;
+    else
+        memcpy(&(fdir_filter.ip_src.ipv6_addr),
+                &(res->ip_src.addr.ipv6),
+                sizeof(struct in6_addr));
+
+    if (res->ip_dst.family == AF_INET)
+        fdir_filter.ip_dst.ipv4_addr = res->ip_dst.addr.ipv4.s_addr;
+    else
+        memcpy(&(fdir_filter.ip_dst.ipv6_addr),
+                &(res->ip_dst.addr.ipv6),
+                sizeof(struct in6_addr));
+
+    fdir_filter.port_dst = rte_cpu_to_be_16(res->port_dst);
+    fdir_filter.port_src = rte_cpu_to_be_16(res->port_src);
+
+    if (!strcmp(res->protocol, "udp"))
+        fdir_filter.l4type = RTE_FDIR_L4TYPE_UDP;
+    else if (!strcmp(res->protocol, "tcp"))
+        fdir_filter.l4type = RTE_FDIR_L4TYPE_TCP;
+    else if (!strcmp(res->protocol, "sctp"))
+        fdir_filter.l4type = RTE_FDIR_L4TYPE_SCTP;
+    else //  default only IP
+        fdir_filter.l4type = RTE_FDIR_L4TYPE_NONE;
+
+    if (res->ip_dst.family == AF_INET6)
+        fdir_filter.iptype = RTE_FDIR_IPTYPE_IPV6;
+    else
+        fdir_filter.iptype = RTE_FDIR_IPTYPE_IPV4;
+
+    fdir_filter.vlan_id    = rte_cpu_to_be_16(res->vlan_id);
+    fdir_filter.flex_bytes = rte_cpu_to_be_16(res->flexbytes_value);
+
+
+} // end function: set_filter_values
+
+*/
+
+int fdir_add_perfect_filter_wrapper_dummy(int queue_id, char *srcIP,
+        int srcPort, char *dstIP, int dstPort, int type)
+{
+/*
+    printf("%s:%s: for queue %d filter [srcIP=%s, scrPort=%d, dstIP=%s, "
+            "dstPort =%d, type =%d]\n",
             __FILE__, __func__,
             queue_id, srcIP, srcPort, dstIP, dstPort, type);
+*/
+    return 0;
+    struct rte_fdir_filter fdir_filter;
+    memset(&fdir_filter, 0, sizeof(struct rte_fdir_filter));
 
-	int diag;
+    int diag;
 
-	diag = rte_eth_dev_fdir_add_perfect_filter(0, NULL,
-						   0, queue_id, 0);
-	if (diag == 0)
-            return 0;
-        else {
-            printf("%s:%s: failed: for queue %d filter "
-                    "[srcIP=%s, scrPort=%d, dstIP=%s, dstPort =%d, type =%d]\n",
-                    __FILE__, __func__,
-                    queue_id, srcIP, srcPort, dstIP, dstPort, type);
-
-            return -1;
-        }
+    diag = rte_eth_dev_fdir_add_perfect_filter(0, NULL,
+            0, queue_id, 0);
+    if (diag == 0)
         return 0;
+    else {
+        printf("%s:%s: failed: for queue %d filter "
+                "[srcIP=%s, scrPort=%d, dstIP=%s, dstPort =%d, type =%d]\n",
+                __FILE__, __func__,
+                queue_id, srcIP, srcPort, dstIP, dstPort, type);
+
+        return -1;
+    }
+    return 0;
 }
 
 int
 fdir_add_perfect_filter2_wrapper_dummy(int queue_id)
 {
-    printf("%s:%s: for queue %d filter add\n",
-            __FILE__, __func__,
-            queue_id);
     return fdir_add_perfect_filter_wrapper_dummy(queue_id, NULL, 0, NULL, 0, 0);
 }
 
 int
 fdir_del_perfect_filter_wrapper_dummy(int queue_id)
 {
+/*
     printf("%s:%s: for queue %d filter del\n",
             __FILE__, __func__,
             queue_id);
-    return 0;
+*/
+
+//    const char *cmd = "help ports\r\n";
+    const char *cmd = "add_perfect_filter 0 udp src 0.0.0.0 0 "
+        "dst 0.0.0.0 0 flexbytes 0 vlan 0 queue 0 soft 0\r\n";
+
+/*    printf("%s:%s: for queue %d filter add\n",
+            __FILE__, __func__,
+            queue_id);
+*/
+
+    printf("###############################\n");
+    printf("## calling cmdline\n");
+    struct cmdline *cl = create_virtual_cmdline();
+    printf("\n## executing command [%s] \n", cmd);
+    int ret = exec_virtual_cmd(cl, cmd);
+    printf("############################### return = %d ####\n", ret);
+    return queue_id; // 0; // FIXME: to avoid unused queue_id error.
 }
 
 int
 fdir_add_flow_filter_wrapper_dummy(int queue_id)
 {
+    /*
     printf("%s:%s: for queue %d flow-filter add\n",
             __FILE__, __func__,
             queue_id);
-    return 0;
+    */
+    return queue_id; // 0; // FIXME: to avoid unused queue_id error.
 }
 
 

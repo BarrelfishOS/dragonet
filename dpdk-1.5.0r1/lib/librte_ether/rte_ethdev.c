@@ -68,7 +68,7 @@
 #include "rte_ether.h"
 #include "rte_ethdev.h"
 
-//#define RTE_LIBRTE_ETHDEV_DEBUG 1
+#define RTE_LIBRTE_ETHDEV_DEBUG 1
 #ifdef RTE_LIBRTE_ETHDEV_DEBUG
 #define PMD_DEBUG_TRACE(fmt, args...) do {                        \
 		RTE_LOG(ERR, PMD, "%s: " fmt, __func__, ## args); \
@@ -1325,6 +1325,7 @@ rte_eth_dev_fdir_add_perfect_filter(uint8_t port_id,
 				    uint8_t drop)
 {
 	struct rte_eth_dev *dev;
+        printf("## %s called.\n", __func__);
 
 	if (port_id >= nb_ports) {
 		PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
@@ -1982,6 +1983,7 @@ rte_eth_mirror_rule_reset(uint8_t port_id, uint8_t rule_id)
 	return (*dev->dev_ops->mirror_rule_reset)(dev, rule_id);
 }
 
+#if 0
 #ifdef RTE_LIBRTE_ETHDEV_DEBUG
 uint16_t
 rte_eth_rx_burst(uint8_t port_id, uint16_t queue_id,
@@ -2053,6 +2055,7 @@ rte_eth_rx_descriptor_done(uint8_t port_id, uint16_t queue_id, uint16_t offset)
 		dev->data->rx_queues[queue_id], offset);
 }
 #endif
+#endif // 0
 
 int
 rte_eth_dev_callback_register(uint8_t port_id,

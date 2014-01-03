@@ -2521,6 +2521,7 @@ cmd_pkt_filter_parsed(void *parsed_result,
 	struct rte_fdir_filter fdir_filter;
 	struct cmd_pkt_filter_result *res = parsed_result;
 
+        printf("%s: function called\n", __func__);
 	memset(&fdir_filter, 0, sizeof(struct rte_fdir_filter));
 
 	if (res->ip_src.family == AF_INET)
@@ -4621,6 +4622,26 @@ cmdline_parse_ctx_t main_ctx[] = {
 	(cmdline_parse_inst_t *)&cmd_reset_mirror_rule,
 	NULL,
 };
+
+/* creates a virtual cmdline which can be used to execute commands */
+struct cmdline *
+create_virtual_cmdline(void)
+{
+	struct cmdline *cl;
+
+//	cl = cmdline_stdin_new(main_ctx, "virtualForDragonet> ");
+	cl = cmdline_new(main_ctx, "virtualForDragonet> ", 0, 1);
+        return cl;
+}
+
+// FIXME: this external declation should not be needed.
+int cmdline_exec_buffer(struct cmdline *cl, const char *buf);
+int
+exec_virtual_cmd(struct cmdline *cl, const char *buf)
+{
+        return cmdline_exec_buffer(cl, buf);
+}
+
 
 /* prompt function, called from main on MASTER lcore */
 void

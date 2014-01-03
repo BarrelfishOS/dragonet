@@ -520,6 +520,11 @@ void set_vf_rx_vlan(portid_t port_id, uint16_t vlan_id,
 
 int init_dpdkControl(int argc, char** argv);
 
+// Creates a virtual command prompt which will be used by dragonet to send
+// commands.
+struct cmdline *create_virtual_cmdline(void);
+int exec_virtual_cmd(struct cmdline *cl, const char *buf);
+
 
 /*
  * Work-around of a compilation error with ICC on invocations of the

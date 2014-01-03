@@ -306,7 +306,8 @@ port_id_is_invalid(portid_t port_id)
 {
 	if (port_id < nb_ports)
 		return 0;
-	printf("Invalid port %d (must be < nb_ports=%d)\n", port_id, nb_ports);
+	printf("%s:Invalid port %d (must be < nb_ports=%d)\n", __func__,
+                port_id, nb_ports);
 	return 1;
 }
 
@@ -1536,6 +1537,7 @@ fdir_add_perfect_filter(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
 {
 	int diag;
 
+        printf("\n## %s called.##\n", __func__);
 	if (port_id_is_invalid(port_id))
 		return;
 

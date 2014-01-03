@@ -1685,13 +1685,13 @@ init_port_dcb_config(portid_t pid,struct dcb_config *dcb_conf)
 	return 0;
 }
 
-//#ifdef RTE_EXEC_ENV_BAREMETAL
-//#define main _main
-//#endif
+#ifdef RTE_EXEC_ENV_BAREMETAL
+#define main _main
+#endif
 
-//int main(int argc, char** argv)
-int main_test(int argc, char** argv);
-int main_test(int argc, char** argv)
+int main(int argc, char** argv)
+//int main_test(int argc, char** argv);
+//int main_test(int argc, char** argv)
 {
 	int  diag;
 	uint8_t port_id;

@@ -1,13 +1,13 @@
 /*-
  *   BSD LICENSE
- * 
+ *
  *   Copyright(c) 2010-2013 Intel Corporation. All rights reserved.
  *   All rights reserved.
- * 
+ *
  *   Redistribution and use in source and binary forms, with or without
  *   modification, are permitted provided that the following conditions
  *   are met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above copyright
@@ -17,7 +17,7 @@
  *     * Neither the name of Intel Corporation nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -74,6 +74,7 @@
 #include "cmdline_parse.h"
 #include "cmdline.h"
 
+//#define RTE_LIBRTE_CMDLINE_DEBUG 1
 #ifdef RTE_LIBRTE_CMDLINE_DEBUG
 #define debug_printf printf
 #else
@@ -191,11 +192,15 @@ match_inst(cmdline_parse_inst_t *inst, const char *buf,
 		if (i == nb_match_token) {
 			return 0;
 		}
+                debug_printf("%s:specific num of token did not match :%d /= %d\n",
+                        __func__, nb_match_token, i);
 		return i;
 	}
 
 	/* we don't match all the tokens */
 	if (token_p) {
+                debug_printf("%s: we don't match all the tokens :%d\n",
+                        __func__, i);
 		return i;
 	}
 
@@ -209,6 +214,7 @@ match_inst(cmdline_parse_inst_t *inst, const char *buf,
 		return 0;
 
 	/* garbage after inst */
+        debug_printf("%s:garbage after inst :%d\n", __func__, i);
 	return i;
 }
 
@@ -232,8 +238,10 @@ cmdline_parse(struct cmdline *cl, const char * buf)
 	char debug_buf[BUFSIZ];
 #endif
 
-	if (!cl || !buf)
+	if (!cl || !buf) {
+		printf("Error: %s: NULL values: %p, %p\n", __func__, cl, buf);
 		return CMDLINE_PARSE_BAD_ARGS;
+        }
 
 	ctx = cl->ctx;
 
@@ -282,8 +290,11 @@ cmdline_parse(struct cmdline *cl, const char * buf)
 		/* fully parsed */
 		tok = match_inst(inst, buf, 0, result_buf);
 
-		if (tok > 0) /* we matched at least one token */
+		if (tok > 0) { /* we matched at least one token */
 			err = CMDLINE_PARSE_BAD_ARGS;
+		        printf("Error: %s: we matched atleast one token: %d\n",
+                                __func__, tok);
+                }
 
 		else if (!tok) {
 			debug_printf("INST fully parsed\n");

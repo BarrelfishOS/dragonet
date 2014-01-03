@@ -640,15 +640,17 @@ launch_args_parse(int argc, char** argv)
 						 n, ETHER_MIN_LEN);
 			}
 			if (!strcmp(lgopts[opt_idx].name, "pkt-filter-mode")) {
-				if (!strcmp(optarg, "signature"))
+				if (!strcmp(optarg, "signature")) {
 					fdir_conf.mode =
 						RTE_FDIR_MODE_SIGNATURE;
-				else if (!strcmp(optarg, "perfect"))
+                                        printf("#### setting up the filter mode to signature\n");
+                                } else if (!strcmp(optarg, "perfect")) {
 					fdir_conf.mode = RTE_FDIR_MODE_PERFECT;
-				else if (!strcmp(optarg, "none"))
+                                        printf("#### setting up the filter mode to perfect\n");
+                                } else if (!strcmp(optarg, "none")) {
 					fdir_conf.mode = RTE_FDIR_MODE_NONE;
-				else
-					rte_exit(EXIT_FAILURE,
+                                        printf("#### setting up the filter mode to NONE\n");
+                                } else rte_exit(EXIT_FAILURE,
 						 "pkt-mode-invalid %s invalid - must be: "
 						 "none, signature or perfect\n",
 						 optarg);

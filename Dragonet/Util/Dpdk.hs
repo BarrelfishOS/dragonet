@@ -108,12 +108,12 @@ e10k5TAdd qid srcIP srcPort dstIP dstPort tp = do
     let
         c_qid = fromIntegral qid
     len <- c_fdir_add_perfect_filter2_wrapper c_qid
-    putStrLn ("e10k5TAdd2: qid: " ++ (show qid)
-            ++ ", srcIP: " ++ (show srcIP)
-            ++ ", srcPort: " ++ (show srcPort)
-            ++ ", dstIP: " ++ (show dstIP)
-            ++ ", dstPort: " ++ (show dstPort)
-            ++ ", type: " ++ (show tp))
+    putStrLn ("e10k5TAdd2: qid: " ++ (show qid))
+--            ++ ", srcIP: " ++ (show srcIP)
+--            ++ ", srcPort: " ++ (show srcPort)
+--            ++ ", dstIP: " ++ (show dstIP)
+--            ++ ", dstPort: " ++ (show dstPort)
+--            ++ ", type: " ++ (show tp))
 
 e10k5TAdd2 :: Int -> IO()
 e10k5TAdd2 tid = do
