@@ -8,6 +8,8 @@ import Dragonet.DotGenerator
 import Dragonet.Embedding
 import Dragonet.Constraints
 
+import LPGImpl as LPGI (graphGen)
+
 [unicorn|
 graph prg {
     node HWDrop { }
@@ -26,13 +28,13 @@ graph prg {
             port other[.CSynFilter] }
 
     }
-    
+
     cluster L3IPv4 {
 
         boolean Classified {
             attr "software"
-            port true false[] } 
-    
+            port true false[] }
+
         node Checksum_ {
             port out[ValidChecksum .CSynFilter] }
 
@@ -214,6 +216,8 @@ main = do
     writeFile "embedded.dot" $ toDot $ embedded
     constrained <- constrain embedded
     writeFile "constrained.dot" $ toDot $ constrained
+    graphGen
+
     where
         lpgT = pgSetType GTLpg lpg
         prgTConf = pgSetType GTPrg prgConfigured

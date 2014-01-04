@@ -98,7 +98,7 @@ graph lpg {
         cluster L3IPv4 {
             boolean ValidHeaderLength {
                 port true[ValidReassembly ValidVersion ValidLength
-                          ValidTTL ValidChecksum Classify .ToIPv4Local]
+                          ValidTTL ValidChecksum Classify ValidLocalIP]
                 port false[..PacketDrop] }
 
             boolean ValidReassembly {
@@ -116,6 +116,9 @@ graph lpg {
             boolean ValidChecksum {
                 port true false[Valid] }
 
+            boolean ValidLocalIP {
+                port true false[Valid] }
+
             node Classify {
                 port tcp[.L4TCPValidHeaderLength]
                 port udp[.L4UDPValidHeaderLength]
@@ -124,6 +127,7 @@ graph lpg {
 
             and Valid {
                 port true false[.L3IPValid] }
+
         }
 
 
@@ -179,10 +183,14 @@ graph lpg {
                 port true false[Valid] }
 
             and Valid {
-                port true[.ToUDPPortDNS]
+                port true[PortClassify]
                 port false[..PacketDrop] }
 
-            node Out { }
+            node PortClassify {
+                port appDNS [.DnsRX]
+                port closedPort [ClosedPortAction]
+            }
+            node ClosedPortAction { }
         }
 
 
@@ -204,23 +212,13 @@ graph lpg {
         /*******************************************/
         /* Application RX                          */
 
-        boolean ToIPv4Local {
-            port true false[DnsRXFilter L3ICMPNeedsResponse] }
-
-        boolean ToUDPPortDNS {
+/*        boolean ToUDPPortDNS {
             port true false[DnsRXFilter] }
-
-        and DnsRXFilter {
-            port true[DnsRX]
-            port false[.PacketDrop] }
+*/
 
         node DnsRX { }
 
     }
-
-
-
-
 
 
     cluster Tx {
@@ -228,7 +226,7 @@ graph lpg {
             node InitiateResponse {
                 port out[AllocateHeader]
 		port drop[] }
-            
+
             node AllocateHeader {
                 port out[FillHeader] }
 
@@ -249,13 +247,13 @@ graph lpg {
 
             boolean Routing {
                 port true false[.L3ARPLookup] }
-        } 
+        }
 
         cluster L3ARP {
             node InitiateResponse {
                 port true false[Prepare]
 		port drop[] }
-            
+
             or Prepare {
                 port true[AllocateHeader]
                 port false[] }

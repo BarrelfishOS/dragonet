@@ -22,7 +22,7 @@ incremental_run: incremental
 all: models
 
 # generates graphs (lpg, prg, prg_conf, embedded, constrained)
-graph: base
+graph: base lpgImpl.unicorn
 	$(GHC) $(GHCFLAGS) testGraph.hs -o graph
 graph_run: graph
 	./graph

@@ -1,7 +1,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+
 module LPGImpl (
-    lpg, lpgClusters, pbool,
+    lpg, lpgClusters, pbool, graphGen,
 
     lpgSoftwareRXImpl, lpgRxL2EtherClassifiedImpl, lpgRxL2EtherValidLengthImpl,
     lpgRxL2EtherValidTypeImpl, lpgRxL2EtherValidMulticastImpl,
@@ -18,8 +19,12 @@ module LPGImpl (
     lpgRxL3ICMPValidChecksumImpl, lpgRxL3ICMPIsTypeRequestImpl,
     lpgRxL4UDPValidHeaderLengthImpl, lpgRxL4UDPValidLengthImpl,
     lpgRxL4UDPValidChecksumImpl, lpgRxL4TCPValidHeaderLengthImpl,
-    lpgRxToIPv4LocalImpl, lpgRxToUDPPortDNSImpl, lpgPacketDropImpl,
-    lpgRxL4TCPOutImpl, lpgRxL4UDPOutImpl, lpgRxDnsRXImpl,
+    lpgRxL3IPv4ValidLocalIPImpl, lpgRxToUDPPortDNSImpl, lpgPacketDropImpl,
+    lpgRxL4TCPOutImpl,
+
+    lpgRxL4UDPPortClassifyImpl, lpgRxL4UDPClosedPortActionImpl,
+    lpgRxDnsRXImpl,
+
     lpgTxQueueImpl, lpgTxL2EtherAllocateHeaderImpl, lpgTxL2EtherFillHeaderImpl,
     lpgTxL3ARPInitiateResponseImpl, lpgTxL3ARPAllocateHeaderImpl,
     lpgTxL3ARPFillHeaderImpl, lpgTxL3ARPLookup_Impl, lpgTxL3ARPSendRequestImpl,
@@ -27,6 +32,9 @@ module LPGImpl (
     lpgTxL3IPv4RoutingImpl, lpgTxL3ICMPInitiateResponseImpl,
     lpgTxL3ICMPAllocateHeaderImpl, lpgTxL3ICMPFillHeaderImpl,
 ) where
+
+import Dragonet.DotGenerator
+
 
 import qualified Dragonet.ProtocolGraph as PG
 import Dragonet.Unicorn
@@ -237,6 +245,10 @@ lpgRxL3IPv4ValidChecksumImpl = do
     pkt <- readP hlen off
     toPort $ pbool $ (IP4.checksum pkt) == 0
 
+lpgRxL3IPv4ValidLocalIPImpl = do
+    dIP <- IP4.destIPRd
+    toPort $ pbool $ dIP == cfgLocalIP
+
 lpgRxL3IPv4ClassifyImpl = do
     l4off <- IP4.payloadOff
     setAttr "L4Offset" $ AttrI $ l4off
@@ -312,6 +324,21 @@ lpgRxL4UDPValidChecksumImpl = do
     debug ("lpgRxL4UDPValidChecksumImpl " ++ (show nextPort))
     toPort $ pbool nextPort
 
+lpgRxL4UDPPortClassifyImpl = do
+    dPort <- UDP.destPortRd
+    let outPort = if dPort == 51098 then "appDNS"
+            else "closedPort"
+    toPort $ outPort
+
+    off <- UDP.headerOff
+    len <- packetLen
+    udpLen <- UDP.lengthRd
+    toPort $ pbool (len >= (fromIntegral udpLen) + off)
+
+
+lpgRxL4UDPClosedPortActionImpl = do
+    debug "UDP packet on closed port"
+    toPort ""
 
 -----------------------------------------------------------------------------
 -- TCP
@@ -321,12 +348,6 @@ lpgRxL4TCPValidHeaderLengthImpl = toPort "true"
 -----------------------------------------------------------------------------
 -- Application RX
 
-lpgRxToIPv4LocalImpl = do
-    dIP <- IP4.destIPRd
-    let nextPort = dIP == cfgLocalIP
-    debug ("lpgRxToIPv4LocalImpl " ++ (show nextPort))
-    toPort $ pbool $ nextPort
-
 lpgRxToUDPPortDNSImpl = do
     dPort <- UDP.destPortRd
     let nextPort = dPort == 51098
@@ -335,16 +356,10 @@ lpgRxToUDPPortDNSImpl = do
 
 
 
-
 -- Sinks
 lpgPacketDropImpl = do { debug "Packet dropped!" ; toPort "" }
 lpgRxL4TCPOutImpl = do { debug "Got TCP packet!" ; toPort "" }
-lpgRxL4UDPOutImpl = do { debug "Got UDP packet!" ; toPort "" }
 lpgRxDnsRXImpl = do { debug "Got DNS packet!" ; toPort "" }
-
-
-
-
 
 -----------------------------------------------------------------------------
 -- Transmit Side
@@ -611,4 +626,12 @@ lpg :: PG.PGraph Implementation
 
 -- The protocol graph
 [unicornImpl_f|lpgImpl.unicorn|]
+
+
+graphGen :: IO ()
+graphGen = do
+    putStrLn "Generating .dot files for Dragonet implemented lpg"
+    writeFile "lpgImpl.dot" $ toDotClustered lpgT lpgClusters
+    where
+        lpgT = PG.pgSetType PG.GTLpg lpg
 
