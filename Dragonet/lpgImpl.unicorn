@@ -20,7 +20,7 @@ graph lpg {
 
             boolean ValidLength {
                 port true[ValidUnicast ValidMulticast ValidBroadcast
-                          ValidSrc ValidType]
+                          ValidSrc ValidType ValidLocalMAC]
                 port false[..PacketDrop] }
 
             boolean ValidUnicast {
@@ -36,6 +36,9 @@ graph lpg {
                 port true false[Valid] }
 
             boolean ValidSrc {
+                port true false[Valid] }
+
+            boolean ValidLocalMAC {
                 port true false[Valid] }
 
             and Valid {
@@ -187,10 +190,12 @@ graph lpg {
                 port false[..PacketDrop] }
 
             node PortClassify {
-                port appDNS [.DnsRX]
+                port appDNS [.DnsAPP]
                 port closedPort [ClosedPortAction]
             }
+
             node ClosedPortAction { }
+
         }
 
 
@@ -212,16 +217,29 @@ graph lpg {
         /*******************************************/
         /* Application RX                          */
 
-/*        boolean ToUDPPortDNS {
-            port true false[DnsRXFilter] }
-*/
+    node DnsAPP {
+                port out[.TxL4UDPInitiateResponse]
+                port drop[.PacketDrop] }
 
-        node DnsRX { }
 
     }
 
 
     cluster Tx {
+
+        cluster L4UDP {
+            node InitiateResponse {
+                port out[AllocateHeader]
+		port drop[] }
+
+            node AllocateHeader {
+                port out[FillHeader] }
+
+            boolean FillHeader {
+                port true false[.L3IPv4Prepare] }
+        }
+
+
         cluster L3ICMP {
             node InitiateResponse {
                 port out[AllocateHeader]

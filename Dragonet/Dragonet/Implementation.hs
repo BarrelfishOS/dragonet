@@ -2,7 +2,7 @@ module Dragonet.Implementation(
     Implementation,
     Packet,
     AttrValue(..),
-    Context(..), 
+    Context(..),
     GlobalState(..),
     ImplM,
 
@@ -28,6 +28,7 @@ module Dragonet.Implementation(
     readP16BEsafe,
     readP32BEsafe,
     readP,
+    readPX,
     readP8,
     readP16BE,
     readP32BE,
@@ -219,9 +220,23 @@ readP len offset = do
     pkt <- getPacket
     let l = BS.unpack $ BS.take len $ BS.drop offset pkt
     if (length $ l) /= len then
-        error "Invalid read"
+        error ("Invalid read: " ++ (show (length $ l))
+            ++ " /= " ++ (show len))
     else
         return l
+
+readPX :: Int -> Int -> ImplM [Word8]
+readPX len offset = do
+    pkt <- getPacket
+    let l = BS.unpack $ BS.take len $ BS.drop offset pkt
+--    if (length $ l) /= len then
+--        error ("Invalid read: " ++ (show (length $ l))
+--            ++ " /= " ++ (show len))
+--    else
+    return l
+
+
+
 
 readP8 :: Int -> ImplM Word8
 readP8 offset = do

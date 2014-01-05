@@ -8,22 +8,40 @@ module LPGImpl (
     lpgRxL2EtherValidTypeImpl, lpgRxL2EtherValidMulticastImpl,
     lpgRxL2EtherValidBroadcastImpl, lpgRxL2EtherValidUnicastImpl,
     lpgRxL2EtherValidSrcImpl, lpgRxL2EtherClassifyL3Impl,
+    lpgRxL2EtherValidLocalMACImpl,
     lpgRxL3ARPValidHeaderLengthImpl, lpgRxL3ARPClassifyImpl,
     lpgRxL3ARPValidRequestImpl, lpgRxL3ARPLocalIPDestImpl,
     lpgRxL3ARPValidResponseImpl, lpgRxL3ARPIsPendingImpl,
     lpgRxL3ARPProcessPendingResponseImpl, lpgRxL3IPv4ValidHeaderLengthImpl,
     lpgRxL3IPv4ValidReassemblyImpl, lpgRxL3IPv4ValidVersionImpl,
+    lpgRxL3IPv4ValidLocalIPImpl,
     lpgRxL3IPv4ValidLengthImpl, lpgRxL3IPv4ValidTTLImpl,
     lpgRxL3IPv4ValidChecksumImpl, lpgRxL3IPv4ClassifyImpl,
     lpgRxL3IPv6ValidHeaderLengthImpl, lpgRxL3ICMPValidHeaderLengthImpl,
     lpgRxL3ICMPValidChecksumImpl, lpgRxL3ICMPIsTypeRequestImpl,
-    lpgRxL4UDPValidHeaderLengthImpl, lpgRxL4UDPValidLengthImpl,
-    lpgRxL4UDPValidChecksumImpl, lpgRxL4TCPValidHeaderLengthImpl,
-    lpgRxL3IPv4ValidLocalIPImpl, lpgRxToUDPPortDNSImpl, lpgPacketDropImpl,
+
+    -- UDP functions
+    lpgRxL4UDPValidHeaderLengthImpl,
+    lpgRxL4UDPValidLengthImpl,
+    lpgRxL4UDPValidChecksumImpl,
+    lpgRxL4UDPPortClassifyImpl,
+    lpgRxL4UDPClosedPortActionImpl,
+
+--    lpgRxL4UDPOutImpl,
+
+    lpgRxDnsAPPImpl,
+
+    lpgPacketDropImpl,
+
+    -- TCP functions
+    lpgRxL4TCPValidHeaderLengthImpl,
     lpgRxL4TCPOutImpl,
 
-    lpgRxL4UDPPortClassifyImpl, lpgRxL4UDPClosedPortActionImpl,
-    lpgRxDnsRXImpl,
+
+    -- UDP TX functions
+    lpgTxL4UDPInitiateResponseImpl,
+    lpgTxL4UDPAllocateHeaderImpl,
+    lpgTxL4UDPFillHeaderImpl,
 
     lpgTxQueueImpl, lpgTxL2EtherAllocateHeaderImpl, lpgTxL2EtherFillHeaderImpl,
     lpgTxL3ARPInitiateResponseImpl, lpgTxL3ARPAllocateHeaderImpl,
@@ -58,16 +76,17 @@ pbool b = if b then "true" else "false"
 
 toPort = return
 
+-- FIXME: figure out a way to get correct IP automatically based
+-- on TUNTAP or DPDK interface.
 
-cfgLocalMAC = fromJust $ ETH.macFromString "00:0f:53:07:48:d5"
---cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.36"
-cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.37"
+-- FOR DPDK
+--cfgLocalMAC = fromJust $ ETH.macFromString "00:0f:53:07:48:d5"
+-- --cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.36"
+--cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.37"
 
---cfgLocalMAC = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
---cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
---cfgLocalIP = fromJust $ IP4.ipFromString "129.132.102.111"
-
-
+-- FOR TUNTAP
+cfgLocalMAC = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
+cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
 
 
 lpgSoftwareRXImpl = toPort "out"
@@ -100,17 +119,29 @@ lpgRxL2EtherValidMulticastImpl = do
 lpgRxL2EtherValidBroadcastImpl = do
     smac <- ETH.destRd
     dmac <- ETH.sourceRd
-    debug ("llpgRxL2EtherValidBroadcastImpl destMac " ++ show (dmac)
-            ++ " , srcMac " ++ show(smac) )
+--    debug ("llpgRxL2EtherValidBroadcastImpl destMac " ++ show (dmac)
+--            ++ " , srcMac " ++ show(smac) )
     toPort $ pbool (dmac == ([0xff, 0xff, 0xff, 0xff, 0xff, 0xff]))
 
 lpgRxL2EtherValidUnicastImpl = do
     smac <- ETH.destRd
     dmac <- ETH.sourceRd
-    debug ("lpgRxL2EtherValidUnicastImpl  destMac " ++ show (dmac)
-            ++ " , srcMac " ++ show(smac) )
-
+--    debug ("lpgRxL2EtherValidUnicastImpl  destMac " ++ show (dmac)
+--            ++ " , srcMac " ++ show(smac) )
     toPort $ pbool $ (((head dmac) .&. 1) == 0)
+
+
+lpgRxL2EtherValidLocalMACImpl = do
+    smac <- ETH.destRd
+    let endPort = (smac == cfgLocalMAC)
+--    debug ("lpgRxL2EtherValidLocalMACImpl: "
+--        ++ " smac (" ++ (show smac)
+--        ++ ") == local mac (" ++ (show cfgLocalMAC)
+--        ++ ") ==> "
+--        ++ " port: " ++ (show endPort)
+--        )
+    toPort $ pbool $  endPort
+
 
 lpgRxL2EtherValidSrcImpl = do
     toPort "true"
@@ -129,13 +160,14 @@ lpgRxL2EtherClassifyL3Impl = do
 -- ARP
 
 lpgRxL3ARPValidHeaderLengthImpl = do
-    debug "RxL3ARPValidHeaderLength"
     off <- ARP.headerOff
     len <- packetLen
     let plen = len - off
-    debug ("len is " ++ show(len))
-    debug ("off is " ++ show(off))
-    debug ("plen is "  ++ show (plen))
+    debug ("RxL3ARPValidHeaderLength: "
+        ++ (" len is " ++ show(len))
+        ++ (" off is " ++ show(off))
+        ++ (" plen is "  ++ show (plen))
+        )
     if plen >= ARP.headerMinLen then do
         hlen <- ARP.headerLen
         debug ("toport is "  ++ show (plen) ++ " == " ++ show(hlen))
@@ -144,7 +176,7 @@ lpgRxL3ARPValidHeaderLengthImpl = do
         toPort "false"
 
 lpgRxL3ARPClassifyImpl = do
-    debug "RxL3ARPClassify"
+--    debug "RxL3ARPClassify"
     oper <- ARP.operRd
     debug ("RxL3ARPClassify oper is " ++ show(oper) ++ " Req is "
             ++ show(ARP.operRequest) ++ " and res is " ++ show(ARP.operReply) )
@@ -247,7 +279,9 @@ lpgRxL3IPv4ValidChecksumImpl = do
 
 lpgRxL3IPv4ValidLocalIPImpl = do
     dIP <- IP4.destIPRd
-    toPort $ pbool $ dIP == cfgLocalIP
+    let nextPort = dIP == cfgLocalIP
+    debug ("lpgRxL3IPv4ValidLocalIPImpl:  " ++ (show nextPort))
+    toPort $ pbool $ nextPort
 
 lpgRxL3IPv4ClassifyImpl = do
     l4off <- IP4.payloadOff
@@ -257,12 +291,12 @@ lpgRxL3IPv4ClassifyImpl = do
         else if proto == IP4.protocolTCP then "tcp"
         else if proto == IP4.protocolUDP then "udp"
         else "drop"
-    debug("lpgRxL3IPv4ClassifyImpl l4Proto val, (ICMP, TCP, UDP), dest_port: "
-        ++ show(proto) ++ ", ("
-        ++ show IP4.protocolICMP ++ ", "
-        ++ show IP4.protocolTCP ++ ", "
-        ++ show IP4.protocolUDP ++ ") "
-        ++ nextPort)
+--    debug("lpgRxL3IPv4ClassifyImpl l4Proto val, (ICMP, TCP, UDP), dest_port: "
+--        ++ show(proto) ++ ", ("
+--        ++ show IP4.protocolICMP ++ ", "
+--        ++ show IP4.protocolTCP ++ ", "
+--        ++ show IP4.protocolUDP ++ ") "
+--        ++ nextPort)
     toPort $ nextPort
 
 -----------------------------------------------------------------------------
@@ -330,14 +364,19 @@ lpgRxL4UDPPortClassifyImpl = do
             else "closedPort"
     toPort $ outPort
 
-    off <- UDP.headerOff
-    len <- packetLen
-    udpLen <- UDP.lengthRd
-    toPort $ pbool (len >= (fromIntegral udpLen) + off)
-
-
 lpgRxL4UDPClosedPortActionImpl = do
-    debug "UDP packet on closed port"
+    dport <- UDP.destPortRd
+    sport <- UDP.sourcePortRd
+    poff <- UDP.payloadOff
+    plen <- UDP.payloadLen
+    payload <- readPX plen poff
+    debug ("UDP packet on closed port with data:"
+        ++ "  sport " ++ (show sport)
+        ++ ", dport " ++ (show dport)
+        ++ ", poff " ++ (show poff)
+        ++ ", len " ++ (show plen)
+        ++ ", payload " ++ (show payload)
+        )
     toPort ""
 
 -----------------------------------------------------------------------------
@@ -348,18 +387,25 @@ lpgRxL4TCPValidHeaderLengthImpl = toPort "true"
 -----------------------------------------------------------------------------
 -- Application RX
 
-lpgRxToUDPPortDNSImpl = do
-    dPort <- UDP.destPortRd
-    let nextPort = dPort == 51098
-    debug ("lpgRxToUDPPortDNSImpl " ++ (show nextPort))
-    toPort $ pbool $ nextPort
-
 
 
 -- Sinks
 lpgPacketDropImpl = do { debug "Packet dropped!" ; toPort "" }
 lpgRxL4TCPOutImpl = do { debug "Got TCP packet!" ; toPort "" }
-lpgRxDnsRXImpl = do { debug "Got DNS packet!" ; toPort "" }
+lpgRxDnsAPPImpl = do
+    dport <- UDP.destPortRd
+    sport <- UDP.sourcePortRd
+    poff <- UDP.payloadOff
+    plen <- UDP.payloadLen
+    payload <- readPX plen poff
+    debug ("DNS Packet with data:"
+        ++ "  sport " ++ (show sport)
+        ++ ", dport " ++ (show dport)
+        ++ ", poff " ++ (show poff)
+        ++ ", len " ++ (show plen)
+        ++ ", payload " ++ (show payload)
+        )
+    toPort "out"
 
 -----------------------------------------------------------------------------
 -- Transmit Side
@@ -570,8 +616,64 @@ lpgTxL3ICMPFillHeaderImpl = do
     setAttr "IP4Proto" $ AttrW8 IP4.protocolICMP
     toPort "true"
 
+-----------------------------------------------------------------------------
+-- UDP TX
 
 
+
+lpgTxL4UDPInitiateResponseImpl = do
+    debug "lpgTxL4UDPInitiateResponseImpl "
+    sport <- UDP.destPortRd
+    dport <- UDP.sourcePortRd
+    poff <- UDP.payloadOff
+    plen <- UDP.payloadLen
+    plen' <- UDP.lengthRd
+    payload <- readPX plen poff
+    dstIP <- IP4.sourceIPRd
+    srcIP <- IP4.destIPRd
+
+    forkPkt $ return $
+        (setAttr' "IP4Dest" $ AttrW32 dstIP) $
+        (setAttr' "IP4Source" $ AttrW32 srcIP) $
+        (setAttr' "UDPSrcPort" $ AttrW16 sport) $
+        (setAttr' "UDPDstPort" $ AttrW16 dport) $
+        (setAttr' "UDPDstPort" $ AttrW16 dport) $
+        (setAttr' "UDPLen" $ AttrW16 plen') $
+        (setAttr' "UDPPayload" $ AttrD payload) $
+        (setAttr' "forked" $ AttrI 1) $
+        initContext emptyPacket
+    f <- getAttrM "forked"
+    if isJust f then do
+        dropAttr "forked"
+        insertP plen 0
+        writeP payload 0
+        toPort "out"
+    else
+        toPort "drop"
+
+lpgTxL4UDPAllocateHeaderImpl = do
+    debug "lpgTxL4UDPAllocateHeaderImpl "
+    insertP UDP.headerLen 0
+    setAttr "L4Offset" $ AttrI 0
+    toPort "out"
+
+lpgTxL4UDPFillHeaderImpl = do
+    debug "lpgTxL4UDPFillHeaderImpl "
+    (AttrW16 sport) <- getAttr "UDPSrcPort"
+    (AttrW16 dport) <- getAttr "UDPDstPort"
+    (AttrW16 l) <- getAttr "UDPLen"
+    UDP.sourcePortWr sport
+    UDP.destPortWr dport
+    UDP.lengthWr l
+
+    -- set checksum
+    UDP.checksumWr 0
+
+    setAttr "IP4Proto" $ AttrW8 IP4.protocolUDP
+    toPort "true"
+
+
+-----------------------------------------------------------------------------
 
 
 

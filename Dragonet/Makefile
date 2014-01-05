@@ -26,6 +26,7 @@ graph: base lpgImpl.unicorn
 	$(GHC) $(GHCFLAGS) testGraph.hs -o graph
 graph_run: graph
 	./graph
+	./convertDot.sh
 
 confgen: base
 	$(GHC) $(GHCFLAGS) testConfGen.hs -o confgen
