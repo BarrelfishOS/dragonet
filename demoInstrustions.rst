@@ -64,6 +64,10 @@ to check it out from netos home directory as well ::
 
     git clone ssh://shindep@129.132.186.96:8006//home/netos/git/dragonet
 
+To push back the changes, you need to add following line in your repository
+and then you can do pull ::
+
+
 The dpdk related code is in ``dragonet/dpdk-1.5.0r1`` directory. Hopefully you
 don't have to deal with this code for demo.
 

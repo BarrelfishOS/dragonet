@@ -74,7 +74,7 @@ Util/Tap.$(OSUF): Util/Tap_.$(OSUF) Util/tap.$(OSUF)
 
 
 # Runs the simulator against dpdk userspace network
-dpdk: base Util/Dpdk.$(OSUF) intel_dpdk
+dpdk: base Util/Dpdk.$(OSUF) #intel_dpdk
 	$(GHC) $(GHCFLAGS) -threaded dpdkTests.hs -o dpdkDragonet -L../dpdk-1.5.0r1/build/lib/ -lintel_dpdk
 
 dpdk_run: dpdk
@@ -91,7 +91,7 @@ Util/dpdk.$(OSUF): ../dpdk-1.5.0r1/examples/uDragonet/dpdk.c intel_dpdk
 	cd ../dpdk-1.5.0r1/examples/uDragonet  && $(MAKE)
 	cp ../dpdk-1.5.0r1/examples/uDragonet/build/dpdk.$(OSUF) Util/
 
-objfiles: ../dpdk-1.5.0r1/app/test-pmd/dpdk.c intel_dpdk
+objfiles: ../dpdk-1.5.0r1/app/test-pmd/dpdk.c #intel_dpdk
 	echo "##########################"
 	cd ../dpdk-1.5.0r1/app/dpdkDriver/ && ./myMake.sh
 	cp ../dpdk-1.5.0r1/app/dpdkDriver/build/*.$(OSUF) Util/

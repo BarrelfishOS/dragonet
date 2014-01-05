@@ -4,6 +4,7 @@ module Util.Dpdk (
         init_dpdk_setup_v2
         , getPacket_v2
         , sendPacket_v2
+        , exec_control_command
 
         , e10k5TAdd
         , e10k5TDel
@@ -18,6 +19,10 @@ import Foreign.ForeignPtr (mallocForeignPtrBytes,
 
 import Foreign.C.String (CString, withCString)
 import Foreign.C.Types (CInt(..) )
+
+import Text.Printf
+
+--import Text.Format
 
 import Data.Word (Word8)
 import Data.Word
@@ -39,6 +44,14 @@ foreign import ccall "send_packetV2"
 	c_send_packet_v2 :: CInt -> CInt -> CInt -> Ptr Word8 -> CInt -> IO ()
 
 -- ##########################################################################
+
+-- C function bindings for sending and receiving packets
+foreign import ccall "exec_control_command"
+	c_exec_control_command :: CString -> IO (CInt)
+
+-- ##########################################################################
+
+
 
 -- C function bindings for managing hardware queues
 foreign import ccall "fdir_add_perfect_filter_wrapper"
@@ -102,25 +115,63 @@ sendPacket_v2 coreid portid queueid bstr = do
 
 -- ###############################################################
 
+--exec_control_command :: String -> IO Int
+exec_control_command :: String -> IO ()
+exec_control_command cmd = do
+    ret <- withCString cmd (\x -> c_exec_control_command x)
+    let msg = case (ret >= 0) of
+            True -> show ("Command executioned successfully [" ++ (show ret)
+                ++ "] : " ++ (show cmd))
+            False -> show ("Command execution failed [" ++ (show ret)
+                ++ "] : " ++ (show cmd))
+    putStrLn (msg)
+
+--    msg
+--        | ret > 0 = show ("Command executioned successfully [" ++ (show ret)
+--                ++ "] : " ++ (show cmd))
+--        | otherwise = show ("Command execution failed [" ++ (show ret)
+--                ++ "] : " ++ (show cmd))
+--    in putStrLn (msg)
+--
+
+
+--    case ret of
+--        > 0 -> putStrLn ("Command executioned successfully [" ++ (show ret)
+--                ++ "] : " ++ (show cmd))
+--        _ -> putStrLn ("Command execution failed [" ++ (show ret)
+--                ++ "] : " ++ (show cmd))
+
+--    let ret' = fromIntegral ret
+--    in return ret'
+
+
+-- ###############################################################
+
 
 e10k5TAdd ::  Int -> String -> Word16 -> String -> Word16 -> Int -> IO ()
 e10k5TAdd qid srcIP srcPort dstIP dstPort tp = do
     let
-        c_qid = fromIntegral qid
-    len <- c_fdir_add_perfect_filter2_wrapper c_qid
-    putStrLn ("e10k5TAdd2: qid: " ++ (show qid))
---            ++ ", srcIP: " ++ (show srcIP)
---            ++ ", srcPort: " ++ (show srcPort)
---            ++ ", dstIP: " ++ (show dstIP)
---            ++ ", dstPort: " ++ (show dstPort)
---            ++ ", type: " ++ (show tp))
+        ethPort = 0
+        proto = case tp of
+            1 -> "tcp"
+            otherwise -> "udp"
+        cmd2 = ("add_perfect_filter " ++ (show ethPort) ++ " " ++ proto
+            ++ " src " ++ srcIP ++ " " ++ (show srcPort)
+            ++ " dst " ++ dstIP ++ " " ++ (show dstPort)
+            ++ " flexbytes 0 "
+            ++ " vlan 0 "
+            ++ " queue " ++ (show qid)
+            ++ " soft 0"
+            ++ "\r\n" )
+    exec_control_command cmd2
+    putStrLn ("e10k5TAdd: cmd: " ++ (show cmd2))
 
 e10k5TAdd2 :: Int -> IO()
 e10k5TAdd2 tid = do
     let
         c_tid = fromIntegral tid
     len <- c_fdir_add_perfect_filter2_wrapper c_tid
-    putStrLn ("e10k5TAdd: tid " ++ (show tid))
+    putStrLn ("e10k5TAdd2: tid " ++ (show tid))
 
 
 e10k5TDel :: Int -> IO()

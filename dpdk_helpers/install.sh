@@ -32,6 +32,7 @@ prepare_machine() {
     echo 'apt-get install -y build-essential' | on_machine ${MACHINE}
     echo 'apt-get install -y linux-headers-$(uname -r)' | on_machine ${MACHINE}
     echo 'apt-get install -y linux-headers-generic' | on_machine ${MACHINE}
+    echo 'apt-get install -y netcat.traditional' | on_machine ${MACHINE}
 
     # for Dragonet
     echo 'apt-get install -y ghc cabal-install clang graphviz pdftk libghc-parsec2-dev libghc-stm-dev minisat' | on_machine ${MACHINE}

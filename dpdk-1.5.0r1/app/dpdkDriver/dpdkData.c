@@ -97,6 +97,8 @@ void send_packetV2(int core_id, int port_id, int queue_id,
         char *pkt_tx, size_t len);
 int init_dpdk_setupV2(void);
 
+static struct cmdline *virtual_cl = NULL; // virtual cmdline for Dragonet
+int exec_control_command(const char *cmd);
 
 //  ###################### TO DELETE ########################
 
@@ -245,28 +247,45 @@ int init_dpdkControl(int argc, char** argv);
 int init_dpdk_setupV2(void)
 {
 
-        const char *myArgs[13] = {"./a.out",
-                    "-c", "0xf",  // coremask
-                    "-n", "1",  // no of ports
-                    "--",
-                    "--pkt-filter-mode=perfect",
-                    ""};
+    if (virtual_cl != NULL) {
+        printf("ERROR: Already initialized\n");
+        return -1;
+    }
+    const char *myArgs[13] = {"./a.out",
+        "-c", "0xf",  // coremask
+        "-n", "1",  // no of ports
+        "--",
+        "--pkt-filter-mode=perfect",
+        ""};
 
-        char *myArgs2[13];
-        int i;
-        for (i = 0; i < 13; ++i) {
-            printf("copying %dth string [%s]\n", i, myArgs[i]);
-            myArgs2[i] = malloc(127);
-            if (myArgs[i] == NULL) {
-                myArgs2[i] = NULL;
-            } else {
-                strncpy(myArgs2[i], myArgs[i], 126);
-            }
+    char *myArgs2[13];
+    int i;
+    for (i = 0; i < 13; ++i) {
+        printf("copying %dth string [%s]\n", i, myArgs[i]);
+        myArgs2[i] = malloc(127);
+        if (myArgs[i] == NULL) {
+            myArgs2[i] = NULL;
+        } else {
+            strncpy(myArgs2[i], myArgs[i], 126);
         }
+    }
 
-        printf("Hello world from DPDK....\n");
-        return init_dpdkControl(8, myArgs2);
-}
+    printf("Hello world from DPDK....\n");
+    int ret = init_dpdkControl(8, myArgs2);
+    if (ret < 0) {
+        printf("ERROR: %s: Initialization failed (ret val=%d)\n",
+                __func__, ret);
+    }
+
+    // Create a commandline.
+    virtual_cl = create_virtual_cmdline();
+    if (virtual_cl == NULL) {
+        printf("\nInitialization successful, but commandline creation failed.\n");
+        return -1;
+    }
+    printf("\nInitialization successful.\n");
+    return ret;
+} // end function:  init_dpdk_setupV2
 
 #if 0
 int main(int __attribute__((unused)) argc, char __attribute__((unused)) *argv[])
@@ -550,22 +569,52 @@ fdir_del_perfect_filter_wrapper_dummy(int queue_id)
 */
 
 //    const char *cmd = "help ports\r\n";
-    const char *cmd = "add_perfect_filter 0 udp src 0.0.0.0 0 "
-        "dst 0.0.0.0 0 flexbytes 0 vlan 0 queue 0 soft 0\r\n";
+//    const char *cmd = "add_perfect_filter 0 udp src 0.0.0.0 0 "
+//        "dst 0.0.0.0 0 flexbytes 0 vlan 0 queue 0 soft 0\r\n";
 
 /*    printf("%s:%s: for queue %d filter add\n",
             __FILE__, __func__,
             queue_id);
 */
 
+/*
     printf("###############################\n");
     printf("## calling cmdline\n");
     struct cmdline *cl = create_virtual_cmdline();
     printf("\n## executing command [%s] \n", cmd);
     int ret = exec_virtual_cmd(cl, cmd);
     printf("############################### return = %d ####\n", ret);
+    */
     return queue_id; // 0; // FIXME: to avoid unused queue_id error.
 }
+
+
+// Execute the command sent on the NIC.
+// To be used by Dragonet remotely.
+// Example commands:
+//    const char *cmd = "help ports\r\n";
+//    const char *cmd = "add_perfect_filter 0 udp src 0.0.0.0 0 "
+//        "dst 0.0.0.0 0 flexbytes 0 vlan 0 queue 0 soft 0\r\n";
+int exec_control_command(const char *cmd)
+{
+
+
+    int ret = 0;
+    if (virtual_cl == NULL) {
+        printf("ERROR: command called before initializing the cmdline\n");
+        return -1;
+    }
+
+    printf("\n## executing command [%s] \n", cmd);
+    ret = exec_virtual_cmd(virtual_cl, cmd);
+
+    if (ret < 0) {
+        printf("ERROR: %s: Execution failed for command [%s] (ret val=%d)\n",
+                __func__, cmd, ret);
+    }
+
+    return ret;
+} // end function: exec_control_command
 
 int
 fdir_add_flow_filter_wrapper_dummy(int queue_id)

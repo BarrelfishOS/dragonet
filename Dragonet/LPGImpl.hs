@@ -241,15 +241,17 @@ lpgRxL3IPv4ClassifyImpl = do
     l4off <- IP4.payloadOff
     setAttr "L4Offset" $ AttrI $ l4off
     proto <- IP4.protocolRd
-    debug("lpgRxL3IPv4ClassifyImpl l4Proto, ICMP, TCP, UDP "
-        ++ show(proto) ++ " " ++ show(IP4.protocolTCP) ++ " " ++ show(IP4.protocolUDP)  )
-    toPort $
-        -- FIXME: Can't this be turned into a case?
-        if proto == IP4.protocolICMP then "icmp"
+    let nextPort = if proto == IP4.protocolICMP then "icmp"
         else if proto == IP4.protocolTCP then "tcp"
         else if proto == IP4.protocolUDP then "udp"
         else "drop"
-
+    debug("lpgRxL3IPv4ClassifyImpl l4Proto val, (ICMP, TCP, UDP), dest_port: "
+        ++ show(proto) ++ ", ("
+        ++ show IP4.protocolICMP ++ ", "
+        ++ show IP4.protocolTCP ++ ", "
+        ++ show IP4.protocolUDP ++ ") "
+        ++ nextPort)
+    toPort $ nextPort
 
 -----------------------------------------------------------------------------
 -- IPv6
@@ -285,15 +287,20 @@ lpgRxL3ICMPIsTypeRequestImpl = do
 -- UDP
 
 lpgRxL4UDPValidHeaderLengthImpl = do
+    debug "RxL4UDPValidHeaderLengthImpl"
     off <- UDP.headerOff
     len <- packetLen
-    toPort $ pbool ((len - off) >= UDP.headerLen)
+    let nextPort = ((len - off) >= UDP.headerLen)
+    debug ("RxL4UDPValidHeaderLengthImpl " ++ (show nextPort))
+    toPort $ pbool nextPort
 
 lpgRxL4UDPValidLengthImpl = do
     off <- UDP.headerOff
     len <- packetLen
     udpLen <- UDP.lengthRd
-    toPort $ pbool (len >= (fromIntegral udpLen) + off)
+    let nextPort = (len >= (fromIntegral udpLen) + off)
+    debug ("lpgRxL4UDPValidLengthImpl " ++ (show nextPort))
+    toPort $ pbool nextPort
 
 lpgRxL4UDPValidChecksumImpl = do
     off <- UDP.headerOff
@@ -301,7 +308,9 @@ lpgRxL4UDPValidChecksumImpl = do
     cxsm <- UDP.checksumRd
     pkt <- readP (len - off) off
     ipPH <- IP4.pseudoheader
-    toPort $ pbool (cxsm == 0 || (IP4.checksum (ipPH ++ pkt)) == 0)
+    let nextPort = (cxsm == 0 || (IP4.checksum (ipPH ++ pkt)) == 0)
+    debug ("lpgRxL4UDPValidChecksumImpl " ++ (show nextPort))
+    toPort $ pbool nextPort
 
 
 -----------------------------------------------------------------------------
@@ -314,11 +323,15 @@ lpgRxL4TCPValidHeaderLengthImpl = toPort "true"
 
 lpgRxToIPv4LocalImpl = do
     dIP <- IP4.destIPRd
-    toPort $ pbool $ dIP == cfgLocalIP
+    let nextPort = dIP == cfgLocalIP
+    debug ("lpgRxToIPv4LocalImpl " ++ (show nextPort))
+    toPort $ pbool $ nextPort
 
 lpgRxToUDPPortDNSImpl = do
     dPort <- UDP.destPortRd
-    toPort $ pbool $ dPort == 51098
+    let nextPort = dPort == 51098
+    debug ("lpgRxToUDPPortDNSImpl " ++ (show nextPort))
+    toPort $ pbool $ nextPort
 
 
 
@@ -326,7 +339,7 @@ lpgRxToUDPPortDNSImpl = do
 -- Sinks
 lpgPacketDropImpl = do { debug "Packet dropped!" ; toPort "" }
 lpgRxL4TCPOutImpl = do { debug "Got TCP packet!" ; toPort "" }
-lpgRxL4UDPOutImpl = do { debug "!" ; toPort "" }
+lpgRxL4UDPOutImpl = do { debug "Got UDP packet!" ; toPort "" }
 lpgRxDnsRXImpl = do { debug "Got DNS packet!" ; toPort "" }
 
 
