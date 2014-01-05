@@ -1,13 +1,13 @@
 /*-
  *   BSD LICENSE
- * 
+ *
  *   Copyright(c) 2010-2013 Intel Corporation. All rights reserved.
  *   All rights reserved.
- * 
+ *
  *   Redistribution and use in source and binary forms, with or without
  *   modification, are permitted provided that the following conditions
  *   are met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above copyright
@@ -17,7 +17,7 @@
  *     * Neither the name of Intel Corporation nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -618,23 +618,32 @@ fdir_set_input_mask_82599(struct ixgbe_hw *hw,
 			PMD_INIT_LOG(ERR, " Error on src/dst port mask\n");
 			return -EINVAL;
 		}
+                printf("%s: only_ip_flow set\n", __func__);
 	}
 
-	if (!input_mask->comp_ipv6_dst)
+	if (!input_mask->comp_ipv6_dst) {
 		/* mask DIPV6 */
 		fdirm |= IXGBE_FDIRM_DIPv6;
+                printf("%s: IXGBE_FDIRM_DIPv6 set\n", __func__);
+        }
 
-	if (!input_mask->vlan_id)
+	if (!input_mask->vlan_id) {
 		/* mask VLAN ID*/
 		fdirm |= IXGBE_FDIRM_VLANID;
+                printf("%s: IXGBE_FDIRM_VLANID set\n", __func__);
+        }
 
-	if (!input_mask->vlan_prio)
+	if (!input_mask->vlan_prio) {
 		/* mask VLAN priority */
 		fdirm |= IXGBE_FDIRM_VLANP;
+                printf("%s: IXGBE_FDIRM_VLANP set\n", __func__);
+        }
 
-	if (!input_mask->flexbytes)
+	if (!input_mask->flexbytes) {
 		/* Mask Flex Bytes */
 		fdirm |= IXGBE_FDIRM_FLEX;
+                printf("%s: IXGBE_FDIRM_FLEX set\n", __func__);
+        }
 
 	IXGBE_WRITE_REG(hw, IXGBE_FDIRM, fdirm);
 
@@ -646,12 +655,18 @@ fdir_set_input_mask_82599(struct ixgbe_hw *hw,
 	IXGBE_WRITE_REG(hw, IXGBE_FDIRTCPM, ~fdirtcpm);
 	IXGBE_WRITE_REG(hw, IXGBE_FDIRUDPM, ~fdirtcpm);
 
+        printf("%s: dst port mask %d, src port mask %d set\n", __func__,
+                        input_mask->dst_port_mask,
+	                input_mask->src_port_mask
+                );
+
 	if (!input_mask->set_ipv6_mask) {
 		/* Store source and destination IPv4 masks (big-endian) */
 		IXGBE_WRITE_REG_BE32(hw, IXGBE_FDIRSIP4M,
 				IXGBE_NTOHL(~input_mask->src_ipv4_mask));
 		IXGBE_WRITE_REG_BE32(hw, IXGBE_FDIRDIP4M,
 				IXGBE_NTOHL(~input_mask->dst_ipv4_mask));
+                printf("%s: IPv4 mask set\n", __func__);
 	}
 	else {
 		/* Store source and destination IPv6 masks (bit reversed) */
@@ -659,6 +674,7 @@ fdir_set_input_mask_82599(struct ixgbe_hw *hw,
 		                                  input_mask->src_ipv6_mask);
 
 		IXGBE_WRITE_REG(hw, IXGBE_FDIRIP6M, ~fdiripv6m);
+                printf("%s: IPv6 mask set\n", __func__);
 	}
 
 	return IXGBE_SUCCESS;

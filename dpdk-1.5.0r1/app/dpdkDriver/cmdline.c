@@ -837,6 +837,7 @@ cmd_config_rx_tx_parsed(void *parsed_result,
 			return;
 		}
 		nb_rxq = res->value;
+                printf("## nb_rxq  set to %d\n", nb_rxq);
 	}
 	else if (!strcmp(res->name, "txq")) {
 		if (res->value <= 0) {
@@ -844,6 +845,7 @@ cmd_config_rx_tx_parsed(void *parsed_result,
 			return;
 		}
 		nb_txq = res->value;
+                printf("## nb_txq  set to %d\n", nb_txq);
 	}
 	else if (!strcmp(res->name, "rxd")) {
 		if (res->value <= 0 || res->value > RTE_TEST_RX_DESC_MAX) {
@@ -852,6 +854,7 @@ cmd_config_rx_tx_parsed(void *parsed_result,
 			return;
 		}
 		nb_rxd = res->value;
+
 	} else if (!strcmp(res->name, "txd")) {
 		if (res->value <= 0 || res->value > RTE_TEST_TX_DESC_MAX) {
 			printf("txd %d invalid - must be > 0 && <= %d\n",

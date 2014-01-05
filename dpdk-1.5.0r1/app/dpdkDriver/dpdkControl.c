@@ -1189,6 +1189,8 @@ start_port(portid_t pid)
 		}
 		if (port->need_reconfig_queues > 0) {
 			port->need_reconfig_queues = 0;
+                        printf("## Configuring rxq = %d, txq = %d\n",
+                                nb_rxq, nb_txq);
 			/* setup tx queues */
 			for (qi = 0; qi < nb_txq; qi++) {
 				if ((numa_support) &&

@@ -197,15 +197,26 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
         char *pkt_out, size_t buf_len)
 {
     struct rte_mbuf *pkts_burst[2];
+    struct rte_mbuf *pkts_burst2[2];
     struct rte_mbuf *m;
     unsigned portid, nb_rx;
     size_t pkt_size = 0;
 
+    unsigned nb_rx_other_q = 0;
+
+    printf("get_packetV2 on queue_id %d\n", queue_id);
     portid = port_id;
 
     do {
         nb_rx = rte_eth_rx_burst((uint8_t) portid, (uint16_t) queue_id,
                 pkts_burst, 1);
+
+        nb_rx_other_q = rte_eth_rx_burst((uint8_t) portid, (uint16_t) (queue_id + 1),
+                pkts_burst2, 1);
+
+        if (nb_rx_other_q > 0) {
+            printf("Other queue %d received %d packets\n", (queue_id + 1), nb_rx_other_q);
+        }
     } while (nb_rx <= 0);
 
     assert(nb_rx == 1);
@@ -244,6 +255,7 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
 
 int init_dpdkControl(int argc, char** argv);
 
+#define ARGNOS 15
 int init_dpdk_setupV2(void)
 {
 
@@ -251,16 +263,21 @@ int init_dpdk_setupV2(void)
         printf("ERROR: Already initialized\n");
         return -1;
     }
-    const char *myArgs[13] = {"./a.out",
+    const char *myArgs[ARGNOS] = {"./a.out",
         "-c", "0xf",  // coremask
         "-n", "1",  // no of ports
         "--",
-        "--pkt-filter-mode=perfect",
-        ""};
+//        "--pkt-filter-mode=perfect",
+        "--pkt-filter-mode=signature",
+        "--rxq=2",
+        "--txq=2",
+        "--disable-rss",
+        "--disable-hw-vlan",
+        ""}; // 12 arguments
 
-    char *myArgs2[13];
+    char *myArgs2[ARGNOS];
     int i;
-    for (i = 0; i < 13; ++i) {
+    for (i = 0; i < ARGNOS; ++i) {
         printf("copying %dth string [%s]\n", i, myArgs[i]);
         myArgs2[i] = malloc(127);
         if (myArgs[i] == NULL) {
@@ -271,7 +288,7 @@ int init_dpdk_setupV2(void)
     }
 
     printf("Hello world from DPDK....\n");
-    int ret = init_dpdkControl(8, myArgs2);
+    int ret = init_dpdkControl(12, myArgs2);
     if (ret < 0) {
         printf("ERROR: %s: Initialization failed (ret val=%d)\n",
                 __func__, ret);
@@ -283,6 +300,40 @@ int init_dpdk_setupV2(void)
         printf("\nInitialization successful, but commandline creation failed.\n");
         return -1;
     }
+
+    // Insert a test filter which will separate out specific UDP traffic
+
+    const char *cmd1 = "set_masks_filter 0 only_ip_flow 0 "
+//        "src_mask 0xffffffff 0xffff " // NOTE: 0xff means those bits will be matched
+//        "src_mask 0xffffffff 0x0 "
+        "src_mask 0x0 0x0 "
+        "dst_mask 0x0 0xffff "
+        "flexbytes 0 vlan_id 0 vlan_prio 0"
+        "\r\n";
+    ret = exec_control_command(cmd1);
+    printf ("exec_control_command for [%s] returned %d\n", cmd1, ret);
+    if (ret < 0) {
+        printf ("exec_control_command failed for [%s] returned %d\n", cmd1, ret);
+        return -1;
+    }
+
+//    const char *cmd = "add_perfect_filter 0 udp src 10.111.4.36 5555 "
+//        "dst 10.111.4.37 51098 flexbytes 0 vlan 0 queue 1 soft 0\r\n";
+
+    // NOTE: Working signature filter (quite strict match)
+//    const char *cmd = "add_signature_filter 0 udp src 10.111.4.36 0 " // 5555 " // 43690 "
+//        "dst 10.111.4.37 51098 flexbytes 0 vlan 0 queue 1\r\n";
+
+    const char *cmd = "add_signature_filter 0 udp src 0.0.0.0 0 " // 5555 " // 43690 "
+        "dst 0.0.0.0 51098 flexbytes 0 vlan 0 queue 1\r\n";
+
+    ret = exec_control_command(cmd);
+    printf ("exec_control_command for [%s] returned %d\n", cmd, ret);
+    if (ret < 0) {
+        printf ("exec_control_command failed for [%s] returned %d\n", cmd, ret);
+        return -1;
+    }
+
     printf("\nInitialization successful.\n");
     return ret;
 } // end function:  init_dpdk_setupV2
