@@ -197,12 +197,14 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
         char *pkt_out, size_t buf_len)
 {
     struct rte_mbuf *pkts_burst[2];
-    struct rte_mbuf *pkts_burst2[2];
     struct rte_mbuf *m;
     unsigned portid, nb_rx;
     size_t pkt_size = 0;
 
+/*
+    struct rte_mbuf *pkts_burst2[2];
     unsigned nb_rx_other_q = 0;
+*/
 
     printf("get_packetV2 on queue_id %d\n", queue_id);
     portid = port_id;
@@ -211,12 +213,14 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
         nb_rx = rte_eth_rx_burst((uint8_t) portid, (uint16_t) queue_id,
                 pkts_burst, 1);
 
+/*
         nb_rx_other_q = rte_eth_rx_burst((uint8_t) portid, (uint16_t) (queue_id + 1),
                 pkts_burst2, 1);
 
         if (nb_rx_other_q > 0) {
             printf("Other queue %d received %d packets\n", (queue_id + 1), nb_rx_other_q);
         }
+*/
     } while (nb_rx <= 0);
 
     assert(nb_rx == 1);
@@ -267,8 +271,8 @@ int init_dpdk_setupV2(void)
         "-c", "0xf",  // coremask
         "-n", "1",  // no of ports
         "--",
-//        "--pkt-filter-mode=perfect",
-        "--pkt-filter-mode=signature",
+        "--pkt-filter-mode=perfect",
+//        "--pkt-filter-mode=signature",
         "--rxq=2",
         "--txq=2",
         "--disable-rss",
@@ -324,8 +328,8 @@ int init_dpdk_setupV2(void)
 //    const char *cmd = "add_signature_filter 0 udp src 10.111.4.36 0 " // 5555 " // 43690 "
 //        "dst 10.111.4.37 51098 flexbytes 0 vlan 0 queue 1\r\n";
 
-    const char *cmd = "add_signature_filter 0 udp src 0.0.0.0 0 " // 5555 " // 43690 "
-        "dst 0.0.0.0 51098 flexbytes 0 vlan 0 queue 1\r\n";
+    const char *cmd = "add_perfect_filter 0 udp src 0.0.0.0 0 " // 5555 " // 43690 "
+        "dst 0.0.0.0 51098 flexbytes 0 vlan 0 queue 1 soft 0\r\n";
 
     ret = exec_control_command(cmd);
     printf ("exec_control_command for [%s] returned %d\n", cmd, ret);

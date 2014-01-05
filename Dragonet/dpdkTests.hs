@@ -32,17 +32,17 @@ data NetEvent =
     RXEvent BS.ByteString |
     TXEvent BS.ByteString
 
-rxThread c dpdk = M.forever $ do
+rxThread c dpdk qid = M.forever $ do
 --    p <- Dpdk.getPacket
-    p <- Dpdk.getPacket_v2 0 0 0
-    putStrLn "received Packet"
+    p <- Dpdk.getPacket_v2 0 0 qid
+    putStrLn ("received Packet on qid " ++ (show qid))
     STM.atomically $ TC.writeTChan c (RXEvent p)
 
-txThread c dpdk = M.forever $ do
+txThread c dpdk qid = M.forever $ do
     (TXEvent p) <- STM.atomically $ TC.readTChan c
-    putStrLn "Send Packet"
+    putStrLn ("Send Packet on qid " ++ (show qid))
 --    Dpdk.sendPacket p
-    Dpdk.sendPacket_v2 0 0 0 p
+    Dpdk.sendPacket_v2 0 0 qid p
 
 simStep rxC txC state = do
     e <- TC.readTChan rxC
@@ -80,13 +80,22 @@ main = do
         putStrLn ("Warning: You are a non-root user. So DPDK may not work!")
 
     -- create rx/tx channels
-    rxC <- TC.newTChanIO
-    txC <- TC.newTChanIO
+    rxC0 <- TC.newTChanIO
+    txC0 <- TC.newTChanIO
 
-    -- spawn rx/tx threads
-    _ <- CC.forkIO $ rxThread rxC dpdk1
-    _ <- CC.forkIO $ txThread txC dpdk1
+    -- create rx/tx channels for queue 1
+    rxC1 <- TC.newTChanIO
+    txC1 <- TC.newTChanIO
 
-    _ <- CC.forkIO $ simThread rxC txC initialState
+    -- spawn rx/tx threads to handle queue 0
+    _ <- CC.forkIO $ rxThread rxC0 dpdk1 0
+    _ <- CC.forkIO $ txThread txC0 dpdk1 0
+
+    -- spawn rx/tx threads to handle queue 0
+    _ <- CC.forkIO $ rxThread rxC1 dpdk1 1
+    _ <- CC.forkIO $ txThread txC1 dpdk1 1
+
+    _ <- CC.forkIO $ simThread rxC0 txC0 initialState
+    _ <- CC.forkIO $ simThread rxC1 txC1 initialState
     l <- getLine
     print l

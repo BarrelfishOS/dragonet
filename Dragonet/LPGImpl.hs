@@ -126,6 +126,7 @@ lpgRxL2EtherValidBroadcastImpl = do
 lpgRxL2EtherValidUnicastImpl = do
     smac <- ETH.destRd
     dmac <- ETH.sourceRd
+
 --    debug ("lpgRxL2EtherValidUnicastImpl  destMac " ++ show (dmac)
 --            ++ " , srcMac " ++ show(smac) )
     toPort $ pbool $ (((head dmac) .&. 1) == 0)
@@ -134,6 +135,8 @@ lpgRxL2EtherValidUnicastImpl = do
 lpgRxL2EtherValidLocalMACImpl = do
     smac <- ETH.destRd
     let endPort = (smac == cfgLocalMAC)
+
+
 --    debug ("lpgRxL2EtherValidLocalMACImpl: "
 --        ++ " smac (" ++ (show smac)
 --        ++ ") == local mac (" ++ (show cfgLocalMAC)
@@ -279,6 +282,18 @@ lpgRxL3IPv4ValidChecksumImpl = do
 
 lpgRxL3IPv4ValidLocalIPImpl = do
     dIP <- IP4.destIPRd
+
+    -- FIXME: THIS is hack to avoid unnecessary ARP requests going out.
+    -- Updating the ARP cache with MAC from current packet
+    smac <- ETH.sourceRd
+    sip <- IP4.sourceIPRd
+
+    gs <- getGS
+    let cache = M.insert sip smac $ gsARPCache gs
+    let gs' = gs { gsARPCache = cache }
+    putGS gs'
+
+
     let nextPort = dIP == cfgLocalIP
     debug ("lpgRxL3IPv4ValidLocalIPImpl:  " ++ (show nextPort))
     toPort $ pbool $ nextPort
