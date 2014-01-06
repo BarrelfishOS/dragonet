@@ -72,6 +72,9 @@ main = do
     --dpdk1 <- Dpdk.init_dpdk_setup "dragonet01"
     dpdk1 <- Dpdk.init_dpdk_setup_v2
 
+    -- Insert the filter to separate two flows
+    Dpdk.e10k5TAdd 1 "0.0.0.0" 0 "0.0.0.0" 51098 0
+
     -- Initialize dpdk device on linux side
     uid <- SPU.getRealUserID
     if uid == 0 then do

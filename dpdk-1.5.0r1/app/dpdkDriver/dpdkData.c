@@ -315,12 +315,14 @@ int init_dpdk_setupV2(void)
         "flexbytes 0 vlan_id 0 vlan_prio 0"
         "\r\n";
     ret = exec_control_command(cmd1);
-    printf ("exec_control_command for [%s] returned %d\n", cmd1, ret);
+//    printf ("exec_control_command for [%s] returned %d\n", cmd1, ret);
     if (ret < 0) {
         printf ("exec_control_command failed for [%s] returned %d\n", cmd1, ret);
         return -1;
     }
 
+
+#if 0
 //    const char *cmd = "add_perfect_filter 0 udp src 10.111.4.36 5555 "
 //        "dst 10.111.4.37 51098 flexbytes 0 vlan 0 queue 1 soft 0\r\n";
 
@@ -337,6 +339,7 @@ int init_dpdk_setupV2(void)
         printf ("exec_control_command failed for [%s] returned %d\n", cmd, ret);
         return -1;
     }
+#endif // 0
 
     printf("\nInitialization successful.\n");
     return ret;

@@ -146,8 +146,6 @@ exec_control_command cmd = do
 
 
 -- ###############################################################
-
-
 e10k5TAdd ::  Int -> String -> Word16 -> String -> Word16 -> Int -> IO ()
 e10k5TAdd qid srcIP srcPort dstIP dstPort tp = do
     let
@@ -165,13 +163,6 @@ e10k5TAdd qid srcIP srcPort dstIP dstPort tp = do
             ++ "\r\n" )
     exec_control_command cmd2
     putStrLn ("e10k5TAdd: cmd: " ++ (show cmd2))
-
-e10k5TAdd2 :: Int -> IO()
-e10k5TAdd2 tid = do
-    let
-        c_tid = fromIntegral tid
-    len <- c_fdir_add_perfect_filter2_wrapper c_tid
-    putStrLn ("e10k5TAdd2: tid " ++ (show tid))
 
 
 e10k5TDel :: Int -> IO()

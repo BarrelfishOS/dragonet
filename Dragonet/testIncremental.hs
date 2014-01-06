@@ -586,14 +586,22 @@ findAllHWActions :: ((String,String),[PolicyAction b]) ->
     [PolicyAction b]
 findAllHWActions (_, pa) = filter isHWaction pa
 
+
+ipSTRtoDottedIP :: String -> String
+ipSTRtoDottedIP addr = converted
+    where
+        a :: Word32
+        a = read addr
+        converted = IP4.ipToString $ a
+
 -- Calls the function which will actually configure the hardware based on
 -- the PolicyAction
 execHWAction :: PolicyAction E10kPAction -> IO ()
 execHWAction (PActHWAction (E10kPAct5TSet ftID c5tuple)) = do
     Dpdk.e10k5TAdd ftID
-        (fromMaybe "" $ c5tL3Src c5tuple)
+        (ipSTRtoDottedIP (fromMaybe "0" $ c5tL3Src c5tuple))
         (fromMaybe 0 $ c5tL4Src c5tuple)
-        (fromMaybe "" $ c5tL3Dst c5tuple)
+        (ipSTRtoDottedIP (fromMaybe "0" $ c5tL3Dst c5tuple))
         (fromMaybe 0 $ c5tL4Dst c5tuple)
         (0) -- FIXME: Protocol type.  For time being I am assuming that it is UDP
 execHWAction (PActHWAction (E10kPAct5TDel ftID)) = do
