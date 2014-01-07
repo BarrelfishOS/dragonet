@@ -17,12 +17,13 @@ import Dragonet.Implementation as DNET
 
 import LPGImplTH
 import LPGImpl
+import qualified LPGEx1 as LPG1
 
 initialState = DNET.emptyGS
 
 --receivedPacket state packet = DNET.Alg.execute LPGImpl.lpg packet state
 receivedPacket state packet = fst $ CS.runConcSM f $ DNET.initSimState state packet
-    where f = $(return $ generateFCall lpg "lpg")
+    where f = $(return $ generateFCall LPG1.lpg "lpg")
 
 
 

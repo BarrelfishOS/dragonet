@@ -2,8 +2,11 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 module LPGImpl (
-    lpg, lpgClusters, pbool, graphGen,
 
+--    lpg, lpgClusters, graphGen,
+
+    pbool,
+    lpgQueueImpl,
     lpgSoftwareRXImpl, lpgRxL2EtherClassifiedImpl, lpgRxL2EtherValidLengthImpl,
     lpgRxL2EtherValidTypeImpl, lpgRxL2EtherValidMulticastImpl,
     lpgRxL2EtherValidBroadcastImpl, lpgRxL2EtherValidUnicastImpl,
@@ -88,7 +91,7 @@ cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.37"
 --cfgLocalMAC = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
 --cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
 
-
+lpgQueueImpl = toPort "out"
 lpgSoftwareRXImpl = toPort "out"
 
 -----------------------------------------------------------------------------
@@ -736,6 +739,7 @@ lpgTxL2EtherAddHdrSAddrImpl = toPort "true"
 lpgTxL2EtherAddHdrDAddrImpl = toPort "true"-}
 
 
+{-
 lpgClusters :: [(Int, [String])]
 lpgNodes :: [(Int, PG.Node Implementation)]
 lpgEdges :: [PG.PGEdge]
@@ -748,7 +752,8 @@ lpg :: PG.PGraph Implementation
 graphGen :: IO ()
 graphGen = do
     putStrLn "Generating .dot files for Dragonet implemented lpg"
-    writeFile "lpgImpl.dot" $ toDotClustered lpgT lpgClusters
+    writeFile "lpgImpl2.dot" $ toDotClustered lpgT lpgClusters
     where
         lpgT = PG.pgSetType PG.GTLpg lpg
+-}
 

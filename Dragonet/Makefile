@@ -11,7 +11,13 @@ CC=clang
 # Debuging for DSL -> Haskell process
 # GHCFLAGS+=-ddump-splices
 
+# Setting the default goal to simplify compiling
+.DEFAULT_GOAL := useful
+#.DEFAULT_GOAL := graph
+#.DEFAULT_GOAL := tuntap
+#.DEFAULT_GOAL := dpdk
 
+useful: graph confgen #dpdk #impl
 incremental: base Util/Dpdk.$(OSUF)
 	$(GHC) $(GHCFLAGS) -threaded testIncremental.hs -o incremental  -L../dpdk-1.5.0r1/build/lib/ -lintel_dpdk
 
@@ -57,8 +63,7 @@ tuntap : base Util/Tap.$(OSUF)
 	$(GHC) $(GHCFLAGS) -threaded tuntapTests.hs -o tuntap
 
 tuntap_run: tuntap
-	./tuntap
-
+	sudo ./tuntap
 
 
 ## Util/Tap
@@ -72,7 +77,6 @@ Util/Tap_.$(OSUF): Util/Tap.hs
 Util/Tap.$(OSUF): Util/Tap_.$(OSUF) Util/tap.$(OSUF)
 	echo ld -i $^ -o $@
 	ld -i $^ -o $@
-
 
 # Runs the simulator against dpdk userspace network
 dpdk: base Util/Dpdk.$(OSUF) #intel_dpdk

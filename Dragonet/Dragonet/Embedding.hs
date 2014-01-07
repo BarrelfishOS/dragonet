@@ -125,7 +125,9 @@ serialize g =
     GH.delDupEdges $ DGI.insEdges fixedEdges $ GH.delLEdges crossingEdges g
     where
         -- List of queue names
-        qls = map (PG.nLabel . snd) $ queues g
+        qls1 = map (PG.nLabel . snd) $ queues g
+        qls = if qls1 /= [] then qls1 -- error ("qls list is " ++ show qls1 )
+                else error "qls list is empty!"
         -- Generate association tuple for specified queue (q,(node,port))
         genSWE q = (q, fromMaybe err $ findSWE q g)
             where err = error "serialize: SoftwareEntry node not found in LPG"
@@ -136,7 +138,12 @@ serialize g =
             where
                 (Just tag') = DGI.lab g n
                 tag = PG.nTag tag'
-                (Just swe) = lookup tag swEMap
+                ans = lookup tag swEMap
+                (Just swe) = if ans == Nothing then
+                    error ("failed lookup tag " ++ (show tag)
+                        ++ ", swEMap " ++ (show swEMap) ++
+                        ", Most probably, queue-name missing in LPG" )
+                    else ans
 
         -- List of edges crossing from HW to SW nodes
         crossingEdges = filter isCrossingEdge $ DGI.labEdges g

@@ -8,10 +8,20 @@ import Dragonet.DotGenerator
 import Dragonet.Embedding
 import Dragonet.Constraints
 
-import LPGImpl as LPGI (graphGen)
+import qualified Dragonet.ProtocolGraph as PG
+import qualified Dragonet.Implementation as Impl
+
+import qualified LPGImpl as LPGI -- (graphGen)
+import qualified LPGEx1 as LPG1 -- (graphGen)
+import qualified LPGEx2 as LPG2 -- (graphGen)
+
+import LPGImpl
 
 [unicorn|
 graph prg {
+
+    cluster Rx {
+
     node HWDrop { }
 
     cluster L2Ether {
@@ -54,19 +64,21 @@ graph prg {
         constraint false "!(TCP&TCPSYNFlag)" }
 
     config CSynOutput {
-        port Q0[Queue0]
-        port Q1[Queue1]
-        port Q2[Queue2] }
+        port Q0[.Queue0]
+        port Q1[.Queue1]
+        port Q2[.Queue2] }
 
     boolean HWIsUDPDest53 {
         port true[L2EtherValidUnicast]
-        port false[Queue0]
+        port false[.Queue0]
         constraint true "UDP&DestPort=53"
         constraint false "!(UDP&DestPort=53)" }
 
     boolean L2EtherValidUnicast {
-        port true[Queue1]
+        port true[.Queue1]
         port false[] }
+
+    } /* end cluser : RX */
 
     node Queue0 {
         attr "software"
@@ -79,15 +91,18 @@ graph prg {
     node Queue2 {
         attr "software"
         port out[] }
+
 }
 |]
 
-
-
 [unicorn|
 graph lpg {
+
     node Queue {
-        port out[L2EtherClassified] }
+        port out[RxL2EtherClassified] }
+//        port out[L2EtherClassified] }
+
+    cluster Rx {
 
     cluster L2Ether {
         boolean Classified {
@@ -172,7 +187,8 @@ graph lpg {
         }
 
         and Verified {
-            port true false[.dhcpd .named] }
+            port true false[..dhcpd ..named] }
+//            port true false[.dhcpd .named] }
     }
 
     cluster L3ARP {
@@ -185,15 +201,20 @@ graph lpg {
         port false []}
 
     boolean IsUDPDest53 {
-        port true false[named]
+        port true false[.named]
+//        port true false[named]
         constraint true "UDP&DestPort=53"
         constraint false "!(UDP&DestPort=53)" }
 
     boolean IsUDPDest67 {
-        port true false[dhcpd]
+        port true false[.dhcpd]
+//        port true false[dhcpd]
         constraint true "UDP&DestPort=67"
         constraint false "!(UDP&DestPort=67)" }
 
+    } /* end cluster : Rx */
+
+    /* Applications  */
     and named {
         port true [Named]
 	port false[] }
@@ -207,22 +228,39 @@ graph lpg {
 }
 |]
 
+-- The protocol graph
+
+
+myWriteFile :: String -> String -> IO()
+myWriteFile fname contents = do
+    putStrLn ("Generating " ++ fname ++ " files...")
+    writeFile fname contents
+
 main :: IO ()
 main = do
     putStrLn "Generating .dot files..."
-    writeFile "lpg.dot" $ toDotClustered lpgT lpgClusters
-    writeFile "prg.dot" $ toDot prg
-    writeFile "prg_conf.dot" $ toDot prgTConf
-    writeFile "embedded.dot" $ toDot $ embedded
+    myWriteFile "lpg.dot" $ toDotClustered lpgT lpgClusters
+    myWriteFile "prg.dot" $ toDot prg
+    myWriteFile "prg_conf.dot" $ toDot prgTConf
+
+    myWriteFile "embedded.dot" $ toDot $ embedded
     constrained <- constrain embedded
-    writeFile "constrained.dot" $ toDot $ constrained
-    graphGen
+    myWriteFile "constrained.dot" $ toDot $ constrained
+    myWriteFile "lpgImpl.dot" $ toDotClustered lpgT lpgClusters
+
+    myWriteFile "embeddedImpl.dot" $ toDot $ embeddedImpl
+    constrainedImpl <- constrain embeddedImpl
+    myWriteFile "constrainedImpl.dot" $ toDot $ constrainedImpl
 
     where
         lpgT = pgSetType GTLpg lpg
         prgTConf = pgSetType GTPrg prgConfigured
 
         prgConfigured = applyConfig config prg
-        config = [("CSynFilter", "true"), ("CSynOutput","Q2")]
+--        config = [("CSynFilter", "true"), ("CSynOutput","Q2")]
+        config = [("RxCSynFilter", "true"), ("RxCSynOutput","Q2")]
 
+        lpgTImpl = pgSetType GTLpg LPG2.lpg
         embedded = fullEmbedding prgTConf lpgT
+        embeddedImpl = fullEmbedding prgTConf lpgTImpl
+
