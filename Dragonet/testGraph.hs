@@ -246,7 +246,7 @@ main = do
     myWriteFile "embedded.dot" $ toDot $ embedded
     constrained <- constrain embedded
     myWriteFile "constrained.dot" $ toDot $ constrained
-    myWriteFile "lpgImpl.dot" $ toDotClustered lpgT lpgClusters
+    myWriteFile "lpgImpl.dot" $ toDotClustered lpgTImpl lpgClusters
 
     myWriteFile "embeddedImpl.dot" $ toDot $ embeddedImpl
     constrainedImpl <- constrain embeddedImpl
