@@ -627,15 +627,17 @@ main = do
         pPRGRebalance = e10kRebalance }
     let events = cgmRun queues 42 (e10kPStateInit n5tuples) policy rndS
     --putStrLn $ show events
-    --mapM_ putStrLn $ map (\ x -> show x ) events
+    mapM_ putStrLn $ map (\ x -> show x ) events
     let actionList = concatMap findAllHWActions events
-    --putStrLn $ Pr.ppShow actionList
+    putStrLn $ Pr.ppShow actionList
+{-
     putStrLn "Initializing hardware..."
     dpdk1 <- Dpdk.init_dpdk_setup_v2
     putStrLn $ show ("Hardware... init " ++ (show dpdk1))
     putStrLn "Executing hardware actions..."
     mapM_ execHWAction actionList
     putStrLn "Done with Executing hardware actions!"
+-}
     where
         config = [("CSynFilter", "false"), ("CSynOutput","drop")]
 

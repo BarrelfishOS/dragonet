@@ -39,6 +39,11 @@ prepare_machine() {
     echo 'cabal update' | on_machine ${MACHINE}
     echo 'cabal install graphviz' | on_machine ${MACHINE}
 
+    # For simplified source code navigation
+    echo 'apt-get install -y happy' | on_machine ${MACHINE}
+    echo 'cabal install hscope' | on_machine ${MACHINE}
+    echo 'cabal install SourceGraph' | on_machine ${MACHINE}
+
 
 
     # my vim configuration
