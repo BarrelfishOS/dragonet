@@ -77,7 +77,7 @@ graph lpg {
                 port true false[NeedsResponse] }
 
             and NeedsResponse {
-                port true[..TxL3ARPInitiateResponse]
+                port true[.TagTxARPIR]
                 port false[] }
 
             boolean ValidResponse {
@@ -91,7 +91,7 @@ graph lpg {
                 port false[] }
 
             node ProcessPendingResponse {
-                port true false[..TxL3ARPLookup]
+                port true false[.TagTxARPLu]
                 port drop[] }
         }
 
@@ -168,7 +168,7 @@ graph lpg {
                 port true false[NeedsResponse] }
 
             and NeedsResponse {
-                port true[..TxL3ICMPInitiateResponse]
+                port true[.TagTxICMPIR]
                 port false[] }
         }
 
@@ -219,14 +219,44 @@ graph lpg {
         /* Application RX                          */
 
     node DnsAPP {
-                port out[.TxL4UDPInitiateResponse]
+                port out[TagTxUDPIR]
                 port drop[.PacketDrop] }
 
+    /*******************************************/
+    /* Multiplexing for TX queue               */
+
+    cluster TagTx {
+        boolean ARPIR {
+            port true[.ToTx]
+            port false[] }
+
+        boolean ARPLu {
+            port true[.ToTx]
+            port false[] }
+
+        boolean ICMPIR {
+            port true[.ToTx]
+            port false[] }
+
+        boolean UDPIR {
+            port true[.ToTx]
+            port false[] }
+    }
+
+    or ToTx {
+        port true[.TxDemux]
+        port false[] }
 
     }
 
 
     cluster Tx {
+        node Demux {
+            port ARPIR[L3ARPInitiateResponse]
+            port ARPLu[L3ARPLookup]
+            port ICMPIR[L3ICMPInitiateResponse]
+            port UDPIR[L4UDPInitiateResponse]
+            port drop[] }
 
         cluster L4UDP {
             node InitiateResponse {
