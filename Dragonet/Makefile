@@ -18,9 +18,15 @@ CC=clang
 #.DEFAULT_GOAL := dpdk
 
 useful: graph confgen #dpdk #impl
+
+incrementalSim: base
+	$(GHC) $(GHCFLAGS) -threaded testIncremental.hs -o incrementalSim
+
+incrementalSim_run: incrementalSim
+	./incrementalSim
+
 incremental: base Util/Dpdk.$(OSUF)
 	$(GHC) $(GHCFLAGS) -threaded testIncremental.hs -o incremental  -L../dpdk-1.5.0r1/build/lib/ -lintel_dpdk
-
 
 incremental_run: incremental
 	export LD_LIBRARY_PATH=/home/ubuntu/dragonet/dpdk-1.5.0r1/build/lib/ ;   ./incremental
@@ -39,7 +45,6 @@ confgen: base
 confgen_run: confgen
 	./confgen
 	./convertConfGen.sh
-
 
 # generates graphs for plos paper (lpg, prg, prgUnconf, embedded, embeddedFull, clustered)
 plos13: base

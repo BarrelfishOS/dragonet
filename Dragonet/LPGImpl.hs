@@ -32,7 +32,9 @@ module LPGImpl (
 
 --    lpgRxL4UDPOutImpl,
 
+    -- Applications
     lpgRxDnsAPPImpl,
+    lpgRxEchoAPPImpl,
 
     lpgPacketDropImpl,
 
@@ -410,6 +412,7 @@ lpgRxL4TCPValidHeaderLengthImpl = toPort "true"
 -- Sinks
 lpgPacketDropImpl = do { debug "Packet dropped!" ; toPort "" }
 lpgRxL4TCPOutImpl = do { debug "Got TCP packet!" ; toPort "" }
+
 lpgRxDnsAPPImpl = do
     dport <- UDP.destPortRd
     sport <- UDP.sourcePortRd
@@ -417,6 +420,21 @@ lpgRxDnsAPPImpl = do
     plen <- UDP.payloadLen
     payload <- readPX plen poff
     debug ("DNS Packet with data:"
+        ++ "  sport " ++ (show sport)
+        ++ ", dport " ++ (show dport)
+        ++ ", poff " ++ (show poff)
+        ++ ", len " ++ (show plen)
+        ++ ", payload " ++ (show payload)
+        )
+    toPort "out"
+
+lpgRxEchoAPPImpl = do
+    dport <- UDP.destPortRd
+    sport <- UDP.sourcePortRd
+    poff <- UDP.payloadOff
+    plen <- UDP.payloadLen
+    payload <- readPX plen poff
+    debug ("Echo Packet with data:"
         ++ "  sport " ++ (show sport)
         ++ ", dport " ++ (show dport)
         ++ ", poff " ++ (show poff)

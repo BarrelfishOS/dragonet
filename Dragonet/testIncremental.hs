@@ -8,7 +8,8 @@ import Dragonet.DotGenerator
 import Dragonet.Embedding
 import Dragonet.Constraints
 import Dragonet.Implementation.IPv4 as IP4
-import qualified Util.Dpdk as Dpdk
+
+--import qualified Util.Dpdk as Dpdk
 
 import Data.Word
 import Data.Maybe
@@ -567,6 +568,9 @@ rndStep = do
             return (ip,port)
 
 
+{- Creates given number of random calls to ``listen socket``, ``new flow``
+ -  and ``close socket``.
+-}
 rndScenario :: Int -> ConfigGenM a b ()
 rndScenario steps = do
     cgmStep (toLbl 0) ""
@@ -594,6 +598,7 @@ ipSTRtoDottedIP addr = converted
         a = read addr
         converted = IP4.ipToString $ a
 
+{-
 -- Calls the function which will actually configure the hardware based on
 -- the PolicyAction
 execHWAction :: PolicyAction E10kPAction -> IO ()
@@ -611,7 +616,7 @@ execHWAction (PActHWAction (E10kPActFDirAdd fdt)) = do
 execHWAction (PActHWAction (E10kPActFDirDel fdt)) = do
     Dpdk.e10kFDirDel (cfdtQueue fdt)
 execHWAction _ = error "non HWaction crypted in"
-
+-}
 
 
 main :: IO ()
@@ -620,13 +625,16 @@ main = do
     writeFile "prgU.dot" $ toDot prg
     let queues = 3
         n5tuples = 3
-    let rndS = rndScenario 10
+
+    let rndS = rndScenario 10 -- Random events (listen, connect, clsoe) list of size 10
     let policy = Policy {
         pPRGAddSocket = e10kAddSocket,
         pPRGRemoveSocket = e10kDelSocket,
         pPRGRebalance = e10kRebalance }
+
     let events = cgmRun queues 42 (e10kPStateInit n5tuples) policy rndS
-    --putStrLn $ show events
+    -- cgmRun (3 queues) (42 seed) (e10K-initial-state 5 filters) (e10k policy) (10 random events)
+    putStrLn $ show events
     mapM_ putStrLn $ map (\ x -> show x ) events
     let actionList = concatMap findAllHWActions events
     putStrLn $ Pr.ppShow actionList

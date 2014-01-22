@@ -197,20 +197,27 @@ graph lpg {
     }
 
     or L4Classified {
-        port true [IsUDPDest53 IsUDPDest67]
+//        port true [IsUDPDest53 IsUDPDest67]
+        port true [UDPPortClassify]
         port false []}
 
+/*
     boolean IsUDPDest53 {
         port true false[.named]
-//        port true false[named]
         constraint true "UDP&DestPort=53"
         constraint false "!(UDP&DestPort=53)" }
 
     boolean IsUDPDest67 {
         port true false[.dhcpd]
-//        port true false[dhcpd]
         constraint true "UDP&DestPort=67"
         constraint false "!(UDP&DestPort=67)" }
+*/
+
+    boolean UDPPortClassify {
+        port true false[.dhcpd .named]
+        constraint true "UDP"
+        constraint false "!(UDP)" }
+
 
     } /* end cluster : Rx */
 

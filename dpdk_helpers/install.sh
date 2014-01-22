@@ -38,6 +38,8 @@ prepare_machine() {
     echo 'apt-get install -y ghc cabal-install clang graphviz pdftk libghc-parsec2-dev libghc-stm-dev minisat' | on_machine ${MACHINE}
     echo 'cabal update' | on_machine ${MACHINE}
     echo 'cabal install graphviz' | on_machine ${MACHINE}
+    echo 'cabal install pretty-show' | on_machine ${MACHINE}
+    echo 'cabal install MonadRandom' | on_machine ${MACHINE}
 
     # For simplified source code navigation
     echo 'apt-get install -y happy' | on_machine ${MACHINE}

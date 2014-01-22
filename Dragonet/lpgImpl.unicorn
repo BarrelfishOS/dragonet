@@ -192,6 +192,7 @@ graph lpg {
 
             node PortClassify {
                 port appDNS [.DnsAPP]
+                port appEcho [.EchoAPP]
                 port closedPort [ClosedPortAction]
             }
 
@@ -222,8 +223,11 @@ graph lpg {
                 port out[.TxL4UDPInitiateResponse]
                 port drop[.PacketDrop] }
 
+    node EchoAPP {
+                port out[.TxL4UDPInitiateResponse]
+                port drop[.PacketDrop] }
 
-    }
+    } // end cluster: Rx
 
 
     cluster Tx {
