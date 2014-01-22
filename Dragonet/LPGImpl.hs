@@ -31,6 +31,8 @@ module LPGImpl (
     lpgRxL4UDPClosedPortActionImpl,
 
 --    lpgRxL4UDPOutImpl,
+    lpgRxTagTxARPIRImpl, lpgRxTagTxARPLuImpl, lpgRxTagTxICMPIRImpl,
+    lpgRxTagTxUDPIRImpl,
 
     -- Applications
     lpgRxDnsAPPImpl,
@@ -48,6 +50,7 @@ module LPGImpl (
     lpgTxL4UDPAllocateHeaderImpl,
     lpgTxL4UDPFillHeaderImpl,
 
+    lpgTxDemuxImpl,
     lpgTxQueueImpl, lpgTxL2EtherAllocateHeaderImpl, lpgTxL2EtherFillHeaderImpl,
     lpgTxL3ARPInitiateResponseImpl, lpgTxL3ARPAllocateHeaderImpl,
     lpgTxL3ARPFillHeaderImpl, lpgTxL3ARPLookup_Impl, lpgTxL3ARPSendRequestImpl,
@@ -444,6 +447,28 @@ lpgRxEchoAPPImpl = do
     toPort "out"
 
 -----------------------------------------------------------------------------
+-- Multiplexing for TX queue
+
+lpgRxTagTxARPIRImpl = do
+    setAttr "mux" $ AttrS "ARPIR"
+    toPort "true"
+
+lpgRxTagTxARPLuImpl = do
+    setAttr "mux" $ AttrS "ARPLu"
+    toPort "true"
+
+lpgRxTagTxICMPIRImpl = do
+    setAttr "mux" $ AttrS "ICMPIR"
+    toPort "true"
+
+lpgRxTagTxUDPIRImpl = do
+    setAttr "mux" $ AttrS "ICMPIR"
+    toPort "true"
+
+
+
+
+-----------------------------------------------------------------------------
 -- Transmit Side
 
 lpgTxQueueImpl = do
@@ -453,6 +478,11 @@ lpgTxQueueImpl = do
     putGS (gs { gsTXQueue = gsTXQueue gs ++ [pkt] })
     toPort ""
 
+lpgTxDemuxImpl = do
+    a <- getAttrM "mux"
+    toPort $ case a of
+        Just (AttrS p) -> p
+        _ -> "drop"
 
 -----------------------------------------------------------------------------
 -- Ethernet TX
