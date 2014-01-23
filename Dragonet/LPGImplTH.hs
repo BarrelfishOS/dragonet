@@ -1,5 +1,6 @@
 module LPGImplTH(
     generateFCall,
+    generateFCallList,
 ) where
 
 import Language.Haskell.TH
@@ -72,3 +73,6 @@ generateFCall g p =
     DoE (ns ++ [NoBindS $ returnE $ TupE []])
     where ns = map (nodeS g p) $ GH.topsortLN g
 
+
+generateFCallList g p =  ns
+    where ns = map (nodeS g p) $ GH.topsortLN g

@@ -17,12 +17,18 @@ import LPGImplTH
 import LPGImpl
 import qualified LPGEx1 as LPG1
 
+
+--import qualified Text.Show.Pretty as Pr
+
 initialState = DNET.emptyGS
 
 --receivedPacket state packet = DNET.Alg.execute LPGImpl.lpg packet state
 receivedPacket state packet = fst $ CS.runConcSM f $ DNET.initSimState state packet
     where f = $(return $ generateFCall LPG1.lpg "lpg")
 
+
+funCallList = f
+    where f = generateFCallList LPG1.lpg "lpg"
 
 ----------------------------------------------------------------
 
@@ -62,8 +68,10 @@ simThread rxC txC state = do
     let state'' = state' { DNET.gsDebug = [], DNET.gsTXQueue = [] }
     simThread rxC txC state''
 
+debugshow = do
+    putStrLn $ show funCallList
 
-main = do
+runSim = do
     -- create and open a TAP device
     tap <- TAP.create "dragonet0"
 
@@ -88,3 +96,38 @@ main = do
     _ <- CC.forkIO $ simThread rxC txC initialState
     l <- getLine
     print l
+
+runSimIncremental = do
+    -- create and open a TAP device
+    tap <- TAP.create "dragonet0"
+
+    -- Initialize tap device on linux side
+    uid <- SPU.getRealUserID
+    if uid == 0 then do
+        TAP.set_ip tap "192.168.123.100"
+        TAP.set_mask tap "255.255.255.0"
+        TAP.up tap
+    else do
+        putStrLn ("Warning: Cannot configure Linux-side of TAP device as " ++
+                  "non-root user.")
+
+    -- create rx/tx channels
+    rxC <- TC.newTChanIO
+    txC <- TC.newTChanIO
+
+    -- spawn rx/tx threads
+    _ <- CC.forkIO $ rxThread rxC tap
+    _ <- CC.forkIO $ txThread txC tap
+
+    -- FIXME: somewhere here, I need to add calls to create new connections
+    --
+    _ <- CC.forkIO $ simThread rxC txC initialState
+    l <- getLine
+    print l
+
+
+main = do
+    --debugshow
+    runSimIncremental
+    -- runSim
+

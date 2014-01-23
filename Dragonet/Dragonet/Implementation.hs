@@ -39,6 +39,13 @@ module Dragonet.Implementation(
     writeP32BE,
     insertP,
 
+    -- For managing the port state
+    readPortMappings,
+    writePortMappings,
+    findPortMapping,
+    removePortMapping,
+    addPortMapping,
+
     debug,
 ) where
 
@@ -65,16 +72,30 @@ data Context = Context {
     ctxDebug  :: [String]
 } deriving Show
 
+--type FunType = (CS.ConcSM GlobalState Context [Char])
+type FunType = Int
+
+type ImplM a = CS.ConcSM GlobalState Context a
+type Implementation = ImplM String
+
+
+data PortFunction = PortFunction {
+        pfPortNo :: Int,
+        pfImpl :: Implementation
+    }
+
+instance Show PortFunction where
+  show (PortFunction a _) = show a ++ " opened "
+
 data GlobalState = GlobalState {
     gsDebug :: [String],
     gsTXQueue :: [Packet],
     gsARPPending :: [(Word32,Context)],
-    gsARPCache :: M.Map Word32 [Word8]
+    gsARPCache :: M.Map Word32 [Word8],
+--    gsUDPPorts :: M.Map Word16 FunType
+    gsUDPPorts :: [PortFunction]
 } deriving Show
 
-
-type ImplM a = CS.ConcSM GlobalState Context a
-type Implementation = ImplM String
 
 initContext :: Packet -> Context
 initContext p = Context {
@@ -90,9 +111,9 @@ emptyGS = GlobalState {
         gsDebug = [],
         gsTXQueue = [],
         gsARPPending = [],
-        gsARPCache = M.empty
+        gsARPCache = M.empty,
+        gsUDPPorts = []
     }
-
 
 
 getCtx :: ImplM Context
@@ -281,6 +302,35 @@ insertP len off = do
     let zs = BS.pack $ replicate len 0
     putPacket (pre `BS.append` zs `BS.append` suf)
 
+
+readPortMappings :: ImplM [PortFunction]
+readPortMappings = do
+    gs <- getGS
+    return $ gsUDPPorts gs
+
+writePortMappings :: [PortFunction] -> ImplM ()
+writePortMappings pm = do
+    gs <- getGS
+    putGS $ gs { gsUDPPorts = pm }
+
+
+findPortMapping :: Int -> ImplM ([Implementation])
+findPortMapping p = do
+        mappings <- readPortMappings
+        let found = filter (\x -> ((pfPortNo x) == p) ) mappings
+        return $ map pfImpl found
+
+removePortMapping :: Int -> ImplM ()
+removePortMapping p = do
+        mappings <- readPortMappings
+        let mappings' = filter (\x -> ((pfPortNo x) /= p) ) mappings
+        writePortMappings mappings'
+
+addPortMapping :: Int -> Implementation -> ImplM ()
+addPortMapping p imp = do
+        mappings <- readPortMappings
+        let mappings' = mappings ++ [(PortFunction p imp)]
+        writePortMappings mappings'
 
 
 debug :: String -> ImplM ()

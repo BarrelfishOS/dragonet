@@ -27,12 +27,13 @@ module LPGImpl (
     lpgRxL4UDPValidHeaderLengthImpl,
     lpgRxL4UDPValidLengthImpl,
     lpgRxL4UDPValidChecksumImpl,
-    lpgRxL4UDPPortClassifyImpl,
+    lpgRxL4UDPPortClassifyImpl, -- classify function
     lpgRxL4UDPClosedPortActionImpl,
 
 --    lpgRxL4UDPOutImpl,
     lpgRxTagTxARPIRImpl, lpgRxTagTxARPLuImpl, lpgRxTagTxICMPIRImpl,
-    lpgRxTagTxUDPIRImpl,
+
+    lpgRxTagTxUDPIRImpl, -- classify Tx
 
     -- Applications
     lpgRxDnsAPPImpl,
@@ -50,13 +51,17 @@ module LPGImpl (
     lpgTxL4UDPAllocateHeaderImpl,
     lpgTxL4UDPFillHeaderImpl,
 
-    lpgTxDemuxImpl,
+    lpgTxDemuxImpl, -- Important node
+
     lpgTxQueueImpl, lpgTxL2EtherAllocateHeaderImpl, lpgTxL2EtherFillHeaderImpl,
     lpgTxL3ARPInitiateResponseImpl, lpgTxL3ARPAllocateHeaderImpl,
     lpgTxL3ARPFillHeaderImpl, lpgTxL3ARPLookup_Impl, lpgTxL3ARPSendRequestImpl,
     lpgTxL3IPv4AllocateHeaderImpl, lpgTxL3IPv4FillHeaderImpl,
     lpgTxL3IPv4RoutingImpl, lpgTxL3ICMPInitiateResponseImpl,
     lpgTxL3ICMPAllocateHeaderImpl, lpgTxL3ICMPFillHeaderImpl,
+
+    -- Port management functions
+    lpgRxL4UDPAddPort,
 ) where
 
 import Dragonet.DotGenerator
@@ -88,13 +93,13 @@ toPort = return
 -- on TUNTAP or DPDK interface.
 
 -- FOR DPDK
-cfgLocalMAC = fromJust $ ETH.macFromString "00:0f:53:07:48:d5"
 -- --cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.36"
-cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.37"
+--cfgLocalMAC = fromJust $ ETH.macFromString "00:0f:53:07:48:d5"
+--cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.37"
 
 -- FOR TUNTAP
---cfgLocalMAC = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
---cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
+cfgLocalMAC = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
+cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
 
 lpgQueueImpl = toPort "out"
 lpgSoftwareRXImpl = toPort "out"
@@ -381,11 +386,40 @@ lpgRxL4UDPValidChecksumImpl = do
     debug ("lpgRxL4UDPValidChecksumImpl " ++ (show nextPort))
     toPort $ pbool nextPort
 
+
+
+lpgRxL4UDPAddPort = do
+    addPortMapping 6666 lpgRxEchoAPPImpl
+
+
 lpgRxL4UDPPortClassifyImpl = do
-    dPort <- UDP.destPortRd
-    let outPort = if dPort == 51098 then "appDNS"
-            else "closedPort"
+    dport <- UDP.destPortRd
+    sport <- UDP.sourcePortRd
+    poff <- UDP.payloadOff
+    plen <- UDP.payloadLen
+    payload <- readPX plen poff
+{-
+    portHandlerList <- findPortMapping $ fromIntegral dport
+    let outPort2 = if portHandlerList == [] then "closedPort"
+                else  ("AppID" ++ show (head portHandlerList))
+    let outPort = "closedPort"
+
+-}
+    let outPort = if dport == 51098 then "appDNS"
+        else if dport == 5556 then "appEcho"
+        else "closedPort"
+
+    debug ("Classify: UDP packet with :"
+        ++ "  sport " ++ (show sport)
+        ++ ", dport " ++ (show dport)
+        ++ ", poff " ++ (show poff)
+        ++ ", len " ++ (show plen)
+        ++ ", payload " ++ (show payload)
+        ++ " ====> to ==> " ++ (show outPort)
+        )
+--    toPort $ "" -- outPort
     toPort $ outPort
+--    toPort $ "closedPort"
 
 lpgRxL4UDPClosedPortActionImpl = do
     dport <- UDP.destPortRd
@@ -400,7 +434,7 @@ lpgRxL4UDPClosedPortActionImpl = do
         ++ ", len " ++ (show plen)
         ++ ", payload " ++ (show payload)
         )
-    toPort ""
+    toPort $ pbool True
 
 -----------------------------------------------------------------------------
 -- TCP
@@ -413,8 +447,9 @@ lpgRxL4TCPValidHeaderLengthImpl = toPort "true"
 
 
 -- Sinks
-lpgPacketDropImpl = do { debug "Packet dropped!" ; toPort "" }
+lpgPacketDropImpl = do { debug "Packet dropped!!!!" ; toPort "" }
 lpgRxL4TCPOutImpl = do { debug "Got TCP packet!" ; toPort "" }
+
 
 lpgRxDnsAPPImpl = do
     dport <- UDP.destPortRd
@@ -446,6 +481,7 @@ lpgRxEchoAPPImpl = do
         )
     toPort "out"
 
+
 -----------------------------------------------------------------------------
 -- Multiplexing for TX queue
 
@@ -462,7 +498,8 @@ lpgRxTagTxICMPIRImpl = do
     toPort "true"
 
 lpgRxTagTxUDPIRImpl = do
-    setAttr "mux" $ AttrS "ICMPIR"
+    debug "lpgRxTagTxUDPIRImpl --> "
+    setAttr "mux" $ AttrS "UDPIR"
     toPort "true"
 
 -----------------------------------------------------------------------------
@@ -477,9 +514,12 @@ lpgTxQueueImpl = do
 
 lpgTxDemuxImpl = do
     a <- getAttrM "mux"
-    toPort $ case a of
-        Just (AttrS p) -> p
-        _ -> "drop"
+    let nextPort = case a of
+            Just (AttrS p) -> p
+            _ -> "drop"
+
+    debug ("lpgTxDemuxImpl " ++ (show nextPort))
+    toPort nextPort
 
 -----------------------------------------------------------------------------
 -- Ethernet TX

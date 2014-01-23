@@ -191,12 +191,17 @@ graph lpg {
                 port false[..PacketDrop] }
 
             node PortClassify {
+
                 port appDNS [.DnsAPP]
                 port appEcho [.EchoAPP]
                 port closedPort [ClosedPortAction]
+
+//                port closedPort [..PacketDrop]
             }
 
-            node ClosedPortAction { }
+            boolean ClosedPortAction {
+                port true false[..PacketDrop]
+            }
 
         }
 
@@ -219,13 +224,16 @@ graph lpg {
         /*******************************************/
         /* Application RX                          */
 
-    node DnsAPP {
-                port out[TagTxUDPIR]
-                port drop[.PacketDrop] }
-
     node EchoAPP {
                 port out[TagTxUDPIR]
+//                port out[.TxL4UDPInitiateResponse]
                 port drop[.PacketDrop] }
+
+    node DnsAPP {
+                port out[TagTxUDPIR]
+//                port out[.TxL4UDPInitiateResponse]
+                port drop[.PacketDrop] }
+
 
     /*******************************************/
     /* Multiplexing for TX queue               */
@@ -246,12 +254,6 @@ graph lpg {
         boolean UDPIR {
             port true[.ToTx]
             port false[] }
-
-/*        boolean EchoIR {
-            port true[.ToTx]
-            port false[] }
-*/
-
     }
 
     or ToTx {
@@ -266,7 +268,8 @@ graph lpg {
             port ARPLu[L3ARPLookup]
             port ICMPIR[L3ICMPInitiateResponse]
             port UDPIR[L4UDPInitiateResponse]
-            port EchoIR[L4UDPInitiateResponse]
+//            port DnsIR[L4UDPInitiateResponse]
+//            port EchoIR[L4UDPInitiateResponse]
             port drop[] }
 
         cluster L4UDP {
