@@ -33,6 +33,13 @@ incremental_run: incremental
 
 all: models
 
+# generates graphs for tcp protocol processing
+tcpGraph: base lpgImpl.unicorn
+	$(GHC) $(GHCFLAGS) tcpGraph.hs -o tcpGraph
+tcpGraph_run: tcpGraph
+	./tcpGraph
+	./convertDot.sh
+
 # generates graphs (lpg, prg, prg_conf, embedded, constrained)
 graph: base lpgImpl.unicorn
 	$(GHC) $(GHCFLAGS) testGraph.hs -o graph
