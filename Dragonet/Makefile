@@ -17,7 +17,7 @@ CC=clang
 #.DEFAULT_GOAL := tuntap
 #.DEFAULT_GOAL := dpdk
 
-useful: graph confgen #dpdk #impl
+useful: graph confgen tuntap #dpdk #impl
 
 incrementalSim: base
 	$(GHC) $(GHCFLAGS) -threaded testIncremental.hs -o incrementalSim
@@ -125,7 +125,7 @@ Util/Dpdk.$(OSUF): Util/Dpdk_.$(OSUF) objfiles
 models: graph_run
 	./convertDot.sh
 
-base: Makefile *.hs */*.hs
+base: Makefile *.hs */*.hs *.unicorn
 
 clean:
 	rm -f *.hi *.o */*.hi */*.o */*/*.hi */*/*.o $(BINARIES)

@@ -62,6 +62,11 @@ module LPGImpl (
 
     -- Port management functions
     lpgRxL4UDPAddPort,
+
+    -- dummy nodes
+    lpgRxL4UDPForwarderDummyImpl,
+    lpgRxL4UDPAppHolderDummyImpl,
+
 ) where
 
 import Dragonet.DotGenerator
@@ -387,10 +392,14 @@ lpgRxL4UDPValidChecksumImpl = do
     toPort $ pbool nextPort
 
 
+lpgRxL4UDPAddPort portNo appName app = do
+    addPortMapping portNo appName  app
 
-lpgRxL4UDPAddPort = do
-    addPortMapping 6666 lpgRxEchoAPPImpl
+lpgRxL4UDPForwarderDummyImpl = do
+    toPort $ "always"
 
+lpgRxL4UDPAppHolderDummyImpl = do
+    toPort $ "closedPort"
 
 lpgRxL4UDPPortClassifyImpl = do
     dport <- UDP.destPortRd
@@ -398,16 +407,20 @@ lpgRxL4UDPPortClassifyImpl = do
     poff <- UDP.payloadOff
     plen <- UDP.payloadLen
     payload <- readPX plen poff
-{-
-    portHandlerList <- findPortMapping $ fromIntegral dport
-    let outPort2 = if portHandlerList == [] then "closedPort"
-                else  ("AppID" ++ show (head portHandlerList))
-    let outPort = "closedPort"
 
--}
+    portHandler <- findPortMapping1 $ fromIntegral dport
+    let
+        outPortFun = case portHandler of
+            Nothing -> lpgRxL4UDPClosedPortActionImpl
+            Just x -> x
+        outPort = "closedPort"
+
+{-
+    -- Hardcoded port classification
     let outPort = if dport == 51098 then "appDNS"
         else if dport == 5556 then "appEcho"
         else "closedPort"
+-}
 
     debug ("Classify: UDP packet with :"
         ++ "  sport " ++ (show sport)
@@ -417,8 +430,8 @@ lpgRxL4UDPPortClassifyImpl = do
         ++ ", payload " ++ (show payload)
         ++ " ====> to ==> " ++ (show outPort)
         )
---    toPort $ "" -- outPort
     toPort $ outPort
+    outPortFun
 --    toPort $ "closedPort"
 
 lpgRxL4UDPClosedPortActionImpl = do

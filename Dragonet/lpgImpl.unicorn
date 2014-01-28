@@ -187,16 +187,25 @@ graph lpg {
                 port true false[Valid] }
 
             and Valid {
-                port true[PortClassify]
+                port true[ForwarderDummy]
+//                port true[PortClassify]
                 port false[..PacketDrop] }
 
-            node PortClassify {
 
+            node ForwarderDummy {
+                port always[PortClassify]
+                port dontcall[AppHolderDummy]
+            }
+
+            node AppHolderDummy {
                 port appDNS [.DnsAPP]
                 port appEcho [.EchoAPP]
                 port closedPort [ClosedPortAction]
+            }
 
-//                port closedPort [..PacketDrop]
+
+
+            node PortClassify {
             }
 
             boolean ClosedPortAction {

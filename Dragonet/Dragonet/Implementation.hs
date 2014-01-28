@@ -40,9 +40,10 @@ module Dragonet.Implementation(
     insertP,
 
     -- For managing the port state
+    findPortMapping,
+    findPortMapping1,
     readPortMappings,
     writePortMappings,
-    findPortMapping,
     removePortMapping,
     addPortMapping,
 
@@ -64,13 +65,13 @@ emptyPacket = BS.empty
 
 data AttrValue = AttrS String | AttrI Int | AttrD [Word8] | AttrW32 Word32
         | AttrW16 Word16 | AttrW8 Word8 | AttrB Bool
-    deriving Show
+    deriving (Show, Eq)
 
 data Context = Context {
     ctxPacket :: Packet,
     ctxAttrs  :: M.Map String AttrValue,
     ctxDebug  :: [String]
-} deriving Show
+} deriving (Show, Eq)
 
 --type FunType = (CS.ConcSM GlobalState Context [Char])
 type FunType = Int
@@ -81,11 +82,15 @@ type Implementation = ImplM String
 
 data PortFunction = PortFunction {
         pfPortNo :: Int,
+        pfApp :: String,
         pfImpl :: Implementation
     }
 
+instance Eq PortFunction where
+ (PortFunction a _ _) == (PortFunction b _ _) = a == b
+
 instance Show PortFunction where
-  show (PortFunction a _) = show a ++ " opened "
+  show (PortFunction a appName _) = (show a) ++ " " ++ (show appName)
 
 data GlobalState = GlobalState {
     gsDebug :: [String],
@@ -94,7 +99,7 @@ data GlobalState = GlobalState {
     gsARPCache :: M.Map Word32 [Word8],
 --    gsUDPPorts :: M.Map Word16 FunType
     gsUDPPorts :: [PortFunction]
-} deriving Show
+} deriving (Show)
 
 
 initContext :: Packet -> Context
@@ -314,6 +319,21 @@ writePortMappings pm = do
     putGS $ gs { gsUDPPorts = pm }
 
 
+
+findPortMapping1 :: Int -> ImplM (Maybe Implementation)
+findPortMapping1 p = do
+        mappings <- readPortMappings
+        -- get portNo. only list, and make sure that it has this port
+        --      if not, return Nothing
+        --  else
+        --      locate the port no. again
+        let found = filter (\x -> ((pfPortNo x) == p) ) mappings
+            usedPorts = map pfPortNo found
+            ans = if usedPorts == [] then Nothing
+                    else Just (pfImpl (head found))
+        return $ ans
+
+
 findPortMapping :: Int -> ImplM ([Implementation])
 findPortMapping p = do
         mappings <- readPortMappings
@@ -326,10 +346,10 @@ removePortMapping p = do
         let mappings' = filter (\x -> ((pfPortNo x) /= p) ) mappings
         writePortMappings mappings'
 
-addPortMapping :: Int -> Implementation -> ImplM ()
-addPortMapping p imp = do
+addPortMapping :: Int -> String -> Implementation -> ImplM ()
+addPortMapping p appName imp = do
         mappings <- readPortMappings
-        let mappings' = mappings ++ [(PortFunction p imp)]
+        let mappings' = mappings ++ [(PortFunction p appName imp)]
         writePortMappings mappings'
 
 
