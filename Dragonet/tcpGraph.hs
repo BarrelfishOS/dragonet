@@ -15,110 +15,146 @@ import qualified Dragonet.Implementation as Impl
 graph tcp {
 
     node TCPQueue {
-        port out[RxL4TCPPortClassify] }
+        port out[L4TCPRxFindSocketByPacket] }
 
-    cluster Rx {
+    node EventQueue {
+        port out[L4TCPEventFindSocketByContext] }
 
-        cluster L4TCP {
 
+    cluster L4TCP {
+
+        cluster Event {
+
+            node FindSocketByContext{
+                port toSocket[Classify]
+                port noSockets[NoSocketEvent]
+            }
+
+            node NoSocketEvent{
+                // drop the event
+            }
+
+            node Classify{
+                // get the state based on given event
+                port toRetransmissionTimer  [RetransmissionTimer]
+                port toPersistTimer         [PersistTimer]
+                port toKeepAliveTimer       [KeepAliveTimer]
+                port toMsl2Timer            [Msl2Timer]
+            }
+
+            node RetransmissionTimer {}
+            node PersistTimer        {}
+            node KeepAliveTimer      {}
+            node Msl2Timer           {}
+
+        } // end cluster: cluster Event
+
+
+        cluster Rx {
+
+            node FindSocketByPacket{
+                port toSocket[PacketForSocket]
+                port noSockets[ClosedPortAction]
+            }
+
+/*
             node PortClassify {
                 port p1[Sock1]
                 port p2[Sock2]
                 port noSockets[ClosedPortAction]
             }
+*/
 
             node ClosedPortAction{
                 // drop packet
                 port out[..DropPacket]
             }
 
-            node Sock1{
-                // drop packet
+            node PacketForSocket{
                 port srvSocket[ServerSocket]
                 port cliSocket[ClientSocket]
             }
 
             node ServerSocket{
-                port toClose[StateClosedStart]
-                port toListen[StateListen]
-                port toSynRecv[StateSynSent]
-                port toEstablished[StateEstablished]
-                port toCloseWait[StateCloseWait]
-                port toLastAck[StateLastAck]
+                port toClose        [.StateClosedStart]
+                port toListen       [.StateListen]
+                port toSynRecv      [.StateSynSent]
+                port toEstablished  [.StateEstablished]
+                port toCloseWait    [.StateCloseWait]
+                port toLastAck      [.StateLastAck]
             }
 
             node ClientSocket{
-                port toClose[StateClosedStart]
-                port toSynSent [StateSynSent]
-                port toEstablished [StateEstablished]
-                port toFinWait1 [StateFinWait1]
-                port toFinWait2 [StateFinWait2]
-                port toTimeWait [StateTimeWait]
-                port toClosing [StateClosing]
+                port toClose        [.StateClosedStart]
+                port toSynSent      [.StateSynSent]
+                port toEstablished  [.StateEstablished]
+                port toFinWait1     [.StateFinWait1]
+                port toFinWait2     [.StateFinWait2]
+                port toTimeWait     [.StateTimeWait]
+                port toClosing      [.StateClosing]
             }
 
-            cluster State {
+        } /* end cluser : RX */
 
-                node ClosedStart{
-                    port toListen[Listen]
-                    port toSynSent[SynSent]
-                }
 
-                node Listen{
-                    port toSynRecv[SynSent]
-                }
+        cluster State {
 
-                node SynSent{
-                    port toEstablished [Established]
-                }
-
-                node SynReceived{
-                    port toEstablished [Established]
-                }
-
-                node Established{
-                    port toFinWait1 [FinWait1]
-                    port toCloseWait [CloseWait]
-                }
-
-                node FinWait1{
-                    port toFinWait2 [FinWait2]
-                    port toClosing [Closing]
-                    port toTimeWait [TimeWait]
-                }
-
-                node FinWait2{
-                    port toTimeWait [TimeWait]
-                }
-
-                node Closing{
-                    port toTimeWait [TimeWait]
-                }
-
-                node TimeWait{
-                    port toClosedEnd [ClosedEnd]
-                }
-
-                node CloseWait{
-                    port toLastAck[LastAck]
-                }
-
-                node LastAck{
-                    port toClosedEnd [ClosedEnd]
-                }
-
-                node ClosedEnd{
-                }
+            node ClosedStart{
+                port toListen[Listen]
+                port toSynSent[SynSent]
             }
 
-            node Sock2{
-                // drop packet
+            node Listen{
+                port toSynRecv[SynSent]
             }
 
+            node SynSent{
+                port toEstablished [Established]
+            }
 
-        } // end cluster: cluster L4TCP
+            node SynReceived{
+                port toEstablished [Established]
+            }
 
-    } /* end cluser : RX */
+            node Established{
+                port toFinWait1 [FinWait1]
+                port toCloseWait [CloseWait]
+            }
+
+            node FinWait1{
+                port toFinWait2 [FinWait2]
+                port toClosing [Closing]
+                port toTimeWait [TimeWait]
+            }
+
+            node FinWait2{
+                port toTimeWait [TimeWait]
+            }
+
+            node Closing{
+                port toTimeWait [TimeWait]
+            }
+
+            node TimeWait{
+                port toClosedEnd [ClosedEnd]
+            }
+
+            node CloseWait{
+                port toLastAck[LastAck]
+            }
+
+            node LastAck{
+                port toClosedEnd [ClosedEnd]
+            }
+
+            node ClosedEnd{
+            }
+
+        } // end cluster: cluster State
+
+
+    } // end cluster: cluster L4TCP
+
 
     node DropPacket{
         // drop packet
