@@ -17,22 +17,16 @@ graph tcp {
     node TCPQueue {
         port out[TCPRxFindSocketByPacket] }
 
-//    node EventQueue {
-//        port out[TCPEventFindSocketByContext] }
-
+    node EventQueue {
+        port out[TCPEventFindSocketByContext TCPEventClassify] }
 
     cluster TCP {
 
-/*
         cluster Event {
 
             node FindSocketByContext{
-                port toSocket[Classify]
-                port noSockets[NoSocketEvent]
-            }
-
-            node NoSocketEvent{
-                // drop the event
+                port toSocket[STestIsTimeWaitState STestIsEstablishedState]
+                port noSockets[..DropEvent]
             }
 
             node Classify{
@@ -40,16 +34,45 @@ graph tcp {
                 port toRetransmissionTimer  [RetransmissionTimer]
                 port toPersistTimer         [PersistTimer]
                 port toKeepAliveTimer       [KeepAliveTimer]
-                port toMsl2Timer            [Msl2Timer]
+                port toMSL2Timer            [MSL2Timer]
             }
 
             node RetransmissionTimer {}
             node PersistTimer        {}
-            node KeepAliveTimer      {}
-            node Msl2Timer           {}
+            boolean KeepAliveTimer      {
+                port true false[HandleKeepAliveTimer]
+            }
+
+            boolean MSL2Timer {
+                port true false[HandleMSL2Timer]
+            }
+
+            and HandleKeepAliveTimer {
+                port true [.TxSendAck]
+                port false[..DropEvent]
+            }
+
+            and HandleMSL2Timer {
+                port true [.SChangeToClosed]
+                port false[..DropEvent]
+            }
+
+            cluster STest {
+                boolean IsTimeWaitState {
+                    port true false[.HandleMSL2Timer]
+                }
+
+                boolean IsEstablishedState {
+                    port true false[.HandleKeepAliveTimer]
+                }
+
+            } // end cluster: STest
+
+
 
         } // end cluster: cluster Event
-*/
+
+
 
         cluster Rx {
 
@@ -199,7 +222,6 @@ graph tcp {
                 // Update the state to Timewait for clients
            }
 
-
         } // end cluster: SChange
 
 
@@ -231,12 +253,11 @@ graph tcp {
 
            node SendSynAck{
                 // send Ack for syn
-                port out [.SChangeToEstb ..SendPacket]
+                port out [.SChangeToEstb ..SendPacket ..TimerResetKeepAlive]
            }
 
-
            node SendAck{
-                port out[.ContextSequenceNo ..SendPacket]
+                port out[.ContextSequenceNo ..SendPacket ..TimerResetKeepAlive]
            }
 
            node SendFinAckServer{
@@ -251,7 +272,7 @@ graph tcp {
 
            node SendFinAckClient{
                 // send Ack for Fin from state FinWait1 or FinWait2
-                port out [.SChangeToTimeWait ..SendPacket]
+                port out [.SChangeToTimeWait ..SendPacket ..TimerRegisterMSL2]
            }
 
         } // end cluster : Tx
@@ -259,15 +280,35 @@ graph tcp {
 
     } // end cluster: cluster L4TCP
 
+
     node SendPacket{
         // Send the TCP packet out
     }
 
-
-
     node DropPacket{
         // drop packet
     }
+
+    node DropEvent{
+        // drop event
+    }
+
+
+    cluster Timer {
+    node ResetKeepAlive {
+        // Register for callback event/timer
+        // to detect (2 * Maximum Life time) of outstanding packets.
+    }
+
+
+
+    node RegisterMSL2{
+        // Register for callback event/timer
+        // to detect (2 * Maximum Life time) of outstanding packets.
+    }
+
+    }
+
 
 }
 |]
