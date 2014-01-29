@@ -12,10 +12,11 @@ CC=clang
 # GHCFLAGS+=-ddump-splices
 
 # Setting the default goal to simplify compiling
-.DEFAULT_GOAL := useful
+#.DEFAULT_GOAL := useful
 #.DEFAULT_GOAL := graph
 #.DEFAULT_GOAL := tuntap
 #.DEFAULT_GOAL := dpdk
+.DEFAULT_GOAL := tcpGraph_run
 
 useful: graph confgen tuntap #dpdk #impl
 
@@ -36,6 +37,7 @@ all: models
 # generates graphs for tcp protocol processing
 tcpGraph: base lpgImpl.unicorn
 	$(GHC) $(GHCFLAGS) tcpGraph.hs -o tcpGraph
+
 tcpGraph_run: tcpGraph
 	./tcpGraph
 	./convertDot.sh
