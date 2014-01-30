@@ -96,7 +96,7 @@ graph tcp {
                 // of socket and without consulting the packet
 
                 port isListen       [IsValidSyn]
-                port isSynRecv      [IsValidAck] // for simultaneous open
+                port isSynRecv      [IsValidSynAckS] // for simultaneous open
                 port isEstablished  [IsDataPacket IsValidAck IsFin]
                 port isLastAck      [IsValidFinAck]
             }
@@ -112,6 +112,13 @@ graph tcp {
             }
 
 
+            boolean IsValidSynAckS{
+
+                port true[.SChangeToEstb]
+                port false[..DropPacket]
+            }
+
+
             boolean IsValidSynAck{
                 port true[.TxSendSynAck]
                 port false[]
@@ -124,8 +131,8 @@ graph tcp {
             }
 
             boolean IsValidAck{
-                port true[.SChangeToEstb]
-                port false[..DropPacket]
+                port true[.ContextAckNo]
+                port false[]
             }
 
             boolean IsDataPacket{
@@ -228,12 +235,19 @@ graph tcp {
         cluster Context{
             // These are context updates
 
-           node AckWindow{
+           node AckNo{
+                port moved [DropAckData]
+                port unMoved []
                 // Update the ACKed packets/data
            }
 
-           node SequenceNo{
-                // Update the next expected data
+           node DropAckData {
+                // Drop the data which is already acked.
+           }
+
+
+           node RecvdSeqNo{
+                // Update the next expected sequence number
            }
 
            node Generic{
@@ -257,7 +271,7 @@ graph tcp {
            }
 
            node SendAck{
-                port out[.ContextSequenceNo ..SendPacket ..TimerResetKeepAlive]
+                port out[.ContextRecvdSeqNo ..SendPacket ..TimerResetKeepAlive]
            }
 
            node SendFinAckServer{
