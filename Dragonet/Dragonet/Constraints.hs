@@ -67,7 +67,7 @@ cToCNF = BE.toECNF
 
 
 -- Constraints induced by a particular port on a node
-getNPConstraints :: PG.Node i -> PG.Port -> Maybe CExp
+getNPConstraints :: PG.Node -> PG.Port -> Maybe CExp
 getNPConstraints n p = do
     a <- L.find (L.isPrefixOf prefix) $ PG.nAttributes n
     parse $ drop (length prefix) a
@@ -79,7 +79,7 @@ getNPConstraints n p = do
             Right e -> Just $ cFromBE e
 
 -- Generates the constraints for a specific node
-combineN :: GH.RecContext [(PG.Port,CExp)] PG.Port (PG.Node i) (PG.Node i) PG.Port -> [(PG.Port,CExp)]
+combineN :: GH.RecContext [(PG.Port,CExp)] PG.Port (PG.Node) (PG.Node) PG.Port -> [(PG.Port,CExp)]
 combineN (pr,(_,n),_) = map port $ PG.nPorts n
     where
         port p = (p,case PG.nPersonality n of
@@ -105,7 +105,7 @@ combineN (pr,(_,n),_) = map port $ PG.nPorts n
         inExps = concatMap (\(e,(_,m)) -> filter ((== e) . fst) m) pr
 
 -- Generate constraints for each node/port
-generateConstraints :: PG.PGraph i -> [((DGI.Node,PG.Port),CExp)]
+generateConstraints :: PG.PGraph -> [((DGI.Node,PG.Port),CExp)]
 generateConstraints g =
     concatMap (\(n,l) -> map (\(p,e) -> ((n,p),e)) l) $ DGI.labNodes g'
     where g' = GH.recurseNFW combineN g
@@ -161,7 +161,7 @@ getUnsatisfiable es = do
             return (s == TFalse)
 
 -- Remove edges originating from ports with unsatisfiable constraints
-removeUnsatisfiable :: PG.PGraph i -> [(DGI.Node, PG.Port)] -> PG.PGraph i
+removeUnsatisfiable :: PG.PGraph -> [(DGI.Node, PG.Port)] -> PG.PGraph
 removeUnsatisfiable g u = GH.delLEdges edges g
     where
         edges = concatMap handlePort u
@@ -170,14 +170,14 @@ removeUnsatisfiable g u = GH.delLEdges edges g
 
 -- Simplify graph:
 --    - remove nodes without incoming or outgoing edges
-simplifyGraph :: PG.PGraph i -> PG.PGraph i
+simplifyGraph :: PG.PGraph -> PG.PGraph
 simplifyGraph g = DGI.delNodes orphaned g
     where
         orphaned = filter ((== 0) . DGI.deg g) $ DGI.nodes g
 
 
 -- Apply constraints to graph
-constrain :: PG.PGraph i -> IO (PG.PGraph i)
+constrain :: PG.PGraph -> IO (PG.PGraph)
 constrain g = do
     let constraints = addAdditionalConstraints $ generateConstraints g
     unsatisfiable <- getUnsatisfiable constraints

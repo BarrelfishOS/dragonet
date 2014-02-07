@@ -460,7 +460,7 @@ configFDir _ inE outE cfg = do
 -- Adapting LPG
 
 -- Generate LPG corresponding to the specified LPG
-ssLPG :: StackState -> PGraph ()
+ssLPG :: StackState -> PGraph
 ssLPG ss = snd $ GM.runOn (do
     -- Create socket and validS-nodes
     vns <- mapM (\sd -> do
@@ -668,7 +668,7 @@ ssPRGConfig ss =
 
 
 -- Iteratively drop all sink nodes that don't have the sink attribute
-dropNonsinks :: PGraph () -> PGraph ()
+dropNonsinks :: PGraph -> PGraph
 dropNonsinks graph =
         foldl dropNS graph ts
     where

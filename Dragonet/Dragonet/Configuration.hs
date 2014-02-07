@@ -11,7 +11,7 @@ import Data.Maybe
 
 
 -- Create new node
-confMNewNode :: Node i -> ConfMonad i (PGNode i)
+confMNewNode :: Node -> ConfMonad PGNode
 confMNewNode n = do
     (m,ns) <- ST.get
     let i = m + 1
@@ -20,7 +20,7 @@ confMNewNode n = do
     return node
 
 -- Add edges and nodes from configuration function to graph
-confMRun :: PGraph i -> ConfMonad i [PGEdge] -> PGraph i
+confMRun :: PGraph -> ConfMonad [PGEdge] -> PGraph
 confMRun g m = addEdges $ addNodes g
     where
         (_,maxId) = DGI.nodeRange g
@@ -36,7 +36,7 @@ confMRun g m = addEdges $ addNodes g
 
 
 -- Apply configuration for a single CNode
-applyCNode :: [(String,String)] -> PGraph i -> PGContext i -> PGraph i
+applyCNode :: [(String,String)] -> PGraph -> PGContext -> PGraph
 applyCNode config g ctx = confMRun g' newEM
     where
         node = DGI.lab' ctx
@@ -57,7 +57,7 @@ applyCNode config g ctx = confMRun g' newEM
 
 
 -- Apply specified configuration to graph
-applyConfig :: [(String,String)] -> PGraph i -> PGraph i
+applyConfig :: [(String,String)] -> PGraph -> PGraph
 applyConfig cfg g =
     foldl (applyCNode cfg) g configNodes
     where

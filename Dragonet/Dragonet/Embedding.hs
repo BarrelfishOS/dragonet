@@ -17,33 +17,33 @@ import qualified Data.List as L
 subsetLBy :: (a -> a -> Bool) -> [a] -> [a] -> Bool
 subsetLBy f a b = all (\x -> any (f x) b) a
 
-embMatch :: PG.Node i -> PG.Node i -> Bool
+embMatch :: PG.Node -> PG.Node -> Bool
 embMatch lA lB = PG.nLabel lA == PG.nLabel lB
 
 -- Test if node l is already embedded in graph g
-isEmbeddedIn :: PG.Node i -> PG.PGraph i -> Bool
+isEmbeddedIn :: PG.Node -> PG.PGraph -> Bool
 isEmbeddedIn l g = isJust $ GH.findNodeByL (embMatch l) g
 
-convertL2LN :: PG.Node i -> PG.PGraph i -> Maybe (DGI.LNode (PG.Node i))
+convertL2LN :: PG.Node -> PG.PGraph -> Maybe (DGI.LNode PG.Node)
 convertL2LN l = GH.findNodeByL (embMatch l)
 
-convertN2LN :: DGI.Node -> PG.PGraph i -> PG.PGraph i
-                    -> Maybe (DGI.LNode (PG.Node i))
+convertN2LN :: DGI.Node -> PG.PGraph -> PG.PGraph
+                    -> Maybe (DGI.LNode PG.Node)
 convertN2LN n gFr gTo = do { l <- DGI.lab gFr n ; convertL2LN l gTo }
 
-convertEdge :: PG.PGraph i -> PG.PGraph i -> DGI.LEdge PG.Port
+convertEdge :: PG.PGraph -> PG.PGraph -> DGI.LEdge PG.Port
                 -> Maybe (DGI.LEdge PG.Port)
 convertEdge gFr gTo (a,b,l) = do
     (na,_) <- convN a ; (nb,_) <- convN b
     return (na,nb,l)
     where convN n = convertN2LN n gFr gTo
 
-convertEdges :: PG.PGraph i -> PG.PGraph i -> [DGI.LEdge PG.Port]
+convertEdges :: PG.PGraph -> PG.PGraph -> [DGI.LEdge PG.Port]
                     -> Maybe [DGI.LEdge PG.Port]
 convertEdges gFr gTo = mapM (convertEdge gFr gTo)
 
-convInsEdges :: PG.PGraph i -> PG.PGraph i -> [DGI.LEdge PG.Port]
-                    -> Maybe (PG.PGraph i)
+convInsEdges :: PG.PGraph -> PG.PGraph -> [DGI.LEdge PG.Port]
+                    -> Maybe PG.PGraph 
 convInsEdges gFr gTo es = do
     edges <- convertEdges gFr gTo es
     return $ DGI.insEdges edges gTo
@@ -52,7 +52,7 @@ convInsEdges gFr gTo es = do
 
 
 -- The actual embedding algorithm for one queue
-queueEmbedding :: PG.PGraph i -> PG.PGraph i -> PG.PGraph i
+queueEmbedding :: PG.PGraph -> PG.PGraph -> PG.PGraph
 queueEmbedding prg' lpg = embeddingStep DGI.empty lpgNodes
     where
     -- Make sure that we can just add nodes from PRG to LPG without conflicts
@@ -106,11 +106,11 @@ queueEmbedding prg' lpg = embeddingStep DGI.empty lpgNodes
 
 
 -- Get list of queue nodes in graph
-queues ::  PG.PGraph i -> [PG.PGNode i]
+queues ::  PG.PGraph -> [PG.PGNode]
 queues g = filter (L.isPrefixOf "Queue" . PG.nLabel . snd) $ DGI.labNodes g
 
 -- Find SW-Entry node for specified queue
-findSWE :: String -> PG.PGraph i -> Maybe (DGI.Node,PG.Port)
+findSWE :: String -> PG.PGraph -> Maybe (DGI.Node,PG.Port)
 findSWE q g = do
     (n,_) <- GH.findNodeByL isSWE g
     return (n,"out")
@@ -120,7 +120,7 @@ findSWE q g = do
 
 -- Serialize graph (introduces SoftwareEntry node for each queue, and fixes
 -- edges crossing from PRG-Nodes to LPG-Nodes)
-serialize :: PG.PGraph i -> PG.PGraph i
+serialize :: PG.PGraph -> PG.PGraph
 serialize g =
     GH.delDupEdges $ DGI.insEdges fixedEdges $ GH.delLEdges crossingEdges g
     where
@@ -159,11 +159,11 @@ serialize g =
             where (swn,swp) = swEN b
 
 -- Get LPG for specified queue (tag nodes and rename "Queue")
-lpgQ :: PG.PGNode i -> PG.PGraph i -> PG.PGraph i
+lpgQ :: PG.PGNode -> PG.PGraph -> PG.PGraph
 lpgQ q = DGI.nmap (lpgQNode q)
 
 -- Relabel node to q if its label is "Queue", and tag the node with q
-lpgQNode :: PG.PGNode i -> PG.Node i -> PG.Node i
+lpgQNode :: PG.PGNode -> PG.Node -> PG.Node
 lpgQNode (_,qn) n = if lbl == "Queue" then n' { PG.nLabel = ql } else n'
     where
         ql = PG.nLabel qn
@@ -175,7 +175,7 @@ lpgQNode (_,qn) n = if lbl == "Queue" then n' { PG.nLabel = ql } else n'
 -- functionality that is not available on a particular queue.
 -- We also need to tag software nodes, so they are introduced once for each
 -- queue.
-prgQ :: PG.PGNode i -> PG.PGraph i -> PG.PGraph i
+prgQ :: PG.PGNode -> PG.PGraph -> PG.PGraph
 prgQ (qn,ql) prg = DGI.nmap tagSWN g'
     where
         prgNodes q = DGIDFS.reachable q $ DGI.grev prg
@@ -191,7 +191,7 @@ prgQ (qn,ql) prg = DGI.nmap tagSWN g'
         qlab = PG.nLabel ql
         tagSWN n = if PG.nIsSoftware n then n { PG.nTag = qlab } else n
 
-fullEmbedding :: PG.PGraph i -> PG.PGraph i -> PG.PGraph i
+fullEmbedding :: PG.PGraph -> PG.PGraph -> PG.PGraph
 fullEmbedding prg lpg = serialized
     where
         embedQueue q = queueEmbedding (prgQ q prg) (lpgQ q lpg)

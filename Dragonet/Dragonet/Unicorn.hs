@@ -94,10 +94,10 @@ declareClusters gn cl impl =
         --signatures = [clSig,nlSig,elSig,gSig]
         signatures = if impl then [] else [clSig,nlSig,elSig,gSig]
         gSig = TH.SigD graphName gType
-        gType = TH.ConT (TH.mkName "PGraph") `TH.AppT` TH.TupleT 0
+        gType = TH.ConT (TH.mkName "PGraph") --`TH.AppT` TH.TupleT 0
         nlSig = TH.SigD nodesName nlType
         nlType = tListOf $ tTupleOf [TH.ConT $ TH.mkName "Int",
-                    (TH.ConT $TH.mkName "Node") `TH.AppT` (TH.TupleT 0)]
+                    (TH.ConT $TH.mkName "Node") ] -- `TH.AppT` (TH.TupleT 0)]
         elSig = TH.SigD edgesName elType
         elType = tListOf $ tTupleOf [TH.ConT $ TH.mkName "Int",
                                     TH.ConT $ TH.mkName "Int",
@@ -145,28 +145,12 @@ declareClusters gn cl impl =
 
 
 
-unicornNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> Maybe i -> PG.Node i
-unicornNode = PG.baseFNode
-
-unicornConfNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> PG.ConfFunction
-                    -> Maybe i -> PG.Node i
-unicornConfNode = PG.baseCNode
-
-unicornAndNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> Maybe i
-                    -> PG.Node i
-unicornAndNode l a p = PG.baseONode l a p PG.OpAnd
-
-unicornNAndNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> Maybe i
-                    -> PG.Node i
-unicornNAndNode l a p = PG.baseONode l a p PG.OpNAnd
-
-unicornOrNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> Maybe i -> PG.Node i
-unicornOrNode l a p = PG.baseONode l a p PG.OpOr
-
-unicornNOrNode :: PG.Label -> [PG.Attribute] -> [PG.Port] -> Maybe i -> PG.Node i
-unicornNOrNode l a p = PG.baseONode l a p PG.OpNOr
-
-unicornGraph :: [(Int, PG.Node i)] -> [(Int, Int, PG.Port)] -> PG.PGraph i
+unicornNode             = PG.baseFNode
+unicornConfNode         = PG.baseCNode
+unicornAndNode l a p    = PG.baseONode l a p PG.OpAnd
+unicornNAndNode l a p   = PG.baseONode l a p PG.OpNAnd
+unicornOrNode l a p     = PG.baseONode l a p PG.OpOr
+unicornNOrNode l a p    = PG.baseONode l a p PG.OpNOr
 unicornGraph nodes edges = DGI.mkGraph nodes edges
 
 nodeExp :: String -> Node -> Bool -> TH.Exp

@@ -38,11 +38,12 @@ module Dragonet.ProtocolGraph(
 import qualified Data.Graph.Inductive as DGI
 import qualified Control.Monad.State as ST
 
+import Dragonet.Implementation (Implementation)
+
 type Label = String
 type Tag = String
 type Attribute = String
 type Port = String
-
 
 data Operator = OpAnd | OpOr | OpNAnd | OpNOr
     deriving (Show, Eq)
@@ -66,17 +67,17 @@ instance Show Personality where
 data GraphType = GTUnknown | GTPrg | GTLpg
     deriving (Show, Eq)
 
-data Node i = Node {
+data Node = Node {
     nLabel          :: Label,
     nTag            :: Tag,
     nPersonality    :: Personality,
     nGraphType      :: GraphType,
     nAttributes     :: [Attribute],
     nPorts          :: [Port],
-    nImplementation :: Maybe i
+    nImplementation :: Maybe Implementation
 }-- deriving (Show)
 
-instance Show (Node i) where
+instance Show (Node) where
     show n = pref ++ nLabel n ++ "[" ++ nTag n ++ "]"
         where
             pref = case nGraphType n of
@@ -84,7 +85,7 @@ instance Show (Node i) where
                 GTPrg -> "P:"
                 _ -> ""
 
-instance Eq (Node i) where
+instance Eq (Node) where
     a == b =
         (nLabel a == nLabel b)
         && (nTag a == nTag b)
@@ -93,10 +94,10 @@ instance Eq (Node i) where
         && (nPorts a == nPorts b)
 
 
-type PGraph i = DGI.Gr (Node i) Port
-type PGNode i = DGI.LNode (Node i)
+type PGraph = DGI.Gr Node Port
+type PGNode = DGI.LNode Node
 type PGEdge = DGI.LEdge Port
-type PGContext i = DGI.Context (Node i) Port
+type PGContext = DGI.Context Node Port
 
 
 
@@ -104,18 +105,17 @@ type PGContext i = DGI.Context (Node i) Port
 -------------------------------------------------------------------------------
 -- Configuration
 type ConfSpace = String
-type ConfMonad i a = ST.State (Int,[PGNode i]) a 
+type ConfMonad a = ST.State (Int,[PGNode]) a 
 type ConfFunction =
-    forall i.
-    Node i ->
-    [(DGI.LNode (Node i), Port)] ->
-    [(DGI.LNode (Node i), Port)] ->
+    Node ->
+    [(DGI.LNode (Node), Port)] ->
+    [(DGI.LNode (Node), Port)] ->
     ConfSpace ->
-    ConfMonad i [DGI.LEdge Port]
+    ConfMonad [DGI.LEdge Port]
 
 
 -- Get configuration function from node (assumes node is CNode)
-nConfFun :: Node i -> ConfFunction
+nConfFun :: Node -> ConfFunction
 nConfFun n = fun
     where (CNode fun) = nPersonality n
 
@@ -124,7 +124,7 @@ nConfFun n = fun
 -------------------------------------------------------------------------------
 -- Node functions
 
-baseFNode :: Label -> [Attribute] -> [Port] -> Maybe i -> Node i
+baseFNode :: Label -> [Attribute] -> [Port] -> Maybe Implementation -> Node
 baseFNode label attr ports impl = Node {
         nLabel = label,
         nTag = "",
@@ -134,7 +134,7 @@ baseFNode label attr ports impl = Node {
         nPorts = ports,
         nImplementation = impl }
 
-baseONode :: Label -> [Attribute] -> [Port] -> Operator -> Maybe i -> Node i
+baseONode :: Label -> [Attribute] -> [Port] -> Operator -> Maybe Implementation -> Node
 baseONode label attr ports op impl = Node {
         nLabel = label,
         nTag = "",
@@ -144,8 +144,8 @@ baseONode label attr ports op impl = Node {
         nPorts = ports,
         nImplementation = impl }
 
-baseCNode :: Label -> [Attribute] -> [Port] -> ConfFunction -> Maybe i
-                -> Node i
+baseCNode :: Label -> [Attribute] -> [Port] -> ConfFunction -> Maybe Implementation
+                -> Node
 baseCNode label attr ports cnf impl = Node {
         nLabel = label,
         nTag = "",
@@ -156,18 +156,18 @@ baseCNode label attr ports cnf impl = Node {
         nImplementation = impl }
 
 
-nIsCNode :: Node i -> Bool
+nIsCNode :: Node -> Bool
 nIsCNode n = persIsCNode $ nPersonality n
 
-nIsFNode :: Node i -> Bool
+nIsFNode :: Node -> Bool
 nIsFNode n = persIsFNode $ nPersonality n
 
-nIsONode :: Node i -> Bool
+nIsONode :: Node -> Bool
 nIsONode n = persIsONode $ nPersonality n
 
 -- Returns true iff node is a LPG node, or a PRG node with the software
 -- attribute
-nIsSoftware :: Node i -> Bool
+nIsSoftware :: Node -> Bool
 nIsSoftware n
     | elem "software" $ nAttributes n = True
     | otherwise = nGraphType n == GTLpg
@@ -178,7 +178,7 @@ nIsSoftware n
 -------------------------------------------------------------------------------
 -- Protocol graph functions
 
-pgSetType :: GraphType -> PGraph i -> PGraph i
+pgSetType :: GraphType -> PGraph -> PGraph
 pgSetType t = DGI.nmap (\n -> n { nGraphType = t })
 
 

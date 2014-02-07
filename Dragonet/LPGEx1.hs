@@ -13,9 +13,9 @@ import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.Implementation as Impl
 
 lpgClusters :: [(Int, [String])]
-lpgNodes :: [(Int, PG.Node Impl.Implementation)]
+lpgNodes :: [(Int, PG.Node)]
 lpgEdges :: [PG.PGEdge]
-lpg :: PG.PGraph Impl.Implementation
+lpg :: PG.PGraph
 
 -- The protocol graph
 [unicornImpl_f|lpgImpl.unicorn|]
