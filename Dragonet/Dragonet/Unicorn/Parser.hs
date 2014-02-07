@@ -6,7 +6,7 @@ module Dragonet.Unicorn.Parser(
     Port(..),
     Node(..),
 
-    pName,
+    pName, pOuts,
     nName,
     nAttrs,
     nPorts,
@@ -25,10 +25,15 @@ import qualified Text.ParserCombinators.Parsec.Token as P
 -- Representing parsed code
 
 data Graph = Graph String Cluster
-data Cluster = Cluster String [Cluster] [Node]
+    deriving Show
 
+data Cluster = Cluster String [Cluster] [Node]
+    deriving Show
+
+-- String is port name, [String] is out edges
 data Port = Port String [String]
     deriving Show
+
 data Node =
     Node String [Port] [String] |
     Config String [Port] [String] (Maybe String) |
@@ -42,6 +47,9 @@ data Node =
 
 pName :: Port -> String
 pName (Port n _) = n
+
+pOuts :: Port -> [String]
+pOuts (Port _ outs) = outs
 
 nName :: Node -> String
 nName (Node n _ _) = n

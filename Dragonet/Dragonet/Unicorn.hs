@@ -11,6 +11,7 @@ module Dragonet.Unicorn(
     unicornOrNode,
     unicornNOrNode,
     unicornGraph,
+    constructGraph,
 ) where
 
 import Dragonet.Unicorn.Parser
@@ -18,11 +19,12 @@ import Dragonet.Unicorn.Parser
 import qualified Language.Haskell.TH as TH
 import Language.Haskell.TH.Quote
 import Data.Maybe
+import qualified Data.List as L
 
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Data.Graph.Inductive as DGI
 
-
+import qualified Text.Show.Pretty as Pr
 
 
 unicorn  :: QuasiQuoter
@@ -62,6 +64,54 @@ quoteMyDecImpl s = do
 
 declare :: Graph -> Bool -> [TH.Dec]
 declare (Graph name cl) impl = declareClusters name cl impl
+
+-- empty implementation for now
+node_to_pgnode :: Node -> PG.Node
+node_to_pgnode (Node name ports attrs)    = PG.baseFNode name attrs pnames Nothing
+    where pnames = map pName ports
+node_to_pgnode (Boolean name pt pf attrs) = PG.baseFNode name attrs pnames Nothing
+    where pnames = map pName [pt, pf]
+node_to_pgnode (And name pt pf attrs)     = PG.baseONode name attrs pnames PG.OpAnd Nothing
+    where pnames = map pName [pt, pf]
+node_to_pgnode (NAnd name pt pf attrs)    = PG.baseONode name attrs pnames PG.OpNAnd Nothing
+    where pnames = map pName [pt, pf]
+node_to_pgnode (Or name pt pf attrs)      = PG.baseONode name attrs pnames PG.OpOr Nothing
+    where pnames = map pName [pt, pf]
+node_to_pgnode (NOr name pt pf attrs)     = PG.baseONode name attrs pnames PG.OpNOr Nothing
+    where pnames = map pName [pt, pf]
+
+constructGraph :: Graph -> PG.PGraph
+constructGraph (Graph gname cluster) =
+        DGI.mkGraph pg_nodes pg_edges
+    where
+        -- produce a flatten list of nodes from a (hiearchical) cluster
+        cl_flat_nodes :: Cluster -> [Node]
+        cl_flat_nodes (Cluster cl_name cl_clusters cl_nodes) =
+            [ n | n <- cl_nodes ] ++ (concatMap cl_flat_nodes cl_clusters)
+
+        nodes_ids :: [(Int, Node)]
+        nodes_ids = zip [1..] $ cl_flat_nodes cluster
+
+        pg_nodes :: [PG.PGNode]
+        pg_nodes = [(id, node_to_pgnode(node)) | (id, node) <- nodes_ids]
+
+        node_id :: String -> Int
+        node_id name = case node of
+            Just n  -> (fst n) -- return id
+            Nothing -> error ("Node " ++ name ++ " not found")
+            where node = L.find (\x -> (nName (snd x)) == name) nodes_ids
+
+        -- PG.PGEdge is (Int, Int, String)
+        get_edges_port :: (Int, Port) -> [PG.PGEdge]
+        get_edges_port (nid, port) = [(nid, (node_id out), pname) | out <- pOuts port]
+            where pname = pName port
+
+        get_edges_node :: (Int, Node) -> [PG.PGEdge]
+        get_edges_node (nid, node) = concatMap get_edges_port x
+            where x = [ (nid, port) | port <- nPorts node ]
+
+        pg_edges :: [PG.PGEdge]
+        pg_edges = concatMap get_edges_node nodes_ids
 
 nodeClusterMap :: Cluster -> [(String, Node)]
 nodeClusterMap (Cluster cn cs ns) =

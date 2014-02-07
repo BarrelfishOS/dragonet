@@ -63,6 +63,9 @@ impl_th: base
 impl_th_run: impl_th
 	./impl_th
 
+kk-test: base
+	$(GHC) $(GHCFLAGS) kk-test.hs -o kk-test
+
 # Runs the simulator against tuntap interface
 tuntap : base Util/Tap.$(OSUF)
 	$(GHC) $(GHCFLAGS) -threaded tuntapTests.hs -o tuntap

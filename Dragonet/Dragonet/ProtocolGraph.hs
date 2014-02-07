@@ -48,9 +48,9 @@ type Port = String
 data Operator = OpAnd | OpOr | OpNAnd | OpNOr
     deriving (Show, Eq)
 
-data Personality = 
+data Personality =
     CNode ConfFunction |
-    ONode Operator | 
+    ONode Operator |
     FNode
 
 instance Eq Personality where
