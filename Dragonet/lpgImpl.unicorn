@@ -224,7 +224,7 @@ graph lpg {
                 port drop[.PacketDrop] }
 
     node EchoAPP {
-                port out[TagTxEchoIR]
+                port out[TagTxUDPIR]
                 port drop[.PacketDrop] }
 
     /*******************************************/
@@ -247,9 +247,11 @@ graph lpg {
             port true[.ToTx]
             port false[] }
 
-        boolean EchoIR {
+/*        boolean EchoIR {
             port true[.ToTx]
             port false[] }
+*/
+
     }
 
     or ToTx {

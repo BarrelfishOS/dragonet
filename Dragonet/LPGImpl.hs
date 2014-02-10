@@ -465,9 +465,6 @@ lpgRxTagTxUDPIRImpl = do
     setAttr "mux" $ AttrS "ICMPIR"
     toPort "true"
 
-
-
-
 -----------------------------------------------------------------------------
 -- Transmit Side
 
