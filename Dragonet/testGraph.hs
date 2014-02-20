@@ -7,9 +7,11 @@ import Dragonet.Configuration
 import Dragonet.DotGenerator
 import Dragonet.Embedding
 import Dragonet.Constraints
+import Dragonet.Pipelines
 
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.Implementation as Impl
+import qualified Data.Graph.Inductive.Graph as DGI
 
 import qualified LPGImpl as LPGI -- (graphGen)
 import qualified LPGEx1 as LPG1 -- (graphGen)
@@ -253,11 +255,20 @@ main = do
     myWriteFile "embedded.dot" $ toDot $ embedded
     constrained <- constrain embedded
     myWriteFile "constrained.dot" $ toDot $ constrained
-    myWriteFile "lpgImpl.dot" $ toDotClustered lpgTImpl lpgClusters
 
+    -- Divide graph into pipelines
+    let plg = generatePLG nodePipeline constrained
+    myWriteFile "pipelines.dot" $ pipelinesDot plg
+    mapM_ (\pl ->
+        myWriteFile ("pl_" ++ plLabel pl ++ ".dot") $ toDot $ plGraph pl
+        ) $ map snd $ DGI.labNodes plg
+
+    -- Also use impl graph
+    myWriteFile "lpgImpl.dot" $ toDotClustered lpgTImpl lpgClusters
     myWriteFile "embeddedImpl.dot" $ toDot $ embeddedImpl
     constrainedImpl <- constrain embeddedImpl
     myWriteFile "constrainedImpl.dot" $ toDot $ constrainedImpl
+
 
     where
         lpgT = pgSetType GTLpg lpg
@@ -270,4 +281,6 @@ main = do
         lpgTImpl = pgSetType GTLpg LPG2.lpg
         embedded = fullEmbedding prgTConf lpgT
         embeddedImpl = fullEmbedding prgTConf lpgTImpl
+
+        nodePipeline (_,n) = nTag n
 
