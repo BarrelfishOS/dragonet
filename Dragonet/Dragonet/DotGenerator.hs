@@ -4,9 +4,11 @@ module Dragonet.DotGenerator(
     toDotWith',
     toDotClustered,
     toDotClusteredWith,
+    pipelinesDot,
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG
+import qualified Dragonet.Pipelines as PL
 import qualified Data.Graph.Inductive as DGI
 import qualified Data.GraphViz as GV
 import qualified Data.GraphViz.Attributes.Complete as GA
@@ -182,4 +184,22 @@ toDotClusteredWith :: (String -> String) -> (String -> String) -> PG.PGraph
 toDotClusteredWith nlf plf g cs =
     T.unpack $ GV.printDotGraph $ GV.graphToDot p $ getELs g
     where p = paramsCluster nlf plf cs
+
+
+--------------------------------------------------------------------------------
+-- Code for pipeline graphs
+
+plFormatNode :: PL.PLNode -> GA.Attributes
+plFormatNode (_,p) = [lbl]
+    where
+        lbl = GA.Label $ GA.StrLabel $ t $ PL.plLabel p
+
+-- Get graph showing only the pipelines
+pipelinesDot :: PL.PLGraph -> String
+pipelinesDot plg = dotString $ GV.graphToDot p plg
+    where
+        p = GV.nonClusteredParams {
+            GV.fmtNode = plFormatNode,
+            GV.globalAttributes = [GV.GraphAttrs [GA.RankDir GA.FromLeft]]
+        }
 
