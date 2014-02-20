@@ -12,10 +12,14 @@ import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.Implementation as Impl
 
 [unicorn|
-graph tcp {
+graph tcp2 {
 
     node TCPPacketIn {
         port out[TCPRxFindSocketByPacket] }
+
+    node TCPsend {
+        port out[TCPSendFindSocket]
+        }
 
     node EventQueue {
         port out[TCPEventFindSocketByContext TCPEventClassify] }
@@ -256,6 +260,63 @@ graph tcp {
 
         } // end cluster: Context
 
+        cluster Send {
+
+            node FindSocket{
+                port toSocket[DataForSocket]
+                port noSockets[ClosedPortAction]
+            }
+
+            node ClosedPortAction{
+                // drop packet
+                port out[..NotifyApp]
+            }
+
+            node DataForSocket{
+                port srvSocket[ServerSocket]
+                port cliSocket[ClientSocket]
+            }
+
+            node ServerSocket{
+                // Selects the next edge based on the current state
+                // of socket and without consulting the packet
+
+                port isEstablished  [CopyDataTxBuffer]
+            }
+
+            node ClientSocket{
+                port isEstablished  [CopyDataTxBuffer]
+            }
+
+            node CopyDataTxBuffer {
+                port out [IsSpaceInTxWindow ..NotifyApp]
+            }
+
+            boolean IsSpaceInTxWindow {
+                port true[SendWindowData]
+                port false[]
+            }
+
+            node SendWindowData {
+               // Following part will be done multiple times.  Once for each packet.
+                port out [SendDataPart]
+            }
+
+            node SendWindowData {
+               // Following part will be done multiple times.  Once for each packet.
+                //port out [SendDataPart SendDataPart SendDataPart SendDataPart]
+                port out [SendDataPart]
+            }
+
+            node SendDataPart {
+               // Carve out the data part to be sent
+                port out [.TxSendEstablishedData]
+            }
+
+        } // end cluster : Send
+
+
+
         cluster Tx {
 
            node SendSyn{
@@ -348,8 +409,8 @@ main :: IO ()
 main = do
 
     putStrLn "Generating .dot files..."
-    myWriteFile "tcpClustered.dot" $ toDotClustered lpgT tcpClusters
+    myWriteFile "tcpClustered2.dot" $ toDotClustered lpgT tcp2Clusters
 
     where
-        lpgT = pgSetType GTLpg tcp
+        lpgT = pgSetType GTLpg tcp2
 

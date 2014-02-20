@@ -6,11 +6,11 @@ flist=`ls *.dot`
 for f in ${flist} ; do
     justFile=`echo ${f} | sed -e "s/.dot//"`
     pdfFile="${justFile}.pdf"
-    #pngFile="${justFile}.png"
-    #dot -Gconcentrate=true -Tpng -o "${pngFile}" "${f}"
+    pngFile="${justFile}.png"
+    dot -Gconcentrate=true -Tpng -o "${pngFile}" "${f}"
     dot -Gconcentrate=true -Tpdf -o "${pdfFile}" "${f}"
     #pdfcrop ${pdfFile}
-    #echo converted "${f} to ${pngFile} and ${pdfFile}"
-    echo converted "${f} to ${pdfFile}"
+    echo converted "${f} to ${pngFile} and ${pdfFile}"
+    #echo converted "${f} to ${pdfFile}"
 done
 

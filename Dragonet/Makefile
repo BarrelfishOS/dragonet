@@ -18,7 +18,8 @@ CC=clang
 #.DEFAULT_GOAL := dpdk
 .DEFAULT_GOAL := tcpGraph_run
 
-useful: graph confgen tuntap #dpdk #impl
+
+useful: graph tcpGraph_run tcpGraph2_run confgen tuntap #dpdk #impl
 
 incrementalSim: base
 	$(GHC) $(GHCFLAGS) -threaded testIncremental.hs -o incrementalSim
@@ -33,6 +34,15 @@ incremental_run: incremental
 	export LD_LIBRARY_PATH=/home/ubuntu/dragonet/dpdk-1.5.0r1/build/lib/ ;   ./incremental
 
 all: models
+
+# generates graphs for tcp protocol SEnd side
+tcpGraph2: base lpgImpl.unicorn
+	$(GHC) $(GHCFLAGS) tcpGraph2.hs -o tcpGraph2
+
+tcpGraph2_run: tcpGraph2
+	./tcpGraph2
+	./convertDot.sh
+
 
 # generates graphs for tcp protocol processing
 tcpGraph: base lpgImpl.unicorn
