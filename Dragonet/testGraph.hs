@@ -12,6 +12,9 @@ import Dragonet.Pipelines
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.Implementation as Impl
 import qualified Data.Graph.Inductive.Graph as DGI
+import qualified Util.GraphHelpers as GH
+import qualified Data.Map as M
+import Util.Misc
 
 import qualified LPGImpl as LPGI -- (graphGen)
 import qualified LPGEx1 as LPG1 -- (graphGen)
@@ -232,8 +235,10 @@ graph lpg {
         port true [Dhcpd]
 	port false[] }
 
-    node Named {}
-    node Dhcpd {}
+    node Named {
+        attr "app" }
+    node Dhcpd {
+        attr "app" }
 }
 |]
 
@@ -245,6 +250,28 @@ myWriteFile fname contents = do
     putStrLn ("Generating " ++ fname ++ " files...")
     writeFile fname contents
 
+-- Merge nodes with the same label that have the app attribute into one, and
+-- update the tag of the kept nodes to be their label
+mergeAppNodes :: PGraph -> PGraph
+mergeAppNodes g =
+    DGI.insEdges newEdges $ DGI.insNodes newNodes $ DGI.delNodes drop g
+    where
+        isAppN n = elem "app" $ nAttributes n
+        appNodes = GH.filterNodesByL isAppN g
+        parted = partListBy (nLabel . snd) appNodes
+        -- Keep one node for each app
+        keep = M.fromList $ map (\(a,b) -> (a, head b)) parted
+        newNodes = map fixKept $ M.elems keep
+        fixKept (n,l) = (n,l { nTag = nLabel l })
+        -- Drop original nodes
+        dropL = concatMap snd parted
+        drop = map fst dropL
+        -- Replacement edges
+        newEdges = concatMap fixEdges dropL
+        fixEdges (n,l) = map (\(s,el) -> (s,rn,el)) $ DGI.lpre g n
+            where (rn,_) = keep M.! nLabel l
+
+
 main :: IO ()
 main = do
     putStrLn "Generating .dot files..."
@@ -253,8 +280,8 @@ main = do
     myWriteFile "prg_conf.dot" $ toDot prgTConf
 
     myWriteFile "embedded.dot" $ toDot $ embedded
-    constrained <- constrain embedded
-    myWriteFile "constrained.dot" $ toDot $ constrained
+    constrained <- fmap mergeAppNodes $ constrain embedded
+    myWriteFile "constrained.dot" $ toDot constrained
 
     -- Divide graph into pipelines
     let plg = generatePLG nodePipeline constrained
