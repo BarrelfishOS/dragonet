@@ -68,7 +68,8 @@ nodeS g prefix (n,l) = BindS varP $ CondE ce te fe
         pMatch p = Match (LitP $ StringL p)
                         (NormalB $ TupE $ map (boolE . (== p) . snd) ss) []
 
-generateFCall :: PGraph Implementation -> String -> Exp
+--generateFCall :: PGraph Implementation -> String -> Exp
+generateFCall :: PGraph -> String -> Exp
 generateFCall g p =
     DoE (ns ++ [NoBindS $ returnE $ TupE []])
     where ns = map (nodeS g p) $ GH.topsortLN g
