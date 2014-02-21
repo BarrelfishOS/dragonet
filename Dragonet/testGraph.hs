@@ -291,7 +291,7 @@ main = do
         ) $ map snd $ DGI.labNodes plg
 
     -- Also use impl graph
-    myWriteFile "lpgImpl.dot" $ toDotClustered lpgTImpl lpgClusters
+    myWriteFile "lpgImpl.dot" $ toDotClustered lpgTImpl LPG2.lpgClusters
     myWriteFile "embeddedImpl.dot" $ toDot $ embeddedImpl
     constrainedImpl <- constrain embeddedImpl
     myWriteFile "constrainedImpl.dot" $ toDot $ constrainedImpl

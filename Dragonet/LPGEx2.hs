@@ -2,7 +2,8 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
 module LPGEx2 (
-    lpg
+    lpg,
+    lpgClusters
 ) where
 
 
