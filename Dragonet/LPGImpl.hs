@@ -27,7 +27,9 @@ module LPGImpl (
     lpgRxL4UDPValidHeaderLengthImpl,
     lpgRxL4UDPValidLengthImpl,
     lpgRxL4UDPValidChecksumImpl,
-    lpgRxL4UDPPortClassifyImpl, -- classify function
+    lpgRxL4UDPPortClassifyTypeImpl,
+    lpgRxL4UDPPortClassifyStaticImpl,
+    lpgRxL4UDPPortClassifyDynamicImpl,
     lpgRxL4UDPClosedPortActionImpl,
 
 --    lpgRxL4UDPOutImpl,
@@ -38,13 +40,20 @@ module LPGImpl (
     -- Applications
     lpgRxDnsAPPImpl,
     lpgRxEchoAPPImpl,
-
+--    lpgRxEchoAppServSocketImpl, -- TCP application
     lpgPacketDropImpl,
 
     -- TCP functions
     lpgRxL4TCPValidHeaderLengthImpl,
-    lpgRxL4TCPOutImpl,
+    lpgRxL4TCPPortClassifyTypeImpl,
+    lpgRxL4TCPPortClassifyStaticImpl,
+    lpgRxL4TCPPortClassifyDynamicImpl,
+    lpgRxL4TCPClosedPortActionImpl,
 
+    -- TCP socket related functions
+    lpgRxL4TCPSocketClassifyImpl,
+    lpgRxL4TCPSocketServerSideImpl, lpgRxL4TCPSocketClientSideImpl,
+    lpgRxL4TCPSocketIsValidSynImpl, lpgRxL4TCPSocketSendSynImpl,
 
     -- UDP TX functions
     lpgTxL4UDPInitiateResponseImpl,
@@ -63,10 +72,6 @@ module LPGImpl (
     -- Port management functions
     lpgRxL4UDPAddPort,
 
-    -- dummy nodes
-    lpgRxL4UDPForwarderDummyImpl,
-    lpgRxL4UDPAppHolderDummyImpl,
-
 ) where
 
 import Dragonet.DotGenerator
@@ -80,6 +85,7 @@ import qualified Dragonet.Implementation.Ethernet as ETH
 import qualified Dragonet.Implementation.IPv4 as IP4
 import qualified Dragonet.Implementation.ICMP as ICMP
 import qualified Dragonet.Implementation.UDP as UDP
+import qualified Dragonet.Implementation.TCP as TCP
 import qualified Dragonet.Implementation.ARP as ARP
 
 import Data.Maybe
@@ -124,7 +130,7 @@ lpgRxL2EtherValidLengthImpl = do
 
 lpgRxL2EtherValidTypeImpl = do
     etype <- ETH.etypeRd
-    debug ("etype is " ++ show(etype))
+--    debug ("etype is " ++ show(etype))
     toPort $ pbool (etype >= 0x0800)
 
 lpgRxL2EtherValidMulticastImpl = do
@@ -184,14 +190,15 @@ lpgRxL3ARPValidHeaderLengthImpl = do
     off <- ARP.headerOff
     len <- packetLen
     let plen = len - off
-    debug ("RxL3ARPValidHeaderLength: "
-        ++ (" len is " ++ show(len))
-        ++ (" off is " ++ show(off))
-        ++ (" plen is "  ++ show (plen))
-        )
+--    debug ("RxL3ARPValidHeaderLength: "
+--        ++ (" len is " ++ show(len))
+--        ++ (" off is " ++ show(off))
+--        ++ (" plen is "  ++ show (plen))
+--        )
+
     if plen >= ARP.headerMinLen then do
         hlen <- ARP.headerLen
-        debug ("toport is "  ++ show (plen) ++ " == " ++ show(hlen))
+--        debug ("toport is "  ++ show (plen) ++ " == " ++ show(hlen))
         toPort $ pbool (plen >= hlen)
     else
         toPort "false"
@@ -199,8 +206,8 @@ lpgRxL3ARPValidHeaderLengthImpl = do
 lpgRxL3ARPClassifyImpl = do
 --    debug "RxL3ARPClassify"
     oper <- ARP.operRd
-    debug ("RxL3ARPClassify oper is " ++ show(oper) ++ " Req is "
-            ++ show(ARP.operRequest) ++ " and res is " ++ show(ARP.operReply) )
+--    debug ("RxL3ARPClassify oper is " ++ show(oper) ++ " Req is "
+--            ++ show(ARP.operRequest) ++ " and res is " ++ show(ARP.operReply) )
 
     toPort $
         if oper == ARP.operRequest then "request"
@@ -211,32 +218,34 @@ lpgRxL3ARPClassifyImpl = do
 
 -- Make sure the request is for Ethernet/IPv4
 lpgRxL3ARPValidRequestImpl = do
-    debug "L3ARPValidRequest"
+--    debug "L3ARPValidRequest"
     htype <- ARP.htypeRd
     ptype <- ARP.ptypeRd
     toPort $ pbool (htype == ARP.htypeEthernet && ptype == ARP.ptypeIPV4)
 
 lpgRxL3ARPLocalIPDestImpl = do
     tpa <- ARP.tpaRd
-    debug ("lpgRxL3ARPLocalIPDestImpl " ++ show (tpa) ++ " "++ show (pack32BE tpa) ++ " " ++ show (cfgLocalIP)  ++ " selectedPort " ++
-        show (pack32BE tpa == cfgLocalIP))
+--    debug ("lpgRxL3ARPLocalIPDestImpl " ++ show (tpa) ++
+        -- " "++ show (pack32BE tpa) ++ " " ++ show (cfgLocalIP)  ++
+        -- " selectedPort " ++
+        -- show (pack32BE tpa == cfgLocalIP))
     toPort $ pbool (pack32BE tpa == cfgLocalIP)
 
 lpgRxL3ARPValidResponseImpl = do
-    debug "RxL3ARPValidResponse"
+--    debug "RxL3ARPValidResponse"
     htype <- ARP.htypeRd
     ptype <- ARP.ptypeRd
     toPort $ pbool (htype == ARP.htypeEthernet && ptype == ARP.ptypeIPV4)
 
 lpgRxL3ARPIsPendingImpl = do
-    debug "RxL3ARPIsPending"
+--    debug "RxL3ARPIsPending"
     gs <- getGS
     ip <- fmap pack32BE ARP.spaRd
     let pending = gsARPPending gs
     toPort $ pbool $ not $ null $ filter ((== ip) . fst) pending
 
 lpgRxL3ARPProcessPendingResponseImpl = do
-    debug "RxL3ARPProcessPendingResponse"
+--    debug "RxL3ARPProcessPendingResponse"
     ip <- fmap pack32BE ARP.spaRd
     mac <- ARP.shaRd
 
@@ -313,7 +322,7 @@ lpgRxL3IPv4ValidLocalIPImpl = do
 
 
     let nextPort = dIP == cfgLocalIP
-    debug ("lpgRxL3IPv4ValidLocalIPImpl:  " ++ (show nextPort))
+--    debug ("lpgRxL3IPv4ValidLocalIPImpl:  " ++ (show nextPort))
     toPort $ pbool $ nextPort
 
 lpgRxL3IPv4ClassifyImpl = do
@@ -342,21 +351,21 @@ lpgRxL3IPv6ValidHeaderLengthImpl = toPort "true"
 -- ICMP
 
 lpgRxL3ICMPValidHeaderLengthImpl = do
-    debug "RxL3ICMPValidHeaderLength"
+--    debug "RxL3ICMPValidHeaderLength"
     len <- packetLen
     off <- ICMP.headerOff
     toPort $ pbool (len - off >= ICMP.headerLen)
 
 lpgRxL3ICMPValidChecksumImpl = do
-    debug "RxL3ICMPValidChecksum"
+--    debug "RxL3ICMPValidChecksum"
     len <- packetLen
     off <- ICMP.headerOff
     pkt <- readP (len - off) off
-    debug ("   "  ++ show (IP4.checksum pkt == 0))
+--    debug ("   "  ++ show (IP4.checksum pkt == 0))
     toPort $ pbool (IP4.checksum pkt == 0)
 
 lpgRxL3ICMPIsTypeRequestImpl = do
-    debug "RxL3ICMPIsTypeRequest"
+--    debug "RxL3ICMPIsTypeRequest"
     t <- ICMP.typeRd
     c <- ICMP.codeRd
     toPort $ pbool (t == ICMP.typeEchoRequest && c == 0x0)
@@ -366,11 +375,11 @@ lpgRxL3ICMPIsTypeRequestImpl = do
 -- UDP
 
 lpgRxL4UDPValidHeaderLengthImpl = do
-    debug "RxL4UDPValidHeaderLengthImpl"
+--    debug "RxL4UDPValidHeaderLengthImpl"
     off <- UDP.headerOff
     len <- packetLen
     let nextPort = ((len - off) >= UDP.headerLen)
-    debug ("RxL4UDPValidHeaderLengthImpl " ++ (show nextPort))
+--    debug ("RxL4UDPValidHeaderLengthImpl " ++ (show nextPort))
     toPort $ pbool nextPort
 
 lpgRxL4UDPValidLengthImpl = do
@@ -378,7 +387,7 @@ lpgRxL4UDPValidLengthImpl = do
     len <- packetLen
     udpLen <- UDP.lengthRd
     let nextPort = (len >= (fromIntegral udpLen) + off)
-    debug ("lpgRxL4UDPValidLengthImpl " ++ (show nextPort))
+--   debug ("lpgRxL4UDPValidLengthImpl " ++ (show nextPort))
     toPort $ pbool nextPort
 
 lpgRxL4UDPValidChecksumImpl = do
@@ -388,20 +397,39 @@ lpgRxL4UDPValidChecksumImpl = do
     pkt <- readP (len - off) off
     ipPH <- IP4.pseudoheader
     let nextPort = (cxsm == 0 || (IP4.checksum (ipPH ++ pkt)) == 0)
-    debug ("lpgRxL4UDPValidChecksumImpl " ++ (show nextPort))
+--    debug ("lpgRxL4UDPValidChecksumImpl " ++ (show nextPort))
     toPort $ pbool nextPort
 
 
 lpgRxL4UDPAddPort portNo appName app = do
     addPortMapping portNo appName  app
 
-lpgRxL4UDPForwarderDummyImpl = do
-    toPort $ "always"
+lpgRxL4UDPPortClassifyTypeImpl = do
+--    toPort $ "dynamic"  -- Use this when using modifying port allocation
+    toPort $ "static" -- Use this when using hardcoded port allocation
 
-lpgRxL4UDPAppHolderDummyImpl = do
-    toPort $ "closedPort"
+-- Classifies incomming connections in static way based on following values
+lpgRxL4UDPPortClassifyStaticImpl = do
+    dport <- UDP.destPortRd
+    sport <- UDP.sourcePortRd
+    poff <- UDP.payloadOff
+    plen <- UDP.payloadLen
+    payload <- readPX plen poff
+    let outPort = if dport == 51098 then "appDNS"
+        else if dport == 5556 then "appEcho"
+        else "closedPort"
+    debug ("Hardcoded Classify: UDP packet with :"
+        ++ "  sport " ++ (show sport)
+        ++ ", dport " ++ (show dport)
+        ++ ", poff " ++ (show poff)
+        ++ ", len " ++ (show plen)
+        ++ ", payload " ++ (show payload)
+        ++ " ====> to ==> " ++ (show outPort)
+        )
+    toPort $ outPort
 
-lpgRxL4UDPPortClassifyImpl = do
+-- Classifies incomming connections in dynamic way based on port table context
+lpgRxL4UDPPortClassifyDynamicImpl = do
     dport <- UDP.destPortRd
     sport <- UDP.sourcePortRd
     poff <- UDP.payloadOff
@@ -413,16 +441,13 @@ lpgRxL4UDPPortClassifyImpl = do
         outPortFun = case portHandler of
             Nothing -> lpgRxL4UDPClosedPortActionImpl
             Just x -> x
-        outPort = "closedPort"
 
-{-
-    -- Hardcoded port classification
-    let outPort = if dport == 51098 then "appDNS"
-        else if dport == 5556 then "appEcho"
-        else "closedPort"
--}
+        outPort = case portHandler of
+            Nothing -> "closedPort"
+            Just _ -> ("SomeApp_" ++ (show dport))
+                -- FIXME: need a way to get application name
 
-    debug ("Classify: UDP packet with :"
+    debug ("Adaptive Classify: UDP packet with :"
         ++ "  sport " ++ (show sport)
         ++ ", dport " ++ (show dport)
         ++ ", poff " ++ (show poff)
@@ -430,9 +455,7 @@ lpgRxL4UDPPortClassifyImpl = do
         ++ ", payload " ++ (show payload)
         ++ " ====> to ==> " ++ (show outPort)
         )
-    toPort $ outPort
     outPortFun
---    toPort $ "closedPort"
 
 lpgRxL4UDPClosedPortActionImpl = do
     dport <- UDP.destPortRd
@@ -447,12 +470,123 @@ lpgRxL4UDPClosedPortActionImpl = do
         ++ ", len " ++ (show plen)
         ++ ", payload " ++ (show payload)
         )
-    toPort $ pbool True
+    toPort $ "out"
 
 -----------------------------------------------------------------------------
 -- TCP
 
-lpgRxL4TCPValidHeaderLengthImpl = toPort "true"
+lpgRxL4TCPValidHeaderLengthImpl = do
+    toPort "true"
+
+
+lpgRxL4TCPPortClassifyTypeImpl = do
+--    toPort $ "dynamic"  -- Use this when using modifying port allocation
+    toPort $ "static" -- Use this when using hardcoded port allocation
+
+-- Classifies incomming connections in dynamic way based on port table context
+lpgRxL4TCPPortClassifyDynamicImpl = do
+    dport <- TCP.destPortRd
+    sport <- TCP.sourcePortRd
+
+    portHandler <- findPortMapping1 $ fromIntegral dport
+    let
+        outPortFun = case portHandler of
+            Nothing -> lpgRxL4TCPClosedPortActionImpl
+            Just x -> x
+
+        outPort = case portHandler of
+            Nothing -> "closedPort"
+            Just _ -> ("SomeApp_" ++ (show dport))
+                -- FIXME: need a way to get application name
+
+    debug ("Adaptive Classify: TCP packet with :"
+        ++ "  sport " ++ (show sport)
+        ++ ", dport " ++ (show dport)
+        ++ " ====> to ==> " ++ (show outPort)
+        )
+    outPortFun
+
+lpgRxL4TCPClosedPortActionImpl = do
+    dport <- TCP.destPortRd
+    sport <- TCP.sourcePortRd
+    debug ("TCP packet on closed port with data:"
+        ++ "  sport " ++ (show sport)
+        ++ ", dport " ++ (show dport)
+        )
+    toPort $ "out"
+
+
+-- Classifies incomming connections in static way based on following values
+lpgRxL4TCPPortClassifyStaticImpl = do
+    dport <- TCP.destPortRd
+    sport <- TCP.sourcePortRd
+    seqNo <- TCP.seqNoRd
+    ackNo <- TCP.ackNoRd
+    urgent <- TCP.urgentRd
+    win <- TCP.windowRd
+    doof <- TCP.dORd
+    flags <- TCP.flagsRd
+    isSyn <- TCP.isSYN
+    isAck <- TCP.isACK
+    isRst <- TCP.isRST
+    isFin <- TCP.isFIN
+    let outPort = if dport == 1234 then "toSocket"
+        else "noSocket"
+    debug ("Static Classify (Hardcoded) : TCP packet with :"
+        ++ "  sport " ++ (show sport)
+        ++ ", dport " ++ (show dport)
+        ++ ", seqNo " ++ (show seqNo)
+        ++ ", ackNo " ++ (show ackNo)
+        ++ ", win " ++ (show win)
+        ++ ", urgent " ++ (show urgent)
+        ++ ", flags " ++ (show flags)
+        ++ ", dataoff " ++ (show doof)
+        ++ ", isSyn " ++ (show isSyn)
+        ++ ", isAck " ++ (show isAck)
+        ++ ", isRst " ++ (show isRst)
+        ++ ", isFin " ++ (show isFin)
+        ++ " ====> to ==> " ++ (show outPort)
+        )
+    toPort $ outPort
+
+-- figures out if the socket is server socket, or client socket
+--      based on the socket descriptor
+lpgRxL4TCPSocketClassifyImpl = do
+    -- FIXME: this should do a lookup and then decide
+    --      if this is client or server socket
+    let outPort = "srvSocket"
+    debug ("socket Classify (Hardcoded) : "
+        ++ " ====> to ==> " ++ (show outPort)
+        )
+    toPort $ outPort
+
+lpgRxL4TCPSocketServerSideImpl = do
+    let outPort = "isListen"
+    debug ("TCPSocketServerSide: state classify (Hardcoded): "
+        ++ " ====> to ==> " ++ (show outPort)
+        )
+    toPort $ outPort
+
+lpgRxL4TCPSocketClientSideImpl = do
+    let outPort = "out"
+    debug ("TCPSocketClientSide: state classify (Hardcoded): "
+        ++ " ====> to ==> " ++ (show outPort)
+        )
+    toPort $ outPort
+
+lpgRxL4TCPSocketIsValidSynImpl = do
+    let outPort = "true"
+    debug ("TCPSocketIsValidSyn: action selection (Hardcoded): "
+        ++ " ====> to ==> " ++ (show outPort)
+        )
+    toPort $ outPort
+
+lpgRxL4TCPSocketSendSynImpl = do
+    let outPort = "out"
+    debug ("TCPSocketSendSyn: No action (Hardcoded): "
+        ++ " ====> to ==> " ++ (show outPort)
+        )
+    toPort $ outPort
 
 -----------------------------------------------------------------------------
 -- Application RX
@@ -461,7 +595,6 @@ lpgRxL4TCPValidHeaderLengthImpl = toPort "true"
 
 -- Sinks
 lpgPacketDropImpl = do { debug "Packet dropped!!!!" ; toPort "" }
-lpgRxL4TCPOutImpl = do { debug "Got TCP packet!" ; toPort "" }
 
 
 lpgRxDnsAPPImpl = do
@@ -494,6 +627,39 @@ lpgRxEchoAPPImpl = do
         )
     toPort "out"
 
+
+-----------------------------
+-- TCP application
+
+lpgRxEchoAppServSocketImpl = do
+    dport <- TCP.destPortRd
+    sport <- TCP.sourcePortRd
+    seqNo <- TCP.seqNoRd
+    ackNo <- TCP.ackNoRd
+    urgent <- TCP.urgentRd
+    win <- TCP.windowRd
+    doof <- TCP.dORd
+    flags <- TCP.flagsRd
+    isSyn <- TCP.isSYN
+    isAck <- TCP.isACK
+    isRst <- TCP.isRST
+    isFin <- TCP.isFIN
+    debug ("TCP Echo Packet with data:"
+        ++ "  sport " ++ (show sport)
+        ++ ", dport " ++ (show dport)
+        ++ ", seqNo " ++ (show seqNo)
+        ++ ", ackNo " ++ (show ackNo)
+        ++ ", win " ++ (show win)
+        ++ ", urgent " ++ (show urgent)
+        ++ ", flags " ++ (show flags)
+        ++ ", dataoff " ++ (show doof)
+--        ++ ", flags " ++ (showIntAtBase 2 intToDigit flags)
+        ++ ", isSyn " ++ (show isSyn)
+        ++ ", isAck " ++ (show isAck)
+        ++ ", isRst " ++ (show isRst)
+        ++ ", isFin " ++ (show isFin)
+        )
+    toPort "out"
 
 -----------------------------------------------------------------------------
 -- Multiplexing for TX queue

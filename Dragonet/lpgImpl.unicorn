@@ -187,29 +187,25 @@ graph lpg {
                 port true false[Valid] }
 
             and Valid {
-                port true[ForwarderDummy]
-//                port true[PortClassify]
+                port true[PortClassifyType]
                 port false[..PacketDrop] }
 
-
-            node ForwarderDummy {
-                port always[PortClassify]
-                port dontcall[AppHolderDummy]
+            node PortClassifyType {
+                port static[PortClassifyStatic]
+                port dynamic[PortClassifyDynamic]
             }
 
-            node AppHolderDummy {
+            node PortClassifyStatic {
                 port appDNS [.DnsAPP]
                 port appEcho [.EchoAPP]
                 port closedPort [ClosedPortAction]
             }
 
-
-
-            node PortClassify {
+            node PortClassifyDynamic {
             }
 
-            boolean ClosedPortAction {
-                port true false[..PacketDrop]
+            node ClosedPortAction {
+                port out[..PacketDrop]
             }
 
         }
@@ -223,11 +219,61 @@ graph lpg {
                 port true false[Valid] }
 
             and Valid {
-                port true[Out]
+                port true[PortClassifyType]
                 port false[..PacketDrop] }
 
-            node Out { }
-        }
+            node PortClassifyType {
+                port static[PortClassifyStatic]
+                port dynamic[PortClassifyDynamic]
+            }
+
+            node PortClassifyStatic {
+//                port appEchoTCP [.EchoAppTCP]
+                port toSocket [SocketClassify]
+                port noSocket [ClosedPortAction]
+            }
+
+            node PortClassifyDynamic {
+            }
+
+            node ClosedPortAction {
+                port out[..PacketDrop]
+            }
+
+            cluster Socket {
+
+            node Classify{
+                port srvSocket[ServerSide]
+                port cliSocket[ClientSide]
+            }
+
+            node ServerSide {
+                // Selects the next edge based on the current state
+                // of socket and without consulting the packet
+
+                port isListen       [IsValidSyn]
+//                port isSynRecv      [IsValidSynAckS] // for simultaneous open
+//                port isEstablished  [IsDataPacket IsValidAck IsFin]
+//                port isLastAck      [IsValidFinAck]
+            }
+
+            node ClientSide {
+                port out []
+            }
+
+            boolean IsValidSyn{
+                port true[SendSyn]
+                port false[...PacketDrop]
+            }
+
+           node SendSyn{
+                port out []
+           }
+
+            } // end cluster: Socket
+
+
+        } // end cluster: L4TCP
 
 
         /*******************************************/
@@ -242,7 +288,6 @@ graph lpg {
                 port out[TagTxUDPIR]
 //                port out[.TxL4UDPInitiateResponse]
                 port drop[.PacketDrop] }
-
 
     /*******************************************/
     /* Multiplexing for TX queue               */
@@ -268,6 +313,7 @@ graph lpg {
     or ToTx {
         port true[.TxDemux]
         port false[] }
+
     } // end cluster: Rx
 
 

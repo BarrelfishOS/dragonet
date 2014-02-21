@@ -14,9 +14,9 @@ CC=clang
 # Setting the default goal to simplify compiling
 #.DEFAULT_GOAL := useful
 #.DEFAULT_GOAL := graph
-#.DEFAULT_GOAL := tuntap
+.DEFAULT_GOAL := tuntap
 #.DEFAULT_GOAL := dpdk
-.DEFAULT_GOAL := tcpGraph_run
+#.DEFAULT_GOAL := tcpGraph_run
 
 
 useful: graph tcpGraph_run tcpGraph2_run confgen tuntap #dpdk #impl
@@ -144,7 +144,7 @@ Util/Dpdk.$(OSUF): Util/Dpdk_.$(OSUF) objfiles
 models: graph_run
 	./convertDot.sh
 
-base: Makefile *.hs */*.hs *.unicorn
+base: Makefile *.hs */*.hs */*/*.hs *.unicorn Dragonet/Implementation/*.hs
 
 clean:
 	rm -f *.hi *.o */*.hi */*.o */*/*.hi */*/*.o $(BINARIES)
