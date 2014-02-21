@@ -52,13 +52,19 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
         outN = partListBy snd3 outE
         outPL = partListBy ((nm M.!) . fst) outN
 
+        -- Find nodes without predecessors
+        sources' = S.fromList $ filter (\n -> null $ DGI.pre g n) $ DGI.nodes g
+        sources = S.toList $ nss `S.intersection` sources'
+
         -- Adapt graph
         (suc,pg) = flip GM.runOn pg' (do
             -- Demux node for incoming edges
-            let demuxPs = map labN inDN ++ ["_"]
+            let demuxPs = map labN inDN ++ (if null sources then [] else ["_"])
             demuxN <- GM.newNode $ PG.baseFNode "Demux" [] demuxPs Nothing
-            mapM_ (\n -> GM.newEdge (demuxN,n, labN n)) inDN
-            -- TODO: Handle original source nodes
+            mapM_ (\n -> GM.newEdge (demuxN, n, labN n)) inDN
+
+            -- Add edges for nodes that were originally without incoming edges
+            mapM_ (\n -> GM.newEdge (demuxN, n, "_")) sources
 
             -- Destination nodes for outgoing queues
             if null outE then
