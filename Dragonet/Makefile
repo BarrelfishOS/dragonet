@@ -19,7 +19,7 @@ CC=clang
 #.DEFAULT_GOAL := tcpGraph_run
 
 
-useful: graph tcpGraph_run tcpGraph2_run confgen tuntap #dpdk #impl
+useful: graph_run tcpGraph_run tcpGraph2_run confgen tuntap #dpdk #impl
 
 incrementalSim: base
 	$(GHC) $(GHCFLAGS) -threaded testIncremental.hs -o incrementalSim
