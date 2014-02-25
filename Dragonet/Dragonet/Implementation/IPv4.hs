@@ -7,7 +7,7 @@ module Dragonet.Implementation.IPv4(
     flagsDF, flagsMF,
     protocolICMP, protocolTCP, protocolUDP,
     headerMinLen, headerLen, headerOff, payloadOff, payloadLen, checksum,
-    pseudoheader, ipFromString, ipToString
+    pseudoheader, pseudoheaderTx, ipFromString, ipToString
 ) where
 
 import Dragonet.Implementation
@@ -210,7 +210,7 @@ checksum p = cxsm
         cxsm32 = xor 0xffff $ foldInt $ foldInt s32
         cxsm = fromIntegral cxsm32 :: Word16
 
--- IPv4 pseudoheader
+-- IPv4 pseudoheader for incomming packet by reading their fields
 pseudoheader :: ImplM [Word8]
 pseudoheader = do
     src <- sourceIPRd
@@ -219,6 +219,20 @@ pseudoheader = do
     len <- payloadLen
     let l = fromIntegral len
     return (unpack32BE src ++ unpack32BE dst ++ [0,proto] ++ unpack16BE l)
+
+
+-- IPv4 pseudoheader for outgoing packet by assuming values for their fields
+pseudoheaderTx :: ImplM [Word8]
+pseudoheaderTx = do
+    (AttrW32 src) <- getAttr "IP4Source"
+    (AttrW32 dst) <- getAttr "IP4Dest"
+    (AttrW8 proto) <- getAttr "IP4Proto"
+    (AttrW16 len) <- getAttr "IP4PayloadLen"
+    debug ("protocol used for calculating checksum = " ++ (show proto))
+    let l = fromIntegral len
+    return (unpack32BE src ++ unpack32BE dst ++ [0,proto] ++ unpack16BE l)
+
+
 
 
 -- Convert IP as string to 32-bit word

@@ -149,8 +149,18 @@ lpgRxL4TCPSocketClassifyImpl = do
 lpgRxL4TCPSocketServerSideImpl = do
 
     dport <- TCP.destPortRd
-    Just portDetails <- findPortMappingTCPSocket $ fromIntegral dport
-    let state = tcpState (head (ptcontextTCP portDetails))
+    sport <- TCP.sourcePortRd
+    listenports <-  findPortMappingTCPSocket (fromIntegral dport)
+    pdtails <- getSpecificSocketTCP sport dport
+    let portDetails = case pdtails of
+            Just x -> x
+            Nothing -> case (listenports) of
+                            Just xx -> (head (ptcontextTCP xx))
+                            Nothing -> error "No socket is in listen or accepted mode"
+
+--    Just portDetails <- findPortMappingTCPSocket $ fromIntegral dport
+    --let state = tcpState (head (ptcontextTCP portDetails))
+    let state = tcpState portDetails
         outPort = case state of
             TCPListen -> "isListen"
 --          TCPSynSent ->
@@ -206,6 +216,28 @@ lpgRxL4TCPSocketAddHalfOpenConnImpl = do
 
     addSocketTCP sport dport newcon
     debug ("AddHalfOpenConn: "
+        ++ " ====> to ==> " ++ (show outPort)
+        )
+    toPort $ outPort
+
+
+lpgRxL4TCPSocketIsValidSynAckImpl = do
+    isSyn <- TCP.isSYN
+    isAck <- TCP.isACK
+    isRst <- TCP.isRST
+    isFin <- TCP.isFIN
+    seqNo <- TCP.seqNoRd
+    ackNo <- TCP.ackNoRd
+    dport <- TCP.destPortRd
+    sport <- TCP.sourcePortRd
+
+    Just sock <- getSpecificSocketTCP sport dport
+    let myseqno = seqNoTCP sock
+        outPort = if (isAck && (seqNo == myseqno + 1) &&
+                     (not isSyn) &&  (not isRst) && (not isFin))
+                    then "true"
+                    else "false"
+    debug ("IsValidSynAck: action selection: "
         ++ " ====> to ==> " ++ (show outPort)
         )
     toPort $ outPort
@@ -305,7 +337,7 @@ lpgTxL4TCPInitiateResponseImpl = do
 --        (setAttr' "TCPAck" $ ackset) $
         (setAttr' "TCPChecksum" $ AttrW16 checksum) $
 
---        (setAttr' "TCPLen" $ AttrW16 (fromIntegral plen')) $
+        (setAttr' "TCPLen" $ AttrW16 (fromIntegral plen)) $
         (setAttr' "TCPPayload" $ AttrD (BS.unpack payload)) $
         (setAttr' "forked" $ AttrI 1) $
         initContext emptyPacket
@@ -347,9 +379,20 @@ lpgTxL4TCPFillHeaderImpl = do
     TCP.flagsWr flags
     TCP.dOWr doof
 
-    -- set checksum
-    TCP.checksumWr checksum
+    -- Calculate checksum
+    pkt <- getPacket
+    pktlen <- packetLen
 
+    -- Following values needs to be set for creating psudo ipv4 header
     setAttr "IP4Proto" $ AttrW8 IP4.protocolTCP
+    setAttr "IP4PayloadLen" $ AttrW16 (fromIntegral pktlen)
+
+    ipPH <- IP4.pseudoheaderTx
+    let csum = IP4.checksum (ipPH ++ (BS.unpack pkt))
+
+    -- set checksum
+    TCP.checksumWr csum
+
     toPort "true"
+
 
