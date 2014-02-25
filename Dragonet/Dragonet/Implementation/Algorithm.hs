@@ -16,7 +16,6 @@ import qualified Data.List as L
 import qualified Data.Map as M
 
 
-
 -- Execute graph. First parameter is expected to be a topologically sorted
 -- list of the graph nodes, the second list is used to store the enablement
 -- indication, so (enabled node, origin, port), and the last argument is the
@@ -70,8 +69,8 @@ executeNodes g ((n,l):ns) ret ss =
                 | nIsONode l = executeOpNode
                 | otherwise = error "CNodes not supported while executing graph"
             outSS' = outSS { ssForked = M.empty }
-        
-            -- Implementation 
+
+            -- Implementation
             executeOpNode
                 | op == OpAnd =
                     ((if L.any (== "false") inValues then "false"

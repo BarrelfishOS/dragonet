@@ -287,7 +287,9 @@ lpgRxL3IPv4ValidLocalIPImpl = do
 
 lpgRxL3IPv4ClassifyImpl = do
     l4off <- IP4.payloadOff
+    l4payloadLen <- IP4.payloadLen
     setAttr "L4Offset" $ AttrI $ l4off
+    setAttr "L4PayloadLen" $ AttrI $ l4payloadLen
     proto <- IP4.protocolRd
     let nextPort = if proto == IP4.protocolICMP then "icmp"
         else if proto == IP4.protocolTCP then "tcp"
@@ -361,8 +363,8 @@ lpgRxL4UDPValidChecksumImpl = do
     toPort $ pbool nextPort
 
 
-lpgRxL4UDPAddPort portNo appName app = do
-    addPortMapping portNo appName  app
+lpgRxL4UDPAddPort portNo socktype  appName app = do
+    addPortMappingUDP portNo socktype appName app
 
 lpgRxL4UDPPortClassifyTypeImpl = do
 --    toPort $ "dynamic"  -- Use this when using modifying port allocation
@@ -396,7 +398,7 @@ lpgRxL4UDPPortClassifyDynamicImpl = do
     plen <- UDP.payloadLen
     payload <- readPX plen poff
 
-    portHandler <- findPortMapping1 $ fromIntegral dport
+    portHandler <- findPortMappingUDP1 $ fromIntegral dport
     let
         outPortFun = case portHandler of
             Nothing -> lpgRxL4UDPClosedPortActionImpl

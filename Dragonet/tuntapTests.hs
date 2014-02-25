@@ -71,32 +71,6 @@ simThread rxC txC state = do
 debugshow = do
     putStrLn $ show funCallList
 
-runSim = do
-    -- create and open a TAP device
-    tap <- TAP.create "dragonet0"
-
-    -- Initialize tap device on linux side
-    uid <- SPU.getRealUserID
-    if uid == 0 then do
-        TAP.set_ip tap "192.168.123.100"
-        TAP.set_mask tap "255.255.255.0"
-        TAP.up tap
-    else do
-        putStrLn ("Warning: Cannot configure Linux-side of TAP device as " ++
-                  "non-root user.")
-
-    -- create rx/tx channels
-    rxC <- TC.newTChanIO
-    txC <- TC.newTChanIO
-
-    -- spawn rx/tx threads
-    _ <- CC.forkIO $ rxThread rxC tap
-    _ <- CC.forkIO $ txThread txC tap
-
-    _ <- CC.forkIO $ simThread rxC txC initialState
-    l <- getLine
-    print l
-
 runSimIncremental = do
     -- create and open a TAP device
     tap <- TAP.create "dragonet0"
@@ -120,14 +94,16 @@ runSimIncremental = do
     _ <- CC.forkIO $ txThread txC tap
 
     -- FIXME: somewhere here, I need to add calls to create new connections
-    --
-    _ <- CC.forkIO $ simThread rxC txC initialState
+    -- Opening new connection
+    let initialState' = addPortMappingTCPGS initialState 1234 "DummyAppTCP"
+                            DNET.ListenSocket DNET.TCPListen
+                            lpgRxL4TCPSocketClassifyImpl
+--                            DNET.ListenSocket lpgRxTCPdynamicPortUsed
+    _ <- CC.forkIO $ simThread rxC txC initialState'
     l <- getLine
     print l
-
 
 main = do
     --debugshow
     runSimIncremental
-    -- runSim
 

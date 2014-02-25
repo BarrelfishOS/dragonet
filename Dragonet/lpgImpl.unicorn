@@ -245,6 +245,7 @@ graph lpg {
             node Classify{
                 port srvSocket[ServerSide]
                 port cliSocket[ClientSide]
+//                port closedSocket[...PacketDrop]
             }
 
             node ServerSide {
@@ -252,9 +253,11 @@ graph lpg {
                 // of socket and without consulting the packet
 
                 port isListen       [IsValidSyn]
-//                port isSynRecv      [IsValidSynAckS] // for simultaneous open
-//                port isEstablished  [IsDataPacket IsValidAck IsFin]
-//                port isLastAck      [IsValidFinAck]
+                port isSynRecv      [] // [IsValidSynAckS] // for simultaneous open
+                port isEstablished  [] // [IsDataPacket IsValidAck IsFin]
+                port isLastAck      [] // [IsValidFinAck]
+                port isClosed       [] //
+
             }
 
             node ClientSide {
@@ -262,12 +265,17 @@ graph lpg {
             }
 
             boolean IsValidSyn{
-                port true[SendSyn]
+                port true[AddHalfOpenConn]
                 port false[...PacketDrop]
             }
 
+            node AddHalfOpenConn{
+                port success[SendSyn]
+                port failure[] // [SendRst]
+            }
+
            node SendSyn{
-                port out []
+                port out[..TagTxTCPIR]
            }
 
             } // end cluster: Socket
@@ -281,18 +289,26 @@ graph lpg {
 
     node EchoAPP {
                 port out[TagTxUDPIR]
-//                port out[.TxL4UDPInitiateResponse]
                 port drop[.PacketDrop] }
 
     node DnsAPP {
                 port out[TagTxUDPIR]
-//                port out[.TxL4UDPInitiateResponse]
                 port drop[.PacketDrop] }
 
     /*******************************************/
     /* Multiplexing for TX queue               */
 
     cluster TagTx {
+
+        boolean TCPIR {
+            port true[.ToTx]
+            //port true[]
+            port false[] }
+
+        boolean UDPIR {
+            port true[.ToTx]
+            port false[] }
+
         boolean ARPIR {
             port true[.ToTx]
             port false[] }
@@ -305,10 +321,7 @@ graph lpg {
             port true[.ToTx]
             port false[] }
 
-        boolean UDPIR {
-            port true[.ToTx]
-            port false[] }
-    }
+    } // end cluster: TagTx
 
     or ToTx {
         port true[.TxDemux]
@@ -319,15 +332,26 @@ graph lpg {
 
     cluster Tx {
         node Demux {
-            port ARPIR[L3ARPInitiateResponse]
-            port ARPLu[L3ARPLookup]
-            port ICMPIR[L3ICMPInitiateResponse]
+            port TCPIR[L4TCPInitiateResponse]
             port UDPIR[L4UDPInitiateResponse]
-//            port DnsIR[L4UDPInitiateResponse]
-//            port EchoIR[L4UDPInitiateResponse]
+            port ICMPIR[L3ICMPInitiateResponse]
+            port ARPLu[L3ARPLookup]
+            port ARPIR[L3ARPInitiateResponse]
             port drop[] }
 
         cluster L4UDP {
+            node InitiateResponse {
+                port out[AllocateHeader]
+		port drop[] }
+
+            node AllocateHeader {
+                port out[FillHeader] }
+
+            boolean FillHeader {
+                port true false[.L3IPv4Prepare] }
+        }
+
+        cluster L4TCP {
             node InitiateResponse {
                 port out[AllocateHeader]
 		port drop[] }

@@ -11,8 +11,9 @@ module Dragonet.Implementation.TCP(
     dORd, dOWr,
     isSYN, isFIN, isACK, isRST, isPSH, isURG,
     setSYN, setFIN, setACK, setRST, setPSH, setURG,
---    lengthRd,
---    headerLen, headerOff, payloadOff, payloadLen,
+
+    getLength,
+    headerLen, headerLenMin,  headerOff, payloadOff, payloadLen,
 ) where
 
 import Dragonet.Implementation
@@ -21,6 +22,9 @@ import Data.Bits
 
 headerOff :: ImplM Int
 headerOff = do { (AttrI i) <- getAttr "L4Offset" ; return i }
+
+getLength :: ImplM Int
+getLength = do { (AttrI i) <- getAttr "L4PayloadLen" ; return i }
 
 fieldOff :: Int -> ImplM Int
 fieldOff o = do { i <- headerOff ; return (i + o) }
@@ -87,16 +91,35 @@ dORd2 = gen8Rd 12
 dORd :: ImplM Word8
 dORd =  do
     b <- gen8Rd dooff
---    let o = dooff
---    b <- readP8 o
-    return (b .&. 0xf0) -- bin(0xf0) = 0b11110000
+    return (shift (b .&. 0xf0) (-4)) -- bin(0xf0) = 0b11110000
 
 dOWr :: Word8 -> ImplM ()
 dOWr v = do
+--    orig <- dORd
     let o = dooff
+        v' = shift (v .&. 0x0f) (4)
     b <- gen8Rd o
-    writeP8 ((b .&. 0x0f) .|. v) o -- bin(0x0f) = '0b00001111'
+    let val = ((b .&. 0x0f) .|. v')
+    debug ("##### DO == " ++ (show val))
+    writeP8 val  o -- bin(0x0f) = '0b00001111'
 
+headerLenMin :: Int
+headerLenMin = 20
+
+
+headerLen :: ImplM Int
+headerLen = do
+    ihl <- dORd
+    return ((fromIntegral ihl) * 4)
+
+payloadLen :: ImplM Int
+payloadLen = do
+    h <- headerLen
+    l <- getLength
+    return ((fromIntegral l) - h)
+
+payloadOff :: ImplM Int
+payloadOff = do { i <- headerOff ; l <- headerLen ; return (i + l) }
 
 -- flags manipulation
 flagsRd2 = gen8Rd 13

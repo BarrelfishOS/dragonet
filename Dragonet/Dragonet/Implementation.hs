@@ -6,6 +6,13 @@ module Dragonet.Implementation(
     GlobalState(..),
     ImplM,
 
+    SocketType(..),
+    UDPContext(..),
+    TCPContext(..),
+    PortTableUDP(..),
+    PortTableTCP(..),
+    TCPState(..),
+
     emptyPacket,
     initContext,
     initSimState,
@@ -39,13 +46,29 @@ module Dragonet.Implementation(
     writeP32BE,
     insertP,
 
-    -- For managing the port state
-    findPortMapping,
-    findPortMapping1,
-    readPortMappings,
-    writePortMappings,
-    removePortMapping,
-    addPortMapping,
+    -- For managing UDP ports
+    findPortMappingUDP,
+    findPortMappingUDP1,
+    readPortMappingsUDP,
+    writePortMappingsUDP,
+    removePortMappingUDP,
+    addPortMappingUDP,
+
+    -- For managing TCP ports
+    getPortMappingTCP,
+    findPortMappingTCP1,
+    readPortMappingsTCP,
+    writePortMappingsTCP,
+    removePortMappingTCP,
+    addPortMappingTCP,
+    findPortMappingTCPSocket,
+
+    getSpecificSocketTCP,
+    getSocketsTCP,
+    addSocketTCP,
+
+    -- For managing TCP ports without monad
+    addPortMappingTCPGS,
 
     debug,
 ) where
@@ -57,6 +80,7 @@ import qualified Data.Map as M
 import Data.Maybe
 import Data.Word
 import Data.Bits
+
 
 type Packet = BS.ByteString
 
@@ -79,26 +103,78 @@ type FunType = Int
 type ImplM a = CS.ConcSM GlobalState Context a
 type Implementation = ImplM String
 
+data SocketType =  ListenSocket | ConnectSocket | CloseSocket | AcceptSocket
+    deriving (Show, Eq)
 
-data PortFunction = PortFunction {
-        pfPortNo :: Int,
-        pfApp :: String,
-        pfImpl :: Implementation
+
+
+-- UDPContext remembers protocol specific information
+data UDPContext =  UDPContext {
+    socketStateUDP  :: SocketType,
+    srcPortUDP      :: Word16,
+    dstPortUDP      :: Word16
+    }
+    deriving (Show, Eq)
+
+data TCPState = TCPClosed | TCPListen | TCPSynSent
+                | TCPSynRecved | TCPEstablished
+                deriving (Show, Eq)
+
+-- TCPContext remembers TCP protocol specific information
+data TCPContext =  TCPContext {
+    socketStateTCP  :: SocketType,
+    srcPortTCP      :: Word16,
+    dstPortTCP      :: Word16,
+    seqNoTCP        :: Word32,
+    ackNoTCP        :: Word32,
+    urgentNoTCP     :: Word16,
+    windowTCP       :: Word16,
+    payloadTCP      :: BS.ByteString,
+    payloadLenTCP   :: Int,
+    tcpState        :: TCPState
+    }
+    deriving (Show, Eq)
+
+-- PortTable: One entry for each port.
+--  This tells us if the port is open, which application owns the port
+--      list of sockets associated with port
+--      (muliple sockets can exist in case of listen socket)
+
+-- FIXME: parameterize this datatype so that I can reuse it for both TCP and UDP.
+data PortTableUDP = PortTableUDP {
+        ptPortNoTCPUDP :: Int, -- Port number
+        ptcontextUDP :: [UDPContext], -- one or more connections
+        ptAppUDP :: String, -- Application name (for debugging)
+        ptImplUDP :: Implementation -- Function to call
     }
 
-instance Eq PortFunction where
- (PortFunction a _ _) == (PortFunction b _ _) = a == b
+instance Eq PortTableUDP where
+ (PortTableUDP a _ _ _) == (PortTableUDP b _ _ _) = a == b
 
-instance Show PortFunction where
-  show (PortFunction a appName _) = (show a) ++ " " ++ (show appName)
+instance Show PortTableUDP where
+  show (PortTableUDP a _ appName _) = (show a) ++ " " ++ (show appName)
+
+data PortTableTCP = PortTableTCP {
+        ptPortNoTCP :: Int, -- Port number
+        ptcontextTCP :: [TCPContext], -- one or more connections
+        ptAppTCP :: String, -- Application name (for debugging)
+        ptImplTCP :: Implementation -- Function to call
+    }
+
+instance Eq PortTableTCP where
+ (PortTableTCP a _ _ _) == (PortTableTCP b _ _ _) = a == b
+
+instance Show PortTableTCP where
+  show (PortTableTCP a _ appName _) = (show a) ++ " " ++ (show appName)
+
 
 data GlobalState = GlobalState {
     gsDebug :: [String],
     gsTXQueue :: [Packet],
     gsARPPending :: [(Word32,Context)],
     gsARPCache :: M.Map Word32 [Word8],
---    gsUDPPorts :: M.Map Word16 FunType
-    gsUDPPorts :: [PortFunction]
+    gsUDPPorts :: [PortTableUDP],
+    gsTCPPorts :: [PortTableTCP]
 } deriving (Show)
 
 
@@ -117,7 +193,8 @@ emptyGS = GlobalState {
         gsTXQueue = [],
         gsARPPending = [],
         gsARPCache = M.empty,
-        gsUDPPorts = []
+        gsUDPPorts = [],
+        gsTCPPorts = []
     }
 
 
@@ -157,7 +234,14 @@ setAttr n v = do
 getAttr :: String -> ImplM AttrValue
 getAttr n = do
     a <- getAttrM n
-    return $ fromJust a
+    ctx <- getCtx
+    gs <- getGS
+    case a of
+        Nothing -> error ("getAttr failed to find attribute: " ++
+                        (show n) ++ ",\n ctx = " ++ (show ctx) ++
+                        ",\n gs = " ++ (show gs))
+        Just x -> return x
+--    return $ fromJust a
 
 getAttrM :: String -> ImplM (Maybe AttrValue)
 getAttrM n = do
@@ -300,6 +384,7 @@ writeP16BE val = writeP (unpack16BE val)
 writeP32BE :: Word32 -> Int -> ImplM ()
 writeP32BE val = writeP (unpack32BE val)
 
+-- Insert len bytes at location off.
 insertP :: Int -> Int -> ImplM ()
 insertP len off = do
     pkt <- getPacket
@@ -308,49 +393,53 @@ insertP len off = do
     putPacket (pre `BS.append` zs `BS.append` suf)
 
 
-readPortMappings :: ImplM [PortFunction]
-readPortMappings = do
+
+------------------------------
+-- UDP port management
+
+readPortMappingsUDP :: ImplM [PortTableUDP]
+readPortMappingsUDP = do
     gs <- getGS
     return $ gsUDPPorts gs
 
-writePortMappings :: [PortFunction] -> ImplM ()
-writePortMappings pm = do
+writePortMappingsUDP :: [PortTableUDP] -> ImplM ()
+writePortMappingsUDP pm = do
     gs <- getGS
     putGS $ gs { gsUDPPorts = pm }
 
 
-
-findPortMapping1 :: Int -> ImplM (Maybe Implementation)
-findPortMapping1 p = do
-        mappings <- readPortMappings
+findPortMappingUDP1 :: Int -> ImplM (Maybe Implementation)
+findPortMappingUDP1 p = do
+        mappings <- readPortMappingsUDP
         -- get portNo. only list, and make sure that it has this port
         --      if not, return Nothing
         --  else
         --      locate the port no. again
-        let found = filter (\x -> ((pfPortNo x) == p) ) mappings
-            usedPorts = map pfPortNo found
+        let found = filter (\x -> ((ptPortNoTCPUDP x) == p) ) mappings
+            usedPorts = map ptPortNoTCPUDP found
             ans = if usedPorts == [] then Nothing
-                    else Just (pfImpl (head found))
+                    else Just (ptImplUDP (head found))
         return $ ans
 
 
-findPortMapping :: Int -> ImplM ([Implementation])
-findPortMapping p = do
-        mappings <- readPortMappings
-        let found = filter (\x -> ((pfPortNo x) == p) ) mappings
-        return $ map pfImpl found
+findPortMappingUDP :: Int -> ImplM ([Implementation])
+findPortMappingUDP p = do
+        mappings <- readPortMappingsUDP
+        let found = filter (\x -> ((ptPortNoTCPUDP x) == p) ) mappings
+        return $ map ptImplUDP found
 
-removePortMapping :: Int -> ImplM ()
-removePortMapping p = do
-        mappings <- readPortMappings
-        let mappings' = filter (\x -> ((pfPortNo x) /= p) ) mappings
-        writePortMappings mappings'
+removePortMappingUDP :: Int -> ImplM ()
+removePortMappingUDP p = do
+        mappings <- readPortMappingsUDP
+        let mappings' = filter (\x -> ((ptPortNoTCPUDP x) /= p) ) mappings
+        writePortMappingsUDP mappings'
 
-addPortMapping :: Int -> String -> Implementation -> ImplM ()
-addPortMapping p appName imp = do
-        mappings <- readPortMappings
-        let mappings' = mappings ++ [(PortFunction p appName imp)]
-        writePortMappings mappings'
+addPortMappingUDP :: Int -> String -> SocketType -> Implementation -> ImplM ()
+addPortMappingUDP p appName stype imp = do
+        mappings <- readPortMappingsUDP
+        let usock = UDPContext stype 0 (fromIntegral p)
+            mappings' = mappings ++ [(PortTableUDP p [usock] appName imp)]
+        writePortMappingsUDP mappings'
 
 
 debug :: String -> ImplM ()
@@ -359,3 +448,159 @@ debug s = do
     --putCtx $ ctx { ctxDebug = (ctxDebug ctx) ++ [s] }
     gs <- getGS
     putGS $ gs { gsDebug = gsDebug gs ++ [s] }
+
+
+------------------------------
+-- Socket and TCP state management
+
+readPortMappingsTCP :: ImplM [PortTableTCP]
+readPortMappingsTCP = do
+    gs <- getGS
+    return $ gsTCPPorts gs
+
+writePortMappingsTCP :: [PortTableTCP] -> ImplM ()
+writePortMappingsTCP pm = do
+    gs <- getGS
+    putGS $ gs { gsTCPPorts = pm }
+
+findPortMappingTCP1 :: Int -> ImplM (Maybe (String, Implementation))
+findPortMappingTCP1 p = do
+        mappings <- readPortMappingsTCP
+        -- get portNo. only list, and make sure that it has this port
+        --      if not, return Nothing
+        --  else
+        --      locate the port no. again
+        let found = filter (\x -> ((ptPortNoTCP x) == p) ) mappings
+            ans = if found == [] then Nothing
+                    else Just ((ptAppTCP (head found)) , (ptImplTCP (head found)))
+        return $ ans
+
+getPortMappingTCP :: Int -> ImplM ([PortTableTCP])
+getPortMappingTCP p = do
+        mappings <- readPortMappingsTCP
+        let found = filter (\x -> ((ptPortNoTCP x) == p) ) mappings
+        return found
+
+findPortMappingTCPSocket :: Int -> ImplM (Maybe PortTableTCP)
+findPortMappingTCPSocket p = do
+        found <- getPortMappingTCP p
+        case found of
+                [] -> return Nothing
+                x:[] -> return $ Just x
+                _   -> error ("More than on port mapping block present "
+                                    ++ (show found))
+
+
+removePortMappingTCP :: Int -> ImplM ()
+removePortMappingTCP p = do
+        mappings <- readPortMappingsTCP
+        let mappings' = filter (\x -> ((ptPortNoTCP x) /= p) ) mappings
+        writePortMappingsTCP mappings'
+
+
+addPortMappingTCP :: Int -> String -> SocketType -> TCPState ->
+                        Implementation -> ImplM ()
+addPortMappingTCP p appName stype tcpS imp = do
+        mappings <- readPortMappingsTCP
+        let usock = TCPContext stype 0 (fromIntegral p) 0 0 0 11 emptyPacket 0 tcpS
+            mappings' = mappings ++ [(PortTableTCP p [usock] appName imp)]
+        writePortMappingsTCP mappings'
+
+
+
+-- Update the portMapping for given port number with new portMapping
+updatePortMappingTCP :: PortTableTCP -> ImplM ()
+updatePortMappingTCP pttcp = do
+        mappings <- readPortMappingsTCP
+        let mappings' = map (\x -> if ((ptPortNoTCP x) == (ptPortNoTCP pttcp))
+                            then pttcp else x)
+                            mappings
+        writePortMappingsTCP mappings'
+
+-- Return all TCP contexts associated with given port
+getSocketsTCP ::  Word16  -> ImplM ([TCPContext])
+getSocketsTCP dport = do
+        socks <- findPortMappingTCPSocket (fromIntegral dport)
+        return (maybe [] ptcontextTCP socks)
+--        m <- getPortMappingTCP (fromIntegral dport)
+--        return $ ptcontextTCP m
+
+
+-- Find specific socket which which matches both source and destination port
+--getSpecificSocketTCP :: Word16 -> Word16 -> ImplM ([TCPContext])
+getSpecificSocketTCP :: Word16 -> Word16 -> ImplM (Maybe TCPContext)
+getSpecificSocketTCP sport dport = do
+        socks <- getSocketsTCP dport
+        let matched = filter (\x -> ((srcPortTCP x) == sport) &&
+                                ((dstPortTCP x) == dport)) socks
+            ans = case matched of
+                [] -> Nothing
+                x:[] -> Just x
+                _  -> error ("More than one matching ports found "
+                        ++ show (matched))
+        debug ("specificSocket for source:" ++ (show sport)
+            ++ ", dest:" ++ (show dport)
+            ++ ", for state: " ++ (show socks)
+            ++ ", \n\nis ===> " ++ (show ans)
+            )
+        return ans
+
+-- Add new socket such with given source and destionation port numbers
+addSocketTCP :: Word16 -> Word16 -> TCPContext -> ImplM()
+addSocketTCP sport dport ctcp = do
+    -- Find portMapping
+    mappings <- getPortMappingTCP (fromIntegral dport)
+    let m = case mappings of
+            [] -> error "No portMapping present to add socket into it."
+            x:[] -> x
+            _ -> error "More than one portMapping present for same port no."
+
+        socks = ptcontextTCP m
+        matched = filter (\x -> ((srcPortTCP x) == sport) &&
+                                ((dstPortTCP x) == dport)) socks
+        ans = case matched of
+            [] -> socks ++ [ctcp]
+            _   -> error ("socket for specified ports exist "
+                                    ++ (show ans))
+    debug "addSocketTCP: new connection added!"
+    updatePortMappingTCP (m {ptcontextTCP = ans})
+
+
+------------------------------
+-- TCP management without monads
+
+wPortMappingsTCP :: GlobalState -> [PortTableTCP] -> GlobalState
+wPortMappingsTCP gs pm =  gs { gsTCPPorts = pm }
+
+fPortMappingTCP1 :: GlobalState -> Int -> Maybe Implementation
+fPortMappingTCP1 gs p = ans
+    where
+    mappings = gsTCPPorts gs
+    found = filter (\x -> ((ptPortNoTCP x) == p) ) mappings
+    usedPorts = map ptPortNoTCP found
+    ans = if usedPorts == [] then Nothing
+          else Just (ptImplTCP (head found))
+
+fPortMappingTCP :: GlobalState -> Int -> [Implementation]
+fPortMappingTCP gs p = ans
+    where
+        mappings = gsTCPPorts gs
+        found = filter (\x -> ((ptPortNoTCP x) == p) ) mappings
+        ans = map ptImplTCP found
+
+rmPortMappingTCP :: GlobalState -> Int -> GlobalState
+rmPortMappingTCP gs p = ans
+    where
+        mappings = gsTCPPorts gs
+        mappings' = filter (\x -> ((ptPortNoTCP x) /= p) ) mappings
+        ans = gs { gsTCPPorts = mappings'}
+
+addPortMappingTCPGS :: GlobalState -> Int -> String -> SocketType ->
+        TCPState -> Implementation -> GlobalState
+addPortMappingTCPGS gs p appName stype tcpS imp = ans
+    where
+        mappings = gsTCPPorts gs
+        usock = TCPContext stype 0 (fromIntegral p) 0 0 0 11 emptyPacket 0 tcpS
+        mappings' = mappings ++ [(PortTableTCP p [usock] appName imp)]
+        ans = gs { gsTCPPorts = mappings'}
+
