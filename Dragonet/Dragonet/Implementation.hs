@@ -67,6 +67,14 @@ module Dragonet.Implementation(
     getSocketsTCP,
     addSocketTCP,
 
+    -- updating socket state
+    updateSocketTCP,
+    updateSocketTCPState,
+    updateSocketTCPSynNo,
+    updateSocketTCPAckNo,
+    updateSocketTCPPayload,
+    decideFlags,
+
     -- For managing TCP ports without monad
     addPortMappingTCPGS,
 
@@ -80,6 +88,7 @@ import qualified Data.Map as M
 import Data.Maybe
 import Data.Word
 import Data.Bits
+import qualified Data.Bits as BITS
 
 
 type Packet = BS.ByteString
@@ -116,7 +125,7 @@ data UDPContext =  UDPContext {
     }
     deriving (Show, Eq)
 
-data TCPState = TCPClosed | TCPListen | TCPSynSent
+data TCPState = TCPClosed | TCPListen | TCPConnect | TCPSynSent
                 | TCPSynRecved | TCPEstablished
                 deriving (Show, Eq)
 
@@ -135,7 +144,25 @@ data TCPContext =  TCPContext {
     }
     deriving (Show, Eq)
 
--- PortTable: One entry for each port.
+decideFlags :: TCPContext -> Word8
+decideFlags sock = flags
+    where
+    fin = 0
+    syn = if (elem (tcpState sock) [TCPListen, TCPSynRecved, TCPConnect]) then 1 else 0
+    rst = 0
+    psh = 0
+    ack = if ((not $ elem (tcpState sock) [TCPListen,  TCPConnect]) &&
+        (ackNoTCP sock /= 0)) then 1 else 0
+    urg = if ((not $ elem (tcpState sock) [TCPListen, TCPConnect]) &&
+        (urgentNoTCP sock /= 0)) then 1 else 0
+    flags = (BITS.shift fin 0) .|. (BITS.shift syn 1) .|.
+            (BITS.shift rst 2) .|. (BITS.shift psh 3) .|.
+            (BITS.shift ack 4) .|. (BITS.shift urg 5)
+
+
+
+
+--PortTable: One entry for each port.
 --  This tells us if the port is open, which application owns the port
 --      list of sockets associated with port
 --      (muliple sockets can exist in case of listen socket)
@@ -538,11 +565,12 @@ getSpecificSocketTCP sport dport = do
                 x:[] -> Just x
                 _  -> error ("More than one matching ports found "
                         ++ show (matched))
-        debug ("specificSocket for source:" ++ (show sport)
+{-        debug ("specificSocket for source:" ++ (show sport)
             ++ ", dest:" ++ (show dport)
             ++ ", for state: " ++ (show socks)
             ++ ", \n\nis ===> " ++ (show ans)
             )
+-}
         return ans
 
 -- Add new socket such with given source and destionation port numbers
@@ -564,6 +592,54 @@ addSocketTCP sport dport ctcp = do
                                     ++ (show ans))
     debug "addSocketTCP: new connection added!"
     updatePortMappingTCP (m {ptcontextTCP = ans})
+
+
+-- Add new socket such with given source and destionation port numbers
+updateSocketTCP :: Word16 -> Word16 -> TCPContext -> ImplM()
+updateSocketTCP sport dport ctcp = do
+    -- Find portMapping
+    mappings <- getPortMappingTCP (fromIntegral dport)
+    let m = case mappings of
+            [] -> error "No portMapping present to add socket into it."
+            x:[] -> x
+            _ -> error "More than one portMapping present for same port no."
+
+        socks = ptcontextTCP m
+        matched = filter (\x -> ((srcPortTCP x) == sport) &&
+                                ((dstPortTCP x) == dport)) socks
+        ans = case matched of
+            []   -> error ("socket for specified ports does not exist ")
+            x:[] -> map (\x -> ( if (((srcPortTCP x) == sport) &&
+                                ((dstPortTCP x) == dport)) then ctcp else x))
+                                socks
+            x:xs -> error ("More than one sockets present for same port mappings"
+                            ++ show (ans))
+    debug "update: connection updated!"
+    updatePortMappingTCP (m {ptcontextTCP = ans})
+
+
+updateSocketTCPState :: Word16 -> Word16 -> TCPState -> ImplM()
+updateSocketTCPState sport dport st = do
+   Just sock <- getSpecificSocketTCP sport dport
+   updateSocketTCP sport dport (sock {tcpState = st})
+
+updateSocketTCPAckNo :: Word16 -> Word16 -> Word32 -> ImplM()
+updateSocketTCPAckNo sport dport ackno = do
+   Just sock <- getSpecificSocketTCP sport dport
+   updateSocketTCP sport dport (sock {ackNoTCP = ackno})
+
+updateSocketTCPSynNo :: Word16 -> Word16 -> Word32 -> ImplM()
+updateSocketTCPSynNo sport dport synno = do
+   Just sock <- getSpecificSocketTCP sport dport
+   updateSocketTCP sport dport (sock {seqNoTCP = synno})
+
+updateSocketTCPPayload :: Word16 -> Word16 -> [Word8] -> ImplM()
+updateSocketTCPPayload sport dport payload = do
+   Just sock <- getSpecificSocketTCP sport dport
+   let payloadlen = length payload
+       payloadBS = BS.pack payload
+   updateSocketTCP sport dport (sock { payloadTCP = payloadBS,
+                payloadLenTCP = payloadlen})
 
 
 ------------------------------

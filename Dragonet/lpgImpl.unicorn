@@ -253,8 +253,8 @@ graph lpg {
                 // of socket and without consulting the packet
 
                 port isListen       [IsValidSyn]
-                port isSynRecv      [] // [IsValidSynAckS] // for simultaneous open
-                port isEstablished  [] // [IsDataPacket IsValidAck IsFin]
+                port isSynRecv      [IsValidSynAckS] // for simultaneous open
+                port isEstablished  [IsDataPacket] // [IsDataPacket IsValidAck IsFin]
                 port isLastAck      [] // [IsValidFinAck]
                 port isClosed       [] //
 
@@ -274,11 +274,39 @@ graph lpg {
                 port failure[] // [SendRst]
             }
 
-           node SendSyn{
-                port out[..TagTxTCPIR]
+           boolean SendSyn{
+                port true[TCPOutMerge]
+                port false[]
            }
 
-            } // end cluster: Socket
+           boolean IsValidSynAckS {
+                port true[SChangeEstablished]
+                port false[...PacketDrop]
+           }
+
+           boolean SChangeEstablished{
+                //port true[TCPOutMerge]
+                port true[]
+                port false[]
+           }
+
+           boolean IsDataPacket { // FIXME: complete the Implementation
+                port true[CopyData] // [.TxSendAck ]
+                //port true[..TagTxTCPIR CopyData] // [.TxSendAck ]
+                port false[]
+           }
+
+           boolean CopyData{
+                // Copy the data into application buffer
+                port true[TCPOutMerge] // [..NotifyApp]
+                port false[]
+           }
+
+            or TCPOutMerge {
+                port true[..TagTxTCPIR]
+                port false[] }
+
+           } // end cluster: Socket
 
 
         } // end cluster: L4TCP

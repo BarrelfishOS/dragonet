@@ -15,6 +15,11 @@ module LPGImpl.LPGImplTCP (
     lpgRxL4TCPSocketIsValidSynImpl, lpgRxL4TCPSocketSendSynImpl,
 
     lpgRxL4TCPSocketAddHalfOpenConnImpl, -- importanat function, sets the connection state
+    lpgRxL4TCPSocketIsValidSynAckSImpl,
+    lpgRxL4TCPSocketIsDataPacketImpl,
+    lpgRxL4TCPSocketCopyDataImpl,
+
+    lpgRxL4TCPSocketSChangeEstablishedImpl,
 
     -- TCP dummy function placeholder
     lpgRxTCPdynamicPortUsed,
@@ -32,6 +37,7 @@ import Dragonet.DotGenerator
 import qualified Dragonet.ProtocolGraph as PG
 import Dragonet.Unicorn
 import Dragonet.Implementation
+import qualified Dragonet.Implementation as IMPL
 
 import qualified Dragonet.Implementation.Ethernet as ETH
 import qualified Dragonet.Implementation.IPv4 as IP4
@@ -182,7 +188,6 @@ lpgRxL4TCPSocketClientSideImpl = do
     toPort $ outPort
 
 lpgRxL4TCPSocketIsValidSynImpl = do
-    -- FIXME: check if packet is actually syn packet or not.
     isSyn <- TCP.isSYN
     isAck <- TCP.isACK
     isRst <- TCP.isRST
@@ -221,7 +226,51 @@ lpgRxL4TCPSocketAddHalfOpenConnImpl = do
     toPort $ outPort
 
 
-lpgRxL4TCPSocketIsValidSynAckImpl = do
+lpgRxL4TCPSocketSChangeEstablishedImpl = do
+    let outPort = "true"
+    dport <- TCP.destPortRd
+    sport <- TCP.sourcePortRd
+    seqNo <- TCP.seqNoRd
+    payloadlen <- TCP.payloadLen
+    updateSocketTCPState sport dport TCPEstablished
+    Just sock <- getSpecificSocketTCP sport dport
+    let newSeqNo = (fromIntegral (seqNoTCP sock)) + 1
+    updateSocketTCPSynNo sport dport newSeqNo
+    let newAckNo = (fromIntegral seqNo) + 1
+    updateSocketTCPAckNo sport dport newAckNo
+
+    debug ("SChangeEstablished: with payload-len " ++  (show payloadlen)
+        ++ " ====> to ==> " ++ (show outPort)
+        )
+    -- FIXME: connect with IsDataPacket or with CopyData when there is data in this packet
+    toPort $ outPort
+
+
+
+lpgRxL4TCPSocketIsValidSynAckSImpl = do
+    isSyn <- TCP.isSYN
+    isAck <- TCP.isACK
+    isRst <- TCP.isRST
+    isFin <- TCP.isFIN
+    seqNo <- TCP.seqNoRd
+    ackNo <- TCP.ackNoRd
+    dport <- TCP.destPortRd
+    sport <- TCP.sourcePortRd
+    flags <- TCP.flagsRd
+
+    Just sock <- getSpecificSocketTCP sport dport
+    let myseqno = seqNoTCP sock
+        outPort = if (isAck && (ackNo == myseqno + 1) &&
+                     (not isSyn) &&  (not isRst) && (not isFin))
+                    then "true"
+                    else "false"
+    debug ("IsValidSynAck: action selection: [ " ++ " flags " ++ (show flags)
+            ++ " ackNo " ++ (show ackNo) ++ " == myseqno " ++ (show myseqno)
+            ++ "] ====> to ==> " ++ (show outPort)
+        )
+    toPort $ outPort
+
+lpgRxL4TCPSocketIsDataPacketImpl = do
     isSyn <- TCP.isSYN
     isAck <- TCP.isACK
     isRst <- TCP.isRST
@@ -233,21 +282,41 @@ lpgRxL4TCPSocketIsValidSynAckImpl = do
 
     Just sock <- getSpecificSocketTCP sport dport
     let myseqno = seqNoTCP sock
-        outPort = if (isAck && (seqNo == myseqno + 1) &&
+        -- FIXME: figure out a proper way to validate ack numbers
+        --outPort = if (isAck && (ackNo == myseqno + 1) &&
+        outPort = if (isAck && -- (ackNo == myseqno + 1) &&
                      (not isSyn) &&  (not isRst) && (not isFin))
                     then "true"
                     else "false"
-    debug ("IsValidSynAck: action selection: "
+    debug ("IsValidData: "
         ++ " ====> to ==> " ++ (show outPort)
         )
     toPort $ outPort
 
+lpgRxL4TCPSocketCopyDataImpl = do
+    dport <- TCP.destPortRd
+    sport <- TCP.sourcePortRd
+    payload <- TCP.getPayload
+    seqNo <- TCP.seqNoRd
+    payloadlen <- TCP.payloadLen
+    Just sock <- getSpecificSocketTCP sport dport
+--    let newAckNo = (fromIntegral (ackNoTCP sock) + (fromIntegral payloadlen))
+    let newAckNo = (fromIntegral seqNo) + (fromIntegral payloadlen)
+
+    updateSocketTCPAckNo sport dport newAckNo
+    debug ("############## Data of size " ++ (show payloadlen)
+            ++ " for application: " ++ (show payload))
+    let outPort = if (payloadlen == 0) then "false" else "true"
+    toPort $ outPort
+
+
 
 lpgRxL4TCPSocketSendSynImpl = do
-    let outPort = "out"
-    debug ("TCPSocketSendSyn: No action (Hardcoded): "
+    let outPort = "true"
+    debug ("TCPSocketSendSyn: "
         ++ " ====> to ==> " ++ (show outPort)
         )
+    -- FIXME: make explicit operation for updating ACK no.
     toPort $ outPort
 
 
@@ -307,20 +376,25 @@ lpgTxL4TCPInitiateResponseImpl = do
     srcIP <- IP4.destIPRd
 
     let checksum = 0
-        seqNo = seqNoTCP sock
-        ackNo = ackNoTCP sock
-        window = windowTCP sock
-        urgent = urgentNoTCP sock
+        seqNo = IMPL.seqNoTCP sock
+        ackNo = IMPL.ackNoTCP sock
+        window = IMPL.windowTCP sock
+        urgent = IMPL.urgentNoTCP sock
+
+        -- FIXME: Get the header size from socket option, and don't hardcode it.
         doof = 5 -- minimum size in 32 bits unit (4 bytes unit)
-
         poff = doof * 4 -- Minimum header size in bytes
-        plen = payloadLenTCP sock
---        plen' <- TCP.getLength
-        payload = payloadTCP sock -- readPX plen poff
 
+        plen = IMPL.payloadLenTCP sock
+        payload = IMPL.payloadTCP sock -- readPX plen poff
+
+        sockState = IMPL.tcpState sock
+
+        -- Get flags from socket state
 --        synset = True
 --        ackset = True
-        flags = 0x12    -- 0b010010
+        -- flags = 0x12    -- 0b010010
+        flags = decideFlags sock
 
     forkPkt $ return $
         (setAttr' "IP4Dest" $ AttrW32 dstIP) $
@@ -333,8 +407,6 @@ lpgTxL4TCPInitiateResponseImpl = do
         (setAttr' "TCPUrgent" $ AttrW16 urgent) $
         (setAttr' "TCPdataoff" $ AttrW8 doof) $
         (setAttr' "TCPFlags" $ AttrW8 flags) $
---        (setAttr' "TCPSyn" $ synset) $
---        (setAttr' "TCPAck" $ ackset) $
         (setAttr' "TCPChecksum" $ AttrW16 checksum) $
 
         (setAttr' "TCPLen" $ AttrW16 (fromIntegral plen)) $
@@ -342,6 +414,8 @@ lpgTxL4TCPInitiateResponseImpl = do
         (setAttr' "forked" $ AttrI 1) $
         initContext emptyPacket
     f <- getAttrM "forked"
+    debug ("###### flags for state " ++ (show sockState) ++
+            " are " ++ (show flags))
     if isJust f then do
         dropAttr "forked"
         insertP plen 0

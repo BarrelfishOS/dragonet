@@ -36,15 +36,18 @@ data NetEvent =
     RXEvent BS.ByteString |
     TXEvent BS.ByteString
 
-rxThread c tap = M.forever $ do
-    p <- TAP.readbs tap
-    putStrLn "received Packet"
-    STM.atomically $ TC.writeTChan c (RXEvent p)
+rxThread c tap done = do
+    M.forever $ do
+        p <- TAP.readbs tap
+        putStrLn "received Packet"
+        STM.atomically $ TC.writeTChan c (RXEvent p)
 
-txThread c tap = M.forever $ do
-    (TXEvent p) <- STM.atomically $ TC.readTChan c
-    putStrLn "Send Packet"
-    TAP.writebs tap p
+txThread c tap done = do
+    M.forever $ do
+        (TXEvent p) <- STM.atomically $ TC.readTChan c
+        putStrLn "Send Packet"
+        TAP.writebs tap p
+    CC.putMVar done ()
 
 simStep rxC txC state = do
     e <- TC.readTChan rxC
@@ -68,10 +71,14 @@ simThread rxC txC state = do
     let state'' = state' { DNET.gsDebug = [], DNET.gsTXQueue = [] }
     simThread rxC txC state''
 
+
 debugshow = do
     putStrLn $ show funCallList
 
 runSimIncremental = do
+
+    done <- CC.newEmptyMVar
+
     -- create and open a TAP device
     tap <- TAP.create "dragonet0"
 
@@ -90,8 +97,8 @@ runSimIncremental = do
     txC <- TC.newTChanIO
 
     -- spawn rx/tx threads
-    _ <- CC.forkIO $ rxThread rxC tap
-    _ <- CC.forkIO $ txThread txC tap
+    rxtid <- CC.forkIO $ rxThread rxC tap done
+    txtid <- CC.forkIO $ txThread txC tap done
 
     -- FIXME: somewhere here, I need to add calls to create new connections
     -- Opening new connection
@@ -99,11 +106,16 @@ runSimIncremental = do
                             DNET.ListenSocket DNET.TCPListen
                             lpgRxL4TCPSocketClassifyImpl
 --                            DNET.ListenSocket lpgRxTCPdynamicPortUsed
-    _ <- CC.forkIO $ simThread rxC txC initialState'
-    l <- getLine
-    print l
+    simtid <- CC.forkIO $ simThread rxC txC initialState'
+
+    CC.takeMVar done  -- blocks till MVar is full
+
+--    l <- getLine
+--    print l
 
 main = do
     --debugshow
     runSimIncremental
+
+
 

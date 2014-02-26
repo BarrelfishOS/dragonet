@@ -20,6 +20,10 @@ CC=clang
 
 
 useful: graph_run tcpGraph_run tcpGraph2_run confgen tuntap #dpdk #impl
+	echo "Removing all png except the one which I want"
+	rm `find *.png | grep -v "lpgImpl" | grep -v "tcp*"`
+
+
 
 incrementalSim: base
 	$(GHC) $(GHCFLAGS) -threaded testIncremental.hs -o incrementalSim
@@ -42,7 +46,6 @@ tcpGraph2: base lpgImpl.unicorn
 tcpGraph2_run: tcpGraph2
 	./tcpGraph2
 	./convertDot.sh
-
 
 # generates graphs for tcp protocol processing
 tcpGraph: base lpgImpl.unicorn

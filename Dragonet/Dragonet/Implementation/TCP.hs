@@ -14,6 +14,8 @@ module Dragonet.Implementation.TCP(
 
     getLength,
     headerLen, headerLenMin,  headerOff, payloadOff, payloadLen,
+    getPayload,
+
 ) where
 
 import Dragonet.Implementation
@@ -100,7 +102,7 @@ dOWr v = do
         v' = shift (v .&. 0x0f) (4)
     b <- gen8Rd o
     let val = ((b .&. 0x0f) .|. v')
-    debug ("##### DO == " ++ (show val))
+--    debug ("##### DO == " ++ (show val))
     writeP8 val  o -- bin(0x0f) = '0b00001111'
 
 headerLenMin :: Int
@@ -120,6 +122,12 @@ payloadLen = do
 
 payloadOff :: ImplM Int
 payloadOff = do { i <- headerOff ; l <- headerLen ; return (i + l) }
+
+getPayload :: ImplM ([Word8])
+getPayload = do
+    poff <- payloadOff
+    plen <- payloadLen
+    readPX plen poff
 
 -- flags manipulation
 flagsRd2 = gen8Rd 13
@@ -162,11 +170,11 @@ setRST = setGenFlag 2
 isPSH = isGenFlagSet 3
 setPSH = setGenFlag 3
 
-isACK = isGenFlagSet 5
-setACK = setGenFlag 5
+isACK = isGenFlagSet 4
+setACK = setGenFlag 4
 
-isURG = isGenFlagSet 6
-setURG = setGenFlag 6
+isURG = isGenFlagSet 5
+setURG = setGenFlag 5
 
 
 
