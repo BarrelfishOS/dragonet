@@ -126,7 +126,9 @@ data UDPContext =  UDPContext {
     deriving (Show, Eq)
 
 data TCPState = TCPClosed | TCPListen | TCPConnect | TCPSynSent
-                | TCPSynRecved | TCPEstablished
+                | TCPSynRecved | TCPEstablished | TCPCloseWait
+                | TCPLastAck | TCPFinWait1 | TCPFinWait2 | TCPClosing
+                | TCPTimeWait
                 deriving (Show, Eq)
 
 -- TCPContext remembers TCP protocol specific information
@@ -147,7 +149,7 @@ data TCPContext =  TCPContext {
 decideFlags :: TCPContext -> Word8
 decideFlags sock = flags
     where
-    fin = 0
+    fin = if (elem (tcpState sock) [TCPCloseWait, TCPLastAck]) then 1 else 0
     syn = if (elem (tcpState sock) [TCPListen, TCPSynRecved, TCPConnect]) then 1 else 0
     rst = 0
     psh = 0

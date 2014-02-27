@@ -15,11 +15,26 @@ module LPGImpl.LPGImplTCP (
     lpgRxL4TCPSocketIsValidSynImpl, lpgRxL4TCPSocketSendSynImpl,
 
     lpgRxL4TCPSocketAddHalfOpenConnImpl, -- importanat function, sets the connection state
-    lpgRxL4TCPSocketIsValidSynAckSImpl,
-    lpgRxL4TCPSocketIsDataPacketImpl,
+
     lpgRxL4TCPSocketCopyDataImpl,
 
+    -- state change nodes
     lpgRxL4TCPSocketSChangeEstablishedImpl,
+    lpgRxL4TCPSocketSChangeCloseWaitImpl,
+    lpgRxL4TCPSocketSChangeToClosedImpl,
+    lpgRxL4TCPSocketSChangeToClosed2Impl,
+    lpgRxL4TCPSocketSChangeLastAckImpl,
+
+    -- condition check nodes
+    lpgRxL4TCPSocketIsValidSynAckSImpl,
+    lpgRxL4TCPSocketIsDataPacketImpl,
+    lpgRxL4TCPSocketIsFinSetImpl,
+    lpgRxL4TCPSocketIsValidFinAckImpl,
+    lpgRxL4TCPSocketIsValidFinAck2Impl,
+
+
+    -- Error condition handling
+    lpgRxL4TCPSocketInClosedImpl,
 
     -- TCP dummy function placeholder
     lpgRxTCPdynamicPortUsed,
@@ -29,6 +44,8 @@ module LPGImpl.LPGImplTCP (
     lpgTxL4TCPInitiateResponseImpl,
     lpgTxL4TCPAllocateHeaderImpl,
     lpgTxL4TCPFillHeaderImpl,
+
+
 
 ) where
 
@@ -153,7 +170,6 @@ lpgRxL4TCPSocketClassifyImpl = do
 
 
 lpgRxL4TCPSocketServerSideImpl = do
-
     dport <- TCP.destPortRd
     sport <- TCP.sourcePortRd
     listenports <-  findPortMappingTCPSocket (fromIntegral dport)
@@ -172,6 +188,8 @@ lpgRxL4TCPSocketServerSideImpl = do
 --          TCPSynSent ->
             TCPSynRecved -> "isSynRecv"
             TCPEstablished -> "isEstablished"
+            TCPCloseWait -> "isCloseWait"
+            TCPLastAck -> "isLastAck"
             TCPClosed -> "isClosed"
             _ -> "isClosed"
 
@@ -179,6 +197,15 @@ lpgRxL4TCPSocketServerSideImpl = do
         ++ " ====> to ==> " ++ (show outPort)
         )
     toPort $ outPort
+
+
+lpgRxL4TCPSocketInClosedImpl = do
+    let outPort = "out"
+    debug ("TCPSocketInClosedState: incomming packet on closed socket "
+        ++ " ====> to ==> " ++ (show outPort)
+        )
+    toPort $ outPort
+
 
 lpgRxL4TCPSocketClientSideImpl = do
     let outPort = "out"
@@ -285,13 +312,90 @@ lpgRxL4TCPSocketIsDataPacketImpl = do
         -- FIXME: figure out a proper way to validate ack numbers
         --outPort = if (isAck && (ackNo == myseqno + 1) &&
         outPort = if (isAck && -- (ackNo == myseqno + 1) &&
-                     (not isSyn) &&  (not isRst) && (not isFin))
+                     (not isSyn) &&  (not isRst)) --  && (not isFin)
                     then "true"
                     else "false"
-    debug ("IsValidData: "
-        ++ " ====> to ==> " ++ (show outPort)
+    debug ("IsValidData: " ++ " ====> to ==> " ++ (show outPort))
+    toPort $ outPort
+
+-- Check if the fin flag is set
+lpgRxL4TCPSocketIsFinSetImpl = do
+    isFin <- TCP.isFIN
+    let outPort = if (isFin) then "true" else "false"
+    debug ("IsFin: " ++ " ====> to ==> " ++ (show outPort))
+    toPort $ outPort
+
+lpgRxL4TCPSocketIsValidFinAckImpl = do
+    isAck <- TCP.isACK
+    isSyn <- TCP.isSYN
+    isRst <- TCP.isRST
+    isFin <- TCP.isFIN
+    seqNo <- TCP.seqNoRd
+    ackNo <- TCP.ackNoRd
+    dport <- TCP.destPortRd
+    sport <- TCP.sourcePortRd
+
+    Just sock <- getSpecificSocketTCP sport dport
+    let myseqno = seqNoTCP sock
+        outPort = if (isAck && (ackNo == myseqno + 1) &&
+                     (not isSyn) &&  (not isRst)) -- && (not isFin))
+                    then "true"
+                    else "false"
+    debug ("IsValidFinAck: action selection: [ "
+            ++ " ackNo " ++ (show ackNo) ++ " == myseqno " ++ (show myseqno)
+            ++ "] ====> to ==> " ++ (show outPort)
         )
     toPort $ outPort
+
+lpgRxL4TCPSocketIsValidFinAck2Impl = lpgRxL4TCPSocketIsValidFinAckImpl
+
+lpgRxL4TCPSocketSChangeCloseWaitImpl = do
+    let outPort = "true"
+    dport <- TCP.destPortRd
+    sport <- TCP.sourcePortRd
+    seqNo <- TCP.seqNoRd
+    payloadlen <- TCP.payloadLen
+    updateSocketTCPState sport dport TCPCloseWait
+    let newAckNo = (fromIntegral seqNo) + 1 -- (fromIntegral payloadlen)
+    updateSocketTCPAckNo sport dport newAckNo
+    debug ("SChangeCloseWait: state reached " ++ " ====> to ==> "
+            ++ (show outPort))
+    toPort $ outPort
+
+
+
+lpgRxL4TCPSocketSChangeLastAckImpl = do
+    let outPort = "true"
+    dport <- TCP.destPortRd
+    sport <- TCP.sourcePortRd
+    seqNo <- TCP.seqNoRd
+    isAck <- TCP.isACK
+    payloadlen <- TCP.payloadLen
+    updateSocketTCPState sport dport TCPLastAck
+
+    Just sock <- getSpecificSocketTCP sport dport
+--    let mysynno = seqNoTCP sock
+--        newSynNo = (fromIntegral mysynno) + 1
+--    updateSocketTCPSynNo sport dport newSynNo
+    let newAckNo = (fromIntegral seqNo) + 1 -- (fromIntegral payloadlen)
+    updateSocketTCPAckNo sport dport newAckNo
+    debug ("SChangeLastAck: state reached " ++ " ====> to ==> "
+            ++ (show outPort))
+    toPort $ outPort
+
+
+lpgRxL4TCPSocketSChangeToClosedImpl = do
+    let outPort = "true"
+    dport <- TCP.destPortRd
+    sport <- TCP.sourcePortRd
+    updateSocketTCPState sport dport TCPClosed
+    debug ("SChangeToClosed: state reached " ++ " ====> to ==> "
+            ++ (show outPort))
+    toPort $ outPort
+
+
+lpgRxL4TCPSocketSChangeToClosed2Impl = lpgRxL4TCPSocketSChangeToClosedImpl
+
 
 lpgRxL4TCPSocketCopyDataImpl = do
     dport <- TCP.destPortRd
@@ -302,12 +406,13 @@ lpgRxL4TCPSocketCopyDataImpl = do
     Just sock <- getSpecificSocketTCP sport dport
 --    let newAckNo = (fromIntegral (ackNoTCP sock) + (fromIntegral payloadlen))
     let newAckNo = (fromIntegral seqNo) + (fromIntegral payloadlen)
-
     updateSocketTCPAckNo sport dport newAckNo
     debug ("############## Data of size " ++ (show payloadlen)
             ++ " for application: " ++ (show payload))
     let outPort = if (payloadlen == 0) then "false" else "true"
     toPort $ outPort
+
+
 
 
 

@@ -254,10 +254,17 @@ graph lpg {
 
                 port isListen       [IsValidSyn]
                 port isSynRecv      [IsValidSynAckS] // for simultaneous open
-                port isEstablished  [IsDataPacket] // [IsDataPacket IsValidAck IsFin]
-                port isLastAck      [] // [IsValidFinAck]
-                port isClosed       [] //
+                port isEstablished  [IsDataPacket IsFinSet] // [IsDataPacket IsValidAck IsFin]
+                port isCloseWait    [IsValidFinAck] // FIXME: This transition is pretty much invalid,
+                                            // and should not happen
+                port isLastAck      [IsValidFinAck2]
+                port isClosed       [InClosed] //
 
+            }
+
+            node InClosed {
+            // To handle err condition of packets coming in closed state socket
+                port out[...PacketDrop]
             }
 
             node ClientSide {
@@ -284,6 +291,17 @@ graph lpg {
                 port false[...PacketDrop]
            }
 
+
+           boolean IsValidFinAck {
+                port true[SChangeToClosed]
+                port false[]
+           }
+
+           boolean IsValidFinAck2 {
+                port true[SChangeToClosed2]
+                port false[]
+           }
+
            boolean SChangeEstablished{
                 //port true[TCPOutMerge]
                 port true[]
@@ -292,9 +310,37 @@ graph lpg {
 
            boolean IsDataPacket { // FIXME: complete the Implementation
                 port true[CopyData] // [.TxSendAck ]
-                //port true[..TagTxTCPIR CopyData] // [.TxSendAck ]
                 port false[]
            }
+
+           boolean IsFinSet{ // FIXME: Implement
+                // Copy the data into application buffer
+                port true[SChangeLastAck] // [..NotifyApp]
+                port false[]
+           }
+
+/*           boolean SChangeCloseWait {
+                port true[TCPOutMerge]
+                port false[]
+           }
+*/
+
+           boolean SChangeLastAck{
+                port true[TCPOutMerge]
+                port false[]
+           }
+
+
+           boolean SChangeToClosed{
+                port true[TCPOutMerge]
+                port false[]
+           }
+
+           boolean SChangeToClosed2{
+                port true[]
+                port false[]
+           }
+
 
            boolean CopyData{
                 // Copy the data into application buffer

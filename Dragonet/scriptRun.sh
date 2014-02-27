@@ -13,3 +13,5 @@ sudo kill $TUNTAP_PID
 sudo killall tuntap
 sudo killall tcpdump
 
+cat rawPacketLog.log | tcpdump -lnr -
+#wireshark rawPacketLog.log

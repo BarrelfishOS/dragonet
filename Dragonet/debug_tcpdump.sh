@@ -4,4 +4,5 @@ sudo tcpdump -n -i dragonet0 tcp -U -s 1500 -w - | tee rawPacketLog.log | tcpdum
 
 # use following command to analyze the packet logs with tcpdump.
 # wireshark rawPacketLog.log
+# cat rawPacketLog.log | tcpdump -lnr -
 
