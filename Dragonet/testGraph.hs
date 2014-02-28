@@ -296,6 +296,14 @@ main = do
     constrainedImpl <- constrain embeddedImpl
     myWriteFile "constrainedImpl.dot" $ toDot $ constrainedImpl
 
+    putStrLn $ show LPG2.lpgClusters
+
+    let plg' = generatePLG (nodeImplPipeline LPG2.lpgClusters) lpgTImpl
+    myWriteFile "pipelines_impl.dot" $ pipelinesDot plg'
+    mapM_ (\pl ->
+        myWriteFile ("pli_" ++ plLabel pl ++ ".dot") $ toDot $ plGraph pl
+        ) $ map snd $ DGI.labNodes plg'
+
 
     where
         lpgT = pgSetType GTLpg lpg
@@ -310,4 +318,9 @@ main = do
         embeddedImpl = fullEmbedding prgTConf lpgTImpl
 
         nodePipeline (_,n) = nTag n
+        nodeImplPipeline cl (n,_) =
+            case lookup n cl of
+                Just [] -> "rest"
+                Just c -> last c
+                Nothing -> "rest"
 
