@@ -7,10 +7,12 @@ for f in ${flist} ; do
     justFile=`echo ${f} | sed -e "s/.dot//"`
     pdfFile="${justFile}.pdf"
     pngFile="${justFile}.png"
+    svgFile="${justFile}.svg"
     dot -Gconcentrate=true -Tpng -o "${pngFile}" "${f}"
     dot -Gconcentrate=true -Tpdf -o "${pdfFile}" "${f}"
+    dot -Gconcentrate=true -Tsvg -o "${svgFile}" "${f}"
     #pdfcrop ${pdfFile}
-    echo converted "${f} to ${pngFile} and ${pdfFile}"
+    echo converted "${f} to ${pngFile} and ${pdfFile} ${svgFile}"
     #echo converted "${f} to ${pdfFile}"
 done
 

@@ -189,17 +189,20 @@ toDotClusteredWith nlf plf g cs =
 --------------------------------------------------------------------------------
 -- Code for pipeline graphs
 
-plFormatNode :: PL.PLNode -> GA.Attributes
-plFormatNode (_,p) = [lbl]
+plFormatNode :: Maybe (PL.Pipeline -> String) -> PL.PLNode -> GA.Attributes
+plFormatNode lmap (_,p) = [lbl] ++ url
     where
         lbl = GA.Label $ GA.StrLabel $ t $ PL.plLabel p
+        url = case lmap of
+            Just m -> [GA.URL $ t $ m p]
+            Nothing -> []
 
 -- Get graph showing only the pipelines
-pipelinesDot :: PL.PLGraph -> String
-pipelinesDot plg = dotString $ GV.graphToDot p plg
+pipelinesDot :: Maybe (PL.Pipeline -> String) -> PL.PLGraph -> String
+pipelinesDot lmap plg = dotString $ GV.graphToDot p plg
     where
         p = GV.nonClusteredParams {
-            GV.fmtNode = plFormatNode,
+            GV.fmtNode = plFormatNode lmap,
             GV.globalAttributes = [GV.GraphAttrs [GA.RankDir GA.FromLeft]]
         }
 

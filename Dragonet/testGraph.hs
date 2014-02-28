@@ -12,6 +12,9 @@ import Dragonet.Pipelines
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.Implementation as Impl
 import qualified Data.Graph.Inductive.Graph as DGI
+import qualified Data.GraphViz as GV
+import qualified Data.GraphViz.Attributes.Complete as GA
+import qualified Data.Text.Lazy as T
 import qualified Util.GraphHelpers as GH
 import qualified Data.Map as M
 import Util.Misc
@@ -285,7 +288,7 @@ main = do
 
     -- Divide graph into pipelines
     let plg = generatePLG nodePipeline constrained
-    myWriteFile "pipelines.dot" $ pipelinesDot plg
+    myWriteFile "pipelines.dot" $ pipelinesDot Nothing plg
     mapM_ (\pl ->
         myWriteFile ("pl_" ++ plLabel pl ++ ".dot") $ toDot $ plGraph pl
         ) $ map snd $ DGI.labNodes plg
@@ -299,10 +302,11 @@ main = do
     putStrLn $ show LPG2.lpgClusters
 
     let plg' = generatePLG (nodeImplPipeline LPG2.lpgClusters) lpgTImpl
-    myWriteFile "pipelines_impl.dot" $ pipelinesDot plg'
+    myWriteFile "pipelines_impl.dot" $ pipelinesDot (Just linkMap) plg'
     mapM_ (\pl ->
-        myWriteFile ("pli_" ++ plLabel pl ++ ".dot") $ toDot $ plGraph pl
-        ) $ map snd $ DGI.labNodes plg'
+        myWriteFile ("pli_" ++ plLabel pl ++ ".dot") $
+            toDotWith' (plDotParams pl) $ plGraph pl) $
+            map snd $ DGI.labNodes plg'
 
 
     where
@@ -323,4 +327,9 @@ main = do
                 Just [] -> "rest"
                 Just c -> last c
                 Nothing -> "rest"
+        linkMap pl = "pli_" ++ plLabel pl ++ ".svg"
+        plDotParams pl p = p {
+            GV.globalAttributes = GV.globalAttributes p ++ [
+                GV.GraphAttrs [GA.Label $ GA.StrLabel $ T.pack $ plLabel pl,
+                               GA.LabelLoc $ GA.VTop]] }
 
