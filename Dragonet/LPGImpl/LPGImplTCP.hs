@@ -243,10 +243,21 @@ lpgRxL4TCPSocketAddHalfOpenConnImpl = do
         myWindow = 13
         payload = emptyPacket
         payloadLen = 0
-        newcon = TCPContext AcceptSocket sport dport mySeqNo ackNo
-                    urgentNo myWindow payload payloadLen  TCPSynRecved
-
-    addSocketTCP sport dport newcon
+        newcon = defaultTCPContext dport AcceptSocket TCPSynRecved
+        newcon' = newcon {
+                        srcPortTCP      = sport,
+                        seqNoTCP        = mySeqNo,
+                        ackNoTCP        = ackNo,
+                        windowTCP       = myWindow,
+                        snd_iss_TCP     = 85,
+                        snd_una_TCP     = mySeqNo,
+                        snd_nxt_TCP     = mySeqNo,
+                        snd_wnd_TCP     = win,
+                        rcv_iss_TCP     = seqNo,
+                        rcv_nxt_TCP     = ackNo,
+                        rcv_wnd_TCP     = myWindow
+                     }
+    addSocketTCP sport dport newcon'
     debug ("AddHalfOpenConn: "
         ++ " ====> to ==> " ++ (show outPort)
         )
@@ -259,13 +270,23 @@ lpgRxL4TCPSocketSChangeEstablishedImpl = do
     sport <- TCP.sourcePortRd
     seqNo <- TCP.seqNoRd
     payloadlen <- TCP.payloadLen
+    win <- TCP.windowRd
+
     updateSocketTCPState sport dport TCPEstablished
     Just sock <- getSpecificSocketTCP sport dport
-    let newSeqNo = (fromIntegral (seqNoTCP sock)) + 1
+
+    --let newSeqNo = (fromIntegral (seqNoTCP sock)) + 1
+    let newSeqNo = (fromIntegral (snd_nxt_TCP sock)) + 1
     updateSocketTCPSynNo sport dport newSeqNo
     let newAckNo = (fromIntegral seqNo) + 1
     updateSocketTCPAckNo sport dport newAckNo
-
+    let usock = sock {
+                        snd_una_TCP     = newSeqNo,
+                        snd_nxt_TCP     = newSeqNo,
+                        rcv_nxt_TCP     = newAckNo,
+                        snd_wnd_TCP     = win
+        }
+    updateSocketTCP sport dport usock
     debug ("SChangeEstablished: with payload-len " ++  (show payloadlen)
         ++ " ====> to ==> " ++ (show outPort)
         )
@@ -286,7 +307,8 @@ lpgRxL4TCPSocketIsValidSynAckSImpl = do
     flags <- TCP.flagsRd
 
     Just sock <- getSpecificSocketTCP sport dport
-    let myseqno = seqNoTCP sock
+    --let myseqno = seqNoTCP sock
+    let myseqno = snd_nxt_TCP sock
         outPort = if (isAck && (ackNo == myseqno + 1) &&
                      (not isSyn) &&  (not isRst) && (not isFin))
                     then "true"
@@ -307,8 +329,11 @@ lpgRxL4TCPSocketIsDataPacketImpl = do
     dport <- TCP.destPortRd
     sport <- TCP.sourcePortRd
 
+    -- FIXME: Valid seq number
+
     Just sock <- getSpecificSocketTCP sport dport
-    let myseqno = seqNoTCP sock
+--    let myseqno = seqNoTCP sock
+    let myseqno = snd_nxt_TCP sock
         -- FIXME: figure out a proper way to validate ack numbers
         --outPort = if (isAck && (ackNo == myseqno + 1) &&
         outPort = if (isAck && -- (ackNo == myseqno + 1) &&
@@ -336,7 +361,8 @@ lpgRxL4TCPSocketIsValidFinAckImpl = do
     sport <- TCP.sourcePortRd
 
     Just sock <- getSpecificSocketTCP sport dport
-    let myseqno = seqNoTCP sock
+    --let myseqno = seqNoTCP sock
+    let myseqno = snd_nxt_TCP sock
         outPort = if (isAck && (ackNo == myseqno + 1) &&
                      (not isSyn) &&  (not isRst)) -- && (not isFin))
                     then "true"
@@ -355,9 +381,18 @@ lpgRxL4TCPSocketSChangeCloseWaitImpl = do
     sport <- TCP.sourcePortRd
     seqNo <- TCP.seqNoRd
     payloadlen <- TCP.payloadLen
+    win <- TCP.windowRd
+    Just sock <- getSpecificSocketTCP sport dport
     updateSocketTCPState sport dport TCPCloseWait
     let newAckNo = (fromIntegral seqNo) + 1 -- (fromIntegral payloadlen)
     updateSocketTCPAckNo sport dport newAckNo
+    let usock = sock {
+--                        snd_una_TCP     = newSeqNo,
+--                        snd_nxt_TCP     = newSeqNo,
+                        rcv_nxt_TCP     = newAckNo,
+                        snd_wnd_TCP     = win
+        }
+    updateSocketTCP sport dport usock
     debug ("SChangeCloseWait: state reached " ++ " ====> to ==> "
             ++ (show outPort))
     toPort $ outPort
@@ -371,6 +406,7 @@ lpgRxL4TCPSocketSChangeLastAckImpl = do
     seqNo <- TCP.seqNoRd
     isAck <- TCP.isACK
     payloadlen <- TCP.payloadLen
+    win <- TCP.windowRd
     updateSocketTCPState sport dport TCPLastAck
 
     Just sock <- getSpecificSocketTCP sport dport
@@ -379,6 +415,13 @@ lpgRxL4TCPSocketSChangeLastAckImpl = do
 --    updateSocketTCPSynNo sport dport newSynNo
     let newAckNo = (fromIntegral seqNo) + 1 -- (fromIntegral payloadlen)
     updateSocketTCPAckNo sport dport newAckNo
+    let usock = sock {
+--                        snd_una_TCP     = newSeqNo,
+--                        snd_nxt_TCP     = newSeqNo,
+                        rcv_nxt_TCP     = newAckNo,
+                        snd_wnd_TCP     = win
+        }
+    updateSocketTCP sport dport usock
     debug ("SChangeLastAck: state reached " ++ " ====> to ==> "
             ++ (show outPort))
     toPort $ outPort
@@ -402,11 +445,37 @@ lpgRxL4TCPSocketCopyDataImpl = do
     sport <- TCP.sourcePortRd
     payload <- TCP.getPayload
     seqNo <- TCP.seqNoRd
+    seg_ack <- TCP.ackNoRd
     payloadlen <- TCP.payloadLen
+    win <- TCP.windowRd
     Just sock <- getSpecificSocketTCP sport dport
+
+    -- FIXME: Use the ACK no to determine which seq no. can be dropped.
+    -- Is it valid ACK no? SND.UNA < SEG.ACK =< SND.NXT
+    let snd_una = IMPL.snd_una_TCP sock
+        snd_nxt = IMPL.snd_nxt_TCP sock
+        snd_una_new = if ((snd_una) < seg_ack) && (seg_ack <= snd_nxt) then seg_ack
+                        else snd_una
+
+        -- Dropping the data which is successfully acked.
+        remaining_send_data = BS.drop (fromIntegral (snd_una_new - snd_una))
+                                    (IMPL.sendDataTCP sock)
+        usock = sock {
+                        sendDataTCP     = remaining_send_data,
+                        snd_una_TCP     = snd_una_new
+            }
+
+
 --    let newAckNo = (fromIntegral (ackNoTCP sock) + (fromIntegral payloadlen))
     let newAckNo = (fromIntegral seqNo) + (fromIntegral payloadlen)
     updateSocketTCPAckNo sport dport newAckNo
+    let usock = sock {
+--                        snd_una_TCP     = newSeqNo,
+--                        snd_nxt_TCP     = newSeqNo,
+                        rcv_nxt_TCP     = newAckNo,
+                        snd_wnd_TCP     = win
+        }
+    updateSocketTCP sport dport usock
     debug ("############## Data of size " ++ (show payloadlen)
             ++ " for application: " ++ (show payload))
     let outPort = if (payloadlen == 0) then "false" else "true"
@@ -481,9 +550,12 @@ lpgTxL4TCPInitiateResponseImpl = do
     srcIP <- IP4.destIPRd
 
     let checksum = 0
-        seqNo = IMPL.seqNoTCP sock
-        ackNo = IMPL.ackNoTCP sock
-        window = IMPL.windowTCP sock
+        --seqNo = IMPL.seqNoTCP sock
+        seqNo = IMPL.snd_nxt_TCP sock
+        --ackNo = IMPL.ackNoTCP sock
+        ackNo = IMPL.rcv_nxt_TCP sock
+        --window = IMPL.windowTCP sock
+        window = IMPL.rcv_wnd_TCP sock
         urgent = IMPL.urgentNoTCP sock
 
         -- FIXME: Get the header size from socket option, and don't hardcode it.

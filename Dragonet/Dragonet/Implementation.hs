@@ -78,6 +78,9 @@ module Dragonet.Implementation(
     -- For managing TCP ports without monad
     addPortMappingTCPGS,
 
+    -- Initialize TCP context
+    defaultTCPContext,
+
     debug,
 ) where
 
@@ -134,6 +137,7 @@ data TCPState = TCPClosed | TCPListen | TCPConnect | TCPSynSent
 -- TCPContext remembers TCP protocol specific information
 data TCPContext =  TCPContext {
     socketStateTCP  :: SocketType,
+    tcpState        :: TCPState,
     srcPortTCP      :: Word16,
     dstPortTCP      :: Word16,
     seqNoTCP        :: Word32,
@@ -142,7 +146,14 @@ data TCPContext =  TCPContext {
     windowTCP       :: Word16,
     payloadTCP      :: BS.ByteString,
     payloadLenTCP   :: Int,
-    tcpState        :: TCPState
+    sendDataTCP     :: BS.ByteString,
+    snd_una_TCP     :: Word32,
+    snd_nxt_TCP     :: Word32,
+    snd_wnd_TCP     :: Word16,
+    snd_iss_TCP     :: Word32,
+    rcv_nxt_TCP     :: Word32,
+    rcv_wnd_TCP     :: Word16,
+    rcv_iss_TCP     :: Word32
     }
     deriving (Show, Eq)
 
@@ -162,6 +173,30 @@ decideFlags sock = flags
             (BITS.shift ack 4) .|. (BITS.shift urg 5)
 
 
+
+defaultTCPContext :: Word16 -> SocketType -> TCPState -> TCPContext
+defaultTCPContext p stype tcpS = usock
+    where
+    usock = TCPContext {
+                        socketStateTCP  = stype,
+                        tcpState        = tcpS,
+                        srcPortTCP      = 0,
+                        dstPortTCP      = p,
+                        seqNoTCP        = 0,
+                        ackNoTCP        = 0,
+                        urgentNoTCP     = 0,
+                        windowTCP       = 11,
+                        payloadTCP      = emptyPacket,
+                        payloadLenTCP   = 0,
+                        sendDataTCP     = BS.empty,
+                        snd_una_TCP     = 0,
+                        snd_nxt_TCP     = 0,
+                        snd_wnd_TCP     = 0,
+                        snd_iss_TCP     = 0,
+                        rcv_nxt_TCP     = 0,
+                        rcv_wnd_TCP     = 0,
+                        rcv_iss_TCP     = 0
+                  }
 
 
 --PortTable: One entry for each port.
@@ -531,7 +566,7 @@ addPortMappingTCP :: Int -> String -> SocketType -> TCPState ->
                         Implementation -> ImplM ()
 addPortMappingTCP p appName stype tcpS imp = do
         mappings <- readPortMappingsTCP
-        let usock = TCPContext stype 0 (fromIntegral p) 0 0 0 11 emptyPacket 0 tcpS
+        let usock = defaultTCPContext (fromIntegral p) stype tcpS
             mappings' = mappings ++ [(PortTableTCP p [usock] appName imp)]
         writePortMappingsTCP mappings'
 
@@ -678,7 +713,7 @@ addPortMappingTCPGS :: GlobalState -> Int -> String -> SocketType ->
 addPortMappingTCPGS gs p appName stype tcpS imp = ans
     where
         mappings = gsTCPPorts gs
-        usock = TCPContext stype 0 (fromIntegral p) 0 0 0 11 emptyPacket 0 tcpS
+        usock = defaultTCPContext (fromIntegral p) stype tcpS
         mappings' = mappings ++ [(PortTableTCP p [usock] appName imp)]
         ans = gs { gsTCPPorts = mappings'}
 
