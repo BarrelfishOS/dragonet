@@ -174,15 +174,13 @@ lpgRxL4TCPSocketServerSideImpl = do
     sport <- TCP.sourcePortRd
     listenports <-  findPortMappingTCPSocket (fromIntegral dport)
     pdtails <- getSpecificSocketTCP sport dport
-    let portDetails = case pdtails of
+    let sock = case pdtails of
             Just x -> x
             Nothing -> case (listenports) of
                             Just xx -> (head (ptcontextTCP xx))
                             Nothing -> error "No socket is in listen or accepted mode"
 
---    Just portDetails <- findPortMappingTCPSocket $ fromIntegral dport
-    --let state = tcpState (head (ptcontextTCP portDetails))
-    let state = tcpState portDetails
+    let state = tcpState sock
         outPort = case state of
             TCPListen -> "isListen"
 --          TCPSynSent ->
@@ -192,6 +190,8 @@ lpgRxL4TCPSocketServerSideImpl = do
             TCPLastAck -> "isLastAck"
             TCPClosed -> "isClosed"
             _ -> "isClosed"
+
+    debug ("TCPSocketServerSide: state:  " ++ (show sock))
 
     debug ("TCPSocketServerSide: state classify: "
         ++ " ====> to ==> " ++ (show outPort)
@@ -246,9 +246,6 @@ lpgRxL4TCPSocketAddHalfOpenConnImpl = do
         newcon = defaultTCPContext dport AcceptSocket TCPSynRecved
         newcon' = newcon {
                         srcPortTCP      = sport,
-                        seqNoTCP        = mySeqNo,
-                        ackNoTCP        = ackNo,
-                        windowTCP       = myWindow,
                         snd_iss_TCP     = 85,
                         snd_una_TCP     = mySeqNo,
                         snd_nxt_TCP     = mySeqNo,
@@ -275,11 +272,8 @@ lpgRxL4TCPSocketSChangeEstablishedImpl = do
     updateSocketTCPState sport dport TCPEstablished
     Just sock <- getSpecificSocketTCP sport dport
 
-    --let newSeqNo = (fromIntegral (seqNoTCP sock)) + 1
     let newSeqNo = (fromIntegral (snd_nxt_TCP sock)) + 1
-    updateSocketTCPSynNo sport dport newSeqNo
     let newAckNo = (fromIntegral seqNo) + 1
-    updateSocketTCPAckNo sport dport newAckNo
     let usock = sock {
                         snd_una_TCP     = newSeqNo,
                         snd_nxt_TCP     = newSeqNo,
@@ -307,7 +301,6 @@ lpgRxL4TCPSocketIsValidSynAckSImpl = do
     flags <- TCP.flagsRd
 
     Just sock <- getSpecificSocketTCP sport dport
-    --let myseqno = seqNoTCP sock
     let myseqno = snd_nxt_TCP sock
         outPort = if (isAck && (ackNo == myseqno + 1) &&
                      (not isSyn) &&  (not isRst) && (not isFin))
@@ -332,7 +325,6 @@ lpgRxL4TCPSocketIsDataPacketImpl = do
     -- FIXME: Valid seq number
 
     Just sock <- getSpecificSocketTCP sport dport
---    let myseqno = seqNoTCP sock
     let myseqno = snd_nxt_TCP sock
         -- FIXME: figure out a proper way to validate ack numbers
         --outPort = if (isAck && (ackNo == myseqno + 1) &&
@@ -361,7 +353,6 @@ lpgRxL4TCPSocketIsValidFinAckImpl = do
     sport <- TCP.sourcePortRd
 
     Just sock <- getSpecificSocketTCP sport dport
-    --let myseqno = seqNoTCP sock
     let myseqno = snd_nxt_TCP sock
         outPort = if (isAck && (ackNo == myseqno + 1) &&
                      (not isSyn) &&  (not isRst)) -- && (not isFin))
@@ -385,10 +376,7 @@ lpgRxL4TCPSocketSChangeCloseWaitImpl = do
     Just sock <- getSpecificSocketTCP sport dport
     updateSocketTCPState sport dport TCPCloseWait
     let newAckNo = (fromIntegral seqNo) + 1 -- (fromIntegral payloadlen)
-    updateSocketTCPAckNo sport dport newAckNo
-    let usock = sock {
---                        snd_una_TCP     = newSeqNo,
---                        snd_nxt_TCP     = newSeqNo,
+        usock = sock {
                         rcv_nxt_TCP     = newAckNo,
                         snd_wnd_TCP     = win
         }
@@ -410,14 +398,8 @@ lpgRxL4TCPSocketSChangeLastAckImpl = do
     updateSocketTCPState sport dport TCPLastAck
 
     Just sock <- getSpecificSocketTCP sport dport
---    let mysynno = seqNoTCP sock
---        newSynNo = (fromIntegral mysynno) + 1
---    updateSocketTCPSynNo sport dport newSynNo
     let newAckNo = (fromIntegral seqNo) + 1 -- (fromIntegral payloadlen)
-    updateSocketTCPAckNo sport dport newAckNo
-    let usock = sock {
---                        snd_una_TCP     = newSeqNo,
---                        snd_nxt_TCP     = newSeqNo,
+        usock = sock {
                         rcv_nxt_TCP     = newAckNo,
                         snd_wnd_TCP     = win
         }
@@ -464,20 +446,25 @@ lpgRxL4TCPSocketCopyDataImpl = do
                         sendDataTCP     = remaining_send_data,
                         snd_una_TCP     = snd_una_new
             }
+    debug ("lpgRxL4TCPSocketCopyDataImpl: remaining data "
+            ++ (show remaining_send_data)
+            ++ ", snd_una_new: " ++ (show snd_una_new)
+            )
+    updateSocketTCP sport dport usock
 
-
---    let newAckNo = (fromIntegral (ackNoTCP sock) + (fromIntegral payloadlen))
+    -- Adding new data to be sent
+    Just sock2 <- getSpecificSocketTCP sport dport
     let newAckNo = (fromIntegral seqNo) + (fromIntegral payloadlen)
-    updateSocketTCPAckNo sport dport newAckNo
-    let usock = sock {
---                        snd_una_TCP     = newSeqNo,
---                        snd_nxt_TCP     = newSeqNo,
+        newSendData = BS.concat [(IMPL.sendDataTCP sock2), (BS.pack payload)]
+        usock2 = sock2 {
+                        sendDataTCP     = newSendData,
                         rcv_nxt_TCP     = newAckNo,
                         snd_wnd_TCP     = win
         }
-    updateSocketTCP sport dport usock
-    debug ("############## Data of size " ++ (show payloadlen)
-            ++ " for application: " ++ (show payload))
+    updateSocketTCP sport dport usock2
+    debug ("Data of size " ++ (show payloadlen)
+            ++ " for application: " ++ (show payload) ++
+            "making total data " ++ (show newSendData) )
     let outPort = if (payloadlen == 0) then "false" else "true"
     toPort $ outPort
 
@@ -550,11 +537,8 @@ lpgTxL4TCPInitiateResponseImpl = do
     srcIP <- IP4.destIPRd
 
     let checksum = 0
-        --seqNo = IMPL.seqNoTCP sock
         seqNo = IMPL.snd_nxt_TCP sock
-        --ackNo = IMPL.ackNoTCP sock
         ackNo = IMPL.rcv_nxt_TCP sock
-        --window = IMPL.windowTCP sock
         window = IMPL.rcv_wnd_TCP sock
         urgent = IMPL.urgentNoTCP sock
 
@@ -562,16 +546,20 @@ lpgTxL4TCPInitiateResponseImpl = do
         doof = 5 -- minimum size in 32 bits unit (4 bytes unit)
         poff = doof * 4 -- Minimum header size in bytes
 
-        plen = IMPL.payloadLenTCP sock
-        payload = IMPL.payloadTCP sock -- readPX plen poff
+        payload = IMPL.getValidTCPpayload sock
+        plen = BS.length payload
 
         sockState = IMPL.tcpState sock
 
         -- Get flags from socket state
---        synset = True
---        ackset = True
-        -- flags = 0x12    -- 0b010010
         flags = decideFlags sock
+
+        -- Update the socket state for future seq number
+        usock = sock {
+               snd_nxt_TCP     = (seqNo + (fromIntegral plen))
+        }
+    updateSocketTCP sport dport usock
+
 
     forkPkt $ return $
         (setAttr' "IP4Dest" $ AttrW32 dstIP) $
@@ -591,11 +579,13 @@ lpgTxL4TCPInitiateResponseImpl = do
         (setAttr' "forked" $ AttrI 1) $
         initContext emptyPacket
     f <- getAttrM "forked"
-    debug ("###### flags for state " ++ (show sockState) ++
-            " are " ++ (show flags))
+    debug ("###### payload " ++ (show payload) ++
+            " length " ++ (show plen))
+
     if isJust f then do
         dropAttr "forked"
         insertP plen 0
+        debug ("##### writing payload " ++ (show payload))
         writeP (BS.unpack payload) 0
         toPort "out"
     else
@@ -618,6 +608,7 @@ lpgTxL4TCPFillHeaderImpl = do
     (AttrW8 doof) <- getAttr "TCPdataoff"
     (AttrW8 flags) <- getAttr "TCPFlags"
     (AttrW16 checksum) <- getAttr "TCPChecksum"
+    (AttrD payload1) <- getAttr "TCPPayload"  -- (BS.unpack payload)) $
 --        (setAttr' "TCPSyn" $ synset) $
 --        (setAttr' "TCPAck" $ ackset) $
 
@@ -629,6 +620,11 @@ lpgTxL4TCPFillHeaderImpl = do
     TCP.urgentWr urgent
     TCP.flagsWr flags
     TCP.dOWr doof
+
+--    IMPL.insertData (TCP.headerLenMin) (BS.pack payload1)
+--    debug ("##### writing payload " ++ (show payload1)
+--            -- ++ " length " ++ (show pktlen)
+--            )
 
     -- Calculate checksum
     pkt <- getPacket
@@ -643,6 +639,9 @@ lpgTxL4TCPFillHeaderImpl = do
 
     -- set checksum
     TCP.checksumWr csum
+
+    debug ("writing payload " ++ (show pkt) ++
+            " length " ++ (show pktlen))
 
     toPort "true"
 

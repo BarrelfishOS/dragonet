@@ -45,6 +45,7 @@ module Dragonet.Implementation(
     writeP16BE,
     writeP32BE,
     insertP,
+    insertData,
 
     -- For managing UDP ports
     findPortMappingUDP,
@@ -70,10 +71,9 @@ module Dragonet.Implementation(
     -- updating socket state
     updateSocketTCP,
     updateSocketTCPState,
-    updateSocketTCPSynNo,
-    updateSocketTCPAckNo,
     updateSocketTCPPayload,
     decideFlags,
+    getValidTCPpayload,
 
     -- For managing TCP ports without monad
     addPortMappingTCPGS,
@@ -92,7 +92,7 @@ import Data.Maybe
 import Data.Word
 import Data.Bits
 import qualified Data.Bits as BITS
-
+import qualified Debug.Trace as TR
 
 type Packet = BS.ByteString
 
@@ -140,13 +140,10 @@ data TCPContext =  TCPContext {
     tcpState        :: TCPState,
     srcPortTCP      :: Word16,
     dstPortTCP      :: Word16,
-    seqNoTCP        :: Word32,
-    ackNoTCP        :: Word32,
     urgentNoTCP     :: Word16,
-    windowTCP       :: Word16,
-    payloadTCP      :: BS.ByteString,
+    payloadTCP      :: BS.ByteString, -- Data to be sent in next packet
     payloadLenTCP   :: Int,
-    sendDataTCP     :: BS.ByteString,
+    sendDataTCP     :: BS.ByteString, -- All the data that needs to be sent
     snd_una_TCP     :: Word32,
     snd_nxt_TCP     :: Word32,
     snd_wnd_TCP     :: Word16,
@@ -165,7 +162,7 @@ decideFlags sock = flags
     rst = 0
     psh = 0
     ack = if ((not $ elem (tcpState sock) [TCPListen,  TCPConnect]) &&
-        (ackNoTCP sock /= 0)) then 1 else 0
+        (rcv_nxt_TCP sock /= 0)) then 1 else 0
     urg = if ((not $ elem (tcpState sock) [TCPListen, TCPConnect]) &&
         (urgentNoTCP sock /= 0)) then 1 else 0
     flags = (BITS.shift fin 0) .|. (BITS.shift syn 1) .|.
@@ -173,6 +170,17 @@ decideFlags sock = flags
             (BITS.shift ack 4) .|. (BITS.shift urg 5)
 
 
+getValidTCPpayload :: TCPContext -> BS.ByteString
+getValidTCPpayload sock = TR.trace ("getValidTCPpayload: " ++ msg) toSend
+    where
+    from = (snd_nxt_TCP sock) - (snd_una_TCP sock)
+    len = (snd_una_TCP sock) + (fromIntegral (snd_wnd_TCP sock))
+                - (snd_nxt_TCP sock)
+    toSend =  BS.take (fromIntegral len)  $ BS.drop (fromIntegral from) $ sendDataTCP sock
+
+    msg = "from: " ++ (show from) ++ "(snd_nxt_TCP " ++ (show $ snd_nxt_TCP sock)
+            ++ " - snd_una_TCP " ++ (show $ snd_una_TCP sock) ++  " ) \n"
+            ++ ", len: " ++ (show len) ++ "\n ##### toSend " ++ (show toSend)
 
 defaultTCPContext :: Word16 -> SocketType -> TCPState -> TCPContext
 defaultTCPContext p stype tcpS = usock
@@ -182,10 +190,7 @@ defaultTCPContext p stype tcpS = usock
                         tcpState        = tcpS,
                         srcPortTCP      = 0,
                         dstPortTCP      = p,
-                        seqNoTCP        = 0,
-                        ackNoTCP        = 0,
                         urgentNoTCP     = 0,
-                        windowTCP       = 11,
                         payloadTCP      = emptyPacket,
                         payloadLenTCP   = 0,
                         sendDataTCP     = BS.empty,
@@ -448,7 +453,7 @@ writeP16BE val = writeP (unpack16BE val)
 writeP32BE :: Word32 -> Int -> ImplM ()
 writeP32BE val = writeP (unpack32BE val)
 
--- Insert len bytes at location off.
+-- Insert len bytes off zeroes at location off.
 insertP :: Int -> Int -> ImplM ()
 insertP len off = do
     pkt <- getPacket
@@ -456,6 +461,12 @@ insertP len off = do
     let zs = BS.pack $ replicate len 0
     putPacket (pre `BS.append` zs `BS.append` suf)
 
+-- Insert given Bytestring at location off.
+insertData :: Int -> BS.ByteString -> ImplM ()
+insertData off content = do
+    pkt <- getPacket
+    let (pre,suf) = BS.splitAt off pkt
+    putPacket (pre `BS.append` content `BS.append` suf)
 
 
 ------------------------------
@@ -659,16 +670,6 @@ updateSocketTCPState :: Word16 -> Word16 -> TCPState -> ImplM()
 updateSocketTCPState sport dport st = do
    Just sock <- getSpecificSocketTCP sport dport
    updateSocketTCP sport dport (sock {tcpState = st})
-
-updateSocketTCPAckNo :: Word16 -> Word16 -> Word32 -> ImplM()
-updateSocketTCPAckNo sport dport ackno = do
-   Just sock <- getSpecificSocketTCP sport dport
-   updateSocketTCP sport dport (sock {ackNoTCP = ackno})
-
-updateSocketTCPSynNo :: Word16 -> Word16 -> Word32 -> ImplM()
-updateSocketTCPSynNo sport dport synno = do
-   Just sock <- getSpecificSocketTCP sport dport
-   updateSocketTCP sport dport (sock {seqNoTCP = synno})
 
 updateSocketTCPPayload :: Word16 -> Word16 -> [Word8] -> ImplM()
 updateSocketTCPPayload sport dport payload = do

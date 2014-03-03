@@ -1,5 +1,5 @@
 #!/bin/bash
-sudo ls
+sudo ls > /dev/null
 sudo ./tuntap &
 TUNTAP_PID=$!
 sleep 1
@@ -14,4 +14,5 @@ sudo killall tuntap
 sudo killall tcpdump
 
 cat rawPacketLog.log | tcpdump -lnr -
+
 #wireshark rawPacketLog.log

@@ -108,18 +108,20 @@ dOWr v = do
 headerLenMin :: Int
 headerLenMin = 20
 
-
+-- Header lenth of RX packet which is currently under processing
 headerLen :: ImplM Int
 headerLen = do
     ihl <- dORd
     return ((fromIntegral ihl) * 4)
 
+-- Payload len of RX packet
 payloadLen :: ImplM Int
 payloadLen = do
     h <- headerLen
     l <- getLength
     return ((fromIntegral l) - h)
 
+-- Payload offset of received packet
 payloadOff :: ImplM Int
 payloadOff = do { i <- headerOff ; l <- headerLen ; return (i + l) }
 
@@ -128,6 +130,7 @@ getPayload = do
     poff <- payloadOff
     plen <- payloadLen
     readPX plen poff
+
 
 -- flags manipulation
 flagsRd2 = gen8Rd 13
@@ -145,6 +148,14 @@ flagsWr v = do
     let o = flagsOff
     b <- gen8Rd o
     writeP8 ((b .&. 0xc0) .|. v) o -- bin(0xc0) = 0b11000000
+
+
+-- Add payload in TX packet
+{-addPayload :: BS.ByteString -> ImplM ()
+addPayload payload = do
+    let offset = headerLenMin
+    insertData offset payload
+-}
 
 -- Detailed flags
 
