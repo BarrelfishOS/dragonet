@@ -1,17 +1,31 @@
 #!/bin/bash
 
+to_full_name() {
+    local mname=$1
+    fullName="ubuntu@${mname}.in.barrelfish.org"
+    #fullName="ubuntu@${mname}"
+    echo ${fullName}
+}
+
+reload_resolver() {
+    local mname=$1
+    fullName="ubuntu@${mname}.in.barrelfish.org"
+    scp "./resolv.conf" "${fullName}://home/ubuntu/resolv.conf"
+    ssh ${fullName} sudo "cp /home/ubuntu/resolv.conf /etc/resolv.conf"
+}
+
 on_machine_nosudo() {
     local mname=$1
     if [ -z ${mname} ] ; then
         echo "executing command without giving any machine name"
         exit 1
     fi
-
-    #fullName="ubuntu@${mname}.in.barrelfish.org"
-    fullName="ubuntu@${mname}"
+    fullName="ubuntu@${mname}.in.barrelfish.org"
+    #fullName="ubuntu@${mname}"
     #check_connectivity ${fullName}
     ssh ${fullName} bash 2>&1 | sed "s/^/${mname}: /"
 }
+
 
 on_machine() {
     local mname=$1
@@ -20,33 +34,40 @@ on_machine() {
         exit 1
     fi
 
-    #fullName="ubuntu@${mname}.in.barrelfish.org"
-    fullName="ubuntu@${mname}"
+    fullName="ubuntu@${mname}.in.barrelfish.org"
+    #fullName="ubuntu@${mname}"
     #check_connectivity ${fullName}
     ssh ${fullName} sudo bash 2>&1 | sed "s/^/${mname}: /"
 }
 
 prepare_machine() {
+
+    reload_resolver ${MACHINE}
     echo 'apt-get update' | on_machine ${MACHINE}
     echo 'apt-get install -y screen byobu tree vim ctags cscope' | on_machine ${MACHINE}
     echo 'apt-get install -y build-essential' | on_machine ${MACHINE}
     echo 'apt-get install -y linux-headers-$(uname -r)' | on_machine ${MACHINE}
     echo 'apt-get install -y linux-headers-generic' | on_machine ${MACHINE}
     echo 'apt-get install -y netcat.traditional' | on_machine ${MACHINE}
+    echo 'apt-get install -y git-core' | on_machine ${MACHINE}
 
     # for Dragonet
     echo 'apt-get install -y ghc cabal-install clang graphviz pdftk libghc-parsec2-dev libghc-stm-dev minisat' | on_machine ${MACHINE}
-    echo 'cabal update' | on_machine ${MACHINE}
-    echo 'cabal install graphviz' | on_machine ${MACHINE}
-    echo 'cabal install pretty-show' | on_machine ${MACHINE}
-    echo 'cabal install MonadRandom' | on_machine ${MACHINE}
+
+    reload_resolver ${MACHINE}
+
+    reload_resolver ${MACHINE}
+    echo 'cabal update' | on_machine_nosudo ${MACHINE}
+    reload_resolver ${MACHINE}
+    echo 'cabal install graphviz' | on_machine_nosudo ${MACHINE}
+    echo 'cabal install pretty-show' | on_machine_nosudo ${MACHINE}
+    echo 'cabal install MonadRandom' | on_machine_nosudo ${MACHINE}
 
     # For simplified source code navigation
+    reload_resolver ${MACHINE}
     echo 'apt-get install -y happy' | on_machine ${MACHINE}
-    echo 'cabal install hscope' | on_machine ${MACHINE}
-    echo 'cabal install SourceGraph' | on_machine ${MACHINE}
-
-
+    echo 'cabal install hscope' | on_machine_nosudo ${MACHINE}
+    echo 'cabal install SourceGraph' | on_machine_nosudo ${MACHINE}
 
     # my vim configuration
     scp  "vimconf.tar" "${HOST}:"
@@ -57,20 +78,7 @@ prepare_machine() {
 copy_code() {
 
     echo "rm -rf ${SOURCE_DIR}" | on_machine ${MACHINE}
-    echo 'hg clone ssh://shindep@129.132.186.96:8006/hg/dragonet' | on_machine_nosudo ${MACHINE}
-
-    # removing old code (if any)
-#    echo "rm -rf ${SOURCE_DIR}" | on_machine ${MACHINE}
-#    echo "rm -rf ${SRC_ARCHIVE}" | on_machine ${MACHINE}
-
-    # Copying new codebase
-#    scp  "../${SRC_ARCHIVE}" "${HOST}:"
-#    echo "tar -xf ${SRC_ARCHIVE}" | on_machine ${MACHINE}
-
-    # Copying the updated file to take care of the compile error
-#    scp "../${SOURCE_DIR}/${updatedFile}"  "${HOST}:"
-#    echo "cp `basename ${updatedFile}` ${SOURCE_DIR}/${updatedFile}" | on_machine ${MACHINE}
-
+    echo 'git clone ssh://shindep@129.132.186.96:8006/git/dragonet' | on_machine_nosudo ${MACHINE}
 }
 
 compile_code() {
@@ -78,43 +86,10 @@ compile_code() {
     echo "cd ${SOURCE_DIR} ; make" | on_machine ${MACHINE}
 }
 
-setup_huge_pages() {
-    echo "mkdir -p /mnt/huge"  | on_machine ${MACHINE}
-    echo "mount -t hugetlbfs nodev /mnt/huge"  | on_machine ${MACHINE}
-    echo "echo 64 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages"  | on_machine ${MACHINE}
-}
-
-install_new_driver() {
-    # Removing older versions of drivers
-    echo "lsmod | grep igb_uio && rmmod igb_uio" | on_machine ${MACHINE}
-    echo "lsmod | grep uio && rmmod uio" | on_machine ${MACHINE}
-    sleep 5
-    echo "modprobe uio" | on_machine ${MACHINE}
-    echo "cd ${SOURCE_DIR} ; insmod build/kmod/igb_uio.ko" | on_machine ${MACHINE}
-    echo "Current drivers list"
-    echo "lsmod | grep igb_uio" | on_machine ${MACHINE}
-}
-
-run_test_command() {
-    # Removing older versions of drivers
-    echo "cd ${SOURCE_DIR}; build/app/testpmd -c7 -n3 -- -i --nb-cores=2 --nb-ports=2"  | on_machine ${MACHINE}
-}
-
-quick_test() {
-    # runs part of the script as very quick test
-
-    echo "installing new driver"
-    install_new_driver
-
-    echo "Running test command to check working"
-    run_test_command
-    exit 0
-}
-
 MACHINE="ziger1"
-#HOST="ubuntu@${MACHINE}.in.barrelfish.org"
-MACHINE="10.110.5.34"
-HOST="ubuntu@${MACHINE}"
+HOST="ubuntu@${MACHINE}.in.barrelfish.org"
+#MACHINE="10.110.5.34"
+#HOST="ubuntu@${MACHINE}"
 SSH="ssh ${HOST}"
 SRC_ARCHIVE="dpdk-1.5.0r1.tar.gz"
 SOURCE_DIR="dpdk-1.5.0r1"
@@ -124,8 +99,6 @@ updatedFile="lib/librte_sched/Makefile"
 
 #set -x
 set -e
-# Quick test
-#quick_test
 
 echo "Preparing system"
 prepare_machine
@@ -136,15 +109,5 @@ copy_code
 echo "Compiling code"
 compile_code
 
-exit 0
-
-echo "setup huge pages"
-install_new_driver
-
-echo "installing new driver"
-install_new_driver
-
-echo "Running test command to check working"
-run_test_command
-
+echo "Done.."
 
