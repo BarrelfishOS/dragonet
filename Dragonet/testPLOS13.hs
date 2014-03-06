@@ -225,7 +225,7 @@ graph lpg {
 |]
 
 -- Drop all nodes before the QueueX nodes
-dropBeforeQ :: PGraph () -> PGraph ()
+dropBeforeQ :: PGraph -> PGraph
 dropBeforeQ g = DGI.delNodes dropN g
     where
         dropN = filter (`notElem` reach) $ L.nub $ DGI.nodes g
