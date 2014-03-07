@@ -44,7 +44,7 @@ on_machine() {
 
 prepare_machine() {
 
-    reload_resolver ${MACHINE}
+#    reload_resolver ${MACHINE}
     echo 'apt-get update' | on_machine ${MACHINE}
     echo 'apt-get install -y screen byobu tree vim ctags cscope vim-gnome' | on_machine ${MACHINE}
     echo 'apt-get install -y build-essential' | on_machine ${MACHINE}
@@ -61,6 +61,7 @@ prepare_machine() {
     echo 'cabal install graphviz' | on_machine_nosudo ${MACHINE}
     echo 'cabal install pretty-show' | on_machine_nosudo ${MACHINE}
     echo 'cabal install MonadRandom' | on_machine_nosudo ${MACHINE}
+    echo 'cabal install fgl pretty-show mtl random' | on_machine_nosudo ${MACHINE}
 
     # For simplified source code navigation
     echo 'apt-get install -y happy' | on_machine ${MACHINE}
@@ -80,14 +81,25 @@ prepare_machine() {
 copy_code() {
 
     #echo "rm -rf .ssh/known_hosts" | on_machine_nosudo ${MACHINE}
-    echo "rm -rf ${SOURCE_DIR}" | on_machine ${MACHINE}
+    echo "rm -rf ${DPDK_SOURCE_DIR}" | on_machine ${MACHINE}
     echo 'git clone ssh://shindep@129.132.186.96:8006//home/shindep/git/dragonet -b openonload' | on_machine_nosudo ${MACHINE}
 }
 
-compile_code() {
-    echo "cd ${SOURCE_DIR} ; make config T=x86_64-default-linuxapp-gcc" | on_machine ${MACHINE}
-    echo "cd ${SOURCE_DIR} ; make" | on_machine ${MACHINE}
+compile_dpdk() {
+    echo "cd ${DPDK_SOURCE_DIR} ; make config T=x86_64-default-linuxapp-gcc" | on_machine ${MACHINE}
+    echo "cd ${DPDK_SOURCE_DIR} ; make" | on_machine ${MACHINE}
 }
+
+compile_openonload() {
+
+    echo "cd ${OPENONLOAD_SOURCE_DIR} ; ./scripts/onload_build " | on_machine_nosudo ${MACHINE}
+}
+
+install_haskell_dep() {
+
+    echo "cd ${Dragonet_SOURCE_DIR} ; ./INSTALL.sh " | on_machine_nosudo ${MACHINE}
+}
+
 
 
 show_usage() {
@@ -95,13 +107,13 @@ show_usage() {
         echo "Usage: ${0} -m <machineName> [-i -g -c]"
         echo "           -i -->  Installation of required packages"
         echo "           -g -->  Git cloning the code repository"
-        echo "           -c -->  compile the code (only for dpdk)"
+        echo "           -c -->  DPDK the code (only for dpdk)"
         echo "Examples: ${0} -m appenzeller -i"
         echo "Examples: ${0} -m ziger1 -g -c"
         exit 1
 }
 
-while getopts ":m:igc" opt; do
+while getopts ":m:icdoh" opt; do
   case $opt in
     m)
         echo "-m was triggered, machine name: $OPTARG"
@@ -111,13 +123,21 @@ while getopts ":m:igc" opt; do
         echo "-i was triggered, setting for installation"
         INSTALL="yes"
       ;;
-    g)
-        echo "-g was triggered, setting for git repo initialization"
-        GITCLONE="yes"
-      ;;
     c)
-        echo "-c was triggered, setting for compilation of code"
-        COMPILE="yes"
+        echo "-c was triggered, copying the code"
+        COPYCODE="yes"
+      ;;
+    d)
+        echo "-d was triggered, setting for compilation of dpdk code"
+        DPDK="yes"
+      ;;
+    o)
+        echo "-o was triggered, setting for compilation of openonload code"
+        OPENONLOAD="yes"
+      ;;
+    h)
+        echo "-h was triggered, setting for installation of Haskell libraries"
+        HASKELLLIB="yes"
       ;;
     \?)
         echo "Invalid option: -$OPTARG" >&2
@@ -142,10 +162,9 @@ HOST="ubuntu@${MACHINE}.in.barrelfish.org"
 #MACHINE="10.110.5.34"
 #HOST="ubuntu@${MACHINE}"
 SSH="ssh ${HOST}"
-SRC_ARCHIVE="dpdk-1.5.0r1.tar.gz"
-SOURCE_DIR="dpdk-1.5.0r1"
-SOURCE_DIR="dragonet/dpdk-1.5.0r1"
-updatedFile="lib/librte_sched/Makefile"
+DPDK_SOURCE_DIR="dragonet/dpdk-1.5.0r1/"
+OPENONLOAD_SOURCE_DIR="dragonet/openonload-201310-u2/"
+Dragonet_SOURCE_DIR="dragonet/Dragonet/"
 
 
 #set -x
@@ -160,18 +179,34 @@ else
 fi
 
 
-if [ "${GITCLONE}" == "yes" ] ; then
+if [ "${COPYCODE}" == "yes" ] ; then
     echo "Doing git clone to copy the code on remote ${HOST} machine"
     copy_code
 else
     echo "Skipping phase: code copy with git clone on remote ${HOST} machine"
 fi
 
-if [ "${COMPILE}" == "yes" ] ; then
-    echo "Compiling the code on remote ${HOST} machine"
-    compile_code
+if [ "${DPDK}" == "yes" ] ; then
+    echo "Compiling the DPDK code on remote ${HOST} machine"
+    compile_dpdk
 else
-    echo "Skipping phase: code copy with git clone on remote ${HOST} machine"
+    echo "Skipping phase: compilation of DPDK on ${HOST} machine"
+fi
+
+
+if [ "${OPENONLOAD}" == "yes" ] ; then
+    echo "Compiling the OPENONLOAD code on remote ${HOST} machine"
+    compile_openonload
+else
+    echo "Skipping phase: compilation of OPENONLOAD on ${HOST} machine"
+fi
+
+
+if [ "${HASKELLLIB}" == "yes" ] ; then
+    echo "Installing haskell dependencies remote ${HOST} machine"
+    install_haskell_dep
+else
+    echo "Skipping phase: Haskell dependency installation on ${HOST} machine"
 fi
 
 echo "Done.."
