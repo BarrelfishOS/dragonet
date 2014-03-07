@@ -1,5 +1,5 @@
 
-TEST_APPS	:= efpingpong efforward efrss efsink efpio efdragonet
+TEST_APPS	:= efpingpong efforward efrss efsink efpio efdragonetTest
 
 TARGETS		:= $(TEST_APPS:%=$(AppPattern))
 
@@ -14,7 +14,10 @@ clean:
 	@$(MakeClean)
 
 
-efdragonet: efdragonet.o efvi_sfw.o
+#efdragonetTest: efdragonetTest.o efdragonetLib
+efdragonetTest: efdragonetTest.o efdragonet.o efvi_sfw.o
+
+efdragonetLib: efdragonet.o efvi_sfw.o
 
 efforward: efforward.o efvi_sfw.o
 

@@ -221,7 +221,8 @@ static void usage(void)
 }
 
 
-int main(int argc, char* argv[])
+int dummy_main(int argc, char* argv[]);
+int dummy_main(int argc, char* argv[])
 {
   pthread_t thread_id;
   struct vi* vis[2];
@@ -270,3 +271,67 @@ int main(int argc, char* argv[])
 
   return 0;
 }
+
+
+// ###################### MY CODE ###########################
+
+/*
+typedef uint8_t  lcoreid_t;
+typedef uint8_t  portid_t;
+typedef uint16_t queueid_t;
+
+// TODO: Implement these as these are used in DPDK
+size_t get_packetV2(int core_id, int port_id, int queue_id,
+        char *pkt_out, size_t buf_len);
+void send_packetV2(int core_id, int port_id, int queue_id,
+        char *pkt_tx, size_t len);
+int init_dpdk_setupV2(void);
+*/
+
+
+struct vi *init_openonload_setup(char *name);
+size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len);
+void send_packet(struct vi *vif, char *pkt_tx, size_t len);
+
+
+struct vi *init_openonload_setup(char *name)
+{
+
+    struct vi* vis;
+    struct net_if* net_if;
+
+    printf("%s:%s:%d: called\n", __FILE__, __func__, __LINE__);
+    if( (net_if = net_if_alloc(0, name, 0)) == NULL ) {
+        LOGE(fprintf(stderr, "ERROR: Bad interface '%s' or unable to allocate "
+                    "resources\n", name));
+        exit(1);
+    }
+    vis = vi_alloc(0, net_if, EF_VI_FLAGS_DEFAULT);
+
+    // setting up filter
+    ef_filter_spec filter_spec;
+    ef_filter_spec_init(&filter_spec, EF_FILTER_FLAG_NONE);
+    TRY(ef_filter_spec_set_unicast_all(&filter_spec));
+    TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
+
+    printf("%s:%s:%d: done\n", __FILE__, __func__, __LINE__);
+    return vis;
+}
+
+size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
+{
+    //assert(!"get_packet: NYI");
+    printf("%s:%s:%d: NYI\n", __FILE__, __func__, __LINE__);
+    return 0;
+} // end function: get_packet
+
+
+void send_packet(struct vi *vif, char *pkt_tx, size_t len)
+{
+    printf("%s:%s:%d: NYI\n", __FILE__, __func__, __LINE__);
+    //assert(!"send_packet: NYI");
+} // end function: send_packet
+
+// ######################  ###########################
+
+

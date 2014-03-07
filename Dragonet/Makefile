@@ -14,10 +14,10 @@ CC=clang
 # Setting the default goal to simplify compiling
 #.DEFAULT_GOAL := useful
 #.DEFAULT_GOAL := graph
-.DEFAULT_GOAL := tuntap
+#.DEFAULT_GOAL := tuntap
 #.DEFAULT_GOAL := dpdk
 #.DEFAULT_GOAL := tcpGraph_run
-
+.DEFAULT_GOAL := sf_openonload
 
 useful: graph_run tcpGraph_run tcpGraph2_run confgen tuntap #dpdk #impl
 	echo "Removing all png except the one which I want"
@@ -146,6 +146,37 @@ Util/Dpdk.$(OSUF): Util/Dpdk_.$(OSUF) objfiles
 # Converts graphs into pdfs
 models: graph_run
 	./convertDot.sh
+
+
+# ######################## Openonload  ################################
+
+
+# Runs the simulator against openonload userspace network
+sf_openonload: base Util/Openonload.$(OSUF) sf_onloadLibs
+	$(GHC) $(GHCFLAGS) -threaded openonloadTests.hs -o openonloadDragonet     -L../openonload-201310-u2/build/gnu_x86_64/lib/ciul/ -lciul
+
+sf_openonload_run: sf_openonload
+	export LD_LIBRARY_PATH=/home/ubuntu/dragonet/openonload-201310-u2/build/gnu_x86_64/lib/ciul/ ; ./openonloadDragonet
+
+
+# libciul1.a or libciul.so
+#sf_onloadLibs: ../openonload-201310-u2/build/gnu_x86_64/tests/ef_vi/efdragonet.o ../openonload-201310-u2/build/gnu_x86_64/tests/ef_vi/efvi_sfw.o
+sf_onloadLibs:
+	#cd ../openonload-201310-u2/ && ./scripts/onload_build --user
+	cp ../openonload-201310-u2/build/gnu_x86_64/tests/ef_vi/efdragonet.o Util/
+	cp ../openonload-201310-u2/build/gnu_x86_64/tests/ef_vi/efvi_sfw.o Util/
+
+
+Util/Openonload_.$(OSUF): Util/Openonload.hs
+	echo $(GHC) $(GHCFLAGS) -c $< -o $@
+	$(GHC) $(GHCFLAGS) -c $< -o $@
+
+Util/Openonload.$(OSUF): Util/Openonload_.$(OSUF) sf_onloadLibs
+	ld -i  Util/Openonload_.$(OSUF) Util/efdragonet.o Util/efvi_sfw.o  -o $@
+
+
+
+# ######################## Openonload: end ############################
 
 base: Makefile *.hs */*.hs */*/*.hs *.unicorn Dragonet/Implementation/*.hs
 
