@@ -318,9 +318,92 @@ struct vi *init_openonload_setup(char *name)
     return vis;
 }
 
+
 size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
 {
-    //assert(!"get_packet: NYI");
+    if (vif == NULL) {
+        printf("%s:%s:%d:ERROR: vif == NULL\n", __FILE__, __func__, __LINE__);
+        return 0;
+    }
+
+    ef_request_id ids[EF_VI_TRANSMIT_BATCH];
+    ef_event evs[1];
+
+    struct vi* viff;
+    int i, j, n, n_ev = 0;
+    int pkt_buf_i = 0;
+    int len = 0;
+    int copylen = 0;
+    int pkt_received = 0;
+    struct pkt_buf* pkt_buf;
+
+    while( 1 ) {
+        viff = vif;
+
+        n_ev = ef_eventq_poll(&viff->vi, evs, sizeof(evs) / sizeof(evs[0]));
+        if( n_ev <= 0 )
+            continue;
+
+        for( i = 0; i < n_ev; ++i ) {
+            switch( EF_EVENT_TYPE(evs[i]) ) {
+                case EF_EVENT_TYPE_RX:
+                    printf("RX event arrived\n");
+                    /* This code does not handle jumbos. */
+                    assert(EF_EVENT_RX_SOP(evs[i]) != 0);
+                    assert(EF_EVENT_RX_CONT(evs[i]) == 0);
+
+                    pkt_buf_i = EF_EVENT_RX_RQ_ID(evs[i]);
+                    pkt_buf = pkt_buf_from_id(viff, pkt_buf_i);
+                    len = EF_EVENT_RX_BYTES(evs[i]) - viff->frame_off;
+                    int myoffset = RX_PKT_OFF(viff);
+
+                    copylen = len;
+                    if (len > buf_len) {
+                        copylen = buf_len;
+                        printf("buffer too small to copy full packet."
+                                "Ignoring  %d byte data\n", (len - copylen));
+                    }
+                    printf("RX event: trying to copy %d bytes at location %p\n",
+                            copylen, pkt_out);
+
+                    //memcpy(pkt_out, pkt_buf->addr[viff->net_if->id] + myoffset, copylen);
+                    //hexdump(RX_PKT_PTR(pkt_buf), len);
+                    memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
+                    pkt_buf_release(pkt_buf);
+                    pkt_received = copylen;
+                    // NOTE: I am assuming that we are reading only one event
+                    //      in each iteration
+                    return pkt_received;
+                    break;
+
+                case EF_EVENT_TYPE_TX:
+                    printf("TX event arrived\n");
+                    n = ef_vi_transmit_unbundle(&viff->vi, &evs[i], ids);
+                    for( j = 0; j < n; ++j ) {
+                        //complete_tx(thread, TX_RQ_ID_VI(ids[j]), TX_RQ_ID_PB(ids[j]));
+                        pkt_buf = pkt_buf_from_id(viff, TX_RQ_ID_PB(ids[j]));
+                        pkt_buf_release(pkt_buf);
+                    }
+                    break;
+
+                case EF_EVENT_TYPE_RX_DISCARD:
+                    printf("RX_discard event arrived\n");
+                    //handle_rx_discard(thread, viff, EF_EVENT_RX_DISCARD_RQ_ID(evs[i]),
+                    //        EF_EVENT_RX_DISCARD_TYPE(evs[i]));
+                        pkt_buf = pkt_buf_from_id(viff,
+                                    EF_EVENT_RX_DISCARD_RQ_ID(evs[i]));
+                        pkt_buf_release(pkt_buf);
+                    break;
+
+                default:
+                    LOGE(fprintf(stderr, "ERROR: unexpected event type=%d\n",
+                                (int) EF_EVENT_TYPE(evs[i])));
+                    break;
+            } // end switch
+        } // end for : i
+        vi_refill_rx_ring(viff);
+    }
+
     printf("%s:%s:%d: NYI\n", __FILE__, __func__, __LINE__);
     return 0;
 } // end function: get_packet
@@ -328,6 +411,10 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
 
 void send_packet(struct vi *vif, char *pkt_tx, size_t len)
 {
+    if (vif == NULL) {
+        printf("%s:%s:%d:ERROR: vif == NULL\n", __FILE__, __func__, __LINE__);
+        return 0;
+    }
     printf("%s:%s:%d: NYI\n", __FILE__, __func__, __LINE__);
     //assert(!"send_packet: NYI");
 } // end function: send_packet
