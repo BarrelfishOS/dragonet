@@ -1,0 +1,272 @@
+graph lpg {
+//    node SoftwareRX {
+    node Queue {
+        port out[RxL2EtherClassified] }
+
+    node PacketDrop { }
+
+    node NotSupported { }
+
+    /**************************************************************************/
+    /* Receive                                                                */
+
+    cluster Rx {
+
+        /*******************************************/
+        /* Ethernet RX                             */
+
+        cluster L2Ether {
+            boolean Classified {
+                port true[ValidLength]
+                port false[..PacketDrop] }
+
+            boolean ValidLength {
+                port true[ValidUnicast ValidMulticast ValidBroadcast
+                          ValidSrc ValidType ValidLocalMAC]
+                port false[..PacketDrop] }
+
+            boolean ValidUnicast {
+                port true false[ValidDest] }
+
+            boolean ValidMulticast {
+                port true false[ValidDest] }
+
+            boolean ValidBroadcast {
+                port true false[ValidDest] }
+
+            or ValidDest {
+                port true false[Valid] }
+
+            boolean ValidSrc {
+                port true false[Valid] }
+
+            boolean ValidLocalMAC {
+                port true false[Valid] }
+
+            and Valid {
+                port true false[.L3IPAndBelowValid] }
+
+            boolean ValidType {
+                port true[ClassifyL3]
+                port false[..PacketDrop] }
+
+            node ClassifyL3 {
+                port ipv4[.L3IPv4ValidHeaderLength]
+                port ipv6[..NotSupported]
+                port arp[.L3ARPValidHeaderLength]
+                port drop[..PacketDrop] }
+        }
+
+
+        /*******************************************/
+        /* ARP RX                                  */
+
+        cluster L3ARP {
+            boolean ValidHeaderLength {
+                port true[Classify LocalIPDest]
+                port false[..PacketDrop] }
+
+            node Classify {
+                port request[ValidRequest]
+                port response[ValidResponse]
+                port drop[..PacketDrop] }
+
+            boolean LocalIPDest {
+                port true false[NeedsResponse ValidPendingResponse] }
+
+            boolean ValidRequest {
+                port true false[NeedsResponse] }
+
+            and NeedsResponse {
+                port true[.TagTxARPIR]
+                port false[] }
+
+            boolean ValidResponse {
+                port true false[ValidPendingResponse IsPending] }
+
+            boolean IsPending {
+                port true false[ValidPendingResponse] }
+
+            and ValidPendingResponse {
+                port true[ProcessPendingResponse]
+                port false[] }
+
+            node ProcessPendingResponse {
+                port true false[.TagTxARPLu]
+                port drop[] }
+        }
+
+
+        /*******************************************/
+        /* IPv4 RX                                 */
+
+        cluster L3IPv4 {
+            boolean ValidHeaderLength {
+                port true[ValidReassembly ValidVersion ValidLength
+                          ValidTTL ValidChecksum Classify ValidLocalIP]
+                port false[..PacketDrop] }
+
+            boolean ValidReassembly {
+                port true false[Valid] }
+
+            boolean ValidVersion {
+                port true false[Valid] }
+
+            boolean ValidLength {
+                port true false[Valid] }
+
+            boolean ValidTTL {
+                port true false[Valid] }
+
+            boolean ValidChecksum {
+                port true false[Valid] }
+
+            boolean ValidLocalIP {
+                port true false[Valid] }
+
+            node Classify {
+//                port tcp[..NotSupported] //  [.L4TCPValidHeaderLength]
+                port udp[..NotSupported] // [.L4UDPValidHeaderLength]
+                port icmp[.L3ICMPValidHeaderLength]
+                port drop[..PacketDrop] }
+
+            and Valid {
+                port true false[.L3IPValid] }
+
+        }
+
+        or L3IPValid {
+            port true false[L3IPAndBelowValid] }
+
+        and L3IPAndBelowValid {
+                //port true false[L3ICMPValid L4TCPValid L4UDPValid]
+                port true false[L3ICMPValid]
+            }
+
+
+        /*******************************************/
+        /* ICMP RX                                 */
+
+        cluster L3ICMP {
+            boolean ValidHeaderLength {
+                port true[ValidChecksum IsTypeRequest]
+		port false[] }
+
+            boolean ValidChecksum {
+                port true false[Valid] }
+
+            and Valid {
+                port true false[NeedsResponse] }
+
+            boolean IsTypeRequest {
+                port true false[NeedsResponse] }
+
+            and NeedsResponse {
+                port true[.TagTxICMPIR]
+                port false[] }
+        }
+
+
+    /*******************************************/
+    /* Multiplexing for TX queue               */
+
+    cluster TagTx {
+
+        boolean ARPIR {
+            port true[.ToTx]
+            port false[] }
+
+        boolean ARPLu {
+            port true[.ToTx]
+            port false[] }
+
+        boolean ICMPIR {
+            port true[.ToTx]
+            port false[] }
+
+    } // end cluster: TagTx
+
+    or ToTx {
+        port true[.TxDemux]
+        port false[] }
+
+    } // end cluster: Rx
+
+
+    cluster Tx {
+        node Demux {
+            port ICMPIR[L3ICMPInitiateResponse]
+            port ARPLu[L3ARPLookup]
+            port ARPIR[L3ARPInitiateResponse]
+            port drop[] }
+
+        cluster L3ICMP {
+            node InitiateResponse {
+                port out[AllocateHeader]
+		port drop[] }
+
+            node AllocateHeader {
+                port out[FillHeader] }
+
+            boolean FillHeader {
+                port true false[.L3IPv4Prepare] }
+        }
+
+	cluster L3IPv4 {
+            or Prepare {
+                port true[AllocateHeader]
+                port false[] }
+
+            node AllocateHeader {
+                port out[FillHeader] }
+
+            node FillHeader {
+                port out[Routing] }
+
+            boolean Routing {
+                port true false[.L3ARPLookup] }
+        }
+
+        cluster L3ARP {
+            node InitiateResponse {
+                port true false[Prepare]
+		port drop[] }
+
+            or Prepare {
+                port true[AllocateHeader]
+                port false[] }
+
+            node AllocateHeader {
+                port out[FillHeader] }
+
+            boolean FillHeader {
+                port true false[.L2EtherPrepare] }
+
+            or Lookup {
+                port true[Lookup_]
+                port false[] }
+
+            node Lookup_ {
+                port true false[.L2EtherPrepare]
+                port miss[SendRequest] }
+
+            node SendRequest {
+                port true false[Prepare]
+                port drop[] }
+        }
+
+        cluster L2Ether {
+            or Prepare {
+                port true[AllocateHeader]
+                port false[] }
+
+            node AllocateHeader {
+                port out[FillHeader] }
+
+            node FillHeader {
+                port out[.Queue] }
+        }
+
+        node Queue { }
+    }
+}

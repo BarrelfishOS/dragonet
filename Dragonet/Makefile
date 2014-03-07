@@ -96,6 +96,14 @@ tuntap_run: tuntap
 	sudo ./tuntap
 
 
+# Runs the simulator against tuntap interface
+tuntap_icmp : base Util/Tap.$(OSUF)
+	$(GHC) $(GHCFLAGS) -threaded tuntapPing.hs -o tuntapPing
+
+tuntap_icmp_run: tuntap_icmp
+	sudo ./tuntapPing
+
+
 ## Util/Tap
 
 Util/tap.$(OSUF): Util/tap.c

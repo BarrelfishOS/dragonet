@@ -22,6 +22,7 @@ import Util.Misc
 import qualified LPGImpl as LPGI -- (graphGen)
 import qualified LPGEx1 as LPG1 -- (graphGen)
 import qualified LPGEx2 as LPG2 -- (graphGen)
+import qualified LPGicmp as LPGicmp -- (graphGen)
 
 import LPGImpl
 
@@ -309,6 +310,24 @@ main = do
             map snd $ DGI.labNodes plg'
 
 
+
+    -- Also use impl graph for ICMP
+    myWriteFile "lpgICMPImpl.dot" $ toDotClustered lpgTIcmpImpl LPGicmp.lpgClusters
+
+    myWriteFile "embeddedICMPImpl.dot" $ toDot $ embeddedIcmpImpl
+    constrainedIcmpImpl <- constrain embeddedIcmpImpl
+    myWriteFile "constrainedICMPImpl.dot" $ toDot $ constrainedIcmpImpl
+
+    putStrLn $ show LPGicmp.lpgClusters
+
+    let plg' = generatePLG (nodeImplPipeline LPGicmp.lpgClusters) lpgTIcmpImpl
+    myWriteFile "pipelines_icmp_impl.dot" $ pipelinesDot (Just linkMap) plg'
+    mapM_ (\pl ->
+        myWriteFile ("pli_icmp_" ++ plLabel pl ++ ".dot") $
+            toDotWith' (plDotParams pl) $ plGraph pl) $
+            map snd $ DGI.labNodes plg'
+
+
     where
         lpgT = pgSetType GTLpg lpg
         prgTConf = pgSetType GTPrg prgConfigured
@@ -318,8 +337,13 @@ main = do
         config = [("RxCSynFilter", "true"), ("RxCSynOutput","Q2")]
 
         lpgTImpl = pgSetType GTLpg LPG2.lpg
-        embedded = fullEmbedding prgTConf lpgT
+        embedded = fullEmbedding prgTConf lpgTImpl
         embeddedImpl = fullEmbedding prgTConf lpgTImpl
+
+        -- for ICMP Implementation graph
+        lpgTIcmpImpl = pgSetType GTLpg LPGicmp.lpg
+        embeddedIcmpImpl = fullEmbedding prgTConf lpgTIcmpImpl
+
 
         nodePipeline (_,n) = nTag n
         nodeImplPipeline cl (n,_) =

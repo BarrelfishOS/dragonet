@@ -40,7 +40,10 @@ module LPGImpl.LPGImplGen (
     -- Applications
     lpgRxDnsAPPImpl,
     lpgRxEchoAPPImpl,
+
+    -- Sinks
     lpgPacketDropImpl,
+    lpgNotSupportedImpl,
 
     -- Port management functions
     lpgRxL4UDPAddPort,
@@ -440,6 +443,11 @@ lpgRxL4UDPClosedPortActionImpl = do
 
 -- Sinks
 lpgPacketDropImpl = do { debug "Packet dropped!!!!" ; toPort "" }
+
+lpgNotSupportedImpl = do
+    debug "This protocol is not supported by this version!"
+    debug "You may want to bug a developer to get this support"
+    toPort ""
 
 
 lpgRxDnsAPPImpl = do
