@@ -106,10 +106,12 @@ show_usage() {
         echo "Please specify the machine name"
         echo "Usage: ${0} -m <machineName> [-i -g -c]"
         echo "           -i -->  Installation of required packages"
-        echo "           -g -->  Git cloning the code repository"
-        echo "           -c -->  DPDK the code (only for dpdk)"
-        echo "Examples: ${0} -m appenzeller -i"
-        echo "Examples: ${0} -m ziger1 -g -c"
+        echo "           -c -->  copy the code to server"
+        echo "           -d -->  Compile the DPDK code (only for dpdk)"
+        echo "           -o -->  Compile the openonload code (only for openonload)"
+        echo "           -h -->  Install haskell dependencies"
+        echo "Examples: ${0} -m appenzeller -i -c"
+        echo "Examples: ${0} -m ziger1 -d"
         exit 1
 }
 
