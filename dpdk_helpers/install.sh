@@ -46,7 +46,7 @@ prepare_machine() {
 
 #    reload_resolver ${MACHINE}
     echo 'apt-get update' | on_machine ${MACHINE}
-    echo 'apt-get install -y screen byobu tree vim ctags cscope vim-gnome' | on_machine ${MACHINE}
+    echo 'apt-get install -y screen byobu tree vim ctags cscope vim-gnome ack-grep' | on_machine ${MACHINE}
     echo 'apt-get install -y build-essential' | on_machine ${MACHINE}
     echo 'apt-get install -y linux-headers-$(uname -r)' | on_machine ${MACHINE}
     echo 'apt-get install -y linux-headers-generic' | on_machine ${MACHINE}
@@ -74,7 +74,8 @@ prepare_machine() {
     echo 'mkdir -p .vimbackup/backup' | on_machine_nosudo ${MACHINE}
     echo 'cd /root/ ; tar -xvf /home/ubuntu/vimconf.tar' | on_machine ${MACHINE}
     echo 'cd /root/ ; mkdir -p .vimbackup/backup' | on_machine ${MACHINE}
-
+    echo 'mkdir bin' | on_machine_nosudo ${MACHINE}
+    scp "~/bin/cs_create.sh" "${HOST}:bin/"
     #FIXME: Copy the ~/bin/ folder (or atleast useful part of it)
 }
 
@@ -91,8 +92,14 @@ compile_dpdk() {
 }
 
 compile_openonload() {
-
-    echo "cd ${OPENONLOAD_SOURCE_DIR} ; ./scripts/onload_build " | on_machine_nosudo ${MACHINE}
+    # Compiling and installing SF driver which supports userspace networking
+    echo "cd ${OPENONLOAD_SOURCE_DIR} ; ./scripts/onload_install " | on_machine ${MACHINE}
+    # actually inserting the newly compiled and installed driver
+    echo "cd ${OPENONLOAD_SOURCE_DIR} ; onload_tool reload " | on_machine ${MACHINE}
+    # Reconfiguring the IP addresses of all interaces as SF interaces will be reset after insertion of new driver
+    echo "bash ./setIPaddress.sh" | on_machine ${MACHINE}
+    # Changing the owner back to normal user so that normal user can run build
+    echo "cd ${OPENONLOAD_SOURCE_DIR} ; chown -R ubuntu.ubuntu ./build " | on_machine ${MACHINE}
 }
 
 install_haskell_dep() {
