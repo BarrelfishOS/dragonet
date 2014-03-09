@@ -33,15 +33,18 @@ data NetEvent =
     RXEvent BS.ByteString |
     TXEvent BS.ByteString
 
-rxThread c sfvi qid = M.forever $ do
-    p <- SF.getPacket sfvi
-    putStrLn ("received Packet on qid " ++ (show qid))
-    STM.atomically $ TC.writeTChan c (RXEvent p)
+rxThread c sfvi qid done = do
+    M.forever $ do
+        p <- SF.getPacket sfvi
+        putStrLn ("received Packet on qid " ++ (show qid))
+        STM.atomically $ TC.writeTChan c (RXEvent p)
 
-txThread c sfvi qid = M.forever $ do
-    (TXEvent p) <- STM.atomically $ TC.readTChan c
-    putStrLn ("Send Packet on qid " ++ (show qid))
-    SF.sendPacket sfvi p
+txThread c sfvi qid done = do
+    M.forever $ do
+        (TXEvent p) <- STM.atomically $ TC.readTChan c
+        putStrLn ("Send Packet on qid " ++ (show qid))
+        SF.sendPacket sfvi p
+    CC.putMVar done ()
 
 simStep rxC txC state = do
     e <- TC.readTChan rxC
@@ -66,7 +69,11 @@ simThread rxC txC state = do
     simThread rxC txC state''
 
 
-main = do
+
+runSimIncremental = do
+
+    done <- CC.newEmptyMVar
+
     -- create and open a SF device
     sfvi <- SF.init_openonload_setup "eth7"
 
@@ -78,14 +85,27 @@ main = do
         putStrLn ("Warning: You are a non-root user. So SF openonload may not work!")
 
     -- create rx/tx channels
-    rxC0 <- TC.newTChanIO
-    txC0 <- TC.newTChanIO
+    rxC <- TC.newTChanIO
+    txC <- TC.newTChanIO
 
     -- spawn rx/tx threads to handle queue 0
-    _ <- CC.forkIO $ rxThread rxC0 sfvi 0
-    _ <- CC.forkIO $ txThread txC0 sfvi 0
+    rxtid <- CC.forkIO $ rxThread rxC sfvi 0 done
+    txtid <- CC.forkIO $ txThread txC sfvi 0 done
 
-    _ <- CC.forkIO $ simThread rxC0 txC0 initialState
-    l <- getLine
-    print l
+    -- FIXME: somewhere here, I need to add calls to create new connections
+    -- Opening new connection
+    let initialState' = addPortMappingTCPGS initialState 1234 "DummyAppTCP"
+                            DNET.ListenSocket DNET.TCPListen
+                            lpgRxL4TCPSocketClassifyImpl
+--                            DNET.ListenSocket lpgRxTCPdynamicPortUsed
+    simtid <- CC.forkIO $ simThread rxC txC initialState'
+
+    CC.takeMVar done  -- blocks till MVar is full
+
+--    l <- getLine
+--    print l
+
+main = do
+    --debugshow
+    runSimIncremental
 
