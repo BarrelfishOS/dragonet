@@ -116,6 +116,17 @@ void vi_refill_rx_ring(struct vi* vi)
 }
 
 
+struct pkt_buf* vi_get_free_pkt_buf(struct vi* vi)
+{
+    struct pkt_buf* pkt_buf;
+    pkt_buf = vi->free_pkt_bufs;
+    vi->free_pkt_bufs = vi->free_pkt_bufs->next;
+    --vi->free_pkt_bufs_n;
+    assert(pkt_buf->n_refs == 0);
+    pkt_buf->n_refs = 1;
+    return pkt_buf;
+}
+
 static void vi_init_pktbufs(struct vi* vi)
 {
   /* Allocate memory for packet buffers -- enough to fill the RX ring.
