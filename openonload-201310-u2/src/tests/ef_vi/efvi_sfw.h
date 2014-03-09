@@ -197,4 +197,7 @@ extern int
 vi_send(struct vi* vi, struct pkt_buf* pkt_buf, int off, int len);
 
 
+extern struct pkt_buf*
+vi_get_free_pkt_buf(struct vi* vi);
+
 #endif  /* __EFVI_SFW_H__ */

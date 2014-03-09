@@ -319,6 +319,28 @@ struct vi *init_openonload_setup(char *name)
 }
 
 
+
+#define PRINTBUFSIZE    (1023)
+static void buf_details(struct pkt_buf* pkt_buf, char *buff, int l)
+{
+    assert(pkt_buf != NULL);
+    assert(pkt_buf->vi_owner != NULL);
+    assert(pkt_buf->vi_owner->net_if != NULL);
+    assert(buff != NULL);
+
+    //snprintf(buff, l,
+    printf(
+           "BUF[id=%d,owner=%d,ref=%d,if_id=%d,addr=%"PRIu64"]\n",
+                    pkt_buf->id,
+                    pkt_buf->vi_owner->id,
+                    pkt_buf->n_refs,
+                    pkt_buf->vi_owner->net_if->id,
+                    RX_PKT_PTR(pkt_buf)
+                    );
+
+}
+
+
 size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
 {
     if (vif == NULL) {
@@ -336,6 +358,7 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
     int copylen = 0;
     int pkt_received = 0;
     struct pkt_buf* pkt_buf;
+    char printbuf[PRINTBUFSIZE] = {'\0'};
 
     while( 1 ) {
         viff = vif;
@@ -355,7 +378,6 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
                     pkt_buf_i = EF_EVENT_RX_RQ_ID(evs[i]);
                     pkt_buf = pkt_buf_from_id(viff, pkt_buf_i);
                     len = EF_EVENT_RX_BYTES(evs[i]) - viff->frame_off;
-                    int myoffset = RX_PKT_OFF(viff);
 
                     copylen = len;
                     if (len > buf_len) {
@@ -366,10 +388,17 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
                     printf("RX event: trying to copy %d bytes at location %p\n",
                             copylen, pkt_out);
 
+                    buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                    printf("%s:%s:%d: reveived %s\n", __FILE__, __func__, __LINE__, printbuf);
+
+                    //int myoffset = RX_PKT_OFF(viff);
                     //memcpy(pkt_out, pkt_buf->addr[viff->net_if->id] + myoffset, copylen);
                     //hexdump(RX_PKT_PTR(pkt_buf), len);
                     memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
                     pkt_buf_release(pkt_buf);
+                    buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                    printf("%s:%s:%d: RX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
+
                     pkt_received = copylen;
                     // NOTE: I am assuming that we are reading only one event
                     //      in each iteration
@@ -382,7 +411,11 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
                     for( j = 0; j < n; ++j ) {
                         //complete_tx(thread, TX_RQ_ID_VI(ids[j]), TX_RQ_ID_PB(ids[j]));
                         pkt_buf = pkt_buf_from_id(viff, TX_RQ_ID_PB(ids[j]));
+                        buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                        printf("%s:%s:%d: TX, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
                         pkt_buf_release(pkt_buf);
+                        buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                        printf("%s:%s:%d: TX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
                     }
                     break;
 
@@ -392,7 +425,11 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
                     //        EF_EVENT_RX_DISCARD_TYPE(evs[i]));
                         pkt_buf = pkt_buf_from_id(viff,
                                     EF_EVENT_RX_DISCARD_RQ_ID(evs[i]));
+                        buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                        printf("%s:%s:%d: RX_DISCARD, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
                         pkt_buf_release(pkt_buf);
+                        buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                        printf("%s:%s:%d: RX_DISCARD, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
                     break;
 
                 default:
@@ -411,11 +448,73 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
 
 void send_packet(struct vi *vif, char *pkt_tx, size_t len)
 {
+
+    struct pkt_buf* pkt_buf;
+    int rc;
+    int offset = 0;
+    int ii;
+
     if (vif == NULL) {
         printf("%s:%s:%d:ERROR: vif == NULL\n", __FILE__, __func__, __LINE__);
-        return 0;
+        return;
     }
-    printf("%s:%s:%d: NYI\n", __FILE__, __func__, __LINE__);
+    pkt_buf = vi_get_free_pkt_buf(vif);
+    if (pkt_buf == NULL) {
+        printf("%s:%s:%d: No free pkt buffers\n", __FILE__, __func__, __LINE__);
+        return;
+    }
+
+    // print details of buffer which is being sent
+    char printbuf[PRINTBUFSIZE] = {'\0'};
+    buf_details(pkt_buf, printbuf, sizeof(printbuf));
+    printf("%s:%s:%d: using %s\n", __FILE__, __func__, __LINE__, printbuf);
+
+    offset = RX_PKT_OFF(vif);
+    assert(pkt_buf != NULL);
+    assert(pkt_buf->vi_owner != NULL);
+    assert(pkt_buf->vi_owner->net_if != NULL);
+
+//#define RX_PKT_PTR(pb)   ((char*) (pb) + RX_PKT_OFF((pb)->vi_owner))
+//                    memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
+    void * buf_addr = RX_PKT_PTR(pkt_buf);
+//    void * buf_addr = (void *)(pkt_buf->addr[pkt_buf->vi_owner->net_if->id] + offset);
+    printf("%s:%s:%d: calling memcpy\n", __FILE__, __func__, __LINE__);
+    volatile char aa = 0;
+    for (ii = 0; ii < len; ++ii) {
+       aa = aa + ((char *) pkt_tx)[ii];
+    }
+    printf("%s:%s:%d: verified pkt_tx %c\n", __FILE__, __func__, __LINE__, aa);
+
+    for (ii = 0; ii < len; ++ii) {
+       aa = aa + ((char *) buf_addr)[ii];
+    }
+    printf("%s:%s:%d: verified pkt_tx %c\n", __FILE__, __func__, __LINE__, aa);
+
+
+    // FIXME: make sure that len is smaller than buffer length
+    memcpy(buf_addr, pkt_tx, len);
+
+    printf("%s:%s:%d: calling vi_send\n", __FILE__, __func__, __LINE__);
+    rc = vi_send(vif, pkt_buf, offset, len);
+    if( rc != 0 ) {
+        assert(rc == -EAGAIN);
+        /* TXQ is full.  A real app might consider implementing an overflow
+         * queue in software.  We simply choose not to send.
+         */
+        printf("%s:%s:%d: send queue full, so not sending\n", __FILE__, __func__, __LINE__);
+        LOGW(fprintf(stderr, "WARNING: [%s] dropped send\n",
+                    vif->net_if->name));
+    }
+    // FIXME: should I release pkt_buf here?
+//    pkt_buf_release(pkt_buf);
+    printf("%s:%s:%d: vi_send done\n", __FILE__, __func__, __LINE__);
+    buf_details(pkt_buf, printbuf, sizeof(printbuf));
+    printf("%s:%s:%d: buf ater sending %s\n", __FILE__, __func__, __LINE__, printbuf);
+
+
+
+    // FIXME: Wait for send ACK
+    printf("%s:%s:%d: buf[] send done\n", __FILE__, __func__, __LINE__);
     //assert(!"send_packet: NYI");
 } // end function: send_packet
 
