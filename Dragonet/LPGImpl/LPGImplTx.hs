@@ -196,7 +196,8 @@ lpgTxL3IPv4FillHeaderImpl = do
     IP4.identificationWr 0
     IP4.flagsWr IP4.flagsDF
     IP4.fragmentWr 0
-    IP4.ttlWr 64
+    --IP4.ttlWr 64
+    IP4.ttlWr 14
     IP4.protocolWr proto
     IP4.sourceIPWr srcIP
     IP4.destIPWr dstIP
