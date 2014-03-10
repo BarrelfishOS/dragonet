@@ -69,8 +69,10 @@ declare (Graph name cl) impl = declareClusters name cl impl
 node_to_pgnode :: Node -> PG.Node
 node_to_pgnode (Node name ports attrs)    = PG.baseFNode name attrs pnames Nothing
     where pnames = map pName ports
-node_to_pgnode (Boolean name pt pf attrs) = PG.baseFNode name attrs pnames Nothing
-    where pnames = map pName [pt, pf]
+node_to_pgnode (Boolean name pt pf attrs) = PG.baseFNode name a pnames Nothing
+    where
+        pnames = map pName [pt, pf]
+        a = "Boolean":attrs
 node_to_pgnode (And name pt pf attrs)     = PG.baseONode name attrs pnames PG.OpAnd Nothing
     where pnames = map pName [pt, pf]
 node_to_pgnode (NAnd name pt pf attrs)    = PG.baseONode name attrs pnames PG.OpNAnd Nothing
@@ -218,9 +220,14 @@ nodeExp gn n impl =
                 (NOr _ _ _ _) -> ("unicornNOrNode", [],False)
 
         labelE = TH.LitE $ TH.StringL $ nName n
-        attrE = TH.ListE $ map (TH.LitE . TH.StringL) $ nAttrs n
+        attrE = TH.ListE $ map (TH.LitE . TH.StringL) $ fixAttrs $ nAttrs n
         portsE = TH.ListE $ map (TH.LitE . TH.StringL . pName) $ nPorts n
         confFE f = TH.VarE $ TH.mkName $ fromMaybe "unicornSimpleConfig" f
+
+        fixAttrs a =
+            case n of
+                (Boolean _ _ _ _) -> "Boolean":a
+                otherwise -> a
 
         i = if impl && isfnode then
                 TH.AppE (TH.ConE $ TH.mkName "Just")
