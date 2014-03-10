@@ -289,16 +289,24 @@ int init_dpdk_setupV2(void);
 */
 
 
-struct vi *init_openonload_setup(char *name);
+struct net_if *init_openonload_setup(char *name);
+struct vi *alloc_queue(struct net_if *myif);
+
+int alloc_filter_default(struct vi *vis);
+int alloc_filter_full_ipv4(struct vi *vis, int protocol,
+            uint32_t localip, uint16_t localport,
+            uint32_t remoteip, uint16_t remoteport);
+int alloc_filter_listen_ipv4(struct vi *vis, int protocol,
+            uint32_t localip, uint16_t localport);
+
 size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len);
 void send_packet(struct vi *vif, char *pkt_tx, size_t len);
 
+static struct net_if* net_if = NULL;
 
-struct vi *init_openonload_setup(char *name)
+//struct vi *init_openonload_setup(char *name)
+struct net_if *init_openonload_setup(char *name)
 {
-
-    struct vi* vis;
-    struct net_if* net_if;
 
     printf("%s:%s:%d: called\n", __FILE__, __func__, __LINE__);
     if( (net_if = net_if_alloc(0, name, 0)) == NULL ) {
@@ -306,8 +314,18 @@ struct vi *init_openonload_setup(char *name)
                     "resources\n", name));
         exit(1);
     }
-    vis = vi_alloc(0, net_if, EF_VI_FLAGS_DEFAULT);
+    return net_if;
+} // end function : init_openonload_setup
 
+struct vi *alloc_queue(struct net_if *myif)
+{
+    struct vi* vis;
+    vis = vi_alloc(0, myif, EF_VI_FLAGS_DEFAULT);
+    return vis;
+} // end function: alloc_queue
+
+int alloc_filter_default(struct vi *vis)
+{
     // setting up filter
     ef_filter_spec filter_spec;
     ef_filter_spec_init(&filter_spec, EF_FILTER_FLAG_NONE);
@@ -315,8 +333,47 @@ struct vi *init_openonload_setup(char *name)
     TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
 
     printf("%s:%s:%d: done\n", __FILE__, __func__, __LINE__);
-    return vis;
-}
+    return 1;
+} // end function: alloc_filter_default
+
+int alloc_filter_listen_ipv4(struct vi *vis, int protocol,
+            uint32_t localip1,
+            uint16_t localport1)
+{
+    uint16_t localport = htons(localport1);
+    uint32_t localip = htonl(localip1);
+    ef_filter_spec filter_spec;
+    ef_filter_spec_init(&filter_spec, EF_FILTER_FLAG_NONE);
+    printf("%s:%s:%d: inserting listen filter proto [%d], "
+            "localip [%"PRIx32"] localport[%"PRIx16"]\n",
+            __FILE__, __func__, __LINE__,
+            protocol, localip, localport);
+
+    TRY(ef_filter_spec_set_ip4_local(&filter_spec, protocol, localip,
+                localport));
+    TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
+    printf("%s:%s:%d: done\n", __FILE__, __func__, __LINE__);
+    return 1;
+} // end function: alloc_filter_listen_ipv4
+
+int alloc_filter_full_ipv4(struct vi *vis, int protocol,
+            uint32_t localip, uint16_t localport,
+            uint32_t remoteip, uint16_t remoteport
+            )
+{
+    ef_filter_spec filter_spec;
+    ef_filter_spec_init(&filter_spec, EF_FILTER_FLAG_NONE);
+    printf("%s:%s:%d: inserting listen filter proto [%d], "
+            "localip [%"PRIx32"] localport[%"PRIx16"]\n",
+            __FILE__, __func__, __LINE__,
+            protocol, localip, localport);
+
+    TRY(ef_filter_spec_set_ip4_full(&filter_spec, protocol,
+                localip, localport, remoteip, remoteport));
+    TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
+    printf("%s:%s:%d: done\n", __FILE__, __func__, __LINE__);
+    return 1;
+} // end function: alloc_filter_full_ipv4
 
 
 
@@ -330,7 +387,7 @@ static void buf_details(struct pkt_buf* pkt_buf, char *buff, int l)
 
     //snprintf(buff, l,
     printf(
-           "BUF[id=%d,owner=%d,ref=%d,if_id=%d,addr=%"PRIu64"]\n",
+           "BUF[id=%d,owner=%d,ref=%d,if_id=%d,addr=%p]\n",
                     pkt_buf->id,
                     pkt_buf->vi_owner->id,
                     pkt_buf->n_refs,

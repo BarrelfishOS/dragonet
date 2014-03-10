@@ -1,11 +1,18 @@
 #!/bin/bash
 
 
-SERVERPORT=1234
+if [ -z ${1} ]; then
+        SERVERPORT=1234
+else
+        SERVERPORT=${1}
+fi
+
+echo "Connecting to the port ${SERVERPORT}"
+
 #IPADDR="127.0.0.1"  # for localhost
 IPADDR="10.113.4.71"
 
-CLIENTPORT=2231
+CLIENTPORT=5566
 
 INFILE="./test_nc_msg.txt"
 OUTFILE="./test_nc_answer.txt"
