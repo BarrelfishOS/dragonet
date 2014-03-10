@@ -1,6 +1,7 @@
 import qualified Dragonet.Unicorn.Parser as UP
 import qualified Dragonet.Unicorn as Unicorn
 import Data.Function
+import Data.Maybe
 import qualified Data.List as L
 
 import Dragonet.Pipelines
@@ -25,23 +26,33 @@ generatePortEnum n g = c_enum n (boolVals ++ nVals)
             where ls = map (\(UP.Port p _) -> "P_" ++ n' ++ "_" ++ p) ps
         nodePorts _ = []
 
-generateFNSigs :: UP.Graph -> String
-generateFNSigs g = concatMap fsig $ graphNodes g
+generateFNSig :: UP.Node -> Maybe String
+generateFNSig node =
+    case node of
+        (UP.Node n _ _) -> Just $ fsig n
+        (UP.Boolean n _ _ _) -> Just $ fsig n
+        _ -> Nothing
     where
         nPref = "do_pg__"
-        fsig (UP.Node n ps _) =
-            "node_out_t " ++ nPref ++ n ++
-                "(struct state *state, struct input *in)\n{\n    // " ++
-                phs ++ "\n}\n\n"
-            where
-                phs = L.intercalate ", " $ map ph ps
-                ph (UP.Port p _) = "P_" ++ n ++ "_" ++ p
-        fsig (UP.Boolean n _ _ _) =
-            "node_out_t " ++ nPref ++ n ++
-                "(struct state *state, struct input *in)\n{\n    // " ++
-                phs ++ "\n}\n\n"
-            where phs = "P_true, P_false"
-        fsig _ = []
+        fsig n = "node_out_t " ++ nPref ++ n ++
+           "(struct state *state, struct input *in)"
+
+generateFNProtos :: UP.Graph -> String
+generateFNProtos g = L.intercalate ";\n" $ mapMaybe generateFNSig $ graphNodes g
+
+generateFNSkels :: UP.Graph -> String
+generateFNSkels g = L.intercalate "\n\n" $ mapMaybe proto $ graphNodes g
+    where
+        ph n (UP.Port p _) = "P_" ++ n ++ "_" ++ p
+        phs n ps = L.intercalate ", " $ map (ph n) ps
+        proto n = do
+            sig <- generateFNSig n
+            let body = case n of
+                    (UP.Node n' ps _) ->
+                        "\n{\n    // " ++ phs n' ps ++ "\n    return 0;\n}"
+                    (UP.Boolean _ _ _ _) ->
+                        "\n{\n    // P_true, P_false\n    return 0;\n}"
+            return (sig ++ body)
 
 
 main :: IO ()
@@ -50,7 +61,9 @@ main = do
     igraph <- UP.parseGraph txt
     putStrLn $ generatePortEnum "out_ports" igraph
     putStrLn "\n"
-    putStrLn $ generateFNSigs igraph
+    putStrLn $ generateFNProtos igraph
+    putStrLn "\n"
+    putStrLn $ generateFNSkels igraph
     --putStrLn $ generatePortEnum "node_ports" igraph
     --let graph = Unicorn.constructGraph igraph
     return ()
