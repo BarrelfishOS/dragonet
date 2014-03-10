@@ -13,11 +13,13 @@ import qualified System.Posix.User as SPU
 import qualified Data.ByteString as BS
 
 import Dragonet.Implementation as DNET
+import qualified Dragonet.Implementation.IPv4 as IP4
 --import qualified Dragonet.Implementation.Algorithm as DNET.Alg
 
 import LPGImplTH
 import LPGImpl
 import qualified LPGEx1 as LPG1
+import qualified LPGImpl.LPGImplBase as LPGBase
 
 initialState = DNET.emptyGS
 
@@ -72,35 +74,65 @@ simThread rxC txC state = do
 
 runSimIncremental = do
 
-    done <- CC.newEmptyMVar
+    done0 <- CC.newEmptyMVar
+    done1 <- CC.newEmptyMVar
 
-    -- create and open a SF device
-    sfvi <- SF.init_openonload_setup "eth7"
-
-    -- Initialize dpdk device on linux side
+    -- verify that you are a root
     uid <- SPU.getRealUserID
     if uid == 0 then do
         putStrLn ("SF device created, everything should be fine ")
     else do
         putStrLn ("Warning: You are a non-root user. So SF openonload may not work!")
 
+    -- open a SF device eth7
+    sf_if <- SF.init_openonload_setup "eth7"
+
+    -- Allocate a queue and set it to receive all the traffic
+    sfvi0 <- SF.alloc_queue sf_if
+    SF.alloc_filter_default sfvi0
+
+    -- Allocate another queue and set it to receive specific traffic
+    sfvi1 <- SF.alloc_queue sf_if
+    --SF.alloc_filter_default sfvi1
+--    let Just localip =  LPGBase.cfgLocalIP
+    SF.alloc_filter_listen_ipv4 sfvi0 (fromIntegral IP4.protocolTCP) LPGBase.cfgLocalIP 1234
+    SF.alloc_filter_listen_ipv4 sfvi1 (fromIntegral IP4.protocolTCP) LPGBase.cfgLocalIP 2234
+    --SF.alloc_filter_listen_ipv4 sfvi1 (fromIntegral IP4.protocolTCP) 0 0
+
+
     -- create rx/tx channels
-    rxC <- TC.newTChanIO
-    txC <- TC.newTChanIO
+    rxC0 <- TC.newTChanIO
+    txC0 <- TC.newTChanIO
+
+    -- create rx/tx channels for queue 1
+    rxC1 <- TC.newTChanIO
+    txC1 <- TC.newTChanIO
+
 
     -- spawn rx/tx threads to handle queue 0
-    rxtid <- CC.forkIO $ rxThread rxC sfvi 0 done
-    txtid <- CC.forkIO $ txThread txC sfvi 0 done
+    rxtid0 <- CC.forkIO $ rxThread rxC0 sfvi0 0 done0
+    txtid0 <- CC.forkIO $ txThread txC0 sfvi0 0 done0
 
-    -- FIXME: somewhere here, I need to add calls to create new connections
+    -- spawn rx/tx threads to handle queue 1
+    rxtid1 <- CC.forkIO $ rxThread rxC1 sfvi1 1 done1
+    txtid1 <- CC.forkIO $ txThread txC1 sfvi1 1 done1
+
+
     -- Opening new connection
-    let initialState' = addPortMappingTCPGS initialState 1234 "DummyAppTCP"
+    let initialState0 = addPortMappingTCPGS initialState 1234 "DummyAppTCP0"
                             DNET.ListenSocket DNET.TCPListen
                             lpgRxL4TCPSocketClassifyImpl
---                            DNET.ListenSocket lpgRxTCPdynamicPortUsed
-    simtid <- CC.forkIO $ simThread rxC txC initialState'
 
-    CC.takeMVar done  -- blocks till MVar is full
+    -- Opening new connection
+    let initialState1 = addPortMappingTCPGS initialState 2234 "DummyAppTCP1"
+                            DNET.ListenSocket DNET.TCPListen
+                            lpgRxL4TCPSocketClassifyImpl
+
+    simtid0 <- CC.forkIO $ simThread rxC0 txC0 initialState0
+    simtid1 <- CC.forkIO $ simThread rxC1 txC1 initialState1
+
+    CC.takeMVar done0  -- blocks till MVar is full
+    CC.takeMVar done1  -- blocks till MVar is full
 
 --    l <- getLine
 --    print l
