@@ -38,7 +38,8 @@ generateFNSig node =
            "(struct state *state, struct input *in)"
 
 generateFNProtos :: UP.Graph -> String
-generateFNProtos g = L.intercalate ";\n" $ mapMaybe generateFNSig $ graphNodes g
+generateFNProtos g = L.intercalate "\n" $ map (++ ";") $
+        mapMaybe generateFNSig $ graphNodes g
 
 generateFNSkels :: UP.Graph -> String
 generateFNSkels g = L.intercalate "\n\n" $ mapMaybe proto $ graphNodes g
