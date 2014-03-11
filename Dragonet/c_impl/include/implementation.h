@@ -1,9 +1,20 @@
 #ifndef IMPLEMENTATION_H_
 #define IMPLEMENTATION_H_
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
+
 typedef int node_out_t;
 struct state { };
-struct input { };
+struct input {
+
+
+    // Buffer
+    void  *data;
+    size_t len;
+    size_t bytes_before;
+};
 
 enum out_ports {
     P_false = 0,
@@ -95,6 +106,21 @@ node_out_t do_pg__TxL3ARPSendRequest(struct state *state, struct input *in);
 node_out_t do_pg__TxL2EtherAllocateHeader(struct state *state, struct input *in);
 node_out_t do_pg__TxL2EtherFillHeader(struct state *state, struct input *in);
 
+
+//#define panic(x...) do { printf(#__FILE__":"#__LINE__": "x); abort(); } while (0)
+#define panic(x...) panic_(__FILE__,__LINE__,x);
+
+static inline void panic_(const char *file, int line, const char *fmt,...)
+    __attribute__((noreturn));
+static inline void panic_(const char *file, int line, const char *fmt,...)
+{
+    va_list va;
+    fprintf(stderr, "%s:%d: ", file, line);
+    va_start(va, fmt);
+    vfprintf(stderr, fmt, va);
+    va_end(va);
+    abort();
+}
 
 
 #endif

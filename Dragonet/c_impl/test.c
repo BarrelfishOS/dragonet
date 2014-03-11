@@ -2,6 +2,8 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include <packet_access.h>
+
 void testFun(struct state * st, struct input *in);
 
 int main(int argc, char *argv[])
