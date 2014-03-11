@@ -16,6 +16,8 @@ import Dragonet.Implementation as DNET
 import LPGImplTH
 import LPGImpl
 
+import Numeric (showHex)
+
 --import qualified LPGEx1 as LPG1
 import qualified LPGicmp as LPG1
 --import qualified LPGicmp as LPGicmp
@@ -34,6 +36,10 @@ funCallList = f
 
 ----------------------------------------------------------------
 
+
+prettyPrint :: BS.ByteString -> String
+prettyPrint = concat . map (flip showHex ",0x") . BS.unpack
+
 data NetEvent =
     RXEvent BS.ByteString |
     TXEvent BS.ByteString
@@ -41,13 +47,13 @@ data NetEvent =
 rxThread c tap done = do
     M.forever $ do
         p <- TAP.readbs tap
-        putStrLn "received Packet"
+        putStrLn ("received Packet: [0x"  ++ (prettyPrint p) ++ "]")
         STM.atomically $ TC.writeTChan c (RXEvent p)
 
 txThread c tap done = do
     M.forever $ do
         (TXEvent p) <- STM.atomically $ TC.readTChan c
-        putStrLn "Send Packet"
+        putStrLn ("Send Packet: [0x"  ++ (prettyPrint p) ++ "]")
         TAP.writebs tap p
     CC.putMVar done ()
 

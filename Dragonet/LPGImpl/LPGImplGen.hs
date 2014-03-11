@@ -97,22 +97,28 @@ lpgRxL2EtherValidTypeImpl = do
     toPort $ pbool (etype >= 0x0800)
 
 lpgRxL2EtherValidMulticastImpl = do
-    dmac <- ETH.sourceRd
+    --dmac <- ETH.sourceRd
+    dmac <- ETH.destRd
     toPort $ pbool
         ((dmac /= ([0xff, 0xff, 0xff, 0xff, 0xff, 0xff]) &&
         (((head dmac) .&. 1) == 1)))
 
 
 lpgRxL2EtherValidBroadcastImpl = do
-    smac <- ETH.destRd
-    dmac <- ETH.sourceRd
+    --smac <- ETH.destRd
+    --dmac <- ETH.sourceRd
+    dmac <- ETH.destRd
+    smac <- ETH.sourceRd
 --    debug ("llpgRxL2EtherValidBroadcastImpl destMac " ++ show (dmac)
 --            ++ " , srcMac " ++ show(smac) )
     toPort $ pbool (dmac == ([0xff, 0xff, 0xff, 0xff, 0xff, 0xff]))
 
 lpgRxL2EtherValidUnicastImpl = do
-    smac <- ETH.destRd
-    dmac <- ETH.sourceRd
+    -- FIXME: This seems mistake as we are
+    --smac <- ETH.destRd
+    --dmac <- ETH.sourceRd
+    dmac <- ETH.destRd
+    smac <- ETH.sourceRd
 
 --    debug ("lpgRxL2EtherValidUnicastImpl  destMac " ++ show (dmac)
 --            ++ " , srcMac " ++ show(smac) )
