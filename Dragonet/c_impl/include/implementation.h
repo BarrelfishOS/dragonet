@@ -13,7 +13,8 @@ struct input {
     // Buffer
     void  *data;
     size_t len;
-    size_t bytes_before;
+    size_t space_before;
+    size_t space_after;
 };
 
 enum out_ports {
