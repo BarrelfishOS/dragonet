@@ -1,4 +1,4 @@
-#include "implementation.h"
+#include <implementation.h>
 #include <stddef.h>
 #include <stdio.h>
 
@@ -7,6 +7,7 @@ void testFun(struct state * st, struct input *in);
 int main(int argc, char *argv[])
 {
     testFun(NULL, NULL);
+    return 0;
 }
 
 void testFun(struct state * st, struct input *in)
