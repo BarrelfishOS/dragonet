@@ -47,13 +47,13 @@ data NetEvent =
 rxThread c tap done = do
     M.forever $ do
         p <- TAP.readbs tap
-        putStrLn ("received Packet: [0x"  ++ (prettyPrint p) ++ "]")
+--        putStrLn ("received Packet: [0x"  ++ (prettyPrint p) ++ "]")
         STM.atomically $ TC.writeTChan c (RXEvent p)
 
 txThread c tap done = do
     M.forever $ do
         (TXEvent p) <- STM.atomically $ TC.readTChan c
-        putStrLn ("Send Packet: [0x"  ++ (prettyPrint p) ++ "]")
+--        putStrLn ("Send Packet: [0x"  ++ (prettyPrint p) ++ "]")
         TAP.writebs tap p
     CC.putMVar done ()
 
@@ -67,10 +67,10 @@ simThread rxC txC state = do
     (p,state') <- STM.atomically $ simStep rxC txC state
 
     -- Show Debug output
-    putStrLn "SimStepDNET.Alg."
-    if not $ null $ DNET.gsDebug state' then
-        putStr $ unlines $ map ("    " ++) $ DNET.gsDebug state'
-    else return ()
+--    putStrLn "SimStepDNET.Alg."
+--    if not $ null $ DNET.gsDebug state' then
+--        putStr $ unlines $ map ("    " ++) $ DNET.gsDebug state'
+--    else return ()
 
     -- Send out packets on TX queue
     let send p = STM.atomically $ TC.writeTChan txC (TXEvent p)

@@ -198,7 +198,7 @@ void input_clean_attrs(struct input *in);
 void input_clean_packet(struct input *in);
 void input_dump(struct input *in);
 
-#define MYDEBUG     1
+//#define MYDEBUG     1
 #ifdef MYDEBUG
 #define dprint(x...)    printf("debug:" x)
 #else

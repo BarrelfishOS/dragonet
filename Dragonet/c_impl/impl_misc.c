@@ -8,14 +8,14 @@ node_out_t do_pg__Queue(struct state *state, struct input *in)
 
 node_out_t do_pg__PacketDrop(struct state *state, struct input *in)
 {
-    // 
+    //
     dprint("PacketDrop!\n");
     return 0;
 }
 
 node_out_t do_pg__NotSupported(struct state *state, struct input *in)
 {
-    // 
+    //
     dprint("NotSupported!\n");
     return 0;
 }
@@ -54,9 +54,9 @@ node_out_t do_pg__TxDemux(struct state *state, struct input *in)
 
 node_out_t do_pg__TxQueue(struct state *state, struct input *in)
 {
-    // 
-    printf("Send!: ");
-    input_dump(in);
+    //
+    dprint("Send!: ");
+    //input_dump(in);
     return 0;
 }
 

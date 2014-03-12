@@ -171,313 +171,313 @@ void testFun(struct state * st, struct input *in)
                TxL2EtherFillHeader=-1;
     if (1) {
         Queue = do_pg__Queue(st, in);
-        printf("Queue=%d\n", Queue);
+        dprint("Queue=%d\n", Queue);
     }
     if (Queue == P_Queue_out) {
         RxL2EtherClassified = do_pg__RxL2EtherClassified(st, in);
-        printf("RxL2EtherClassified=%d\n", RxL2EtherClassified);
+        dprint("RxL2EtherClassified=%d\n", RxL2EtherClassified);
     }
     if (RxL2EtherClassified == P_true) {
         RxL2EtherValidLength = do_pg__RxL2EtherValidLength(st, in);
-        printf("RxL2EtherValidLength=%d\n", RxL2EtherValidLength);
+        dprint("RxL2EtherValidLength=%d\n", RxL2EtherValidLength);
     }
     if (RxL2EtherValidLength == P_true) {
         RxL2EtherValidUnicast = do_pg__RxL2EtherValidUnicast(st, in);
-        printf("RxL2EtherValidUnicast=%d\n", RxL2EtherValidUnicast);
+        dprint("RxL2EtherValidUnicast=%d\n", RxL2EtherValidUnicast);
     }
     if (RxL2EtherValidLength == P_true) {
         RxL2EtherValidMulticast = do_pg__RxL2EtherValidMulticast(st, in);
-        printf("RxL2EtherValidMulticast=%d\n", RxL2EtherValidMulticast);
+        dprint("RxL2EtherValidMulticast=%d\n", RxL2EtherValidMulticast);
     }
     if (RxL2EtherValidLength == P_true) {
         RxL2EtherValidBroadcast = do_pg__RxL2EtherValidBroadcast(st, in);
-        printf("RxL2EtherValidBroadcast=%d\n", RxL2EtherValidBroadcast);
+        dprint("RxL2EtherValidBroadcast=%d\n", RxL2EtherValidBroadcast);
     }
     if (RxL2EtherValidBroadcast == P_true || RxL2EtherValidMulticast == P_true || RxL2EtherValidUnicast == P_true) {
         RxL2EtherValidDest = P_true;
-        printf("RxL2EtherValidDest=%d\n", RxL2EtherValidDest);
+        dprint("RxL2EtherValidDest=%d\n", RxL2EtherValidDest);
     }
     if (RxL2EtherValidBroadcast == P_false && RxL2EtherValidMulticast == P_false && RxL2EtherValidUnicast == P_false) {
         RxL2EtherValidDest = P_false;
-        printf("RxL2EtherValidDest=%d\n", RxL2EtherValidDest);
+        dprint("RxL2EtherValidDest=%d\n", RxL2EtherValidDest);
     }
     if (RxL2EtherValidLength == P_true) {
         RxL2EtherValidSrc = do_pg__RxL2EtherValidSrc(st, in);
-        printf("RxL2EtherValidSrc=%d\n", RxL2EtherValidSrc);
+        dprint("RxL2EtherValidSrc=%d\n", RxL2EtherValidSrc);
     }
     if (RxL2EtherValidLength == P_true) {
         RxL2EtherValidLocalMAC = do_pg__RxL2EtherValidLocalMAC(st, in);
-        printf("RxL2EtherValidLocalMAC=%d\n", RxL2EtherValidLocalMAC);
+        dprint("RxL2EtherValidLocalMAC=%d\n", RxL2EtherValidLocalMAC);
     }
     if (RxL2EtherValidLocalMAC == P_true && RxL2EtherValidSrc == P_true && RxL2EtherValidDest == P_true) {
         RxL2EtherValid = P_true;
-        printf("RxL2EtherValid=%d\n", RxL2EtherValid);
+        dprint("RxL2EtherValid=%d\n", RxL2EtherValid);
     }
     if (RxL2EtherValidLocalMAC == P_false || RxL2EtherValidSrc == P_false || RxL2EtherValidDest == P_false) {
         RxL2EtherValid = P_false;
-        printf("RxL2EtherValid=%d\n", RxL2EtherValid);
+        dprint("RxL2EtherValid=%d\n", RxL2EtherValid);
     }
     if (RxL2EtherValidLength == P_true) {
         RxL2EtherValidType = do_pg__RxL2EtherValidType(st, in);
-        printf("RxL2EtherValidType=%d\n", RxL2EtherValidType);
+        dprint("RxL2EtherValidType=%d\n", RxL2EtherValidType);
     }
     if (RxL2EtherValidType == P_true) {
         RxL2EtherClassifyL3 = do_pg__RxL2EtherClassifyL3(st, in);
-        printf("RxL2EtherClassifyL3=%d\n", RxL2EtherClassifyL3);
+        dprint("RxL2EtherClassifyL3=%d\n", RxL2EtherClassifyL3);
     }
     if (RxL2EtherClassifyL3 == P_RxL2EtherClassifyL3_arp) {
         RxL3ARPValidHeaderLength = do_pg__RxL3ARPValidHeaderLength(st, in);
-        printf("RxL3ARPValidHeaderLength=%d\n", RxL3ARPValidHeaderLength);
+        dprint("RxL3ARPValidHeaderLength=%d\n", RxL3ARPValidHeaderLength);
     }
     if (RxL3ARPValidHeaderLength == P_true) {
         RxL3ARPClassify = do_pg__RxL3ARPClassify(st, in);
-        printf("RxL3ARPClassify=%d\n", RxL3ARPClassify);
+        dprint("RxL3ARPClassify=%d\n", RxL3ARPClassify);
     }
     if (RxL3ARPClassify == P_RxL3ARPClassify_request) {
         RxL3ARPValidRequest = do_pg__RxL3ARPValidRequest(st, in);
-        printf("RxL3ARPValidRequest=%d\n", RxL3ARPValidRequest);
+        dprint("RxL3ARPValidRequest=%d\n", RxL3ARPValidRequest);
     }
     if (RxL3ARPClassify == P_RxL3ARPClassify_response) {
         RxL3ARPValidResponse = do_pg__RxL3ARPValidResponse(st, in);
-        printf("RxL3ARPValidResponse=%d\n", RxL3ARPValidResponse);
+        dprint("RxL3ARPValidResponse=%d\n", RxL3ARPValidResponse);
     }
     if (RxL3ARPValidResponse == P_true || RxL3ARPValidResponse == P_false) {
         RxL3ARPIsPending = do_pg__RxL3ARPIsPending(st, in);
-        printf("RxL3ARPIsPending=%d\n", RxL3ARPIsPending);
+        dprint("RxL3ARPIsPending=%d\n", RxL3ARPIsPending);
     }
     if (RxL3ARPValidHeaderLength == P_true) {
         RxL3ARPLocalIPDest = do_pg__RxL3ARPLocalIPDest(st, in);
-        printf("RxL3ARPLocalIPDest=%d\n", RxL3ARPLocalIPDest);
+        dprint("RxL3ARPLocalIPDest=%d\n", RxL3ARPLocalIPDest);
     }
     if (RxL3ARPValidRequest == P_true && RxL3ARPLocalIPDest == P_true) {
         RxL3ARPNeedsResponse = P_true;
-        printf("RxL3ARPNeedsResponse=%d\n", RxL3ARPNeedsResponse);
+        dprint("RxL3ARPNeedsResponse=%d\n", RxL3ARPNeedsResponse);
     }
     if (RxL3ARPValidRequest == P_false || RxL3ARPLocalIPDest == P_false) {
         RxL3ARPNeedsResponse = P_false;
-        printf("RxL3ARPNeedsResponse=%d\n", RxL3ARPNeedsResponse);
+        dprint("RxL3ARPNeedsResponse=%d\n", RxL3ARPNeedsResponse);
     }
     if (RxL3ARPNeedsResponse == P_true) {
         RxTagTxARPIR = do_pg__RxTagTxARPIR(st, in);
-        printf("RxTagTxARPIR=%d\n", RxTagTxARPIR);
+        dprint("RxTagTxARPIR=%d\n", RxTagTxARPIR);
     }
     if (RxL3ARPIsPending == P_true && RxL3ARPValidResponse == P_true && RxL3ARPLocalIPDest == P_true) {
         RxL3ARPValidPendingResponse = P_true;
-        printf("RxL3ARPValidPendingResponse=%d\n", RxL3ARPValidPendingResponse);
+        dprint("RxL3ARPValidPendingResponse=%d\n", RxL3ARPValidPendingResponse);
     }
     if (RxL3ARPIsPending == P_false || RxL3ARPValidResponse == P_false || RxL3ARPLocalIPDest == P_false) {
         RxL3ARPValidPendingResponse = P_false;
-        printf("RxL3ARPValidPendingResponse=%d\n", RxL3ARPValidPendingResponse);
+        dprint("RxL3ARPValidPendingResponse=%d\n", RxL3ARPValidPendingResponse);
     }
     if (RxL3ARPValidPendingResponse == P_true) {
         RxL3ARPProcessPendingResponse = do_pg__RxL3ARPProcessPendingResponse(st, in);
-        printf("RxL3ARPProcessPendingResponse=%d\n", RxL3ARPProcessPendingResponse);
+        dprint("RxL3ARPProcessPendingResponse=%d\n", RxL3ARPProcessPendingResponse);
     }
     if (RxL3ARPProcessPendingResponse == P_RxL3ARPProcessPendingResponse_true) {
         RxTagTxARPLu = do_pg__RxTagTxARPLu(st, in);
-        printf("RxTagTxARPLu=%d\n", RxTagTxARPLu);
+        dprint("RxTagTxARPLu=%d\n", RxTagTxARPLu);
     }
     if (RxL2EtherClassifyL3 == P_RxL2EtherClassifyL3_ipv4) {
         RxL3IPv4ValidHeaderLength = do_pg__RxL3IPv4ValidHeaderLength(st, in);
-        printf("RxL3IPv4ValidHeaderLength=%d\n", RxL3IPv4ValidHeaderLength);
+        dprint("RxL3IPv4ValidHeaderLength=%d\n", RxL3IPv4ValidHeaderLength);
     }
     if (RxL3IPv4ValidHeaderLength == P_true) {
         RxL3IPv4ValidReassembly = do_pg__RxL3IPv4ValidReassembly(st, in);
-        printf("RxL3IPv4ValidReassembly=%d\n", RxL3IPv4ValidReassembly);
+        dprint("RxL3IPv4ValidReassembly=%d\n", RxL3IPv4ValidReassembly);
     }
     if (RxL3IPv4ValidHeaderLength == P_true) {
         RxL3IPv4ValidVersion = do_pg__RxL3IPv4ValidVersion(st, in);
-        printf("RxL3IPv4ValidVersion=%d\n", RxL3IPv4ValidVersion);
+        dprint("RxL3IPv4ValidVersion=%d\n", RxL3IPv4ValidVersion);
     }
     if (RxL3IPv4ValidHeaderLength == P_true) {
         RxL3IPv4ValidLength = do_pg__RxL3IPv4ValidLength(st, in);
-        printf("RxL3IPv4ValidLength=%d\n", RxL3IPv4ValidLength);
+        dprint("RxL3IPv4ValidLength=%d\n", RxL3IPv4ValidLength);
     }
     if (RxL3IPv4ValidHeaderLength == P_true) {
         RxL3IPv4ValidTTL = do_pg__RxL3IPv4ValidTTL(st, in);
-        printf("RxL3IPv4ValidTTL=%d\n", RxL3IPv4ValidTTL);
+        dprint("RxL3IPv4ValidTTL=%d\n", RxL3IPv4ValidTTL);
     }
     if (RxL3IPv4ValidHeaderLength == P_true) {
         RxL3IPv4ValidChecksum = do_pg__RxL3IPv4ValidChecksum(st, in);
-        printf("RxL3IPv4ValidChecksum=%d\n", RxL3IPv4ValidChecksum);
+        dprint("RxL3IPv4ValidChecksum=%d\n", RxL3IPv4ValidChecksum);
     }
     if (RxL3IPv4ValidHeaderLength == P_true) {
         RxL3IPv4ValidLocalIP = do_pg__RxL3IPv4ValidLocalIP(st, in);
-        printf("RxL3IPv4ValidLocalIP=%d\n", RxL3IPv4ValidLocalIP);
+        dprint("RxL3IPv4ValidLocalIP=%d\n", RxL3IPv4ValidLocalIP);
     }
     if (RxL3IPv4ValidLocalIP == P_true && RxL3IPv4ValidChecksum == P_true && RxL3IPv4ValidTTL == P_true && RxL3IPv4ValidLength == P_true && RxL3IPv4ValidVersion == P_true && RxL3IPv4ValidReassembly == P_true) {
         RxL3IPv4Valid = P_true;
-        printf("RxL3IPv4Valid=%d\n", RxL3IPv4Valid);
+        dprint("RxL3IPv4Valid=%d\n", RxL3IPv4Valid);
     }
     if (RxL3IPv4ValidLocalIP == P_false || RxL3IPv4ValidChecksum == P_false || RxL3IPv4ValidTTL == P_false || RxL3IPv4ValidLength == P_false || RxL3IPv4ValidVersion == P_false || RxL3IPv4ValidReassembly == P_false) {
         RxL3IPv4Valid = P_false;
-        printf("RxL3IPv4Valid=%d\n", RxL3IPv4Valid);
+        dprint("RxL3IPv4Valid=%d\n", RxL3IPv4Valid);
     }
     if (RxL3IPv4Valid == P_true) {
         RxL3IPValid = P_true;
-        printf("RxL3IPValid=%d\n", RxL3IPValid);
+        dprint("RxL3IPValid=%d\n", RxL3IPValid);
     }
     if (RxL3IPv4Valid == P_false) {
         RxL3IPValid = P_false;
-        printf("RxL3IPValid=%d\n", RxL3IPValid);
+        dprint("RxL3IPValid=%d\n", RxL3IPValid);
     }
     if (RxL2EtherValid == P_true && RxL3IPValid == P_true) {
         RxL3IPAndBelowValid = P_true;
-        printf("RxL3IPAndBelowValid=%d\n", RxL3IPAndBelowValid);
+        dprint("RxL3IPAndBelowValid=%d\n", RxL3IPAndBelowValid);
     }
     if (RxL2EtherValid == P_false || RxL3IPValid == P_false) {
         RxL3IPAndBelowValid = P_false;
-        printf("RxL3IPAndBelowValid=%d\n", RxL3IPAndBelowValid);
+        dprint("RxL3IPAndBelowValid=%d\n", RxL3IPAndBelowValid);
     }
     if (RxL3IPv4ValidHeaderLength == P_true) {
         RxL3IPv4Classify = do_pg__RxL3IPv4Classify(st, in);
-        printf("RxL3IPv4Classify=%d\n", RxL3IPv4Classify);
+        dprint("RxL3IPv4Classify=%d\n", RxL3IPv4Classify);
     }
     if (RxL3IPv4Classify == P_RxL3IPv4Classify_udp || RxL2EtherClassifyL3 == P_RxL2EtherClassifyL3_ipv6) {
         NotSupported = do_pg__NotSupported(st, in);
-        printf("NotSupported=%d\n", NotSupported);
+        dprint("NotSupported=%d\n", NotSupported);
     }
     if (RxL3IPv4Classify == P_RxL3IPv4Classify_drop || RxL3IPv4ValidHeaderLength == P_false || RxL3ARPClassify == P_RxL3ARPClassify_drop || RxL3ARPValidHeaderLength == P_false || RxL2EtherClassifyL3 == P_RxL2EtherClassifyL3_drop || RxL2EtherValidType == P_false || RxL2EtherValidLength == P_false || RxL2EtherClassified == P_false) {
         PacketDrop = do_pg__PacketDrop(st, in);
-        printf("PacketDrop=%d\n", PacketDrop);
+        dprint("PacketDrop=%d\n", PacketDrop);
     }
     if (RxL3IPv4Classify == P_RxL3IPv4Classify_icmp) {
         RxL3ICMPValidHeaderLength = do_pg__RxL3ICMPValidHeaderLength(st, in);
-        printf("RxL3ICMPValidHeaderLength=%d\n", RxL3ICMPValidHeaderLength);
+        dprint("RxL3ICMPValidHeaderLength=%d\n", RxL3ICMPValidHeaderLength);
     }
     if (RxL3ICMPValidHeaderLength == P_true) {
         RxL3ICMPValidChecksum = do_pg__RxL3ICMPValidChecksum(st, in);
-        printf("RxL3ICMPValidChecksum=%d\n", RxL3ICMPValidChecksum);
+        dprint("RxL3ICMPValidChecksum=%d\n", RxL3ICMPValidChecksum);
     }
     if (RxL3ICMPValidChecksum == P_true && RxL3IPAndBelowValid == P_true) {
         RxL3ICMPValid = P_true;
-        printf("RxL3ICMPValid=%d\n", RxL3ICMPValid);
+        dprint("RxL3ICMPValid=%d\n", RxL3ICMPValid);
     }
     if (RxL3ICMPValidChecksum == P_false || RxL3IPAndBelowValid == P_false) {
         RxL3ICMPValid = P_false;
-        printf("RxL3ICMPValid=%d\n", RxL3ICMPValid);
+        dprint("RxL3ICMPValid=%d\n", RxL3ICMPValid);
     }
     if (RxL3ICMPValidHeaderLength == P_true) {
         RxL3ICMPIsTypeRequest = do_pg__RxL3ICMPIsTypeRequest(st, in);
-        printf("RxL3ICMPIsTypeRequest=%d\n", RxL3ICMPIsTypeRequest);
+        dprint("RxL3ICMPIsTypeRequest=%d\n", RxL3ICMPIsTypeRequest);
     }
     if (RxL3ICMPIsTypeRequest == P_true && RxL3ICMPValid == P_true) {
         RxL3ICMPNeedsResponse = P_true;
-        printf("RxL3ICMPNeedsResponse=%d\n", RxL3ICMPNeedsResponse);
+        dprint("RxL3ICMPNeedsResponse=%d\n", RxL3ICMPNeedsResponse);
     }
     if (RxL3ICMPIsTypeRequest == P_false || RxL3ICMPValid == P_false) {
         RxL3ICMPNeedsResponse = P_false;
-        printf("RxL3ICMPNeedsResponse=%d\n", RxL3ICMPNeedsResponse);
+        dprint("RxL3ICMPNeedsResponse=%d\n", RxL3ICMPNeedsResponse);
     }
     if (RxL3ICMPNeedsResponse == P_true) {
         RxTagTxICMPIR = do_pg__RxTagTxICMPIR(st, in);
-        printf("RxTagTxICMPIR=%d\n", RxTagTxICMPIR);
+        dprint("RxTagTxICMPIR=%d\n", RxTagTxICMPIR);
     }
     if (RxTagTxICMPIR == P_true || RxTagTxARPLu == P_true || RxTagTxARPIR == P_true) {
         RxToTx = P_true;
-        printf("RxToTx=%d\n", RxToTx);
+        dprint("RxToTx=%d\n", RxToTx);
     }
     if (RxTagTxICMPIR == P_false && RxTagTxARPLu == P_false && RxTagTxARPIR == P_false) {
         RxToTx = P_false;
-        printf("RxToTx=%d\n", RxToTx);
+        dprint("RxToTx=%d\n", RxToTx);
     }
     if (RxToTx == P_true) {
         TxDemux = do_pg__TxDemux(st, in);
-        printf("TxDemux=%d\n", TxDemux);
+        dprint("TxDemux=%d\n", TxDemux);
     }
     if (TxDemux == P_TxDemux_ICMPIR) {
         TxL3ICMPInitiateResponse = do_pg__TxL3ICMPInitiateResponse(st, in);
-        printf("TxL3ICMPInitiateResponse=%d\n", TxL3ICMPInitiateResponse);
+        dprint("TxL3ICMPInitiateResponse=%d\n", TxL3ICMPInitiateResponse);
     }
     if (TxL3ICMPInitiateResponse == P_TxL3ICMPInitiateResponse_out) {
         TxL3ICMPAllocateHeader = do_pg__TxL3ICMPAllocateHeader(st, in);
-        printf("TxL3ICMPAllocateHeader=%d\n", TxL3ICMPAllocateHeader);
+        dprint("TxL3ICMPAllocateHeader=%d\n", TxL3ICMPAllocateHeader);
     }
     if (TxL3ICMPAllocateHeader == P_TxL3ICMPAllocateHeader_out) {
         TxL3ICMPFillHeader = do_pg__TxL3ICMPFillHeader(st, in);
-        printf("TxL3ICMPFillHeader=%d\n", TxL3ICMPFillHeader);
+        dprint("TxL3ICMPFillHeader=%d\n", TxL3ICMPFillHeader);
     }
     if (TxL3ICMPFillHeader == P_true) {
         TxL3IPv4Prepare = P_true;
-        printf("TxL3IPv4Prepare=%d\n", TxL3IPv4Prepare);
+        dprint("TxL3IPv4Prepare=%d\n", TxL3IPv4Prepare);
     }
     if (TxL3ICMPFillHeader == P_false) {
         TxL3IPv4Prepare = P_false;
-        printf("TxL3IPv4Prepare=%d\n", TxL3IPv4Prepare);
+        dprint("TxL3IPv4Prepare=%d\n", TxL3IPv4Prepare);
     }
     if (TxL3IPv4Prepare == P_true) {
         TxL3IPv4AllocateHeader = do_pg__TxL3IPv4AllocateHeader(st, in);
-        printf("TxL3IPv4AllocateHeader=%d\n", TxL3IPv4AllocateHeader);
+        dprint("TxL3IPv4AllocateHeader=%d\n", TxL3IPv4AllocateHeader);
     }
     if (TxL3IPv4AllocateHeader == P_TxL3IPv4AllocateHeader_out) {
         TxL3IPv4FillHeader = do_pg__TxL3IPv4FillHeader(st, in);
-        printf("TxL3IPv4FillHeader=%d\n", TxL3IPv4FillHeader);
+        dprint("TxL3IPv4FillHeader=%d\n", TxL3IPv4FillHeader);
     }
     if (TxL3IPv4FillHeader == P_TxL3IPv4FillHeader_out) {
         TxL3IPv4Routing = do_pg__TxL3IPv4Routing(st, in);
-        printf("TxL3IPv4Routing=%d\n", TxL3IPv4Routing);
+        dprint("TxL3IPv4Routing=%d\n", TxL3IPv4Routing);
     }
     if (TxDemux == P_TxDemux_ARPIR) {
         TxL3ARPInitiateResponse = do_pg__TxL3ARPInitiateResponse(st, in);
-        printf("TxL3ARPInitiateResponse=%d\n", TxL3ARPInitiateResponse);
+        dprint("TxL3ARPInitiateResponse=%d\n", TxL3ARPInitiateResponse);
     }
     if (TxDemux == P_TxDemux_ARPLu) {
         TxL3ARPLookupRequestIn = do_pg__TxL3ARPLookupRequestIn(st, in);
-        printf("TxL3ARPLookupRequestIn=%d\n", TxL3ARPLookupRequestIn);
+        dprint("TxL3ARPLookupRequestIn=%d\n", TxL3ARPLookupRequestIn);
     }
     if (TxL3ARPLookupRequestIn == P_true || TxL3IPv4Routing == P_true) {
         TxL3ARPLookup = P_true;
-        printf("TxL3ARPLookup=%d\n", TxL3ARPLookup);
+        dprint("TxL3ARPLookup=%d\n", TxL3ARPLookup);
     }
     if (TxL3ARPLookupRequestIn == P_false && TxL3IPv4Routing == P_false) {
         TxL3ARPLookup = P_false;
-        printf("TxL3ARPLookup=%d\n", TxL3ARPLookup);
+        dprint("TxL3ARPLookup=%d\n", TxL3ARPLookup);
     }
     if (TxL3ARPLookup == P_true) {
         TxL3ARPLookup_ = do_pg__TxL3ARPLookup_(st, in);
-        printf("TxL3ARPLookup_=%d\n", TxL3ARPLookup_);
+        dprint("TxL3ARPLookup_=%d\n", TxL3ARPLookup_);
     }
     if (TxL3ARPLookup_ == P_TxL3ARPLookup__miss) {
         TxL3ARPSendRequest = do_pg__TxL3ARPSendRequest(st, in);
-        printf("TxL3ARPSendRequest=%d\n", TxL3ARPSendRequest);
+        dprint("TxL3ARPSendRequest=%d\n", TxL3ARPSendRequest);
     }
     if (TxL3ARPSendRequest == P_TxL3ARPSendRequest_true || TxL3ARPInitiateResponse == P_TxL3ARPInitiateResponse_true) {
         TxL3ARPPrepare = P_true;
-        printf("TxL3ARPPrepare=%d\n", TxL3ARPPrepare);
+        dprint("TxL3ARPPrepare=%d\n", TxL3ARPPrepare);
     }
     if (TxL3ARPSendRequest == P_TxL3ARPSendRequest_false && TxL3ARPInitiateResponse == P_TxL3ARPInitiateResponse_false) {
         TxL3ARPPrepare = P_false;
-        printf("TxL3ARPPrepare=%d\n", TxL3ARPPrepare);
+        dprint("TxL3ARPPrepare=%d\n", TxL3ARPPrepare);
     }
     if (TxL3ARPPrepare == P_true) {
         TxL3ARPAllocateHeader = do_pg__TxL3ARPAllocateHeader(st, in);
-        printf("TxL3ARPAllocateHeader=%d\n", TxL3ARPAllocateHeader);
+        dprint("TxL3ARPAllocateHeader=%d\n", TxL3ARPAllocateHeader);
     }
     if (TxL3ARPAllocateHeader == P_TxL3ARPAllocateHeader_out) {
         TxL3ARPFillHeader = do_pg__TxL3ARPFillHeader(st, in);
-        printf("TxL3ARPFillHeader=%d\n", TxL3ARPFillHeader);
+        dprint("TxL3ARPFillHeader=%d\n", TxL3ARPFillHeader);
     }
     if (TxL3ARPLookup_ == P_TxL3ARPLookup__true || TxL3ARPFillHeader == P_true) {
         TxL2EtherPrepare = P_true;
-        printf("TxL2EtherPrepare=%d\n", TxL2EtherPrepare);
+        dprint("TxL2EtherPrepare=%d\n", TxL2EtherPrepare);
     }
     if (TxL3ARPLookup_ == P_TxL3ARPLookup__false && TxL3ARPFillHeader == P_false) {
         TxL2EtherPrepare = P_false;
-        printf("TxL2EtherPrepare=%d\n", TxL2EtherPrepare);
+        dprint("TxL2EtherPrepare=%d\n", TxL2EtherPrepare);
     }
     if (TxL2EtherPrepare == P_true) {
         TxL2EtherAllocateHeader = do_pg__TxL2EtherAllocateHeader(st, in);
-        printf("TxL2EtherAllocateHeader=%d\n", TxL2EtherAllocateHeader);
+        dprint("TxL2EtherAllocateHeader=%d\n", TxL2EtherAllocateHeader);
     }
     if (TxL2EtherAllocateHeader == P_TxL2EtherAllocateHeader_out) {
         TxL2EtherFillHeader = do_pg__TxL2EtherFillHeader(st, in);
-        printf("TxL2EtherFillHeader=%d\n", TxL2EtherFillHeader);
+        dprint("TxL2EtherFillHeader=%d\n", TxL2EtherFillHeader);
     }
     if (TxL2EtherFillHeader == P_TxL2EtherFillHeader_out) {
         TxQueue = do_pg__TxQueue(st, in);
-        printf("TxQueue=%d\n", TxQueue);
-        printf("PacketContents\n");
-        show_hex_dump(in->data, in->len);
+        dprint("TxQueue=%d\n", TxQueue);
+        dprint("PacketContents\n");
+//        show_hex_dump(in->data, in->len);
         // Sending out packet with tuntap
         if (tap_dn != NULL) {
             tap_write(tap_dn, in->data, in->len);
@@ -487,7 +487,8 @@ void testFun(struct state * st, struct input *in)
 
 
 // #############################################################
-
+// FIXME: following this the direct copy-paste from dragonet/Dragonet/Util/tap.c
+//          we need better way to reuse the code and avoid this ugly copy.
 #define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/socket.h>
