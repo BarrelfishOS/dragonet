@@ -53,7 +53,7 @@ node_out_t do_pg__RxL3ARPValidHeaderLength(struct state *state, struct input *in
     if (arplen < ARP_HDRLEN_MIN)
         return P_false;
 
-    return PORT_BOOL(arplen <= arp_hdrlen(in));
+    return PORT_BOOL(arplen >= arp_hdrlen(in));
 }
 
 node_out_t do_pg__RxL3ARPClassify(struct state *state, struct input *in)
