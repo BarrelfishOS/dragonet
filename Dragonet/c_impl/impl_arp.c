@@ -154,6 +154,12 @@ node_out_t do_pg__TxL3ARPFillHeader(struct state *state, struct input *in)
     return P_true;
 }
 
+node_out_t do_pg__TxL3ARPLookupRequestIn(struct state *state, struct input *in)
+{
+    // P_true, P_false
+    return P_true;
+}
+
 node_out_t do_pg__TxL3ARPLookup_(struct state *state, struct input *in)
 {
     // P_TxL3ARPLookup__true, P_TxL3ARPLookup__false, P_TxL3ARPLookup__miss

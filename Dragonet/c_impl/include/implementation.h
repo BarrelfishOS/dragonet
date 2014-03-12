@@ -168,6 +168,7 @@ node_out_t do_pg__TxL3IPv4Routing(struct state *state, struct input *in);
 node_out_t do_pg__TxL3ARPInitiateResponse(struct state *state, struct input *in);
 node_out_t do_pg__TxL3ARPAllocateHeader(struct state *state, struct input *in);
 node_out_t do_pg__TxL3ARPFillHeader(struct state *state, struct input *in);
+node_out_t do_pg__TxL3ARPLookupRequestIn(struct state *state, struct input *in);
 node_out_t do_pg__TxL3ARPLookup_(struct state *state, struct input *in);
 node_out_t do_pg__TxL3ARPSendRequest(struct state *state, struct input *in);
 node_out_t do_pg__TxL2EtherAllocateHeader(struct state *state, struct input *in);
