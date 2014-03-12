@@ -1,8 +1,10 @@
 #include <implementation.h>
 #include <proto_ipv4.h>
 #include <ethernetproto.h>
+#include <inttypes.h>
 
 
+struct arp_cache *arp_cache_lookup(struct state *st, uint32_t ip);
 
 node_out_t do_pg__RxL3IPv4ValidHeaderLength(struct state *state, struct input *in)
 {
@@ -47,6 +49,17 @@ node_out_t do_pg__RxL3IPv4ValidChecksum(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL3IPv4ValidLocalIP(struct state *state, struct input *in)
 {
+    dprint("%s: srcIP = %"PRIx32", dstIP = %"PRIx32"\n", __func__,
+            ipv4_srcIP_rd(in), ipv4_dstIP_rd(in));
+    struct arp_cache *c = arp_cache_lookup(state, ipv4_srcIP_rd(in));
+    if (c == NULL) {
+        c = malloc(sizeof(*c));
+        c->ip = ipv4_srcIP_rd(in);
+        c->mac =  eth_src_mac_read(in);
+        c->next = state->arp_cache;
+        state->arp_cache = c;
+    }
+
     // P_true, P_false
     return PORT_BOOL(ipv4_dstIP_rd(in) == state->local_ip);
 }
@@ -72,7 +85,7 @@ node_out_t do_pg__TxL3IPv4AllocateHeader(struct state *state, struct input *in)
     in->offset_l4 += hlen;
     in->offset_l5 += hlen;
 
-    ipv4_ihl_wr(in, 4);
+    ipv4_ihl_wr(in, 5);
     return P_TxL3IPv4AllocateHeader_out;
 }
 

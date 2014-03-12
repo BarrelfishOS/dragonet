@@ -47,6 +47,7 @@ node_out_t do_pg__RxL2EtherValidLocalMAC(struct state *state, struct input *in)
     mac_t dst = eth_dst_mac_read(in);
     mac_t localmac = state->local_mac;
     dprint("%s: %lx == %lx\n", __func__, dst, localmac);
+    dprint("%s: src mac == %lx\n", __func__, eth_src_mac_read(in));
     return PORT_BOOL(dst == localmac || dst == eth_broadcast_addr);
     //return ((eth_dst_mac_read(in) == get_local_mac(state))?P_true: P_false);
 }

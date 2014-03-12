@@ -3,6 +3,7 @@
 #include <implementation.h>
 #include <proto_arp.h>
 #include <ethernetproto.h>
+#include <inttypes.h>
 
 static struct arp_pending *arp_get_pending(struct state *st, uint32_t ip)
 {
@@ -34,7 +35,7 @@ static void arp_remove_pending(struct state *st, struct arp_pending *p)
     }
 }
 
-static struct arp_cache *arp_cache_lookup(struct state *st, uint32_t ip)
+struct arp_cache *arp_cache_lookup(struct state *st, uint32_t ip)
 {
     struct arp_cache *cache = st->arp_cache;
     while (cache != NULL) {
@@ -162,6 +163,7 @@ node_out_t do_pg__TxL3ARPLookupRequestIn(struct state *state, struct input *in)
 
 node_out_t do_pg__TxL3ARPLookup_(struct state *state, struct input *in)
 {
+    dprint("%s: arp lookup for : %"PRIx32"\n", __func__, in->ip4_dst);
     // P_TxL3ARPLookup__true, P_TxL3ARPLookup__false, P_TxL3ARPLookup__miss
     struct arp_cache *cache = arp_cache_lookup(state, in->ip4_dst);
     if (cache == NULL) {
