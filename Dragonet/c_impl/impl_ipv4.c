@@ -51,14 +51,14 @@ node_out_t do_pg__RxL3IPv4ValidLocalIP(struct state *state, struct input *in)
 {
     dprint("%s: srcIP = %"PRIx32", dstIP = %"PRIx32"\n", __func__,
             ipv4_srcIP_rd(in), ipv4_dstIP_rd(in));
-    struct arp_cache *c = arp_cache_lookup(state, ipv4_srcIP_rd(in));
+    /*struct arp_cache *c = arp_cache_lookup(state, ipv4_srcIP_rd(in));
     if (c == NULL) {
         c = malloc(sizeof(*c));
         c->ip = ipv4_srcIP_rd(in);
         c->mac =  eth_src_mac_read(in);
         c->next = state->arp_cache;
         state->arp_cache = c;
-    }
+    }*/
 
     // P_true, P_false
     return PORT_BOOL(ipv4_dstIP_rd(in) == state->local_ip);

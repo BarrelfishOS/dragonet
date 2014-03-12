@@ -99,6 +99,7 @@ node_out_t do_pg__RxL3ARPProcessPendingResponse(struct state *state, struct inpu
     // P_RxL3ARPProcessPendingResponse_true, P_RxL3ARPProcessPendingResponse_false, P_RxL3ARPProcessPendingResponse_drop
     struct arp_pending *pending = arp_get_pending(state, arp_spa_ipv4_rd(in));
     struct arp_cache   *cache;
+    struct input i;
     arp_remove_pending(state, pending);
 
     cache = malloc(sizeof(*cache));
@@ -108,9 +109,12 @@ node_out_t do_pg__RxL3ARPProcessPendingResponse(struct state *state, struct inpu
     state->arp_cache = cache;
 
     // TODO: Can we avoid this?
+    memcpy(&i, in, sizeof(*in));
     memcpy(in, pending->input, sizeof(*in));
-    free(pending->input);
+    memcpy(pending->input, &i, sizeof(i));
+    input_free(pending->input);
     free(pending);
+
     return P_RxL3ARPProcessPendingResponse_true;
 }
 
@@ -183,6 +187,7 @@ node_out_t do_pg__TxL3ARPSendRequest(struct state *state, struct input *in)
     pending = malloc(sizeof(*pending));
     pending->next = state->arp_pending;
     state->arp_pending = pending;
+    pending->ip = in->ip4_dst;
 
     // Allocate new input for pending, and exchange it with current in
     pending->input = input_alloc();
