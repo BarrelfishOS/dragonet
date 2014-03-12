@@ -12,6 +12,14 @@
 #define eth_type_IPv6       (0x86DD)
 #define eth_type_ARP        (0x0806)
 
+// Ethernet header length
+#define ethernet_header_len     (14)
+
+//#define l2Offset(x)                (0)
+static inline size_t l2Offset(struct input *pkt)
+{
+    return ((size_t)pkt->attrs[L2Offset]);
+}
 
 typedef uint64_t mac_t;
 

@@ -6,7 +6,8 @@
 node_out_t do_pg__RxL2EtherClassified(struct state *state, struct input *in)
 {
     // P_true, P_false
-    // Assuming that it is Ethernet packet
+    // setting the offset of Ethernet packet starting
+    in->attrs[L2Offset] = 0;
     return P_true;
 }
 
@@ -73,13 +74,25 @@ node_out_t do_pg__RxL2EtherClassifyL3(struct state *state, struct input *in)
 
 node_out_t do_pg__TxL2EtherAllocateHeader(struct state *state, struct input *in)
 {
-    // P_TxL2EtherAllocateHeader_out
-    return 0;
+
+    pkt_prepend(in, ethernet_header_len);
+    pkt_clear(in,  l2Offset(in), ethernet_header_len);
+
+    // Moving L3 and L4 header offset (in case someone still modifies them)
+    in->attrs[L3Offset] += (ethernet_header_len);
+    in->attrs[L4Offset] += (ethernet_header_len);
+    return P_TxL2EtherAllocateHeader_out;
 }
 
 node_out_t do_pg__TxL2EtherFillHeader(struct state *state, struct input *in)
 {
-    // P_TxL2EtherFillHeader_out
-    return 0;
+
+    mac_t src_mac = (mac_t)in->attrs[ETHSrcMAC];
+    mac_t dst_mac = (mac_t)in->attrs[ETHDstMAC];
+    uint16_t ethType =  (uint16_t)in->attrs[ETHType];
+    eth_src_mac_write(in, src_mac);
+    eth_dst_mac_write(in, dst_mac);
+    eth_type_write(in, ethType);
+    return P_TxL2EtherFillHeader_out;
 }
 

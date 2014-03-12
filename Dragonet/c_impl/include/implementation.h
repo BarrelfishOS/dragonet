@@ -9,6 +9,40 @@
 
 typedef int node_out_t;
 
+enum PktAttributes {
+    ARPDstIP,
+    ARPDstMAC,
+    ARPOper,
+    ARPSrcIP,
+    ARPSrcMAC,
+    ETHDstMAC,
+    ETHSrcMAC,
+    ETHType,
+    ICMPId,
+    IP4Dest,
+    IP4PayloadLen,
+    IP4Proto,
+    IP4Source,
+    L2Offset,
+    L3Offset,
+    L4Offset,
+    L4PayloadLen,
+    TCPAckNo,
+    TCPChecksum,
+    TCPdataoff,
+    TCPDstPort,
+    TCPFlags,
+    TCPPayload,
+    TCPSeqNo,
+    TCPSrcPort,
+    TCPUrgent,
+    TCPWindow,
+    UDPDstPort,
+    UDPLen,
+    UDPSrcPort,
+    AttributeCount,  // must be the last attribute
+};
+
 struct state {
     uint64_t pkt_counter;
     void *place_holder;
@@ -21,7 +55,9 @@ struct input {
     size_t len;
     size_t space_before;
     size_t space_after;
+    uint64_t attrs[AttributeCount];
 };
+
 
 enum out_ports {
     P_false = 0,

@@ -57,6 +57,13 @@ static inline void pkt_prepend(struct input *in, ssize_t change)
 }
 
 
+/** clear `len' bytes from offset `off' in the packet buffer */
+static inline void pkt_clear(struct input *in, size_t off, size_t len)
+{
+    CHECK_BOUNDS(in, off, len, "pkt_clear");
+    memset((uint8_t *) in->data + off, 0, len);
+}
+
 /******************************************************************************/
 /* Read without conversion to machine order */
 
