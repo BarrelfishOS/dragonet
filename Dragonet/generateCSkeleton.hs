@@ -61,8 +61,13 @@ generateFNSkels g = L.intercalate "\n\n" $ mapMaybe proto $ graphNodes g
 
 
 nodeStmts :: PGraph -> PGNode -> [String]
-nodeStmts g (n,l) =
-    ["if (" ++ guardE ++ ") {", "    " ++ nLabel l ++ " = " ++ callS, dbg, "}"]
+nodeStmts g (n,l)
+    | nIsFNode l = ["if (" ++ guardE ++ ") {",
+                    "    " ++ nLabel l ++ " = " ++ callS, dbg, "}"]
+    | nIsONode l = ["if (" ++ guardTE ++ ") {",
+                    "    " ++ nLabel l ++ " = P_true;", dbg, "}",
+                    "if (" ++ guardFE ++ ") {",
+                    "    " ++ nLabel l ++ " = P_false;", dbg, "}"]
     where
         isBoolean l' = (elem "Boolean" $ nAttributes l') || nIsONode l'
         pLabel l' p =
@@ -70,32 +75,39 @@ nodeStmts g (n,l) =
                 then ("P_" ++ p)
                 else ("P_" ++ nLabel l' ++ "_" ++ p)
         nfLabel l' = "do_pg__" ++ nLabel l'
-        guardE
-            | nIsFNode l = if null pre
+        dbg = "    printf(\"" ++ nLabel l ++ "=%d\\n\", " ++ nLabel l ++ ");"
+
+        -- For FNodes
+        guardE = if null pre
                 then "1"
                 else L.intercalate " || " $
                     map (\(n',p) -> (nLabel n' ++ " == " ++ pLabel n' p)) pre
-            | nIsONode l = L.intercalate " && " $
-                map (\(n',p) -> (nLabel n' ++ " != -1")) pre
             where
                 pre = map (\(n',e) -> (fromJust $ DGI.lab g n',e)) $
                     DGI.lpre g n
-        callS
-            | nIsFNode l = nfLabel l ++ "(st, in);"
-            | nIsONode l = "(" ++ onCond ++ " ? P_true : P_false);"
-        onCond =
+        callS = nfLabel l ++ "(st, in);"
+
+        -- For ONodes
+        guardTE =
             case op of
                 OpAnd -> L.intercalate " && " $
                     map (\l' -> nLabel l' ++ " == P_true") inT
                 OpOr -> L.intercalate " || " $
                     map (\l' -> nLabel l' ++ " == P_true") inT
-           where
-                (ONode op) = nPersonality l
-                inT = map (fromJust . DGI.lab g . fst) $
-                    filter (\(_,e) -> e == "true") $ DGI.lpre g n
-                inF = map (fromJust . DGI.lab g . fst) $
-                    filter (\(_,e) -> e == "false") $ DGI.lpre g n
-        dbg = "    printf(\"" ++ nLabel l ++ "=%d\\n\", " ++ nLabel l ++ ");"
+        guardFE =
+            case op of
+                OpAnd -> L.intercalate " || " $
+                    map (\l' -> nLabel l' ++ " == P_false") inT
+                OpOr -> L.intercalate " && " $
+                    map (\l' -> nLabel l' ++ " == P_false") inT
+
+        -- Helpers for Onodes, incoming true and false edges
+        inT = map (fromJust . DGI.lab g . fst) $
+            filter (\(_,e) -> e == "true") $ DGI.lpre g n
+        inF = map (fromJust . DGI.lab g . fst) $
+            filter (\(_,e) -> e == "false") $ DGI.lpre g n
+        (ONode op) = nPersonality l
+
 
 generateTestFun :: String -> PGraph -> String
 generateTestFun name g = sig ++ "\n{\n" ++ body ++ "\n}\n"
