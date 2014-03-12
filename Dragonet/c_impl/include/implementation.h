@@ -181,6 +181,8 @@ static inline void panic_(const char *file, int line, const char *fmt,...)
 /** Allocate/initialize a new input structure including a buffer */
 struct input *input_alloc(void);
 void input_free(struct input *in);
+/** Keep the data in the input struct as is, but reinitialize attributes */
+void input_clean_attrs(struct input *in);
 
 #define MYDEBUG     1
 #ifdef MYDEBUG
