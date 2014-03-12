@@ -68,6 +68,15 @@ struct input {
     uint32_t arp_src_ip;
     uint32_t arp_dst_ip;
     uint8_t  arp_oper;
+
+    // Misc
+    uint8_t mux_id;
+};
+
+enum attr_mux_id {
+    ATTR_MUX_ARPIR,
+    ATTR_MUX_ARPLU,
+    ATTR_MUX_ICMPIR,
 };
 
 
