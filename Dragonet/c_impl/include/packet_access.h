@@ -33,7 +33,7 @@ static inline void pkt_append(struct input *in, ssize_t change)
             panic("Cannot append space to packet\n");
         }
     } else {
-        if (change > in->space_after) {
+        if (-change > in->len) {
             panic("Trying to remove more bytes than packet len (append)\n");
         }
     }
@@ -49,7 +49,7 @@ static inline void pkt_prepend(struct input *in, ssize_t change)
             panic("Cannot prepend space to packet\n");
         }
     } else {
-        if (change > in->space_after) {
+        if (-change > in->len) {
             panic("Trying to remove more bytes than packet len (prepend)\n");
         }
     }
