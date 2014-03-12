@@ -59,6 +59,18 @@ static uint8_t pkt_unsupported_proto_rx[] = {
     };
 
 
+static void show_hex_dump(void *data, size_t len)
+{
+    int i = 0;
+    printf("[");
+    uint8_t *ptr = data;
+    for (i = 0; i < len; ++i) {
+        printf("0x%x,", ptr[i]);
+    }
+    printf("]\n");
+}
+
+
 static void run_packet(struct state *st, void *buffer, size_t len)
 {
     struct input *in = input_alloc();
@@ -81,10 +93,14 @@ int main(int argc, char *argv[])
     // Testing incoming arp request packet
     printf("\nTesting:arp_request_rx\n");
     run_packet(&st, arp_request_rx, sizeof(arp_request_rx));
+    printf("\nVerify: Should match with following expected packet\n");
+    show_hex_dump(arp_response_tx, sizeof(arp_response_tx));
 
     // Testing incoming icmp packet
     printf("\nTesting:ICMP packet\n");
     run_packet(&st, pkt_icmp_echo_rx, sizeof(pkt_icmp_echo_rx));
+    printf("\nVerify: Should match with following expected packet\n");
+    show_hex_dump(pkt_icmp_echo_response_tx, sizeof(pkt_icmp_echo_response_tx));
 
     // Testing incoming packet for unsupported protocol
     printf("\nTesting incoming packet for unsupported protocol\n");
@@ -431,6 +447,10 @@ void testFun(struct state * st, struct input *in)
     if (TxL2EtherFillHeader == P_TxL2EtherFillHeader_out) {
         TxQueue = do_pg__TxQueue(st, in);
         printf("TxQueue=%d\n", TxQueue);
+        printf("PacketContents\n");
+        show_hex_dump(in->data, in->len);
     }
 }
+
+
 
