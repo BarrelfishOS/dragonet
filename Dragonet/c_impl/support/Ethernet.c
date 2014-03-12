@@ -9,7 +9,7 @@
 
 mac_t eth_dst_mac_read(struct input *pkt)
 {
-    return pkt_read48be(pkt, eth_dst_mac_offset(pkt));
+    return pkt_read48(pkt, eth_dst_mac_offset(pkt));
 }
 
 void eth_dst_mac_write(struct input *pkt, mac_t val)
@@ -23,7 +23,7 @@ void eth_dst_mac_write(struct input *pkt, mac_t val)
 
 mac_t eth_src_mac_read(struct input *pkt)
 {
-    return pkt_read48be(pkt, eth_src_mac_offset(pkt));
+    return pkt_read48(pkt, eth_src_mac_offset(pkt));
 }
 
 void eth_src_mac_write(struct input *pkt, mac_t val)
