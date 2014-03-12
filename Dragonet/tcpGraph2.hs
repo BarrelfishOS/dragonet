@@ -399,9 +399,12 @@ graph tcp2 {
 
 -- The protocol graph
 
+getGraphDirName :: String
+getGraphDirName = "./graphsGen/"
 
 myWriteFile :: String -> String -> IO()
-myWriteFile fname contents = do
+myWriteFile fnamefile contents = do
+    let fname = (getGraphDirName  ++ fnamefile)
     putStrLn ("Generating " ++ fname ++ " files...")
     writeFile fname contents
 

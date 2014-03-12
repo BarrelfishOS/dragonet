@@ -13,6 +13,7 @@ module LPGImpl.LPGImplTx (
     lpgTxQueueImpl, lpgTxL2EtherAllocateHeaderImpl, lpgTxL2EtherFillHeaderImpl,
     lpgTxL3ARPInitiateResponseImpl, lpgTxL3ARPAllocateHeaderImpl,
     lpgTxL3ARPFillHeaderImpl, lpgTxL3ARPLookup_Impl, lpgTxL3ARPSendRequestImpl,
+    lpgTxL3ARPLookupRequestInImpl,
     lpgTxL3IPv4AllocateHeaderImpl, lpgTxL3IPv4FillHeaderImpl,
     lpgTxL3IPv4RoutingImpl, lpgTxL3ICMPInitiateResponseImpl,
     lpgTxL3ICMPAllocateHeaderImpl, lpgTxL3ICMPFillHeaderImpl,
@@ -139,6 +140,13 @@ lpgTxL3ARPFillHeaderImpl = do
     setAttr "ETHType" $ AttrW16 ETH.etypeARP
 
     toPort "true"
+
+-- Dummy node to interface with ARP lookup OR operator
+lpgTxL3ARPLookupRequestInImpl = do
+    debug "TxL3ARPLookupRequestIn"
+    toPort "true"
+
+
 
 lpgTxL3ARPLookup_Impl = do
     debug "TxL3ARPLookup"

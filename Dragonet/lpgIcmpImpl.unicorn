@@ -92,10 +92,10 @@ graph lpg {
                 port false[] }
 
             node ProcessPendingResponse {
-                port true false[.TagTxARPLu]
+                port true [.TagTxARPLu]
+                port false []
                 port drop[] }
         }
-
 
         /*******************************************/
         /* IPv4 RX                                 */
@@ -173,16 +173,20 @@ graph lpg {
     cluster TagTx {
 
         boolean ARPIR {
-            port true[.ToTx]
-            port false[] }
+            port true false [.ToTx]
+            //port false[.ToTx]
+            //port false[]
+            }
 
         boolean ARPLu {
-            port true[.ToTx]
-            port false[] }
+            port true false [.ToTx]
+            //port false[]
+            }
 
         boolean ICMPIR {
-            port true[.ToTx]
-            port false[] }
+            port true false [.ToTx]
+            //port false[]
+            }
 
     } // end cluster: TagTx
 
@@ -196,7 +200,7 @@ graph lpg {
     cluster Tx {
         node Demux {
             port ICMPIR[L3ICMPInitiateResponse]
-            port ARPLu[L3ARPLookup]
+            port ARPLu[L3ARPLookupRequestIn]
             port ARPIR[L3ARPInitiateResponse]
             port drop[] }
 
@@ -232,6 +236,7 @@ graph lpg {
                 port true false[Prepare]
 		port drop[] }
 
+
             or Prepare {
                 port true[AllocateHeader]
                 port false[] }
@@ -241,6 +246,10 @@ graph lpg {
 
             boolean FillHeader {
                 port true false[.L2EtherPrepare] }
+
+            boolean LookupRequestIn {
+                port true false[Lookup]
+            }
 
             or Lookup {
                 port true[Lookup_]
