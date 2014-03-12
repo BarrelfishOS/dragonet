@@ -91,15 +91,15 @@ nodeStmts g (n,l)
         guardTE =
             case op of
                 OpAnd -> L.intercalate " && " $
-                    map (\l' -> nLabel l' ++ " == P_true") inT
+                    map (\l' -> nLabel l' ++ " == " ++ pLabel l' "true") inT
                 OpOr -> L.intercalate " || " $
-                    map (\l' -> nLabel l' ++ " == P_true") inT
+                    map (\l' -> nLabel l' ++ " == " ++ pLabel l' "true") inT
         guardFE =
             case op of
                 OpAnd -> L.intercalate " || " $
-                    map (\l' -> nLabel l' ++ " == P_false") inT
+                    map (\l' -> nLabel l' ++ " == " ++ pLabel l' "false") inT
                 OpOr -> L.intercalate " && " $
-                    map (\l' -> nLabel l' ++ " == P_false") inT
+                    map (\l' -> nLabel l' ++ " == " ++ pLabel l' "false") inT
 
         -- Helpers for Onodes, incoming true and false edges
         inT = map (fromJust . DGI.lab g . fst) $

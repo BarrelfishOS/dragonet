@@ -396,11 +396,11 @@ void testFun(struct state * st, struct input *in)
         TxL3ARPSendRequest = do_pg__TxL3ARPSendRequest(st, in);
         printf("TxL3ARPSendRequest=%d\n", TxL3ARPSendRequest);
     }
-    if (TxL3ARPSendRequest == P_true || TxL3ARPInitiateResponse == P_true) {
+    if (TxL3ARPSendRequest == P_TxL3ARPSendRequest_true || TxL3ARPInitiateResponse == P_TxL3ARPInitiateResponse_true) {
         TxL3ARPPrepare = P_true;
         printf("TxL3ARPPrepare=%d\n", TxL3ARPPrepare);
     }
-    if (TxL3ARPSendRequest == P_false && TxL3ARPInitiateResponse == P_false) {
+    if (TxL3ARPSendRequest == P_TxL3ARPSendRequest_false && TxL3ARPInitiateResponse == P_TxL3ARPInitiateResponse_false) {
         TxL3ARPPrepare = P_false;
         printf("TxL3ARPPrepare=%d\n", TxL3ARPPrepare);
     }
@@ -412,11 +412,11 @@ void testFun(struct state * st, struct input *in)
         TxL3ARPFillHeader = do_pg__TxL3ARPFillHeader(st, in);
         printf("TxL3ARPFillHeader=%d\n", TxL3ARPFillHeader);
     }
-    if (TxL3ARPLookup_ == P_true || TxL3ARPFillHeader == P_true) {
+    if (TxL3ARPLookup_ == P_TxL3ARPLookup__true || TxL3ARPFillHeader == P_true) {
         TxL2EtherPrepare = P_true;
         printf("TxL2EtherPrepare=%d\n", TxL2EtherPrepare);
     }
-    if (TxL3ARPLookup_ == P_false && TxL3ARPFillHeader == P_false) {
+    if (TxL3ARPLookup_ == P_TxL3ARPLookup__false && TxL3ARPFillHeader == P_false) {
         TxL2EtherPrepare = P_false;
         printf("TxL2EtherPrepare=%d\n", TxL2EtherPrepare);
     }
