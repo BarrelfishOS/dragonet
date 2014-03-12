@@ -13,15 +13,11 @@ node_out_t do_pg__RxL3ICMPValidHeaderLength(struct state *state, struct input *i
 
 node_out_t do_pg__RxL3ICMPValidChecksum(struct state *state, struct input *in)
 {
-    pktoff_t __attribute__((unused)) len = in->len;
-    //pktoff_t off = icmp_header_offset(in);
-    // FIXME: calculate the checksum without copying out the packet
-    //pkt <- readP (len - off) off
-    // FIXME: Verify that the checksum is zero.
-    //toPort $ pbool (IP4.checksum pkt == 0)
-
-    // P_true, P_false
-    return P_true;
+    // calculate the checksum without copying out the packet
+    pktoff_t off = icmp_header_offset(in);
+    pktoff_t len = in->len;
+    uint16_t checksum = ipv4_checksum(in, off, (len - off));
+    return ((checksum == 0)?P_true: P_false);
 }
 
 node_out_t do_pg__RxL3ICMPIsTypeRequest(struct state *state, struct input *in)
@@ -85,7 +81,7 @@ node_out_t do_pg__TxL3ICMPFillHeader(struct state *state, struct input *in)
     uint16_t checksum = 0;
     icmp_hdr_checksum_write(in, checksum);
 
-    pktoff_t off = icmp_payload_offset(in);
+    pktoff_t off = icmp_header_offset(in);
     pktoff_t len = in->len;
 
     checksum = ipv4_checksum(in, off, (len - off));
