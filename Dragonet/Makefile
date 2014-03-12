@@ -45,7 +45,7 @@ tcpGraph2: base lpgImpl.unicorn
 
 tcpGraph2_run: tcpGraph2
 	./tcpGraph2
-	./convertDot.sh
+	cd graphsGen ; ../convertDot.sh
 
 # generates graphs for tcp protocol processing
 tcpGraph: base lpgImpl.unicorn
@@ -53,20 +53,21 @@ tcpGraph: base lpgImpl.unicorn
 
 tcpGraph_run: tcpGraph
 	./tcpGraph
-	./convertDot.sh
+	cd graphsGen ; ../convertDot.sh
 
 # generates graphs (lpg, prg, prg_conf, embedded, constrained)
 graph: base lpgImpl.unicorn
 	$(GHC) $(GHCFLAGS) testGraph.hs -o graph
 graph_run: graph
+	mkdir -p graphsGen/
 	./graph
-	./convertDot.sh
+	cd graphsGen ; ../convertDot.sh
 
 confgen: base
 	$(GHC) $(GHCFLAGS) testConfGen.hs -o confgen
 confgen_run: confgen
 	./confgen
-	./convertConfGen.sh
+	cd graphsGen ; ../convertConfGen.sh
 
 # generates graphs for plos paper (lpg, prg, prgUnconf, embedded, embeddedFull, clustered)
 plos13: base
@@ -94,6 +95,14 @@ tuntap : base Util/Tap.$(OSUF)
 
 tuntap_run: tuntap
 	sudo ./tuntap
+
+
+# Runs the simulator against tuntap interface
+tuntap_icmp : base Util/Tap.$(OSUF)
+	$(GHC) $(GHCFLAGS) -threaded tuntapPing.hs -o tuntapPing
+
+tuntap_icmp_run: tuntap_icmp
+	sudo ./tuntapPing
 
 
 ## Util/Tap
@@ -145,7 +154,7 @@ Util/Dpdk.$(OSUF): Util/Dpdk_.$(OSUF) objfiles
 
 # Converts graphs into pdfs
 models: graph_run
-	./convertDot.sh
+	cd graphsGen ; ../convertDot.sh
 
 
 # ######################## Openonload  ################################
@@ -182,5 +191,6 @@ base: Makefile *.hs */*.hs */*/*.hs *.unicorn Dragonet/Implementation/*.hs
 
 clean:
 	rm -f *.hi *.o */*.hi */*.o */*/*.hi */*/*.o $(BINARIES)
-	rm -f *.pdf *.dot *.png
+	rm -f *.pdf *.dot *.png *.svg
+	cd graphsGen ; rm -f *.pdf *.dot *.png *.svg
 
