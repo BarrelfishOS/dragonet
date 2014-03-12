@@ -58,6 +58,7 @@ node_out_t do_pg__RxL2EtherValidType(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL2EtherClassifyL3(struct state *state, struct input *in)
 {
+    in->offset_l3 = 14;
     switch (eth_type_read(in)) {
         case eth_type_IPv4  : dprint("%s: pkt IPv4\n", __func__);
                               return P_RxL2EtherClassifyL3_ipv4;
