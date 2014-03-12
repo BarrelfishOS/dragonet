@@ -55,7 +55,8 @@ node_out_t do_pg__TxDemux(struct state *state, struct input *in)
 node_out_t do_pg__TxQueue(struct state *state, struct input *in)
 {
     // 
-    printf("Send!\n");
+    printf("Send!: ");
+    input_dump(in);
     return 0;
 }
 

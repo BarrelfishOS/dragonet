@@ -196,6 +196,8 @@ void input_free(struct input *in);
 /** Keep the data in the input struct as is, but reinitialize attributes */
 void input_clean_attrs(struct input *in);
 void input_clean_packet(struct input *in);
+void input_dump(struct input *in);
+
 #define MYDEBUG     1
 #ifdef MYDEBUG
 #define dprint(x...)    printf("debug:" x)

@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include <implementation.h>
 #include "config.h"
@@ -47,3 +48,17 @@ void input_clean_packet(struct input *in)
     in->len = 0;
     in->space_before = DEFAULT_BUFFER_SIZE;
 }
+
+void input_dump(struct input *in)
+{
+    pktoff_t len = in->len;
+    printf("input[%"PRIx64"]: ", in->len);
+    pktoff_t i = 0;
+    while (i < len) {
+        printf("%02"PRIx8" ", *((uint8_t *) in->data + i));
+        i++;
+    }
+    printf("\n");
+
+}
+
