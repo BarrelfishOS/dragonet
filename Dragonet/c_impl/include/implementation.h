@@ -178,6 +178,10 @@ static inline void panic_(const char *file, int line, const char *fmt,...)
     abort();
 }
 
+/** Allocate/initialize a new input structure including a buffer */
+struct input *input_alloc(void);
+void input_free(struct input *in);
+
 #define MYDEBUG     1
 #ifdef MYDEBUG
 #define dprint(x...)    printf("debug:" x)

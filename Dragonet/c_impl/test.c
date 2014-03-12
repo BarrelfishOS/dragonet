@@ -6,8 +6,6 @@
 
 void testFun(struct state * st, struct input *in);
 
-#define MAX_PKT_SIZE        1600
-
 static uint8_t arp_request_rx[] = {
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xd6, 0xc8, 0x7f, 0xdd,
         0xe3, 0xab, 0x8, 0x6, 0x0, 0x1, 0x8, 0x0, 0x6, 0x4, 0x0, 0x1, 0xd6,
@@ -60,9 +58,18 @@ static uint8_t pkt_unsupported_proto_rx[] = {
          0x1
     };
 
+
+static void run_packet(struct state *st, void *buffer, size_t len)
+{
+    struct input *in = input_alloc();
+    pkt_prepend(in, len);
+    memcpy(in->data, buffer, len);
+    testFun(st, in);
+    input_free(in);
+}
+
 int main(int argc, char *argv[])
 {
-
     struct state st = {
         .local_mac      = CONFIG_LOCAL_MAC,
         .local_ip       = CONFIG_LOCAL_IP,
@@ -70,27 +77,15 @@ int main(int argc, char *argv[])
         .arp_cache      = NULL,
         .pkt_counter    = 0,
     };
-    struct input in;
 
     // Testing incoming arp request packet
-    memset(&in, 0, sizeof(in));
-    in.data = (void *)arp_request_rx;
-    in.len = sizeof(arp_request_rx);
-    testFun(&st, &in);
-
+    run_packet(&st, arp_request_rx, sizeof(arp_request_rx));
 
     // Testing incoming icmp packet
-    memset(&in, 0, sizeof(in));
-    in.data = (void *)pkt_icmp_echo_rx;
-    in.len = sizeof(pkt_icmp_echo_rx);
-    testFun(&st, &in);
+    run_packet(&st, pkt_icmp_echo_rx, sizeof(pkt_icmp_echo_rx));
 
     // Testing incoming packet for unsupported protocol
-    memset(&in, 0, sizeof(in));
-    in.data = (void *)pkt_unsupported_proto_rx;
-    in.len = sizeof(pkt_unsupported_proto_rx);
-    testFun(&st, &in);
-
+    run_packet(&st, pkt_unsupported_proto_rx, sizeof(pkt_unsupported_proto_rx));
 
     return 0;
 }
