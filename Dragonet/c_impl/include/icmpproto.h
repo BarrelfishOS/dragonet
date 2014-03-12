@@ -32,14 +32,14 @@ static inline size_t icmp_header_field_offset(struct input *pkt,
 
 // ----------------------- ICMP field PAYLOAD -----------
 
-static inline size_t icmp_hdr_payload_offset(struct input *pkt)
+static inline size_t icmp_payload_offset(struct input *pkt)
 {
     return icmp_header_field_offset(pkt, 8);
 }
 
 static inline size_t icmp_payload_length(struct input *pkt)
 {
-    return (pkt->len - icmp_hdr_payload_offset(pkt));
+    return (pkt->len - icmp_payload_offset(pkt));
 }
 
 

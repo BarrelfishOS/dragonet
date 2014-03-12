@@ -60,13 +60,13 @@ node_out_t do_pg__RxL2EtherValidType(struct state *state, struct input *in)
 node_out_t do_pg__RxL2EtherClassifyL3(struct state *state, struct input *in)
 {
     switch (eth_type_read(in)) {
-        case eth_type_IPv4  : dprint("%s:pkt IPv4\n", __func__);
+        case eth_type_IPv4  : dprint("%s: pkt IPv4\n", __func__);
                               return P_RxL2EtherClassifyL3_ipv4;
-        case eth_type_IPv6  : dprint("%s:pkt IPv6\n", __func__);
+        case eth_type_IPv6  : dprint("%s: pkt IPv6\n", __func__);
                               return P_RxL2EtherClassifyL3_ipv6;
-        case eth_type_ARP   : dprint("%s:pkt ARP\n", __func__);
+        case eth_type_ARP   : dprint("%s: pkt ARP\n", __func__);
                               return P_RxL2EtherClassifyL3_arp;
-        default             : dprint("%s:pkt DROP\n", __func__);
+        default             : dprint("%s: pkt DROP\n", __func__);
                               return P_RxL2EtherClassifyL3_drop;
     }
     return P_RxL2EtherClassifyL3_drop;
