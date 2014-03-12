@@ -6,10 +6,9 @@
 node_out_t do_pg__RxL3ICMPValidHeaderLength(struct state *state, struct input *in)
 {
 
-    pktoff_t len = icmp_header_len;
+    pktoff_t len = in->len;
     pktoff_t off = icmp_header_offset(in);
     return (((len - off) >= icmp_header_len)? P_true : P_false);
-    // P_true, P_false
 }
 
 node_out_t do_pg__RxL3ICMPValidChecksum(struct state *state, struct input *in)

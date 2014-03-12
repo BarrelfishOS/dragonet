@@ -71,6 +71,14 @@ struct input {
 
     // ICMP
     uint32_t icmp_id;
+    // Misc
+    uint8_t mux_id;
+};
+
+enum attr_mux_id {
+    ATTR_MUX_ARPIR,
+    ATTR_MUX_ARPLU,
+    ATTR_MUX_ICMPIR,
 };
 
 

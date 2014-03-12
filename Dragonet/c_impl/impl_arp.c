@@ -59,7 +59,7 @@ node_out_t do_pg__RxL3ARPValidHeaderLength(struct state *state, struct input *in
 node_out_t do_pg__RxL3ARPClassify(struct state *state, struct input *in)
 {
     // P_RxL3ARPClassify_request, P_RxL3ARPClassify_response, P_RxL3ARPClassify_drop
-    switch (arp_off_oper(in)) {
+    switch (arp_oper_rd(in)) {
         case ARP_OPER_REQUEST:  return P_RxL3ARPClassify_request;
         case ARP_OPER_REPLY:    return P_RxL3ARPClassify_response;
         default:                return P_RxL3ARPClassify_drop;
@@ -75,15 +75,15 @@ node_out_t do_pg__RxL3ARPLocalIPDest(struct state *state, struct input *in)
 node_out_t do_pg__RxL3ARPValidRequest(struct state *state, struct input *in)
 {
     // P_true, P_false
-    return PORT_BOOL (arp_off_htype(in) == ARP_HTYPE_ETHERNET &&
-                      arp_off_ptype(in) == ARP_PTYPE_IPV4);
+    return PORT_BOOL (arp_htype_rd(in) == ARP_HTYPE_ETHERNET &&
+                      arp_ptype_rd(in) == ARP_PTYPE_IPV4);
 }
 
 node_out_t do_pg__RxL3ARPValidResponse(struct state *state, struct input *in)
 {
     // P_true, P_false
-    return PORT_BOOL (arp_off_htype(in) == ARP_HTYPE_ETHERNET &&
-                      arp_off_ptype(in) == ARP_PTYPE_IPV4);
+    return PORT_BOOL (arp_htype_rd(in) == ARP_HTYPE_ETHERNET &&
+                      arp_ptype_rd(in) == ARP_PTYPE_IPV4);
 }
 
 node_out_t do_pg__RxL3ARPIsPending(struct state *state, struct input *in)
