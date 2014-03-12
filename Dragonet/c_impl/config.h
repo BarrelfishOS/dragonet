@@ -6,7 +6,7 @@
 
 static inline mac_t get_local_mac(struct state *state)
 {
-    uint64_t macaddr = 0x001b225469f80000;
+    uint64_t macaddr = 0x001b225469f8;
     return macaddr;
 };
 

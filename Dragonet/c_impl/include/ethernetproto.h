@@ -16,9 +16,9 @@
 typedef uint64_t mac_t;
 
 // NOTE:when read with pkt_read48
-#define eth_broadcast_addr               ((mac_t) 0xffffffffffff0000)
-#define eth_multicast_bit_mask           ((mac_t) 0x1000000000000000)
-
+#define eth_broadcast_addr               ((mac_t) 0xffffffffffff)
+//#define eth_multicast_bit_mask           ((mac_t) 0x100000000000)
+#define eth_multicast_bit_mask           ((mac_t) 0x000000000001)
 
 mac_t eth_src_mac_read(struct input *pkt);
 void eth_src_mac_write(struct input *pkt, mac_t val);

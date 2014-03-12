@@ -10,13 +10,27 @@
 
 #define eth_header_field_offset(x)      (l2Offset + (x))
 
+// ---------------------------- DST MAC --------------------
+
+#define eth_dst_mac_offset              (eth_header_field_offset(0))
+
+mac_t eth_dst_mac_read(struct input *pkt)
+{
+    return pkt_read48be(pkt, eth_dst_mac_offset);
+}
+
+void eth_dst_mac_write(struct input *pkt, mac_t val)
+{
+    pkt_write48(pkt, eth_dst_mac_offset, val);
+}
+
 // ---------------------------- SRC MAC --------------------
 
-#define eth_src_mac_offset              (eth_header_field_offset(0))
+#define eth_src_mac_offset              (eth_header_field_offset(6))
 
 mac_t eth_src_mac_read(struct input *pkt)
 {
-    return pkt_read48(pkt, eth_src_mac_offset);
+    return pkt_read48be(pkt, eth_src_mac_offset);
 }
 
 void eth_src_mac_write(struct input *pkt, mac_t val)
@@ -24,19 +38,7 @@ void eth_src_mac_write(struct input *pkt, mac_t val)
     pkt_write48(pkt, eth_src_mac_offset, val);
 }
 
-// ---------------------------- DST MAC --------------------
 
-#define eth_dst_mac_offset              (eth_header_field_offset(6))
-
-mac_t eth_dst_mac_read(struct input *pkt)
-{
-    return pkt_read48(pkt, eth_dst_mac_offset);
-}
-
-void eth_dst_mac_write(struct input *pkt, mac_t val)
-{
-    pkt_write48(pkt, eth_dst_mac_offset, val);
-}
 
 // ---------------------------- ETH TYPE --------------------
 

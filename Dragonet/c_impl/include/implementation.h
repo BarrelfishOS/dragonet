@@ -4,11 +4,17 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 
 typedef int node_out_t;
-struct state { };
-struct input {
 
+struct state {
+    uint64_t pkt_counter;
+    void *place_holder;
+};
+
+struct input {
 
     // Buffer
     void  *data;
@@ -123,6 +129,12 @@ static inline void panic_(const char *file, int line, const char *fmt,...)
     abort();
 }
 
+#define MYDEBUG     1
+#ifdef MYDEBUG
+#define dprint(x...)    printf("debug:" x)
+#else
+#define dprint(x...)   ((void)0)
+#endif // MYDEBUG
 
 #endif
 

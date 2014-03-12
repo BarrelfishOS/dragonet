@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <implementation.h>
 #include <ethernetproto.h>
 #include "config.h"
@@ -23,13 +24,17 @@ node_out_t do_pg__RxL2EtherValidUnicast(struct state *state, struct input *in)
 node_out_t do_pg__RxL2EtherValidMulticast(struct state *state, struct input *in)
 {
     mac_t dst = eth_dst_mac_read(in);
+    dprint("%s: %lx & %lx == %lx\n", __func__, dst, eth_multicast_bit_mask,
+            (dst & eth_multicast_bit_mask));
     return (((dst != eth_broadcast_addr) && (dst & eth_multicast_bit_mask))?
                 P_true : P_false);
 }
 
 node_out_t do_pg__RxL2EtherValidBroadcast(struct state *state, struct input *in)
 {
-    return ((eth_dst_mac_read(in) == eth_broadcast_addr)? P_true : P_false);
+    mac_t dst = eth_dst_mac_read(in);
+    dprint("%s: %lx == %lx\n", __func__, dst, eth_broadcast_addr);
+    return ((dst == eth_broadcast_addr)? P_true : P_false);
 }
 
 node_out_t do_pg__RxL2EtherValidSrc(struct state *state, struct input *in)
@@ -39,7 +44,11 @@ node_out_t do_pg__RxL2EtherValidSrc(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL2EtherValidLocalMAC(struct state *state, struct input *in)
 {
-    return ((eth_dst_mac_read(in) == get_local_mac(state))?P_true: P_false);
+    mac_t dst = eth_dst_mac_read(in);
+    mac_t localmac = get_local_mac(state);
+    dprint("%s: %lx == %lx\n", __func__, dst, localmac);
+    return ((dst == localmac)?P_true: P_false);
+    //return ((eth_dst_mac_read(in) == get_local_mac(state))?P_true: P_false);
 }
 
 node_out_t do_pg__RxL2EtherValidType(struct state *state, struct input *in)
@@ -50,10 +59,14 @@ node_out_t do_pg__RxL2EtherValidType(struct state *state, struct input *in)
 node_out_t do_pg__RxL2EtherClassifyL3(struct state *state, struct input *in)
 {
     switch (eth_type_read(in)) {
-        case eth_type_IPv4  : return P_RxL2EtherClassifyL3_ipv4;
-        case eth_type_IPv6  : return P_RxL2EtherClassifyL3_ipv6;
-        case eth_type_ARP   : return P_RxL2EtherClassifyL3_arp;
-        default             : return P_RxL2EtherClassifyL3_drop;
+        case eth_type_IPv4  : dprint("%s:pkt IPv4\n", __func__);
+                              return P_RxL2EtherClassifyL3_ipv4;
+        case eth_type_IPv6  : dprint("%s:pkt IPv6\n", __func__);
+                              return P_RxL2EtherClassifyL3_ipv6;
+        case eth_type_ARP   : dprint("%s:pkt ARP\n", __func__);
+                              return P_RxL2EtherClassifyL3_arp;
+        default             : dprint("%s:pkt DROP\n", __func__);
+                              return P_RxL2EtherClassifyL3_drop;
     }
     return P_RxL2EtherClassifyL3_drop;
 }

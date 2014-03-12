@@ -6,15 +6,119 @@
 
 void testFun(struct state * st, struct input *in);
 
+#define MAX_PKT_SIZE        1600
+
+static uint8_t arp_request_rx[] = {
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xd6, 0xc8, 0x7f, 0xdd,
+        0xe3, 0xab, 0x8, 0x6, 0x0, 0x1, 0x8, 0x0, 0x6, 0x4, 0x0, 0x1, 0xd6,
+        0xc8, 0x7f, 0xdd, 0xe3, 0xab, 0xc0, 0xa8, 0x7b, 0x64, 0x0, 0x0, 0x0,
+        0x0, 0x0, 0x0, 0xc0, 0xa8, 0x7b, 0x1
+    };
+
+//static  // FIXME: commenting out to avoid warning of unused variable
+uint8_t arp_response_tx[] = {
+         0xd6, 0xc8, 0x7f, 0xdd, 0xe3,
+         0xab, 0x0, 0x1b, 0x22, 0x54, 0x69, 0xf8, 0x8, 0x6, 0x0, 0x1, 0x8, 0x0,
+         0x6, 0x4, 0x0, 0x2, 0x0, 0x1b, 0x22, 0x54, 0x69, 0xf8, 0xc0, 0xa8,
+         0x7b, 0x1, 0xd6, 0xc8, 0x7f, 0xdd, 0xe3, 0xab, 0xc0, 0xa8, 0x7b, 0x64
+    };
+
+static uint8_t pkt_icmp_echo_rx[] = {
+         0x0, 0x1b, 0x22, 0x54, 0x69, 0xf8, 0xd6, 0xc8, 0x7f, 0xdd,
+         0xe3, 0xab, 0x8, 0x0, 0x45, 0x0, 0x0, 0x54, 0x2b, 0xdd, 0x40, 0x0,
+         0x40, 0x1, 0x97, 0x15, 0xc0, 0xa8, 0x7b, 0x64, 0xc0, 0xa8, 0x7b, 0x1,
+         0x8, 0x0, 0x28, 0x59, 0xd, 0x94, 0x0, 0x1, 0x9, 0x5a, 0x1f, 0x53, 0x0,
+         0x0, 0x0, 0x0, 0xd1, 0x91, 0x9, 0x0, 0x0, 0x0, 0x0, 0x0, 0x10, 0x11,
+         0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d,
+         0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29,
+         0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35,
+         0x36, 0x37
+    };
+
+//static  // FIXME: commenting out to avoid warning of unused variable
+uint8_t pkt_icmp_echo_response_tx[] = {
+         0xd6, 0xc8, 0x7f, 0xdd, 0xe3, 0xab, 0x0, 0x1b, 0x22, 0x54,
+         0x69, 0xf8, 0x8, 0x0, 0x45, 0x0, 0x0, 0x54, 0x0, 0x0, 0x40, 0x0, 0x40,
+         0x1, 0xc2, 0xf2, 0xc0, 0xa8, 0x7b, 0x1, 0xc0, 0xa8, 0x7b, 0x64, 0x0,
+         0x0, 0x30, 0x59, 0xd, 0x94, 0x0, 0x1, 0x9, 0x5a, 0x1f, 0x53, 0x0, 0x0,
+         0x0, 0x0, 0xd1, 0x91, 0x9, 0x0, 0x0, 0x0, 0x0, 0x0, 0x10, 0x11, 0x12,
+         0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e,
+         0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a,
+         0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36,
+         0x37
+    };
+
+
+static uint8_t pkt_unsupported_proto_rx[] = {
+         0x1, 0x0, 0x5e, 0x0, 0x0, 0xfb, 0xd6, 0xc8, 0x7f, 0xdd, 0xe3,
+         0xab, 0x8, 0x0, 0x45, 0x0, 0x0, 0x49, 0xa9, 0x40, 0x40, 0x0, 0xff,
+         0x11, 0xb5, 0x5a, 0xc0, 0xa8, 0x7b, 0x64, 0xe0, 0x0, 0x0, 0xfb, 0x14,
+         0xe9, 0x14, 0xe9, 0x0, 0x35, 0xb7, 0x2e, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2,
+         0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x5, 0x5f, 0x69, 0x70, 0x70, 0x73, 0x4,
+         0x5f, 0x74, 0x63, 0x70, 0x5, 0x6c, 0x6f, 0x63, 0x61, 0x6c, 0x0, 0x0,
+         0xc, 0x0, 0x1, 0x4, 0x5f, 0x69, 0x70, 0x70, 0xc0, 0x12, 0x0, 0xc, 0x0,
+         0x1
+    };
+
 int main(int argc, char *argv[])
 {
-    testFun(NULL, NULL);
+
+    struct state st = {0, NULL};
+    struct input in;
+    in.space_before = 0;
+    in.space_after = 0;
+
+    // Testing incoming arp request packet
+    in.data = (void *)arp_request_rx;
+    in.len = sizeof(arp_request_rx);
+    testFun(&st, &in);
+
+
+    // Testing incoming icmp packet
+    in.data = (void *)pkt_icmp_echo_rx;
+    in.len = sizeof(pkt_icmp_echo_rx);
+    testFun(&st, &in);
+
+    // Testing incoming packet for unsupported protocol
+    in.data = (void *)pkt_unsupported_proto_rx;
+    in.len = sizeof(pkt_unsupported_proto_rx);
+    testFun(&st, &in);
+
+
     return 0;
 }
 
 void testFun(struct state * st, struct input *in)
 {
-    node_out_t Queue=-1, PacketDrop=-1, NotSupported=-1, RxL3IPValid=-1, RxL3IPAndBelowValid=-1, RxToTx=-1, RxL2EtherClassified=-1, RxL2EtherValidLength=-1, RxL2EtherValidUnicast=-1, RxL2EtherValidMulticast=-1, RxL2EtherValidBroadcast=-1, RxL2EtherValidDest=-1, RxL2EtherValidSrc=-1, RxL2EtherValidLocalMAC=-1, RxL2EtherValid=-1, RxL2EtherValidType=-1, RxL2EtherClassifyL3=-1, RxL3ARPValidHeaderLength=-1, RxL3ARPClassify=-1, RxL3ARPLocalIPDest=-1, RxL3ARPValidRequest=-1, RxL3ARPNeedsResponse=-1, RxL3ARPValidResponse=-1, RxL3ARPIsPending=-1, RxL3ARPValidPendingResponse=-1, RxL3ARPProcessPendingResponse=-1, RxL3IPv4ValidHeaderLength=-1, RxL3IPv4ValidReassembly=-1, RxL3IPv4ValidVersion=-1, RxL3IPv4ValidLength=-1, RxL3IPv4ValidTTL=-1, RxL3IPv4ValidChecksum=-1, RxL3IPv4ValidLocalIP=-1, RxL3IPv4Classify=-1, RxL3IPv4Valid=-1, RxL3ICMPValidHeaderLength=-1, RxL3ICMPValidChecksum=-1, RxL3ICMPValid=-1, RxL3ICMPIsTypeRequest=-1, RxL3ICMPNeedsResponse=-1, RxTagTxARPIR=-1, RxTagTxARPLu=-1, RxTagTxICMPIR=-1, TxDemux=-1, TxQueue=-1, TxL3ICMPInitiateResponse=-1, TxL3ICMPAllocateHeader=-1, TxL3ICMPFillHeader=-1, TxL3IPv4Prepare=-1, TxL3IPv4AllocateHeader=-1, TxL3IPv4FillHeader=-1, TxL3IPv4Routing=-1, TxL3ARPInitiateResponse=-1, TxL3ARPPrepare=-1, TxL3ARPAllocateHeader=-1, TxL3ARPFillHeader=-1, TxL3ARPLookup=-1, TxL3ARPLookup_=-1, TxL3ARPSendRequest=-1, TxL2EtherPrepare=-1, TxL2EtherAllocateHeader=-1, TxL2EtherFillHeader=-1;
+    node_out_t Queue=-1, PacketDrop=-1, NotSupported=-1, RxL3IPValid=-1,
+               RxL3IPAndBelowValid=-1, RxToTx=-1, RxL2EtherClassified=-1,
+               RxL2EtherValidLength=-1, RxL2EtherValidUnicast=-1,
+               RxL2EtherValidMulticast=-1, RxL2EtherValidBroadcast=-1,
+               RxL2EtherValidDest=-1, RxL2EtherValidSrc=-1,
+               RxL2EtherValidLocalMAC=-1, RxL2EtherValid=-1,
+               RxL2EtherValidType=-1, RxL2EtherClassifyL3=-1,
+               RxL3ARPValidHeaderLength=-1, RxL3ARPClassify=-1,
+               RxL3ARPLocalIPDest=-1, RxL3ARPValidRequest=-1,
+               RxL3ARPNeedsResponse=-1, RxL3ARPValidResponse=-1,
+               RxL3ARPIsPending=-1, RxL3ARPValidPendingResponse=-1,
+               RxL3ARPProcessPendingResponse=-1, RxL3IPv4ValidHeaderLength=-1,
+               RxL3IPv4ValidReassembly=-1, RxL3IPv4ValidVersion=-1,
+               RxL3IPv4ValidLength=-1, RxL3IPv4ValidTTL=-1,
+               RxL3IPv4ValidChecksum=-1, RxL3IPv4ValidLocalIP=-1,
+               RxL3IPv4Classify=-1, RxL3IPv4Valid=-1,
+               RxL3ICMPValidHeaderLength=-1, RxL3ICMPValidChecksum=-1,
+               RxL3ICMPValid=-1, RxL3ICMPIsTypeRequest=-1,
+               RxL3ICMPNeedsResponse=-1, RxTagTxARPIR=-1, RxTagTxARPLu=-1,
+               RxTagTxICMPIR=-1, TxDemux=-1, TxQueue=-1,
+               TxL3ICMPInitiateResponse=-1, TxL3ICMPAllocateHeader=-1,
+               TxL3ICMPFillHeader=-1, TxL3IPv4Prepare=-1,
+               TxL3IPv4AllocateHeader=-1, TxL3IPv4FillHeader=-1,
+               TxL3IPv4Routing=-1, TxL3ARPInitiateResponse=-1,
+               TxL3ARPPrepare=-1, TxL3ARPAllocateHeader=-1,
+               TxL3ARPFillHeader=-1, TxL3ARPLookup=-1, TxL3ARPLookup_=-1,
+               TxL3ARPSendRequest=-1, TxL2EtherPrepare=-1,
+               TxL2EtherAllocateHeader=-1, TxL2EtherFillHeader=-1;
+
     if (1) {
         Queue = do_pg__Queue(st, in);
         printf("Queue=%d\n", Queue);
@@ -39,8 +143,12 @@ void testFun(struct state * st, struct input *in)
         RxL2EtherValidBroadcast = do_pg__RxL2EtherValidBroadcast(st, in);
         printf("RxL2EtherValidBroadcast=%d\n", RxL2EtherValidBroadcast);
     }
-    if (RxL2EtherValidBroadcast != -1 && RxL2EtherValidBroadcast != -1 && RxL2EtherValidMulticast != -1 && RxL2EtherValidMulticast != -1 && RxL2EtherValidUnicast != -1 && RxL2EtherValidUnicast != -1) {
-        RxL2EtherValidDest = (RxL2EtherValidBroadcast == P_true || RxL2EtherValidMulticast == P_true || RxL2EtherValidUnicast == P_true ? P_true : P_false);
+    if (RxL2EtherValidBroadcast != -1 && RxL2EtherValidBroadcast != -1 &&
+            RxL2EtherValidMulticast != -1 && RxL2EtherValidMulticast != -1 &&
+            RxL2EtherValidUnicast != -1 && RxL2EtherValidUnicast != -1) {
+        RxL2EtherValidDest = (RxL2EtherValidBroadcast == P_true ||
+                RxL2EtherValidMulticast == P_true || RxL2EtherValidUnicast
+                == P_true ? P_true : P_false);
         printf("RxL2EtherValidDest=%d\n", RxL2EtherValidDest);
     }
     if (RxL2EtherValidLength == P_true) {
@@ -87,23 +195,30 @@ void testFun(struct state * st, struct input *in)
         RxL3ARPLocalIPDest = do_pg__RxL3ARPLocalIPDest(st, in);
         printf("RxL3ARPLocalIPDest=%d\n", RxL3ARPLocalIPDest);
     }
-    if (RxL3ARPValidRequest != -1 && RxL3ARPValidRequest != -1 && RxL3ARPLocalIPDest != -1 && RxL3ARPLocalIPDest != -1) {
-        RxL3ARPNeedsResponse = (RxL3ARPValidRequest == P_true && RxL3ARPLocalIPDest == P_true ? P_true : P_false);
+    if (RxL3ARPValidRequest != -1 && RxL3ARPValidRequest != -1 &&
+            RxL3ARPLocalIPDest != -1 && RxL3ARPLocalIPDest != -1) {
+        RxL3ARPNeedsResponse = (RxL3ARPValidRequest == P_true &&
+                RxL3ARPLocalIPDest == P_true ? P_true : P_false);
         printf("RxL3ARPNeedsResponse=%d\n", RxL3ARPNeedsResponse);
     }
     if (RxL3ARPNeedsResponse == P_true) {
         RxTagTxARPIR = do_pg__RxTagTxARPIR(st, in);
         printf("RxTagTxARPIR=%d\n", RxTagTxARPIR);
     }
-    if (RxL3ARPIsPending != -1 && RxL3ARPIsPending != -1 && RxL3ARPValidResponse != -1 && RxL3ARPValidResponse != -1 && RxL3ARPLocalIPDest != -1 && RxL3ARPLocalIPDest != -1) {
-        RxL3ARPValidPendingResponse = (RxL3ARPIsPending == P_true && RxL3ARPValidResponse == P_true && RxL3ARPLocalIPDest == P_true ? P_true : P_false);
+    if (RxL3ARPIsPending != -1 && RxL3ARPIsPending != -1 &&
+            RxL3ARPValidResponse != -1 && RxL3ARPValidResponse != -1 &&
+            RxL3ARPLocalIPDest != -1 && RxL3ARPLocalIPDest != -1) {
+        RxL3ARPValidPendingResponse = (RxL3ARPIsPending == P_true &&
+                RxL3ARPValidResponse == P_true && RxL3ARPLocalIPDest
+                == P_true ? P_true : P_false);
         printf("RxL3ARPValidPendingResponse=%d\n", RxL3ARPValidPendingResponse);
     }
     if (RxL3ARPValidPendingResponse == P_true) {
         RxL3ARPProcessPendingResponse = do_pg__RxL3ARPProcessPendingResponse(st, in);
         printf("RxL3ARPProcessPendingResponse=%d\n", RxL3ARPProcessPendingResponse);
     }
-    if (RxL3ARPProcessPendingResponse == P_RxL3ARPProcessPendingResponse_true || RxL3ARPProcessPendingResponse == P_RxL3ARPProcessPendingResponse_false) {
+    if (RxL3ARPProcessPendingResponse == P_RxL3ARPProcessPendingResponse_true ||
+            RxL3ARPProcessPendingResponse == P_RxL3ARPProcessPendingResponse_false) {
         RxTagTxARPLu = do_pg__RxTagTxARPLu(st, in);
         printf("RxTagTxARPLu=%d\n", RxTagTxARPLu);
     }
@@ -135,27 +250,45 @@ void testFun(struct state * st, struct input *in)
         RxL3IPv4ValidLocalIP = do_pg__RxL3IPv4ValidLocalIP(st, in);
         printf("RxL3IPv4ValidLocalIP=%d\n", RxL3IPv4ValidLocalIP);
     }
-    if (RxL3IPv4ValidLocalIP != -1 && RxL3IPv4ValidLocalIP != -1 && RxL3IPv4ValidChecksum != -1 && RxL3IPv4ValidChecksum != -1 && RxL3IPv4ValidTTL != -1 && RxL3IPv4ValidTTL != -1 && RxL3IPv4ValidLength != -1 && RxL3IPv4ValidLength != -1 && RxL3IPv4ValidVersion != -1 && RxL3IPv4ValidVersion != -1 && RxL3IPv4ValidReassembly != -1 && RxL3IPv4ValidReassembly != -1) {
-        RxL3IPv4Valid = (RxL3IPv4ValidLocalIP == P_true && RxL3IPv4ValidChecksum == P_true && RxL3IPv4ValidTTL == P_true && RxL3IPv4ValidLength == P_true && RxL3IPv4ValidVersion == P_true && RxL3IPv4ValidReassembly == P_true ? P_true : P_false);
+    if (RxL3IPv4ValidLocalIP != -1 && RxL3IPv4ValidLocalIP != -1 &&
+            RxL3IPv4ValidChecksum != -1 && RxL3IPv4ValidChecksum != -1 &&
+            RxL3IPv4ValidTTL != -1 && RxL3IPv4ValidTTL != -1 &&
+            RxL3IPv4ValidLength != -1 && RxL3IPv4ValidLength != -1 &&
+            RxL3IPv4ValidVersion != -1 && RxL3IPv4ValidVersion != -1 &&
+            RxL3IPv4ValidReassembly != -1 && RxL3IPv4ValidReassembly != -1) {
+        RxL3IPv4Valid = (RxL3IPv4ValidLocalIP == P_true &&
+                RxL3IPv4ValidChecksum == P_true && RxL3IPv4ValidTTL == P_true &&
+                RxL3IPv4ValidLength == P_true && RxL3IPv4ValidVersion == P_true &&
+                RxL3IPv4ValidReassembly == P_true ? P_true : P_false);
         printf("RxL3IPv4Valid=%d\n", RxL3IPv4Valid);
     }
     if (RxL3IPv4Valid != -1 && RxL3IPv4Valid != -1) {
         RxL3IPValid = (RxL3IPv4Valid == P_true ? P_true : P_false);
         printf("RxL3IPValid=%d\n", RxL3IPValid);
     }
-    if (RxL2EtherValid != -1 && RxL2EtherValid != -1 && RxL3IPValid != -1 && RxL3IPValid != -1) {
-        RxL3IPAndBelowValid = (RxL2EtherValid == P_true && RxL3IPValid == P_true ? P_true : P_false);
+    if (RxL2EtherValid != -1 && RxL2EtherValid != -1 && RxL3IPValid != -1 &&
+            RxL3IPValid != -1) {
+        RxL3IPAndBelowValid = (RxL2EtherValid == P_true && RxL3IPValid ==
+                P_true ? P_true : P_false);
         printf("RxL3IPAndBelowValid=%d\n", RxL3IPAndBelowValid);
     }
     if (RxL3IPv4ValidHeaderLength == P_true) {
         RxL3IPv4Classify = do_pg__RxL3IPv4Classify(st, in);
         printf("RxL3IPv4Classify=%d\n", RxL3IPv4Classify);
     }
-    if (RxL3IPv4Classify == P_RxL3IPv4Classify_udp || RxL2EtherClassifyL3 == P_RxL2EtherClassifyL3_ipv6) {
+    if (RxL3IPv4Classify == P_RxL3IPv4Classify_udp || RxL2EtherClassifyL3 ==
+            P_RxL2EtherClassifyL3_ipv6) {
         NotSupported = do_pg__NotSupported(st, in);
         printf("NotSupported=%d\n", NotSupported);
     }
-    if (RxL3IPv4Classify == P_RxL3IPv4Classify_drop || RxL3IPv4ValidHeaderLength == P_false || RxL3ARPClassify == P_RxL3ARPClassify_drop || RxL3ARPValidHeaderLength == P_false || RxL2EtherClassifyL3 == P_RxL2EtherClassifyL3_drop || RxL2EtherValidType == P_false || RxL2EtherValidLength == P_false || RxL2EtherClassified == P_false) {
+    if (RxL3IPv4Classify == P_RxL3IPv4Classify_drop ||
+            RxL3IPv4ValidHeaderLength == P_false ||
+            RxL3ARPClassify == P_RxL3ARPClassify_drop ||
+            RxL3ARPValidHeaderLength == P_false ||
+            RxL2EtherClassifyL3 == P_RxL2EtherClassifyL3_drop ||
+            RxL2EtherValidType == P_false ||
+            RxL2EtherValidLength == P_false ||
+            RxL2EtherClassified == P_false) {
         PacketDrop = do_pg__PacketDrop(st, in);
         printf("PacketDrop=%d\n", PacketDrop);
     }
@@ -167,16 +300,20 @@ void testFun(struct state * st, struct input *in)
         RxL3ICMPValidChecksum = do_pg__RxL3ICMPValidChecksum(st, in);
         printf("RxL3ICMPValidChecksum=%d\n", RxL3ICMPValidChecksum);
     }
-    if (RxL3ICMPValidChecksum != -1 && RxL3ICMPValidChecksum != -1 && RxL3IPAndBelowValid != -1 && RxL3IPAndBelowValid != -1) {
-        RxL3ICMPValid = (RxL3ICMPValidChecksum == P_true && RxL3IPAndBelowValid == P_true ? P_true : P_false);
+    if (RxL3ICMPValidChecksum != -1 && RxL3ICMPValidChecksum != -1 &&
+            RxL3IPAndBelowValid != -1 && RxL3IPAndBelowValid != -1) {
+        RxL3ICMPValid = (RxL3ICMPValidChecksum == P_true &&
+                RxL3IPAndBelowValid == P_true ? P_true : P_false);
         printf("RxL3ICMPValid=%d\n", RxL3ICMPValid);
     }
     if (RxL3ICMPValidHeaderLength == P_true) {
         RxL3ICMPIsTypeRequest = do_pg__RxL3ICMPIsTypeRequest(st, in);
         printf("RxL3ICMPIsTypeRequest=%d\n", RxL3ICMPIsTypeRequest);
     }
-    if (RxL3ICMPIsTypeRequest != -1 && RxL3ICMPIsTypeRequest != -1 && RxL3ICMPValid != -1 && RxL3ICMPValid != -1) {
-        RxL3ICMPNeedsResponse = (RxL3ICMPIsTypeRequest == P_true && RxL3ICMPValid == P_true ? P_true : P_false);
+    if (RxL3ICMPIsTypeRequest != -1 && RxL3ICMPIsTypeRequest != -1 &&
+            RxL3ICMPValid != -1 && RxL3ICMPValid != -1) {
+        RxL3ICMPNeedsResponse = (RxL3ICMPIsTypeRequest == P_true &&
+                RxL3ICMPValid == P_true ? P_true : P_false);
         printf("RxL3ICMPNeedsResponse=%d\n", RxL3ICMPNeedsResponse);
     }
     if (RxL3ICMPNeedsResponse == P_true) {
@@ -184,7 +321,8 @@ void testFun(struct state * st, struct input *in)
         printf("RxTagTxICMPIR=%d\n", RxTagTxICMPIR);
     }
     if (RxTagTxICMPIR != -1 && RxTagTxARPLu != -1 && RxTagTxARPIR != -1) {
-        RxToTx = (RxTagTxICMPIR == P_true || RxTagTxARPLu == P_true || RxTagTxARPIR == P_true ? P_true : P_false);
+        RxToTx = (RxTagTxICMPIR == P_true || RxTagTxARPLu == P_true ||
+                RxTagTxARPIR == P_true ? P_true : P_false);
         printf("RxToTx=%d\n", RxToTx);
     }
     if (RxToTx == P_true) {
@@ -235,8 +373,10 @@ void testFun(struct state * st, struct input *in)
         TxL3ARPSendRequest = do_pg__TxL3ARPSendRequest(st, in);
         printf("TxL3ARPSendRequest=%d\n", TxL3ARPSendRequest);
     }
-    if (TxL3ARPSendRequest != -1 && TxL3ARPSendRequest != -1 && TxL3ARPInitiateResponse != -1 && TxL3ARPInitiateResponse != -1) {
-        TxL3ARPPrepare = (TxL3ARPSendRequest == P_true || TxL3ARPInitiateResponse == P_true ? P_true : P_false);
+    if (TxL3ARPSendRequest != -1 && TxL3ARPSendRequest != -1 &&
+            TxL3ARPInitiateResponse != -1 && TxL3ARPInitiateResponse != -1) {
+        TxL3ARPPrepare = (TxL3ARPSendRequest == P_true ||
+                TxL3ARPInitiateResponse == P_true ? P_true : P_false);
         printf("TxL3ARPPrepare=%d\n", TxL3ARPPrepare);
     }
     if (TxL3ARPPrepare == P_true) {
@@ -247,8 +387,10 @@ void testFun(struct state * st, struct input *in)
         TxL3ARPFillHeader = do_pg__TxL3ARPFillHeader(st, in);
         printf("TxL3ARPFillHeader=%d\n", TxL3ARPFillHeader);
     }
-    if (TxL3ARPLookup_ != -1 && TxL3ARPLookup_ != -1 && TxL3ARPFillHeader != -1 && TxL3ARPFillHeader != -1) {
-        TxL2EtherPrepare = (TxL3ARPLookup_ == P_true || TxL3ARPFillHeader == P_true ? P_true : P_false);
+    if (TxL3ARPLookup_ != -1 && TxL3ARPLookup_ != -1 && TxL3ARPFillHeader != -1
+            && TxL3ARPFillHeader != -1) {
+        TxL2EtherPrepare = (TxL3ARPLookup_ == P_true ||
+                TxL3ARPFillHeader == P_true ? P_true : P_false);
         printf("TxL2EtherPrepare=%d\n", TxL2EtherPrepare);
     }
     if (TxL2EtherPrepare == P_true) {
