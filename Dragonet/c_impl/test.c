@@ -1,8 +1,8 @@
 #include <implementation.h>
 #include <stddef.h>
 #include <stdio.h>
-
 #include <packet_access.h>
+#include "config.h"
 
 void testFun(struct state * st, struct input *in);
 
@@ -63,23 +63,30 @@ static uint8_t pkt_unsupported_proto_rx[] = {
 int main(int argc, char *argv[])
 {
 
-    struct state st = {0, NULL};
+    struct state st = {
+        .local_mac      = CONFIG_LOCAL_MAC,
+        .local_ip       = CONFIG_LOCAL_IP,
+        .arp_pending    = NULL,
+        .arp_cache      = NULL,
+        .pkt_counter    = 0,
+    };
     struct input in;
-    in.space_before = 0;
-    in.space_after = 0;
 
     // Testing incoming arp request packet
+    memset(&in, 0, sizeof(in));
     in.data = (void *)arp_request_rx;
     in.len = sizeof(arp_request_rx);
     testFun(&st, &in);
 
 
     // Testing incoming icmp packet
+    memset(&in, 0, sizeof(in));
     in.data = (void *)pkt_icmp_echo_rx;
     in.len = sizeof(pkt_icmp_echo_rx);
     testFun(&st, &in);
 
     // Testing incoming packet for unsupported protocol
+    memset(&in, 0, sizeof(in));
     in.data = (void *)pkt_unsupported_proto_rx;
     in.len = sizeof(pkt_unsupported_proto_rx);
     testFun(&st, &in);

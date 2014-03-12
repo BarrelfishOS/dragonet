@@ -8,54 +8,66 @@
 #include <stdint.h>
 
 typedef int node_out_t;
+typedef uint16_t pktoff_t;
 
-enum PktAttributes {
-    ARPDstIP,
-    ARPDstMAC,
-    ARPOper,
-    ARPSrcIP,
-    ARPSrcMAC,
-    ETHDstMAC,
-    ETHSrcMAC,
-    ETHType,
-    ICMPId,
-    IP4Dest,
-    IP4PayloadLen,
-    IP4Proto,
-    IP4Source,
-    L2Offset,
-    L3Offset,
-    L4Offset,
-    L4PayloadLen,
-    TCPAckNo,
-    TCPChecksum,
-    TCPdataoff,
-    TCPDstPort,
-    TCPFlags,
-    TCPPayload,
-    TCPSeqNo,
-    TCPSrcPort,
-    TCPUrgent,
-    TCPWindow,
-    UDPDstPort,
-    UDPLen,
-    UDPSrcPort,
-    AttributeCount,  // must be the last attribute
+struct arp_pending;
+struct arp_cache;
+struct input;
+struct state {
+    uint32_t local_ip;
+    uint64_t local_mac;
+
+    struct arp_pending *arp_pending;
+    struct arp_cache   *arp_cache;
+
+    uint64_t pkt_counter;
 };
 
-struct state {
-    uint64_t pkt_counter;
-    void *place_holder;
+struct arp_pending {
+    uint32_t ip;
+    struct input *input;
+
+    struct arp_pending *next;
+};
+
+struct arp_cache {
+    uint32_t ip;
+    uint64_t mac;
+
+    struct arp_cache *next;
 };
 
 struct input {
-
     // Buffer
     void  *data;
     size_t len;
     size_t space_before;
     size_t space_after;
-    uint64_t attrs[AttributeCount];
+
+// Attributes ----------------------------------------
+
+    // Offset for headers on different layers
+    pktoff_t offset_l2;
+    pktoff_t offset_l3;
+    pktoff_t offset_l4;
+    pktoff_t offset_l5;
+
+    // Ethernet
+    uint64_t eth_dst_mac;
+    uint64_t eth_src_mac;
+    uint16_t eth_type;
+
+    // IPv4
+    uint16_t ip4_proto;
+    uint32_t ip4_dst;
+    uint32_t ip4_src;
+
+    // ARP
+    uint64_t arp_src_mac;
+    uint64_t arp_dst_mac;
+    uint32_t arp_src_ip;
+    uint32_t arp_dst_ip;
+    uint8_t  arp_oper;
 };
 
 
@@ -99,6 +111,7 @@ enum out_ports {
     P_TxL2EtherFillHeader_out = 0,
 };
 
+#define PORT_BOOL(b) ((b) ? P_true : P_false)
 
 node_out_t do_pg__Queue(struct state *state, struct input *in);
 node_out_t do_pg__PacketDrop(struct state *state, struct input *in);

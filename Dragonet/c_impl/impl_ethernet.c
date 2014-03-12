@@ -1,13 +1,12 @@
 #include <stdint.h>
 #include <implementation.h>
 #include <ethernetproto.h>
-#include "config.h"
 
 node_out_t do_pg__RxL2EtherClassified(struct state *state, struct input *in)
 {
     // P_true, P_false
     // setting the offset of Ethernet packet starting
-    in->attrs[L2Offset] = 0;
+    in->offset_l2 = 0;
     return P_true;
 }
 
@@ -46,7 +45,7 @@ node_out_t do_pg__RxL2EtherValidSrc(struct state *state, struct input *in)
 node_out_t do_pg__RxL2EtherValidLocalMAC(struct state *state, struct input *in)
 {
     mac_t dst = eth_dst_mac_read(in);
-    mac_t localmac = get_local_mac(state);
+    mac_t localmac = state->local_mac;
     dprint("%s: %lx == %lx\n", __func__, dst, localmac);
     return ((dst == localmac)?P_true: P_false);
     //return ((eth_dst_mac_read(in) == get_local_mac(state))?P_true: P_false);
@@ -79,17 +78,18 @@ node_out_t do_pg__TxL2EtherAllocateHeader(struct state *state, struct input *in)
     pkt_clear(in,  l2Offset(in), ethernet_header_len);
 
     // Moving L3 and L4 header offset (in case someone still modifies them)
-    in->attrs[L3Offset] += (ethernet_header_len);
-    in->attrs[L4Offset] += (ethernet_header_len);
+    in->offset_l3 += (ethernet_header_len);
+    in->offset_l4 += (ethernet_header_len);
+    in->offset_l5 += (ethernet_header_len);
     return P_TxL2EtherAllocateHeader_out;
 }
 
 node_out_t do_pg__TxL2EtherFillHeader(struct state *state, struct input *in)
 {
 
-    mac_t src_mac = (mac_t)in->attrs[ETHSrcMAC];
-    mac_t dst_mac = (mac_t)in->attrs[ETHDstMAC];
-    uint16_t ethType =  (uint16_t)in->attrs[ETHType];
+    mac_t src_mac = in->eth_src_mac;
+    mac_t dst_mac = in->eth_dst_mac;
+    uint16_t ethType = in->eth_type;
     eth_src_mac_write(in, src_mac);
     eth_dst_mac_write(in, dst_mac);
     eth_type_write(in, ethType);

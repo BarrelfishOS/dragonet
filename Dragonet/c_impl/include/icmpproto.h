@@ -16,7 +16,7 @@
 
 static inline size_t l4Offset(struct input *pkt)
 {
-    return (pkt->attrs[L4Offset]);
+    return pkt->offset_l4;
 }
 
 static inline size_t icmp_header_offset(struct input *pkt)

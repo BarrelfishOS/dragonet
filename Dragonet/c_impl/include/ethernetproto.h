@@ -18,7 +18,7 @@
 //#define l2Offset(x)                (0)
 static inline size_t l2Offset(struct input *pkt)
 {
-    return ((size_t)pkt->attrs[L2Offset]);
+    return pkt->offset_l2;
 }
 
 typedef uint64_t mac_t;
