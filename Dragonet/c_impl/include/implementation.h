@@ -68,6 +68,9 @@ struct input {
     uint32_t arp_src_ip;
     uint32_t arp_dst_ip;
     uint8_t  arp_oper;
+
+    // ICMP
+    uint32_t icmp_id;
 };
 
 
@@ -183,7 +186,7 @@ struct input *input_alloc(void);
 void input_free(struct input *in);
 /** Keep the data in the input struct as is, but reinitialize attributes */
 void input_clean_attrs(struct input *in);
-
+void input_clean_packet(struct input *in);
 #define MYDEBUG     1
 #ifdef MYDEBUG
 #define dprint(x...)    printf("debug:" x)

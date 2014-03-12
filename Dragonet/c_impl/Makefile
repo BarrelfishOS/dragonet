@@ -6,6 +6,8 @@ CFLAGS+= -Iinclude -Wall -O2
 test: $(OBJFILES)
 	gcc -o $@ $^
 
+run: test
+	./test
 
 clean:
 	rm -f test $(OBJFILES)

@@ -37,3 +37,13 @@ void input_clean_attrs(struct input *in)
     in->space_after = space_after;
 }
 
+void input_clean_packet(struct input *in)
+{
+
+    in->data = (void *) ((uintptr_t) in->data - in->space_before);
+    // NOTE: Not clearing buffer explicitly as it will anyway get overwritten
+    //memset(in->data, 0, DEFAULT_BUFFER_SIZE);
+    in->data = (void *) ((uintptr_t) in->data + DEFAULT_BUFFER_SIZE);
+    in->len = 0;
+    in->space_before = DEFAULT_BUFFER_SIZE;
+}

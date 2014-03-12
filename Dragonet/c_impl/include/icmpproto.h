@@ -32,7 +32,7 @@ static inline size_t icmp_header_field_offset(struct input *pkt,
 
 // ----------------------- ICMP field PAYLOAD -----------
 
-static inline size_t icmp_payload_offset(struct input *pkt)
+static inline pktoff_t icmp_payload_offset(struct input *pkt)
 {
     return icmp_header_field_offset(pkt, 8);
 }
@@ -42,6 +42,20 @@ static inline size_t icmp_payload_length(struct input *pkt)
     return (pkt->len - icmp_payload_offset(pkt));
 }
 
+// NOTE: It is assumed that destination is atleast a buffer size
+static inline int icmp_copy_payload(struct input *pkt, void *dst,
+        size_t bufsize)
+{
+    size_t payloadsize = icmp_payload_length(pkt);
+    if (bufsize < payloadsize) {
+        panic("too small buffer to copy data\n");
+        return -1;
+    }
+
+    pktoff_t off = icmp_payload_offset(pkt);
+    pkt_read(pkt, off, payloadsize, dst);
+    return payloadsize;
+}
 
 // ----------------------- ICMP field accessing functions -----------
 uint8_t icmp_hdr_type_read(struct input *pkt);

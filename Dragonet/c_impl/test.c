@@ -79,12 +79,15 @@ int main(int argc, char *argv[])
     };
 
     // Testing incoming arp request packet
+    printf("\nTesting:arp_request_rx\n");
     run_packet(&st, arp_request_rx, sizeof(arp_request_rx));
 
     // Testing incoming icmp packet
+    printf("\nTesting:ICMP packet\n");
     run_packet(&st, pkt_icmp_echo_rx, sizeof(pkt_icmp_echo_rx));
 
     // Testing incoming packet for unsupported protocol
+    printf("\nTesting incoming packet for unsupported protocol\n");
     run_packet(&st, pkt_unsupported_proto_rx, sizeof(pkt_unsupported_proto_rx));
 
     return 0;
