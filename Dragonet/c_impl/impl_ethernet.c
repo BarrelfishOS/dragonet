@@ -13,12 +13,12 @@ node_out_t do_pg__RxL2EtherClassified(struct state *state, struct input *in)
 node_out_t do_pg__RxL2EtherValidLength(struct state *state, struct input *in)
 {
     size_t len = in->len;
-    return ((len >= 14) ? P_true : P_false);
+    return PORT_BOOL(len >= 14);
 }
 
 node_out_t do_pg__RxL2EtherValidUnicast(struct state *state, struct input *in)
 {
-    return (((eth_dst_mac_read(in) & eth_multicast_bit_mask) == 0)? P_true : P_false);
+    return PORT_BOOL((eth_dst_mac_read(in) & eth_multicast_bit_mask) == 0);
 }
 
 node_out_t do_pg__RxL2EtherValidMulticast(struct state *state, struct input *in)
@@ -26,15 +26,15 @@ node_out_t do_pg__RxL2EtherValidMulticast(struct state *state, struct input *in)
     mac_t dst = eth_dst_mac_read(in);
     dprint("%s: %lx & %lx == %lx\n", __func__, dst, eth_multicast_bit_mask,
             (dst & eth_multicast_bit_mask));
-    return (((dst != eth_broadcast_addr) && (dst & eth_multicast_bit_mask))?
-                P_true : P_false);
+    return PORT_BOOL((dst != eth_broadcast_addr) &&
+                     (dst & eth_multicast_bit_mask));
 }
 
 node_out_t do_pg__RxL2EtherValidBroadcast(struct state *state, struct input *in)
 {
     mac_t dst = eth_dst_mac_read(in);
     dprint("%s: %lx == %lx\n", __func__, dst, eth_broadcast_addr);
-    return ((dst == eth_broadcast_addr)? P_true : P_false);
+    return PORT_BOOL(dst == eth_broadcast_addr);
 }
 
 node_out_t do_pg__RxL2EtherValidSrc(struct state *state, struct input *in)
@@ -47,13 +47,13 @@ node_out_t do_pg__RxL2EtherValidLocalMAC(struct state *state, struct input *in)
     mac_t dst = eth_dst_mac_read(in);
     mac_t localmac = state->local_mac;
     dprint("%s: %lx == %lx\n", __func__, dst, localmac);
-    return ((dst == localmac)?P_true: P_false);
+    return PORT_BOOL(dst == localmac || dst == eth_broadcast_addr);
     //return ((eth_dst_mac_read(in) == get_local_mac(state))?P_true: P_false);
 }
 
 node_out_t do_pg__RxL2EtherValidType(struct state *state, struct input *in)
 {
-    return ((eth_type_read(in) >= eth_type_IPv4) ? P_true : P_false);
+    return PORT_BOOL(eth_type_read(in) >= eth_type_IPv4);
 }
 
 node_out_t do_pg__RxL2EtherClassifyL3(struct state *state, struct input *in)
