@@ -152,6 +152,12 @@ Util/Dpdk_.$(OSUF): Util/Dpdk.hs
 Util/Dpdk.$(OSUF): Util/Dpdk_.$(OSUF) objfiles
 	ld -i  Util/Dpdk_.$(OSUF) Util/cmdline.o Util/dpdkData.o Util/config.o Util/csumonly.o Util/iofwd.o Util/macfwd.o Util/parameters.o Util/rxonly.o Util/dpdkControl.o Util/txonly.o -o $@
 
+Util/tap.bc: Util/tap.c
+	clang -O2 -emit-llvm -c $< -o $@
+
+llvm-helpers.bc: Util/tap.bc c_impl/llvm_pg_impl.bc
+	llvm-link-3.5 $^ -o $@
+
 # Converts graphs into pdfs
 models: graph_run
 	cd graphsGen ; ../convertDot.sh
