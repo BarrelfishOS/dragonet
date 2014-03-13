@@ -73,6 +73,8 @@ struct input {
     uint32_t icmp_id;
     // Misc
     uint8_t mux_id;
+
+    struct input *next;
 };
 
 enum attr_mux_id {
