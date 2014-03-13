@@ -6,8 +6,13 @@
 #include <string.h>
 #include <implementation.h>
 
-#define CHECK_BOUNDS(in,o,l,f) do { if (o + l > in->len) \
-    panic("Out of bounds in "#f"\n") } while (0)
+#define ENABLE_CHECK_BOUNDS 1
+#if ENABLE_CHECK_BOUNDS
+    #define CHECK_BOUNDS(in,o,l,f) do { if (o + l > in->len) \
+            panic("Out of bounds in "#f"\n") } while (0)
+#else
+    #define CHECK_BOUNDS(in,o,l,f) do { } while (0)
+#endif
 
 /** Read `len' bytes from offset `off' to buffer `d' */
 static inline void pkt_read(struct input *in, pktoff_t off, pktoff_t len,
