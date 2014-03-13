@@ -317,6 +317,9 @@ struct net_if *init_openonload_setup(char *name)
     return net_if;
 } // end function : init_openonload_setup
 
+
+
+
 struct vi *alloc_queue(struct net_if *myif)
 {
     struct vi* vis;
@@ -575,6 +578,14 @@ void send_packet(struct vi *vif, char *pkt_tx, size_t len)
     //assert(!"send_packet: NYI");
 } // end function: send_packet
 
-// ######################  ###########################
 
+struct vi *init_and_alloc_default_queue(char *name)
+{
+    struct net_ifi *myif = init_openonload_setup(name);
+    struct vi* vis =  alloc_queue(myif);
+    int ret = alloc_filter_default(vis);
+    return vis;
+}
+
+// ######################  ###########################
 

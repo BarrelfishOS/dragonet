@@ -143,20 +143,6 @@ tap_create(char *name)
 	return tap;
 }
 
-#define CONFIG_LOCAL_MAC_TUNTAP    0xf86954221b00ULL   // 00:1b:22:54:69:f8
-#define CONFIG_LOCAL_IP_TUNTAP    0xc0a87b01          // 192.168.123.1
-
-static
-uint64_t tuntap_mac_read(device_t ttd) {
-    return (CONFIG_LOCAL_MAC_TUNTAP);
-}
-
-static
-uint32_t tuntap_ip_read(device_t ttd) {
-    return (CONFIG_LOCAL_IP_TUNTAP);
-}
-
-
 static
 struct tap_handler *init_tap_network(char *ifname)
 {
@@ -168,6 +154,19 @@ struct tap_handler *init_tap_network(char *ifname)
     tap_set_ip(tap, ipaddr);
     tap_set_mask(tap, ipmask);
     return tap;
+}
+
+#define CONFIG_LOCAL_MAC_TUNTAP    0xf86954221b00ULL   // 00:1b:22:54:69:f8
+#define CONFIG_LOCAL_IP_TUNTAP    0xc0a87b01          // 192.168.123.1
+
+static
+uint64_t tuntap_mac_read(device_t ttd) {
+    return (CONFIG_LOCAL_MAC_TUNTAP);
+}
+
+static
+uint32_t tuntap_ip_read(device_t ttd) {
+    return (CONFIG_LOCAL_IP_TUNTAP);
 }
 
 static
