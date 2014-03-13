@@ -88,14 +88,14 @@ struct arp_cache hardcoded_cache = {
     .next = NULL,
 };
 
-int main(int argc, char *argv[])
-{
-    struct driver *drv = NULL;
 
-    drv = get_tuntap_driver();
+
+int main_loop(struct driver *drv)
+{
+
     struct state st = {
-        .local_mac      = CONFIG_LOCAL_MAC,
-        .local_ip       = CONFIG_LOCAL_IP,
+        .local_mac      = 0,
+        .local_ip       = 0,
         .arp_pending    = NULL,
         .arp_cache      = NULL, //&hardcoded_cache,
         .pkt_counter    = 0,

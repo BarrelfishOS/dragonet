@@ -7,6 +7,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+
+#define DEFAULT_BUFFER_SIZE 2048
+
 typedef int node_out_t;
 typedef uint16_t pktoff_t;
 
@@ -216,6 +219,9 @@ void input_free(struct input *in);
 void input_clean_attrs(struct input *in);
 void input_clean_packet(struct input *in);
 void input_dump(struct input *in);
+
+// does the continuous packet processing by fetching packets from driver
+int main_loop(struct driver *drv);
 
 //#define MYDEBUG     1
 #ifdef MYDEBUG

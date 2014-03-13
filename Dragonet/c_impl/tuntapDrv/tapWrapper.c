@@ -203,3 +203,9 @@ struct driver *get_tuntap_driver(void)
     return &tap_driver;
 }
 
+int main(int argc, char *argv[])
+{
+    struct driver *drv = NULL;
+    drv = get_tuntap_driver();
+    return main_loop(drv);
+}

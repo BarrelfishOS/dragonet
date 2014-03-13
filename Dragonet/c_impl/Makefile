@@ -3,11 +3,17 @@ SRCFILES+= $(wildcard support/*.c)
 OBJFILES= $(addsuffix .o,$(basename $(SRCFILES)))
 CFLAGS+= -Iinclude -Wall -O2
 
-test: $(OBJFILES)
+
+TTSRCFILES= $(wildcard tuntapDrv/*.c)
+TTSRCFILES+= $(SRCFILES)
+TTOBJFILES= $(addsuffix .o,$(basename $(TTSRCFILES)))
+
+tuntap: $(TTOBJFILES)
 	gcc -o $@ $^
 
-run: test
-	./test
+tuntap_run: tuntap
+	sudo ./tuntap
 
 clean:
-	rm -f test $(OBJFILES)
+	rm -f tuntap $(OBJFILES) $(TTOBJFILES)
+
