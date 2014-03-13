@@ -23,6 +23,7 @@ cabal-version:      >=1.8
 library
     Hs-source-dirs:     lib
     C-sources:          lib/Util/tap.c
+    CC-options:         -std=gnu99
     Exposed-modules:    Dragonet.Configuration,
                         Dragonet.Constraints,
                         Dragonet.DotGenerator,
@@ -45,66 +46,59 @@ library
                         Util.BoolExpParser,
                         Util.Misc,
                         Util.Tap
-    build-depends:      base==4.5.*, containers==0.4.*,
-                        template-haskell==2.7.*, fgl==5.4.*, parsec==2.1.*,
-                        bytestring==0.9.*, pretty-show==1.1.*, stm==2.4.*,
-                        mtl==2.1.*, graphviz==2999.16.*, text==0.11.*,
-                        process==1.1.*, temporary==1.1.*
+    build-depends:      base, containers, template-haskell, fgl, parsec,
+                        bytestring, pretty-show, stm, mtl, graphviz, text,
+                        process, temporary
     extensions:         DoAndIfThenElse, RankNTypes, EmptyDataDecls
 
 executable confgen
     main-is:            testConfGen.hs
-    build-depends:      Dragonet, base==4.5.*, graphviz==2999.16.*,
-                        text==0.11.*, random==1.0.*, transformers==0.3.*,
-                        fgl==5.4.*, containers==0.4.*
+    build-depends:      Dragonet, base, graphviz, text, random, transformers,
+                        fgl, containers
     extensions:         DoAndIfThenElse
 
 executable graph
     main-is:            testGraph.hs
-    build-depends:      Dragonet, base==4.5.*, containers==0.4.*,
-                        bytestring==0.9.*, text==0.11.*, graphviz==2999.16.*,
-                        fgl==5.4.*
+    build-depends:      Dragonet, base, containers, bytestring, text, graphviz,
+                        fgl
     extensions:         DoAndIfThenElse
 
 executable impl_th
     main-is:            testImplTH.hs
-    build-depends:      Dragonet, base==4.5.*, fgl==5.4.*, containers==0.4.*,
-                        bytestring==0.9.*, template-haskell
+    build-depends:      Dragonet, base, fgl, containers, bytestring,
+                        template-haskell
     extensions:         DoAndIfThenElse
 
 executable incrementalSim
     main-is:            testIncremental.hs
-    build-depends:      Dragonet, base==4.5.*, fgl==5.4.*, pretty-show==1.1.*,
-                        graphviz==2999.16.*, text==0.11.*, random==1.0.*,
-                        mtl==2.1.*,MonadRandom==0.1.*, containers==0.4.*
+    build-depends:      Dragonet, base, fgl, pretty-show, graphviz, text,
+                        random, mtl, MonadRandom, containers
     extensions:         DoAndIfThenElse
     ghc-options:        -threaded
 
 executable plos13
     main-is:            testPLOS13.hs
-    build-depends:      Dragonet, base==4.5.*, fgl==5.4.*
+    build-depends:      Dragonet, base, fgl
 
 executable tcpGraph
     main-is:            tcpGraph.hs
-    build-depends:      Dragonet, base==4.5.*
+    build-depends:      Dragonet, base
 
 executable tcpGraph2
     main-is:            tcpGraph2.hs
-    build-depends:      Dragonet, base==4.5.*
+    build-depends:      Dragonet, base
 
 executable tuntap
     main-is:            tuntapTests.hs
-    build-depends:      Dragonet, base==4.5.*, containers==0.4.*,
-                        bytestring==0.9.*, fgl==5.4.*, template-haskell,
-                        unix==2.5.*, stm==2.4.*
+    build-depends:      Dragonet, base, containers, bytestring, fgl,
+                        template-haskell, unix, stm
     extensions:         DoAndIfThenElse
     ghc-options:        -threaded
 
 executable tuntapPing
     main-is:            tuntapPing.hs
-    build-depends:      Dragonet, base==4.5.*, containers==0.4.*,
-                        bytestring==0.9.*, fgl==5.4.*, template-haskell,
-                        unix==2.5.*, stm==2.4.*
+    build-depends:      Dragonet, base, containers, bytestring, fgl,
+                        template-haskell, unix, stm
     extensions:         DoAndIfThenElse
     ghc-options:        -threaded
 
