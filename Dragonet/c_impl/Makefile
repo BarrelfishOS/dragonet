@@ -3,7 +3,8 @@
 SRCFILES= $(wildcard *.c)
 SRCFILES+= $(wildcard support/*.c)
 OBJFILES= $(addsuffix .o,$(basename $(SRCFILES)))
-CFLAGS+= -Iinclude -Wall -O2
+CFLAGS+= -Iinclude -Wall -O3 -flto
+LDFLAGS= -O3 -flto
 
 BCSRCFILES = $(filter-out test.c,$(SRCFILES))
 BCFILES = $(addsuffix .bc,$(basename $(BCSRCFILES))) # llvm bytecode
@@ -11,7 +12,7 @@ BCFILES = $(addsuffix .bc,$(basename $(BCSRCFILES))) # llvm bytecode
 all: test llvm_pg_impl.bc
 
 test: $(OBJFILES)
-	gcc -o $@ $^
+	$(CC) $(LDFLAGS) -o $@ $^
 
 run: test
 	./test
