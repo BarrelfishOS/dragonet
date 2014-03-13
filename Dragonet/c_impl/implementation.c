@@ -38,6 +38,11 @@ void input_clean_attrs(struct input *in)
     in->space_after = space_after;
 }
 
+void input_zero(struct input *in)
+{
+    memset(in, 0, sizeof(*in));
+}
+
 void input_clean_packet(struct input *in)
 {
 
@@ -62,3 +67,11 @@ void input_dump(struct input *in)
 
 }
 
+void pg_state_init(struct state *st)
+{
+    st->local_mac      = CONFIG_LOCAL_MAC;
+    st->local_ip       = CONFIG_LOCAL_IP;
+    st->arp_pending    = NULL;
+    st->arp_cache      = NULL;
+    st->pkt_counter    = 0;
+}

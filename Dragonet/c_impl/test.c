@@ -94,15 +94,13 @@ struct arp_cache hardcoded_cache = {
     .next = NULL,
 };
 
+void pg_state_init(struct state *st);
+
 int main(int argc, char *argv[])
 {
-    struct state st = {
-        .local_mac      = CONFIG_LOCAL_MAC,
-        .local_ip       = CONFIG_LOCAL_IP,
-        .arp_pending    = NULL,
-        .arp_cache      = NULL, //&hardcoded_cache,
-        .pkt_counter    = 0,
-    };
+    struct state st;
+
+    pg_state_init(&st);
 
     tap_dn = init_tap_network();
     char buf[4096];
