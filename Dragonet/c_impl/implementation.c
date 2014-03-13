@@ -26,6 +26,13 @@ struct input *input_alloc(void)
     return in;
 }
 
+void input_copy_packet(struct input *in, unsigned char *buff, size_t len)
+{
+    pkt_prepend(in, len);
+    memcpy(in->data, buff, len);
+}
+
+
 void input_free(struct input *in)
 {
     input_clean_attrs(in);
