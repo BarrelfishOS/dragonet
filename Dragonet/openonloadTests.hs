@@ -38,13 +38,13 @@ data NetEvent =
 rxThread c sfvi qid done = do
     M.forever $ do
         p <- SF.getPacket sfvi
-        putStrLn ("received Packet on qid " ++ (show qid))
+--        putStrLn ("received Packet on qid " ++ (show qid))
         STM.atomically $ TC.writeTChan c (RXEvent p)
 
 txThread c sfvi qid done = do
     M.forever $ do
         (TXEvent p) <- STM.atomically $ TC.readTChan c
-        putStrLn ("Send Packet on qid " ++ (show qid))
+--        putStrLn ("Send Packet on qid " ++ (show qid))
         SF.sendPacket sfvi p
     CC.putMVar done ()
 
@@ -58,11 +58,11 @@ simThread rxC txC state = do
     (p,state') <- STM.atomically $ simStep rxC txC state
 
     -- Show Debug output
-    putStrLn "SimStepDNET.Alg."
+{-    putStrLn "SimStepDNET.Alg."
     if not $ null $ DNET.gsDebug state' then
         putStr $ unlines $ map ("    " ++) $ DNET.gsDebug state'
     else return ()
-
+-}
     -- Send out packets on TX queue
     let send p = STM.atomically $ TC.writeTChan txC (TXEvent p)
     mapM_ send $ DNET.gsTXQueue state'

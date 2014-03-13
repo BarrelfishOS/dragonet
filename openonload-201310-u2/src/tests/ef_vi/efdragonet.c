@@ -288,6 +288,14 @@ void send_packetV2(int core_id, int port_id, int queue_id,
 int init_dpdk_setupV2(void);
 */
 
+#include <arpa/inet.h>
+
+//#define MYDEBUG     1
+#ifdef MYDEBUG
+#define dprint(x...)    printf("sfdebug:" x)
+#else
+#define dprint(x...)   ((void)0)
+#endif // MYDEBUG
 
 struct net_if *init_openonload_setup(char *name);
 struct vi *alloc_queue(struct net_if *myif);
@@ -308,7 +316,7 @@ static struct net_if* net_if = NULL;
 struct net_if *init_openonload_setup(char *name)
 {
 
-    printf("%s:%s:%d: called\n", __FILE__, __func__, __LINE__);
+    dprint("%s:%s:%d: called\n", __FILE__, __func__, __LINE__);
     if( (net_if = net_if_alloc(0, name, 0)) == NULL ) {
         LOGE(fprintf(stderr, "ERROR: Bad interface '%s' or unable to allocate "
                     "resources\n", name));
@@ -335,7 +343,7 @@ int alloc_filter_default(struct vi *vis)
     TRY(ef_filter_spec_set_unicast_all(&filter_spec));
     TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
 
-    printf("%s:%s:%d: done\n", __FILE__, __func__, __LINE__);
+    dprint("%s:%s:%d: done\n", __FILE__, __func__, __LINE__);
     return 1;
 } // end function: alloc_filter_default
 
@@ -347,7 +355,7 @@ int alloc_filter_listen_ipv4(struct vi *vis, int protocol,
     uint32_t localip = htonl(localip1);
     ef_filter_spec filter_spec;
     ef_filter_spec_init(&filter_spec, EF_FILTER_FLAG_NONE);
-    printf("%s:%s:%d: inserting listen filter proto [%d], "
+    dprint("%s:%s:%d: inserting listen filter proto [%d], "
             "localip [%"PRIx32"] localport[%"PRIx16"]\n",
             __FILE__, __func__, __LINE__,
             protocol, localip, localport);
@@ -355,7 +363,7 @@ int alloc_filter_listen_ipv4(struct vi *vis, int protocol,
     TRY(ef_filter_spec_set_ip4_local(&filter_spec, protocol, localip,
                 localport));
     TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
-    printf("%s:%s:%d: done\n", __FILE__, __func__, __LINE__);
+    dprint("%s:%s:%d: done\n", __FILE__, __func__, __LINE__);
     return 1;
 } // end function: alloc_filter_listen_ipv4
 
@@ -366,7 +374,7 @@ int alloc_filter_full_ipv4(struct vi *vis, int protocol,
 {
     ef_filter_spec filter_spec;
     ef_filter_spec_init(&filter_spec, EF_FILTER_FLAG_NONE);
-    printf("%s:%s:%d: inserting listen filter proto [%d], "
+    dprint("%s:%s:%d: inserting listen filter proto [%d], "
             "localip [%"PRIx32"] localport[%"PRIx16"]\n",
             __FILE__, __func__, __LINE__,
             protocol, localip, localport);
@@ -374,7 +382,7 @@ int alloc_filter_full_ipv4(struct vi *vis, int protocol,
     TRY(ef_filter_spec_set_ip4_full(&filter_spec, protocol,
                 localip, localport, remoteip, remoteport));
     TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
-    printf("%s:%s:%d: done\n", __FILE__, __func__, __LINE__);
+    dprint("%s:%s:%d: done\n", __FILE__, __func__, __LINE__);
     return 1;
 } // end function: alloc_filter_full_ipv4
 
@@ -389,7 +397,7 @@ static void buf_details(struct pkt_buf* pkt_buf, char *buff, int l)
     assert(buff != NULL);
 
     //snprintf(buff, l,
-    printf(
+    dprint(
            "BUF[id=%d,owner=%d,ref=%d,if_id=%d,addr=%p]\n",
                     pkt_buf->id,
                     pkt_buf->vi_owner->id,
@@ -404,7 +412,7 @@ static void buf_details(struct pkt_buf* pkt_buf, char *buff, int l)
 size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
 {
     if (vif == NULL) {
-        printf("%s:%s:%d:ERROR: vif == NULL\n", __FILE__, __func__, __LINE__);
+        dprint("%s:%s:%d:ERROR: vif == NULL\n", __FILE__, __func__, __LINE__);
         return 0;
     }
 
@@ -430,7 +438,7 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
         for( i = 0; i < n_ev; ++i ) {
             switch( EF_EVENT_TYPE(evs[i]) ) {
                 case EF_EVENT_TYPE_RX:
-                    printf("RX event arrived\n");
+                    dprint("RX event arrived\n");
                     /* This code does not handle jumbos. */
                     assert(EF_EVENT_RX_SOP(evs[i]) != 0);
                     assert(EF_EVENT_RX_CONT(evs[i]) == 0);
@@ -442,14 +450,14 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
                     copylen = len;
                     if (len > buf_len) {
                         copylen = buf_len;
-                        printf("buffer too small to copy full packet."
+                        dprint("buffer too small to copy full packet."
                                 "Ignoring  %d byte data\n", (len - copylen));
                     }
-                    printf("RX event: trying to copy %d bytes at location %p\n",
+                    dprint("RX event: trying to copy %d bytes at location %p\n",
                             copylen, pkt_out);
 
                     buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                    printf("%s:%s:%d: reveived %s\n", __FILE__, __func__, __LINE__, printbuf);
+                    dprint("%s:%s:%d: reveived %s\n", __FILE__, __func__, __LINE__, printbuf);
 
                     //int myoffset = RX_PKT_OFF(viff);
                     //memcpy(pkt_out, pkt_buf->addr[viff->net_if->id] + myoffset, copylen);
@@ -457,7 +465,7 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
                     memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
                     pkt_buf_release(pkt_buf);
                     buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                    printf("%s:%s:%d: RX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                    dprint("%s:%s:%d: RX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
 
                     pkt_received = copylen;
                     // NOTE: I am assuming that we are reading only one event
@@ -466,30 +474,30 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
                     break;
 
                 case EF_EVENT_TYPE_TX:
-                    printf("TX event arrived\n");
+                    dprint("TX event arrived\n");
                     n = ef_vi_transmit_unbundle(&viff->vi, &evs[i], ids);
                     for( j = 0; j < n; ++j ) {
                         //complete_tx(thread, TX_RQ_ID_VI(ids[j]), TX_RQ_ID_PB(ids[j]));
                         pkt_buf = pkt_buf_from_id(viff, TX_RQ_ID_PB(ids[j]));
                         buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                        printf("%s:%s:%d: TX, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                        dprint("%s:%s:%d: TX, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
                         pkt_buf_release(pkt_buf);
                         buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                        printf("%s:%s:%d: TX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                        dprint("%s:%s:%d: TX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
                     }
                     break;
 
                 case EF_EVENT_TYPE_RX_DISCARD:
-                    printf("RX_discard event arrived\n");
+                    dprint("RX_discard event arrived\n");
                     //handle_rx_discard(thread, viff, EF_EVENT_RX_DISCARD_RQ_ID(evs[i]),
                     //        EF_EVENT_RX_DISCARD_TYPE(evs[i]));
                         pkt_buf = pkt_buf_from_id(viff,
                                     EF_EVENT_RX_DISCARD_RQ_ID(evs[i]));
                         buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                        printf("%s:%s:%d: RX_DISCARD, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                        dprint("%s:%s:%d: RX_DISCARD, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
                         pkt_buf_release(pkt_buf);
                         buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                        printf("%s:%s:%d: RX_DISCARD, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                        dprint("%s:%s:%d: RX_DISCARD, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
                     break;
 
                 default:
@@ -501,7 +509,7 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
         vi_refill_rx_ring(viff);
     }
 
-    printf("%s:%s:%d: NYI\n", __FILE__, __func__, __LINE__);
+    dprint("%s:%s:%d: NYI\n", __FILE__, __func__, __LINE__);
     return 0;
 } // end function: get_packet
 
@@ -515,19 +523,19 @@ void send_packet(struct vi *vif, char *pkt_tx, size_t len)
     int ii;
 
     if (vif == NULL) {
-        printf("%s:%s:%d:ERROR: vif == NULL\n", __FILE__, __func__, __LINE__);
+        dprint("%s:%s:%d:ERROR: vif == NULL\n", __FILE__, __func__, __LINE__);
         return;
     }
     pkt_buf = vi_get_free_pkt_buf(vif);
     if (pkt_buf == NULL) {
-        printf("%s:%s:%d: No free pkt buffers\n", __FILE__, __func__, __LINE__);
+        dprint("%s:%s:%d: No free pkt buffers\n", __FILE__, __func__, __LINE__);
         return;
     }
 
     // print details of buffer which is being sent
     char printbuf[PRINTBUFSIZE] = {'\0'};
     buf_details(pkt_buf, printbuf, sizeof(printbuf));
-    printf("%s:%s:%d: using %s\n", __FILE__, __func__, __LINE__, printbuf);
+    dprint("%s:%s:%d: using %s\n", __FILE__, __func__, __LINE__, printbuf);
 
     offset = RX_PKT_OFF(vif);
     assert(pkt_buf != NULL);
@@ -538,52 +546,52 @@ void send_packet(struct vi *vif, char *pkt_tx, size_t len)
 //                    memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
     void * buf_addr = RX_PKT_PTR(pkt_buf);
 //    void * buf_addr = (void *)(pkt_buf->addr[pkt_buf->vi_owner->net_if->id] + offset);
-    printf("%s:%s:%d: calling memcpy\n", __FILE__, __func__, __LINE__);
+    dprint("%s:%s:%d: calling memcpy\n", __FILE__, __func__, __LINE__);
     volatile char aa = 0;
     for (ii = 0; ii < len; ++ii) {
        aa = aa + ((char *) pkt_tx)[ii];
     }
-    printf("%s:%s:%d: verified pkt_tx %c\n", __FILE__, __func__, __LINE__, aa);
+    dprint("%s:%s:%d: verified pkt_tx %c\n", __FILE__, __func__, __LINE__, aa);
 
     for (ii = 0; ii < len; ++ii) {
        aa = aa + ((char *) buf_addr)[ii];
     }
-    printf("%s:%s:%d: verified pkt_tx %c\n", __FILE__, __func__, __LINE__, aa);
+    dprint("%s:%s:%d: verified pkt_tx %c\n", __FILE__, __func__, __LINE__, aa);
 
 
     // FIXME: make sure that len is smaller than buffer length
     memcpy(buf_addr, pkt_tx, len);
 
-    printf("%s:%s:%d: calling vi_send\n", __FILE__, __func__, __LINE__);
+    dprint("%s:%s:%d: calling vi_send\n", __FILE__, __func__, __LINE__);
     rc = vi_send(vif, pkt_buf, offset, len);
     if( rc != 0 ) {
         assert(rc == -EAGAIN);
         /* TXQ is full.  A real app might consider implementing an overflow
          * queue in software.  We simply choose not to send.
          */
-        printf("%s:%s:%d: send queue full, so not sending\n", __FILE__, __func__, __LINE__);
+        dprint("%s:%s:%d: send queue full, so not sending\n", __FILE__, __func__, __LINE__);
         LOGW(fprintf(stderr, "WARNING: [%s] dropped send\n",
                     vif->net_if->name));
     }
     // FIXME: should I release pkt_buf here?
 //    pkt_buf_release(pkt_buf);
-    printf("%s:%s:%d: vi_send done\n", __FILE__, __func__, __LINE__);
+    dprint("%s:%s:%d: vi_send done\n", __FILE__, __func__, __LINE__);
     buf_details(pkt_buf, printbuf, sizeof(printbuf));
-    printf("%s:%s:%d: buf ater sending %s\n", __FILE__, __func__, __LINE__, printbuf);
+    dprint("%s:%s:%d: buf ater sending %s\n", __FILE__, __func__, __LINE__, printbuf);
 
 
 
     // FIXME: Wait for send ACK
-    printf("%s:%s:%d: buf[] send done\n", __FILE__, __func__, __LINE__);
+    dprint("%s:%s:%d: buf[] send done\n", __FILE__, __func__, __LINE__);
     //assert(!"send_packet: NYI");
 } // end function: send_packet
 
 
 struct vi *init_and_alloc_default_queue(char *name)
 {
-    struct net_ifi *myif = init_openonload_setup(name);
+    struct net_if *myif = init_openonload_setup(name);
     struct vi* vis =  alloc_queue(myif);
-    int ret = alloc_filter_default(vis);
+    alloc_filter_default(vis);
     return vis;
 }
 

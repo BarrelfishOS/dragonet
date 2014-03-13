@@ -198,6 +198,7 @@ static struct driver tap_driver = {
     .drv_ip_read = tuntap_ip_read,
 };
 
+static
 struct driver *get_tuntap_driver(void)
 {
     return &tap_driver;
