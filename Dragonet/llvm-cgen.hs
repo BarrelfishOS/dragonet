@@ -50,6 +50,7 @@ import qualified LLVM.General.PassManager as LLVM.PM
 import qualified Text.Show.Pretty as Pr
 import Debug.Trace (trace, traceShow)
 import System.Environment (getArgs)
+import System.IO  (writeFile)
 
 -- heavily based on: http://www.stephendiehl.com/llvm/
 
@@ -859,7 +860,7 @@ bldPrintf str args = do
 
 bldDbgPrintf :: String -> [AST.Operand] -> FnBuilder ()
 bldDbgPrintf str args = do
-    --bldPrintf str args
+    bldPrintf str args
     return ()
 
 -- call a remote node
@@ -926,7 +927,7 @@ llvm_pg_fnode_terminal nid node outs = do
         bldAddDef $ mkExternalFn i32Ty (pg_fimplname node) fnode_args
         -- print message on entering the function
         (AST.Name fnstr) <- gets fnName
-        --bldPrintMsg $ "Entering terminal node: " ++ fnstr
+        bldDbgPrintf ("Entering terminal node: " ++ fnstr) []
         -- set up a phi node for the return value
         bldNewPhi i32Ty "ret_phi"
         -- call implementation function
@@ -982,7 +983,7 @@ llvm_pg_fnode_nonterminal nid node outs' = do
         bldAddDef $ mkExternalFn i32Ty (pg_fimplname node) fnode_args
         -- print message on entering the function
         (AST.Name fnstr) <- gets fnName
-        --bldPrintMsg $ "Entering node: " ++ fnstr
+        bldDbgPrintf ("Entering node: " ++ fnstr) []
         -- set up a phi node for the return value
         bldNewPhi i32Ty "ret_phi"
         -- call implementation function
@@ -1032,7 +1033,7 @@ llvm_pg_op cnf nid node adj_out adj_in = do
     fnAdd (pg_fname node) i32Ty ops_args $ do
         -- print message on entering the function
         (AST.Name fnstr) <- gets fnName
-        --bldPrintMsg $ "Entering node: " ++ fnstr
+        bldDbgPrintf ("Entering node: " ++ fnstr) []
         -- set up a count variable: how many times this node was activated
         let cntstr = fnstr ++ ".count"
         bldAddDef $ mkStaticVar i32Ty cntstr (mkConstInt32 0)
@@ -1195,7 +1196,7 @@ llvm_tap_pg_entry entry_node = do
 
         -- initialize state and input
         bldAddInstruction $ mkCall (getFnOp "pg_state_init") [state]
-        bldAddInstruction $  mkCall (getFnOp "input_zero") [input]
+        bldAddInstruction $ mkCall (getFnOp "input_zero") [input]
         gep_in_buff <- bldAddInstruction $ cgInput_make_gep input "buff"
         bldAddInstruction $ mkSt gep_in_buff gep_buff
 
@@ -1285,6 +1286,12 @@ foreign import ccall "dynamic" haskFn :: FunPtr (IO ()) -> (IO ())
 modPrint :: LlvmMod  -> IO ()
 modPrint mod = LLVM.Mod.moduleLLVMAssembly mod >>= putStrLn
 
+modWriteFile :: LlvmMod -> String -> IO ()
+modWriteFile mod fname = do
+    --this segfaults
+    --liftError $ LLVM.Mod.writeLLVMAssemblyToFile (LLVM.Mod.File fname) mod
+    LLVM.Mod.moduleLLVMAssembly mod >>= (writeFile fname)
+
 modExec :: LlvmCtx -> LlvmMod -> String -> IO ()
 modExec ctx mod fn_name = withExMod ctx mod $ \emod -> do
     fn <- LLVM.EE.getFunction emod (AST.Name fn_name)
@@ -1295,6 +1302,7 @@ modExec ctx mod fn_name = withExMod ctx mod $ \emod -> do
         run :: FunPtr a -> IO ()
         run fn = haskFn (castFunPtr fn :: FunPtr (IO ()))
 
+-- find a type by name in a module
 findTy :: AST.Module -> String -> Maybe AST.Type
 findTy ast ty_str = case L.find fn $ AST.moduleDefinitions ast of
                     Just (AST.TypeDefinition (AST.Name _) (Just ty)) -> Just ty
@@ -1304,6 +1312,14 @@ findTy ast ty_str = case L.find fn $ AST.moduleDefinitions ast of
                     (AST.TypeDefinition (AST.Name s) _) -> s == ty_str
                     _ -> False
 
+getTypes :: AST.Module -> [AST.Definition]
+getTypes ast = filter fn $ AST.moduleDefinitions ast
+    where fn :: AST.Definition -> Bool
+          fn (AST.TypeDefinition _ _) = True
+          fn _ = False
+
+getTypeNames :: AST.Module -> [String]
+getTypeNames ast = map (\x@(AST.TypeDefinition (AST.Name s) _) -> s) $ getTypes ast
 
 -- TODO:
 --  - input from queues
@@ -1326,6 +1342,8 @@ codegen_all pgraph  = do
     -- dummy implementations
     -- llvm_pg_dummy pgraph entry_label []
 
+    addDefn $ AST.TypeDefinition (AST.Name "struct.input") Nothing
+    addDefn $ AST.TypeDefinition (AST.Name "struct.state") Nothing
     -- hack:
     addDefn $ AST.TypeDefinition (AST.Name "struct.arp_pending") Nothing
     addDefn $ AST.TypeDefinition (AST.Name "struct.arp_cache") Nothing
@@ -1335,9 +1353,9 @@ passes = LLVM.PM.defaultCuratedPassSetSpec { LLVM.PM.optLevel = Just 3 }
 
 main :: IO ()
 main = do
-    let fname_def = "kk-test.unicorn" -- default unicorn file name
-    let mname = "dragonet_pg"         -- LLVM module name
-    let llvm_helpers = LLVM.Mod.File "llvm-helpers.bc"
+    let fname_def = "unicorn-tests/hello.unicorn"       -- default unicorn file name
+    let mname = "dragonet_pg"                           -- LLVM module name
+    let llvm_helpers = LLVM.Mod.File "llvm-helpers.bc"  -- LLVM file with helper utilities
 
     xargs <- getArgs
     let fname = if (length xargs) == 0 then fname_def else xargs !! 0
@@ -1348,19 +1366,7 @@ main = do
     txt <- readFile fname
     graph <- UnicornAST.parseGraph txt
     let pgraph = Unicorn.constructGraph graph
-    putStrLn $ Pr.ppShow pgraph
     writeFile "DELETEME.dot" $ toDot pgraph
-
-
-    {-
-    let ast_mod = codeGen "kk-test" llvm_hello
-    LLVM.Ctx.withContext $ \ctx ->
-        liftError $ LLVM.Mod.withModuleFromAST ctx ast_mod $ \mod -> do
-            -- print module assembly
-            modPrint mod
-            --modExec ctx mod "callme"
-    -}
-
 
     LLVM.Ctx.withContext $ \ctx ->
         liftError $ LLVM.Mod.withModuleFromBitcode ctx llvm_helpers $ \mod2 -> do
@@ -1379,11 +1385,14 @@ main = do
             let ast_mod = cgAstModule $ codeGen mname state_ty input_ty (codegen_all pgraph)
             liftError $ LLVM.Mod.withModuleFromAST ctx ast_mod $ \mod -> do
                 liftError $ LLVM.Mod.linkModules False mod mod2
-                modPrint mod
+                --modPrint mod
+                modWriteFile mod $ mname ++ "-cg.ll"
                 err <- runErrorT $ LLVM.A.verify mod
                 case err of Right () -> putStrLn $ "module verified"
                             Left e   -> putStrLn $ "error verifying module:" ++ e
                 --modExec ctx mod "pg_main"
                 LLVM.PM.withPassManager passes $ \pm -> do
                     LLVM.PM.runPassManager pm mod
+                    modWriteFile mod $ mname ++ "-optimized-cg.ll"
                     modExec ctx mod "pg_tap_main"
+                    return ()
