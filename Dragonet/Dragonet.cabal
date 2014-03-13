@@ -15,7 +15,7 @@ author:             Systems Group, ETH Zurich
 -- maintainer:
 -- copyright:
 category:           Network
-build-type:         Simple
+build-type:         Custom
 
 cabal-version:      >=1.8
 
@@ -102,3 +102,10 @@ executable tuntapPing
     extensions:         DoAndIfThenElse
     ghc-options:        -threaded
 
+executable llvm-cgen
+    main-is:            llvm-cgen.hs
+    build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
+                        llvm-general==3.4.*, llvm-general-pure
+    extensions:         DoAndIfThenElse, ForeignFunctionInterface,
+                        GeneralizedNewtypeDeriving
+    ghc-options:        -threaded
