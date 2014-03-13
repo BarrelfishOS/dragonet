@@ -5,10 +5,18 @@
 #include <implementation.h>
 #include "config.h"
 
+static struct input *in_pool = NULL;
+
 /** Allocate/initialize a new input structure including a buffer */
 struct input *input_alloc(void)
 {
-    struct input *in = calloc(1, sizeof(*in));
+    struct input *in = in_pool;
+    if (in != NULL) {
+        in_pool = in->next;
+        return in;
+    }
+
+    in = calloc(1, sizeof(*in));
     in->data = malloc(DEFAULT_BUFFER_SIZE);
     in->len = 0;
     // Currently we start filling the buffer from the rear
@@ -20,8 +28,12 @@ struct input *input_alloc(void)
 
 void input_free(struct input *in)
 {
-    free((void *) ((uintptr_t) in->data - in->space_before));
-    free(in);
+    input_clean_attrs(in);
+    input_clean_packet(in);
+    in->next = in_pool;
+    in_pool = in;
+    /*free((void *) ((uintptr_t) in->data - in->space_before));
+    free(in);*/
 }
 
 void input_clean_attrs(struct input *in)
@@ -36,6 +48,11 @@ void input_clean_attrs(struct input *in)
     in->len  = len;
     in->space_before = space_before;
     in->space_after = space_after;
+}
+
+void input_zero(struct input *in)
+{
+    memset(in, 0, sizeof(*in));
 }
 
 void input_clean_packet(struct input *in)
@@ -62,3 +79,12 @@ void input_dump(struct input *in)
 
 }
 
+void pg_state_init(struct state *st)
+{
+    st->local_mac      = 0;
+    st->local_ip       = 0;
+    st->arp_pending    = NULL;
+    st->arp_cache      = NULL;
+    st->pkt_counter    = 0;
+    st->driver_handler = 0;
+}

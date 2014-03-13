@@ -1,10 +1,18 @@
+.PHONY: all
+
 SRCFILES= $(wildcard *.c)
 SRCFILES+= $(wildcard support/*.c)
 OBJFILES= $(addsuffix .o,$(basename $(SRCFILES)))
-CFLAGS+= -Iinclude -Wall -O2
+CFLAGS+= -Iinclude -Wall -O3 -flto
+LDFLAGS= -O3 -flto
 
-#.DEFAULT_GOAL := tuntap
-.DEFAULT_GOAL := sfOnload
+BCSRCFILES = $(filter-out test.c,$(SRCFILES))
+BCFILES = $(addsuffix .bc,$(basename $(BCSRCFILES))) # llvm bytecode
+
+all: test llvm_pg_impl.bc
+
+.DEFAULT_GOAL := tuntap
+#.DEFAULT_GOAL := sfOnload
 
 TTSRCFILES= $(wildcard tuntapDrv/*.c)
 TTSRCFILES+= $(SRCFILES)
@@ -15,14 +23,14 @@ SFSRCFILES+= $(SRCFILES)
 SFOBJFILES= $(addsuffix .o,$(basename $(SFSRCFILES)))
 
 tuntap: $(TTOBJFILES)
-	gcc -o $@ $^
+	$(CC) $(LDFLAGS) -o $@ $^
 
 tuntap_run: tuntap
 	sudo ./tuntap
 
 
 sfOnload: $(SFOBJFILES) onloadDrv/efdragonet.o onloadDrv/efvi_sfw.o
-	 gcc -o $@ $^ -L../../openonload-201310-u2/build/gnu_x86_64/lib/ciul/ -lciul -lpthread
+	$(CC) $(LDFLAGS) -o $@ $^ -L../../openonload-201310-u2/build/gnu_x86_64/lib/ciul/ -lciul -lpthread
 
 sfOnload_run: sfOnload
 	export LD_LIBRARY_PATH=/home/ubuntu/dragonet/openonload-201310-u2/build/gnu_x86_64/lib/ciul/ ; ./sfOnload
@@ -36,6 +44,11 @@ onloadDrv/efvi_sfw.o: sf_onloadLibs
 sf_onloadLibs:
 	#cd ../openonload-201310-u2/ && ./scripts/onload_build --user
 
-clean:
-	rm -f tuntap $(OBJFILES) $(TTOBJFILES) $(SFOBJFILES)
+%.bc : %.c
+	clang $(CFLAGS) -c -emit-llvm $^ -o $@
 
+llvm_pg_impl.bc:  $(BCFILES)
+	llvm-link-3.5 $^ -o $@
+
+clean:
+	rm -f tuntap sfOnload llvm_pg_impl.bc $(OBJFILES) $(TTOBJFILES) $(SFOBJFILES) $(BCFILES)

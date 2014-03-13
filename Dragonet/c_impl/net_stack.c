@@ -89,18 +89,14 @@ struct arp_cache hardcoded_cache = {
 };
 
 
+void pg_state_init(struct state *st);
 
 int main_loop(struct driver *drv)
 {
+    struct state st;
 
-    struct state st = {
-        .local_mac      = 0,
-        .local_ip       = 0,
-        .arp_pending    = NULL,
-        .arp_cache      = NULL, //&hardcoded_cache,
-        .pkt_counter    = 0,
-        .driver_handler = drv,
-    };
+    pg_state_init(&st);
+    st.driver_handler = drv;
 
     if (st.driver_handler == NULL
             || st.driver_handler->drv_init == NULL

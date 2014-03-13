@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <ctype.h> // isprint
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -131,6 +132,25 @@ tap_create(char *name)
 
 	tap_open(tap, name);
 	return tap;
+}
+
+static void
+tap_dump_packet(char *buf, size_t len)
+{
+    for (int i=0; i<len; i+=16) {
+        printf("%06x: ", i);
+        int j;
+        for (j=0; j<16; j++) 
+            if (i+j < len)
+                printf("%02x ", buf[i+j]);
+            else
+                printf("   ");
+        printf(" ");
+        for (j=0; j<16; j++) 
+        if (i+j < len)
+            printf("%c", isprint(buf[i+j]) ? buf[i+j] : '.');
+        printf("\n");
+    }
 }
 
 #if defined(TUNTAP_MAIN)

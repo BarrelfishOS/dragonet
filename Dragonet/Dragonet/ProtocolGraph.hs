@@ -27,16 +27,32 @@ module Dragonet.ProtocolGraph(
     PGNode,
     PGEdge,
     PGContext,
+    PGAdj,
+
+    PGAdjFull,
 
     pgSetType,
 
     baseFNode,
     baseONode,
-    baseCNode
+    baseCNode,
+
+    pgFind,
+    pgEntry,
+    pgDFS,
+    pgFullNodes,
+    pgGroupAdjFull
+
 ) where
 
 import qualified Data.Graph.Inductive as DGI
+import qualified Data.Graph.Inductive.Query.DFS as DGI.DFS
+import qualified Data.Graph.Inductive.NodeMap as DGI.NM
+
 import qualified Control.Monad.State as ST
+
+import Data.Maybe (fromJust)
+import qualified Data.List as L
 
 import Dragonet.Implementation (Implementation)
 
@@ -95,12 +111,12 @@ instance Eq (Node) where
 
 
 type PGraph = DGI.Gr Node Port
-type PGNode = DGI.LNode Node
-type PGEdge = DGI.LEdge Port
-type PGContext = DGI.Context Node Port
+type PGNode = DGI.LNode Node            -- (DGI.Node, Node)
+type PGEdge = DGI.LEdge Port            -- (DGI.Node, DGI.Node, Port)
+type PGAdj = DGI.Adj Port               -- [(Port, DGI.Node)]
+type PGContext = DGI.Context Node Port  -- (PGAdj, DGI.Node, Node, PGAdj)
 
-
-
+type PGAdjFull = [(Port, DGI.Node, Node)]
 
 -------------------------------------------------------------------------------
 -- Configuration
@@ -174,7 +190,7 @@ nIsSoftware n
 
 
 
-   
+
 -------------------------------------------------------------------------------
 -- Protocol graph functions
 
@@ -205,4 +221,42 @@ opToString OpNAnd = "NAND"
 opToString OpOr = "OR"
 opToString OpNOr = "NOR"
 
+-------------------------------------------------------------------------------
+-- simple helpers
 
+-- find node by label
+pgFind :: PGraph -> Label -> Maybe PGNode
+pgFind pg label = L.find (\x -> nLabel (snd x ) == label) $ DGI.labNodes pg
+
+pgEntry :: PGraph -> PGNode
+pgEntry pg = case l of []  -> error "No entry found"
+                       [x] -> (x, fromJust $ DGI.lab pg x)
+                       _   -> error "Multiple entries found"
+    where f = \n -> (DGI.pre pg n) == [] -- entry has no predecessors
+          l = L.filter f $ DGI.dfsWith' (\(_,n,_,_) -> n)  pg
+
+-- depth-first search on the protocol graph, starting from node with given label
+pgDFS :: PGraph -> Label -> [PGContext]
+pgDFS pg label = DGI.DFS.dfsWith id [n0] pg
+    where n0 = case pgFind pg label of Just (x, _) -> x
+                                       Nothing -> error $ "Cannot find entry node: " ++ label
+
+mkFullNode :: PGraph -> (DGI.Node, Node) -> (PGAdjFull, DGI.Node, Node, PGAdjFull)
+mkFullNode pg (nid, node) =  (pre, nid, node, suc)
+    where pre = map f $ DGI.lpre pg nid
+          suc = map f $ DGI.lsuc pg nid
+          f :: (DGI.Node, Port) -> (Port, DGI.Node, Node)
+          f (nid, port) = (port, nid, case DGI.lab pg nid of Just x -> x
+                                                             Nothing -> error $ "Cannot find label for nid=" ++ (show nid))
+
+
+pgFullNodes :: PGraph -> Label -> [(PGAdjFull, DGI.Node, Node, PGAdjFull)]
+pgFullNodes pg label = map (mkFullNode pg) $ mydfs [n0] pg
+    where nodes = mydfs [n0] pg
+          mydfs = DGI.dfsWith $ \(_, nid, node, _) -> (nid, node)
+          n0 = case pgFind pg label of Just (x, _) -> x
+                                       Nothing -> error $ "Cannot find entry node: " ++ label
+pgGroupAdjFull :: PGAdjFull -> [(Port, [(DGI.Node, Node)])]
+pgGroupAdjFull adj = [ (p, (get_edges adj p)) | p <- get_ports adj]
+    where get_ports = \adj' -> L.nub $ map (\(x,_,_) -> x) adj'
+          get_edges = \adj' port' -> map (\x@(_,nid,node) -> (nid,node)) $ filter (\(p,_,_) -> p == port') adj'
