@@ -9,4 +9,7 @@
 
 #define DEFAULT_BUFFER_SIZE 2048
 
+
+struct driver *get_tuntap_driver(void);
+
 #endif // DRAGONET_CONFIG_H_

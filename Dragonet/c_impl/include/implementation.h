@@ -13,6 +13,24 @@ typedef uint16_t pktoff_t;
 struct arp_pending;
 struct arp_cache;
 struct input;
+
+typedef void* device_t;
+
+typedef device_t (*drv_init_ft)(char *);
+typedef pktoff_t (*drv_rx_pkt_ft)(device_t, uint8_t *, pktoff_t);
+typedef int (*drv_tx_pkt_ft)(device_t, uint8_t *, pktoff_t);
+typedef uint64_t (*drv_mac_read_ft)(device_t );
+typedef uint32_t (*drv_ip_read_ft)(device_t );
+
+struct driver {
+    device_t drv_handle;
+    drv_init_ft drv_init;
+    drv_rx_pkt_ft drv_rx;
+    drv_tx_pkt_ft drv_tx;
+    drv_mac_read_ft drv_mac_read;
+    drv_ip_read_ft drv_ip_read;
+};
+
 struct state {
     uint32_t local_ip;
     uint64_t local_mac;
@@ -21,6 +39,7 @@ struct state {
     struct arp_cache   *arp_cache;
 
     uint64_t pkt_counter;
+    struct driver *driver_handler;
 };
 
 struct arp_pending {
