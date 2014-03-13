@@ -1382,7 +1382,7 @@ main :: IO ()
 main = do
     let fname_def = "unicorn-tests/hello.unicorn"       -- default unicorn file name
     let mname = "dragonet_pg"                           -- LLVM module name
-    let llvm_helpers = LLVM.Mod.File "llvm-helpers.bc"  -- LLVM file with helper utilities
+    let llvm_helpers = LLVM.Mod.File "dist/build/llvm-helpers.bc"  -- LLVM file with helper utilities
 
     xargs <- getArgs
     let fname = if (length xargs) == 0 then fname_def else xargs !! 0
