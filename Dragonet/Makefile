@@ -14,10 +14,10 @@ CC=clang
 # Setting the default goal to simplify compiling
 #.DEFAULT_GOAL := useful
 #.DEFAULT_GOAL := graph
-#.DEFAULT_GOAL := tuntap
+.DEFAULT_GOAL := tuntapPing
 #.DEFAULT_GOAL := dpdk
 #.DEFAULT_GOAL := tcpGraph_run
-.DEFAULT_GOAL := sf_openonload
+#.DEFAULT_GOAL := sf_openonload
 
 useful: graph_run tcpGraph_run tcpGraph2_run confgen tuntap #dpdk #impl
 	echo "Removing all png except the one which I want"
@@ -98,10 +98,10 @@ tuntap_run: tuntap
 
 
 # Runs the simulator against tuntap interface
-tuntap_icmp : base Util/Tap.$(OSUF)
+tuntapPing : base Util/Tap.$(OSUF)
 	$(GHC) $(GHCFLAGS) -threaded tuntapPing.hs -o tuntapPing
 
-tuntap_icmp_run: tuntap_icmp
+tuntapPing_run: tuntapPing
 	sudo ./tuntapPing
 
 

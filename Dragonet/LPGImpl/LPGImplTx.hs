@@ -95,10 +95,11 @@ lpgTxL3ARPInitiateResponseImpl = do
     srcMAC <- ARP.shaRd
     srcIP <- ARP.spaRd
     dstIP <- ARP.tpaRd
+    localMAC <- getLocalMac
     forkPkt $ (return $
         (setAttr' "ARPDstMAC" $ AttrD srcMAC) $
         (setAttr' "ARPDstIP" $ AttrD srcIP) $
-        (setAttr' "ARPSrcMAC" $ AttrD cfgLocalMAC) $
+        (setAttr' "ARPSrcMAC" $ AttrD localMAC) $
         (setAttr' "ARPSrcIP" $ AttrD dstIP) $
         (setAttr' "ARPOper" $ AttrW16 ARP.operReply) $
         (setAttr' "ETHDstMAC" $ AttrD srcMAC) $
@@ -218,7 +219,8 @@ lpgTxL3IPv4FillHeaderImpl = do
     toPort "out"
 
 lpgTxL3IPv4RoutingImpl = do
-    setAttr "ETHSrcMAC" $ AttrD cfgLocalMAC
+    localMAC <- getLocalMac
+    setAttr "ETHSrcMAC" $ AttrD localMAC
     toPort "true"
 
 

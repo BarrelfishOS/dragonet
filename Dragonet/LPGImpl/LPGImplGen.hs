@@ -55,6 +55,7 @@ import Dragonet.DotGenerator
 import qualified Dragonet.ProtocolGraph as PG
 import Dragonet.Unicorn
 import Dragonet.Implementation
+import qualified Dragonet.Implementation as DNET
 
 import qualified Dragonet.Implementation.Ethernet as ETH
 import qualified Dragonet.Implementation.IPv4 as IP4
@@ -127,12 +128,13 @@ lpgRxL2EtherValidUnicastImpl = do
 
 lpgRxL2EtherValidLocalMACImpl = do
     smac <- ETH.destRd
-    let endPort = (smac == cfgLocalMAC)
+    localMAC <- getLocalMac
+    let endPort = (smac == localMAC)
 
 
 --    debug ("lpgRxL2EtherValidLocalMACImpl: "
 --        ++ " smac (" ++ (show smac)
---        ++ ") == local mac (" ++ (show cfgLocalMAC)
+--        ++ ") == local mac (" ++ (show localMAC)
 --        ++ ") ==> "
 --        ++ " port: " ++ (show endPort)
 --        )
@@ -194,11 +196,12 @@ lpgRxL3ARPValidRequestImpl = do
 
 lpgRxL3ARPLocalIPDestImpl = do
     tpa <- ARP.tpaRd
+    localIP <- DNET.getLocalIPaddr
 --    debug ("lpgRxL3ARPLocalIPDestImpl " ++ show (tpa) ++
-        -- " "++ show (pack32BE tpa) ++ " " ++ show (cfgLocalIP)  ++
+        -- " "++ show (pack32BE tpa) ++ " " ++ show (localIP)  ++
         -- " selectedPort " ++
         -- show (pack32BE tpa == cfgLocalIP))
-    toPort $ pbool (pack32BE tpa == cfgLocalIP)
+    toPort $ pbool (pack32BE tpa == localIP)
 
 lpgRxL3ARPValidResponseImpl = do
 --    debug "RxL3ARPValidResponse"
@@ -283,14 +286,13 @@ lpgRxL3IPv4ValidLocalIPImpl = do
     -- Updating the ARP cache with MAC from current packet
     smac <- ETH.sourceRd
     sip <- IP4.sourceIPRd
-
+    localIP <- DNET.getLocalIPaddr
     gs <- getGS
     let cache = M.insert sip smac $ gsARPCache gs
     let gs' = gs { gsARPCache = cache }
     putGS gs'
 
-
-    let nextPort = dIP == cfgLocalIP
+    let nextPort = dIP == localIP
 --    debug ("lpgRxL3IPv4ValidLocalIPImpl:  " ++ (show nextPort))
     toPort $ pbool $ nextPort
 

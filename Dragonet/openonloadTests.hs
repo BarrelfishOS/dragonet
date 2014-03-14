@@ -13,15 +13,24 @@ import qualified System.Posix.User as SPU
 import qualified Data.ByteString as BS
 
 import Dragonet.Implementation as DNET
-import qualified Dragonet.Implementation.IPv4 as IP4
 --import qualified Dragonet.Implementation.Algorithm as DNET.Alg
+import qualified Dragonet.Implementation.Ethernet as ETH
+import qualified Dragonet.Implementation.IPv4 as IP4
+import Data.Maybe
+
 
 import LPGImplTH
 import LPGImpl
 import qualified LPGEx1 as LPG1
 import qualified LPGImpl.LPGImplBase as LPGBase
 
-initialState = DNET.emptyGS
+initialState = st'
+    where
+    st = DNET.emptyGS
+    mac = fromJust $ ETH.macFromString "00:0f:53:07:51:49"
+    ip = fromJust $ IP4.ipFromString "10.113.4.71"
+    st' = setLocalMACandIP st mac ip
+
 
 --receivedPacket state packet = DNET.Alg.execute LPGImpl.lpg packet state
 receivedPacket state packet = fst $ CS.runConcSM f $ DNET.initSimState state packet
@@ -95,8 +104,9 @@ runSimIncremental = do
     sfvi1 <- SF.alloc_queue sf_if
     --SF.alloc_filter_default sfvi1
 --    let Just localip =  LPGBase.cfgLocalIP
-    SF.alloc_filter_listen_ipv4 sfvi0 (fromIntegral IP4.protocolTCP) LPGBase.cfgLocalIP 1234
-    SF.alloc_filter_listen_ipv4 sfvi1 (fromIntegral IP4.protocolTCP) LPGBase.cfgLocalIP 2234
+    localIP <- DNET.getLocalIPaddr
+    SF.alloc_filter_listen_ipv4 sfvi0 (fromIntegral IP4.protocolTCP) localIP 1234
+    SF.alloc_filter_listen_ipv4 sfvi1 (fromIntegral IP4.protocolTCP) localIP 2234
     --SF.alloc_filter_listen_ipv4 sfvi1 (fromIntegral IP4.protocolTCP) 0 0
 
 

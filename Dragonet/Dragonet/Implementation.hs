@@ -81,6 +81,12 @@ module Dragonet.Implementation(
     -- Initialize TCP context
     defaultTCPContext,
 
+    -- getting/setting local ip address and MAC
+    getLocalIPaddr, setLocalIPaddr,  getLocalMac, setLocalMac,
+
+    setLocalIPaddr', setLocalMac',
+    setLocalMACandIP,
+
     debug,
 ) where
 
@@ -243,7 +249,9 @@ data GlobalState = GlobalState {
     gsARPPending :: [(Word32,Context)],
     gsARPCache :: M.Map Word32 [Word8],
     gsUDPPorts :: [PortTableUDP],
-    gsTCPPorts :: [PortTableTCP]
+    gsTCPPorts :: [PortTableTCP],
+    gsLocalMac :: [Word8],
+    gsLocalIPaddr :: Word32
 } deriving (Show)
 
 
@@ -263,7 +271,9 @@ emptyGS = GlobalState {
         gsARPPending = [],
         gsARPCache = M.empty,
         gsUDPPorts = [],
-        gsTCPPorts = []
+        gsTCPPorts = [],
+        gsLocalMac = [],
+        gsLocalIPaddr = 0
     }
 
 
@@ -517,13 +527,35 @@ addPortMappingUDP p appName stype imp = do
         writePortMappingsUDP mappings'
 
 
+----------------------------------
+-- local ip and MAC management
+
+setLocalMac :: [Word8] -> ImplM ()
+setLocalMac mac = do
+    gs <- getGS
+    putGS $ gs { gsLocalMac = mac }
+
+getLocalMac :: ImplM ([Word8])
+getLocalMac = do
+    gs <- getGS
+    return $ gsLocalMac gs
+
+setLocalIPaddr :: Word32 -> ImplM ()
+setLocalIPaddr ip = do
+    gs <- getGS
+    putGS $ gs { gsLocalIPaddr = ip }
+
+getLocalIPaddr :: ImplM (Word32)
+getLocalIPaddr = do
+    gs <- getGS
+    return $ gsLocalIPaddr gs
+
 debug :: String -> ImplM ()
 debug s = do
     --ctx <- getCtx
     --putCtx $ ctx { ctxDebug = (ctxDebug ctx) ++ [s] }
     gs <- getGS
     putGS $ gs { gsDebug = gsDebug gs ++ [s] }
-
 
 ------------------------------
 -- Socket and TCP state management
@@ -718,4 +750,23 @@ addPortMappingTCPGS gs p appName stype tcpS imp = ans
         mappings' = mappings ++ [(PortTableTCP p [usock] appName imp)]
         ans = gs { gsTCPPorts = mappings'}
 
+------------------------------
+-- local IP and mac management without monad
+
+
+
+setLocalMac' :: GlobalState -> [Word8] -> GlobalState
+setLocalMac' gs mac = gs'
+    where
+       gs' = gs { gsLocalMac = mac }
+
+setLocalIPaddr' :: GlobalState -> Word32 -> GlobalState
+setLocalIPaddr' gs ip = gs'
+    where
+        gs' = gs { gsLocalIPaddr = ip }
+
+setLocalMACandIP ::  GlobalState -> [Word8] -> Word32 -> GlobalState
+setLocalMACandIP gs mac ip = gs'
+    where
+        gs' = gs {gsLocalMac = mac, gsLocalIPaddr = ip}
 

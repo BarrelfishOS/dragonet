@@ -11,6 +11,9 @@ import qualified Util.ConcState as CS
 import qualified System.Posix.User as SPU
 
 import qualified Data.ByteString as BS
+import qualified Dragonet.Implementation.Ethernet as ETH
+import qualified Dragonet.Implementation.IPv4 as IP4
+import Data.Maybe
 
 import Dragonet.Implementation as DNET
 --import qualified Dragonet.Implementation.Algorithm as DNET.Alg
@@ -19,13 +22,16 @@ import LPGImplTH
 import LPGImpl
 import qualified LPGEx1 as LPG1
 
-initialState = DNET.emptyGS
+initialState = st'
+    where
+    st = DNET.emptyGS
+    mac = fromJust $ ETH.macFromString "00:0f:53:07:48:d5"
+    ip = fromJust $ IP4.ipFromString "10.111.4.37"
+    st' = setLocalMACandIP st mac ip
 
 --receivedPacket state packet = DNET.Alg.execute LPGImpl.lpg packet state
 receivedPacket state packet = fst $ CS.runConcSM f $ DNET.initSimState state packet
     where f = $(return $ generateFCall LPG1.lpg "lpg")
-
-
 
 ----------------------------------------------------------------
 

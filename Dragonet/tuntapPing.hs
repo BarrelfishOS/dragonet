@@ -9,6 +9,9 @@ import qualified Util.ConcState as CS
 import qualified System.Posix.User as SPU
 
 import qualified Data.ByteString as BS
+import qualified Dragonet.Implementation.Ethernet as ETH
+import qualified Dragonet.Implementation.IPv4 as IP4
+import Data.Maybe
 
 import Dragonet.Implementation as DNET
 --import qualified Dragonet.Implementation.Algorithm as DNET.Alg
@@ -24,7 +27,12 @@ import qualified LPGicmp as LPG1
 
 --import qualified Text.Show.Pretty as Pr
 
-initialState = DNET.emptyGS
+initialState = st'
+    where
+    st = DNET.emptyGS
+    mac = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
+    ip = fromJust $ IP4.ipFromString "192.168.123.1"
+    st' = setLocalMACandIP st mac ip
 
 --receivedPacket state packet = DNET.Alg.execute LPGImpl.lpg packet state
 receivedPacket state packet = fst $ CS.runConcSM f $ DNET.initSimState state packet
@@ -49,6 +57,7 @@ rxThread c tap done = do
         p <- TAP.readbs tap
 --        putStrLn ("received Packet: [0x"  ++ (prettyPrint p) ++ "]")
         STM.atomically $ TC.writeTChan c (RXEvent p)
+    CC.putMVar done ()
 
 txThread c tap done = do
     M.forever $ do

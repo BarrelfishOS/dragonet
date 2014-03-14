@@ -9,6 +9,9 @@ import qualified Util.ConcState as CS
 import qualified System.Posix.User as SPU
 
 import qualified Data.ByteString as BS
+import qualified Dragonet.Implementation.Ethernet as ETH
+import qualified Dragonet.Implementation.IPv4 as IP4
+import Data.Maybe
 
 import Dragonet.Implementation as DNET
 --import qualified Dragonet.Implementation.Algorithm as DNET.Alg
@@ -20,7 +23,13 @@ import qualified LPGEx1 as LPG1
 
 --import qualified Text.Show.Pretty as Pr
 
-initialState = DNET.emptyGS
+initialState = st'
+    where
+    st = DNET.emptyGS
+    mac = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
+    ip = fromJust $ IP4.ipFromString "192.168.123.1"
+    st' = setLocalMACandIP st mac ip
+
 
 --receivedPacket state packet = DNET.Alg.execute LPGImpl.lpg packet state
 receivedPacket state packet = fst $ CS.runConcSM f $ DNET.initSimState state packet
@@ -39,13 +48,13 @@ data NetEvent =
 rxThread c tap done = do
     M.forever $ do
         p <- TAP.readbs tap
-        putStrLn "received Packet"
+--        putStrLn "received Packet"
         STM.atomically $ TC.writeTChan c (RXEvent p)
 
 txThread c tap done = do
     M.forever $ do
         (TXEvent p) <- STM.atomically $ TC.readTChan c
-        putStrLn "Send Packet"
+--        putStrLn "Send Packet"
         TAP.writebs tap p
     CC.putMVar done ()
 
@@ -59,10 +68,10 @@ simThread rxC txC state = do
     (p,state') <- STM.atomically $ simStep rxC txC state
 
     -- Show Debug output
-    putStrLn "SimStepDNET.Alg."
-    if not $ null $ DNET.gsDebug state' then
-        putStr $ unlines $ map ("    " ++) $ DNET.gsDebug state'
-    else return ()
+--    putStrLn "SimStepDNET.Alg."
+--    if not $ null $ DNET.gsDebug state' then
+--        putStr $ unlines $ map ("    " ++) $ DNET.gsDebug state'
+--    else return ()
 
     -- Send out packets on TX queue
     let send p = STM.atomically $ TC.writeTChan txC (TXEvent p)

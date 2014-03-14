@@ -4,8 +4,8 @@
 module LPGImpl.LPGImplBase (
     pbool,
     --toPort,
-    cfgLocalMAC,
-    cfgLocalIP,
+--    cfgLocalMAC,
+--    cfgLocalIP,
 ) where
 
 import Dragonet.DotGenerator
@@ -35,8 +35,8 @@ pbool b = if b then "true" else "false"
 --cfgLocalIP = fromJust $ IP4.ipFromString "10.111.4.37"
 
 -- FOR TUNTAP
-cfgLocalMAC = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
-cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
+--cfgLocalMAC = fromJust $ ETH.macFromString "00:1b:22:54:69:f8"
+--cfgLocalIP = fromJust $ IP4.ipFromString "192.168.123.1"
 
 -- FOR openonload
 --cfgLocalMAC = fromJust $ ETH.macFromString "00:0f:53:07:51:49"
