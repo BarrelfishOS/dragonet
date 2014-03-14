@@ -50,6 +50,7 @@ import qualified LLVM.General.PassManager as LLVM.PM
 import qualified Text.Show.Pretty as Pr
 import Debug.Trace (trace, traceShow)
 import System.Environment (getArgs)
+import System.IO  (writeFile)
 
 -- heavily based on: http://www.stephendiehl.com/llvm/
 
@@ -494,6 +495,10 @@ mkCall fn args = AST.Call {
     }
     where args_ = [ (x, []) | x <- args ]
 
+-- helper for calling functions
+mkFnCall :: String -> [AST.Operand] -> AST.Instruction
+mkFnCall fname ops = mkCall (getFnOp fname) ops
+
 mkICmpEq :: AST.Operand -> AST.Operand -> AST.Instruction
 mkICmpEq op0 op1 = AST.ICmp {
           AST.I.iPredicate = AST.IP.EQ
@@ -627,6 +632,10 @@ mkAlloca ty nelements = AST.I.Alloca {
         , AST.I.alignment = 0 -- "the target can choose to allign the allocation on any convenient boundary compatible with the type"
         , AST.I.metadata = []
     }
+
+-- allocate a buffer in the stack using alloca
+mkAllocaBuff :: Integer -> AST.I.Instruction
+mkAllocaBuff len = mkAlloca (mkArrayTy i8Ty (fromInteger len)) 1
 
 -- get a constant operand of a function to call it
 --  (i.e., this is the first argument of mkCall)
@@ -926,7 +935,7 @@ llvm_pg_fnode_terminal nid node outs = do
         bldAddDef $ mkExternalFn i32Ty (pg_fimplname node) fnode_args
         -- print message on entering the function
         (AST.Name fnstr) <- gets fnName
-        --bldPrintMsg $ "Entering terminal node: " ++ fnstr
+        bldDbgPrintf ("Entering terminal node: " ++ fnstr) []
         -- set up a phi node for the return value
         bldNewPhi i32Ty "ret_phi"
         -- call implementation function
@@ -982,7 +991,7 @@ llvm_pg_fnode_nonterminal nid node outs' = do
         bldAddDef $ mkExternalFn i32Ty (pg_fimplname node) fnode_args
         -- print message on entering the function
         (AST.Name fnstr) <- gets fnName
-        --bldPrintMsg $ "Entering node: " ++ fnstr
+        bldDbgPrintf ("Entering node: " ++ fnstr ++ "\n") []
         -- set up a phi node for the return value
         bldNewPhi i32Ty "ret_phi"
         -- call implementation function
@@ -1032,7 +1041,7 @@ llvm_pg_op cnf nid node adj_out adj_in = do
     fnAdd (pg_fname node) i32Ty ops_args $ do
         -- print message on entering the function
         (AST.Name fnstr) <- gets fnName
-        --bldPrintMsg $ "Entering node: " ++ fnstr
+        bldDbgPrintf ("Entering node: " ++ fnstr ++ "\n") []
         -- set up a count variable: how many times this node was activated
         let cntstr = fnstr ++ ".count"
         bldAddDef $ mkStaticVar i32Ty cntstr (mkConstInt32 0)
@@ -1140,6 +1149,7 @@ llvm_tap_defs :: LLVM ()
 llvm_tap_defs = do
     -- #include tap.h
     addDefn $ AST.TypeDefinition (AST.Name tap_ty_name) Nothing
+
     addExternalFn ptr_tap_ty "tap_create" [((mkPtrTy i8Ty), "str")]
     addExternalFn voidTy "tap_set_ip" [(ptr_tap_ty, "tap"), ((mkPtrTy i8Ty), "ip")]
     addExternalFn voidTy "tap_set_mask" [(ptr_tap_ty, "tap"), ((mkPtrTy i8Ty), "mask")]
@@ -1147,11 +1157,6 @@ llvm_tap_defs = do
 
     addExternalFn i64Ty  "tap_read" [(ptr_tap_ty, "tap"), ((mkPtrTy i8Ty), "buff"), (i64Ty, "len")]
     addExternalFn voidTy "tap_write" [(ptr_tap_ty, "tap"), ((mkPtrTy i8Ty), "buff"), (i64Ty, "len")]
-
-    state_ty <- cgStateTy
-    input_ty <- cgInputTy
-    addExternalFn voidTy "pg_state_init" [((mkPtrTy state_ty), "state")]
-    addExternalFn voidTy "input_zero" [((mkPtrTy input_ty), "input")]
 
     -- global variable for tap handler
     addStaticVar ptr_tap_ty "mytap__" (AST.C.Null ptr_tap_ty)
@@ -1163,28 +1168,24 @@ llvm_tap_pg_entry entry_node = do
     state_ty <- cgStateTy
     input_ty <- cgInputTy
     fnAdd "pg_tap_main" voidTy [] $ do
-        state <- bldAddInstruction $ mkAlloca state_ty 1   -- allocate state variable in the stack
+        state <- bldAddInstruction $ mkAlloca state_ty 1     -- allocate state variable in the stack
+        bldAddInstruction $ mkFnCall "pg_state_init" [state] -- initialize state
 
-        input <- bldAddInstruction $ mkAlloca input_ty 1   -- allocate input variable in the stack
+        let buff_size = 4096
+        buff  <- bldAddInstruction $ mkAllocaBuff buff_size  -- static buffer in the stack
+        gep_buff <- bldAddInstruction $ mkGep buff [0,0]     -- gep for buffer
 
-        let buff_size = 8192
-        buff  <- bldAddInstruction $ mkAlloca (mkArrayTy i8Ty (fromInteger buff_size)) 1  -- static buffer
-        -- for now split the buffer in two to handle how c_impl manages buffers
-        gep_buff <- bldAddInstruction $ mkGep buff [0,4096]
-
-        name <- bldConstStr "tap_name" (tapCfgName tapCfg)  -- create configuration arguments
+        name <- bldConstStr "tap_name" (tapCfgName tapCfg)  -- create configuration arguments for tap
         ip   <- bldConstStr "tap_ip"   (tapCfgIp   tapCfg)
         mask <- bldConstStr "tap_mask" (tapCfgMask tapCfg)
-        -- initialize tap device
-        tap <- bldAddInstruction $ mkCall (getFnOp "tap_create") [name]
-        bldAddInstruction $ mkCall (getFnOp "tap_set_ip") [tap, ip]
-        bldAddInstruction $ mkCall (getFnOp "tap_set_mask") [tap, mask]
-        bldAddInstruction $ mkCall (getFnOp "tap_up") [tap]
 
-        -- store tap handler to global variable
-        bldAddInstruction $ mkSt (getGlobalOp "mytap__") tap
+        tap <- bldAddInstruction $ mkFnCall "tap_create" [name] --  initialize tap device
+        bldAddInstruction $ mkFnCall "tap_set_ip" [tap, ip]
+        bldAddInstruction $ mkFnCall "tap_set_mask" [tap, mask]
+        bldAddInstruction $ mkFnCall "tap_up" [tap]
+        bldAddInstruction $ mkSt (getGlobalOp "mytap__") tap    -- store tap handler to global variable
 
-        bldTerminate $ termBr "body"                       -- jump to loop body
+        bldTerminate $ termBr "body"                            -- jump to loop body
 
         bldAddBB "body" -- main loop (for now, loop forever)
         entry <- gets entryBB
@@ -1193,17 +1194,12 @@ llvm_tap_pg_entry entry_node = do
         bldDbgPrintf "count: %d\n" [cnt]
         cnt_next <- bldAddNamedInstruction "cnt_next" $ mkAdd cnt operandInt32_1
 
-        -- initialize state and input
-        bldAddInstruction $ mkCall (getFnOp "pg_state_init") [state]
-        bldAddInstruction $  mkCall (getFnOp "input_zero") [input]
-        gep_in_buff <- bldAddInstruction $ cgInput_make_gep input "buff"
-        bldAddInstruction $ mkSt gep_in_buff gep_buff
-
-        len <- bldAddInstruction $ mkCall (getFnOp "tap_read") [tap, gep_buff, operandConstInt64 buff_size]
-        gep_in_len <- bldAddInstruction $ cgInput_make_gep input "buff_len"
-        bldAddInstruction $ mkSt gep_in_len len
-
+        input <- bldAddInstruction $ mkFnCall "input_alloc" []      -- allocate (and initialize) input
+        len <- bldAddInstruction $ mkFnCall "tap_read" [tap, gep_buff, operandConstInt64 buff_size] -- read data from tap
+        bldAddInstruction $ mkFnCall "input_copy_packet" [input, gep_buff, len] -- copy data read to input
         bldAddInstruction $ mkCall (getFnOp $ pg_fname entry_node) [state, input] -- call entry
+        bldAddInstruction $ mkFnCall "input_free" [input] -- free input
+
         bldTerminate $ termBr "body"
 
 -- write input into tap device
@@ -1285,6 +1281,12 @@ foreign import ccall "dynamic" haskFn :: FunPtr (IO ()) -> (IO ())
 modPrint :: LlvmMod  -> IO ()
 modPrint mod = LLVM.Mod.moduleLLVMAssembly mod >>= putStrLn
 
+modWriteFile :: LlvmMod -> String -> IO ()
+modWriteFile mod fname = do
+    --this segfaults
+    --liftError $ LLVM.Mod.writeLLVMAssemblyToFile (LLVM.Mod.File fname) mod
+    LLVM.Mod.moduleLLVMAssembly mod >>= (writeFile fname)
+
 modExec :: LlvmCtx -> LlvmMod -> String -> IO ()
 modExec ctx mod fn_name = withExMod ctx mod $ \emod -> do
     fn <- LLVM.EE.getFunction emod (AST.Name fn_name)
@@ -1295,6 +1297,7 @@ modExec ctx mod fn_name = withExMod ctx mod $ \emod -> do
         run :: FunPtr a -> IO ()
         run fn = haskFn (castFunPtr fn :: FunPtr (IO ()))
 
+-- find a type by name in a module
 findTy :: AST.Module -> String -> Maybe AST.Type
 findTy ast ty_str = case L.find fn $ AST.moduleDefinitions ast of
                     Just (AST.TypeDefinition (AST.Name _) (Just ty)) -> Just ty
@@ -1304,6 +1307,14 @@ findTy ast ty_str = case L.find fn $ AST.moduleDefinitions ast of
                     (AST.TypeDefinition (AST.Name s) _) -> s == ty_str
                     _ -> False
 
+getTypes :: AST.Module -> [AST.Definition]
+getTypes ast = filter fn $ AST.moduleDefinitions ast
+    where fn :: AST.Definition -> Bool
+          fn (AST.TypeDefinition _ _) = True
+          fn _ = False
+
+getTypeNames :: AST.Module -> [String]
+getTypeNames ast = map (\x@(AST.TypeDefinition (AST.Name s) _) -> s) $ getTypes ast
 
 -- TODO:
 --  - input from queues
@@ -1317,6 +1328,20 @@ codegen_all pgraph  = do
     let (entry_id, entry_node) = pgEntry pgraph
     let entry_label = PG.nLabel entry_node
 
+    state_ty <- cgStateTy
+    input_ty <- cgInputTy
+
+    addDefn $ AST.TypeDefinition (AST.Name "struct.input") Nothing
+    addDefn $ AST.TypeDefinition (AST.Name "struct.state") Nothing
+    -- hack:
+    addDefn $ AST.TypeDefinition (AST.Name "struct.arp_pending") Nothing
+    addDefn $ AST.TypeDefinition (AST.Name "struct.arp_cache") Nothing
+
+    addExternalFn voidTy "pg_state_init" [((mkPtrTy state_ty), "state")]
+    addExternalFn (mkPtrTy input_ty) "input_alloc" []
+    addExternalFn voidTy "input_copy_packet" [((mkPtrTy input_ty), "input"), ((mkPtrTy i8Ty), "buff"), (i64Ty, "len")]
+    addExternalFn voidTy "input_free" [((mkPtrTy input_ty), "input")]
+
     llvm_pg pgraph entry_label
     llvm_pg_entry entry_node
     -- tap
@@ -1326,18 +1351,15 @@ codegen_all pgraph  = do
     -- dummy implementations
     -- llvm_pg_dummy pgraph entry_label []
 
-    -- hack:
-    addDefn $ AST.TypeDefinition (AST.Name "struct.arp_pending") Nothing
-    addDefn $ AST.TypeDefinition (AST.Name "struct.arp_cache") Nothing
 
 passes :: LLVM.PM.PassSetSpec
 passes = LLVM.PM.defaultCuratedPassSetSpec { LLVM.PM.optLevel = Just 3 }
 
 main :: IO ()
 main = do
-    let fname_def = "kk-test.unicorn" -- default unicorn file name
-    let mname = "dragonet_pg"         -- LLVM module name
-    let llvm_helpers = LLVM.Mod.File "llvm-helpers.bc"
+    let fname_def = "unicorn-tests/hello.unicorn"       -- default unicorn file name
+    let mname = "dragonet_pg"                           -- LLVM module name
+    let llvm_helpers = LLVM.Mod.File "llvm-helpers.bc"  -- LLVM file with helper utilities
 
     xargs <- getArgs
     let fname = if (length xargs) == 0 then fname_def else xargs !! 0
@@ -1348,19 +1370,7 @@ main = do
     txt <- readFile fname
     graph <- UnicornAST.parseGraph txt
     let pgraph = Unicorn.constructGraph graph
-    putStrLn $ Pr.ppShow pgraph
     writeFile "DELETEME.dot" $ toDot pgraph
-
-
-    {-
-    let ast_mod = codeGen "kk-test" llvm_hello
-    LLVM.Ctx.withContext $ \ctx ->
-        liftError $ LLVM.Mod.withModuleFromAST ctx ast_mod $ \mod -> do
-            -- print module assembly
-            modPrint mod
-            --modExec ctx mod "callme"
-    -}
-
 
     LLVM.Ctx.withContext $ \ctx ->
         liftError $ LLVM.Mod.withModuleFromBitcode ctx llvm_helpers $ \mod2 -> do
@@ -1378,12 +1388,16 @@ main = do
             --let input_ty' = pg_input_ty_
             let ast_mod = cgAstModule $ codeGen mname state_ty input_ty (codegen_all pgraph)
             liftError $ LLVM.Mod.withModuleFromAST ctx ast_mod $ \mod -> do
+                modWriteFile mod $ mname ++ "-cg.ll"
                 liftError $ LLVM.Mod.linkModules False mod mod2
-                modPrint mod
+                --modPrint mod
+                modWriteFile mod $ mname ++ "-linked-cg.ll"
                 err <- runErrorT $ LLVM.A.verify mod
                 case err of Right () -> putStrLn $ "module verified"
                             Left e   -> putStrLn $ "error verifying module:" ++ e
                 --modExec ctx mod "pg_main"
                 LLVM.PM.withPassManager passes $ \pm -> do
                     LLVM.PM.runPassManager pm mod
+                    modWriteFile mod $ mname ++ "-optimized-cg.ll"
                     modExec ctx mod "pg_tap_main"
+                    return ()

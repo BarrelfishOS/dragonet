@@ -1,0 +1,23 @@
+graph simpleor {
+
+    node N1 { port out[N2 N3] }
+
+    boolean N2 {
+        port true false[OR]
+    }
+
+    boolean N3 {
+        port true false[OR]
+    }
+
+    or OR {
+        port true[Ok]
+        port false[Fail]
+    }
+
+    node Ok {
+    }
+
+    node Fail {
+    }
+}

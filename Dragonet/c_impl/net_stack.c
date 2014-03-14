@@ -70,12 +70,10 @@ static void show_hex_dump(void *data, size_t len)
     printf("]\n");
 }
 
-
 static void run_packet(struct state *st, void *buffer, size_t len)
 {
     struct input *in = input_alloc();
-    pkt_prepend(in, len);
-    memcpy(in->data, buffer, len);
+    input_copy_packet(in, buffer, len);
     testFun(st, in);
     input_free(in);
 }
