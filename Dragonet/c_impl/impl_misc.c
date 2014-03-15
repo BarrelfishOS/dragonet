@@ -76,3 +76,26 @@ node_out_t do_pg__TxQueue(struct state *state, struct input *in)
     return 0;
 }
 
+
+
+
+
+node_out_t do_pg__RxL3IPv6ValidHeaderLength(struct state *state, struct input *in)
+{
+    // P_true, P_false
+    return 0;
+}
+
+node_out_t do_pg__RxEchoAPP(struct state *state, struct input *in)
+{
+    // P_RxEchoAPP_out, P_RxEchoAPP_drop
+    return 0;
+}
+
+node_out_t do_pg__RxDnsAPP(struct state *state, struct input *in)
+{
+    // P_RxDnsAPP_out, P_RxDnsAPP_drop
+    return 0;
+}
+
+

@@ -127,8 +127,8 @@ generateTestFun name g = sig ++ "\n{\n" ++ body ++ "\n}\n"
 
 main :: IO ()
 main = do
-    txt <- readFile "lpgIcmpImpl.unicorn"
-    --txt <- readFile "lpgImpl.unicorn"
+    --txt <- readFile "lpgIcmpImpl.unicorn"
+    txt <- readFile "lpgImpl.unicorn"
     igraph <- UP.parseGraph txt
     putStrLn "#ifndef GENERATEDCODE_H_\n"
     putStrLn "#define GENERATEDCODE_H_\n"

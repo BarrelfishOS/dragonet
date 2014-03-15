@@ -6,10 +6,6 @@ enum out_ports {
     P_false = 0,
     P_true = 1,
     P_Queue_out = 0,
-    P_RxEchoAPP_out = 0,
-    P_RxEchoAPP_drop = 1,
-    P_RxDnsAPP_out = 0,
-    P_RxDnsAPP_drop = 1,
     P_RxL2EtherClassifyL3_ipv4 = 0,
     P_RxL2EtherClassifyL3_ipv6 = 1,
     P_RxL2EtherClassifyL3_arp = 2,
@@ -19,45 +15,14 @@ enum out_ports {
     P_RxL3ARPClassify_drop = 2,
     P_RxL3ARPProcessPendingResponse_true = 0,
     P_RxL3ARPProcessPendingResponse_false = 1,
-    P_RxL3IPv4Classify_tcp = 0,
-    P_RxL3IPv4Classify_udp = 1,
-    P_RxL3IPv4Classify_icmp = 2,
-    P_RxL3IPv4Classify_drop = 3,
-    P_RxL4UDPPortClassifyType_static = 0,
-    P_RxL4UDPPortClassifyType_dynamic = 1,
-    P_RxL4UDPPortClassifyStatic_appDNS = 0,
-    P_RxL4UDPPortClassifyStatic_appEcho = 1,
-    P_RxL4UDPPortClassifyStatic_closedPort = 2,
-    P_RxL4UDPClosedPortAction_out = 0,
-    P_RxL4TCPPortClassifyType_static = 0,
-    P_RxL4TCPPortClassifyType_dynamic = 1,
-    P_RxL4TCPPortClassifyStatic_toSocket = 0,
-    P_RxL4TCPPortClassifyStatic_noSocket = 1,
-    P_RxL4TCPClosedPortAction_out = 0,
-    P_RxL4TCPSocketClassify_srvSocket = 0,
-    P_RxL4TCPSocketClassify_cliSocket = 1,
-    P_RxL4TCPSocketServerSide_isListen = 0,
-    P_RxL4TCPSocketServerSide_isSynRecv = 1,
-    P_RxL4TCPSocketServerSide_isEstablished = 2,
-    P_RxL4TCPSocketServerSide_isCloseWait = 3,
-    P_RxL4TCPSocketServerSide_isLastAck = 4,
-    P_RxL4TCPSocketServerSide_isClosed = 5,
-    P_RxL4TCPSocketInClosed_out = 0,
-    P_RxL4TCPSocketClientSide_out = 0,
-    P_RxL4TCPSocketAddHalfOpenConn_success = 0,
-    P_RxL4TCPSocketAddHalfOpenConn_failure = 1,
-    P_TxDemux_TCPIR = 0,
-    P_TxDemux_UDPIR = 1,
-    P_TxDemux_ICMPIR = 2,
-    P_TxDemux_ARPLu = 3,
-    P_TxDemux_ARPIR = 4,
-    P_TxDemux_drop = 5,
-    P_TxL4UDPInitiateResponse_out = 0,
-    P_TxL4UDPInitiateResponse_drop = 1,
-    P_TxL4UDPAllocateHeader_out = 0,
-    P_TxL4TCPInitiateResponse_out = 0,
-    P_TxL4TCPInitiateResponse_drop = 1,
-    P_TxL4TCPAllocateHeader_out = 0,
+    P_RxL3ARPProcessPendingResponse_drop = 2,
+    P_RxL3IPv4Classify_udp = 0,
+    P_RxL3IPv4Classify_icmp = 1,
+    P_RxL3IPv4Classify_drop = 2,
+    P_TxDemux_ICMPIR = 0,
+    P_TxDemux_ARPLu = 1,
+    P_TxDemux_ARPIR = 2,
+    P_TxDemux_drop = 3,
     P_TxL3ICMPInitiateResponse_out = 0,
     P_TxL3ICMPInitiateResponse_drop = 1,
     P_TxL3ICMPAllocateHeader_out = 0,
@@ -81,9 +46,6 @@ enum out_ports {
 node_out_t do_pg__Queue(struct state *state, struct input *in);
 node_out_t do_pg__PacketDrop(struct state *state, struct input *in);
 node_out_t do_pg__NotSupported(struct state *state, struct input *in);
-node_out_t do_pg__RxL3IPv6ValidHeaderLength(struct state *state, struct input *in);
-node_out_t do_pg__RxEchoAPP(struct state *state, struct input *in);
-node_out_t do_pg__RxDnsAPP(struct state *state, struct input *in);
 node_out_t do_pg__RxL2EtherClassified(struct state *state, struct input *in);
 node_out_t do_pg__RxL2EtherValidLength(struct state *state, struct input *in);
 node_out_t do_pg__RxL2EtherValidUnicast(struct state *state, struct input *in);
@@ -111,48 +73,11 @@ node_out_t do_pg__RxL3IPv4Classify(struct state *state, struct input *in);
 node_out_t do_pg__RxL3ICMPValidHeaderLength(struct state *state, struct input *in);
 node_out_t do_pg__RxL3ICMPValidChecksum(struct state *state, struct input *in);
 node_out_t do_pg__RxL3ICMPIsTypeRequest(struct state *state, struct input *in);
-node_out_t do_pg__RxL4UDPValidHeaderLength(struct state *state, struct input *in);
-node_out_t do_pg__RxL4UDPValidLength(struct state *state, struct input *in);
-node_out_t do_pg__RxL4UDPValidChecksum(struct state *state, struct input *in);
-node_out_t do_pg__RxL4UDPPortClassifyType(struct state *state, struct input *in);
-node_out_t do_pg__RxL4UDPPortClassifyStatic(struct state *state, struct input *in);
-node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *in);
-node_out_t do_pg__RxL4UDPClosedPortAction(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPValidHeaderLength(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPPortClassifyType(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPPortClassifyStatic(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPPortClassifyDynamic(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPClosedPortAction(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketClassify(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketServerSide(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketInClosed(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketClientSide(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketIsValidSyn(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketAddHalfOpenConn(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketSendSyn(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketIsValidSynAckS(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketIsValidFinAck(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketIsValidFinAck2(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketSChangeEstablished(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketIsDataPacket(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketIsFinSet(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketSChangeLastAck(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketSChangeToClosed(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketSChangeToClosed2(struct state *state, struct input *in);
-node_out_t do_pg__RxL4TCPSocketCopyData(struct state *state, struct input *in);
-node_out_t do_pg__RxTagTxTCPIR(struct state *state, struct input *in);
-node_out_t do_pg__RxTagTxUDPIR(struct state *state, struct input *in);
 node_out_t do_pg__RxTagTxARPIR(struct state *state, struct input *in);
 node_out_t do_pg__RxTagTxARPLu(struct state *state, struct input *in);
 node_out_t do_pg__RxTagTxICMPIR(struct state *state, struct input *in);
 node_out_t do_pg__TxDemux(struct state *state, struct input *in);
 node_out_t do_pg__TxQueue(struct state *state, struct input *in);
-node_out_t do_pg__TxL4UDPInitiateResponse(struct state *state, struct input *in);
-node_out_t do_pg__TxL4UDPAllocateHeader(struct state *state, struct input *in);
-node_out_t do_pg__TxL4UDPFillHeader(struct state *state, struct input *in);
-node_out_t do_pg__TxL4TCPInitiateResponse(struct state *state, struct input *in);
-node_out_t do_pg__TxL4TCPAllocateHeader(struct state *state, struct input *in);
-node_out_t do_pg__TxL4TCPFillHeader(struct state *state, struct input *in);
 node_out_t do_pg__TxL3ICMPInitiateResponse(struct state *state, struct input *in);
 node_out_t do_pg__TxL3ICMPAllocateHeader(struct state *state, struct input *in);
 node_out_t do_pg__TxL3ICMPFillHeader(struct state *state, struct input *in);
@@ -171,11 +96,7 @@ node_out_t do_pg__TxL2EtherFillHeader(struct state *state, struct input *in);
 
 static inline void executeGraph(struct state * st, struct input *in)
 {
-    node_out_t Queue=-1, PacketDrop=-1, NotSupported=-1, RxL3IPv6ValidHeaderLength=-1, RxL3IPValid=-1, RxL3IPAndBelowValid=-1, RxEchoAPP=-1, RxDnsAPP=-1, RxToTx=-1, RxL2EtherClassified=-1, RxL2EtherValidLength=-1, RxL2EtherValidUnicast=-1, RxL2EtherValidMulticast=-1, RxL2EtherValidBroadcast=-1, RxL2EtherValidDest=-1, RxL2EtherValidSrc=-1, RxL2EtherValidLocalMAC=-1, RxL2EtherValid=-1, RxL2EtherValidType=-1, RxL2EtherClassifyL3=-1, RxL3ARPValidHeaderLength=-1, RxL3ARPClassify=-1, RxL3ARPLocalIPDest=-1, RxL3ARPValidRequest=-1, RxL3ARPNeedsResponse=-1, RxL3ARPValidResponse=-1, RxL3ARPIsPending=-1, RxL3ARPValidPendingResponse=-1, RxL3ARPProcessPendingResponse=-1, RxL3IPv4ValidHeaderLength=-1, RxL3IPv4ValidReassembly=-1, RxL3IPv4ValidVersion=-1, RxL3IPv4ValidLength=-1, RxL3IPv4ValidTTL=-1, RxL3IPv4ValidChecksum=-1, RxL3IPv4ValidLocalIP=-1, RxL3IPv4Classify=-1, RxL3IPv4Valid=-1, RxL3ICMPValidHeaderLength=-1, RxL3ICMPValidChecksum=-1, RxL3ICMPValid=-1, RxL3ICMPIsTypeRequest=-1, RxL3ICMPNeedsResponse=-1, RxL4UDPValidHeaderLength=-1, RxL4UDPValidLength=-1, RxL4UDPValidChecksum=-1, RxL4UDPValid=-1, RxL4UDPPortClassifyType=-1, RxL4UDPPortClassifyStatic=-1, RxL4UDPPortClassifyDynamic=-1, RxL4UDPClosedPortAction=-1, RxL4TCPValidHeaderLength=-1, RxL4TCPValid=-1, RxL4TCPPortClassifyType=-1, RxL4TCPPortClassifyStatic=-1, RxL4TCPPortClassifyDynamic=-1, RxL4TCPClosedPortAction=-1, RxL4TCPSocketClassify=-1, RxL4TCPSocketServerSide=-1, RxL4TCPSocketInClosed=-1, RxL4TCPSocketClientSide=-1, RxL4TCPSocketIsValidSyn=-1, RxL4TCPSocketAddHalfOpenConn=-1, RxL4TCPSocketSendSyn=-1, RxL4TCPSocketIsValidSynAckS=-1, RxL4TCPSocketIsValidFinAck=-1, RxL4TCPSocketIsValidFinAck2=-1, RxL4TCPSocketSChangeEstablished=-1, RxL4TCPSocketIsDataPacket=-1, RxL4TCPSocketIsFinSet=-1, RxL4TCPSocketSChangeLastAck=-1, RxL4TCPSocketSChangeToClosed=-1, RxL4TCPSocketSChangeToClosed2=-1, RxL4TCPSocketCopyData=-1, RxL4TCPSocketTCPOutMerge=-1, RxTagTxTCPIR=-1, RxTagTxUDPIR=-1, RxTagTxARPIR=-1, RxTagTxARPLu=-1, RxTagTxICMPIR=-1, TxDemux=-1, TxQueue=-1, TxL4UDPInitiateResponse=-1, TxL4UDPAllocateHeader=-1, TxL4UDPFillHeader=-1, TxL4TCPInitiateResponse=-1, TxL4TCPAllocateHeader=-1, TxL4TCPFillHeader=-1, TxL3ICMPInitiateResponse=-1, TxL3ICMPAllocateHeader=-1, TxL3ICMPFillHeader=-1, TxL3IPv4Prepare=-1, TxL3IPv4AllocateHeader=-1, TxL3IPv4FillHeader=-1, TxL3IPv4Routing=-1, TxL3ARPInitiateResponse=-1, TxL3ARPPrepare=-1, TxL3ARPAllocateHeader=-1, TxL3ARPFillHeader=-1, TxL3ARPLookupRequestIn=-1, TxL3ARPLookup=-1, TxL3ARPLookup_=-1, TxL3ARPSendRequest=-1, TxL2EtherPrepare=-1, TxL2EtherAllocateHeader=-1, TxL2EtherFillHeader=-1;
-    if (1) {
-        RxL3IPv6ValidHeaderLength = do_pg__RxL3IPv6ValidHeaderLength(st, in);
-        dprint("RxL3IPv6ValidHeaderLength=%d\n", RxL3IPv6ValidHeaderLength);
-    }
+    node_out_t Queue=-1, PacketDrop=-1, NotSupported=-1, RxL3IPValid=-1, RxL3IPAndBelowValid=-1, RxToTx=-1, RxL2EtherClassified=-1, RxL2EtherValidLength=-1, RxL2EtherValidUnicast=-1, RxL2EtherValidMulticast=-1, RxL2EtherValidBroadcast=-1, RxL2EtherValidDest=-1, RxL2EtherValidSrc=-1, RxL2EtherValidLocalMAC=-1, RxL2EtherValid=-1, RxL2EtherValidType=-1, RxL2EtherClassifyL3=-1, RxL3ARPValidHeaderLength=-1, RxL3ARPClassify=-1, RxL3ARPLocalIPDest=-1, RxL3ARPValidRequest=-1, RxL3ARPNeedsResponse=-1, RxL3ARPValidResponse=-1, RxL3ARPIsPending=-1, RxL3ARPValidPendingResponse=-1, RxL3ARPProcessPendingResponse=-1, RxL3IPv4ValidHeaderLength=-1, RxL3IPv4ValidReassembly=-1, RxL3IPv4ValidVersion=-1, RxL3IPv4ValidLength=-1, RxL3IPv4ValidTTL=-1, RxL3IPv4ValidChecksum=-1, RxL3IPv4ValidLocalIP=-1, RxL3IPv4Classify=-1, RxL3IPv4Valid=-1, RxL3ICMPValidHeaderLength=-1, RxL3ICMPValidChecksum=-1, RxL3ICMPValid=-1, RxL3ICMPIsTypeRequest=-1, RxL3ICMPNeedsResponse=-1, RxTagTxARPIR=-1, RxTagTxARPLu=-1, RxTagTxICMPIR=-1, TxDemux=-1, TxQueue=-1, TxL3ICMPInitiateResponse=-1, TxL3ICMPAllocateHeader=-1, TxL3ICMPFillHeader=-1, TxL3IPv4Prepare=-1, TxL3IPv4AllocateHeader=-1, TxL3IPv4FillHeader=-1, TxL3IPv4Routing=-1, TxL3ARPInitiateResponse=-1, TxL3ARPPrepare=-1, TxL3ARPAllocateHeader=-1, TxL3ARPFillHeader=-1, TxL3ARPLookupRequestIn=-1, TxL3ARPLookup=-1, TxL3ARPLookup_=-1, TxL3ARPSendRequest=-1, TxL2EtherPrepare=-1, TxL2EtherAllocateHeader=-1, TxL2EtherFillHeader=-1;
     if (1) {
         Queue = do_pg__Queue(st, in);
         dprint("Queue=%d\n", Queue);
@@ -231,10 +152,6 @@ static inline void executeGraph(struct state * st, struct input *in)
     if (RxL2EtherValidType == P_true) {
         RxL2EtherClassifyL3 = do_pg__RxL2EtherClassifyL3(st, in);
         dprint("RxL2EtherClassifyL3=%d\n", RxL2EtherClassifyL3);
-    }
-    if (RxL2EtherClassifyL3 == P_RxL2EtherClassifyL3_ipv6) {
-        NotSupported = do_pg__NotSupported(st, in);
-        dprint("NotSupported=%d\n", NotSupported);
     }
     if (RxL2EtherClassifyL3 == P_RxL2EtherClassifyL3_arp) {
         RxL3ARPValidHeaderLength = do_pg__RxL3ARPValidHeaderLength(st, in);
@@ -324,11 +241,11 @@ static inline void executeGraph(struct state * st, struct input *in)
         RxL3IPv4Valid = P_false;
         dprint("RxL3IPv4Valid=%d\n", RxL3IPv4Valid);
     }
-    if (RxL3IPv4Valid == P_true || RxL3IPv6ValidHeaderLength == P_true) {
+    if (RxL3IPv4Valid == P_true) {
         RxL3IPValid = P_true;
         dprint("RxL3IPValid=%d\n", RxL3IPValid);
     }
-    if (RxL3IPv4Valid == P_false && RxL3IPv6ValidHeaderLength == P_false) {
+    if (RxL3IPv4Valid == P_false) {
         RxL3IPValid = P_false;
         dprint("RxL3IPValid=%d\n", RxL3IPValid);
     }
@@ -343,6 +260,14 @@ static inline void executeGraph(struct state * st, struct input *in)
     if (RxL3IPv4ValidHeaderLength == P_true) {
         RxL3IPv4Classify = do_pg__RxL3IPv4Classify(st, in);
         dprint("RxL3IPv4Classify=%d\n", RxL3IPv4Classify);
+    }
+    if (RxL3IPv4Classify == P_RxL3IPv4Classify_udp || RxL2EtherClassifyL3 == P_RxL2EtherClassifyL3_ipv6) {
+        NotSupported = do_pg__NotSupported(st, in);
+        dprint("NotSupported=%d\n", NotSupported);
+    }
+    if (RxL3IPv4Classify == P_RxL3IPv4Classify_drop || RxL3IPv4ValidHeaderLength == P_false || RxL3ARPClassify == P_RxL3ARPClassify_drop || RxL3ARPValidHeaderLength == P_false || RxL2EtherClassifyL3 == P_RxL2EtherClassifyL3_drop || RxL2EtherValidType == P_false || RxL2EtherValidLength == P_false || RxL2EtherClassified == P_false) {
+        PacketDrop = do_pg__PacketDrop(st, in);
+        dprint("PacketDrop=%d\n", PacketDrop);
     }
     if (RxL3IPv4Classify == P_RxL3IPv4Classify_icmp) {
         RxL3ICMPValidHeaderLength = do_pg__RxL3ICMPValidHeaderLength(st, in);
@@ -376,201 +301,17 @@ static inline void executeGraph(struct state * st, struct input *in)
         RxTagTxICMPIR = do_pg__RxTagTxICMPIR(st, in);
         dprint("RxTagTxICMPIR=%d\n", RxTagTxICMPIR);
     }
-    if (RxL3IPv4Classify == P_RxL3IPv4Classify_udp) {
-        RxL4UDPValidHeaderLength = do_pg__RxL4UDPValidHeaderLength(st, in);
-        dprint("RxL4UDPValidHeaderLength=%d\n", RxL4UDPValidHeaderLength);
-    }
-    if (RxL4UDPValidHeaderLength == P_true) {
-        RxL4UDPValidLength = do_pg__RxL4UDPValidLength(st, in);
-        dprint("RxL4UDPValidLength=%d\n", RxL4UDPValidLength);
-    }
-    if (RxL4UDPValidHeaderLength == P_true) {
-        RxL4UDPValidChecksum = do_pg__RxL4UDPValidChecksum(st, in);
-        dprint("RxL4UDPValidChecksum=%d\n", RxL4UDPValidChecksum);
-    }
-    if (RxL4UDPValidChecksum == P_true && RxL4UDPValidLength == P_true && RxL3IPAndBelowValid == P_true) {
-        RxL4UDPValid = P_true;
-        dprint("RxL4UDPValid=%d\n", RxL4UDPValid);
-    }
-    if (RxL4UDPValidChecksum == P_false || RxL4UDPValidLength == P_false || RxL3IPAndBelowValid == P_false) {
-        RxL4UDPValid = P_false;
-        dprint("RxL4UDPValid=%d\n", RxL4UDPValid);
-    }
-    if (RxL4UDPValid == P_true) {
-        RxL4UDPPortClassifyType = do_pg__RxL4UDPPortClassifyType(st, in);
-        dprint("RxL4UDPPortClassifyType=%d\n", RxL4UDPPortClassifyType);
-    }
-    if (RxL4UDPPortClassifyType == P_RxL4UDPPortClassifyType_dynamic) {
-        RxL4UDPPortClassifyDynamic = do_pg__RxL4UDPPortClassifyDynamic(st, in);
-        dprint("RxL4UDPPortClassifyDynamic=%d\n", RxL4UDPPortClassifyDynamic);
-    }
-    if (RxL4UDPPortClassifyType == P_RxL4UDPPortClassifyType_static) {
-        RxL4UDPPortClassifyStatic = do_pg__RxL4UDPPortClassifyStatic(st, in);
-        dprint("RxL4UDPPortClassifyStatic=%d\n", RxL4UDPPortClassifyStatic);
-    }
-    if (RxL4UDPPortClassifyStatic == P_RxL4UDPPortClassifyStatic_appDNS) {
-        RxDnsAPP = do_pg__RxDnsAPP(st, in);
-        dprint("RxDnsAPP=%d\n", RxDnsAPP);
-    }
-    if (RxL4UDPPortClassifyStatic == P_RxL4UDPPortClassifyStatic_appEcho) {
-        RxEchoAPP = do_pg__RxEchoAPP(st, in);
-        dprint("RxEchoAPP=%d\n", RxEchoAPP);
-    }
-    if (RxDnsAPP == P_RxDnsAPP_out || RxEchoAPP == P_RxEchoAPP_out) {
-        RxTagTxUDPIR = do_pg__RxTagTxUDPIR(st, in);
-        dprint("RxTagTxUDPIR=%d\n", RxTagTxUDPIR);
-    }
-    if (RxL4UDPPortClassifyStatic == P_RxL4UDPPortClassifyStatic_closedPort) {
-        RxL4UDPClosedPortAction = do_pg__RxL4UDPClosedPortAction(st, in);
-        dprint("RxL4UDPClosedPortAction=%d\n", RxL4UDPClosedPortAction);
-    }
-    if (RxL3IPv4Classify == P_RxL3IPv4Classify_tcp) {
-        RxL4TCPValidHeaderLength = do_pg__RxL4TCPValidHeaderLength(st, in);
-        dprint("RxL4TCPValidHeaderLength=%d\n", RxL4TCPValidHeaderLength);
-    }
-    if (RxL4TCPValidHeaderLength == P_true && RxL3IPAndBelowValid == P_true) {
-        RxL4TCPValid = P_true;
-        dprint("RxL4TCPValid=%d\n", RxL4TCPValid);
-    }
-    if (RxL4TCPValidHeaderLength == P_false || RxL3IPAndBelowValid == P_false) {
-        RxL4TCPValid = P_false;
-        dprint("RxL4TCPValid=%d\n", RxL4TCPValid);
-    }
-    if (RxL4TCPValid == P_true) {
-        RxL4TCPPortClassifyType = do_pg__RxL4TCPPortClassifyType(st, in);
-        dprint("RxL4TCPPortClassifyType=%d\n", RxL4TCPPortClassifyType);
-    }
-    if (RxL4TCPPortClassifyType == P_RxL4TCPPortClassifyType_dynamic) {
-        RxL4TCPPortClassifyDynamic = do_pg__RxL4TCPPortClassifyDynamic(st, in);
-        dprint("RxL4TCPPortClassifyDynamic=%d\n", RxL4TCPPortClassifyDynamic);
-    }
-    if (RxL4TCPPortClassifyType == P_RxL4TCPPortClassifyType_static) {
-        RxL4TCPPortClassifyStatic = do_pg__RxL4TCPPortClassifyStatic(st, in);
-        dprint("RxL4TCPPortClassifyStatic=%d\n", RxL4TCPPortClassifyStatic);
-    }
-    if (RxL4TCPPortClassifyStatic == P_RxL4TCPPortClassifyStatic_noSocket) {
-        RxL4TCPClosedPortAction = do_pg__RxL4TCPClosedPortAction(st, in);
-        dprint("RxL4TCPClosedPortAction=%d\n", RxL4TCPClosedPortAction);
-    }
-    if (RxL4TCPPortClassifyStatic == P_RxL4TCPPortClassifyStatic_toSocket) {
-        RxL4TCPSocketClassify = do_pg__RxL4TCPSocketClassify(st, in);
-        dprint("RxL4TCPSocketClassify=%d\n", RxL4TCPSocketClassify);
-    }
-    if (RxL4TCPSocketClassify == P_RxL4TCPSocketClassify_cliSocket) {
-        RxL4TCPSocketClientSide = do_pg__RxL4TCPSocketClientSide(st, in);
-        dprint("RxL4TCPSocketClientSide=%d\n", RxL4TCPSocketClientSide);
-    }
-    if (RxL4TCPSocketClassify == P_RxL4TCPSocketClassify_srvSocket) {
-        RxL4TCPSocketServerSide = do_pg__RxL4TCPSocketServerSide(st, in);
-        dprint("RxL4TCPSocketServerSide=%d\n", RxL4TCPSocketServerSide);
-    }
-    if (RxL4TCPSocketServerSide == P_RxL4TCPSocketServerSide_isClosed) {
-        RxL4TCPSocketInClosed = do_pg__RxL4TCPSocketInClosed(st, in);
-        dprint("RxL4TCPSocketInClosed=%d\n", RxL4TCPSocketInClosed);
-    }
-    if (RxL4TCPSocketServerSide == P_RxL4TCPSocketServerSide_isListen) {
-        RxL4TCPSocketIsValidSyn = do_pg__RxL4TCPSocketIsValidSyn(st, in);
-        dprint("RxL4TCPSocketIsValidSyn=%d\n", RxL4TCPSocketIsValidSyn);
-    }
-    if (RxL4TCPSocketIsValidSyn == P_true) {
-        RxL4TCPSocketAddHalfOpenConn = do_pg__RxL4TCPSocketAddHalfOpenConn(st, in);
-        dprint("RxL4TCPSocketAddHalfOpenConn=%d\n", RxL4TCPSocketAddHalfOpenConn);
-    }
-    if (RxL4TCPSocketAddHalfOpenConn == P_RxL4TCPSocketAddHalfOpenConn_success) {
-        RxL4TCPSocketSendSyn = do_pg__RxL4TCPSocketSendSyn(st, in);
-        dprint("RxL4TCPSocketSendSyn=%d\n", RxL4TCPSocketSendSyn);
-    }
-    if (RxL4TCPSocketServerSide == P_RxL4TCPSocketServerSide_isSynRecv) {
-        RxL4TCPSocketIsValidSynAckS = do_pg__RxL4TCPSocketIsValidSynAckS(st, in);
-        dprint("RxL4TCPSocketIsValidSynAckS=%d\n", RxL4TCPSocketIsValidSynAckS);
-    }
-    if (RxL4TCPSocketIsValidSynAckS == P_true) {
-        RxL4TCPSocketSChangeEstablished = do_pg__RxL4TCPSocketSChangeEstablished(st, in);
-        dprint("RxL4TCPSocketSChangeEstablished=%d\n", RxL4TCPSocketSChangeEstablished);
-    }
-    if (RxL4TCPSocketIsValidSynAckS == P_false || RxL4TCPSocketIsValidSyn == P_false || RxL4TCPSocketInClosed == P_RxL4TCPSocketInClosed_out || RxL4TCPClosedPortAction == P_RxL4TCPClosedPortAction_out || RxL4TCPValid == P_false || RxL4UDPClosedPortAction == P_RxL4UDPClosedPortAction_out || RxL4UDPValid == P_false || RxL4UDPValidHeaderLength == P_false || RxL3IPv4Classify == P_RxL3IPv4Classify_drop || RxL3IPv4ValidHeaderLength == P_false || RxL3ARPClassify == P_RxL3ARPClassify_drop || RxL3ARPValidHeaderLength == P_false || RxL2EtherClassifyL3 == P_RxL2EtherClassifyL3_drop || RxL2EtherValidType == P_false || RxL2EtherValidLength == P_false || RxL2EtherClassified == P_false || RxDnsAPP == P_RxDnsAPP_drop || RxEchoAPP == P_RxEchoAPP_drop) {
-        PacketDrop = do_pg__PacketDrop(st, in);
-        dprint("PacketDrop=%d\n", PacketDrop);
-    }
-    if (RxL4TCPSocketServerSide == P_RxL4TCPSocketServerSide_isCloseWait) {
-        RxL4TCPSocketIsValidFinAck = do_pg__RxL4TCPSocketIsValidFinAck(st, in);
-        dprint("RxL4TCPSocketIsValidFinAck=%d\n", RxL4TCPSocketIsValidFinAck);
-    }
-    if (RxL4TCPSocketIsValidFinAck == P_true) {
-        RxL4TCPSocketSChangeToClosed = do_pg__RxL4TCPSocketSChangeToClosed(st, in);
-        dprint("RxL4TCPSocketSChangeToClosed=%d\n", RxL4TCPSocketSChangeToClosed);
-    }
-    if (RxL4TCPSocketServerSide == P_RxL4TCPSocketServerSide_isLastAck) {
-        RxL4TCPSocketIsValidFinAck2 = do_pg__RxL4TCPSocketIsValidFinAck2(st, in);
-        dprint("RxL4TCPSocketIsValidFinAck2=%d\n", RxL4TCPSocketIsValidFinAck2);
-    }
-    if (RxL4TCPSocketIsValidFinAck2 == P_true) {
-        RxL4TCPSocketSChangeToClosed2 = do_pg__RxL4TCPSocketSChangeToClosed2(st, in);
-        dprint("RxL4TCPSocketSChangeToClosed2=%d\n", RxL4TCPSocketSChangeToClosed2);
-    }
-    if (RxL4TCPSocketServerSide == P_RxL4TCPSocketServerSide_isEstablished) {
-        RxL4TCPSocketIsDataPacket = do_pg__RxL4TCPSocketIsDataPacket(st, in);
-        dprint("RxL4TCPSocketIsDataPacket=%d\n", RxL4TCPSocketIsDataPacket);
-    }
-    if (RxL4TCPSocketIsDataPacket == P_true) {
-        RxL4TCPSocketCopyData = do_pg__RxL4TCPSocketCopyData(st, in);
-        dprint("RxL4TCPSocketCopyData=%d\n", RxL4TCPSocketCopyData);
-    }
-    if (RxL4TCPSocketServerSide == P_RxL4TCPSocketServerSide_isEstablished) {
-        RxL4TCPSocketIsFinSet = do_pg__RxL4TCPSocketIsFinSet(st, in);
-        dprint("RxL4TCPSocketIsFinSet=%d\n", RxL4TCPSocketIsFinSet);
-    }
-    if (RxL4TCPSocketIsFinSet == P_true) {
-        RxL4TCPSocketSChangeLastAck = do_pg__RxL4TCPSocketSChangeLastAck(st, in);
-        dprint("RxL4TCPSocketSChangeLastAck=%d\n", RxL4TCPSocketSChangeLastAck);
-    }
-    if (RxL4TCPSocketCopyData == P_true || RxL4TCPSocketSChangeToClosed == P_true || RxL4TCPSocketSChangeLastAck == P_true || RxL4TCPSocketSendSyn == P_true) {
-        RxL4TCPSocketTCPOutMerge = P_true;
-        dprint("RxL4TCPSocketTCPOutMerge=%d\n", RxL4TCPSocketTCPOutMerge);
-    }
-    if (RxL4TCPSocketCopyData == P_false && RxL4TCPSocketSChangeToClosed == P_false && RxL4TCPSocketSChangeLastAck == P_false && RxL4TCPSocketSendSyn == P_false) {
-        RxL4TCPSocketTCPOutMerge = P_false;
-        dprint("RxL4TCPSocketTCPOutMerge=%d\n", RxL4TCPSocketTCPOutMerge);
-    }
-    if (RxL4TCPSocketTCPOutMerge == P_true) {
-        RxTagTxTCPIR = do_pg__RxTagTxTCPIR(st, in);
-        dprint("RxTagTxTCPIR=%d\n", RxTagTxTCPIR);
-    }
-    if (RxTagTxICMPIR == P_true || RxTagTxARPLu == P_true || RxTagTxARPIR == P_true || RxTagTxUDPIR == P_true || RxTagTxTCPIR == P_true) {
+    if (RxTagTxICMPIR == P_true || RxTagTxARPLu == P_true || RxTagTxARPIR == P_true) {
         RxToTx = P_true;
         dprint("RxToTx=%d\n", RxToTx);
     }
-    if (RxTagTxICMPIR == P_false && RxTagTxARPLu == P_false && RxTagTxARPIR == P_false && RxTagTxUDPIR == P_false && RxTagTxTCPIR == P_false) {
+    if (RxTagTxICMPIR == P_false && RxTagTxARPLu == P_false && RxTagTxARPIR == P_false) {
         RxToTx = P_false;
         dprint("RxToTx=%d\n", RxToTx);
     }
     if (RxToTx == P_true) {
         TxDemux = do_pg__TxDemux(st, in);
         dprint("TxDemux=%d\n", TxDemux);
-    }
-    if (TxDemux == P_TxDemux_UDPIR) {
-        TxL4UDPInitiateResponse = do_pg__TxL4UDPInitiateResponse(st, in);
-        dprint("TxL4UDPInitiateResponse=%d\n", TxL4UDPInitiateResponse);
-    }
-    if (TxL4UDPInitiateResponse == P_TxL4UDPInitiateResponse_out) {
-        TxL4UDPAllocateHeader = do_pg__TxL4UDPAllocateHeader(st, in);
-        dprint("TxL4UDPAllocateHeader=%d\n", TxL4UDPAllocateHeader);
-    }
-    if (TxL4UDPAllocateHeader == P_TxL4UDPAllocateHeader_out) {
-        TxL4UDPFillHeader = do_pg__TxL4UDPFillHeader(st, in);
-        dprint("TxL4UDPFillHeader=%d\n", TxL4UDPFillHeader);
-    }
-    if (TxDemux == P_TxDemux_TCPIR) {
-        TxL4TCPInitiateResponse = do_pg__TxL4TCPInitiateResponse(st, in);
-        dprint("TxL4TCPInitiateResponse=%d\n", TxL4TCPInitiateResponse);
-    }
-    if (TxL4TCPInitiateResponse == P_TxL4TCPInitiateResponse_out) {
-        TxL4TCPAllocateHeader = do_pg__TxL4TCPAllocateHeader(st, in);
-        dprint("TxL4TCPAllocateHeader=%d\n", TxL4TCPAllocateHeader);
-    }
-    if (TxL4TCPAllocateHeader == P_TxL4TCPAllocateHeader_out) {
-        TxL4TCPFillHeader = do_pg__TxL4TCPFillHeader(st, in);
-        dprint("TxL4TCPFillHeader=%d\n", TxL4TCPFillHeader);
     }
     if (TxDemux == P_TxDemux_ICMPIR) {
         TxL3ICMPInitiateResponse = do_pg__TxL3ICMPInitiateResponse(st, in);
@@ -584,11 +325,11 @@ static inline void executeGraph(struct state * st, struct input *in)
         TxL3ICMPFillHeader = do_pg__TxL3ICMPFillHeader(st, in);
         dprint("TxL3ICMPFillHeader=%d\n", TxL3ICMPFillHeader);
     }
-    if (TxL3ICMPFillHeader == P_true || TxL4TCPFillHeader == P_true || TxL4UDPFillHeader == P_true) {
+    if (TxL3ICMPFillHeader == P_true) {
         TxL3IPv4Prepare = P_true;
         dprint("TxL3IPv4Prepare=%d\n", TxL3IPv4Prepare);
     }
-    if (TxL3ICMPFillHeader == P_false && TxL4TCPFillHeader == P_false && TxL4UDPFillHeader == P_false) {
+    if (TxL3ICMPFillHeader == P_false) {
         TxL3IPv4Prepare = P_false;
         dprint("TxL3IPv4Prepare=%d\n", TxL3IPv4Prepare);
     }
@@ -678,31 +419,13 @@ node_out_t do_pg__Queue(struct state *state, struct input *in)
 
 node_out_t do_pg__PacketDrop(struct state *state, struct input *in)
 {
-    //
+    // 
     return 0;
 }
 
 node_out_t do_pg__NotSupported(struct state *state, struct input *in)
 {
-    //
-    return 0;
-}
-
-node_out_t do_pg__RxL3IPv6ValidHeaderLength(struct state *state, struct input *in)
-{
-    // P_true, P_false
-    return 0;
-}
-
-node_out_t do_pg__RxEchoAPP(struct state *state, struct input *in)
-{
-    // P_RxEchoAPP_out, P_RxEchoAPP_drop
-    return 0;
-}
-
-node_out_t do_pg__RxDnsAPP(struct state *state, struct input *in)
-{
-    // P_RxDnsAPP_out, P_RxDnsAPP_drop
+    // 
     return 0;
 }
 
@@ -798,7 +521,7 @@ node_out_t do_pg__RxL3ARPIsPending(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL3ARPProcessPendingResponse(struct state *state, struct input *in)
 {
-    // P_RxL3ARPProcessPendingResponse_true, P_RxL3ARPProcessPendingResponse_false
+    // P_RxL3ARPProcessPendingResponse_true, P_RxL3ARPProcessPendingResponse_false, P_RxL3ARPProcessPendingResponse_drop
     return 0;
 }
 
@@ -846,7 +569,7 @@ node_out_t do_pg__RxL3IPv4ValidLocalIP(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL3IPv4Classify(struct state *state, struct input *in)
 {
-    // P_RxL3IPv4Classify_tcp, P_RxL3IPv4Classify_udp, P_RxL3IPv4Classify_icmp, P_RxL3IPv4Classify_drop
+    // P_RxL3IPv4Classify_udp, P_RxL3IPv4Classify_icmp, P_RxL3IPv4Classify_drop
     return 0;
 }
 
@@ -868,8 +591,6 @@ node_out_t do_pg__RxL3ICMPIsTypeRequest(struct state *state, struct input *in)
     return 0;
 }
 
-
-
 node_out_t do_pg__RxTagTxARPIR(struct state *state, struct input *in)
 {
     // P_true, P_false
@@ -890,19 +611,15 @@ node_out_t do_pg__RxTagTxICMPIR(struct state *state, struct input *in)
 
 node_out_t do_pg__TxDemux(struct state *state, struct input *in)
 {
-    // P_TxDemux_TCPIR, P_TxDemux_UDPIR, P_TxDemux_ICMPIR, P_TxDemux_ARPLu, P_TxDemux_ARPIR, P_TxDemux_drop
+    // P_TxDemux_ICMPIR, P_TxDemux_ARPLu, P_TxDemux_ARPIR, P_TxDemux_drop
     return 0;
 }
 
 node_out_t do_pg__TxQueue(struct state *state, struct input *in)
 {
-    //
+    // 
     return 0;
 }
-
-
-
-
 
 node_out_t do_pg__TxL3ICMPInitiateResponse(struct state *state, struct input *in)
 {

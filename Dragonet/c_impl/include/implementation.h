@@ -7,6 +7,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define MYDEBUG     1
+#ifdef MYDEBUG
+#define dprint(x...)    printf("debug:" x)
+#else
+#define dprint(x...)   ((void)0)
+#endif // MYDEBUG
+
+
 
 #define DEFAULT_BUFFER_SIZE 2048
 
@@ -135,13 +143,6 @@ void input_dump(struct input *in);
 
 // does the continuous packet processing by fetching packets from driver
 int main_loop(struct driver *drv);
-
-//#define MYDEBUG     1
-#ifdef MYDEBUG
-#define dprint(x...)    printf("debug:" x)
-#else
-#define dprint(x...)   ((void)0)
-#endif // MYDEBUG
 
 #include "gencode.h"
 
