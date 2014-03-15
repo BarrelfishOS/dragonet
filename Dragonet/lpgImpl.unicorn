@@ -5,6 +5,7 @@ graph lpg {
 
     node PacketDrop { }
 
+    node NotSupported { }
 
     /**************************************************************************/
     /* Receive                                                                */
@@ -51,7 +52,7 @@ graph lpg {
 
             node ClassifyL3 {
                 port ipv4[.L3IPv4ValidHeaderLength]
-                port ipv6[.L3IPv6ValidHeaderLength]
+                port ipv6[..NotSupported]
                 port arp[.L3ARPValidHeaderLength]
                 port drop[..PacketDrop] }
         }
@@ -91,8 +92,8 @@ graph lpg {
                 port false[] }
 
             node ProcessPendingResponse {
-                port true false[.TagTxARPLu]
-                port drop[] }
+                port true [.TagTxARPLu]
+                port false [] }
         }
 
 
@@ -409,7 +410,7 @@ graph lpg {
             port TCPIR[L4TCPInitiateResponse]
             port UDPIR[L4UDPInitiateResponse]
             port ICMPIR[L3ICMPInitiateResponse]
-            port ARPLu[L3ARPLookup]
+            port ARPLu[L3ARPLookupRequestIn]
             port ARPIR[L3ARPInitiateResponse]
             port drop[] }
 
@@ -478,6 +479,10 @@ graph lpg {
 
             boolean FillHeader {
                 port true false[.L2EtherPrepare] }
+
+            boolean LookupRequestIn {
+                port true false[Lookup]
+            }
 
             or Lookup {
                 port true[Lookup_]

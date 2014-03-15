@@ -98,7 +98,7 @@ node_out_t do_pg__TxL3IPv4FillHeader(struct state *state, struct input *in)
     ipv4_identification_wr(in, 0);
     ipv4_flags_wr(in, IPV4_FLAGS_DF);
     ipv4_fragment_wr(in, 0);
-    ipv4_ttl_wr(in, 64);
+    ipv4_ttl_wr(in, 17);
     ipv4_protocol_wr(in, in->ip4_proto);
     ipv4_srcIP_wr(in, in->ip4_src);
     ipv4_dstIP_wr(in, in->ip4_dst);

@@ -191,6 +191,9 @@ Util/Openonload.$(OSUF): Util/Openonload_.$(OSUF) sf_onloadLibs
 
 
 
+genCode: generateCSkeleton.hs lpgImpl.unicorn lpgIcmpImpl.unicorn
+	runhaskell generateCSkeleton.hs > c_impl/include/gencode.h
+
 # ######################## Openonload: end ############################
 
 base: Makefile *.hs */*.hs */*/*.hs *.unicorn Dragonet/Implementation/*.hs

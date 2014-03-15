@@ -75,7 +75,7 @@ nodeStmts g (n,l)
                 then ("P_" ++ p)
                 else ("P_" ++ nLabel l' ++ "_" ++ p)
         nfLabel l' = "do_pg__" ++ nLabel l'
-        dbg = "    printf(\"" ++ nLabel l ++ "=%d\\n\", " ++ nLabel l ++ ");"
+        dbg = "    dprint(\"" ++ nLabel l ++ "=%d\\n\", " ++ nLabel l ++ ");"
 
         -- For FNodes
         guardE = if null pre
@@ -114,7 +114,7 @@ generateTestFun name g = sig ++ "\n{\n" ++ body ++ "\n}\n"
     where
         stP = "st"
         inP = "in"
-        sig = "void " ++ name ++ "(struct state * " ++ stP ++
+        sig = "static inline void " ++ name ++ "(struct state * " ++ stP ++
             ", struct input *" ++ inP ++ ")"
         body = L.intercalate "\n" $ map ("    " ++) bodyL
         bodyL = [nvDecl] ++ stmts
@@ -128,14 +128,22 @@ generateTestFun name g = sig ++ "\n{\n" ++ body ++ "\n}\n"
 main :: IO ()
 main = do
     txt <- readFile "lpgIcmpImpl.unicorn"
+    --txt <- readFile "lpgImpl.unicorn"
     igraph <- UP.parseGraph txt
+    putStrLn "#ifndef GENERATEDCODE_H_\n"
+    putStrLn "#define GENERATEDCODE_H_\n"
+
     putStrLn $ generatePortEnum "out_ports" igraph
     putStrLn "\n"
     putStrLn $ generateFNProtos igraph
     putStrLn "\n"
-    putStrLn $ generateFNSkels igraph
-    putStrLn "\n"
     let graph = Unicorn.constructGraph igraph
-    putStrLn $ generateTestFun "testFun" graph
+    putStrLn $ generateTestFun "executeGraph" graph
+    putStrLn "\n"
+    putStrLn "#if 0\n"
+    putStrLn $ generateFNSkels igraph
+    putStrLn "#endif // 0\n"
+    putStrLn "\n"
+    putStrLn "#endif // GENERATEDCODE_H_\n"
     return ()
 
