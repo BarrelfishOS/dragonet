@@ -3,9 +3,9 @@
 SRCFILES= $(wildcard *.c)
 SRCFILES+= $(wildcard support/*.c)
 OBJFILES= $(addsuffix .o,$(basename $(SRCFILES)))
-CFLAGS+= -Iinclude -Wall -O3 -flto
-#LDFLAGS+= -O3 -flto   # having both these flags causes incorrect calculation of checksum for UDP
-LDFLAGS+= -flto
+CFLAGS+= -Iinclude -Wall -O2 -flto
+LDFLAGS+= -O2 -flto   # having both these flags causes incorrect calculation of checksum for UDP
+#LDFLAGS+= -flto
 
 BCSRCFILES = $(filter-out test.c,$(SRCFILES))
 BCFILES = $(addsuffix .bc,$(basename $(BCSRCFILES))) # llvm bytecode

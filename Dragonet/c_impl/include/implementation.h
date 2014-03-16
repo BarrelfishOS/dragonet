@@ -7,14 +7,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define MYDEBUG     1
+//#define MYDEBUG     1
 #ifdef MYDEBUG
 #define dprint(x...)    printf("debug:" x)
 #else
 #define dprint(x...)   ((void)0)
 #endif // MYDEBUG
 
-#define MYDEBUGV     1
+//#define MYDEBUGV     1
 #ifdef MYDEBUGV
 #define ddprint(x...)    dprint(x)
 #else
