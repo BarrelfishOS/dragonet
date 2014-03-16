@@ -14,12 +14,20 @@
 #define dprint(x...)   ((void)0)
 #endif // MYDEBUG
 
+#define MYDEBUGV     1
+#ifdef MYDEBUGV
+#define ddprint(x...)    dprint(x)
+#else
+#define ddprint(x...)   ((void)0)
+#endif // MYDEBUGV
 
 
 #define DEFAULT_BUFFER_SIZE 2048
 
 typedef int node_out_t;
 typedef uint16_t pktoff_t;
+
+typedef uint16_t portno_t;
 
 struct arp_pending;
 struct arp_cache;
@@ -101,18 +109,23 @@ struct input {
 
     // ICMP
     uint32_t icmp_id;
+
+    // UDP
+    portno_t udp_sport;
+    portno_t udp_dport;
+
     // Misc
     uint8_t mux_id;
 
     struct input *next;
 };
 
-#define PORT_BOOL(b) ((b) ? P_true : P_false)
-
 enum attr_mux_id {
     ATTR_MUX_ARPIR,
     ATTR_MUX_ARPLU,
     ATTR_MUX_ICMPIR,
+    ATTR_MUX_UDPIR,
+    ATTR_MUX_TCPIR,
 };
 
 //#define panic(x...) do { printf(#__FILE__":"#__LINE__": "x); abort(); } while (0)
@@ -145,5 +158,7 @@ void input_dump(struct input *in);
 int main_loop(struct driver *drv);
 
 #include "gencode.h"
+
+#define PORT_BOOL(b) ((b) ? P_true : P_false)
 
 #endif // IMPLEMENTATION_H_

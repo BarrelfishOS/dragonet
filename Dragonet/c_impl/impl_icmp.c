@@ -39,10 +39,23 @@ node_out_t do_pg__TxL3ICMPInitiateResponse(struct state *state, struct input *in
     uint32_t srcIP = ipv4_srcIP_rd(in);
     uint32_t dstIP = ipv4_dstIP_rd(in);
 
+#if DO_EXPLICIT_COPY
+    pktoff_t payload_len = icmp_payload_length(in);
+    uint8_t payload[DEFAULT_BUFFER_SIZE];
+    int ret = icmp_copy_payload(in, payload, sizeof(payload));
+    if (ret < 0) {
+        return P_TxL4ICMPInitiateResponse_drop;
+    }
+#endif // DO_EXPLICIT_COPY
+
     // Throw out all headers up to and including ICMP
     pkt_prepend(in, - (ssize_t) icmp_payload_offset(in));
     // clean up the attributes
     input_clean_attrs(in);
+
+#if DO_EXPLICIT_COPY
+    pkt_write(in, 0, payload_len, payload);
+#endif // DO_EXPLICIT_COPY
 
     in->ip4_dst = srcIP;
     in->ip4_src = dstIP;  // FIXME: maybe I should read it from global state

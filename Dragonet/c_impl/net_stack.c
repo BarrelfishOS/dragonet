@@ -1,6 +1,7 @@
 #include <implementation.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <inttypes.h>
 #include <packet_access.h>
 #include "config.h"
 
@@ -117,7 +118,7 @@ int main_loop(struct driver *drv)
 
     uint8_t buf[4096];
     int pktsize;
-
+    uint32_t pktcount = 0;
     // looping with tuntap device
     for (;;) {
         //pktsize = tap_read(tap_dn, buf, sizeof(buf));
@@ -127,6 +128,8 @@ int main_loop(struct driver *drv)
             return -1;
         }
         run_packet(&st, buf, pktsize);
+        dprint("\n### handled %"PRIu32"th packet!!!!\n", pktcount);
+        ++pktcount;
     }
     return 0;
 

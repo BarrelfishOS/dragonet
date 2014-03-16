@@ -94,7 +94,7 @@ tap_set_mask(struct tap_handler *tap, const char *mask)
 }
 
 static ssize_t
-tap_read(struct tap_handler *tap, uint8_t *buff, size_t len)
+tap_read(struct tap_handler *tap, uint8_t *buff, pktoff_t len)
 {
 	ssize_t ret;
 
@@ -106,7 +106,7 @@ tap_read(struct tap_handler *tap, uint8_t *buff, size_t len)
 	*/
 
 	// we will want to handle some (e.g., EAGAIN), but for now just die
-	if ((ret = read(tap->tun_fd, buff, len)) < 0)
+	if ((ret = read(tap->tun_fd, buff, (len))) < 0)
 		err(1, "read failed");
 	else if (ret == 0)    // ditto for EOF
 		err(1, "read returned 0");

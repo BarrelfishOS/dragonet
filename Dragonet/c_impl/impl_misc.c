@@ -1,4 +1,5 @@
 #include <implementation.h>
+#include <udpproto.h>
 
 node_out_t do_pg__Queue(struct state *state, struct input *in)
 {
@@ -41,6 +42,15 @@ node_out_t do_pg__RxTagTxICMPIR(struct state *state, struct input *in)
     return P_true;
 }
 
+node_out_t do_pg__RxTagTxUDPIR(struct state *state, struct input *in)
+{
+    // P_true, P_false
+    in->mux_id = ATTR_MUX_UDPIR;
+    return P_true;
+}
+
+
+
 node_out_t do_pg__TxDemux(struct state *state, struct input *in)
 {
     // P_TxDemux_ICMPIR, P_TxDemux_ARPLu, P_TxDemux_ARPIR, P_TxDemux_drop
@@ -48,6 +58,7 @@ node_out_t do_pg__TxDemux(struct state *state, struct input *in)
         case ATTR_MUX_ARPIR:    return P_TxDemux_ARPIR;
         case ATTR_MUX_ARPLU:    return P_TxDemux_ARPLu;
         case ATTR_MUX_ICMPIR:   return P_TxDemux_ICMPIR;
+        case ATTR_MUX_UDPIR:    return P_TxDemux_UDPIR;
         default:                return P_TxDemux_drop;
     }
 }
@@ -88,14 +99,22 @@ node_out_t do_pg__RxL3IPv6ValidHeaderLength(struct state *state, struct input *i
 
 node_out_t do_pg__RxEchoAPP(struct state *state, struct input *in)
 {
+    uint8_t contents[DEFAULT_BUFFER_SIZE];
+    int ret = udp_copy_payload(in, contents, sizeof(contents));
+    contents[ret] = '\0';
+    dprint("EchoAPP: Packet received ############## [%s]\n", contents);
     // P_RxEchoAPP_out, P_RxEchoAPP_drop
-    return 0;
+    return P_RxEchoAPP_out;
 }
 
 node_out_t do_pg__RxDnsAPP(struct state *state, struct input *in)
 {
+    uint8_t contents[DEFAULT_BUFFER_SIZE];
+    int ret = udp_copy_payload(in, contents, sizeof(contents));
+    contents[ret] = '\0';
+    dprint("DnsAPP: Packet received ############## [%s]\n", contents);
     // P_RxDnsAPP_out, P_RxDnsAPP_drop
-    return 0;
+    return P_RxDnsAPP_out;
 }
 
 

@@ -14,18 +14,18 @@
 // ICMP header length
 #define icmp_header_len     (8)
 
-static inline size_t l4Offset(struct input *pkt)
+static inline pktoff_t l4Offset(struct input *pkt)
 {
     return pkt->offset_l4;
 }
 
-static inline size_t icmp_header_offset(struct input *pkt)
+static inline pktoff_t icmp_header_offset(struct input *pkt)
 {
     return (l4Offset(pkt));
 }
 
-static inline size_t icmp_header_field_offset(struct input *pkt,
-            size_t field_offset)
+static inline pktoff_t icmp_header_field_offset(struct input *pkt,
+            pktoff_t field_offset)
 {
     return (icmp_header_offset(pkt) + field_offset);
 }
@@ -37,16 +37,16 @@ static inline pktoff_t icmp_payload_offset(struct input *pkt)
     return icmp_header_field_offset(pkt, 8);
 }
 
-static inline size_t icmp_payload_length(struct input *pkt)
+static inline pktoff_t icmp_payload_length(struct input *pkt)
 {
     return (pkt->len - icmp_payload_offset(pkt));
 }
 
 // NOTE: It is assumed that destination is atleast a buffer size
 static inline int icmp_copy_payload(struct input *pkt, void *dst,
-        size_t bufsize)
+        pktoff_t bufsize)
 {
-    size_t payloadsize = icmp_payload_length(pkt);
+    pktoff_t payloadsize = icmp_payload_length(pkt);
     if (bufsize < payloadsize) {
         panic("too small buffer to copy data\n");
         return -1;

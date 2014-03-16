@@ -54,6 +54,42 @@ static inline uint16_t ipv4_checksum(struct input *in, pktoff_t off,
     return checksum;
 }
 
+/** Generic IP checksum, calculate checksum in incremental order */
+static uint32_t ipv4_checksum_incremental(struct input *in, pktoff_t off,
+                                     pktoff_t len, uint32_t checksum)
+{
+    while (len > 1) {
+        checksum += pkt_read16be(in, off);
+        len -= 2;
+        off += 2;
+    }
+    if (len > 0) {
+        panic("%s packet length is not even, so can't calculate incremental checksum\n",
+                __func__);
+        return 0;
+        //checksum += (uint32_t) pkt_read8(in, off) << 8;
+    }
+    return checksum;
+}
+
+
+/** Generic IP checksum, calculate checksum in incremental order */
+static uint16_t ipv4_checksum_incremental_final(struct input *in, pktoff_t off,
+                                     pktoff_t len, uint32_t checksum)
+{
+    while (len > 1) {
+        checksum += pkt_read16be(in, off);
+        len -= 2;
+        off += 2;
+    }
+    if (len > 0) {
+        checksum += (uint32_t) pkt_read8(in, off) << 8;
+    }
+    checksum = ((checksum & 0xffff) + (checksum >> 16));
+    checksum = ((checksum & 0xffff) + (checksum >> 16));
+    checksum = checksum ^ 0xffff;
+    return checksum;
+}
 
 /******************************************************************************/
 /* Field offsets in packet */
@@ -234,6 +270,47 @@ static inline void ipv4_dstIP_wr(struct input *in, uint32_t val)
 {
     return pkt_write32be(in, ipv4_off_dstIP(in), val);
 }
+
+/******************************************************************************/
+/* psudo header for calculation of checksum */
+
+#define PSUDO_IPV4_HEADER_LEN           (12)
+static void psudo_header_write(struct input *header,
+        uint32_t src,
+        uint32_t dst,
+        uint8_t proto,
+        uint8_t zeroes,
+        uint16_t len)
+{
+    //pkt_prepend(header, PSUDO_IPV4_HEADER_LEN);
+    pkt_append(header, PSUDO_IPV4_HEADER_LEN);
+    pkt_write32be(header, 0, src);
+    pkt_write32be(header, 4, dst);
+    pkt_write8(header, 8, zeroes);
+    pkt_write8(header, 9, proto);
+    pkt_write16be(header, 10, len);
+}
+
+static void psudo_header_rx(struct input *in, struct input *header)
+{
+    uint32_t src = ipv4_srcIP_rd(in);
+    uint32_t dst = ipv4_dstIP_rd(in);
+    uint8_t proto = ipv4_protocol_rd(in);
+    uint8_t zeroes = 0;
+    uint16_t len = ipv4_payload_len(in);
+    psudo_header_write(header, src, dst, proto, zeroes, len);
+}
+
+static inline void psudo_header_tx(struct input *in, struct input *header)
+{
+    uint32_t src = in->ip4_src;
+    uint32_t dst = in->ip4_dst;
+    uint8_t proto = in->ip4_proto;
+    uint8_t zeroes = 0;
+    uint16_t len = in->len;
+    psudo_header_write(header, src, dst, proto, zeroes, len);
+}
+
 
 
 #endif // ndef PROTO_IPV4_H_

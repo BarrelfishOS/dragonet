@@ -49,8 +49,9 @@ node_out_t do_pg__RxL3IPv4ValidChecksum(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL3IPv4ValidLocalIP(struct state *state, struct input *in)
 {
-    dprint("%s: srcIP = %"PRIx32", dstIP = %"PRIx32"\n", __func__,
-            ipv4_srcIP_rd(in), ipv4_dstIP_rd(in));
+//    dprint("%s: srcIP = %"PRIx32", dstIP = %"PRIx32"\n", __func__,
+//            ipv4_srcIP_rd(in), ipv4_dstIP_rd(in));
+
     /*struct arp_cache *c = arp_cache_lookup(state, ipv4_srcIP_rd(in));
     if (c == NULL) {
         c = malloc(sizeof(*c));

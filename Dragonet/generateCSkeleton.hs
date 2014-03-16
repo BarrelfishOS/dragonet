@@ -75,7 +75,7 @@ nodeStmts g (n,l)
                 then ("P_" ++ p)
                 else ("P_" ++ nLabel l' ++ "_" ++ p)
         nfLabel l' = "do_pg__" ++ nLabel l'
-        dbg = "    dprint(\"" ++ nLabel l ++ "=%d\\n\", " ++ nLabel l ++ ");"
+        dbg = "    ddprint(\"" ++ nLabel l ++ "=%d\\n\", " ++ nLabel l ++ ");"
 
         -- For FNodes
         guardE = if null pre

@@ -4,7 +4,7 @@
 
 
 // ----------------------- ICMP field TYPE -----------
-static inline size_t icmp_hdr_type_offset(struct input *pkt)
+static inline pktoff_t icmp_hdr_type_offset(struct input *pkt)
 {
     return icmp_header_field_offset(pkt, 0);
 }
@@ -21,7 +21,7 @@ void icmp_hdr_type_write(struct input *pkt, uint8_t val)
 
 
 // ----------------------- ICMP field CODE -----------
-static inline size_t icmp_hdr_code_offset(struct input *pkt)
+static inline pktoff_t icmp_hdr_code_offset(struct input *pkt)
 {
     return icmp_header_field_offset(pkt, 1);
 }
@@ -37,7 +37,7 @@ void icmp_hdr_code_write(struct input *pkt, uint8_t val)
 }
 
 // ----------------------- ICMP field CHECKSUM -----------
-static inline size_t icmp_hdr_checksum_offset(struct input *pkt)
+static inline pktoff_t icmp_hdr_checksum_offset(struct input *pkt)
 {
     return icmp_header_field_offset(pkt, 2);
 }
@@ -54,7 +54,7 @@ void icmp_hdr_checksum_write(struct input *pkt, uint16_t val)
 
 // ----------------------- ICMP field MISC -----------
 
-static inline size_t icmp_hdr_misc_offset(struct input *pkt)
+static inline pktoff_t icmp_hdr_misc_offset(struct input *pkt)
 {
     return icmp_header_field_offset(pkt, 4);
 }

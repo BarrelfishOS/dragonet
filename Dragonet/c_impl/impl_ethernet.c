@@ -24,8 +24,8 @@ node_out_t do_pg__RxL2EtherValidUnicast(struct state *state, struct input *in)
 node_out_t do_pg__RxL2EtherValidMulticast(struct state *state, struct input *in)
 {
     mac_t dst = eth_dst_mac_read(in);
-    dprint("%s: %lx & %lx == %lx\n", __func__, dst, eth_multicast_bit_mask,
-            (dst & eth_multicast_bit_mask));
+//    dprint("%s: %lx & %lx == %lx\n", __func__, dst, eth_multicast_bit_mask,
+//            (dst & eth_multicast_bit_mask));
     return PORT_BOOL((dst != eth_broadcast_addr) &&
                      (dst & eth_multicast_bit_mask));
 }
@@ -33,7 +33,7 @@ node_out_t do_pg__RxL2EtherValidMulticast(struct state *state, struct input *in)
 node_out_t do_pg__RxL2EtherValidBroadcast(struct state *state, struct input *in)
 {
     mac_t dst = eth_dst_mac_read(in);
-    dprint("%s: %lx == %lx\n", __func__, dst, eth_broadcast_addr);
+//    dprint("%s: %lx == %lx\n", __func__, dst, eth_broadcast_addr);
     return PORT_BOOL(dst == eth_broadcast_addr);
 }
 
@@ -46,8 +46,8 @@ node_out_t do_pg__RxL2EtherValidLocalMAC(struct state *state, struct input *in)
 {
     mac_t dst = eth_dst_mac_read(in);
     mac_t localmac = state->local_mac;
-    dprint("%s: %lx == %lx\n", __func__, dst, localmac);
-    dprint("%s: src mac == %lx\n", __func__, eth_src_mac_read(in));
+//    dprint("%s: %lx == %lx\n", __func__, dst, localmac);
+//    dprint("%s: src mac == %lx\n", __func__, eth_src_mac_read(in));
     return PORT_BOOL(dst == localmac || dst == eth_broadcast_addr);
     //return ((eth_dst_mac_read(in) == get_local_mac(state))?P_true: P_false);
 }
