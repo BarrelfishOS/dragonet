@@ -15,13 +15,11 @@
 #include <stdlib.h>
 #include <err.h>
 
+#include "tap.h"
+
+
 #define TUNDEV "/dev/net/tun"
 
-struct tap_handler {
-	int tun_fd;
-	int ctl_fd;
-	char name[IFNAMSIZ];
-};
 
 void
 tap_open(struct tap_handler *tap, char *name)
