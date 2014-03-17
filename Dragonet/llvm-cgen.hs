@@ -951,14 +951,6 @@ llvm_pg_fnode_terminal nid node outs = do
         impl_ret <- bldAddInstruction $ mkCall (getFnOp $ pg_fimplname node)
                                                (map getLocalRef pg_fnode_args_names)
 
-        -- quick-n-dirty HACK: call do_pg_tap_out
-        if PG.nLabel node == "TxQueue" then do
-            bldAddInstruction $ mkCall (getFnOp "do_pg_tap_out")
-                                        (map getLocalRef pg_fnode_args_names)
-            return ()
-        else do
-            return ()
-
         -- FIXME:
         -- For now we assume that all structurally terminal nodes terminate
         -- the computation. This, however, might not be correct. We need to
@@ -1114,94 +1106,20 @@ llvm_pg_op cnf nid node adj_out adj_in = do
         ret <- bldPhi "ret_phi"
         bldTerminate $ termRetOp ret
 
--- build a function for entering the pipeline
---   Eventually this function should handle the incoming queue (or queues)
---   For now just invoke the pipeline a number of times
-llvm_pg_entry :: PG.Node -> LLVM ()
-llvm_pg_entry entry_node = do
-    state_ty <- cgStateTy
-    fnode_args <- cgFnodeArgs
-    let nr_loops = 10
-    fnAdd "pg_main" voidTy [] $ do
-        -- allocate a state variable in the stack
-        state <- bldAddInstruction $ mkAlloca state_ty 1
-        -- TODO: initialize state
-        -- set first field of state to zero
-        --state_f0 <- bldAddInstruction $ mkGep state [0, 0]
-        --bldAddInstruction $ mkSt state_f0 operandInt32_0
-        bldTerminate $ termBr "body"
-
-        bldAddBB "body"
-        entry <- gets entryBB
-        idx <- bldAddInstruction $ mkPhi i32Ty [(operandInt32_0, entry), (getLocalRef "idx_next", "body")]
-        bldDbgPrintf "loop index: %d\n" [idx]
-        idx_next <- bldAddNamedInstruction "idx_next" $ mkAdd idx operandInt32_1
-        done <- bldAddInstruction $ mkICmpEq idx_next (operandConstInt32 nr_loops)
-        bldAddInstruction $ mkCall (getFnOp $ pg_fname entry_node) [state, mkNullOp $ fst $ fnode_args !! 1]
-        bldTerminate $ termCondBr done "exit" "body"
-
-        bldAddBB "exit"
-        bldTerminate $ termRetVoid
-
--- TAP stuff (see Utils/tap.c)
-
-tap_ty_name = "struct.tap_handler"
-tap_ty = mkOpaqueTy tap_ty_name
-ptr_tap_ty = mkPtrTy tap_ty
-
-data TapConfig = TapConfig {
-      tapCfgName  :: String
-    , tapCfgIp    :: String
-    , tapCfgMask  :: String
-}
-
-tapCfg :: TapConfig
-tapCfg = TapConfig {
-      tapCfgName = "dragonet"
-    , tapCfgIp   = "192.168.123.100"
-    , tapCfgMask = "255.255.255.0"
-}
-
-llvm_tap_defs :: LLVM ()
-llvm_tap_defs = do
-    -- #include tap.h
-    addDefn $ AST.TypeDefinition (AST.Name tap_ty_name) Nothing
-
-    addExternalFn ptr_tap_ty "tap_create" [((mkPtrTy i8Ty), "str")]
-    addExternalFn voidTy "tap_set_ip" [(ptr_tap_ty, "tap"), ((mkPtrTy i8Ty), "ip")]
-    addExternalFn voidTy "tap_set_mask" [(ptr_tap_ty, "tap"), ((mkPtrTy i8Ty), "mask")]
-    addExternalFn voidTy "tap_up" [(ptr_tap_ty, "tap")]
-
-    addExternalFn i64Ty  "tap_read" [(ptr_tap_ty, "tap"), ((mkPtrTy i8Ty), "buff"), (i64Ty, "len")]
-    addExternalFn voidTy "tap_write" [(ptr_tap_ty, "tap"), ((mkPtrTy i8Ty), "buff"), (i64Ty, "len")]
-
-    -- global variable for tap handler
-    addStaticVar ptr_tap_ty "mytap__" (AST.C.Null ptr_tap_ty)
-    return ()
-
--- initialize tap and call entry node
-llvm_tap_pg_entry :: PG.Node -> LLVM ()
-llvm_tap_pg_entry entry_node = do
+-- Main function for graph that just runs it in an infinite loop, starting with an empty input
+llvm_pg_main_func :: PG.Node -> LLVM ()
+llvm_pg_main_func entry_node = do
     state_ty <- cgStateTy
     input_ty <- cgInputTy
     on_cnt <- cgONCounters
-    fnAdd "pg_tap_main" voidTy [] $ do
+    fnAdd "pg_main" voidTy [] $ do
         state <- bldAddInstruction $ mkAlloca state_ty 1     -- allocate state variable in the stack
         bldAddInstruction $ mkFnCall "pg_state_init" [state] -- initialize state
 
         let buff_size = 4096
         buff  <- bldAddInstruction $ mkAllocaBuff buff_size  -- static buffer in the stack
         gep_buff <- bldAddInstruction $ mkGep buff [0,0]     -- gep for buffer
-
-        name <- bldConstStr "tap_name" (tapCfgName tapCfg)  -- create configuration arguments for tap
-        ip   <- bldConstStr "tap_ip"   (tapCfgIp   tapCfg)
-        mask <- bldConstStr "tap_mask" (tapCfgMask tapCfg)
-
-        tap <- bldAddInstruction $ mkFnCall "tap_create" [name] --  initialize tap device
-        bldAddInstruction $ mkFnCall "tap_set_ip" [tap, ip]
-        bldAddInstruction $ mkFnCall "tap_set_mask" [tap, mask]
-        bldAddInstruction $ mkFnCall "tap_up" [tap]
-        bldAddInstruction $ mkSt (getGlobalOp "mytap__") tap    -- store tap handler to global variable
+        input <- bldAddInstruction $ mkFnCall "input_alloc" [] -- allocate (and initialize) input
 
         bldTerminate $ termBr "body"                            -- jump to loop body
 
@@ -1212,11 +1130,9 @@ llvm_tap_pg_entry entry_node = do
         bldDbgPrintf "count: %d\n" [cnt]
         cnt_next <- bldAddNamedInstruction "cnt_next" $ mkAdd cnt operandInt32_1
 
-        input <- bldAddInstruction $ mkFnCall "input_alloc" []      -- allocate (and initialize) input
-        len <- bldAddInstruction $ mkFnCall "tap_read" [tap, gep_buff, operandConstInt64 buff_size] -- read data from tap
-        bldAddInstruction $ mkFnCall "input_copy_packet" [input, gep_buff, len] -- copy data read to input
         bldAddInstruction $ mkCall (getFnOp $ pg_fname entry_node) [state, input] -- call entry
-        bldAddInstruction $ mkFnCall "input_free" [input] -- free input
+        bldAddInstruction $ mkFnCall "input_clean_attrs" [input] -- clean up input
+        bldAddInstruction $ mkFnCall "input_clean_packet" [input] -- clean up input
 
         -- reset o-node counters
         forM_ on_cnt $ \cnt_name ->
@@ -1225,27 +1141,8 @@ llvm_tap_pg_entry entry_node = do
         -- start over again :-)
         bldTerminate $ termBr "body"
 
--- write input into tap device
-llvm_tap_pg_sink :: LLVM ()
-llvm_tap_pg_sink = do
-    fnode_args <- cgFnodeArgs
-    fnAdd "do_pg_tap_out" i32Ty fnode_args $ do
-        -- load tap from global variable
-        tap <- bldAddInstruction $ mkLd (getGlobalOp "mytap__")
-        -- call tap_write()
-        let input = getLocalRef "input"
 
-        buff_ptr <- bldAddInstruction $ cgInput_make_gep input "buff"
-        buff <- bldAddInstruction $ mkLd buff_ptr
 
-        len_ptr  <- bldAddInstruction $ cgInput_make_gep input "buff_len"
-        len <- bldAddInstruction $ mkLd len_ptr
-
-        bldAddInstruction $ mkCall (getFnOp "tap_write") [tap, buff, len]
-        bldTerminate $ termRetOp pgDoneOp
-        return ()
-
----
 
 -- build an llvm module for the given protocol graph
 llvm_pg :: PGraph -> Label -> LLVM ()
@@ -1315,7 +1212,7 @@ modExec ctx mod fn_name = withExMod ctx mod $ \emod -> do
     fn <- LLVM.EE.getFunction emod (AST.Name fn_name)
     case fn of
         Just f   -> run f
-        Nothing  -> error "Error: cannot get pointer"
+        Nothing  -> error ("Error: cannot get pointer to " ++ fn_name)
     where
         run :: FunPtr a -> IO ()
         run fn = haskFn (castFunPtr fn :: FunPtr (IO ()))
@@ -1356,6 +1253,7 @@ codegen_all pgraph  = do
 
     addDefn $ AST.TypeDefinition (AST.Name "struct.input") Nothing
     addDefn $ AST.TypeDefinition (AST.Name "struct.state") Nothing
+    addDefn $ AST.TypeDefinition (AST.Name "struct.driver") Nothing
     -- hack:
     addDefn $ AST.TypeDefinition (AST.Name "struct.arp_pending") Nothing
     addDefn $ AST.TypeDefinition (AST.Name "struct.arp_cache") Nothing
@@ -1364,19 +1262,25 @@ codegen_all pgraph  = do
     addExternalFn (mkPtrTy input_ty) "input_alloc" []
     addExternalFn voidTy "input_copy_packet" [((mkPtrTy input_ty), "input"), ((mkPtrTy i8Ty), "buff"), (i64Ty, "len")]
     addExternalFn voidTy "input_free" [((mkPtrTy input_ty), "input")]
+    addExternalFn voidTy "input_clean_attrs" [((mkPtrTy input_ty), "input")]
+    addExternalFn voidTy "input_clean_packet" [((mkPtrTy input_ty), "input")]
 
-    llvm_pg pgraph entry_label
-    llvm_pg_entry entry_node
-    -- tap
-    llvm_tap_defs
-    llvm_tap_pg_entry entry_node
-    llvm_tap_pg_sink
-    -- dummy implementations
-    -- llvm_pg_dummy pgraph entry_label []
+    llvm_pg pgraph entry_label   -- Build node functions
+    llvm_pg_main_func entry_node -- Build main runner function
 
 
 passes :: LLVM.PM.PassSetSpec
 passes = LLVM.PM.defaultCuratedPassSetSpec { LLVM.PM.optLevel = Just 3 }
+
+-- Simulates a basic embedding (replace rx and tx queue by tap specific node)
+pg4tap :: PGraph -> PGraph
+pg4tap pg = DGI.nmap fixN pg
+    where
+        fixN n
+            | nLabel n == "Queue" = n { nLabel = "TapRxQueue" }
+            | nLabel n == "TxQueue" = n { nLabel = "TapTxQueue" }
+            | otherwise = n
+
 
 main :: IO ()
 main = do
@@ -1392,7 +1296,7 @@ main = do
 
     txt <- readFile fname
     graph <- UnicornAST.parseGraph txt
-    let pgraph = Unicorn.constructGraph graph
+    let pgraph = pg4tap $ Unicorn.constructGraph graph
     writeFile "DELETEME.dot" $ toDot pgraph
 
     LLVM.Ctx.withContext $ \ctx ->
@@ -1422,5 +1326,5 @@ main = do
                 LLVM.PM.withPassManager passes $ \pm -> do
                     LLVM.PM.runPassManager pm mod
                     modWriteFile mod $ mname ++ "-optimized-cg.ll"
-                    modExec ctx mod "pg_tap_main"
+                    modExec ctx mod "pg_main"
                     return ()
