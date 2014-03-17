@@ -33,6 +33,9 @@ struct dragonet_pipeline {
     struct dragonet_shared_state *shared;
     const char *name;
     struct waitset ws;
+
+    void (*incoming)(struct input *, void *);
+    void *incoming_param;
 };
 
 
@@ -61,13 +64,16 @@ void init_shared_state(const char *name, size_t chancount)
     close(fd);
 }
 
-pipeline_handle_t pl_init(const char *stackname, const char *plname)
+pipeline_handle_t pl_init(const char *stackname, const char *plname, void *st,
+                          void (*incoming)(struct input *, void *))
 {
     int fd;
     struct dragonet_pipeline *pl;
 
     pl = calloc(1, sizeof(*pl));
     pl->name = plname;
+    pl->incoming = incoming;
+    pl->incoming_param = st;
     ws_init(&pl->ws);
 
     // Map shared state

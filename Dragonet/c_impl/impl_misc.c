@@ -1,11 +1,11 @@
 #include <implementation.h>
 #include <udpproto.h>
 
-node_out_t do_pg__Queue(struct state *state, struct input *in)
+/*node_out_t do_pg__Queue(struct state *state, struct input *in)
 {
     // P_Queue_out
     return P_Queue_out;
-}
+}*/
 
 node_out_t do_pg__PacketDrop(struct state *state, struct input *in)
 {
@@ -63,35 +63,49 @@ node_out_t do_pg__TxDemux(struct state *state, struct input *in)
     }
 }
 
-node_out_t do_pg__TxQueue(struct state *state, struct input *in)
-{
-    //
-    dprint("Send!: ");
-    int ret = 0;
-    // Sending out packet with tuntap
-    //input_dump(in);
-
-    // Removing following sanity checks as they are done during initialization
-/*    if ( state->driver_handler == NULL ||
-            state->driver_handler->drv_handle == NULL ||
-            state->driver_handler->drv_tx == NULL) {
-            printf("Error: Device driver not configured\n");
-            return 0;
-    }
-*/
-    ret = state->driver_handler->drv_tx(state->driver_handler->drv_handle,
-                    in->data, in->len);
-    if (ret < 0) {
-        panic("packet sending failed\n");
-    }
-    return 0;
-}
-
-
 node_out_t do_pg__RxL3IPv6ValidHeaderLength(struct state *state, struct input *in)
 {
     // P_true, P_false
     return 0;
+}
+
+
+#include "../lib/Util/tap.h"
+
+static struct tap_handler *tap_handler = NULL;
+
+static void tap_init(void)
+{
+    if (tap_handler != NULL) {
+        printf("TAP Already intialized\n");
+        return;
+    }
+    tap_handler = tap_create("dragonet0");
+    tap_set_ip(tap_handler, "192.168.123.100");
+    tap_set_mask(tap_handler, "255.255.255.0");
+    tap_up(tap_handler);
+}
+
+node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
+{
+    if (tap_handler == NULL) {
+        tap_init();
+
+        state->local_mac = 0xf86954221b00ULL;
+        state->local_ip = 0xc0a87b01;
+    }
+
+    static uint8_t tmpbuf[2048];
+    size_t len = tap_read(tap_handler, (char *) tmpbuf, sizeof(tmpbuf));
+    input_copy_packet(in, tmpbuf, len);
+    return P_Queue_out;
+}
+
+node_out_t do_pg__TapTxQueue(struct state *state, struct input *in)
+{
+    tap_write(tap_handler, in->data, in->len);
+    return 0;
+
 }
 
 
