@@ -390,6 +390,7 @@ lpgRxL4UDPPortClassifyStaticImpl = do
     payload <- readPX plen poff
     let outPort = if dport == 51098 then "appDNS"
         else if dport == 5556 then "appEcho"
+        else if dport == 7 then "appDNS"
         else "closedPort"
     debug ("Hardcoded Classify: UDP packet with :"
         ++ "  sport " ++ (show sport)

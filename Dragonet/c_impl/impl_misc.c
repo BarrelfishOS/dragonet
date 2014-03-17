@@ -88,33 +88,10 @@ node_out_t do_pg__TxQueue(struct state *state, struct input *in)
 }
 
 
-
-
-
 node_out_t do_pg__RxL3IPv6ValidHeaderLength(struct state *state, struct input *in)
 {
     // P_true, P_false
     return 0;
-}
-
-node_out_t do_pg__RxEchoAPP(struct state *state, struct input *in)
-{
-    uint8_t contents[DEFAULT_BUFFER_SIZE];
-    int ret = udp_copy_payload(in, contents, sizeof(contents));
-    contents[ret] = '\0';
-    dprint("EchoAPP: Packet received ############## [%s]\n", contents);
-    // P_RxEchoAPP_out, P_RxEchoAPP_drop
-    return P_RxEchoAPP_out;
-}
-
-node_out_t do_pg__RxDnsAPP(struct state *state, struct input *in)
-{
-    uint8_t contents[DEFAULT_BUFFER_SIZE];
-    int ret = udp_copy_payload(in, contents, sizeof(contents));
-    contents[ret] = '\0';
-    dprint("DnsAPP: Packet received ############## [%s]\n", contents);
-    // P_RxDnsAPP_out, P_RxDnsAPP_drop
-    return P_RxDnsAPP_out;
 }
 
 
