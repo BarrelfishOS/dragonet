@@ -7,8 +7,10 @@ run_server() {
 }
 
 run_netperf() {
-    echo "Running netperf for machine [${MACHINE}:${ATTACKPORT}] for ${TIME} seconds"
-    netperf -N -H ${MACHINE} -4 -t UDP_RR  -l ${TIME} -- -r ${PSIZE} -b ${BRUST}
+#    echo "Running netperf for machine [${MACHINE}:${ATTACKPORT}] for ${TIME} seconds"
+    #OUTFORMAT1="LOCAL_BYTES_SENT,LOCAL_BYTES_RECVD"
+    OUTFORMAT="RESULT_BRAND,DEST_ADDR,REQUEST_SIZE,BURST_SIZE,TRANSACTION_RATE,RT_LATENCY,THROUGHPUT,THROUGHPUT_UNITS"
+    netperf -B ${MSG} -P 1 -N -H ${MACHINE} -4 -t UDP_RR  -l ${TIME} -v 2 -f m -- -r ${PSIZE} -b ${BRUST} -o "${OUTFORMAT}" # -O "${OUTFORMAT}"
 }
 
 show_usage() {
@@ -30,11 +32,15 @@ ATTACKPORT=7
 TIME=5
 BRUST=50
 PSIZE=1400
+MSG=""
 
-while getopts ":m:t:b:p:sg" opt; do
+while getopts ":m:M:t:b:p:sg" opt; do
   case $opt in
     m)
         MACHINE="$OPTARG"
+      ;;
+    M)
+        MSG="$OPTARG"
       ;;
     t)
         TIME="$OPTARG"
