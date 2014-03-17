@@ -51,6 +51,9 @@ prepare_machine() {
     echo 'apt-get install -y linux-headers-$(uname -r)' | on_machine ${MACHINE}
     echo 'apt-get install -y linux-headers-generic' | on_machine ${MACHINE}
     echo 'apt-get install -y netcat.traditional' | on_machine ${MACHINE}
+    echo 'apt-get install -y socat' | on_machine ${MACHINE}
+    echo 'apt-get install -y dstat' | on_machine ${MACHINE}
+    echo 'apt-get install -y netperf' | on_machine ${MACHINE}
     echo 'apt-get install -y git-core tig' | on_machine ${MACHINE}
 
     # for Dragonet
