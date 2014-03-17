@@ -50,20 +50,20 @@ library
                         Util.Misc,
                         Util.Tap
     build-depends:      base, containers, template-haskell, fgl, parsec,
-                        bytestring, pretty-show, stm, mtl, graphviz, text,
-                        process, temporary, Bulktransfer
+                        bytestring, pretty-show, stm, mtl, graphviz>=2999.16,
+                        text, process, temporary, Bulktransfer
     extensions:         DoAndIfThenElse, RankNTypes, EmptyDataDecls
 
 executable confgen
     main-is:            testConfGen.hs
-    build-depends:      Dragonet, base, graphviz, text, random, transformers,
-                        fgl, containers
+    build-depends:      Dragonet, base, graphviz>=2999.16, text, random,
+                        transformers, fgl, containers
     extensions:         DoAndIfThenElse
 
 executable graph
     main-is:            testGraph.hs
-    build-depends:      Dragonet, base, containers, bytestring, text, graphviz,
-                        fgl
+    build-depends:      Dragonet, base, containers, bytestring, text,
+                        graphviz>=2999.16, fgl
     extensions:         DoAndIfThenElse
 
 executable impl_th
@@ -74,8 +74,8 @@ executable impl_th
 
 executable incrementalSim
     main-is:            testIncremental.hs
-    build-depends:      Dragonet, base, fgl, pretty-show, graphviz, text,
-                        random, mtl, MonadRandom, containers
+    build-depends:      Dragonet, base, fgl, pretty-show, graphviz>=2999.16,
+                        text, random, mtl, MonadRandom, containers
     extensions:         DoAndIfThenElse
     ghc-options:        -threaded
 
