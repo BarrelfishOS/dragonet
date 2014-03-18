@@ -44,7 +44,7 @@ on_machine() {
 
 prepare_machine() {
 
-#    reload_resolver ${MACHINE}
+    reload_resolver ${MACHINE}
     echo 'apt-get update' | on_machine ${MACHINE}
     echo 'apt-get install -y screen byobu tree vim ctags cscope vim-gnome ack-grep' | on_machine ${MACHINE}
     echo 'apt-get install -y build-essential' | on_machine ${MACHINE}
