@@ -1,7 +1,15 @@
 #include <implementation.h>
 
-#define CONFIG_LOCAL_MAC_sf  0x495107530f00ULL  // "00:0f:53:07:51:49"
-#define CONFIG_LOCAL_IP_sf   0x0a710447         // "10.113.4.71"
+// this one is connected directly
+#define IFNAME              "eth5"
+#define CONFIG_LOCAL_MAC_sf  0x485107530f00ULL  // "00:0f:53:07:51:48"
+#define CONFIG_LOCAL_IP_sf   0x0a160426          // "10.22.4.38"
+        // NOTE: Can be generated in python with ``print "%02x%02x%02x%02x" % (10,113,4,71)``
+
+// this one is connected via switch
+//#define IFNAME              "eth7"
+//#define CONFIG_LOCAL_MAC_sf  0x495107530f00ULL  // "00:0f:53:07:51:49"
+//#define CONFIG_LOCAL_IP_sf   0x0a710447         // "10.113.4.71"
 
 struct vi;
 
@@ -18,7 +26,7 @@ uint32_t sf_ip_read(device_t ttd) {
 static
 void *init_onload_wrapper(char *arg)
 {
-    return ((void *) init_and_alloc_default_queue("eth7"));
+    return ((void *) init_and_alloc_default_queue(IFNAME));
 }
 
 static
