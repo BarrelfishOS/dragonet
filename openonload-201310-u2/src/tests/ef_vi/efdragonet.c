@@ -290,13 +290,6 @@ int init_dpdk_setupV2(void);
 
 #include <arpa/inet.h>
 
-//#define MYDEBUG     1
-#ifdef MYDEBUG
-#define dprint(x...)    printf("sfdebug:" x)
-#else
-#define dprint(x...)   ((void)0)
-#endif // MYDEBUG
-
 struct net_if *init_openonload_setup(char *name);
 struct vi *alloc_queue(struct net_if *myif);
 
@@ -431,6 +424,7 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
     while( 1 ) {
         viff = vif;
 
+//        dprint("%s:%d: polling event queue\n", __func__, __LINE__);
         n_ev = ef_eventq_poll(&viff->vi, evs, sizeof(evs) / sizeof(evs[0]));
         if( n_ev <= 0 )
             continue;
@@ -464,10 +458,15 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
                     //hexdump(RX_PKT_PTR(pkt_buf), len);
                     memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
                     pkt_buf_release(pkt_buf);
-                    buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                    dprint("%s:%s:%d: RX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                    if (pkt_buf->n_refs != 0) {
+                        dprint("%s:%s:%d: ################### BUF LEAK ####\n", __FILE__, __func__, __LINE__);
+                        buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                        dprint("%s:%s:%d: RX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                    }
+                    //assert(pkt_buf->n_refs == 0);
 
                     pkt_received = copylen;
+                    vi_refill_rx_ring(viff);
                     // NOTE: I am assuming that we are reading only one event
                     //      in each iteration
                     return pkt_received;
@@ -482,9 +481,13 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
                         buf_details(pkt_buf, printbuf, sizeof(printbuf));
                         dprint("%s:%s:%d: TX, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
                         pkt_buf_release(pkt_buf);
-                        buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                        dprint("%s:%s:%d: TX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
-                    }
+                        if (pkt_buf->n_refs != 0) {
+                            dprint("%s:%s:%d: ################### BUF LEAK %d ####\n", __FILE__, __func__, __LINE__,j);
+                            buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                            dprint("%s:%s:%d: TX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                        }
+                        //assert(pkt_buf->n_refs == 0);
+                    } // end for:
                     break;
 
                 case EF_EVENT_TYPE_RX_DISCARD:
@@ -535,7 +538,7 @@ void send_packet(struct vi *vif, char *pkt_tx, size_t len)
     // print details of buffer which is being sent
     char printbuf[PRINTBUFSIZE] = {'\0'};
     buf_details(pkt_buf, printbuf, sizeof(printbuf));
-    dprint("%s:%s:%d: using %s\n", __FILE__, __func__, __LINE__, printbuf);
+    dprint("%s:%s:%d: ###### 1 %s\n", __FILE__, __func__, __LINE__, printbuf);
 
     offset = RX_PKT_OFF(vif);
     assert(pkt_buf != NULL);
@@ -545,6 +548,9 @@ void send_packet(struct vi *vif, char *pkt_tx, size_t len)
 //#define RX_PKT_PTR(pb)   ((char*) (pb) + RX_PKT_OFF((pb)->vi_owner))
 //                    memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
     void * buf_addr = RX_PKT_PTR(pkt_buf);
+    buf_details(pkt_buf, printbuf, sizeof(printbuf));
+    dprint("%s:%s:%d: ###### 2 %s\n", __FILE__, __func__, __LINE__, printbuf);
+
 //    void * buf_addr = (void *)(pkt_buf->addr[pkt_buf->vi_owner->net_if->id] + offset);
     dprint("%s:%s:%d: calling memcpy\n", __FILE__, __func__, __LINE__);
     volatile char aa = 0;
@@ -573,11 +579,14 @@ void send_packet(struct vi *vif, char *pkt_tx, size_t len)
         LOGW(fprintf(stderr, "WARNING: [%s] dropped send\n",
                     vif->net_if->name));
     }
-    // FIXME: should I release pkt_buf here?
-//    pkt_buf_release(pkt_buf);
+
+    // marking that sending is partially done.  The ref counter should still be 1
+    pkt_buf_release(pkt_buf);
+    //assert(pkt_buf->n_refs == 1);
+
     dprint("%s:%s:%d: vi_send done\n", __FILE__, __func__, __LINE__);
     buf_details(pkt_buf, printbuf, sizeof(printbuf));
-    dprint("%s:%s:%d: buf ater sending %s\n", __FILE__, __func__, __LINE__, printbuf);
+    dprint("%s:%s:%d: ###### 3 %s\n", __FILE__, __func__, __LINE__, printbuf);
 
 
 

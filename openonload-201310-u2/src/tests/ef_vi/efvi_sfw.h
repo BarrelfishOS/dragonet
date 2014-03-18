@@ -200,4 +200,12 @@ vi_send(struct vi* vi, struct pkt_buf* pkt_buf, int off, int len);
 extern struct pkt_buf*
 vi_get_free_pkt_buf(struct vi* vi);
 
+//#define MYDEBUG     1
+#ifdef MYDEBUG
+#define dprint(x...)    printf("sfdebug:" x)
+#else
+#define dprint(x...)   ((void)0)
+#endif // MYDEBUG
+
+
 #endif  /* __EFVI_SFW_H__ */

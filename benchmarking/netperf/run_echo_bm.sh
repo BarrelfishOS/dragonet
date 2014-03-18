@@ -2,6 +2,8 @@
 
 run_server() {
     echo "Running sink on port ${ATTACKPORT}"
+    # Note: I normally execute this as root, and not with sudo
+    #sudo onload --profile=latency --preload=/usr/lib64/libonload.so socat PIPE UDP-LISTEN:7,fork
     sudo socat PIPE UDP-LISTEN:7,fork
     #sudo nc.traditional -vvlup 7 -e /bin/cat
 }
@@ -19,9 +21,12 @@ show_usage() {
         echo "           -s/-g -->  run as server/generator"
         #echo "           -a -->  attack port"
         echo "           -t -->  no. seconds to run the test"
-
+        echo "           -M -->  Message to prepend in output"
+        echo "           -f -->  output unit k/m/g"
+        echo "           -o/-O -->  machine/human readable output"
         echo "Examples: ${0} -g -m 127.0.0.1 -t 5"
         echo "Examples: ${0} -g -m 192.168.123.1 -t 5"
+        echo "Examples: ${0} -g -m 10.113.4.71 -M CImpl-SF -O"
         echo "Examples: ${0} -s"
         exit 1
 }
@@ -32,9 +37,11 @@ ATTACKPORT=7
 TIME=5
 BRUST=50
 PSIZE=1400
-MSG=""
+MSG="RUN"
+OUTPUTTYPE="o"
+FTYPE="m"
 
-while getopts ":m:M:t:b:p:sg" opt; do
+while getopts ":m:M:t:b:p:f:sgoO" opt; do
   case $opt in
     m)
         MACHINE="$OPTARG"
@@ -54,10 +61,18 @@ while getopts ":m:M:t:b:p:sg" opt; do
     s)
         SERVER="yes"
       ;;
+    o)
+        OUTPUTTYPE="o"
+      ;;
+    O)
+        OUTPUTTYPE="O"
+      ;;
     g)
         GENERTOR="yes"
       ;;
-
+    f)
+        FTYPE="$OPTARG"
+      ;;
 
     \?)
         echo "Invalid option: -$OPTARG" >&2

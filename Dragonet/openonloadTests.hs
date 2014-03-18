@@ -104,7 +104,7 @@ runSimIncremental = do
     sfvi1 <- SF.alloc_queue sf_if
     --SF.alloc_filter_default sfvi1
 --    let Just localip =  LPGBase.cfgLocalIP
-    localIP <- DNET.getLocalIPaddr
+    let localIP = gsLocalIPaddr initialState
     SF.alloc_filter_listen_ipv4 sfvi0 (fromIntegral IP4.protocolTCP) localIP 1234
     SF.alloc_filter_listen_ipv4 sfvi1 (fromIntegral IP4.protocolTCP) localIP 2234
     --SF.alloc_filter_listen_ipv4 sfvi1 (fromIntegral IP4.protocolTCP) 0 0
