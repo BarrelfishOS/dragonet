@@ -1,5 +1,56 @@
 #!/bin/bash
 
+run_bm_tp() {
+    THOST=${1}
+    MYMSG=${2}
+    if [ ${MYMSG} == "" ] ; then
+        MYMSG="${THOST}-${BRUST}"
+    fi
+    TMPFILE="./tmpout.txt"
+    SAMARRYFILE="./tmpsammary.txt"
+    rm -f ${SAMARRYFILE}
+
+#    set -x
+#    set -e
+    CTP=0
+    NTP=1
+    LBRUST=1
+    CBRUST=1
+    NBRUST=1
+    while [  $NTP -gt $CTP ]; do
+#        set -x
+#        set -e
+        let LBRUST=CBRUST
+        let CBRUST=NBRUST
+        let NBRUST=CBRUST+CBRUST
+        ./run_echo_bm.sh -g -M ${MYMSG} -m ${THOST} -t ${RTIME} -p ${PKTSIZE} -b ${CBRUST} -o k | tee ${TMPFILE}
+
+        let CTP=NTP
+
+        NBWD=`cat ${TMPFILE} | grep "THROUGHPUT=" | cut -d= -f2` # | cut -d. -f1`
+        NLATENCY=`cat ${TMPFILE} | grep "RT_LATENCY=" | cut -d= -f2` # | cut -d. -f1`
+        NTP=`cat ${TMPFILE} | grep "TRANSACTION_RATE=" | cut -d= -f2 | cut -d. -f1`
+        echo "TPITERATOR: ${MYMSG}, ${THOST}, ${PKTSIZE}, ${CBRUST}, ${NTP}, ${NLATENCY}, ${NBWD}" >> ${SAMARRYFILE}
+        echo "TP of $NTP for $CBRUST"
+
+        cat ${TMPFILE} >> ${OUTFILE}
+        rm -f ${TMPFILE}
+        sleep 5
+    done
+
+    set -x
+    set -e
+    ./run_echo_bm.sh -g -M ${MYMSG} -m ${THOST} -t ${RTIME} -p ${PKTSIZE} -b ${LBRUST} | tee -a ${OUTFILE}
+    set +x
+    set +e
+    cat ${SAMARRYFILE} >> ${OUTFILE}
+    rm -f ${SAMARRYFILE}
+    sleep 3
+    echo "while [  $NTP -gt $CTP ]; do"
+}
+
+
+
 run_bm() {
     THOST=${1}
     MYMSG=${2}
@@ -46,10 +97,16 @@ run_others()
 
 process_results () {
 
+NTMPFILE="./tmpfile2"
+cat ${OUTFILE} | grep -v "MIGRATED" | grep "TRANSACTION_RATE"  | grep "RT_LATENCY" | tr , \| | sed 's\$\|\' | sed 's\^\|\' > ${NTMPFILE}
 if [ "${SILENTHEADER}" == "no" ] ; then
-    cat ${OUTFILE}  | grep -v "MIGRATED"  | tr , \| | sed 's\$\|\' | sed 's\^\|\'  | grep "Result Tag" | head -n1 >> ${RESULTFILE}
+    cat ${NTMPFILE} | grep "Result Tag" | head -n1 >> ${RESULTFILE}
 fi
-    cat ${OUTFILE}  | grep -v "MIGRATED"  | tr , \| | sed 's\$\|\' | sed 's\^\|\'  | grep -v "Result Tag" >> ${RESULTFILE}
+cat ${NTMPFILE} | grep -v "Result Tag" | head -n1 >> ${RESULTFILE}
+
+echo "Incremental Throughput measurement"
+cat ${OUTFILE} | grep "TPITERATOR" | cut -d: -f2  | tr , \| | sed 's\$\|\' | sed 's\^\|\' >> ${RESULTFILE}
+
 }
 
 
@@ -61,7 +118,7 @@ BRUST=1
 # Throughput run
 BMTYPE="TP"
 PKTSIZE=1400
-BRUST=50
+BRUST=10
 
 RTIME=5
 OUTFILE="output.txt"
@@ -71,6 +128,7 @@ SILENTHEADER="no"
 LOOPBACK="no"
 TUNTAP="no"
 SF="no"
+SFDirect="no"
 DPDK="no"
 LAN="no"
 MSG=""
@@ -79,7 +137,7 @@ NETSTACKTYPE="Cimpl"
 
 
 show_usage() {
-    echo "Usage: ${0} -T -L -S -D -I (tuntap, loopback, sf, dpdk, lan)"
+    echo "Usage: ${0} -T -L -S -d -D -I (tuntap, loopback, sf, sf-direct, dpdk, lan)"
     echo "      -n <Net-stack-Type> -->  Type of network stack (Cimpl, Haskell,)"
     echo "      -M -->  MSG to prepend to test name (eg: R2)"
     echo "      -r <filename> -->  results file, where results will be added"
@@ -93,7 +151,7 @@ show_usage() {
     exit 1
 }
 
-while getopts ":M:r:n:sltLSDIT" opt; do
+while getopts ":M:r:n:sltLSDITd" opt; do
   case $opt in
     M)
         MSG="$OPTARG"
@@ -116,7 +174,7 @@ while getopts ":M:r:n:sltLSDIT" opt; do
     t)
         BMTYPE="TP"
         PKTSIZE=1400
-        BRUST=50
+        BRUST=10
       ;;
     L)
         LOOPBACK="yes"
@@ -127,6 +185,9 @@ while getopts ":M:r:n:sltLSDIT" opt; do
       ;;
     S)
         SF="yes"
+      ;;
+    d)
+        SFDirect="yes"
       ;;
     D)
         DPDK="yes"
@@ -166,6 +227,16 @@ if [ "${SF}" == "yes" ] ; then
     NMSG="${MSG}-${NETSTACKTYPE}-${BMTYPE}-SF"
     run_bm "10.113.4.71" "${NMSG}"
 fi
+
+if [ "${SFDirect}" == "yes" ] ; then
+    NMSG="${MSG}-${NETSTACKTYPE}-${BMTYPE}-SFD"
+    if [ "${BMTYPE}" == "TP" ] ; then
+        run_bm_tp "10.22.4.38" "${NMSG}"
+    else
+        run_bm "10.22.4.38" "${NMSG}"
+    fi
+fi
+
 
 if [ "${LAN}" == "yes" ] ; then
     NMSG="${MSG}-Linux-${BMTYPE}-LAN"

@@ -12,7 +12,7 @@ run_netperf() {
 #    echo "Running netperf for machine [${MACHINE}:${ATTACKPORT}] for ${TIME} seconds"
     #OUTFORMAT1="LOCAL_BYTES_SENT,LOCAL_BYTES_RECVD"
     OUTFORMAT="RESULT_BRAND,DEST_ADDR,REQUEST_SIZE,BURST_SIZE,TRANSACTION_RATE,RT_LATENCY,THROUGHPUT,THROUGHPUT_UNITS"
-    netperf -B ${MSG} -P 1 -N -H ${MACHINE} -4 -t UDP_RR  -l ${TIME} -v 2 -f m -- -r ${PSIZE} -b ${BRUST} -o "${OUTFORMAT}" # -O "${OUTFORMAT}"
+    netperf -B ${MSG} -P 1 -N -H ${MACHINE} -4 -t UDP_RR  -l ${TIME} -v 2 -f m -- -r ${PSIZE} -b ${BRUST} "-${OUTPUTTYPE}" "${OUTFORMAT}"
 }
 
 show_usage() {
@@ -23,7 +23,7 @@ show_usage() {
         echo "           -t -->  no. seconds to run the test"
         echo "           -M -->  Message to prepend in output"
         echo "           -f -->  output unit k/m/g"
-        echo "           -o/-O -->  machine/human readable output"
+        echo "           -o -->  output format (k/o/O)"
         echo "Examples: ${0} -g -m 127.0.0.1 -t 5"
         echo "Examples: ${0} -g -m 192.168.123.1 -t 5"
         echo "Examples: ${0} -g -m 10.113.4.71 -M CImpl-SF -O"
@@ -41,7 +41,7 @@ MSG="RUN"
 OUTPUTTYPE="o"
 FTYPE="m"
 
-while getopts ":m:M:t:b:p:f:sgoO" opt; do
+while getopts ":m:M:t:b:p:f:sgo:" opt; do
   case $opt in
     m)
         MACHINE="$OPTARG"
@@ -62,10 +62,7 @@ while getopts ":m:M:t:b:p:f:sgoO" opt; do
         SERVER="yes"
       ;;
     o)
-        OUTPUTTYPE="o"
-      ;;
-    O)
-        OUTPUTTYPE="O"
+        OUTPUTTYPE="$OPTARG"
       ;;
     g)
         GENERTOR="yes"

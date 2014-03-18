@@ -82,6 +82,8 @@ IFACE_NAME_FILE="./minfo/used_if.log"
 mkdir -p `dirname $IFACE_NAME_FILE`
 echo "and storing useful information in ${IFACE_NAME_FILE}!!"
 
+echo "" > hosts.txt_new
+
 echo "for gottardo"
 setDHCPIPaddr "00:30:48:fe:58:1e"  "10.110.4.67" "gottardo" "gottardo"
 setIPaddr "00:1b:21:8f:1b:20" "10.113.4.49" "gottardo" "g1" 1
