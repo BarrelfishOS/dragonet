@@ -52,17 +52,6 @@ fi
     cat ${OUTFILE}  | grep -v "MIGRATED"  | tr , \| | sed 's\$\|\' | sed 's\^\|\'  | grep -v "Result Tag" >> ${RESULTFILE}
 }
 
-show_usage() {
-        echo "Usage: ${0} -i <interfaceName> --> tuntap, sf, dpdk, lo, lan"
-        echo "           -M -->  Message to add into result"
-        echo "           -p <filename> -->  process and write results in file"
-        echo "Examples: ${0} -g -m 127.0.0.1 -t 5"
-        echo "Examples: ${0} -g -m 192.168.123.1 -t 5"
-        echo "Examples: ${0} -s"
-        exit 1
-}
-
-
 
 # latency run
 BMTYPE="LP"
@@ -80,13 +69,31 @@ RESULTFILE="result.txt"
 SILENTHEADER="no"
 
 LOOPBACK="no"
+TUNTAP="no"
 SF="no"
 DPDK="no"
 LAN="no"
 MSG=""
 
+NETSTACKTYPE="Cimpl"
 
-while getopts ":M:r:sltLSDI" opt; do
+
+show_usage() {
+    echo "Usage: ${0} -T -L -S -D -I (tuntap, loopback, sf, dpdk, lan)"
+    echo "      -n <Net-stack-Type> -->  Type of network stack (Cimpl, Haskell,)"
+    echo "      -M -->  MSG to prepend to test name (eg: R2)"
+    echo "      -r <filename> -->  results file, where results will be added"
+    echo "      -s  -->  Do not add headers in results file"
+    echo "      -l  -->  Do a latency benchmark"
+    echo "      -t  -->  Do a Throughput benchmark"
+    echo "Examples: ${0} -t -T -L -n 'CImpl' -r ./runh.results"
+    echo "Examples: ${0} -t -T -n 'HImpl' -s -r ./runh.results"
+    echo "Examples: ${0} -t -S -n 'CImpl' -r ./runc.results"
+    echo "Examples: ${0} -t -S -n 'CImpl' -s -r  ./runc.results"
+    exit 1
+}
+
+while getopts ":M:r:n:sltLSDIT" opt; do
   case $opt in
     M)
         MSG="$OPTARG"
@@ -94,6 +101,9 @@ while getopts ":M:r:sltLSDI" opt; do
     r)
         PROCESSRESULT="yes"
         RESULTFILE="$OPTARG"
+      ;;
+    n)
+        NETSTACKTYPE="$OPTARG"
       ;;
     s)
         SILENTHEADER="no"
@@ -110,6 +120,10 @@ while getopts ":M:r:sltLSDI" opt; do
       ;;
     L)
         LOOPBACK="yes"
+      ;;
+
+    T)
+        TUNTAP="yes"
       ;;
     S)
         SF="yes"
@@ -137,29 +151,33 @@ done
 # Resetting putput.
 echo > ${OUTFILE}
 
+if [ "${TUNTAP}" == "yes" ] ; then
+    NMSG="${MSG}-${NETSTACKTYPE}-${BMTYPE}-Tuntap"
+    run_bm "192.168.123.1" "${NMSG}"
+fi
+
 
 if [ "${LOOPBACK}" == "yes" ] ; then
-    NMSG="${MSG}-${BMTYPE}-LinuxLO"
+    NMSG="${MSG}-Linux-${BMTYPE}-LO"
     run_bm "localhost" "${NMSG}"
 fi
 
 if [ "${SF}" == "yes" ] ; then
-    NMSG="${MSG}-${BMTYPE}-SF"
+    NMSG="${MSG}-${NETSTACKTYPE}-${BMTYPE}-SF"
     run_bm "10.113.4.71" "${NMSG}"
 fi
 
 if [ "${LAN}" == "yes" ] ; then
-    NMSG="${MSG}-${BMTYPE}-LAN"
+    NMSG="${MSG}-Linux-${BMTYPE}-LAN"
     run_bm "base-station.ethz.ch" "${NMSG}"
 fi
 
 if [ "${DPDK}" == "yes" ] ; then
-    NMSG="${MSG}-${BMTYPE}-DPDK"
+    NMSG="${MSG}-${NETSTACKTYPE}-${BMTYPE}-DPDK"
     echo "NOT YET SUPPORTED"
     exit 1
 #    run_bm "10.113.4.71" "CImpl-SF"
 fi
-
 
 if [ "${PROCESSRESULT}" == "yes" ] ; then
     process_results
