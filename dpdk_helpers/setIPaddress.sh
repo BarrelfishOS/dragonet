@@ -8,7 +8,6 @@ function setemmentalerASrouter()
     /sbin/route -n
 }
 
-
 function setDHCPIPaddr()
 {
     MAC=$1
@@ -48,12 +47,26 @@ function setIPaddr()
         if [ "$USED" == 1 ]; then
             echo "$IFACE" > ${IFACE_NAME_FILE}
         fi
+
+        # configuring so that interface will reply to only his ARP requests
+        #http://kb.linuxvirtualserver.org/wiki/Using_arp_announce/arp_ignore_to_disable_ARP
+
+        #echo "net.ipv4.conf.eth0.arp_ignore = 1" >> /etc/sysctl.conf
+        #echo "net.ipv4.conf.eth0.arp_announce = 2" >> /etc/sysctl.conf
+        #echo 1 > /proc/sys/net/ipv4/conf/$IFACE/arp_ignore
+        #echo 2 > /proc/sys/net/ipv4/conf/$IFACE/arp_announce
+
     fi
     echo "$IP $SNAME # $HNAME $MAC $IP $SNAME" >> hosts.txt_new
-
 }
 
 
+set_custom_resolver() {
+    echo "domain in.barrelfish.org" > ${RESOLVFILE}
+    echo "search in.barrelfish.org" >> ${RESOLVFILE}
+    echo "nameserver 129.132.102.36" >> ${RESOLVFILE}
+    cp ${RESOLVFILE} "/etc/resolv.conf"
+}
 
 check_file_exist1() {
     FNAME=$1
@@ -64,20 +77,10 @@ check_file_exist1() {
 }
 
 
-#source ./common.h
-
-if [ -f "./common.h" ] ;  then
-    source ./common.h
-    IFACE_NAME_FILE="../minfo/used_if.log"
-    mkdir -p `dirname $IFACE_NAME_FILE`
-    cp ssh_config.txt ssh_config.txt_new
-    cp hosts.txt hosts.txt_new
-else
-    IFACE_NAME_FILE="./minfo/used_if.log"
-    mkdir -p `dirname $IFACE_NAME_FILE`
-    echo "running in stand-alone mode!!"
-    echo "and storing useful information in ${IFACE_NAME_FILE}!!"
-fi
+RESOLVFILE="./minfo/resolv.conf"
+IFACE_NAME_FILE="./minfo/used_if.log"
+mkdir -p `dirname $IFACE_NAME_FILE`
+echo "and storing useful information in ${IFACE_NAME_FILE}!!"
 
 echo "for gottardo"
 setDHCPIPaddr "00:30:48:fe:58:1e"  "10.110.4.67" "gottardo" "gottardo"
@@ -94,7 +97,7 @@ setIPaddr "00:1b:21:8f:1a:c1" "10.112.4.36" "sbrinz1" "sb1d"
 
 echo "for ziger1"
 setDHCPIPaddr "00:21:28:6B:98:ba" "10.110.4.51" "ziger1" "ziger1"
-setIPaddr "00:1b:21:8f:18:64" "10.113.5.37" "ziger1" "z11d"  # not connected
+setIPaddr "00:1b:21:8f:18:64" "10.22.4.37" "ziger1" "z11d"  # not connected
 setIPaddr "00:1b:21:8f:18:65" "10.113.4.38" "ziger1" "z12" 1
 
 
@@ -105,15 +108,34 @@ setIPaddr "00:0f:53:07:48:d5" "10.113.5.43" "ziger2" "z2s2d" # SF # not connecte
 
 echo "for appenzeller"
 setDHCPIPaddr "00:25:64:fc:61:dd" "10.110.4.64" "appenzeller" "appenzeller"
+setIPaddr "00:0f:53:07:51:48" "10.22.4.38" "appenzeller" "a12" # SF
 setIPaddr "00:0f:53:07:51:49" "10.113.4.71" "appenzeller" "a1" # SF
 
 ROUTER="10.110.4.4"
+MYDNSSERVER="129.132.102.36"
+
+nslookup www.google.com
+if [ $? -ne 0 ]; then
+    echo "Default resolver not working, setting custom one"
+    set_custom_resolver
+
+    nslookup www.google.com
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Even custom resolver is not working."
+        echo "You may want to resolve this situation before continuing"
+        echo "Here is your resolv.conf"
+        cat /etc/resolv.conf
+    else
+        echo "NOTE: new resolver is working"
+    fi
+fi
+
 #echo "setting ${ROUTER} as router"
 #setemmentalerASrouter ${ROUTER}
 
 # following steps are done in setTools.sh script
 
-#cat hosts.txt_new >> /etc/hosts
+cat hosts.txt_new >> /etc/hosts
 
 #mkdir -p /root/.ssh/
 #mkdir -p ~/.ssh/
