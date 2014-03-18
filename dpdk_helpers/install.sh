@@ -48,6 +48,9 @@ prepare_machine() {
     echo 'apt-get update' | on_machine ${MACHINE}
     echo 'apt-get install -y screen byobu tree vim ctags cscope vim-gnome ack-grep' | on_machine ${MACHINE}
     echo 'apt-get install -y build-essential' | on_machine ${MACHINE}
+    echo 'apt-get install -y ia32-libs' | on_machine ${MACHINE}
+    echo 'apt-get install -y gcc-multilib libc6-dev-i386' | on_machine ${MACHINE}
+    echo 'apt-get install -y python-dev' | on_machine ${MACHINE}
     echo 'apt-get install -y linux-headers-$(uname -r)' | on_machine ${MACHINE}
     echo 'apt-get install -y linux-headers-generic' | on_machine ${MACHINE}
     echo 'apt-get install -y netcat.traditional' | on_machine ${MACHINE}
