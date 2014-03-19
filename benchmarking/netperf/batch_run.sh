@@ -51,6 +51,7 @@ run_bm_tp() {
 
 
 
+
 run_bm() {
     THOST=${1}
     MYMSG=${2}
@@ -64,6 +65,40 @@ run_bm() {
     set +e
     sleep 3
 }
+
+
+run_bm_ping() {
+    THOST=${1}
+    MYMSG=${2}
+    if [ ${MYMSG} == "" ] ; then
+        MYMSG="${THOST}-${BRUST}"
+    fi
+    set -x
+    set -e
+    ping -c 10 ${THOST} | tee -a ${OUTFILE}
+    set +x
+    set +e
+    sleep 3
+}
+
+run_bm_echo() {
+    THOST=${1}
+    MYMSG=${2}
+    if [ ${MYMSG} == "" ] ; then
+        MYMSG="${THOST}-${BRUST}"
+    fi
+    TMPOUTFILE="./ncechoouttmp.txt"
+    set -x
+    set -e
+    nc.traditional -n -vv -i 1 -q 1 -u ${THOST} ${SERVERPORT} < ${INFILE} &>  ${TMPOUTFILE}
+    cat ${TMPOUTFILE} | tee -a ${OUTFILE}
+    diff ${INFILE} ${TMPOUTFILE} | tee -a ${OUTFILE}
+    set +x
+    set +e
+    sleep 3
+}
+
+
 
 run_haskell_SF()
 {
@@ -98,15 +133,32 @@ run_others()
 process_results () {
 
 NTMPFILE="./tmpfile2"
-cat ${OUTFILE} | grep -v "MIGRATED" | grep "TRANSACTION_RATE"  | grep "RT_LATENCY" | tr , \| | sed 's\$\|\' | sed 's\^\|\' > ${NTMPFILE}
+#cat ${OUTFILE} | grep -v "MIGRATED" | grep "TRANSACTION_RATE"  | grep "RT_LATENCY" | tr , \| | sed 's\$\|\' | sed 's\^\|\' > ${NTMPFILE}
+cat ${OUTFILE} | grep -v "MIGRATED" |  grep -v "=" | grep -v "TPITERATOR" | tr , \| | sed 's\$\|\' | sed 's\^\|\' > ${NTMPFILE}
 if [ "${SILENTHEADER}" == "no" ] ; then
     cat ${NTMPFILE} | grep "Result Tag" | head -n1 >> ${RESULTFILE}
 fi
-cat ${NTMPFILE} | grep -v "Result Tag" | head -n1 >> ${RESULTFILE}
+cat ${NTMPFILE} | grep -v "Result Tag" >> ${RESULTFILE}
 
-echo "Incremental Throughput measurement"
-cat ${OUTFILE} | grep "TPITERATOR" | cut -d: -f2  | tr , \| | sed 's\$\|\' | sed 's\^\|\' >> ${RESULTFILE}
 
+    if [ "${BMTYPE}" == "TP" ] ; then
+        echo "Incremental Throughput measurement"
+        cat ${OUTFILE} | grep "TPITERATOR" | cut -d: -f2  | tr , \| | sed 's\$\|\' | sed 's\^\|\' >> ${RESULTFILE}
+    fi
+
+}
+
+
+run_bm_generic() {
+    if [ "${BMTYPE}" == "TP" ] ; then
+        run_bm_tp ${1} ${2}
+    elif [ "${BMTYPE}" == "LP" ] ; then
+        run_bm ${1} ${2}
+    elif [ "${BMTYPE}" == "PING" ] ; then
+        run_bm_ping ${1} ${2}
+    elif [ "${BMTYPE}" == "ECHO" ] ; then
+        run_bm_echo ${1} ${2}
+    fi
 }
 
 
@@ -134,6 +186,9 @@ LAN="no"
 MSG=""
 
 NETSTACKTYPE="Cimpl"
+SERVERPORT=7
+
+
 
 
 show_usage() {
@@ -144,14 +199,22 @@ show_usage() {
     echo "      -s  -->  Do not add headers in results file"
     echo "      -l  -->  Do a latency benchmark"
     echo "      -t  -->  Do a Throughput benchmark"
+    echo "      -p  -->  Do a ping benchmark"
+    echo "      -e  -->  Do a echo benchmark"
     echo "Examples: ${0} -t -T -L -n 'CImpl' -r ./runh.results"
     echo "Examples: ${0} -t -T -n 'HImpl' -s -r ./runh.results"
     echo "Examples: ${0} -t -S -n 'CImpl' -r ./runc.results"
     echo "Examples: ${0} -t -S -n 'CImpl' -s -r  ./runc.results"
+    echo "Examples: ${0} -p -D"
+    echo "Examples: ${0} -e -D"
     exit 1
 }
 
-while getopts ":M:r:n:sltLSDITd" opt; do
+# for echo benchmark
+INFILE="./inputfile.txt"
+echo -e "hello\nworld\n1\n2\n3\n" > ${INFILE}
+
+while getopts ":M:r:n:sltLSDITdpe" opt; do
   case $opt in
     M)
         MSG="$OPTARG"
@@ -165,6 +228,12 @@ while getopts ":M:r:n:sltLSDITd" opt; do
       ;;
     s)
         SILENTHEADER="no"
+      ;;
+    p)
+        BMTYPE="PING"
+      ;;
+    e)
+        BMTYPE="ECHO"
       ;;
     l)
         BMTYPE="LP"
@@ -209,50 +278,46 @@ while getopts ":M:r:n:sltLSDITd" opt; do
 done
 
 
+
 # Resetting putput.
 echo > ${OUTFILE}
 
 if [ "${TUNTAP}" == "yes" ] ; then
     NMSG="${MSG}-${NETSTACKTYPE}-${BMTYPE}-Tuntap"
-    run_bm "192.168.123.1" "${NMSG}"
+    run_bm_generic "192.168.123.1" "${NMSG}"
 fi
 
 
 if [ "${LOOPBACK}" == "yes" ] ; then
     NMSG="${MSG}-Linux-${BMTYPE}-LO"
-    run_bm "localhost" "${NMSG}"
+    run_bm_generic "localhost" "${NMSG}"
 fi
 
 if [ "${SF}" == "yes" ] ; then
     NMSG="${MSG}-${NETSTACKTYPE}-${BMTYPE}-SF"
-    run_bm "10.113.4.71" "${NMSG}"
+    run_bm_generic "10.113.4.71" "${NMSG}"
 fi
 
 if [ "${SFDirect}" == "yes" ] ; then
     NMSG="${MSG}-${NETSTACKTYPE}-${BMTYPE}-SFD"
-    if [ "${BMTYPE}" == "TP" ] ; then
-        run_bm_tp "10.22.4.38" "${NMSG}"
-    else
-        run_bm "10.22.4.38" "${NMSG}"
-    fi
+    run_bm_generic "10.22.4.38" "${NMSG}"
 fi
 
 
 if [ "${LAN}" == "yes" ] ; then
     NMSG="${MSG}-Linux-${BMTYPE}-LAN"
-    run_bm "base-station.ethz.ch" "${NMSG}"
+    run_bm_generic "base-station.ethz.ch" "${NMSG}"
 fi
 
 if [ "${DPDK}" == "yes" ] ; then
     NMSG="${MSG}-${NETSTACKTYPE}-${BMTYPE}-DPDK"
-    echo "NOT YET SUPPORTED"
-    exit 1
-#    run_bm "10.113.4.71" "CImpl-SF"
+
+    run_bm_generic "10.22.4.37" "${NMSG}"
 fi
 
 if [ "${PROCESSRESULT}" == "yes" ] ; then
     process_results
+    cat ${RESULTFILE}
 fi
 
-cat ${RESULTFILE}
 
