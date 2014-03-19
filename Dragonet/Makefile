@@ -118,10 +118,11 @@ Util/Tap.$(OSUF): Util/Tap_.$(OSUF) Util/tap.$(OSUF)
 	ld -i $^ -o $@
 
 # Runs the simulator against dpdk userspace network
-dpdk: base Util/Dpdk.$(OSUF) intel_dpdk
+dpdk: base Util/Dpdk.$(OSUF) # intel_dpdk
 	$(GHC) $(GHCFLAGS) -threaded dpdkTests.hs -o dpdkDragonet -L../dpdk-1.5.0r1/build/lib/ -lintel_dpdk
 
 dpdk_run: dpdk
+	#../dpdk-1.5.0r1/tools/pci_unbind.py -b igb_uio 81:00.0
 	export LD_LIBRARY_PATH=/home/ubuntu/dragonet/dpdk-1.5.0r1/build/lib/ ; ./dpdkDragonet
 
 ## Util/Dpdk
@@ -130,12 +131,12 @@ RTE_TARGET ?= x86_64-default-linuxapp-gcc
 RTE_SDK ?= ../dpdk-1.5.0r1/
 
 
-Util/dpdk.$(OSUF): ../dpdk-1.5.0r1/examples/uDragonet/dpdk.c intel_dpdk
-	echo "##########################"
-	cd ../dpdk-1.5.0r1/examples/uDragonet  && $(MAKE)
-	cp ../dpdk-1.5.0r1/examples/uDragonet/build/dpdk.$(OSUF) Util/
+#Util/dpdk.$(OSUF): ../dpdk-1.5.0r1/examples/uDragonet/dpdk.c intel_dpdk
+#	echo "##########################"
+#	cd ../dpdk-1.5.0r1/examples/uDragonet  && $(MAKE)
+#	cp ../dpdk-1.5.0r1/examples/uDragonet/build/dpdk.$(OSUF) Util/
 
-objfiles: ../dpdk-1.5.0r1/app/test-pmd/dpdk.c intel_dpdk
+objfiles: ../dpdk-1.5.0r1/app/test-pmd/dpdk.c # intel_dpdk
 	echo "##########################"
 	cd ../dpdk-1.5.0r1/app/dpdkDriver/ && ./myMake.sh
 	cp ../dpdk-1.5.0r1/app/dpdkDriver/build/*.$(OSUF) Util/

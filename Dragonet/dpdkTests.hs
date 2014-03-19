@@ -25,8 +25,8 @@ import qualified LPGEx1 as LPG1
 initialState = st'
     where
     st = DNET.emptyGS
-    mac = fromJust $ ETH.macFromString "00:0f:53:07:48:d5"
-    ip = fromJust $ IP4.ipFromString "10.111.4.37"
+    mac = fromJust $ ETH.macFromString  "00:1b:21:8f:18:64" --"00:0f:53:07:48:d5"
+    ip = fromJust $ IP4.ipFromString  "10.22.4.37"  -- "10.111.4.37"
     st' = setLocalMACandIP st mac ip
 
 --receivedPacket state packet = DNET.Alg.execute LPGImpl.lpg packet state
@@ -42,12 +42,12 @@ data NetEvent =
 rxThread c dpdk qid = M.forever $ do
 --    p <- Dpdk.getPacket
     p <- Dpdk.getPacket_v2 0 0 qid
-    putStrLn ("received Packet on qid " ++ (show qid))
+--    putStrLn ("received Packet on qid " ++ (show qid))
     STM.atomically $ TC.writeTChan c (RXEvent p)
 
 txThread c dpdk qid = M.forever $ do
     (TXEvent p) <- STM.atomically $ TC.readTChan c
-    putStrLn ("Send Packet on qid " ++ (show qid))
+--    putStrLn ("Send Packet on qid " ++ (show qid))
 --    Dpdk.sendPacket p
     Dpdk.sendPacket_v2 0 0 qid p
 
@@ -61,11 +61,11 @@ simThread rxC txC state = do
     (p,state') <- STM.atomically $ simStep rxC txC state
 
     -- Show Debug output
-    putStrLn "SimStepDNET.Alg."
+{-    putStrLn "SimStepDNET.Alg."
     if not $ null $ DNET.gsDebug state' then
         putStr $ unlines $ map ("    " ++) $ DNET.gsDebug state'
     else return ()
-
+-}
     -- Send out packets on TX queue
     let send p = STM.atomically $ TC.writeTChan txC (TXEvent p)
     mapM_ send $ DNET.gsTXQueue state'

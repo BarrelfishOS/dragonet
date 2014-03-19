@@ -86,16 +86,37 @@
 #define MBUF_SIZE (2048 + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
 #define     IFNAMSIZDPDK        1023
 
+//#define MYDEBUG     1
+#ifdef MYDEBUG
+#define dprint(x...)    printf("dpdkData:" x)
+#else
+#define dprint(x...)   ((void)0)
+#endif // MYDEBUG
+
+
+
 typedef uint8_t  lcoreid_t;
 typedef uint8_t  portid_t;
 typedef uint16_t queueid_t;
 
-// TODO: Implement these
+struct dpdk_info {
+    int core_id;
+    int port_id;
+    int queue_id;
+    void *ptr;
+};
+
 size_t get_packetV2(int core_id, int port_id, int queue_id,
         char *pkt_out, size_t buf_len);
 void send_packetV2(int core_id, int port_id, int queue_id,
         char *pkt_tx, size_t len);
 int init_dpdk_setupV2(void);
+
+
+// Simplified wrapper functions
+struct dpdk_info *init_dpdk_setup_and_get_default_queue(char *ifAddr);
+int send_packet_wrapper(struct dpdk_info *dinf, char *pkt_tx, size_t len);
+int get_packet_wrapper(struct dpdk_info *dinf, char *pkt_tx, size_t len);
 
 static struct cmdline *virtual_cl = NULL; // virtual cmdline for Dragonet
 int exec_control_command(const char *cmd);
@@ -193,6 +214,13 @@ fail:
 } // end function: send_packetV2
 
 
+int send_packet_wrapper(struct dpdk_info *dinf, char *pkt_tx, size_t len)
+{
+    assert(dinf != NULL);
+    send_packetV2(dinf->core_id, dinf->port_id, dinf->queue_id, pkt_tx, len);
+    return len;
+}
+
 size_t get_packetV2(int core_id, int port_id, int queue_id,
         char *pkt_out, size_t buf_len)
 {
@@ -206,7 +234,7 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
     unsigned nb_rx_other_q = 0;
 */
 
-    printf("get_packetV2 on queue_id %d\n", queue_id);
+    dprint("get_packetV2 on queue_id %d\n", queue_id);
     portid = port_id;
 
     do {
@@ -251,11 +279,18 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
     }
     memcpy(pkt_out, m->pkt.data, pkt_size);
     rte_pktmbuf_free(m);
-    printf("received packet of size %zu\n", pkt_size);
+    dprint("received packet of size %zu\n", pkt_size);
     return pkt_size;
 
 } // end function: get_packetV2
 
+
+int get_packet_wrapper(struct dpdk_info *dinf, char *pkt_tx, size_t len)
+{
+    assert(dinf != NULL);
+    return get_packetV2(dinf->core_id, dinf->port_id, dinf->queue_id,
+        pkt_tx, len);
+}
 
 int init_dpdkControl(int argc, char** argv);
 
@@ -305,6 +340,7 @@ int init_dpdk_setupV2(void)
         return -1;
     }
 
+#if 0
     // Insert a test filter which will separate out specific UDP traffic
 
     const char *cmd1 = "set_masks_filter 0 only_ip_flow 0 "
@@ -321,6 +357,7 @@ int init_dpdk_setupV2(void)
         return -1;
     }
 
+#endif // 0
 
 #if 0
 //    const char *cmd = "add_perfect_filter 0 udp src 10.111.4.36 5555 "
@@ -351,6 +388,33 @@ int main(int __attribute__((unused)) argc, char __attribute__((unused)) *argv[])
     return init_dpdk_setupV2();
 }
 #endif // 0
+
+
+struct dpdk_info *init_dpdk_setup_and_get_default_queue(char *ifAddr)
+{
+    printf("WARNING: Ignoring %s interface address suggestion\n", ifAddr);
+    printf("    going for default hardcoded value\n");
+    int ret = init_dpdk_setupV2();
+    if (ret < 0) {
+        printf("ERROR: %s:%d:%s init_dpdk_setupV2 failed\n",
+                    __FILE__, __LINE__, __func__);
+        return NULL;
+    }
+
+    struct dpdk_info *dev = NULL;
+    dev = (struct dpdk_info *) malloc (sizeof(struct dpdk_info));
+    if (dev == NULL) {
+        printf("ERROR: %s:%d:%s malloc failed\n",
+                    __FILE__, __LINE__, __func__);
+        return NULL;
+    }
+    memset(dev, 0, sizeof(struct dpdk_info));
+    dev->core_id = 0;
+    dev->port_id = 0;
+    dev->queue_id = 0;
+    dev->ptr = NULL;
+    return dev;
+}
 
 //  ###################### TO DELETE ########################
 
