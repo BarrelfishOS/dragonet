@@ -61,6 +61,7 @@ prepare_machine() {
 
     # for Dragonet
     echo 'apt-get install -y ghc cabal-install clang graphviz pdftk libghc-parsec2-dev libghc-stm-dev minisat' | on_machine ${MACHINE}
+    echo 'apt-get install -y happy' | on_machine ${MACHINE}
 
 
     echo 'cabal update' | on_machine_nosudo ${MACHINE}
@@ -89,12 +90,13 @@ copy_code() {
 
     #echo "rm -rf .ssh/known_hosts" | on_machine_nosudo ${MACHINE}
     echo "rm -rf ${DPDK_SOURCE_DIR}" | on_machine ${MACHINE}
-    echo 'git clone ssh://shindep@129.132.186.96:8006//home/shindep/git/dragonet -b openonload' | on_machine_nosudo ${MACHINE}
+    echo 'git clone ssh://shindep@129.132.186.96:8006//home/shindep/git/dragonet' | on_machine_nosudo ${MACHINE}
 }
 
 compile_dpdk() {
     echo "cd ${DPDK_SOURCE_DIR} ; make config T=x86_64-default-linuxapp-gcc" | on_machine ${MACHINE}
     echo "cd ${DPDK_SOURCE_DIR} ; make" | on_machine ${MACHINE}
+    echo "You also need to run tools/mySetup.py"
 }
 
 compile_openonload() {
