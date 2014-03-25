@@ -105,7 +105,7 @@ compile_openonload() {
     # actually inserting the newly compiled and installed driver
     echo "cd ${OPENONLOAD_SOURCE_DIR} ; onload_tool reload " | on_machine ${MACHINE}
     # Reconfiguring the IP addresses of all interaces as SF interaces will be reset after insertion of new driver
-    echo "bash ./setIPaddress.sh" | on_machine ${MACHINE}
+    echo "bash /extra/setIPaddress.sh" | on_machine ${MACHINE}
     # Changing the owner back to normal user so that normal user can run build
     echo "cd ${OPENONLOAD_SOURCE_DIR} ; chown -R ubuntu.ubuntu ./build " | on_machine ${MACHINE}
 }
