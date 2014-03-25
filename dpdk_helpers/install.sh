@@ -56,8 +56,21 @@ prepare_machine() {
     echo 'apt-get install -y netcat.traditional' | on_machine ${MACHINE}
     echo 'apt-get install -y socat' | on_machine ${MACHINE}
     echo 'apt-get install -y dstat' | on_machine ${MACHINE}
-    echo 'apt-get install -y netperf' | on_machine ${MACHINE}
+    echo 'apt-get install -y netperf iperf' | on_machine ${MACHINE}
     echo 'apt-get install -y git-core tig' | on_machine ${MACHINE}
+    echo 'apt-get install -y ethtool' | on_machine ${MACHINE}
+    echo 'apt-get install -y  chkconfig' | on_machine ${MACHINE}
+
+    # for compiling latest dstat dstat
+    echo 'apt-get install -y  asciidoc' | on_machine ${MACHINE}
+
+    # for netperf-wrapper
+    echo 'apt-get install -y  python-matplotlib' | on_machine ${MACHINE}
+    echo 'apt-get install -y  python-numpy' | on_machine ${MACHINE}
+
+    # for compiling Linux kernel
+    echo 'apt-get install -y bc' | on_machine ${MACHINE}
+    echo 'apt-get install -y initramfs-tools' | on_machine ${MACHINE}
 
     # for Dragonet
     echo 'apt-get install -y ghc cabal-install clang graphviz pdftk libghc-parsec2-dev libghc-stm-dev minisat' | on_machine ${MACHINE}
@@ -86,6 +99,37 @@ prepare_machine() {
     #FIXME: Copy the ~/bin/ folder (or atleast useful part of it)
 }
 
+compile_linux_kernel() {
+    cd ~/dragonet/kernel
+    tar -xf linux-3.13.6.tar.xz
+    cd linux-3.13.6
+    # get old configuration
+    cp ../live_config ./config
+    # make oldconfig
+    yes '' | make oldconfig
+    make dep
+
+    make bzImage
+    make modules
+    sudo make install
+    sudo make modules_install
+    # update initrd
+
+    # update squashfs
+    # https://help.ubuntu.com/community/LiveCDCustomization
+    sudo unsquashfs mnt/casper/filesystem.squashfs
+    # copy things that you need to copy here
+    sudo mksquashfs edit extract-cd/casper/filesystem.squashfs -b 1048576
+
+    # modifying initrd.lz
+    lzma -dc -S .lz /mnt/casper/initrd.lz | cpio -id
+    find . | cpio --quiet --dereference -o -H newc | lzma -7 > ~/new-initrd.lz
+
+
+    gzip -dc /mnt/casper/initrd.gz | cpio -id
+    find . | cpio --quiet --dereference -o -H newc | gzip -9 > ~/new-initrd.gz
+}
+
 copy_code() {
 
     #echo "rm -rf .ssh/known_hosts" | on_machine_nosudo ${MACHINE}
@@ -99,6 +143,11 @@ compile_dpdk() {
     echo "You also need to run tools/mySetup.py"
 }
 
+install_dstat() {
+    echo "cd ${DSTAT_SOURCE_DIR} ; make ; sudo make install "  | on_machine ${MACHINE}
+}
+
+
 compile_openonload() {
     # Compiling and installing SF driver which supports userspace networking
     echo "cd ${OPENONLOAD_SOURCE_DIR} ; ./scripts/onload_install " | on_machine ${MACHINE}
@@ -111,7 +160,7 @@ compile_openonload() {
 }
 
 install_haskell_dep() {
-
+    install_dstat
     echo "cd ${Dragonet_SOURCE_DIR} ; ./INSTALL.sh " | on_machine_nosudo ${MACHINE}
 }
 
@@ -180,6 +229,7 @@ HOST="ubuntu@${MACHINE}.in.barrelfish.org"
 #HOST="ubuntu@${MACHINE}"
 SSH="ssh ${HOST}"
 DPDK_SOURCE_DIR="dragonet/dpdk-1.5.0r1/"
+DSTAT_SOURCE_DIR="dragonet/tools/dstat"
 OPENONLOAD_SOURCE_DIR="dragonet/openonload-201310-u2/"
 Dragonet_SOURCE_DIR="dragonet/Dragonet/"
 
