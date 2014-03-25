@@ -12,7 +12,11 @@ run_netperf() {
 #    echo "Running netperf for machine [${MACHINE}:${ATTACKPORT}] for ${TIME} seconds"
     #OUTFORMAT1="LOCAL_BYTES_SENT,LOCAL_BYTES_RECVD"
     OUTFORMAT="RESULT_BRAND,DEST_ADDR,REQUEST_SIZE,BURST_SIZE,TRANSACTION_RATE,RT_LATENCY,THROUGHPUT,THROUGHPUT_UNITS"
+    set -x
+    set -e
     netperf -B ${MSG} -P 1 -N -H ${MACHINE} -4 -t UDP_RR  -l ${TIME} -v 2 -f m -- -r ${PSIZE} -b ${BRUST} "-${OUTPUTTYPE}" "${OUTFORMAT}"
+    set +x
+    set +e
 }
 
 show_usage() {

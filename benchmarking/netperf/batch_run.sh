@@ -6,8 +6,8 @@ run_bm_tp() {
     if [ ${MYMSG} == "" ] ; then
         MYMSG="${THOST}-${BRUST}"
     fi
-    TMPFILE="./tmpout.txt"
-    SAMARRYFILE="./tmpsammary.txt"
+    TMPFILE=`mktemp`
+    SAMARRYFILE=`mktemp`
     rm -f ${SAMARRYFILE}
 
 #    set -x
@@ -87,7 +87,7 @@ run_bm_echo() {
     if [ ${MYMSG} == "" ] ; then
         MYMSG="${THOST}-${BRUST}"
     fi
-    TMPOUTFILE="./ncechoouttmp.txt"
+    TMPOUTFILE=`mktemp`
     set -x
     set -e
     nc.traditional -n -vv -i 1 -q 1 -u ${THOST} ${SERVERPORT} < ${INFILE} &>  ${TMPOUTFILE}
@@ -132,7 +132,7 @@ run_others()
 
 process_results () {
 
-NTMPFILE="./tmpfile2"
+NTMPFILE=`mktemp`
 #cat ${OUTFILE} | grep -v "MIGRATED" | grep "TRANSACTION_RATE"  | grep "RT_LATENCY" | tr , \| | sed 's\$\|\' | sed 's\^\|\' > ${NTMPFILE}
 cat ${OUTFILE} | grep -v "MIGRATED" |  grep -v "=" | grep -v "TPITERATOR" | tr , \| | sed 's\$\|\' | sed 's\^\|\' > ${NTMPFILE}
 if [ "${SILENTHEADER}" == "no" ] ; then
@@ -150,7 +150,9 @@ cat ${NTMPFILE} | grep -v "Result Tag" >> ${RESULTFILE}
 
 
 run_bm_generic() {
-    if [ "${BMTYPE}" == "TP" ] ; then
+    if [ "${BMTYPE}" == "TPLONG" ] ; then
+        run_bm ${1} ${2}
+    elif [ "${BMTYPE}" == "TP" ] ; then
         run_bm_tp ${1} ${2}
     elif [ "${BMTYPE}" == "LP" ] ; then
         run_bm ${1} ${2}
@@ -173,8 +175,8 @@ PKTSIZE=1400
 BRUST=10
 
 RTIME=5
-OUTFILE="output.txt"
-RESULTFILE="result.txt"
+OUTFILE=`mktemp --tmpdir=./ outputXXXXXX`
+RESULTFILE=`mktemp --tmpdir=./ resultXXXXXX`
 SILENTHEADER="no"
 
 LOOPBACK="no"
@@ -198,7 +200,8 @@ show_usage() {
     echo "      -r <filename> -->  results file, where results will be added"
     echo "      -s  -->  Do not add headers in results file"
     echo "      -l  -->  Do a latency benchmark"
-    echo "      -t  -->  Do a Throughput benchmark"
+    echo "      -t  -->  Do a incremental Throughput benchmark"
+    echo "      -z  -->  Do a fixed and long Throughput benchmark"
     echo "      -p  -->  Do a ping benchmark"
     echo "      -e  -->  Do a echo benchmark"
     echo "Examples: ${0} -t -T -L -n 'CImpl' -r ./runh.results"
@@ -214,7 +217,7 @@ show_usage() {
 INFILE="./inputfile.txt"
 echo -e "hello\nworld\n1\n2\n3\n" > ${INFILE}
 
-while getopts ":M:r:n:sltLSDITdpe" opt; do
+while getopts ":M:r:n:sltLSDITdpez" opt; do
   case $opt in
     M)
         MSG="$OPTARG"
@@ -231,6 +234,12 @@ while getopts ":M:r:n:sltLSDITdpe" opt; do
       ;;
     p)
         BMTYPE="PING"
+      ;;
+    z)
+        PKTSIZE=1024
+        RTIME=20
+        BRUST=64
+        BMTYPE="TPLONG"
       ;;
     e)
         BMTYPE="ECHO"
@@ -277,6 +286,7 @@ while getopts ":M:r:n:sltLSDITdpe" opt; do
   esac
 done
 
+HOSTN=`hostname`
 
 
 # Resetting putput.
@@ -295,12 +305,28 @@ fi
 
 if [ "${SF}" == "yes" ] ; then
     NMSG="${MSG}-${NETSTACKTYPE}-${BMTYPE}-SF"
-    run_bm_generic "10.113.4.71" "${NMSG}"
+    if [ "${HOSTN}" == "appenzeller" ] ; then
+        DESTIPSF="10.110.4.38"
+    elif [ "${HOSTN}" == "ziger1" ] ; then
+        DESTIPSF="10.113.4.71"
+    else
+        echo "Running on unknown host, you may want to provide destination IP explicitly"
+        exit 1
+    fi
+    run_bm_generic "${DESTIPSF}" "${NMSG}"
 fi
 
 if [ "${SFDirect}" == "yes" ] ; then
     NMSG="${MSG}-${NETSTACKTYPE}-${BMTYPE}-SFD"
-    run_bm_generic "10.22.4.38" "${NMSG}"
+    if [ "${HOSTN}" == "appenzeller" ] ; then
+        DESTIPSF="10.22.4.37"
+    elif [ "${HOSTN}" == "ziger1" ] ; then
+        DESTIPSF="10.22.4.38"
+    else
+        echo "Running on unknown host, you may want to provide destination IP explicitly"
+        exit 1
+    fi
+    run_bm_generic "${DESTIPSF}" "${NMSG}"
 fi
 
 
@@ -311,8 +337,15 @@ fi
 
 if [ "${DPDK}" == "yes" ] ; then
     NMSG="${MSG}-${NETSTACKTYPE}-${BMTYPE}-DPDK"
-
-    run_bm_generic "10.22.4.37" "${NMSG}"
+    if [ "${HOSTN}" == "appenzeller" ] ; then
+        DESTIPSF="10.22.4.37"
+    elif [ "${HOSTN}" == "ziger1" ] ; then
+        DESTIPSF="10.22.4.38"
+    else
+        echo "Running on unknown host, you may want to provide destination IP explicitly"
+        exit 1
+    fi
+    run_bm_generic "${DESTIPSF}" "${NMSG}"
 fi
 
 if [ "${PROCESSRESULT}" == "yes" ] ; then
@@ -320,4 +353,5 @@ if [ "${PROCESSRESULT}" == "yes" ] ; then
     cat ${RESULTFILE}
 fi
 
-
+echo "OUTPUT FILE --> ${OUTFILE}"
+echo "Result FILE --> ${RESULTFILE}"
