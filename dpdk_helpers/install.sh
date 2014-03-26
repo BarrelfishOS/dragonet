@@ -77,6 +77,10 @@ prepare_machine() {
     echo 'apt-get install -y happy' | on_machine ${MACHINE}
 
 
+    # copy the script which can initialize code repository
+    scp  "get_repository.sh" "${HOST}:"
+
+    # NOTE: This is repeated in haskell installation part.
     echo 'cabal update' | on_machine_nosudo ${MACHINE}
     echo 'cabal install graphviz' | on_machine_nosudo ${MACHINE}
     echo 'cabal install pretty-show' | on_machine_nosudo ${MACHINE}
@@ -88,15 +92,17 @@ prepare_machine() {
     echo 'cabal install hscope' | on_machine_nosudo ${MACHINE}
     echo 'cabal install SourceGraph' | on_machine_nosudo ${MACHINE}
 
+
     # my vim configuration
-    scp  "vimconf.tar" "${HOST}:"
+    scp  "${HOME}/vimconf.tar" "${HOST}:"
     echo 'tar -xvf vimconf.tar' | on_machine_nosudo ${MACHINE}
     echo 'mkdir -p .vimbackup/backup' | on_machine_nosudo ${MACHINE}
+    echo 'echo export="$PATH:$HOME/bin/" >> .bashrc' | on_machine_nosudo ${MACHINE}
     echo 'cd /root/ ; tar -xvf /home/ubuntu/vimconf.tar' | on_machine ${MACHINE}
     echo 'cd /root/ ; mkdir -p .vimbackup/backup' | on_machine ${MACHINE}
-    echo 'mkdir bin' | on_machine_nosudo ${MACHINE}
-    scp "~/bin/cs_create.sh" "${HOST}:bin/"
-    #FIXME: Copy the ~/bin/ folder (or atleast useful part of it)
+    echo 'mkdir -p bin' | on_machine_nosudo ${MACHINE}
+    scp "${HOME}/bin/cs_create.sh" "${HOST}:bin/"
+    scp "${HOME}/bin/cscope" "${HOST}:bin/"
 }
 
 compile_linux_kernel() {
@@ -134,6 +140,9 @@ copy_code() {
 
     #echo "rm -rf .ssh/known_hosts" | on_machine_nosudo ${MACHINE}
     echo "rm -rf ${DPDK_SOURCE_DIR}" | on_machine ${MACHINE}
+    echo 'git clone ssh://shindep@129.132.186.96:8006//home/shindep/git/dragonet' | on_machine_nosudo ${MACHINE}
+    echo "cd ${DPDK_SOURCE_DIR} ; git submodule init" | on_machine ${MACHINE}
+    echo "cd ${DPDK_SOURCE_DIR} ; git submodule update" | on_machine ${MACHINE}
     echo 'git clone ssh://shindep@129.132.186.96:8006//home/shindep/git/dragonet' | on_machine_nosudo ${MACHINE}
 }
 
