@@ -113,6 +113,14 @@ setDHCPIPaddr "00:25:64:fc:61:dd" "10.110.4.64" "appenzeller" "appenzeller"
 setIPaddr "00:0f:53:07:51:48" "10.22.4.38" "appenzeller" "a12" # SF
 setIPaddr "00:0f:53:07:51:49" "10.113.4.71" "appenzeller" "a1" # SF
 
+
+echo "for babybel"
+setDHCPIPaddr "00:1E:67:92:53:17" "10.110.4.92" "babybel" "babybel"
+setIPaddr "DE:F2:F8:2F:80:F0" "10.113.4.81" "babybel" "bb11"
+setIPaddr "00:1E:67:9F:0C:CA" "10.113.4.82" "babybel" "bb12"
+
+
+
 ROUTER="10.110.4.4"
 MYDNSSERVER="129.132.102.36"
 
