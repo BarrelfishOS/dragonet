@@ -232,6 +232,7 @@ def get_egress_info(target, ip_version):
 
     if route:
         route['qdiscs'] = get_qdiscs(route['iface'])
+        route['MTU'] = get_mtu(route['iface'])
         route['classes'] = get_classes(route['iface'])
         route['offloads'] = get_offloads(route['iface'])
         route['bql'] = get_bql(route['iface'])
@@ -271,6 +272,12 @@ def parse_tc(cmd, kind):
 
             items.append(item)
     return items or None
+
+def get_mtu(iface):
+    # FIXME: use python parsing instead of grep and cut
+    cmd = "ifconfig %s | grep MTU | cut -d: -f2 | cut -d' ' -f1" % (iface)
+    output = get_command_output(cmd)
+    return output
 
 def get_qdiscs(iface):
     return parse_tc("tc qdisc show dev %s" % iface, "qdisc")

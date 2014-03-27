@@ -38,6 +38,7 @@ class ProcessRunner(threading.Thread):
         self.killed = False
         self.pid = None
         self.returncode = None
+        print "ProcessRunner: called with name %s, command %s" % (name, command)
 
     def fork(self):
         # Use named temporary files to avoid errors on double-delete when
@@ -143,6 +144,20 @@ class ProcessRunner(threading.Thread):
         return output.split()[-1].strip()
 
 DefaultRunner = ProcessRunner
+
+class NetperfSumaryRunner(ProcessRunner):
+    """Runner for netperf summary """
+
+    def parse(self, output):
+        """Parses the final results and gives (key,value) pairs."""
+
+        result = {}
+        lines = output.split("\n")
+        for line in lines:
+            parts = line.split("=")
+            #result.append(parts[0], parts[1])
+            result[parts[0]] = parts[1]
+        return result
 
 class NetperfDemoRunner(ProcessRunner):
     """Runner for netperf demo mode."""

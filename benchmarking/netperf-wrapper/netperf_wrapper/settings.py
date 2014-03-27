@@ -215,6 +215,7 @@ class TestEnvironment(object):
         """Find a suitable netperf executable, and test for the required capabilities."""
         # This can take a while, so skip if the tests are only loaded for informational
         # purposes (e.g. for --list-tests)
+        print "Called function find_netperf"
         if self.informational:
             return ""
         if ip_version is None:
