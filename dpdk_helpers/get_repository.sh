@@ -4,7 +4,4 @@
 set -x
 set -e
 git clone ssh://shindep@129.132.186.96:8006//home/shindep/git/dragonet
-cd dragonet
-git submodule init
-git submodule update
 
