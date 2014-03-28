@@ -20,11 +20,13 @@ from __future__ import generators
 try:
     import sys, os, time, sched, re, getopt, fnmatch
     import types, resource, getpass, glob, linecache
+    import json as js
 except KeyboardInterrupt:
     pass
 
 VERSION = '0.7.2svn'
 
+JSON_INDENT = 4
 theme = { 'default': '' }
 
 if sys.version_info < (2, 2):
@@ -90,6 +92,7 @@ class Options:
         self.update = True
         self.header = True
         self.output = False
+        self.jsonoutput = False
         self.pidfile = False
         self.profile = ''
 
@@ -113,11 +116,11 @@ class Options:
         }
 
         try:
-            opts, args = getopt.getopt(args, 'acdfghilmno:prstTvyC:D:I:M:N:S:V',
+            opts, args = getopt.getopt(args, 'acdfghilmno:j:prstTvyC:D:I:M:N:S:V',
                 ['all', 'all-plugins', 'bits', 'bw', 'blackonwhite', 'color',
                  'debug', 'filesystem', 'float', 'full', 'help', 'integer',
                  'list', 'mods', 'modules', 'nocolor', 'noheaders', 'noupdate',
-                 'output=', 'pidfile=', 'profile', 'version', 'vmstat'] + allplugins)
+                 'output=', 'json=','pidfile=', 'profile', 'version', 'vmstat'] + allplugins)
         except getopt.error, exc:
             print 'dstat: %s, try dstat -h for a list of all the options' % str(exc)
             sys.exit(1)
@@ -201,6 +204,8 @@ class Options:
                 self.update = False
             elif opt in ['-o', '--output']:
                 self.output = arg
+            elif opt in ['-j', '--json']:
+                self.jsonoutput = arg
             elif opt in ['--pidfile']:
                 self.pidfile = arg
             elif opt in ['--profile']:
@@ -322,6 +327,7 @@ Dstat options:
   --noheaders            disable repetitive headers
   --noupdate             disable intermediate updates
   --output file          write CSV output to file
+  --json file            write JSON output to file
   --profile              show profiling statistics when exiting dstat
 
 delay is the delay in seconds between each update (default: 1)
@@ -476,6 +482,41 @@ class dstat:
                 if i + 1 != len(self.name): ret = ret + theme['frame'] + char['colon']
             return ret
 
+    def jsontitle(self):
+        #return ""
+        return js.dumps(self.name, indent=JSON_INDENT)
+        if isinstance(self.name, types.StringType):
+            return '"' + self.name + '"' + char['sep'] * (len(self.nick) - 1)
+        else:
+            ret = ''
+            for i, name in enumerate(self.name):
+                ret = ret + '"' + name + '"' + char['sep'] * (len(self.nick) - 1)
+                if i + 1 != len(self.name): ret = ret + char['sep']
+            return ret
+
+    def jsonsubtitle(self):
+        return js.dumps(self.nick, indent=JSON_INDENT)
+        ret = ''
+        if isinstance(self.name, types.StringType):
+            for i, nick in enumerate(self.nick):
+                ret = ret + '"' + nick + '"'
+                if i + 1 != len(self.nick): ret = ret + char['sep']
+        elif len(self.name) == 1:
+            for i, name in enumerate(self.name):
+                for j, nick in enumerate(self.nick):
+                    ret = ret + '"' + nick + '"'
+                    if j + 1 != len(self.nick): ret = ret + char['sep']
+                if i + 1 != len(self.name): ret = ret + char['sep']
+        else:
+            for i, name in enumerate(self.name):
+                for j, nick in enumerate(self.nick):
+                    ret = ret + '"' + name + ':' + nick + '"'
+                    if j + 1 != len(self.nick): ret = ret + char['sep']
+                if i + 1 != len(self.name): ret = ret + char['sep']
+        return ret
+
+
+
     def csvtitle(self):
         if isinstance(self.name, types.StringType):
             return '"' + self.name + '"' + char['sep'] * (len(self.nick) - 1)
@@ -526,6 +567,9 @@ class dstat:
         line = ''
         if hasattr(self, 'output'):
             return cprint(self.output, self.type, self.width, self.scale)
+        if hasattr(self, 'json'):
+            return cprint(self.jsonoutput, self.type, self.width, self.scale)
+
         for i, name in enumerate(self.vars):
             if i < len(self.types):
                 type = self.types[i]
@@ -555,6 +599,45 @@ class dstat:
         elif totlist != vislist:
             return theme['frame'] + char['gt']
         return ''
+
+
+    def showjson(self):
+#        print "\nEntry is zip  (%s, %s, %s)  and name is %s" % (
+#               str(self.nick), str(self.val), str(self.vars), str(self.name))
+        myd = {}
+        for i, name in enumerate(self.vars):
+            if isinstance(self.val[name], types.ListType) or isinstance(self.val[name], types.TupleType):
+                for j, val in enumerate(self.val[name]):
+#                    print "case dict: %s => %s -> %s -> %s -> %s " % (str(self.name[0]), str(i), str(name), str(self.nick[j]), str(val))
+                    myd[self.nick[j]] = val #self.val[name]
+            elif isinstance(self.val[name], types.StringType):
+#                print "case str: %s => %s -> %s -> %s " % (str(self.name[0]), str(i), str(name),  str(self.val[name]))
+                myd[name] = val # self.val[name]
+            else:
+#                print "case else: %s => %s -> %s -> %s -> %s " % (str(self.name), str(i), str(name), str(self.nick[i]), str(self.val[name]))
+                myd[self.nick[i]] = self.val[name]
+        return myd # js.dumps(myd, indent=JSON_INDENT)
+        #return line
+
+    def name_to_str(self):
+        "Convert module name into string"
+        if isinstance(self.name, types.StringType):
+            return self.name
+        elif ((len(self.name) == 1) and isinstance(self.name[0], types.StringType)):
+            return self.name[0]
+        else :
+            # this is quite strange nametype!
+            return str(self.name)
+
+
+    def showjsonend(self, totlist, vislist):
+        if vislist and self is not vislist[-1]:
+            return char['sep']
+        elif totlist and self is not totlist[-1]:
+            return char['sep']
+        return ''
+
+
 
     def showcsv(self):
         def printcsv(var):
@@ -2184,6 +2267,24 @@ def header(totlist, vislist):
             line += theme['title'] + char['gt']
     return line + '\n'
 
+def jsonheader(totlist):
+    "Return the CVS header for a set of module counters"
+    line = ''
+    ### Process title
+    for o in totlist:
+        line = line + o.jsontitle()
+        if o is not totlist[-1]:
+            line = line + char['sep']
+    line += '\n'
+    ### Process subtitle
+    for o in totlist:
+        line = line + o.jsonsubtitle()
+        if o is not totlist[-1]:
+            line = line + char['sep']
+    return line + '\n'
+
+
+
 def csvheader(totlist):
     "Return the CVS header for a set of module counters"
     line = ''
@@ -2502,7 +2603,7 @@ def exit(ret):
 def main():
     "Initialization of the program, terminal, internal structures"
     global cpunr, hz, maxint, ownpid, pagesize
-    global ansi, theme, outputfile
+    global ansi, theme, outputfile, jsonoutputfile
     global totlist, inittime
     global update, missed
 
@@ -2541,6 +2642,25 @@ def main():
     ### Check terminal capabilities
     if op.color == None:
         op.color = gettermcolor()
+
+    ### Prepare JSON output file (unbuffered)
+    if op.jsonoutput:
+        if not os.path.exists(op.jsonoutput):
+            jsonoutputfile = open(op.jsonoutput, 'w', 0)
+            jsonoutputfile.write('{')
+            #jsonoutputfile.write('"Dstat %s JSON output"\n' % VERSION)
+            header = ('"Author:","Dag Wieers <dag@wieers.com>"','','','','"URL:"','"http://dag.wieers.com/home-made/dstat/"\n')
+            #jsonoutputfile.write(char['sep'].join(header))
+        else:
+            jsonoutputfile = open(op.jsonoutput, 'a', 0)
+            jsonoutputfile.write('\n\n')
+        header = ('"Host:"','"%s"' % hostname,'','','','"User:"','"%s"\n' % user)
+        #jsonoutputfile.write(char['sep'].join(header))
+        header = ('"Cmdline:"','"dstat %s"' % ' '.join(op.args),'','','','"Date:"','"%s"\n' % time.strftime('%d %b %Y %H:%M:%S %Z', time.localtime()))
+        #jsonoutputfile.write(char['sep'].join(header))
+
+        jsonoutputfile.write('\"dstat_data\": [')
+
 
     ### Prepare CSV output file (unbuffered)
     if op.output:
@@ -2653,8 +2773,13 @@ def main():
     if not totlist:
         die(8, 'None of the stats you selected are available.')
 
+    #if op.jsonoutput:
+        #jsonoutputfile.write(jsonheader(totlist))
+
     if op.output:
         outputfile.write(csvheader(totlist))
+
+
 
     scheduler = sched.scheduler(time.time, time.sleep)
     inittime = time.time()
@@ -2759,18 +2884,26 @@ def perform(update):
         ### Calculate all objects (visible, invisible)
         line = newline
         oline = ''
+        jdict = {}
         for o in totlist:
             o.extract()
             if o in vislist:
                 line = line + o.show() + o.showend(totlist, vislist)
             if op.output and step == op.delay:
                 oline = oline + o.showcsv() + o.showcsvend(totlist, vislist)
+            if op.jsonoutput and step == op.delay:
+                jdict[o.name_to_str()] = o.showjson()
+
 
         ### Print stats
         sys.stdout.write(line + theme['input'])
         if op.output and step == op.delay:
             outputfile.write(oline + '\n')
 #            outputfile.flush()
+
+        if op.jsonoutput and step == op.delay:
+            jsonoutputfile.write(js.dumps(jdict,indent=JSON_INDENT) + ',\n')
+#            jsonoutputfile.flush()
 
         ### Print debugging output
         if op.debug:
@@ -2795,6 +2928,7 @@ def perform(update):
 
 ### Main entrance
 if __name__ == '__main__':
+#def my_main():
     try:
         initterm()
         op = Options(os.getenv('DSTAT_OPTS','').split() + sys.argv[1:])
