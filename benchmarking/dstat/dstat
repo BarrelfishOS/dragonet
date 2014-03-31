@@ -21,6 +21,7 @@ try:
     import sys, os, time, sched, re, getopt, fnmatch
     import types, resource, getpass, glob, linecache
     import json as js
+    import types as tp
 except KeyboardInterrupt:
     pass
 
@@ -93,6 +94,7 @@ class Options:
         self.header = True
         self.output = False
         self.jsonoutput = False
+        self.jsonoutputTranspose = False
         self.pidfile = False
         self.profile = ''
 
@@ -116,11 +118,11 @@ class Options:
         }
 
         try:
-            opts, args = getopt.getopt(args, 'acdfghilmno:j:prstTvyC:D:I:M:N:S:V',
+            opts, args = getopt.getopt(args, 'acdfghilmno:j:J:prstTvyC:D:I:M:N:S:V',
                 ['all', 'all-plugins', 'bits', 'bw', 'blackonwhite', 'color',
                  'debug', 'filesystem', 'float', 'full', 'help', 'integer',
                  'list', 'mods', 'modules', 'nocolor', 'noheaders', 'noupdate',
-                 'output=', 'json=','pidfile=', 'profile', 'version', 'vmstat'] + allplugins)
+                 'output=', 'json=', "jsontp=", 'pidfile=', 'profile', 'version', 'vmstat'] + allplugins)
         except getopt.error, exc:
             print 'dstat: %s, try dstat -h for a list of all the options' % str(exc)
             sys.exit(1)
@@ -206,6 +208,10 @@ class Options:
                 self.output = arg
             elif opt in ['-j', '--json']:
                 self.jsonoutput = arg
+                jsonoutputfilename = arg
+            elif opt in ['-J', '--jsontp']:
+                self.jsonoutputTranspose = arg
+                jsontransposefilename = arg
             elif opt in ['--pidfile']:
                 self.pidfile = arg
             elif opt in ['--profile']:
@@ -327,7 +333,8 @@ Dstat options:
   --noheaders            disable repetitive headers
   --noupdate             disable intermediate updates
   --output file          write CSV output to file
-  --json file            write JSON output to file
+  -j,--json file         write JSON output to file (one dict for reach update)
+  -J, --jsontp file      Transposes JSON Array of dictionary dictonary of array
   --profile              show profiling statistics when exiting dstat
 
 delay is the delay in seconds between each update (default: 1)
@@ -2581,6 +2588,11 @@ def exit(ret):
     sys.stdout.write(ansi['reset'])
     sys.stdout.flush()
 
+    if jsonoutputfile :
+        jsonoutputfile.flush()
+        jsonoutputfile.close()
+        fix_json_file(jsonoutputfilename, jsontransposefilename)
+
     if op.pidfile and os.path.exists(op.pidfile):
         os.remove(op.pidfile)
 
@@ -2600,13 +2612,63 @@ def exit(ret):
 
     sys.exit(ret)
 
+def fix_json_file(jsinputfile, jsoutputfile=None, fixInputFile=True):
+
+    ff = open(jsinputfile, 'r')
+    data = ff.read()
+    ff.close()
+
+    if ( data[-2] == ',' and data[-1] == '\n' ) :
+        ndata = data[0:-2] + "]}"
+    else:
+        ndata = data
+
+    myd = js.loads(ndata)
+
+    PARENT_DATATYPE = 'dstat_data'
+    PARENT_DATATYPE_OUT = 'dstat_outlist'
+    newd = {}
+    newd[PARENT_DATATYPE_OUT] = {}
+    for pkey in myd[PARENT_DATATYPE][0].keys() :
+        if  isinstance(myd[PARENT_DATATYPE][0][pkey], tp.DictType) :
+            newd[PARENT_DATATYPE_OUT][pkey] =  map ((lambda x: x[pkey]),
+                    myd[PARENT_DATATYPE])
+
+        newd[PARENT_DATATYPE_OUT][pkey] = {}
+        for ckey in myd[PARENT_DATATYPE][0][pkey].keys() :
+            newd[PARENT_DATATYPE_OUT][pkey][ckey] = map ((lambda x: x[pkey][ckey] ),
+                            myd[PARENT_DATATYPE])
+
+
+    # let user decide if he wants to fix his file
+    if (fixInputFile) :
+        if ( data[-2] == ',' and data[-1] == '\n' ) :
+            #print "Updating %s with fixed ending for valid JSON" % (inputfile)
+            ff = open(jsinputfile, 'w')
+            ff.write(ndata)
+            ff.close()
+
+    # If there is output file specified
+    if (jsoutputfile != None) :
+        #print "Writing transformed result into %s" % (outputfile)
+        ff = open(jsoutputfile, 'w')
+        ff.write(js.dumps(newd,indent=JSON_INDENT))
+        ff.close()
+    #else :
+    #    print js.dumps(newd,indent=JSON_INDENT)
+
+
 def main():
     "Initialization of the program, terminal, internal structures"
     global cpunr, hz, maxint, ownpid, pagesize
-    global ansi, theme, outputfile, jsonoutputfile
+    global ansi, theme, outputfile
+    global jsonoutputfile, jsonoutputfilename
+    global jsontransposefilename
     global totlist, inittime
     global update, missed
 
+    jsonoutputfilename = None
+    jsontransposefilename = None
     cpunr = getcpunr()
     hz = os.sysconf('SC_CLK_TCK')
     maxint = (sys.maxint + 1) * 2
@@ -2643,17 +2705,28 @@ def main():
     if op.color == None:
         op.color = gettermcolor()
 
+    jsontransposefilename = op.jsonoutputTranspose
+    # Handle the case where JSON transpose file is specified but not json file.
+    if ((not op.jsonoutput) and op.jsonoutputTranspose):
+        op.jsonoutput = op.jsonoutputTranspose
+        jsonoutputfilename = jsontransposefilename
+
     ### Prepare JSON output file (unbuffered)
     if op.jsonoutput:
         if not os.path.exists(op.jsonoutput):
+            jsonoutputfilename = op.jsonoutput
             jsonoutputfile = open(op.jsonoutput, 'w', 0)
             jsonoutputfile.write('{')
             #jsonoutputfile.write('"Dstat %s JSON output"\n' % VERSION)
             header = ('"Author:","Dag Wieers <dag@wieers.com>"','','','','"URL:"','"http://dag.wieers.com/home-made/dstat/"\n')
             #jsonoutputfile.write(char['sep'].join(header))
         else:
-            jsonoutputfile = open(op.jsonoutput, 'a', 0)
-            jsonoutputfile.write('\n\n')
+            print "WARNING: Json output file %s, already exist, overwriting\n" % (
+                    jsonoutputfile)
+            #jsonoutputfile = open(op.jsonoutput, 'a', 0)
+            #jsonoutputfile.write('\n\n')
+            jsonoutputfile = open(op.jsonoutput, 'w', 0)
+            jsonoutputfile.write('{')
         header = ('"Host:"','"%s"' % hostname,'','','','"User:"','"%s"\n' % user)
         #jsonoutputfile.write(char['sep'].join(header))
         header = ('"Cmdline:"','"dstat %s"' % ' '.join(op.args),'','','','"Date:"','"%s"\n' % time.strftime('%d %b %Y %H:%M:%S %Z', time.localtime()))
