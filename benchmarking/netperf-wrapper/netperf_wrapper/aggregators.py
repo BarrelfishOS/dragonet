@@ -126,11 +126,23 @@ class Aggregator(object):
                     self.m_instances[m]['machine'].threads[n] = i['runner'](self.m_instances[m]['machine'], n, **i)
                     self.m_instances[m]['machine'].threads[n].start()
 
+            print "##############################"
+            print "Waiting for applications to die out"
+            for m, mi in list(self.m_instances.items()):
                 # waiting for threads to die out
                 # FIXME: We should only wait for those threads which are supposed to be blocking
                 for n,t in list(self.m_instances[m]['machine'].threads.items()):
                     while t.isAlive():
                         t.join(1)
+
+            print "##############################"
+            print "Processing results"
+            for m, mi in list(self.m_instances.items()):
+                # waiting for threads to die out
+                # FIXME: We should only wait for those threads which are supposed to be blocking
+                for n,t in list(self.m_instances[m]['machine'].threads.items()):
+
+                    # FIXME: ideally, result processing should happen in separate loop
                     self._log(n,t)
                     if t.result is None:
                         continue

@@ -25,9 +25,17 @@ from datetime import datetime
 
 from .settings import settings, Glob
 
+import json as js
+from .util import gzip_open
+
+
 #from . import runners, transformers
 #from .util import classname
 #import collections
+
+# Controls pretty-printing of json dumps
+JSON_INDENT=4
+#JSON_INDENT=None
 
 
 class MachineRunner(object):
@@ -223,35 +231,14 @@ class ProcessRunner(threading.Thread):
 
 DefaultRunner = ProcessRunner
 
-class DstatRunner(ProcessRunner):
+class DstatJsonRunner(ProcessRunner):
     """Runner dstat monitering """
 
     def parse(self, output):
         """Parses the final results and gives (key,value) pairs."""
-
-        result = {}
-        cmd_output = {}
-        lines = output.split("\n")
-        for line in lines:
-            parts = line.split("=")
-            if (len(parts) == 2):
-                cmd_output[parts[0]] = parts[1]
-            else :
-                print "Could not parse line [%s] == [%s]" % (line, str(parts))
-            #result.append(parts[0], parts[1])
-        # FIXME: Verify that the numbers are proper and there are no errors
-        bytes_sent = int(cmd_output["LOCAL_BYTES_XFERD"])
-        bytes_recvd = int(cmd_output['REMOTE_BYTES_RECVD'])
-        missing_bytes = bytes_sent - bytes_recvd
-        if (missing_bytes != 0) :
-            print ("Bytes lost = %d\n", missing_bytes)
-        assert(cmd_output['THROUGHPUT_UNITS'] == "10^9bits/s")
-        result['RESULT'] = cmd_output['REMOTE_RECV_THROUGHPUT']
-        result['CMD_OUTPUT'] = cmd_output
-
+        # Assuming that json output is in stdout
+        result = js.loads(output)
         return result
-
-
 
 class NetperfSumaryRunner(ProcessRunner):
     """Runner for netperf summary """
