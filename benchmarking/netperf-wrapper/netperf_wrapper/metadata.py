@@ -21,6 +21,11 @@
 
 import sys, os, socket, subprocess, time, re
 
+try:
+    from collections import OrderedDict
+except ImportError:
+    from .ordereddict import OrderedDict
+
 from netperf_wrapper import util
 
 class CommandRunner(object):
@@ -58,7 +63,31 @@ class CommandRunner(object):
 
 get_command_output = CommandRunner()
 
-__all__ = ['record_extended_metadata']
+__all__ = ['record_extended_metadata', 'record_machine_metadata']
+
+
+def record_machine_metadata(mname, targetMachine=None, ipv=4):
+    get_command_output.set_hostname(None)
+    local_hostname = get_command_output("hostname")
+    if mname != None and mname.lower() not in ['localhost', '127.0.0.1', local_hostname] :
+        get_command_output.set_hostname(mname)
+
+    m = OrderedDict()
+    m = {}
+    m['IP_VERSION'] = ipv
+    m['TARGET_MACHINE'] = targetMachine
+    m['LOCAL_HOST'] = get_command_output("hostname")
+    m['KERNEL_NAME'] = get_command_output("uname -s")
+    m['KERNEL_RELEASE'] = get_command_output("uname -r")
+    m['IP_ADDRS'] = get_ip_addrs()
+    m['GATEWAYS'] = get_gateways()
+    if m['TARGET_MACHINE'] :
+        m['EGRESS_INFO'] = get_egress_info(target=m['TARGET_MACHINE'], ip_version=m['IP_VERSION'])
+        if 'src' in m['EGRESS_INFO']:
+            m['INGRESS_INFO'] = get_egress_info(target=m['EGRESS_INFO']['src'], ip_version=m['IP_VERSION'])
+        m['EGRESS_INFO'] = get_egress_info(target=m['TARGET_MACHINE'], ip_version=m['IP_VERSION'])
+    return m
+
 
 def record_extended_metadata(results, hostnames):
     m = results.meta()

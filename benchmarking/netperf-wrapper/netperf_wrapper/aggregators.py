@@ -103,10 +103,15 @@ class Aggregator(object):
         if self.logfile:
             self.logfile.write("Setting up machines %s\n" % datetime.now())
 
+        result = {}
         try:
             for m, i in list(self.m_instances.items()):
                 print "Setting up machine [%s, %s] " % (str(m), str((i)))
                 self.m_instances[m]['machine'].setup_machine()
+                result[m] = {}
+                result[m]['MACHINE_METADATA'] = self.m_instances[m]['machine'].read_machine_metadata()
+                #record_machine_metadata()
+
         except KeyboardInterrupt:
             raise
 
@@ -114,7 +119,6 @@ class Aggregator(object):
             self.logfile.write("Start run at %s\n" % datetime.now())
 
         print "##############################"
-        result = {}
         try:
             for m, mi in list(self.m_instances.items()):
                 print "Running tools on  machine [%s] " % (str(m))
@@ -122,7 +126,6 @@ class Aggregator(object):
                     print "Running tool [%s, %s] on machine %s" % (
                         str(n), str((i)), str(m) )
 
-                    result[m] = {}
                     self.m_instances[m]['machine'].threads[n] = i['runner'](self.m_instances[m]['machine'], n, **i)
                     self.m_instances[m]['machine'].threads[n].start()
 
@@ -152,10 +155,10 @@ class Aggregator(object):
                         # postprocess() method)
                         self.postprocessors.append(t.result)
                     else:
-                        result[n] = t.result
+                        result[m][n] = t.result
                         if 'transformers' in self.m_instances[m]['machine'].tool_instances[n]:
                             for tr in  self.m_instances[m]['machine'].tool_instances[n]['transformers']:
-                                result[n] = tr(result[n])
+                                result[m][n] = tr(result[m][n])
         except KeyboardInterrupt:
             self.kill_runners()
             raise
@@ -216,7 +219,6 @@ class SummaryAggregator(Aggregator):
         results.x_values = list(range(1, self.iterations+1))
         for i in range(self.iterations):
             results.add_result(i+1, self.collect())
-        #results.append_result("somename", self.collect())
         return results
 
 class TimeseriesAggregator(Aggregator):

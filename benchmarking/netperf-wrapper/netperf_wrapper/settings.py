@@ -563,6 +563,7 @@ def load():
                             LENGTH=settings.LENGTH,
                             TOTAL_LENGTH=settings.TOTAL_LENGTH,
                             STEP_SIZE=settings.STEP_SIZE,
+                            ITERATIONS=settings.ITERATIONS,
                             NETPERF_WRAPPER_VERSION=VERSION,
                             IP_VERSION=settings.IP_VERSION)]
         if settings.EXTENDED_METADATA:

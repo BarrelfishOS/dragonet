@@ -28,10 +28,7 @@ from .settings import settings, Glob
 import json as js
 from .util import gzip_open
 
-
-#from . import runners, transformers
-#from .util import classname
-#import collections
+import metadata as md
 
 # Controls pretty-printing of json dumps
 JSON_INDENT=4
@@ -50,7 +47,7 @@ class MachineRunner(object):
         #    self.logfile = open(settings.LOG_FILE, "a")
 
         self.postprocessors = []
-
+        self.machine_metadata = None
         self.m_name = m_name
         self.deployment_host = deployment_host
         self.result = None
@@ -92,10 +89,15 @@ class MachineRunner(object):
 #                )
 #        self.temp_work_location = self._exec_cmd_blocking(cmd)
 
+    def read_machine_metadata(self):
+#        if self.machine_matadata == None:
+#            return self.machine_metadata
+        self.machine_metadata = md.record_machine_metadata(self.deployment_host)
+        return self.machine_metadata
+
     def setup_machine(self):
         """Sets up machine to run the benchmark"""
         self._create_work_location()
-
 
 class ProcessRunner(threading.Thread):
     """Default process runner for any process."""
