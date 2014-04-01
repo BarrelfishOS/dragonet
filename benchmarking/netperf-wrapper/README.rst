@@ -96,3 +96,69 @@ Currently the metadata values are:
 -  ``STEP_SIZE``: Time step size granularity.
 -  ``TIME``: ISO timestamp of the time the test was initiated.
 
+
+Ideal design discussion
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Following couple of sections will talk about ideal design for benchmarking.
+
+Extended JSON format
+~~~~~~~~~~~~~~~~~~~~
+
+This format supports more complex benchmark where multiple clients
+are generating traffic for server, and they are running multiple tools (load
+generator, moniter, background application, etc).  Also, we do multiple runs
+of these benchmarks, and each run can either create single value,
+or time-series.  So, here is the hirarchy :
+
+ - ``Benchmark``: Which benchmark is running (needed to combine results of
+            multiple benchmarks later for plotting).
+            Each benchmark contains one or more machines.
+ - ``Machine``: Which machine is the client running.  Each machine will have
+            one or more process running.
+ - ``Tool``: Which tool is running to gather the data.
+ - ``Result``: Each tool generates data, which will be stored as
+            attribute-value pairs.  In case there are multiple runs, we will
+            generate multiple attribute values.  So, the values are actually
+            an arrary.  In case of only one run, the values will be in index
+            zero, otherwise, it will be in different index.
+
+ - ``Attribute``: Each attribute captures certain aspect of behaviour in
+        numerical value (or maybe string??). Example: Throghtput, Latency,
+        Error rate, Interrupt rate.
+ - ``Value``: Each attribute will have either a single value, or a time series.
+        In case it is a time-series, it can be averaged out in single value.
+
+Resultset Object format
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There is one ``Resultset`` per benchmark.  Each ``Resultset`` contains
+
+Configuration file format
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ * Benchmark name
+ * List of machines involved
+    - Server machine
+    - Client machine(s)
+ * For each machine, we have following information
+    - Meta information
+        - IP address
+        - Hostname
+        - Interface to target
+        - CPU frequency
+        - Where are the tools located?
+        - Where to store the output?
+    - Tools to run
+  * For each tool to run
+    - Commandline
+    - Where to store the output?
+    - Background or forground
+    - Howto parse output
+    - Which values from output to store
+    - Is it keyvalue, or time-series
+    - Which core to run on? (Can be part of commandline)
+
+  * For each tool to run
+    - What are the output key-value pairs?
+

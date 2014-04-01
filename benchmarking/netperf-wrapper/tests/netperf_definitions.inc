@@ -3,6 +3,7 @@
 AGGREGATOR="timeseries"
 TOTAL_LENGTH=LENGTH+2*DELAY
 NETPERF_CMD="../netperf-2.6.0/src/netperf -fg "
+NETSERVER_CMD="../netperf-2.6.0/src/netserver -D "
 
 PING4="ping"
 PING6="ping6"

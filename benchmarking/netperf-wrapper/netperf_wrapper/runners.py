@@ -25,20 +25,96 @@ from datetime import datetime
 
 from .settings import settings, Glob
 
+#from . import runners, transformers
+#from .util import classname
+#import collections
+
+
+class MachineRunner(object):
+    """Machine abstraction to capture machines involved in experiment"""
+    def __init__(self, m_name, deployment_host,
+            result_location, tools_location, logfile):
+        self.tool_instances = {}
+        self.threads = {}
+        #if settings.LOG_FILE is None:
+        #    self.logfile = None
+        #else:
+        #    self.logfile = open(settings.LOG_FILE, "a")
+
+        self.postprocessors = []
+
+        self.m_name = m_name
+        self.deployment_host = deployment_host
+        self.result = None
+        self.logfile = logfile
+        self.result_location = result_location
+        self.tools_location = '${HOME}/dragonet/benchmarking/netperf-wrapper/'
+        self.tools_to_run = []
+        self.temp_work_location = None
+        print "Setting up machine %s ==> %s" % (m_name, deployment_host)
+
+#        if self.deployment_host and self.deployment_host != 'localhost':
+#            self.tools_location = '${HOME}/dragonet/benchmarking/netperf-wrapper/'
+#            self.command = "ssh %s 'cd %s ; %s'" % (self.deployment_host,
+#                    self.tools_location, command)
+#        else :
+#            self.tools_location = '${HOME}/git/dragonet/benchmarking/netperf-wrapper/'
+#            self.command = "bash -c 'cd %s ; %s'" % (self.tools_location, command)
+
+    def _exec_cmd_blocking(self, cmd):
+        if self.deployment_host and self.deployment_host != 'localhost':
+            cmd = "ssh %s '%s'" % (self.deployment_host, cmd)
+        res = subprocess.check_output(cmd, universal_newlines=True, shell=True,
+                    stderr=subprocess.STDOUT)
+        return res.strip()
+
+
+    def _create_work_location(self):
+        """Create location where we can keep output files without any conflicts"""
+        # Clear old results
+        # FIXME: this can be risky if the user gave path to user directory
+        #cmd = "rm --rf %s" % (self.result_location)
+
+        # Making sure that parent directory is there
+        cmd = "mkdir -p %s" % (self.result_location)
+        self._exec_cmd_blocking(cmd)
+#        cmd = "mktemp -d --tmpdir=%s %s_%sXXXXXX" % (self.result_location,
+#                self.m_name.strip().replace(' ', ''),
+#                self.deployment_host.strip().replace(' ', ''),
+#                )
+#        self.temp_work_location = self._exec_cmd_blocking(cmd)
+
+    def setup_machine(self):
+        """Sets up machine to run the benchmark"""
+        self._create_work_location()
+
+
 class ProcessRunner(threading.Thread):
     """Default process runner for any process."""
 
-    def __init__(self, name, command, delay, *args, **kwargs):
+#    def __init__(self, name, command, delay, deployment_host="localhost",
+#            result_location="./", *args, **kwargs):
+    def __init__(self, machine, name, command, delay, *args, **kwargs):
         threading.Thread.__init__(self)
         self.name = name
-        self.command = command
-        self.args = shlex.split(self.command)
         self.delay = delay
         self.result = None
         self.killed = False
+        self.machine_ref = machine
         self.pid = None
         self.returncode = None
-        print "ProcessRunner: called with name %s, command %s" % (name, command)
+#        self.deployment_host = machine.deployment_host
+#        self.result_location = machine.result_location
+#        self.tools_location = '${HOME}/dragonet/benchmarking/netperf-wrapper/'
+#        self.temp_work_location = None
+        if self.machine_ref.deployment_host and self.machine_ref.deployment_host != 'localhost':
+            self.command = "ssh %s 'cd %s ; %s'" % (self.machine_ref.deployment_host,
+                    self.machine_ref.tools_location, command)
+        else :
+            self.command = "bash -c 'cd %s ; %s'" % (self.machine_ref.tools_location, command)
+
+        print "The runner command is [%s]" % (self.command)
+        self.args = shlex.split(self.command)
 
     def fork(self):
         # Use named temporary files to avoid errors on double-delete when
@@ -62,6 +138,7 @@ class ProcessRunner(threading.Thread):
             self.pid = pid
 
     def kill(self):
+        print "T4rying to kill the process"
         if self.killed:
             return
         if self.pid is not None:
@@ -86,6 +163,7 @@ class ProcessRunner(threading.Thread):
             raise RuntimeError("Unknown child exit status!")
 
     def start(self):
+        print "Starting the process"
         self.fork()
         threading.Thread.start(self)
 
@@ -140,10 +218,40 @@ class ProcessRunner(threading.Thread):
     def parse(self, output):
         """Default parser returns the last (whitespace-separated) word of
         output."""
-
+        print "Prasing the output..."
         return output.split()[-1].strip()
 
 DefaultRunner = ProcessRunner
+
+class DstatRunner(ProcessRunner):
+    """Runner dstat monitering """
+
+    def parse(self, output):
+        """Parses the final results and gives (key,value) pairs."""
+
+        result = {}
+        cmd_output = {}
+        lines = output.split("\n")
+        for line in lines:
+            parts = line.split("=")
+            if (len(parts) == 2):
+                cmd_output[parts[0]] = parts[1]
+            else :
+                print "Could not parse line [%s] == [%s]" % (line, str(parts))
+            #result.append(parts[0], parts[1])
+        # FIXME: Verify that the numbers are proper and there are no errors
+        bytes_sent = int(cmd_output["LOCAL_BYTES_XFERD"])
+        bytes_recvd = int(cmd_output['REMOTE_BYTES_RECVD'])
+        missing_bytes = bytes_sent - bytes_recvd
+        if (missing_bytes != 0) :
+            print ("Bytes lost = %d\n", missing_bytes)
+        assert(cmd_output['THROUGHPUT_UNITS'] == "10^9bits/s")
+        result['RESULT'] = cmd_output['REMOTE_RECV_THROUGHPUT']
+        result['CMD_OUTPUT'] = cmd_output
+
+        return result
+
+
 
 class NetperfSumaryRunner(ProcessRunner):
     """Runner for netperf summary """
@@ -152,11 +260,25 @@ class NetperfSumaryRunner(ProcessRunner):
         """Parses the final results and gives (key,value) pairs."""
 
         result = {}
+        cmd_output = {}
         lines = output.split("\n")
         for line in lines:
             parts = line.split("=")
+            if (len(parts) == 2):
+                cmd_output[parts[0]] = parts[1]
+            else :
+                print "Could not parse line [%s] == [%s]" % (line, str(parts))
             #result.append(parts[0], parts[1])
-            result[parts[0]] = parts[1]
+        # FIXME: Verify that the numbers are proper and there are no errors
+        bytes_sent = int(cmd_output["LOCAL_BYTES_XFERD"])
+        bytes_recvd = int(cmd_output['REMOTE_BYTES_RECVD'])
+        missing_bytes = bytes_sent - bytes_recvd
+        if (missing_bytes != 0) :
+            print ("Bytes lost = %d\n", missing_bytes)
+        assert(cmd_output['THROUGHPUT_UNITS'] == "10^9bits/s")
+        result['RESULT'] = cmd_output['REMOTE_RECV_THROUGHPUT']
+        result['CMD_OUTPUT'] = cmd_output
+
         return result
 
 class NetperfDemoRunner(ProcessRunner):

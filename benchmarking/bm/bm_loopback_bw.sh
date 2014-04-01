@@ -10,12 +10,12 @@ runServer() {
 }
 
 recordServer() {
-    ${DSTAT} -tcny --net-packets -N ${IFACE_SERVER} -C ${CORE_SERVER} --bits --output "${SERVER_DSTAT}.csv" > ${SERVER_DSTAT}.dstat &
+    ${DSTAT} -tcny --net-packets -N ${IFACE_SERVER} -C ${CORE_SERVER} --bits --json "${SERVER_DSTAT}.json" > ${SERVER_DSTAT}.dstat &
     DSTAT_SERVER_PID=$!
 }
 
 recordClient() {
-    ${DSTAT} -tcny --net-packets -N ${IFACE_CLIENT} -C ${CORE_CLIENT} --bits --output "${CLIENT_DSTAT}.csv" > ${CLIENT_DSTAT}.dstat &
+    ${DSTAT} -tcny --net-packets -N ${IFACE_CLIENT} -C ${CORE_CLIENT} --bits --json "${CLIENT_DSTAT}.json" > ${CLIENT_DSTAT}.dstat &
     DSTAT_CLIENT_PID=$!
 }
 
@@ -39,7 +39,6 @@ IFACE_SERVER="lo"
 IFACE_CLIENT="lo"
 
 DSTAT="../dstat/dstat"
-NPERF_DIR="../dstat/dstat"
 
 OUTPUTDIR="../output/"
 

@@ -39,6 +39,7 @@ try:
 
     if __name__ == "__main__":
         try:
+
             settings,results = load()
 
             aggregator_name = settings.AGGREGATOR
@@ -49,7 +50,9 @@ try:
                 raise RuntimeError("Aggregator not found: '%s'" % aggregator_name)
 
             for s in list(settings.DATA_SETS.items()):
-                agg.add_instance(*s)
+                print "Adding machine for %s" % (str(s))
+                #agg.add_instance(*s)
+                agg.add_machine(*s)
 
             formatter_name = util.classname(settings.FORMAT, 'Formatter')
             if hasattr(formatters, formatter_name):
@@ -58,6 +61,8 @@ try:
                 raise RuntimeError("Formatter not found.")
 
             if not results[0]:
+                #print "FIXME: not computing results, as this is dryrun"
+                #sys.exit(1)
                 results[0] = agg.postprocess(agg.aggregate(results[0]))
                 results[0].dump_dir(os.path.dirname(settings.OUTPUT) or ".")
             formatter.format(results)

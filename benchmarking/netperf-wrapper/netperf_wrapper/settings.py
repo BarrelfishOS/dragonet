@@ -164,7 +164,10 @@ class TestEnvironment(object):
 
     def execute(self, filename):
         try:
-            exec(compile(open(filename).read(), filename, 'exec'), self.env)
+            #print "Compiling %s" % (filename)
+            comp = compile(open(filename).read(), filename, 'exec')
+            #print "evaluationg %s" % (filename)
+            exec(comp, self.env)
             return self.env
         except (IOError, SyntaxError):
             raise RuntimeError("Unable to read test config file: '%s'" % filename)
@@ -538,6 +541,7 @@ def load():
             if test_name is not None and test_name != r.meta("NAME"):
                 raise RuntimeError("Result sets must be from same test (found %s/%s)" % (test_name, r.meta("NAME")))
             test_name = r.meta("NAME")
+            print "Appending results for test %s" % (test_name)
             results.append(r)
 
         if settings.GUI:

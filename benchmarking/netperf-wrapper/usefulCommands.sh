@@ -4,3 +4,5 @@ cat debut.py | egrep '^(aggregator.py|formatters.py|runners.py|transformers.py|s
 
 ./netperf-wrapper -l 1 -H localhost udp_stream -L ./logout.txt --extended-metadata
 cat tout.json | python -mjson.tool
+gunzip -d udp_demo-2014-03-31T123917.623880.json.gz 
+./netperf-wrapper -l 1 -H localhost udp_demo -L ../out-nf/r2.logs 

@@ -35,7 +35,8 @@ except ImportError:
 from .util import gzip_open
 
 # Controls pretty-printing of json dumps
-JSON_INDENT=None
+JSON_INDENT=4
+#JSON_INDENT=None
 
 __all__ = ['ResultSet']
 
@@ -48,6 +49,9 @@ class ResultSet(object):
             raise RuntimeError("Missing name for resultset")
         self._x_values = []
         self._results = OrderedDict()
+        self._machines = OrderedDict()
+        #self._machines['TOOLS'] = OrderedDict()
+        #self._machines['RESULTS'] = OrderedDict()
 
     def meta(self, k=None):
         if k:
@@ -65,8 +69,14 @@ class ResultSet(object):
     x_values = property(get_x_values, set_x_values)
 
     def add_result(self, name, data):
-        assert len(data) == len(self._x_values)
+        print "Data len is %s, while x_values len is %s" % (
+                len(data), len(self._x_values))
+#        assert len(data) == len(self._x_values)
         self._results[name] = data
+
+    def append_result(self, name, data):
+        self._results[name] = data
+
 
     def create_series(self, series_names):
         for n in series_names:
@@ -125,7 +135,9 @@ class ResultSet(object):
     def zipped(self, keys=None):
         if keys is None:
             keys = self.series_names
+        print "The keys are %s" % (str(keys))
         for i in range(len(self._x_values)):
+
             yield [self._x_values[i]]+[self._results[k][i] for k in keys]
 
     def __iter__(self):
