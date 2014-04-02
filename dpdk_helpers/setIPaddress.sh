@@ -120,6 +120,17 @@ setIPaddr "DE:F2:F8:2F:80:F0" "10.113.4.81" "babybel" "bb11"
 setIPaddr "00:1E:67:9F:0C:CA" "10.113.4.82" "babybel" "bb12"
 
 
+echo "for asiago"
+setDHCPIPaddr "00:1E:67:92:48:4A" "10.110.4.95" "asiago" "asiago"
+setIPaddr "00:1E:67:9F:45:06" "10.22.4.11" "asiago" "asi11d"
+setIPaddr "00:1E:67:9F:45:07" "10.113.4.11" "asiago" "asi11"
+setIPaddr "00:0f:53:07:4d:64" "10.113.4.21" "asiago" "asf21"
+setIPaddr "00:0f:53:07:4d:65" "10.23.4.21" "asiago" "asf11d"
+
+echo "for burrata"
+setDHCPIPaddr "00:1E:67:92:52:D1" "10.110.4.96" "burrata" "burrata"
+setIPaddr "00:1E:67:9F:4F:DE" "10.23.4.29" "burrata" "bri1d"
+setIPaddr "00:1E:67:9F:4F:DF" "10.22.4.19" "burrata" "bri2d"
 
 ROUTER="10.110.4.4"
 MYDNSSERVER="129.132.102.36"
@@ -145,7 +156,7 @@ fi
 
 # following steps are done in setTools.sh script
 
-cat hosts.txt_new >> /etc/hosts
+#cat hosts.txt_new >> /etc/hosts
 
 #mkdir -p /root/.ssh/
 #mkdir -p ~/.ssh/

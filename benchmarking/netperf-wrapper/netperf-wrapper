@@ -54,11 +54,21 @@ try:
                 #agg.add_instance(*s)
                 agg.add_machine(*s)
 
+            print "######################"
+            print "######################"
+            print "######################"
+            print "Loaded result is %s " % (str(results[0]._x_values))
+            print "Loaded result is %s " % (str(results[0]._results))
+            print "Loaded machines is %s " % (str(results[0]._machines))
+            print "######################"
+            print "######################"
+            print "######################"
+
             formatter_name = util.classname(settings.FORMAT, 'Formatter')
             if hasattr(formatters, formatter_name):
                 formatter = getattr(formatters, formatter_name)(settings)
             else:
-                raise RuntimeError("Formatter not found.")
+                raise RuntimeError("Formatter [%s] not found. Make sure this formatter is supported" % (formatter_name))
 
             if not results[0]:
                 #print "FIXME: not computing results, as this is dryrun"
