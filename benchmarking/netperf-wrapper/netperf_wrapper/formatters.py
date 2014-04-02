@@ -375,7 +375,7 @@ class PlotFormatter(Formatter):
             if not s['data'] in results.series_names:
                # ans = s['data'](results._results, **s['args'])
                 ans = s['data'](results._results)
-                print "answer found is : %s " % (str(ans))
+                print "%s: %s " % (s['label'], str(ans))
                 y_values = ans
                 x_values = range(1,len(y_values)+1)
 #                continue

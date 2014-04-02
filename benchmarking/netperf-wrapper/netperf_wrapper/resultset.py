@@ -69,8 +69,8 @@ class ResultSet(object):
     x_values = property(get_x_values, set_x_values)
 
     def add_result(self, name, data):
-        print "Data len is %s, while x_values len is %s" % (
-                len(data), len(self._x_values))
+        #print "Data len is %s, while x_values len is %s" % (
+        #        len(data), len(self._x_values))
 #        assert len(data) == len(self._x_values)
         self._results[name] = data
 
@@ -135,7 +135,7 @@ class ResultSet(object):
     def zipped(self, keys=None):
         if keys is None:
             keys = self.series_names
-        print "The keys are %s" % (str(keys))
+        #print "The keys are %s" % (str(keys))
         for i in range(len(self._x_values)):
 
             yield [self._x_values[i]]+[self._results[k][i] for k in keys]

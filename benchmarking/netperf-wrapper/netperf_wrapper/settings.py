@@ -569,7 +569,7 @@ def load():
             if test_name is not None and test_name != r.meta("NAME"):
                 raise RuntimeError("Result sets must be from same test (found %s/%s)" % (test_name, r.meta("NAME")))
             test_name = r.meta("NAME")
-            print "Appending results for test %s" % (test_name)
+            #print "Appending results for test %s" % (test_name)
             results.append(r)
 
         if settings.GUI:

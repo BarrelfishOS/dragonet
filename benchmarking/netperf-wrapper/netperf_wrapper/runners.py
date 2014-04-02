@@ -57,7 +57,7 @@ class MachineRunner(object):
         self.tools_location = '${HOME}/dragonet/benchmarking/netperf-wrapper/'
         self.tools_to_run = []
         self.temp_work_location = None
-        print "Setting up machine %s ==> %s" % (m_name, deployment_host)
+#        print "Setting up machine %s ==> %s" % (m_name, deployment_host)
 
 #        if self.deployment_host and self.deployment_host != 'localhost':
 #            self.tools_location = '${HOME}/dragonet/benchmarking/netperf-wrapper/'
