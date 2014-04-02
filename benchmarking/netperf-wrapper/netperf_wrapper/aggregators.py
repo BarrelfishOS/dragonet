@@ -54,11 +54,12 @@ class Aggregator(object):
         res_loc = m_instance['result_location']
         tool_loc = m_instance['tools_location']
         tools_2run = m_instance['TOOLS']
+        m_is_server = m_instance['is_server']
         m_instance['machine'] = m_instance['machine'](m_name=name, deployment_host=dep_h,
-            result_location=res_loc, tools_location=tool_loc, logfile=None)
+            result_location=res_loc, tools_location=tool_loc, is_server=m_is_server, logfile=None)
 
         for ts in list(tools_2run.items()):
-            print "Adding test for %s" % (str(ts))
+            #print "Adding test for %s" % (str(ts))
             #m_instance['machine'].add_tool_instance(*ts)
             self.add_t_instance(m_instance['machine'], *ts)
             #agg.add_instance(*ts)
@@ -96,9 +97,9 @@ class Aggregator(object):
         """Create a ProcessRunner thread for each instance and start them. Wait
         for the threads to exit, then collect the results."""
 
-        print "##############################"
-        print "##############################"
-        print "##############################"
+        #print "##############################"
+        #print "##############################"
+        #print "##############################"
 
         if self.logfile:
             self.logfile.write("Setting up machines %s\n" % datetime.now())
@@ -106,10 +107,10 @@ class Aggregator(object):
         result = {}
         try:
             for m, i in list(self.m_instances.items()):
-                print "Setting up machine [%s, %s] " % (str(m), str((i)))
+                #print "Setting up machine [%s, %s] " % (str(m), str((i)))
                 self.m_instances[m]['machine'].setup_machine()
                 result[m] = {}
-                result[m]['MACHINE_METADATA'] = self.m_instances[m]['machine'].read_machine_metadata()
+                #result[m]['MACHINE_METADATA'] = self.m_instances[m]['machine'].read_machine_metadata()
                 #record_machine_metadata()
 
         except KeyboardInterrupt:
@@ -118,19 +119,19 @@ class Aggregator(object):
         if self.logfile:
             self.logfile.write("Start run at %s\n" % datetime.now())
 
-        print "##############################"
+        #print "##############################"
         try:
             for m, mi in list(self.m_instances.items()):
-                print "Running tools on  machine [%s] " % (str(m))
+                #print "Running tools on  machine [%s] " % (str(m))
                 for n,i in list(self.m_instances[m]['machine'].tool_instances.items()):
-                    print "Running tool [%s, %s] on machine %s" % (
-                        str(n), str((i)), str(m) )
+                    #print "Running tool [%s, %s] on machine %s" % (
+                    #    str(n), str((i)), str(m) )
 
                     self.m_instances[m]['machine'].threads[n] = i['runner'](self.m_instances[m]['machine'], n, **i)
                     self.m_instances[m]['machine'].threads[n].start()
 
-            print "##############################"
-            print "Waiting for applications to die out"
+            #print "##############################"
+            #print "Waiting for applications to die out"
             for m, mi in list(self.m_instances.items()):
                 # waiting for threads to die out
                 # FIXME: We should only wait for those threads which are supposed to be blocking
@@ -138,8 +139,8 @@ class Aggregator(object):
                     while t.isAlive():
                         t.join(1)
 
-            print "##############################"
-            print "Processing results"
+            #print "##############################"
+            #print "Processing results"
             for m, mi in list(self.m_instances.items()):
                 # waiting for threads to die out
                 # FIXME: We should only wait for those threads which are supposed to be blocking
@@ -211,7 +212,7 @@ class SummaryAggregator(Aggregator):
 
     def __init__(self, *args, **kwargs):
         self.iterations = settings.ITERATIONS
-        print "Aggregator is being called...."
+        #print "Aggregator is being called...."
         Aggregator.__init__(self, *args, **kwargs)
 
     def aggregate(self, results):

@@ -20,6 +20,7 @@
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import json, sys, csv, math, inspect, os
+#import settings as settings
 
 from .util import cum_prob, frange
 from functools import reduce
@@ -118,7 +119,6 @@ class TableFormatter(Formatter):
         """Generator to combine several result sets into one list of rows, by
         concatenating them."""
         keys = list(self.settings.DATA_SETS.keys())
-        print "Combining result for keys [%s]" % (keys)
         for row in list(zip(*[list(r.zipped(keys)) for r in results])):
             out_row = [row[0][0]]
             for r in row:
@@ -284,23 +284,16 @@ class PlotFormatter(Formatter):
 
         unit = [None]*len(config['axes'])
         for s in config['series']:
-            print "tring for series %s --> %s" % (str(config['series']),
-                    str(s))
             if 'axis' in s and s['axis'] == 2:
                 a = 1
             else:
                 a = 0
 
-            print "Data sets ====> %s" % (str(dir(self.settings.items())))
-            print "Data sets ====> %s" % (str((self.settings.items())))
-            print "############################"
-
-            print "Data sets = %s" % (str(self.settings.DATA_SETS))
-            #s_unit = self.settings.DATA_SETS[s['data']]['units']
+           #s_unit = self.settings.DATA_SETS[s['data']]['units']
             #if unit[a] is not None and s_unit != unit[a]:
             #    raise RuntimeError("Plot axis unit mismatch: %s/%s" % (unit[a], s_unit))
             #unit[a] = s_unit
-            unit[a] = "Gbits/s"
+            #unit[a] = "Gbits/s"
 
         axis.set_xlabel('Time')
         for i,u in enumerate(unit):
@@ -362,6 +355,7 @@ class PlotFormatter(Formatter):
     def do_timeseries_plot(self, results, config=None, axis=None):
         if len(results) > 1:
             for r in results:
+                #self.settings.update(r.meta())
                 self._do_timeseries_plot(r, config=config, axis=axis, postfix=" - "+r.label())
         else:
             self._do_timeseries_plot(results[0], config=config, axis=axis)
@@ -372,16 +366,14 @@ class PlotFormatter(Formatter):
         if config is None:
             config = self.config
 
-        print "inside _do_timeseries_plot function"
         #axis.set_xlim(0, max(results.x_values+[self.settings.TOTAL_LENGTH]))
         data = []
         for i in range(len(config['axes'])):
             data.append([])
 
-        print "_do_timeseries_plot:  series_names %s" % (results.series_names)
-        print "_do_timeseries_plot:  series_%s" % (str(config['series']))
         for s in config['series']:
             if not s['data'] in results.series_names:
+               # ans = s['data'](results._results, **s['args'])
                 ans = s['data'](results._results)
                 print "answer found is : %s " % (str(ans))
                 y_values = ans
@@ -401,7 +393,6 @@ class PlotFormatter(Formatter):
                 kwargs['label']+=postfix
 
             #y_values = results.series(s['data'], smooth)
-            print "reached here....... %s " % (str(s))
             if (not y_values):
                 y_values = results.series(s['data'], smooth)
             if 'axis' in s and s['axis'] == 2:
@@ -432,7 +423,6 @@ class PlotFormatter(Formatter):
         axis = config['axes'][0]
 
         group_size = len(results)
-        print "group size is %d" % group_size
         ticklabels = []
         ticks = []
         pos = 1
@@ -442,7 +432,6 @@ class PlotFormatter(Formatter):
             colours = colours *2
 
         for i,s in enumerate(config['series']):
-            print "config space is %s %s" % (str(i), str(s))
             if 'axis' in s and s['axis'] == 2:
                 a = 1
             else:
@@ -464,8 +453,8 @@ class PlotFormatter(Formatter):
 
             bp = config['axes'][a].boxplot(data,
                                            positions=positions)
+
             for j,r in enumerate(results):
-                print "trying for j %s and r %s" % (str(j), str(r))
                 self.plt.setp(bp['boxes'][j], color=colours[j])
                 if i == 0 and group_size > 1:
                     bp['caps'][j*2].set_label(r.label())
@@ -480,6 +469,16 @@ class PlotFormatter(Formatter):
         axis.set_xticks(ticks)
         axis.set_xticklabels(ticklabels)
         axis.set_xlim(0,pos-1)
+
+        if 'scaling' in config:
+            btm,top = config['scaling']
+        else:
+            btm,top = 0,100
+
+        for a in range(len(config['axes'])):
+            if data[a]:
+                self._do_scaling(config['axes'][a], data[a], btm, top)
+
 
 
     def do_cdf_plot(self, results, config=None, axis=None):
@@ -604,10 +603,10 @@ class PlotFormatter(Formatter):
             titles.append(self.figure.suptitle(plot_title, fontsize=14, y=y))
 
         if self.settings.ANNOTATE:
-            annotation_string = "Local/remote: %s/%s - Time: %s - Length/step: %ds/%.2fs" % (
-                self.settings.LOCAL_HOST, self.settings.HOST,
-                self.settings.TIME,
-                self.settings.LENGTH, self.settings.STEP_SIZE)
+            annotation_string = "client/remote: %s/%s - Target: %s - Time: %s" % (
+                str(self.settings.CLIENTS), self.settings.SERVERS,
+                self.settings.TARGET,
+                self.settings.TIME)
             titles.append(self.figure.text(0.5, 0.0, annotation_string,
                                             horizontalalignment='center',
                                             verticalalignment='bottom',

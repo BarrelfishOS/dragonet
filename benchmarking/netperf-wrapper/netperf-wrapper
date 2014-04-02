@@ -50,19 +50,8 @@ try:
                 raise RuntimeError("Aggregator not found: '%s'" % aggregator_name)
 
             for s in list(settings.DATA_SETS.items()):
-                print "Adding machine for %s" % (str(s))
-                #agg.add_instance(*s)
+                #print "Adding machine for %s" % (str(s))
                 agg.add_machine(*s)
-
-            print "######################"
-            print "######################"
-            print "######################"
-            print "Loaded result is %s " % (str(results[0]._x_values))
-            print "Loaded result is %s " % (str(results[0]._results))
-            print "Loaded machines is %s " % (str(results[0]._machines))
-            print "######################"
-            print "######################"
-            print "######################"
 
             formatter_name = util.classname(settings.FORMAT, 'Formatter')
             if hasattr(formatters, formatter_name):

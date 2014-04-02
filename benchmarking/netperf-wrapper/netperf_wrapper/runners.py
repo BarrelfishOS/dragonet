@@ -38,7 +38,7 @@ JSON_INDENT=4
 class MachineRunner(object):
     """Machine abstraction to capture machines involved in experiment"""
     def __init__(self, m_name, deployment_host,
-            result_location, tools_location, logfile):
+            result_location, tools_location, is_server, logfile):
         self.tool_instances = {}
         self.threads = {}
         #if settings.LOG_FILE is None:
@@ -46,6 +46,7 @@ class MachineRunner(object):
         #else:
         #    self.logfile = open(settings.LOG_FILE, "a")
 
+        self.is_server = is_server
         self.postprocessors = []
         self.machine_metadata = None
         self.m_name = m_name
@@ -92,7 +93,7 @@ class MachineRunner(object):
     def read_machine_metadata(self):
 #        if self.machine_matadata == None:
 #            return self.machine_metadata
-        self.machine_metadata = md.record_machine_metadata(self.deployment_host)
+        #self.machine_metadata = md.record_machine_metadata(self.deployment_host, targetMachine=settings.TARGET)
         return self.machine_metadata
 
     def setup_machine(self):

@@ -35,13 +35,26 @@ except ImportError:
     from netperf_wrapper.ordereddict import OrderedDict
 from netperf_wrapper.resultset import ResultSet
 from netperf_wrapper.build_info import DATA_DIR, VERSION
-from netperf_wrapper.metadata import record_extended_metadata
+from netperf_wrapper.metadata import record_extended_metadata, record_machine_metadata
 from netperf_wrapper import util
+
+#import datetime
+
+def timeStamped(t=None, fmt='%Y%m%d%H%M%S'):
+    if t :
+        return t.strftime(fmt).format()
+    else:
+       return datetime.now().strftime(fmt).format()
 
 DEFAULT_SETTINGS = {
     'NAME': None,
     'HOST': None,
     'HOSTS': [],
+    'TARGET': None,
+    'SERVERS': [],
+    'SERVERS_IF': {},
+    'CLIENTS': [],
+    'CLIENTS_IF': {},
     'LOCAL_HOST': socket.gethostname(),
     'STEP_SIZE': 0.2,
     'LENGTH': 60,
@@ -63,15 +76,25 @@ DEFAULT_SETTINGS = {
     'ANNOTATE': True,
     'PRINT_TITLE': True,
     'PRINT_LEGEND': True,
-    'ZERO_Y': False,
+    'ZERO_Y': True,
     'LOG_SCALE': True,
     'EXTENDED_METADATA': False,
     'REMOTE_METADATA': [],
+    'MINFO_SERVER': {},
+    'MINFO_CLIENT': {},
+    'MINFO': {},
+    'RESULT_LOCATION_BASE2': [],
+    'TOOLS_LOCATION': '${HOME}/dragonet/benchmarking/netperf-wrapper/',
     'GUI': False,
     }
 
 CONFIG_TYPES = {
     'HOSTS': 'list',
+    'CLIENTS': 'list',
+    'TARGER': 'str',
+    'MINFO': 'list',
+    'RESULT_LOCATION_BASE2': 'str',
+    'TOOLS_LOCATION': 'str',
     'STEP_SIZE': 'float',
     'LENGTH': 'int',
     'OUTPUT': 'str',
@@ -344,6 +367,11 @@ test_group.add_option("-H", "--host", action="append", type="string", dest="HOST
                   "specified as unqualified arguments; this parameter guarantees that the "
                   "argument be interpreted as a host name (rather than being subject to "
                   "auto-detection between input files, hostnames and test names).")
+test_group.add_option("-T", "--target", action="store", type="string", dest="TARGET",
+                  help="Target IP to use in clients for generating traffic"),
+test_group.add_option("-C", "--client", action="append", type="string", dest="CLIENTS",
+                  help="Host to connect to for for running the clients. Multiple clients "
+                  "can be specified by supplying this option multiple times.")
 test_group.add_option("-l", "--length", action="store", type="int", dest="LENGTH",
                   help="Base test length (some tests may add some time to this).")
 test_group.add_option("-s", "--step-size", action="store", type="float", dest="STEP_SIZE",
@@ -548,14 +576,35 @@ def load():
             load_gui(settings)
 
         settings.update(results[0].meta())
+
         settings.load_test()
     elif settings.GUI:
         load_gui(settings)
     else:
+        settings.RESULT_LOCATION_BASE2 = '${HOME}/tempResult%s' % (timeStamped(t=settings.TIME).strip().replace(' ', ''))
+        settings.SERVERS = settings.HOSTS
+
+        for m in settings.SERVERS:
+            settings.MINFO_SERVER[m] = record_machine_metadata(m, settings.TARGET)
+            settings.SERVERS_IF[m] = settings.MINFO_SERVER[m]["EGRESS_INFO"]["iface"]
+
+        for m in settings.CLIENTS:
+            settings.MINFO_CLIENT[m] = record_machine_metadata(m, settings.TARGET)
+            settings.CLIENTS_IF[m] = settings.MINFO_CLIENT[m]["EGRESS_INFO"]["iface"]
+
         settings.load_test()
         results = [ResultSet(NAME=settings.NAME,
                             HOST=settings.HOST,
                             HOSTS=settings.HOSTS,
+                            SERVERS=settings.SERVERS,
+                            MINFO_SERVER=settings.MINFO_SERVER,
+                            MINFO_CLIENT=settings.MINFO_CLIENT,
+                            RESULT_LOCATION_BASE2=settings.RESULT_LOCATION_BASE2,
+                            TOOLS_LOCATION=settings.TOOLS_LOCATION,
+                            TARGET=settings.TARGET,
+                            CLIENTS=settings.CLIENTS,
+                            CLIENTS_IF=settings.CLIENTS_IF,
+                            SERVERS_IF=settings.SERVERS_IF,
                             TIME=settings.TIME,
                             LOCAL_HOST=settings.LOCAL_HOST,
                             TITLE=settings.TITLE,

@@ -82,10 +82,10 @@ def record_machine_metadata(mname, targetMachine=None, ipv=4):
     m['IP_ADDRS'] = get_ip_addrs()
     m['GATEWAYS'] = get_gateways()
     if m['TARGET_MACHINE'] :
-        m['EGRESS_INFO'] = get_egress_info(target=m['TARGET_MACHINE'], ip_version=m['IP_VERSION'])
+        m['EGRESS_INFO'] = get_egress_info(target=m['TARGET_MACHINE'], ip_version=m['IP_VERSION'], ifaces=m['IP_ADDRS'])
         if 'src' in m['EGRESS_INFO']:
-            m['INGRESS_INFO'] = get_egress_info(target=m['EGRESS_INFO']['src'], ip_version=m['IP_VERSION'])
-        m['EGRESS_INFO'] = get_egress_info(target=m['TARGET_MACHINE'], ip_version=m['IP_VERSION'])
+            m['INGRESS_INFO'] = get_egress_info(target=m['EGRESS_INFO']['src'], ip_version=m['IP_VERSION'] )
+        m['EGRESS_INFO'] = get_egress_info(target=m['TARGET_MACHINE'], ip_version=m['IP_VERSION'], ifaces=m['IP_ADDRS'])
     return m
 
 
@@ -217,10 +217,15 @@ def get_gateways():
                     gws.append({'ip': parts[1]})
     return gws
 
-def get_egress_info(target, ip_version):
+def get_egress_info(target, ip_version, ifaces={}):
     route = {}
 
-    if target:
+    for key,v in ifaces.items():
+        if v[0] == target:
+            route['iface'] = key
+            route['src'] = target
+
+    if route == {} and target:
         ip = util.lookup_host(target, ip_version)[4][0]
         output = get_command_output("ip route get %s" % ip)
         if output is not None:
@@ -266,7 +271,7 @@ def get_egress_info(target, ip_version):
         route['offloads'] = get_offloads(route['iface'])
         route['bql'] = get_bql(route['iface'])
         route['driver'] = get_driver(route['iface'])
-        route['target'] = ip
+        route['target'] = target
         if not 'nexthop' in route:
             route['nexthop'] = None
 
