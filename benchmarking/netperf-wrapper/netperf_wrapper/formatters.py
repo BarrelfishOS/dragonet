@@ -58,6 +58,7 @@ class Formatter(object):
     def __init__(self, settings):
         self.settings = settings
         self.check_output(self.settings.OUTPUT)
+        self.extra_msg = ""
 
     def check_output(self, output):
         if hasattr(output, 'read') or output == "-":

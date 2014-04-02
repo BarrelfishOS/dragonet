@@ -124,7 +124,7 @@ class ProcessRunner(threading.Thread):
         else :
             self.command = "bash -c 'cd %s ; %s'" % (self.machine_ref.tools_location, command)
 
-        print "The runner command is [%s]" % (self.command)
+#        print "The runner command is [%s]" % (self.command)
         self.args = shlex.split(self.command)
 
     def fork(self):
@@ -174,7 +174,7 @@ class ProcessRunner(threading.Thread):
             raise RuntimeError("Unknown child exit status!")
 
     def start(self):
-        print "Starting the process"
+#        print "Starting the process"
         self.fork()
         threading.Thread.start(self)
 
@@ -229,7 +229,7 @@ class ProcessRunner(threading.Thread):
     def parse(self, output):
         """Default parser returns the last (whitespace-separated) word of
         output."""
-        print "Prasing the output..."
+#        print "Prasing the output..."
         return output.split()[-1].strip()
 
 DefaultRunner = ProcessRunner

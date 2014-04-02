@@ -55,6 +55,8 @@ DEFAULT_SETTINGS = {
     'SERVERS_IF': {},
     'CLIENTS': [],
     'CLIENTS_IF': {},
+    'BRUST_SIZE': 1,
+    'PKT_SIZE': 1024,
     'LOCAL_HOST': socket.gethostname(),
     'STEP_SIZE': 0.2,
     'LENGTH': 60,
@@ -339,6 +341,11 @@ parser.add_option("-p", "--plot", action="store", type="string", dest="PLOT",
                   "Use the --list-plots option to see available plots.")
 parser.add_option("-t", "--title-extra", action="store", type="string", dest="TITLE",
                   help="Text to add to plot title and data file name.")
+parser.add_option("-b", "--brust", action="store", type="int", dest="BRUST_SIZE",
+                  help="Number of concurrent transactions")
+parser.add_option("-P", "--packet", action="store", type="int", dest="PKT_SIZE",
+                  help="Size of outgoing packets")
+
 parser.add_option("-n", "--note", action="store", type="string", dest="NOTE",
                   help="Add arbitrary text as a note to be stored in the JSON data file "
                   "(under the NOTE key in the metadata object).")
@@ -601,7 +608,9 @@ def load():
                             MINFO_CLIENT=settings.MINFO_CLIENT,
                             RESULT_LOCATION_BASE2=settings.RESULT_LOCATION_BASE2,
                             TOOLS_LOCATION=settings.TOOLS_LOCATION,
+                            PKT_SIZE=settings.PKT_SIZE,
                             TARGET=settings.TARGET,
+                            BRUST_SIZE=settings.BRUST_SIZE,
                             CLIENTS=settings.CLIENTS,
                             CLIENTS_IF=settings.CLIENTS_IF,
                             SERVERS_IF=settings.SERVERS_IF,
