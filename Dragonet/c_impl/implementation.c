@@ -92,3 +92,12 @@ void pg_state_init(struct state *st)
     st->pkt_counter    = 0;
     st->driver_handler = 0;
 }
+
+void input_xchg(struct input *a, struct input *b)
+{
+    struct input tmp;
+    memcpy(&tmp, a, sizeof(*a));
+    memcpy(a, b, sizeof(*b));
+    memcpy(b, &tmp, sizeof(*b));
+}
+

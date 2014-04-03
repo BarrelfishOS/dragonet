@@ -156,6 +156,7 @@ void input_copy_packet(struct input *in, unsigned char *buff, size_t len);
 void input_clean_attrs(struct input *in);
 void input_clean_packet(struct input *in);
 void input_dump(struct input *in);
+void input_xchg(struct input *a, struct input *b);
 
 //void testFun(struct state * st, struct input *in);
 
