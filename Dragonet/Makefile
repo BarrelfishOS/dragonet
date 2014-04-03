@@ -122,8 +122,14 @@ dpdk: base Util/Dpdk.$(OSUF) # intel_dpdk
 	$(GHC) $(GHCFLAGS) -threaded dpdkTests.hs -o dpdkDragonet -L../dpdk-1.5.0r1/build/lib/ -lintel_dpdk
 
 dpdk_run: dpdk
+	# For directly connected NIC on asiago
+	#../dpdk-1.5.0r1/tools/pci_unbind.py -b igb_uio 04:00.0
 	#../dpdk-1.5.0r1/tools/pci_unbind.py -b igb_uio 81:00.0
 	export LD_LIBRARY_PATH=/home/ubuntu/dragonet/dpdk-1.5.0r1/build/lib/ ; ./dpdkDragonet
+
+dpdk_stop: dpdk
+	../dpdk-1.5.0r1/tools/pci_unbind.py -b ixgbe 04:00.0
+	../dpdk_helpers/setIPaddress.sh
 
 ## Util/Dpdk
 

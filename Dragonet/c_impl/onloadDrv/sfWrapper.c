@@ -1,10 +1,17 @@
 #include <implementation.h>
 
 // this one is connected directly
-#define IFNAME              "eth5"
-#define CONFIG_LOCAL_MAC_sf  0x485107530f00ULL  // "00:0f:53:07:51:48"
-#define CONFIG_LOCAL_IP_sf   0x0a160426          // "10.22.4.38"
+//#define IFNAME              "eth7"
+//#define CONFIG_LOCAL_MAC_sf  0x485107530f00ULL  // "00:0f:53:07:51:48"
+//#define CONFIG_LOCAL_IP_sf   0x0a160426          // "10.22.4.38"
         // NOTE: Can be generated in python with ``print "%02x%02x%02x%02x" % (10,113,4,71)``
+
+// FIXME: this one is connected directly
+#define IFNAME              "eth5"
+#define CONFIG_LOCAL_MAC_sf  0x654d07530f00ULL  //  "00:0f:53:07:4d:65"
+#define CONFIG_LOCAL_IP_sf   0x0a170415         // "10.23.4.21"
+        // NOTE: Can be generated in python with ``print "%02x%02x%02x%02x" % (10,113,4,71)``
+
 
 // this one is connected via switch
 //#define IFNAME              "eth7"
