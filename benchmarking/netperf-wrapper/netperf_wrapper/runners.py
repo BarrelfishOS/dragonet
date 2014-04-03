@@ -249,8 +249,11 @@ class ProcessRunner(threading.Thread):
         output."""
 #        print "Prasing the output..."
         if output == None or output == [] :
-            return []
-        return output.split()[-1].strip()
+            return ""
+        words = output.split()
+        if len(words) == 0:
+            return ""
+        return words[-1].strip()
 
 DefaultRunner = ProcessRunner
 

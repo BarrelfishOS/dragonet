@@ -122,8 +122,8 @@ class Aggregator(object):
         #print "##############################"
         try:
 
-            print "##############################"
-            print "Start server applications first"
+            #print "##############################"
+            #print "Start server applications first"
             for m, mi in list(self.m_instances.items()):
                 if not mi['is_server'] :
                     continue
@@ -135,8 +135,8 @@ class Aggregator(object):
                     self.m_instances[m]['machine'].threads[n] = i['runner'](self.m_instances[m]['machine'], n, **i)
                     self.m_instances[m]['machine'].threads[n].start()
 
-            print "##############################"
-            print "Starting client applications now "
+            #print "##############################"
+            #print "Starting client applications now "
             for m, mi in list(self.m_instances.items()):
                 if mi['is_server'] :
                     continue
@@ -159,20 +159,20 @@ class Aggregator(object):
                         while t.isAlive():
                             t.join(1)
 
-            print "Main threads are done, killing others"
+            #print "Main threads are done, killing others"
             for m, mi in list(self.m_instances.items()):
                 for n,t in list(self.m_instances[m]['machine'].threads.items()):
                     if t.isAlive():
                         t.kill()
 
-            print "Main threads are done, killing others"
+            #print "Main threads are done, killing others"
             for m, mi in list(self.m_instances.items()):
                 for n,t in list(self.m_instances[m]['machine'].threads.items()):
                     while t.isAlive():
                         t.join(1)
 
-            print "##############################"
-            print "Processing results"
+            #print "##############################"
+            #print "Processing results"
             for m, mi in list(self.m_instances.items()):
                 for n,t in list(self.m_instances[m]['machine'].threads.items()):
 
