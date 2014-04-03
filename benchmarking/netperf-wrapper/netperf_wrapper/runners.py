@@ -248,6 +248,8 @@ class ProcessRunner(threading.Thread):
         """Default parser returns the last (whitespace-separated) word of
         output."""
 #        print "Prasing the output..."
+        if output == None or output == [] :
+            return []
         return output.split()[-1].strip()
 
 DefaultRunner = ProcessRunner

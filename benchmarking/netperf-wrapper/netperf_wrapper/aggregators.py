@@ -121,7 +121,25 @@ class Aggregator(object):
 
         #print "##############################"
         try:
+
+            print "##############################"
+            print "Start server applications first"
             for m, mi in list(self.m_instances.items()):
+                if not mi['is_server'] :
+                    continue
+                #print "Running tools on  machine [%s] " % (str(m))
+                for n,i in list(self.m_instances[m]['machine'].tool_instances.items()):
+                    print "Running tool [%s, %s] on machine %s" % (
+                        str(n), str((i)), str(m) )
+
+                    self.m_instances[m]['machine'].threads[n] = i['runner'](self.m_instances[m]['machine'], n, **i)
+                    self.m_instances[m]['machine'].threads[n].start()
+
+            print "##############################"
+            print "Starting client applications now "
+            for m, mi in list(self.m_instances.items()):
+                if mi['is_server'] :
+                    continue
                 #print "Running tools on  machine [%s] " % (str(m))
                 for n,i in list(self.m_instances[m]['machine'].tool_instances.items()):
                     #print "Running tool [%s, %s] on machine %s" % (
@@ -129,6 +147,8 @@ class Aggregator(object):
 
                     self.m_instances[m]['machine'].threads[n] = i['runner'](self.m_instances[m]['machine'], n, **i)
                     self.m_instances[m]['machine'].threads[n].start()
+
+
 
             #print "##############################"
             #print "Waiting for applications to die out"

@@ -89,6 +89,8 @@ DEFAULT_SETTINGS = {
     'TOOLS_LOCATION': '${HOME}/dragonet/benchmarking/netperf-wrapper/',
     'GUI': False,
     'ITERATIONS': 1,
+#    'ECHO_SERVER': 'netperf',
+    'ECHO_SERVER': 'netcat',
     }
 
 CONFIG_TYPES = {
@@ -116,6 +118,7 @@ CONFIG_TYPES = {
     'LOG_SCALE': 'bool',
     'EXTENDED_METADATA': 'bool',
     'ITERATIONS': 'int',
+    'ECHO_SERVER': 'str',
     }
 
 TEST_PATH = os.path.join(DATA_DIR, 'tests')
@@ -626,6 +629,7 @@ def load():
                             TOTAL_LENGTH=settings.TOTAL_LENGTH,
                             STEP_SIZE=settings.STEP_SIZE,
                             ITERATIONS=settings.ITERATIONS,
+                            ECHO_SERVER=settings.ECHO_SERVER,
                             NETPERF_WRAPPER_VERSION=VERSION,
                             IP_VERSION=settings.IP_VERSION)]
         if settings.EXTENDED_METADATA:
