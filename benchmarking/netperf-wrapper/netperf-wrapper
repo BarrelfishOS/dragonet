@@ -64,7 +64,11 @@ try:
                 #sys.exit(1)
                 results[0] = agg.postprocess(agg.aggregate(results[0]))
                 results[0].dump_dir(os.path.dirname(settings.OUTPUT) or ".")
+                print ("Test data is in %s (use with -i to format).\n" % results[0].dump_file)
+                sys.exit(0)
+
             formatter.format(results)
+
 
         except RuntimeError as e:
             sys.stderr.write("Error occurred: %s\n"% str(e))

@@ -68,6 +68,8 @@ class MachineRunner(object):
 #            self.command = "bash -c 'cd %s ; %s'" % (self.tools_location, command)
 
     def _exec_cmd_blocking(self, cmd):
+        if cmd == None or cmd == '' :
+            return ""
         if self.deployment_host and self.deployment_host != 'localhost':
             cmd = "ssh %s '%s'" % (self.deployment_host, cmd)
         res = subprocess.check_output(cmd, universal_newlines=True, shell=True,
@@ -91,9 +93,6 @@ class MachineRunner(object):
 #        self.temp_work_location = self._exec_cmd_blocking(cmd)
 
     def read_machine_metadata(self):
-#        if self.machine_matadata == None:
-#            return self.machine_metadata
-        #self.machine_metadata = md.record_machine_metadata(self.deployment_host, targetMachine=settings.TARGET)
         return self.machine_metadata
 
     def setup_machine(self):
@@ -103,15 +102,20 @@ class MachineRunner(object):
 class ProcessRunner(threading.Thread):
     """Default process runner for any process."""
 
-#    def __init__(self, name, command, delay, deployment_host="localhost",
-#            result_location="./", *args, **kwargs):
-    def __init__(self, machine, name, command, delay, *args, **kwargs):
+    def __init__(self, machine, name, command, wait_for,
+            init_cmd, kill_cmd, out_cmd,
+            delay, *args, **kwargs
+            ):
         threading.Thread.__init__(self)
         self.name = name
         self.delay = delay
         self.result = None
         self.killed = False
         self.machine_ref = machine
+        self.wait_for = wait_for
+        self.init_cmd = init_cmd
+        self.kill_cmd = kill_cmd
+        self.out_cmd = out_cmd
         self.pid = None
         self.returncode = None
 #        self.deployment_host = machine.deployment_host
@@ -128,6 +132,11 @@ class ProcessRunner(threading.Thread):
         self.args = shlex.split(self.command)
 
     def fork(self):
+        # doing initial setup
+        if self.init_cmd:
+            for cmd in self.init_cmd:
+                self.machine_ref._exec_cmd_blocking(cmd)
+
         # Use named temporary files to avoid errors on double-delete when
         # running on Windows/cygwin.
         self.stdout = tempfile.NamedTemporaryFile(delete=False)
@@ -148,12 +157,19 @@ class ProcessRunner(threading.Thread):
         else:
             self.pid = pid
 
+    def should_wait(self):
+        return self.wait_for
+
+
     def kill(self):
         print "T4rying to kill the process"
         if self.killed:
             return
         if self.pid is not None:
             try:
+                if self.kill_cmd:
+                    for cmd in self.kill_cmd:
+                        self.machine_ref._exec_cmd_blocking(cmd)
                 os.kill(self.pid, signal.SIGINT)
             except OSError:
                 pass
@@ -215,6 +231,8 @@ class ProcessRunner(threading.Thread):
             sys.stderr.write("  " + "\n  ".join(self.err.splitlines()) + "\n")
             sys.stderr.write("  " + "\n  ".join(self.out.splitlines()) + "\n")
             self.result = None
+            # FIXME: should create interrupt, and then cleanup the system
+            sys.exit(1)
         else:
             self.result = self.parse(self.out)
             if not self.result:
@@ -417,8 +435,10 @@ class ComputingRunner(object):
         pass
     def join(self):
         pass
+
     def isAlive(self):
         return False
+
     def kill(self):
         pass
 

@@ -375,9 +375,12 @@ class PlotFormatter(Formatter):
         for s in config['series']:
             if not s['data'] in results.series_names:
                 args = None
-                if s['args']:
+                if 'args' in s.keys():
                     args = s['args']
-                ans = s['data'](results._results, **args)
+                    ans = s['data'](results._results, **args)
+                else:
+                    ans = s['data'](results._results)
+
                 #ans = s['data'](results._results)
                 print "%s: %s " % (s['label'], str(ans))
                 y_values = ans

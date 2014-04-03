@@ -133,17 +133,27 @@ class Aggregator(object):
             #print "##############################"
             #print "Waiting for applications to die out"
             for m, mi in list(self.m_instances.items()):
-                # waiting for threads to die out
-                # FIXME: We should only wait for those threads which are supposed to be blocking
+                # waiting for threads which are marked for waiting
+                for n,t in list(self.m_instances[m]['machine'].threads.items()):
+                    if t.should_wait():
+                        while t.isAlive():
+                            t.join(1)
+
+            print "Main threads are done, killing others"
+            for m, mi in list(self.m_instances.items()):
+                for n,t in list(self.m_instances[m]['machine'].threads.items()):
+                    if t.isAlive():
+                        t.kill()
+
+            print "Main threads are done, killing others"
+            for m, mi in list(self.m_instances.items()):
                 for n,t in list(self.m_instances[m]['machine'].threads.items()):
                     while t.isAlive():
                         t.join(1)
 
-            #print "##############################"
-            #print "Processing results"
+            print "##############################"
+            print "Processing results"
             for m, mi in list(self.m_instances.items()):
-                # waiting for threads to die out
-                # FIXME: We should only wait for those threads which are supposed to be blocking
                 for n,t in list(self.m_instances[m]['machine'].threads.items()):
 
                     # FIXME: ideally, result processing should happen in separate loop

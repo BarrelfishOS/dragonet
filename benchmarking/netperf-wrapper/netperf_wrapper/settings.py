@@ -59,7 +59,7 @@ DEFAULT_SETTINGS = {
     'PKT_SIZE': 1024,
     'LOCAL_HOST': socket.gethostname(),
     'STEP_SIZE': 0.2,
-    'LENGTH': 60,
+    'LENGTH': 10,
     'OUTPUT': '-',
     'FORMAT': 'default',
     'TITLE': '',
@@ -70,7 +70,7 @@ DEFAULT_SETTINGS = {
     'DESCRIPTION': 'No description',
     'PLOTS': {},
     'IP_VERSION': None,
-    'DELAY': 5,
+    'DELAY': 2,
     'SOCKET_TIMEOUT': 2,
     'TIME': datetime.now(),
     'SCALE_DATA': [],
@@ -88,6 +88,7 @@ DEFAULT_SETTINGS = {
     'RESULT_LOCATION_BASE2': [],
     'TOOLS_LOCATION': '${HOME}/dragonet/benchmarking/netperf-wrapper/',
     'GUI': False,
+    'ITERATIONS': 1,
     }
 
 CONFIG_TYPES = {
@@ -114,6 +115,7 @@ CONFIG_TYPES = {
     'ZERO_Y': 'bool',
     'LOG_SCALE': 'bool',
     'EXTENDED_METADATA': 'bool',
+    'ITERATIONS': 'int',
     }
 
 TEST_PATH = os.path.join(DATA_DIR, 'tests')
@@ -383,6 +385,8 @@ test_group.add_option("-l", "--length", action="store", type="int", dest="LENGTH
                   help="Base test length (some tests may add some time to this).")
 test_group.add_option("-s", "--step-size", action="store", type="float", dest="STEP_SIZE",
                   help="Measurement data point step size.")
+test_group.add_option("-I", "--iterations", action="store", type="int", dest="ITERATIONS",
+                  help="How many iterations to run")
 test_group.add_option("-d", "--delay", action="store", type="int", dest="DELAY",
                   help="Number of seconds to delay parts of test (such as bandwidth "
                   "loaders).")
