@@ -89,8 +89,13 @@ DEFAULT_SETTINGS = {
     'TOOLS_LOCATION': '${HOME}/dragonet/benchmarking/netperf-wrapper/',
     'GUI': False,
     'ITERATIONS': 1,
-#    'ECHO_SERVER': 'netperf',
-    'ECHO_SERVER': 'netcat',
+#   'ECHO_SERVER': 'netserver',
+#    'ECHO_SERVER': 'netcat',
+    'ECHO_SERVER': 'HImplOnload',
+    'SERVER_ONLOAD_CMDLINE' : "",
+    'SERVER_ONLOAD_ENABLED' : False,
+    'SERVER_ONLOAD_LATENCY' : False,
+    #sudo onload --profile=latency --preload=/usr/lib64/libonload.so socat PIPE UDP-LISTEN:7,fork
     }
 
 CONFIG_TYPES = {
@@ -119,6 +124,7 @@ CONFIG_TYPES = {
     'EXTENDED_METADATA': 'bool',
     'ITERATIONS': 'int',
     'ECHO_SERVER': 'str',
+    'SERVER_ONLOAD_OPTION' : 'str',
     }
 
 TEST_PATH = os.path.join(DATA_DIR, 'tests')
@@ -348,6 +354,16 @@ parser.add_option("-t", "--title-extra", action="store", type="string", dest="TI
                   help="Text to add to plot title and data file name.")
 parser.add_option("-b", "--brust", action="store", type="int", dest="BRUST_SIZE",
                   help="Number of concurrent transactions")
+parser.add_option("-e", "--onload", action="store_true", dest="SERVER_ONLOAD_ENABLED",
+                  help="Solarflare openonload library will be loaded for Linux apps")
+parser.add_option("-E", "--onloadLatency", action="store_true", dest="SERVER_ONLOAD_LATENCY",
+                  help="Solarflare openonload library with latency profile will be loaded for Linux apps")
+
+parser.add_option("-c", "--echoServer", action="store", type="string", dest="ECHO_SERVER",
+                  help="Which Echo server to use")
+
+
+
 parser.add_option("-P", "--packet", action="store", type="int", dest="PKT_SIZE",
                   help="Size of outgoing packets")
 
@@ -606,6 +622,13 @@ def load():
             settings.MINFO_CLIENT[m] = record_machine_metadata(m, settings.TARGET)
             settings.CLIENTS_IF[m] = settings.MINFO_CLIENT[m]["EGRESS_INFO"]["iface"]
 
+        if settings.SERVER_ONLOAD_LATENCY:
+            settings.SERVER_ONLOAD_CMDLINE = "onload --profile=latency --preload=/usr/lib64/libonload.so"
+        elif settings.SERVER_ONLOAD_ENABLED :
+            settings.SERVER_ONLOAD_CMDLINE = "onload --profile=latency --preload=/usr/lib64/libonload.so"
+        else :
+            settings.SERVER_ONLOAD_CMDLINE = ""
+
         settings.load_test()
         results = [ResultSet(NAME=settings.NAME,
                             HOST=settings.HOST,
@@ -625,6 +648,9 @@ def load():
                             LOCAL_HOST=settings.LOCAL_HOST,
                             TITLE=settings.TITLE,
                             NOTE=settings.NOTE,
+                            SERVER_ONLOAD_LATENCY=settings.SERVER_ONLOAD_LATENCY,
+                            SERVER_ONLOAD_ENABLED=settings.SERVER_ONLOAD_ENABLED,
+                            SERVER_ONLOAD_CMDLINE=settings.SERVER_ONLOAD_CMDLINE,
                             LENGTH=settings.LENGTH,
                             TOTAL_LENGTH=settings.TOTAL_LENGTH,
                             STEP_SIZE=settings.STEP_SIZE,
