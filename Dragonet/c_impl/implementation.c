@@ -93,6 +93,16 @@ void pg_state_init(struct state *st)
     st->driver_handler = 0;
 }
 
+int32_t input_muxid(struct input *in)
+{
+    return in->mux_id;
+}
+
+void input_set_muxid(struct input *in, int32_t mux)
+{
+    in->mux_id = mux;
+}
+
 void input_xchg(struct input *a, struct input *b)
 {
     struct input tmp;
