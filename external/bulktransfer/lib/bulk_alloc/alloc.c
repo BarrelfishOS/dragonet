@@ -36,7 +36,7 @@ errval_t bulk_alloc_init_pool(struct bulk_allocator *alloc,
 
     for (i = 0; i < pool->num_buffers; i++) {
         err = bulk_alloc_return_buffer(alloc, pool->buffers[i]);
-        assert(err_is_ok(err));
+        err_expect_ok(err);
     }
 
     return SYS_ERR_OK;
