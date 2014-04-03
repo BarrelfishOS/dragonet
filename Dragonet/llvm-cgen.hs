@@ -5,12 +5,16 @@ import qualified Data.Graph.Inductive as DGI
 import Dragonet.ProtocolGraph  as PG
 import Dragonet.Unicorn.Parser as UnicornAST
 import Dragonet.Unicorn  as Unicorn
-import Dragonet.DotGenerator (toDot)
+import Dragonet.DotGenerator (toDot, toDotWith, pipelinesDot)
+import qualified Dragonet.Pipelines as PL
+import qualified Dragonet.Pipelines.Implementation as PLI
+import Util.GraphHelpers (findNodeByL)
 
-import Control.Applicative (Applicative)
+import Control.Applicative --(Applicative)
 import Control.Monad.State (State, MonadState, gets, modify, execState)
 import Control.Monad.Error (ErrorT, runErrorT)
-import Control.Monad ((>=>), liftM, mapM_, forM_)
+import Control.Monad ((>=>), liftM, mapM_, forM_, forever)
+import Control.Concurrent (forkOS,yield)
 
 --import Control.Applicative
 
@@ -131,6 +135,8 @@ mkNullPtrOp ty = mkNullOp $ mkPtrTy ty
 data ArgState = ArgState {
       pgState    :: (AST.Type, String)
     , pgInput    :: (AST.Type, String)
+    , pgPLI      :: PLI.PipelineImpl
+    , pgPLG      :: PL.PLGraph
 }
 
 data CodeGenState = CodeGenState {
@@ -141,7 +147,7 @@ data CodeGenState = CodeGenState {
 
 -- llvm monad (all llvm state)
 newtype LLVM a = LLVM { doLLVM :: State CodeGenState a }
-    deriving (Monad, MonadState CodeGenState)
+    deriving (Monad, MonadState CodeGenState, Functor)
     --deriving (Functor, Applicative, Monad, MonadState AST.Module)
 
 ----
@@ -163,6 +169,13 @@ cgONCounters = gets cgONCnts
 cgAddONCounter :: String -> LLVM ()
 cgAddONCounter n = do
     modify $ \s -> s { cgONCnts = n : (cgONCnts s) }
+
+
+pipelineTy :: AST.Type
+pipelineTy = mkOpaqueTy "struct.pipeline_handle"
+
+queueTy :: AST.Type
+queueTy = mkOpaqueTy "struct.queue_handle"
 
 --- XXX: Assumption about input struct
 cgInput_make_gep :: AST.OP.Operand -> String -> AST.I.Instruction
@@ -189,15 +202,26 @@ cgOpArgs = do
     fnode_args <- cgFnodeArgs
     return $ (i1Ty, "val"):fnode_args
 
+cgPLI :: LLVM PLI.PipelineImpl
+cgPLI = pgPLI <$> gets cgArgs
+
+cgPLG :: LLVM PL.PLGraph
+cgPLG = pgPLG <$> gets cgArgs
+
+
 ----
 -----
 
 -- the second argument is an LLVM monad that does not return anything
-codeGen :: String -> AST.Type -> AST.Type -> LLVM () -> CodeGenState
-codeGen mod_name state_ty input_ty llvm = (execState $ doLLVM llvm) st0
+codeGen :: String -> AST.Type -> AST.Type -> PLI.PipelineImpl -> PL.PLGraph -> LLVM () -> CodeGenState
+codeGen mod_name state_ty input_ty pli plg llvm = (execState $ doLLVM llvm) st0
     where st0 = CodeGenState {
           cgAstModule = emptyModule mod_name
-        , cgArgs      = ArgState { pgState = (state_ty, "state"), pgInput = (input_ty, "input") }
+        , cgArgs      = ArgState {
+                            pgState = (state_ty, "state"),
+                            pgInput = (input_ty, "input"),
+                            pgPLI = pli,
+                            pgPLG = plg }
         , cgONCnts    = []
     }
 pg_fnode_args_names = ["state", "input"] -- XXX keep hard-coded for now
@@ -560,6 +584,11 @@ mkConstInt8  = mkConstInt 8
 mkConstIntOperand ::  Word32 -> Integer -> AST.Operand
 mkConstIntOperand bits val = AST.OP.ConstantOperand $ mkConstInt bits val
 
+operandConstInt8 :: Integer -> AST.Operand
+operandConstInt8 = mkConstIntOperand 8
+
+operandInt8_0 = operandConstInt8 8
+
 operandConstInt32 :: Integer -> AST.Operand
 operandConstInt32 = mkConstIntOperand 32
 
@@ -586,6 +615,7 @@ i32Ty = mkIntTy 32
 i8Ty  = mkIntTy 8
 i1Ty  = mkIntTy 1
 voidTy = AST.T.VoidType
+muxIdTy = i32Ty
 
 mkArrayTy :: AST.T.Type -> Word64 -> AST.T.Type
 mkArrayTy elem_ty len  = AST.T.ArrayType {
@@ -850,6 +880,14 @@ bldConstStr str_name str_data = do
     let str_op = getGlobalOp str_name'
     bldAddInstruction $ mkGep str_op [0,0]
 
+-- Get pointer to the provided constant string
+--   differs from bldConstStr by using temporary variable name
+bldConstStr' :: String -> FnBuilder AST.Operand
+bldConstStr' str = do
+    (AST.Name tmp) <- bldTemp
+    bldAddDef $ mkFnStaticConstStr tmp str
+    bldAddInstruction $ flip mkGep [0,0] $ getGlobalOp tmp
+
 -- TODO: use bldConstStr
 bldPrintMsg :: String -> FnBuilder ()
 bldPrintMsg msg = do
@@ -920,6 +958,11 @@ bldCallPort (port, outs) bb_assoc = do
           bb_name = \idx -> (get_bb "bb_prefix") ++ (show idx)
           bb_err  = get_bb "bb_err"
 
+-- Returns value of a named attribute if it exists
+--   (attr "foo=bar" + name "foo" ->  Just "bar"
+getPGNAttr :: PG.Node -> String -> Maybe String
+getPGNAttr node n =
+    drop (length n + 1) <$> (L.find (L.isPrefixOf (n ++ "=")) $ nAttributes node)
 
 -- build a function for an F-node
 --  distinguish between terminal and non-terminal nodes
@@ -938,10 +981,16 @@ llvm_pg_fnode nid node adj_out = do
 -- build a function for a terminal F-node
 llvm_pg_fnode_terminal :: DGI.Node -> PG.Node -> [(PG.Port, [(DGI.Node, PG.Node)])] -> LLVM ()
 llvm_pg_fnode_terminal nid node outs = do
+    -- If we're dealing with an enqueue node, generate its implementation
+    external <- case getPGNAttr node "pipeline" of
+        Just pln -> do { llvm_pg_fnode_enqueue nid node pln ; return False }
+        _ -> return True
     fnode_args <- cgFnodeArgs
     fnAdd (pg_fname node) i32Ty fnode_args $ do
         -- declare the implementation function
-        bldAddDef $ mkExternalFn i32Ty (pg_fimplname node) fnode_args
+        if external
+            then bldAddDef $ mkExternalFn i32Ty (pg_fimplname node) fnode_args
+            else return ()
         -- print message on entering the function
         (AST.Name fnstr) <- gets fnName
         bldDbgPrintf ("Entering terminal node: " ++ fnstr) []
@@ -967,6 +1016,99 @@ llvm_pg_fnode_terminal nid node outs = do
         ret <- bldPhi "ret_phi"
         bldTerminate $ termRetOp ret
 
+-- Handle non-terminal F-Node. Cases:
+--   - Demux nodes
+--   - regular F-Node
+llvm_pg_fnode_nonterminal :: DGI.Node -> PG.Node -> [(PG.Port, [(DGI.Node, PG.Node)])] -> LLVM ()
+llvm_pg_fnode_nonterminal nid node outs = do
+    -- Generate impl function for demultiplexing node
+    isDemux <- if nLabel node == "Demux"
+        then do { llvm_pg_fnode_demux nid node ; return True }
+        else return False
+    -- Generate impl function for multiplexing node
+    isMux <- case (getPGNAttr node "multiplex",getPGNAttr node "muxPL") of
+        (Just aDN,Just aDP) -> do
+            llvm_pg_fnode_mux nid node aDN aDP
+            return True
+        _ -> return False
+    -- Generate Fnode function
+    llvm_pg_fnode_nonterminal' nid node outs (not (isDemux || isMux))
+
+-- Generate function implementing a demux F-node
+--   - Poll the queue until we get an input
+--   - Enable the next node, based on the mux identifier
+llvm_pg_fnode_demux :: DGI.Node -> PG.Node -> LLVM ()
+llvm_pg_fnode_demux nid node = do
+    input_ty <- cgInputTy
+    fnode_args <- cgFnodeArgs
+    fnAdd (pg_fimplname node) i32Ty fnode_args $ do
+        -- print message on entering the function
+        (AST.Name fnstr) <- gets fnName
+        bldDbgPrintf ("Entering demux node: " ++ fnstr ++ "\n") []
+        bldTerminate $ termBr "bb_poll"
+
+        -- Basic Block for polling queue
+        bldAddBB "bb_poll"
+        plh <- bldAddInstruction $ mkLd $ getGlobalOp glblPipeline
+        poll_ret <- bldAddInstruction $ mkFnCall "pl_poll" [plh]
+        t <- bldAddInstruction $ mkICmpEq poll_ret (mkNullPtrOp input_ty)
+        bldTerminate $ termCondBr t "bb_poll" "bb_ret"
+
+        bldAddBB "bb_ret"
+        mux_ret <- bldAddInstruction $ mkFnCall "input_muxid" [poll_ret]
+        -- clear mux id
+        bldAddInstruction $ mkFnCall "input_set_muxid" [poll_ret, operandInt32_0]
+        -- exchange with current input, and free it
+        let inp = getLocalRef "input"
+        bldAddInstruction $ mkFnCall "input_xchg" [inp, poll_ret]
+        bldAddInstruction $ mkFnCall "input_free" [poll_ret]
+        bldTerminate $ termRetOp mux_ret
+
+-- Generate function transfering packet to alternative pipeline
+llvm_pg_fnode_enqueue :: DGI.Node -> PG.Node -> String -> LLVM ()
+llvm_pg_fnode_enqueue nid node pipelineName = do
+    input_ty <- cgInputTy
+    fnode_args <- cgFnodeArgs
+    pli <- cgPLI
+    fnAdd (pg_fimplname node) i32Ty fnode_args $ do
+        -- print message on entering the function
+        (AST.Name fnstr) <- gets fnName
+        bldDbgPrintf ("Entering enqueue node: " ++ fnstr ++ "\n") []
+
+        -- get queue handle
+        let Just (PLI.POQueue queueName) = lookup pipelineName $ PLI.pliOutQs pli
+        qh <- bldAddInstruction $ mkLd $ getGlobalOp $ glblOutqueue queueName
+        -- enqueue packet
+        let inp = getLocalRef "input"
+        poll_ret <- bldAddInstruction $ mkFnCall "pl_enqueue" [qh, inp]
+        bldTerminate $ termRetOp operandInt32_0
+
+-- Generate function implementing a multiplexing F-node
+--   This means tagging the packet with the right mux id
+llvm_pg_fnode_mux :: DGI.Node -> PG.Node -> String -> String -> LLVM ()
+llvm_pg_fnode_mux nid node dNodeL dPL = do
+    -- First we need to figure out the multiplexing identifier, which we will
+    -- make to be the port identifier so it can just be returned by the
+    -- implementation fuction
+    plg <- cgPLG
+    let (Just dpg) = PL.plGraph <$> snd <$> findNodeByL ((==) dPL . PL.plLabel) plg -- dest pipeline
+    --let (Just (dn,_))  = findNodeByL ((==) dNodeL . PG.nLabel) dpg -- Dest node
+    let (Just (dxn,dxnL))  = findNodeByL ((==) "Demux" . PG.nLabel) dpg -- Demux node
+    let dxPorts = flip zip [0..] $ PG.nPorts dxnL -- get map output port -> ID
+    --let (Just (_,dxPort)) = find ((==) dn . fst) DGI.lsuc -- find outgoing edge from Demux node
+    let (Just muxid) = lookup dNodeL dxPorts
+
+    -- Generate the actual function
+    input_ty <- cgInputTy
+    fnode_args <- cgFnodeArgs
+    fnAdd (pg_fimplname node) i32Ty fnode_args $ do
+        (AST.Name fnstr) <- gets fnName
+        bldDbgPrintf ("Entering mux node: " ++ fnstr ++ "\n") []
+        let inp = getLocalRef "input"
+        bldAddInstruction $ mkFnCall "input_set_muxid" [inp, operandConstInt32 muxid]
+        bldTerminate $ termRetOp operandInt32_0
+
+
 -- build a function for a non-terminal F-node
 -- NOTE:
 --  The functionality of each f-node is implemented via an implementation
@@ -974,8 +1116,8 @@ llvm_pg_fnode_terminal nid node outs = do
 --  The implementation function:
 --   - takes the same arguments as the pg function
 --   - returns an integer that corresponds to the port to be enabled
-llvm_pg_fnode_nonterminal :: DGI.Node -> PG.Node -> [(PG.Port, [(DGI.Node, PG.Node)])] -> LLVM ()
-llvm_pg_fnode_nonterminal nid node outs' = do
+llvm_pg_fnode_nonterminal' :: DGI.Node -> PG.Node -> [(PG.Port, [(DGI.Node, PG.Node)])] -> Bool -> LLVM ()
+llvm_pg_fnode_nonterminal' nid node outs' external = do
     -- XXX quick-n-dirty hack: if this is a boolean node, order ports so that
     -- false is first
     let attrs = PG.nAttributes node
@@ -989,7 +1131,9 @@ llvm_pg_fnode_nonterminal nid node outs' = do
     fnode_args <- cgFnodeArgs
     fnAdd (pg_fname node) i32Ty fnode_args $ do
         -- declare the implementation function
-        bldAddDef $ mkExternalFn i32Ty (pg_fimplname node) fnode_args
+        if external
+            then bldAddDef $ mkExternalFn i32Ty (pg_fimplname node) fnode_args
+            else return ()
         -- print message on entering the function
         (AST.Name fnstr) <- gets fnName
         bldDbgPrintf ("Entering node: " ++ fnstr ++ "\n") []
@@ -1094,7 +1238,7 @@ llvm_pg_op cnf nid node adj_out adj_in = do
                 Nothing       -> do
                     --error $ "Cannot find port " ++ lbl ++ " in operator node with id: " ++ (show nid) ++ " (" ++ (show $ nLabel node) ++ ")"
                     bldAddBB $ "bb_"++ lbl ++ "0"
-                    bldPrintf (" -> NO " ++ lbl ++ "PORT DEFINED!") []
+                    bldPrintf (" -> NO " ++ lbl ++ " PORT DEFINED!") []
                     bldTerminate $ termBr "bb_err"
 
         forM_ [("bb_cont", pgContOp), ("bb_done", pgDoneOp), ("bb_err", pgErrOp)] $ \(bb,retval) -> do
@@ -1106,19 +1250,35 @@ llvm_pg_op cnf nid node adj_out adj_in = do
         ret <- bldPhi "ret_phi"
         bldTerminate $ termRetOp ret
 
+
 -- Main function for graph that just runs it in an infinite loop, starting with an empty input
-llvm_pg_main_func :: PG.Node -> LLVM ()
-llvm_pg_main_func entry_node = do
+llvm_pg_main_func :: PG.Node -> String -> LLVM ()
+llvm_pg_main_func entry_node stackname = do
     state_ty <- cgStateTy
     input_ty <- cgInputTy
+    pli <- cgPLI
     on_cnt <- cgONCounters
     fnAdd "pg_main" voidTy [] $ do
-        state <- bldAddInstruction $ mkAlloca state_ty 1     -- allocate state variable in the stack
-        bldAddInstruction $ mkFnCall "pg_state_init" [state] -- initialize state
+        snOp <- bldConstStr' stackname
+        plnameOp <- bldConstStr' $ PL.plLabel $ PLI.pliPipeline pli
 
-        let buff_size = 4096
-        buff  <- bldAddInstruction $ mkAllocaBuff buff_size  -- static buffer in the stack
-        gep_buff <- bldAddInstruction $ mkGep buff [0,0]     -- gep for buffer
+        -- Initialize pipeline
+        plh <- bldAddInstruction $ mkFnCall "pl_init" [snOp, plnameOp]
+        bldAddInstruction $ mkSt (getGlobalOp glblPipeline) plh -- global pipline handle
+        state <- bldAddInstruction $ mkFnCall "pl_get_state" [plh]
+
+        -- Create input queues
+        forM_ (PLI.pliInQs pli) $ \(_,PLI.PIQueue qn) -> do
+            qnOp <- bldConstStr' qn
+            bldAddInstruction $ mkFnCall "pl_inqueue_create" [plh, qnOp]
+        -- Bind output queues
+        forM_ (PLI.pliOutQs pli) $ \(_,PLI.POQueue qn) -> do
+            qnOp <- bldConstStr' qn
+            qh <- bldAddInstruction $ mkFnCall "pl_outqueue_bind" [plh, qnOp]
+            bldAddInstruction $ mkSt (getGlobalOp $ glblOutqueue qn) qh -- global pipline handle
+        -- Wait for all pipelines to be ready
+        bldAddInstruction $ mkFnCall "pl_wait_ready" [plh]
+
         input <- bldAddInstruction $ mkFnCall "input_alloc" [] -- allocate (and initialize) input
 
         bldTerminate $ termBr "body"                            -- jump to loop body
@@ -1133,6 +1293,7 @@ llvm_pg_main_func entry_node = do
         bldAddInstruction $ mkCall (getFnOp $ pg_fname entry_node) [state, input] -- call entry
         bldAddInstruction $ mkFnCall "input_clean_attrs" [input] -- clean up input
         bldAddInstruction $ mkFnCall "input_clean_packet" [input] -- clean up input
+        bldAddInstruction $ mkFnCall "pl_process_events" [plh] -- process events
 
         -- reset o-node counters
         forM_ on_cnt $ \cnt_name ->
@@ -1236,6 +1397,15 @@ getTypes ast = filter fn $ AST.moduleDefinitions ast
 getTypeNames :: AST.Module -> [String]
 getTypeNames ast = map (\x@(AST.TypeDefinition (AST.Name s) _) -> s) $ getTypes ast
 
+-- Name of the global pipeline handle variable
+glblPipeline :: String
+glblPipeline = "pipeline_handle"
+
+-- Name of the global out queue handle variables
+glblOutqueue :: PL.PLabel -> String
+glblOutqueue qn = "outqueue_" ++ qn -- TODO: do we need to sanitize this?
+
+
 -- TODO:
 --  - input from queues
 --  - some sort of initialization infrastructure:
@@ -1243,8 +1413,7 @@ getTypeNames ast = map (\x@(AST.TypeDefinition (AST.Name s) _) -> s) $ getTypes 
 --    . initialize each queue
 --  - access state
 
-codegen_all pgraph  = do
-
+codegen_all pgraph stackname = do
     let (entry_id, entry_node) = pgEntry pgraph
     let entry_label = PG.nLabel entry_node
 
@@ -1254,6 +1423,9 @@ codegen_all pgraph  = do
     addDefn $ AST.TypeDefinition (AST.Name "struct.input") Nothing
     addDefn $ AST.TypeDefinition (AST.Name "struct.state") Nothing
     addDefn $ AST.TypeDefinition (AST.Name "struct.driver") Nothing
+    addDefn $ AST.TypeDefinition (AST.Name "struct.tap_handler") Nothing
+    addDefn $ AST.TypeDefinition (AST.Name "struct.pipeline_handle") Nothing
+    addDefn $ AST.TypeDefinition (AST.Name "struct.queue_handle") Nothing
     -- hack:
     addDefn $ AST.TypeDefinition (AST.Name "struct.arp_pending") Nothing
     addDefn $ AST.TypeDefinition (AST.Name "struct.arp_cache") Nothing
@@ -1264,9 +1436,31 @@ codegen_all pgraph  = do
     addExternalFn voidTy "input_free" [((mkPtrTy input_ty), "input")]
     addExternalFn voidTy "input_clean_attrs" [((mkPtrTy input_ty), "input")]
     addExternalFn voidTy "input_clean_packet" [((mkPtrTy input_ty), "input")]
+    addExternalFn muxIdTy "input_muxid" [((mkPtrTy input_ty), "input")]
+    addExternalFn voidTy "input_set_muxid" [((mkPtrTy input_ty), "input"), (muxIdTy, "id")]
+    addExternalFn voidTy "input_xchg" [((mkPtrTy input_ty), "a"), ((mkPtrTy input_ty), "b")]
+
+    let plp_ty = mkPtrTy pipelineTy
+    let qp_ty = mkPtrTy queueTy
+    -- Pipeline init functions
+    addExternalFn plp_ty "pl_init" [((mkPtrTy i8Ty), "stackname"), ((mkPtrTy i8Ty), "plname")]
+    addExternalFn (mkPtrTy state_ty) "pl_get_state" [(plp_ty, "plh")]
+    addExternalFn qp_ty "pl_inqueue_create" [(plp_ty, "plh"), ((mkPtrTy i8Ty), "name")]
+    addExternalFn qp_ty "pl_outqueue_bind" [(plp_ty, "plh"), ((mkPtrTy i8Ty), "name")]
+    addExternalFn voidTy "pl_wait_ready" [(plp_ty, "plh")]
+
+    -- Queue interaction
+    addExternalFn voidTy "pl_enqueue" [(qp_ty, "queue"), ((mkPtrTy input_ty), "input")]
+    addExternalFn (mkPtrTy input_ty) "pl_poll" [(plp_ty, "plh")]
+    addExternalFn voidTy "pl_process_events" [(plp_ty, "plh")]
+    addStaticVar plp_ty glblPipeline (AST.C.Null plp_ty)
+    --addGlobalVar (mkPtrTy pipelineTy) glblPipeline
+    pli <- cgPLI
+    forM_ (PLI.pliOutQs pli) $ \(_,(PLI.POQueue queue)) -> do
+        addStaticVar qp_ty (glblOutqueue queue) (AST.C.Null qp_ty)
 
     llvm_pg pgraph entry_label   -- Build node functions
-    llvm_pg_main_func entry_node -- Build main runner function
+    llvm_pg_main_func entry_node stackname -- Build main runner function
 
 
 passes :: LLVM.PM.PassSetSpec
@@ -1277,16 +1471,62 @@ pg4tap :: PGraph -> PGraph
 pg4tap pg = DGI.nmap fixN pg
     where
         fixN n
-            | nLabel n == "Queue" = n { nLabel = "TapRxQueue" }
-            | nLabel n == "TxQueue" = n { nLabel = "TapTxQueue" }
+            | l == "Queue" = n { nLabel = "TapRxQueue" }
+            | l == "TxQueue" = n { nLabel = "TapTxQueue" }
             | otherwise = n
+            where l = nLabel n
 
+
+-- Prepeares and runs the pipeline
+runPipeline :: PL.PLGraph -> String -> PLI.PipelineImpl -> IO ()
+runPipeline plg stackname pli = fmap (const ()) $ forkOS $ do
+    writeFile ("pipeline-" ++ mname ++ ".dot") $ toDot pgraph
+    LLVM.Ctx.withContext $ \ctx ->
+        liftError $ LLVM.Mod.withModuleFromBitcode ctx llvm_helpers $ \mod2 -> do
+            ast2 <- LLVM.Mod.moduleAST mod2
+            -- load input type and state type from module
+            let input_ty = case findTy ast2 "struct.input" of
+                                Just ty -> ty
+                                Nothing -> error "Could not find struct input"
+            let state_ty = case findTy ast2 "struct.state" of
+                                Just ty -> ty
+                                Nothing -> error "Could not find struct state"
+            let ast_mod = cgAstModule $ codeGen mname state_ty input_ty pli plg (codegen_all pgraph stackname)
+            liftError $ LLVM.Mod.withModuleFromAST ctx ast_mod $ \mod -> do
+                modWriteFile mod $ mname ++ "-cg.ll"
+                liftError $ LLVM.Mod.linkModules False mod mod2
+                --modPrint mod
+                modWriteFile mod $ mname ++ "-linked-cg.ll"
+                putStrLn $ "Verifying " ++ mname
+                err <- runErrorT $ LLVM.A.verify mod
+                case err of Right () -> putStrLn $ "module verified"
+                            Left e   -> putStrLn $ "error verifying module:" ++ e
+                --modExec ctx mod "pg_main"
+                LLVM.PM.withPassManager passes $ \pm -> do
+                    LLVM.PM.runPassManager pm mod
+                    modWriteFile mod $ mname ++ "-optimized-cg.ll"
+                    modExec ctx mod "pg_main"
+                    return ()
+    where
+        pl = PLI.pliPipeline pli
+        pgraph = PL.plGraph pl
+        mname = PL.plLabel pl
+        llvm_helpers = LLVM.Mod.File "dist/build/llvm-helpers.bc"  -- LLVM file with helper utilities
+
+plAssign :: PG.PGNode -> PL.PLabel
+plAssign (_,n)
+    | take 2 lbl == "Tx" || take 5 lbl == "TapTx" = "Tx"
+    | otherwise = "Rx"
+    where
+        lbl = nLabel n
+
+plConnect :: PL.Pipeline -> PL.Pipeline -> (PLI.POutput,PLI.PInput)
+plConnect i o = (PLI.POQueue n, PLI.PIQueue n)
+    where n = PL.plLabel i ++ "_to_" ++ PL.plLabel o
 
 main :: IO ()
 main = do
     let fname_def = "unicorn-tests/hello.unicorn"       -- default unicorn file name
-    let mname = "dragonet_pg"                           -- LLVM module name
-    let llvm_helpers = LLVM.Mod.File "dist/build/llvm-helpers.bc"  -- LLVM file with helper utilities
 
     xargs <- getArgs
     let fname = if (length xargs) == 0 then fname_def else xargs !! 0
@@ -1298,33 +1538,10 @@ main = do
     graph <- UnicornAST.parseGraph txt
     let pgraph = pg4tap $ Unicorn.constructGraph graph
     writeFile "DELETEME.dot" $ toDot pgraph
+    let plg = PL.generatePLG plAssign pgraph
+    writeFile "pipelines.dot" $ pipelinesDot Nothing plg
 
-    LLVM.Ctx.withContext $ \ctx ->
-        liftError $ LLVM.Mod.withModuleFromBitcode ctx llvm_helpers $ \mod2 -> do
-            ast2 <- LLVM.Mod.moduleAST mod2
-            -- load input type and state type from module
-            let input_ty = case findTy ast2 "struct.input" of
-                                Just ty -> ty
-                                Nothing -> error "Could not find struct input"
-            let state_ty = case findTy ast2 "struct.state" of
-                                Just ty -> ty
-                                Nothing -> error "Could not find struct state"
-            --putStrLn $ (show state_ty)
-            --putStrLn $ (show input_ty)
-            --let state_ty' = pg_state_ty_
-            --let input_ty' = pg_input_ty_
-            let ast_mod = cgAstModule $ codeGen mname state_ty input_ty (codegen_all pgraph)
-            liftError $ LLVM.Mod.withModuleFromAST ctx ast_mod $ \mod -> do
-                modWriteFile mod $ mname ++ "-cg.ll"
-                liftError $ LLVM.Mod.linkModules False mod mod2
-                --modPrint mod
-                modWriteFile mod $ mname ++ "-linked-cg.ll"
-                err <- runErrorT $ LLVM.A.verify mod
-                case err of Right () -> putStrLn $ "module verified"
-                            Left e   -> putStrLn $ "error verifying module:" ++ e
-                --modExec ctx mod "pg_main"
-                LLVM.PM.withPassManager passes $ \pm -> do
-                    LLVM.PM.runPassManager pm mod
-                    modWriteFile mod $ mname ++ "-optimized-cg.ll"
-                    modExec ctx mod "pg_main"
-                    return ()
+    let stackname = "dragonet"
+    PLI.runPipelines stackname plConnect (runPipeline plg stackname) plg
+    forever yield
+

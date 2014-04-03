@@ -19,7 +19,14 @@ main = defaultMainWithHooks simpleUserHooks {
 llvmSources = [ "c_impl/impl_arp.c", "c_impl/impl_ethernet.c",
     "c_impl/impl_icmp.c", "c_impl/impl_ipv4.c", "c_impl/impl_udp.c",
     "c_impl/impl_tcp.c", "c_impl/impl_misc.c", "c_impl/implementation.c",
-    "c_impl/support/Ethernet.c", "c_impl/support/Icmp.c", "lib/Util/tap.c" ]
+    "c_impl/support/Ethernet.c", "c_impl/support/Icmp.c", "lib/Util/tap.c",
+    "lib/Dragonet/Pipelines/pipelines_helper.c",
+    "../external/bulktransfer/lib/bulk_linuxshm/shm_channel.c",
+    "../external/bulktransfer/lib/bulk_linuxshm/implementation.c",
+    "../external/bulktransfer/lib/bulk_alloc/alloc.c",
+    "../external/bulktransfer/lib/bulk_transfer/channel.c",
+    "../external/bulktransfer/lib/bulk_transfer/pool.c",
+    "../external/bulktransfer/lib/barrelfish/waitset.c"]
 llvmCAdditionalInc = ["../external/bulktransfer/lib/include"]
 
 -- Run clang to get llvm bitcode
