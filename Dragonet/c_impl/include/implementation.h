@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "../../lib/Util/tap.h"
+
 //#define MYDEBUG     1
 #ifdef MYDEBUG
 #define dprint(x...)    printf("debug:" x)
@@ -59,6 +61,9 @@ struct state {
 
     uint64_t pkt_counter;
     struct driver *driver_handler;
+
+    // XXX: HACK
+    struct tap_handler *tap_handler;
 };
 
 struct arp_pending {
