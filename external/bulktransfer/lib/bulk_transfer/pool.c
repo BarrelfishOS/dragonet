@@ -46,16 +46,9 @@ errval_t bulk_int_pool_map(struct bulk_pool      *p,
     size_t i;
     struct pool_meta *meta;
     char name[MAX_POOLNAME];
-    size_t bufsz = p->buffer_size;
-    size_t bufcnt = p->num_buffers;
+    size_t bufsz, bufcnt;
     int fd;
 
-
-    p->buffers = calloc(bufcnt, sizeof(*p->buffers));
-    assert_fix(p->buffers != NULL);
-
-    buffers = calloc(bufcnt, sizeof(*buffers));
-    assert_fix(buffers != NULL);
 
 
     // Open pool SHM
@@ -81,6 +74,14 @@ errval_t bulk_int_pool_map(struct bulk_pool      *p,
     close(fd);
 
     p->base_address = buffers_vbase;
+
+    p->buffers = calloc(bufcnt, sizeof(*p->buffers));
+    assert_fix(p->buffers != NULL);
+
+    buffers = calloc(bufcnt, sizeof(*buffers));
+    assert_fix(buffers != NULL);
+
+
     for (i = 0; i < bufcnt; i++) {
         p->buffers[i] = buffers + i;
 
