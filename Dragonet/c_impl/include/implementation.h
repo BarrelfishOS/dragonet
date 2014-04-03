@@ -90,7 +90,8 @@ struct input {
 // Attributes ----------------------------------------
 
     // Offset for headers on different layers
-    pktoff_t offset_l2;
+    pktoff_t offset_l2; // XXX CAUTION: Code in pipeline-helper depends on this
+                        //              being the first attribute!!!
     pktoff_t offset_l3;
     pktoff_t offset_l4;
     pktoff_t offset_l5;
@@ -120,7 +121,7 @@ struct input {
     portno_t udp_dport;
 
     // Misc
-    uint8_t mux_id;
+    int32_t mux_id;
 
     struct input *next;
 };
@@ -156,6 +157,8 @@ void input_copy_packet(struct input *in, unsigned char *buff, size_t len);
 void input_clean_attrs(struct input *in);
 void input_clean_packet(struct input *in);
 void input_dump(struct input *in);
+int32_t input_muxid(struct input *in);
+void input_set_muxid(struct input *in, int32_t mux);
 void input_xchg(struct input *a, struct input *b);
 
 //void testFun(struct state * st, struct input *in);
