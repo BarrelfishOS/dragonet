@@ -22,14 +22,14 @@ struct pool_meta {
 };
 
 static struct bulk_pool *pools = NULL;
-
+uint32_t bulk_machine_id = 0;
 
 static void alloc_poolid(struct bulk_pool_id *id)
 {
     static uint32_t local = 0;
-    id->machine = 0; // TODO
+    id->machine = bulk_machine_id; // TODO
     id->dom = (uint32_t) getpid();
-    id->local = ++local;
+    id->local = __sync_add_and_fetch(&local, 1);
 }
 
 static void get_poolname(struct bulk_pool_id *id, char *name)
