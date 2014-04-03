@@ -151,7 +151,7 @@ static inline void shm_chan_free(struct shm_channel *chan,
     volatile uintptr_t *flags;
     assert(!chan->sender);
 
-    flags = shm_chan_slotflags(shm_chan_slot(chan, chan->current));
+    flags = shm_chan_slotflags(message);
     assert((*flags & SHM_FLAGS_TXDONE) != 0);
 
     *flags &= ~SHM_FLAGS_TXDONE;

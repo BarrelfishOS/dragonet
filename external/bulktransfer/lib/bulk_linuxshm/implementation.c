@@ -678,6 +678,8 @@ static void msg_handler(struct shm_message *msg, void *opaque)
             debug_printf("Unhandled message type: %d\n", msg->type);
             assert(!"NYI");
     }
+
+    shm_chan_free(&internal->rx, msg);
 }
 
 
