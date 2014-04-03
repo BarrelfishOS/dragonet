@@ -59,7 +59,7 @@ runPipelines ::
     PLGraph -> IO ()
 runPipelines sname qconf prun plg = do
     let plis = getPLIs qconf plg
-    init_shared_state sname (length plis)
+    init_shared_state sname (length $ concatMap pliInQs plis)
     mapM_ prun plis
     return ()
 
