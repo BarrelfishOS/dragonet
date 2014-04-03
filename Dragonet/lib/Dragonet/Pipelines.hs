@@ -67,7 +67,7 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
                 return () -- No incoming edges from other pipelines, we're good
             else (do
                 let demuxPs =
-                        map labN inDN ++ (if null sources then [] else ["_"])
+                        (if null sources then [] else ["_"]) ++ map labN inDN
                 demuxN <- GM.newNode $
                     PG.baseFNode "Demux" ["source"] demuxPs Nothing
                 mapM_ (\n -> GM.newEdge (demuxN, n, labN n)) inDN
@@ -86,10 +86,11 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
                         ["sink", toPLNA] ["out"] Nothing
                     mapM_ (\(n,es) -> do
                         -- Create "To$Node" node
-                        let muxNA = "multiplex=" ++ show n
+                        let muxNA = "multiplex=" ++ labN n
+                        let muxPL = "muxPL=" ++ pl
                         toNN <- GM.newNode $
-                            PG.baseFNode ("ToPL" ++ pl ++ "_" ++ labN n) []
-                                ["out"] Nothing
+                            PG.baseFNode ("ToPL" ++ pl ++ "_" ++ labN n)
+                                [muxNA, muxPL] ["out"] Nothing
                         -- Add edge to "To$Pipeline" node
                         GM.newEdge (toNN,toPLN,"out")
                         -- Add edges
