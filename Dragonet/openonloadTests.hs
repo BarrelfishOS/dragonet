@@ -27,8 +27,10 @@ import qualified LPGImpl.LPGImplBase as LPGBase
 initialState = st'
     where
     st = DNET.emptyGS
-    mac = fromJust $ ETH.macFromString "00:0f:53:07:51:49"
-    ip = fromJust $ IP4.ipFromString "10.113.4.71"
+    --mac = fromJust $ ETH.macFromString "00:0f:53:07:51:49"
+    --ip = fromJust $ IP4.ipFromString "10.113.4.71"
+    mac = fromJust $ ETH.macFromString "00:0f:53:07:4d:65"
+    ip = fromJust $ IP4.ipFromString "10.23.4.21"
     st' = setLocalMACandIP st mac ip
 
 
@@ -94,7 +96,7 @@ runSimIncremental = do
         putStrLn ("Warning: You are a non-root user. So SF openonload may not work!")
 
     -- open a SF device eth7
-    sf_if <- SF.init_openonload_setup "eth7"
+    sf_if <- SF.init_openonload_setup "eth5" -- "eth7" (this is for old setup)
 
     -- Allocate a queue and set it to receive all the traffic
     sfvi0 <- SF.alloc_queue sf_if

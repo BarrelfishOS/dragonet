@@ -25,8 +25,10 @@ import qualified LPGEx1 as LPG1
 initialState = st'
     where
     st = DNET.emptyGS
-    mac = fromJust $ ETH.macFromString  "00:1b:21:8f:18:64" --"00:0f:53:07:48:d5"
-    ip = fromJust $ IP4.ipFromString  "10.22.4.37"  -- "10.111.4.37"
+--    mac = fromJust $ ETH.macFromString  "00:1b:21:8f:18:64" --"00:0f:53:07:48:d5"
+--    ip = fromJust $ IP4.ipFromString  "10.22.4.37"  -- "10.111.4.37"
+    mac = fromJust $ ETH.macFromString  "00:0f:53:07:4d:65" --"00:0f:53:07:48:d5"
+    ip = fromJust $ IP4.ipFromString  "10.23.4.21"  -- "10.111.4.37"
     st' = setLocalMACandIP st mac ip
 
 --receivedPacket state packet = DNET.Alg.execute LPGImpl.lpg packet state

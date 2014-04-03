@@ -32,7 +32,7 @@ SFSRCFILES+= $(SRCFILES)
 SFOBJFILES= $(addsuffix .o,$(basename $(SFSRCFILES)))
 
 sfOnload: $(SFOBJFILES) onloadDrv/efdragonet.o onloadDrv/efvi_sfw.o
-	$(CC) $(LDFLAGS) -o $@ $^ -LdpdkDrv/../../openonload-201310-u2/build/gnu_x86_64/lib/ciul/ -lciul -lpthread
+	$(CC) $(LDFLAGS) -o $@ $^ -L ../../openonload-201310-u2/build/gnu_x86_64/lib/ciul/ -lciul -lpthread
 
 sfOnload_run: sfOnload
 	export LD_LIBRARY_PATH=/home/ubuntu/dragonet/openonload-201310-u2/build/gnu_x86_64/lib/ciul/ ; ./sfOnload
@@ -44,7 +44,7 @@ onloadDrv/efvi_sfw.o: sf_onloadLibs
 	cp ../../openonload-201310-u2/build/gnu_x86_64/tests/ef_vi/efvi_sfw.o onloadDrv/
 
 sf_onloadLibs:
-	#cd ../openonload-201310-u2/ && ./scripts/onload_build --user
+	# cd ../../openonload-201310-u2/ && ./scripts/onload_build --user
 
 
 ############################## DPDK compilation ###############
