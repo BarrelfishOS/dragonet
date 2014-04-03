@@ -304,7 +304,7 @@ static errval_t op_channel_bind(struct bulk_channel     *channel,
 
     // this part really shouldn't fail unless something is seriously wrong
     err = shm_chan_alloc(&internal->tx, &msg);
-    assert(err_is_ok(err));
+    err_expect_ok(err);
 
     channel->state = BULK_STATE_BINDING;
     msg->type = SHM_MSG_BIND;
@@ -505,7 +505,7 @@ out:
     // TODO: error handling in case the binding is not successful
 
     e = shm_chan_alloc(&internal->tx, &out);
-    assert_fix(err_is_ok(e));
+    err_expect_ok(e); // FIXME
 
     out->type = SHM_MSG_BIND_DONE;
     out->content.bind_done.meta_size = internal->chan->meta_size;
@@ -524,9 +524,9 @@ static void msg_bind_done(struct lsm_internal *internal, struct shm_message *msg
 
         // Map meta buffers
         err = map_metas(internal, false, false);
-        assert_fix(err_is_ok(err));
+        err_expect_ok(err); // FIXME
         err = map_metas(internal, false, true);
-        assert_fix(err_is_ok(err));
+        err_expect_ok(err); // FIXME
 
         internal->chan->state = BULK_STATE_CONNECTED;
     }
@@ -566,7 +566,7 @@ fail_map:
     free(p);
 out:
     e = shm_chan_alloc(&internal->tx, &out);
-    assert_fix(err_is_ok(e));
+    err_expect_ok(e); // FIXME
 
     out->type = SHM_MSG_STATUS;
     out->content.status.op = msg->content.assign.op;
@@ -625,7 +625,7 @@ static void msg_buffer(struct lsm_internal *internal, struct shm_message *msg)
 
 out:
     e = shm_chan_alloc(&internal->tx, &out);
-    assert_fix(err_is_ok(e));
+    err_expect_ok(e); // FIXME
 
     out->type = SHM_MSG_STATUS;
     out->content.status.op = msg->content.buffer.op;
