@@ -61,6 +61,6 @@ errval_t ws_event_dispatch_nonblock(struct waitset *ws)
         return WS_NO_EVENT;
     }
 
-    return SYS_ERR_OK;
+    return (event_fired ? SYS_ERR_OK : WS_NO_EVENT);
 }
 
