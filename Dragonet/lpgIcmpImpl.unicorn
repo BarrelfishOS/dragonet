@@ -1,6 +1,7 @@
 graph lpg {
 //    node SoftwareRX {
     node Queue {
+        attr "source"
         port out[RxL2EtherClassified] }
 
     node PacketDrop { }
@@ -276,6 +277,7 @@ graph lpg {
                 port out[.Queue] }
         }
 
-        node Queue { }
+        node Queue {
+            attr "sink" }
     }
 }

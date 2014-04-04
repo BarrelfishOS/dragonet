@@ -22,7 +22,9 @@ cabal-version:      >=1.8
 
 library
     Hs-source-dirs:     lib
-    C-sources:          lib/Util/tap.c
+    C-sources:          lib/Util/tap.c,
+                        lib/Dragonet/Pipelines/pipelines_helper.c
+    Include-dirs:       c_impl/include/
     CC-options:         -std=gnu99
     Exposed-modules:    Dragonet.Configuration,
                         Dragonet.Constraints,
@@ -36,6 +38,7 @@ library
                         Dragonet.Implementation.TCP,
                         Dragonet.Implementation.UDP,
                         Dragonet.Pipelines,
+                        Dragonet.Pipelines.Implementation,
                         Dragonet.ProtocolGraph,
                         Dragonet.Unicorn,
                         Dragonet.Unicorn.Parser,
