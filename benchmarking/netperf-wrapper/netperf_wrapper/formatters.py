@@ -59,6 +59,9 @@ class Formatter(object):
         self.settings = settings
         self.check_output(self.settings.OUTPUT)
         self.extra_msg = ""
+        self.nresults = {}
+
+
 
     def check_output(self, output):
         if hasattr(output, 'read') or output == "-":
@@ -361,6 +364,20 @@ class PlotFormatter(Formatter):
         else:
             self._do_timeseries_plot(results[0], config=config, axis=axis)
 
+
+    def _gen_table(result, config=None):
+        for s in config['series']:
+            args = None
+            if 'args' in s.keys():
+                args = s['args']
+                ans = s['data'](result._results, result.metadata, **args)
+            else:
+                ans = s['data'](result._results, result.metadata)
+
+            print "%s: %s: %s" % (s['label'], str(ans),
+                    result.metadata['TITLE'])
+
+
     def _do_timeseries_plot(self, results, config=None, axis=None, postfix=""):
         if axis is None:
             axis = self.figure.gca()
@@ -377,12 +394,18 @@ class PlotFormatter(Formatter):
                 args = None
                 if 'args' in s.keys():
                     args = s['args']
-                    ans = s['data'](results._results, **args)
+                    ans = s['data'](results._results, results.metadata, **args)
                 else:
-                    ans = s['data'](results._results)
+                    ans = s['data'](results._results, results.metadata)
 
-                #ans = s['data'](results._results)
-                print "%s: %s " % (s['label'], str(ans))
+                #print "%s: %s " % (s['label'], str(ans))
+                print "%s: %s: %s" % (s['label'], str(ans),
+                       results.metadata['TITLE'])
+                if (s['label'] not in self.nresults.keys()) :
+                    self.nresults[s['label']] = [ans[0]]
+                else :
+                    self.nresults[s['label']].append(ans[0])
+
                 y_values = ans
                 x_values = range(1,len(y_values)+1)
 #                continue
@@ -446,7 +469,7 @@ class PlotFormatter(Formatter):
 
             data = []
             for r in results:
-                val =  s['data'](r._results)
+                val =  s['data'](r._results, r.metadata)
                 data.append(val)
                 #data.append([i for i in r.series(s['data']) if i is not None])
 
@@ -681,6 +704,9 @@ class PlotFormatter(Formatter):
             if top_percentile/btm_percentile > 20.0 and self.settings.LOG_SCALE:
                 axis.set_yscale('log')
 
+    def show_nresults(self):
+        print "Showing actual results"
+        print (json.dumps(self.nresults, indent=4) )
 
 class MetadataFormatter(Formatter):
 
