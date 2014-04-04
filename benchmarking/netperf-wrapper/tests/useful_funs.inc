@@ -54,8 +54,9 @@ def get_netperf_attr(allResults, meta, attribute):
                     per_run.append(float(out[attribute]))
 
         assert(len(per_run) > 0)
-        ans.append(sum(per_run))
-    return ans
+        #ans.append(sum(per_run))
+        ans.append(myavg(per_run))
+    return (ans)
 
 def get_netperf_str(allResults, meta, attribute):
     """should return value series to plot from whole result"""
@@ -90,5 +91,22 @@ def netperf_attr_wrapper(p, l=None, func=get_netperf_attr):
        }
     return res
 
+
+def get_metadata_attr(allResults, meta, attribute):
+    """should return the metadata attribute"""
+    if attribute in meta.keys() :
+        return meta[attribute]
+    else:
+        return ""
+
+def meta_attr_wrapper(p, l=None, func=get_metadata_attr):
+    if l == None or l == "":
+       l = p
+    res =  {
+        'data': func,
+        'args' : {'attribute': p},
+        'label': l
+       }
+    return res
 
 

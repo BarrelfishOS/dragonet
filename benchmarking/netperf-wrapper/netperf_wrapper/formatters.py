@@ -60,6 +60,7 @@ class Formatter(object):
         self.check_output(self.settings.OUTPUT)
         self.extra_msg = ""
         self.nresults = {}
+        self.nresults_titles = []
 
 
 
@@ -402,13 +403,15 @@ class PlotFormatter(Formatter):
                 print "%s: %s: %s" % (s['label'], str(ans),
                        results.metadata['TITLE'])
                 if (s['label'] not in self.nresults.keys()) :
-                    self.nresults[s['label']] = [ans[0]]
+
+                    self.nresults_titles.append(s['label'])
+                    self.nresults[s['label']] = [ans]
                 else :
-                    self.nresults[s['label']].append(ans[0])
+                    self.nresults[s['label']].append(ans)
 
                 y_values = ans
                 x_values = range(1,len(y_values)+1)
-#                continue
+                continue
 
             if 'smoothing' in s:
                 smooth=s['smoothing']
@@ -469,7 +472,14 @@ class PlotFormatter(Formatter):
 
             data = []
             for r in results:
-                val =  s['data'](r._results, r.metadata)
+                if 'args' in s.keys():
+                    args = s['args']
+                    val = s['data'](r._results, r.metadata, **args)
+                else:
+                    val = s['data'](r._results, r.metadata)
+
+                # val =  s['data'](r._results, r.metadata)
+
                 data.append(val)
                 #data.append([i for i in r.series(s['data']) if i is not None])
 
@@ -705,8 +715,30 @@ class PlotFormatter(Formatter):
                 axis.set_yscale('log')
 
     def show_nresults(self):
-        print "Showing actual results"
-        print (json.dumps(self.nresults, indent=4) )
+
+        trow = self.nresults_titles
+        infod = self.nresults
+        print "Showing actual results %s " % (str(trow))
+
+        sys.stdout.write("|| '''" + "''' || '''".join(trow) + "''' ||\n")
+        #sys.stdout.write("|-" + "-|-".join(["-"*len(i) for i in trow]) + "-|\n")
+
+#        for k in trow:
+#            print "%10s |" % (k),
+#        print "\n",
+
+        nr = len(infod[trow[0]])
+        for i in range(0, nr):
+#            if infod['BURST_SIZE'][i][0] != 1.0 :
+#                continue
+#            if infod['TARGET'][i] != "10.23.4.21" :
+#                continue
+
+            for k in trow:
+                data = infod[k][i]
+                print "||%10s " % (str(data)),
+            print "||\n",
+
 
 class MetadataFormatter(Formatter):
 

@@ -124,7 +124,7 @@ CONFIG_TYPES = {
     'EXTENDED_METADATA': 'bool',
     'ITERATIONS': 'int',
     'ECHO_SERVER': 'str',
-    'SERVER_ONLOAD_OPTION' : 'str',
+    'SERVER_ONLOAD_CMDLINE' : 'str',
     }
 
 TEST_PATH = os.path.join(DATA_DIR, 'tests')

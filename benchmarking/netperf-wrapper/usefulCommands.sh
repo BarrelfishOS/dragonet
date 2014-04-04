@@ -10,3 +10,4 @@ gunzip -d udp_demo-2014-03-31T123917.623880.json.gz
 ./netperf-wrapper -i udp_localhost_stream-2014-*.json.gz -p idlecpu -o p_cpu_util.png
 ./netperf-wrapper -l 1 -H asiago -C burrata -T 10.22.4.11 udp_localhost_stream -L ../out-nf/r4.logs
 ./netperf-wrapper -i ./udp_localhost_stream-2014-04-02T170*json -p serverbw -o p_sb_2.png
+./netperf-wrapper -p userbw2 -o test.png   -i `find ../myplots/myplots/  -name "*json*" | egrep "*_rr*" `
