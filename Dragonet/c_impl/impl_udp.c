@@ -94,7 +94,7 @@ node_out_t do_pg__RxEchoAPP(struct state *state, struct input *in)
     contents[ret] = '\0';
     //printf
     //dprint
-        ("EchoAPP: Packet received ############## [%s]\n", contents);
+    //    ("EchoAPP: Packet received ############## [%s]\n", contents);
     // P_RxEchoAPP_out, P_RxEchoAPP_drop
     return P_RxEchoAPP_out;
 }

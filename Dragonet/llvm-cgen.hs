@@ -929,7 +929,6 @@ bldCallNode node port = do
         (PG.ONode _, "false") -> operandFalse:args
         (PG.ONode _, _)       -> error $ "No idea how to call port " ++ port ++ " of operator node " ++ (show node)
         (PG.CNode _, _)       -> error $ "What is a CNode doing here?!"
-        _                     -> error $ "No idea know how to call " ++ (show node)
 
 -- call a set of remote nodes of a given port
 -- associative list
