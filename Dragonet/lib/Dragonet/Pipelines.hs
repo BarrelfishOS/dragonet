@@ -1,5 +1,5 @@
 module Dragonet.Pipelines(
-    Pipeline(..),
+    Pipeline(..), PLabel,
     PLGraph, PLNode, PLEdge,
     generatePLG,
 ) where
@@ -16,8 +16,11 @@ import Data.Function
 import Data.Maybe
 import Util.Misc
 
+
+type PLabel = String
+
 data Pipeline = Pipeline {
-    plLabel :: String,
+    plLabel :: PLabel,
     plGraph :: PG.PGraph
 } --deriving (Show)
 
@@ -28,9 +31,10 @@ type PLGraph = DGI.Gr Pipeline ()
 type PLNode = DGI.LNode Pipeline
 type PLEdge = DGI.LEdge ()
 
+
 -- Generate one pipeline, returns list of successor pipeline labels and the
 -- pipeline
-generatePipeline :: PG.PGraph -> M.Map DGI.Node String -> String
+generatePipeline :: PG.PGraph -> M.Map DGI.Node PLabel -> String
                         -> [DGI.Node] -> (Pipeline, [String])
 generatePipeline g nm pll ns = (Pipeline pll pg, suc)
     where
@@ -59,12 +63,17 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
         -- Adapt graph
         (suc,pg) = flip GM.runOn pg' (do
             -- Demux node for incoming edges
-            let demuxPs = map labN inDN ++ (if null sources then [] else ["_"])
-            demuxN <- GM.newNode $ PG.baseFNode "Demux" [] demuxPs Nothing
-            mapM_ (\n -> GM.newEdge (demuxN, n, labN n)) inDN
+            if null inE then
+                return () -- No incoming edges from other pipelines, we're good
+            else (do
+                let demuxPs =
+                        map labN inDN ++ (if null sources then [] else ["_"])
+                demuxN <- GM.newNode $
+                    PG.baseFNode "Demux" ["source"] demuxPs Nothing
+                mapM_ (\n -> GM.newEdge (demuxN, n, labN n)) inDN
 
-            -- Add edges for nodes that were originally without incoming edges
-            mapM_ (\n -> GM.newEdge (demuxN, n, "_")) sources
+                -- Add edges for nodes that were originally without incoming edges
+                mapM_ (\n -> GM.newEdge (demuxN, n, "_")) sources)
 
             -- Destination nodes for outgoing queues
             if null outE then
@@ -72,10 +81,12 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
             else
                 mapM_ (\(pl,ns') -> do
                     -- Create "To$Pipeline" node
-                    toPLN <- GM.newNode $
-                        PG.baseFNode ("ToPL" ++ pl) [] ["out"] Nothing
+                    let toPLNA = "pipeline=" ++ pl
+                    toPLN <- GM.newNode $ PG.baseFNode ("ToPL" ++ pl)
+                        ["sink", toPLNA] ["out"] Nothing
                     mapM_ (\(n,es) -> do
                         -- Create "To$Node" node
+                        let muxNA = "multiplex=" ++ show n
                         toNN <- GM.newNode $
                             PG.baseFNode ("ToPL" ++ pl ++ "_" ++ labN n) []
                                 ["out"] Nothing
@@ -90,7 +101,7 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
 
 -- Splits specified graph up into pipelines according to the specified function,
 -- that assigns a string representing the pipeline label to each node
-generatePLG :: (PG.PGNode -> String) -> PG.PGraph -> PLGraph
+generatePLG :: (PG.PGNode -> PLabel) -> PG.PGraph -> PLGraph
 generatePLG sf g = DGI.mkGraph nodes edges
     where
         -- Group nodes by pipeline
@@ -111,4 +122,6 @@ generatePLG sf g = DGI.mkGraph nodes edges
         -- Edges for pipeline graph
         edges = concatMap (\(n,(_,suc)) -> map (\x -> (n,plids M.! x,())) suc)
                     pipelines
+
+
 
