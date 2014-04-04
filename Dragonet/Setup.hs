@@ -10,11 +10,28 @@ import qualified System.Directory as SD
 import System.FilePath
 import Data.Maybe
 
+llvmVersions = ["3.4", "3.5"]
+
+-- Versioned llvm program
+--   e.g. llvm-link could be named just llvm-link, or lllvm-link-3.4
+--   all versions in llvmVersions are tried
+llvmProgram :: String -> Program
+llvmProgram name = (simpleProgram name) {
+                        programFindLocation = findFirst names }
+    where
+        names = name : (map ((++) (name ++ "-")) llvmVersions)
+        findFirst [] _ _ = return Nothing
+        findFirst (n:ns) verb a = do
+            prog <- findProgramLocation verb n
+            case prog of
+                Just p -> return prog
+                Nothing -> findFirst ns verb a
+
 main = defaultMainWithHooks simpleUserHooks {
     buildHook = myBuildHook,
     hookedPrograms = hookedPrograms simpleUserHooks ++
         [simpleProgram "clang",
-         simpleProgram "llvm-link"]
+         llvmProgram "llvm-link"]
     }
 
 llvmSources = [ "c_impl/impl_arp.c", "c_impl/impl_ethernet.c",
@@ -56,7 +73,7 @@ myBuildHook pkg_descr local_bld_info user_hooks bld_flags = do
     let bld_dir = buildDir local_bld_info
         progs = withPrograms local_bld_info
         (Just clang) = lookupProgram (simpleProgram "clang") progs
-        (Just llvmlink) = lookupProgram (simpleProgram "llvm-link") progs
+        (Just llvmlink) = lookupProgram (llvmProgram "llvm-link") progs
         depIncls = concatMap IPI.includeDirs $ PI.allPackages $
             installedPkgs local_bld_info
         incls = inc_dirs ++ depIncls ++ llvmCAdditionalInc
