@@ -136,6 +136,7 @@ data ArgState = ArgState {
 data CodeGenState = CodeGenState {
       cgAstModule :: AST.Module
     , cgArgs      :: ArgState
+    , cgONCnts    :: [String]
 }
 
 -- llvm monad (all llvm state)
@@ -155,6 +156,13 @@ cgInputTy :: LLVM AST.Type
 cgInputTy = do
     st <- gets cgArgs
     return $ fst (pgInput st)
+
+cgONCounters :: LLVM [String]
+cgONCounters = gets cgONCnts
+
+cgAddONCounter :: String -> LLVM ()
+cgAddONCounter n = do
+    modify $ \s -> s { cgONCnts = n : (cgONCnts s) }
 
 --- XXX: Assumption about input struct
 cgInput_make_gep :: AST.OP.Operand -> String -> AST.I.Instruction
@@ -190,6 +198,7 @@ codeGen mod_name state_ty input_ty llvm = (execState $ doLLVM llvm) st0
     where st0 = CodeGenState {
           cgAstModule = emptyModule mod_name
         , cgArgs      = ArgState { pgState = (state_ty, "state"), pgInput = (input_ty, "input") }
+        , cgONCnts    = []
     }
 pg_fnode_args_names = ["state", "input"] -- XXX keep hard-coded for now
 
@@ -1037,13 +1046,21 @@ data LlvmPgOpConf = LlvmPgOpConf {shortCircuitIn :: Bool, shortCircuitOut :: Boo
 
 llvm_pg_op :: LlvmPgOpConf -> DGI.Node -> PG.Node -> PG.PGAdjFull -> PG.PGAdjFull -> LLVM ()
 llvm_pg_op cnf nid node adj_out adj_in = do
+    -- NOTE: We need to somehow reset counters for O-nodes where not every input
+    -- port was enabled and no short-cirtuiting happens. The current approach is
+    -- just to reset all node counters eagerly when done executing the graph for
+    -- one packet.
+    -- Another option would be to do this lazily, by keeping a version ID on
+    -- each counter plus one global version.
+    let nName = pg_fname node
+        cntstr = nName ++ ".count"
+    cgAddONCounter cntstr
     ops_args <- cgOpArgs
-    fnAdd (pg_fname node) i32Ty ops_args $ do
+    fnAdd nName i32Ty ops_args $ do
         -- print message on entering the function
         (AST.Name fnstr) <- gets fnName
         bldDbgPrintf ("Entering node: " ++ fnstr ++ "\n") []
         -- set up a count variable: how many times this node was activated
-        let cntstr = fnstr ++ ".count"
         bldAddDef $ mkStaticVar i32Ty cntstr (mkConstInt32 0)
         -- set up a phi node for the return value
         bldNewPhi i32Ty "ret_phi"
@@ -1167,6 +1184,7 @@ llvm_tap_pg_entry :: PG.Node -> LLVM ()
 llvm_tap_pg_entry entry_node = do
     state_ty <- cgStateTy
     input_ty <- cgInputTy
+    on_cnt <- cgONCounters
     fnAdd "pg_tap_main" voidTy [] $ do
         state <- bldAddInstruction $ mkAlloca state_ty 1     -- allocate state variable in the stack
         bldAddInstruction $ mkFnCall "pg_state_init" [state] -- initialize state
@@ -1200,6 +1218,11 @@ llvm_tap_pg_entry entry_node = do
         bldAddInstruction $ mkCall (getFnOp $ pg_fname entry_node) [state, input] -- call entry
         bldAddInstruction $ mkFnCall "input_free" [input] -- free input
 
+        -- reset o-node counters
+        forM_ on_cnt $ \cnt_name ->
+            bldAddInstruction $ mkSt (getGlobalOp cnt_name) operandInt32_0
+
+        -- start over again :-)
         bldTerminate $ termBr "body"
 
 -- write input into tap device
