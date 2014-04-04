@@ -21,48 +21,6 @@ node_out_t do_pg__NotSupported(struct state *state, struct input *in)
     return 0;
 }
 
-node_out_t do_pg__RxTagTxARPIR(struct state *state, struct input *in)
-{
-    // P_true, P_false
-    in->mux_id = ATTR_MUX_ARPIR;
-    return P_true;
-}
-
-node_out_t do_pg__RxTagTxARPLu(struct state *state, struct input *in)
-{
-    // P_true, P_false
-    in->mux_id = ATTR_MUX_ARPLU;
-    return P_true;
-}
-
-node_out_t do_pg__RxTagTxICMPIR(struct state *state, struct input *in)
-{
-    // P_true, P_false
-    in->mux_id = ATTR_MUX_ICMPIR;
-    return P_true;
-}
-
-node_out_t do_pg__RxTagTxUDPIR(struct state *state, struct input *in)
-{
-    // P_true, P_false
-    in->mux_id = ATTR_MUX_UDPIR;
-    return P_true;
-}
-
-
-
-node_out_t do_pg__TxDemux(struct state *state, struct input *in)
-{
-    // P_TxDemux_ICMPIR, P_TxDemux_ARPLu, P_TxDemux_ARPIR, P_TxDemux_drop
-    switch (in->mux_id) {
-        case ATTR_MUX_ARPIR:    return P_TxDemux_ARPIR;
-        case ATTR_MUX_ARPLU:    return P_TxDemux_ARPLu;
-        case ATTR_MUX_ICMPIR:   return P_TxDemux_ICMPIR;
-        case ATTR_MUX_UDPIR:    return P_TxDemux_UDPIR;
-        default:                return P_TxDemux_drop;
-    }
-}
-
 node_out_t do_pg__RxL3IPv6ValidHeaderLength(struct state *state, struct input *in)
 {
     // P_true, P_false

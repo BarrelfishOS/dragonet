@@ -79,7 +79,7 @@ graph lpg {
                 port true false[NeedsResponse] }
 
             and NeedsResponse {
-                port true[.TagTxARPIR]
+                port true[..TxL3ARPInitiateResponse]
                 port false[] }
 
             boolean ValidResponse {
@@ -93,7 +93,7 @@ graph lpg {
                 port false[] }
 
             node ProcessPendingResponse {
-                port true [.TagTxARPLu]
+                port true [..TxL3ARPLookupRequestIn]
                 port false []
                 port drop[] }
         }
@@ -163,48 +163,14 @@ graph lpg {
                 port true false[NeedsResponse] }
 
             and NeedsResponse {
-                port true[.TagTxICMPIR]
+                port true[..TxL3ICMPInitiateResponse]
                 port false[] }
         }
-
-
-    /*******************************************/
-    /* Multiplexing for TX queue               */
-
-    cluster TagTx {
-
-        boolean ARPIR {
-            port true false [.ToTx]
-            //port false[.ToTx]
-            //port false[]
-            }
-
-        boolean ARPLu {
-            port true false [.ToTx]
-            //port false[]
-            }
-
-        boolean ICMPIR {
-            port true false [.ToTx]
-            //port false[]
-            }
-
-    } // end cluster: TagTx
-
-    or ToTx {
-        port true[.TxDemux]
-        port false[] }
 
     } // end cluster: Rx
 
 
     cluster Tx {
-        node Demux {
-            port ICMPIR[L3ICMPInitiateResponse]
-            port ARPLu[L3ARPLookupRequestIn]
-            port ARPIR[L3ARPInitiateResponse]
-            port drop[] }
-
         cluster L3ICMP {
             node InitiateResponse {
                 port out[AllocateHeader]
