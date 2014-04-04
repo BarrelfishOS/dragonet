@@ -78,7 +78,7 @@ graph lpg {
                 port true false[NeedsResponse] }
 
             and NeedsResponse {
-                port true[.TagTxARPIR]
+                port true[..TxL3ARPInitiateResponse]
                 port false[] }
 
             boolean ValidResponse {
@@ -92,7 +92,7 @@ graph lpg {
                 port false[] }
 
             node ProcessPendingResponse {
-                port true [.TagTxARPLu]
+                port true [..TxL3ARPLookupRequestIn]
                 port false [] }
         }
 
@@ -169,7 +169,7 @@ graph lpg {
                 port true false[NeedsResponse] }
 
             and NeedsResponse {
-                port true[.TagTxICMPIR]
+                port true[..TxL3ICMPInitiateResponse]
                 port false[] }
         }
 
@@ -350,7 +350,7 @@ graph lpg {
            }
 
             or TCPOutMerge {
-                port true[..TagTxTCPIR]
+                port true[...TxL4TCPInitiateResponse]
                 port false[] }
 
            } // end cluster: Socket
@@ -363,57 +363,17 @@ graph lpg {
         /* Application RX                          */
 
     node EchoAPP {
-                port out[TagTxUDPIR]
+                port out[.TxL4UDPInitiateResponse]
                 port drop[.PacketDrop] }
 
     node DnsAPP {
-                port out[TagTxUDPIR]
+                port out[.TxL4UDPInitiateResponse]
                 port drop[.PacketDrop] }
-
-    /*******************************************/
-    /* Multiplexing for TX queue               */
-
-    cluster TagTx {
-
-        boolean TCPIR {
-            port true[.ToTx]
-            //port true[]
-            port false[] }
-
-        boolean UDPIR {
-            port true[.ToTx]
-            port false[] }
-
-        boolean ARPIR {
-            port true[.ToTx]
-            port false[] }
-
-        boolean ARPLu {
-            port true[.ToTx]
-            port false[] }
-
-        boolean ICMPIR {
-            port true[.ToTx]
-            port false[] }
-
-    } // end cluster: TagTx
-
-    or ToTx {
-        port true[.TxDemux]
-        port false[] }
 
     } // end cluster: Rx
 
 
     cluster Tx {
-        node Demux {
-            port TCPIR[L4TCPInitiateResponse]
-            port UDPIR[L4UDPInitiateResponse]
-            port ICMPIR[L3ICMPInitiateResponse]
-            port ARPLu[L3ARPLookupRequestIn]
-            port ARPIR[L3ARPInitiateResponse]
-            port drop[] }
-
         cluster L4UDP {
             node InitiateResponse {
                 port out[AllocateHeader]
