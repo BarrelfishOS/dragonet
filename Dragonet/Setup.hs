@@ -9,6 +9,9 @@ import qualified Distribution.InstalledPackageInfo as IPI
 import qualified System.Directory as SD
 import System.FilePath
 import Data.Maybe
+import Control.Applicative
+import Control.Monad
+import Data.Char
 
 llvmVersions = ["3.4", "3.5"]
 
@@ -34,19 +37,6 @@ main = defaultMainWithHooks simpleUserHooks {
          llvmProgram "llvm-link"]
     }
 
-llvmSources = [ "c_impl/impl_arp.c", "c_impl/impl_ethernet.c",
-    "c_impl/impl_icmp.c", "c_impl/impl_ipv4.c", "c_impl/impl_udp.c",
-    "c_impl/impl_tcp.c", "c_impl/impl_misc.c", "c_impl/implementation.c",
-    "c_impl/support/Ethernet.c", "c_impl/support/Icmp.c", "lib/Util/tap.c",
-    "lib/Dragonet/Pipelines/pipelines_helper.c",
-    "../external/bulktransfer/lib/bulk_linuxshm/shm_channel.c",
-    "../external/bulktransfer/lib/bulk_linuxshm/implementation.c",
-    "../external/bulktransfer/lib/bulk_alloc/alloc.c",
-    "../external/bulktransfer/lib/bulk_transfer/channel.c",
-    "../external/bulktransfer/lib/bulk_transfer/pool.c",
-    "../external/bulktransfer/lib/barrelfish/waitset.c"]
-llvmCAdditionalInc = ["../external/bulktransfer/lib/include"]
-
 -- Run clang to get llvm bitcode
 llvmClang prog verb opts incls outD src = do
     let outD' = outD </> dropFileName src
@@ -64,23 +54,48 @@ llvmLink prog verb opts outD outF srcs = do
     runProgram verb prog opts
     return outP
 
+-- Split list by delimiter into multiple lists
+splitBy :: Eq a => a -> [a] -> [[a]]
+splitBy delimiter = foldr f [[]]
+    where f c l@(x:xs) | c == delimiter = []:l
+                       | otherwise = (c:x):xs
+          f _ _ = undefined
 
+-- Parse a comma separated list of file names
+parseNameList :: String -> [String]
+parseNameList s = filter (not . null) $ map trim $ splitBy ',' s
+    where trim x = reverse $ dropWhile isSpace $ reverse $ dropWhile isSpace x
+
+-- Build hook that will build llvm-bitcode for our C helpers
 myBuildHook pkg_descr local_bld_info user_hooks bld_flags = do
-    let lib = fromJust (library pkg_descr)
-        lib_bi = libBuildInfo lib
-        inc_dirs = includeDirs lib_bi
-
     let bld_dir = buildDir local_bld_info
         progs = withPrograms local_bld_info
         (Just clang) = lookupProgram (simpleProgram "clang") progs
         (Just llvmlink) = lookupProgram (llvmProgram "llvm-link") progs
-        depIncls = concatMap IPI.includeDirs $ PI.allPackages $
-            installedPkgs local_bld_info
-        incls = inc_dirs ++ depIncls ++ llvmCAdditionalInc
         verb = fromFlag $ buildVerbosity bld_flags
-    -- Build llvm bitcode for C implementation of graph
-    llvmBCs <- mapM (llvmClang clang verb ["-O3"] incls bld_dir) llvmSources
-    -- Combine into one bitcode file
-    llvmLink llvmlink verb [] bld_dir "llvm-helpers.bc" llvmBCs
+
+    let lib = libBuildInfo <$> library pkg_descr
+        bis = maybeToList lib ++ map buildInfo (executables pkg_descr)
+
+    -- Iterate over BuildInfos of libraries and executables
+    forM_ bis $ \bi -> do
+        let inc_dirs = includeDirs bi
+            x_fields = customFieldsBI bi
+            x_incs = map snd $ filter ((== "x-llvm-c-includes") . fst) x_fields
+            inc_llvm = concatMap parseNameList x_incs
+            x_chelp = map snd $ filter ((== "x-llvm-c-helpers") . fst) x_fields
+            c_helpers = map parseNameList x_chelp
+        -- Iterate over all x-llvm-c-helpers entries
+        forM_ c_helpers  $ \(out_file:c_files) -> do
+            let -- TODO: This is a bit too generic, gets includes from all
+                --       installed packets
+                depIncls = concatMap IPI.includeDirs $ PI.allPackages $
+                    installedPkgs local_bld_info
+                incls = inc_llvm ++ inc_dirs ++ depIncls
+            -- Build llvm bitcode for C implementation of graph
+            llvmBCs <- mapM (llvmClang clang verb ["-O3"] incls bld_dir) c_files
+            -- Combine into one bitcode file
+            llvmLink llvmlink verb [] bld_dir out_file llvmBCs
+
     -- Default build hook
     buildHook simpleUserHooks pkg_descr local_bld_info user_hooks bld_flags
