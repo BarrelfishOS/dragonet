@@ -35,5 +35,6 @@ DIRS-$(CONFIG_RTE_APP_TEST) += test
 DIRS-$(CONFIG_RTE_TEST_PMD) += test-pmd
 DIRS-$(CONFIG_RTE_LIBRTE_CMDLINE) += cmdline_test
 DIRS-$(CONFIG_RTE_LIBRTE_EAL_LINUXAPP) += dump_cfg
+DIRS-y += dpdkDriver
 
 include $(RTE_SDK)/mk/rte.subdir.mk

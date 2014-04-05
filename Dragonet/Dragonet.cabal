@@ -114,6 +114,14 @@ executable llvm-cgen
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
 
+executable llvm-cgen-dpdk
+    main-is:            llvm-cgen.hs
+    build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
+                        llvm-general==3.4.*, llvm-general-pure, dpdk
+    extensions:         DoAndIfThenElse, ForeignFunctionInterface,
+                        GeneralizedNewtypeDeriving
+    ghc-options:        -threaded
+
 executable generateCSkeleton
     main-is:            generateCSkeleton.hs
     build-depends:      Dragonet, base, fgl
