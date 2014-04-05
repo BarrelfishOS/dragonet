@@ -29,13 +29,6 @@
 #   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 #   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-RTE_SDK ?= /home/ubuntu/dragonet/dpdk-1.5.0r1/
-ifeq ($(RTE_SDK),)
-$(error "Please define RTE_SDK environment variable")
-endif
-
-# Default target, can be overriden by command line or environment
-RTE_TARGET ?= x86_64-default-linuxapp-gcc
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
@@ -43,7 +36,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 # library name
 #
 #APP = dpdkDriver
-LIB = dpdkDriverLib
+LIB = libdpdk_driver.so
 
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)
@@ -72,6 +65,6 @@ endif
 # this application needs libraries first
 DEPDIRS-y += lib
 
-include $(RTE_SDK)/mk/rte.extlib.mk
+include $(RTE_SDK)/mk/rte.lib.mk
 #include $(RTE_SDK)/mk/rte.app.mk
 #####include $(RTE_SDK)/mk/rte.extapp.mk
