@@ -714,13 +714,20 @@ class PlotFormatter(Formatter):
             if top_percentile/btm_percentile > 20.0 and self.settings.LOG_SCALE:
                 axis.set_yscale('log')
 
+
+
     def show_nresults(self):
 
         trow = self.nresults_titles
         infod = self.nresults
-        print "Showing actual results %s " % (str(trow))
 
-        sys.stdout.write("|| '''" + "''' || '''".join(trow) + "''' ||\n")
+        for k in trow:
+            print "|%10s " % (mystr(k)),
+        print "|\n",
+
+
+
+        #sys.stdout.write("| " + " | ".join(trow) + " |\n")
         #sys.stdout.write("|-" + "-|-".join(["-"*len(i) for i in trow]) + "-|\n")
 
 #        for k in trow:
@@ -736,8 +743,11 @@ class PlotFormatter(Formatter):
 
             for k in trow:
                 data = infod[k][i]
-                print "||%10s " % (str(data)),
-            print "||\n",
+                print "|%10s " % (mystr(data)),
+            print "|\n",
+
+def mystr(obj):
+    return str(obj)[:9]
 
 
 class MetadataFormatter(Formatter):

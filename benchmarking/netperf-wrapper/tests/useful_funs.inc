@@ -33,7 +33,7 @@ def get_cpu(allResults, meta, mname, coreid, takeAvg=False):
     if (not takeAvg) :
         return ans
     else :
-        ll = myavg(ans)
+        ll = int(myavg(ans))
         return [ll]
 
 def get_server_cpu(allResults, meta, takeAvg=False):

@@ -8,8 +8,9 @@ result="${3}/latency_${target_t}_${ECHO_SERVER}"
 plotpath="${result}.png"
 log="${result}.log"
 tmpfile="${result}.tmp"
-title="${ECHO_SERVER}_${target_t}_PKT_${PKTSIZE}_B_${BRUST}"
-./netperf-wrapper -l 10 -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${BRUST} -H asiago -C burrata -T ${target} udp_rr -t "${title}" -o "${result}" -L "${log}" | tee ${tmpfile}
+title="${ECHO_SERVER}_${target_t}_PKT_${PKTSIZE}_B_${BRUST}${ONLOADTEXT}"
+
+   ./netperf-wrapper -l 10 ${ONLOADTYPE} -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${BRUST} -H asiago -C burrata -T ${target} udp_rr -t "${title}" -o "${result}" -L "${log}" | tee ${tmpfile}
 
 outfile=`cat ${tmpfile} | grep  'Test data is in ' | cut -d'[' -f2 | cut -d']' -f1`
 ./netperf-wrapper -i ${outfile} -p 'userbw2' -o ${plotpath}
@@ -49,19 +50,19 @@ run_bm_tp_rr() {
         let CBRUST=NBRUST
         let NBRUST=CBRUST+CBRUST
 
-        title="${target_t}_PKT_${PKTSIZE}_B_${CBRUST}"
+        title="${ECHO_SERVER}_${target_t}_PKT_${PKTSIZE}_B_${CBRUST}${ONLOADTEXT}"
 
-        ./netperf-wrapper -l 10 -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${CBRUST} -H asiago -C burrata -T ${target} udp_rr -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
+        ./netperf-wrapper -l 10  ${ONLOADTYPE} -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${CBRUST} -H asiago -C burrata -T ${target} udp_rr -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
         outfile=`cat ${TMPFILE} | grep  'Test data is in ' | cut -d'[' -f2 | cut -d']' -f1`
         ./netperf-wrapper -i ${outfile} -p 'userbw2' -o ${TMPPLOT} | tee ${TMPRES}
 
         let CTP=NTP
 
-        NBWD=`cat ${TMPRES} | grep "THROUGHPUT: " | cut -d'[' -f2 | cut -d']' -f1`
-        NLATENCY=`cat ${TMPRES} | grep "RT_LATENCY: " | cut -d'[' -f2 | cut -d']' -f1`
-        NTP=`cat ${TMPRES} | grep "TRANSACTION_RATE: " | cut -d'[' -f2 | cut -d'.' -f1`
-        SCPU=`cat ${TMPRES} | grep "Server CPU: " | cut -d'[' -f2 | cut -d']' -f1`
-        CCPU=`cat ${TMPRES} | grep "Client CPU: " | cut -d'[' -f2 | cut -d']' -f1`
+        NBWD=`cat ${TMPRES} | grep "^THROUGHPUT: " | cut -d'[' -f2 | cut -d']' -f1`
+        NLATENCY=`cat ${TMPRES} | grep "^RT_LATENCY: " | cut -d'[' -f2 | cut -d']' -f1`
+        NTP=`cat ${TMPRES} | grep "^TRANSACTION_RATE: " | cut -d'[' -f2 | cut -d'.' -f1`
+        SCPU=`cat ${TMPRES} | grep "^Server CPU: " | cut -d'[' -f2 | cut -d']' -f1`
+        CCPU=`cat ${TMPRES} | grep "^Client CPU: " | cut -d'[' -f2 | cut -d']' -f1`
         echo "TPITERATOR: ${title}, ${target}, ${PKTSIZE}, ${CBRUST}, ${SCPU}, ${CCPU}, ${NTP}, ${NLATENCY}, ${NBWD}" >> ${SAMARRYFILE}
         echo "TP of $NTP for $CBRUST"
 
@@ -75,8 +76,8 @@ run_bm_tp_rr() {
     set -x
     set -e
 
-        title="${target_t}_PKT_${PKTSIZE}_B_${LBRUST}_BEST"
-        ./netperf-wrapper -l 10  -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${LBRUST} -H asiago -C burrata -T ${target} udp_rr -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
+        title="${ECHO_SERVER}_${target_t}_PKT_${PKTSIZE}_B_${LBRUST}${ONLOADTEXT}_BEST"
+        ./netperf-wrapper -l 10 ${ONLOADTYPE}  -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${LBRUST} -H asiago -C burrata -T ${target} udp_rr -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
     set +x
     set +e
     cat ${SAMARRYFILE} >> ${FINALRESULT}
@@ -98,7 +99,7 @@ FINALRESULT="${3}/${target_t}finalResult.result"
 log="${3}/stream_tp_${target_t}.log"
 tmpfile="${3}/stream_tp_${target_t}.tmp"
 title="${target_t}_PKT_${PKTSIZE}"
-./netperf-wrapper -l 10  -c ${ECHO_SERVER} -P ${PKTSIZE} -H asiago -C burrata -T ${target} udp_localhost_stream -t "${title}" -o "${result}" -L "${log}" | tee ${tmpfile}
+./netperf-wrapper -l 10 ${ONLOADTYPE}  -c ${ECHO_SERVER} -P ${PKTSIZE} -H asiago -C burrata -T ${target} udp_localhost_stream -t "${title}" -o "${result}" -L "${log}" | tee ${tmpfile}
 
 outfile=`cat ${tmpfile} | grep  'Test data is in ' | cut -d'[' -f2 | cut -d']' -f1`
 ./netperf-wrapper -i ${outfile} -p 'userbw2' -o ${plotpath} | tee -a ${FINALRESULT}
@@ -142,7 +143,7 @@ get_best_latency()
 OUTDIR="${OUTDIRP}/LATENCY/"
 mkdir -p ${OUTDIR}
 
-PKTSIZE=64
+PKTSIZE=$1
 BRUST=1
 # echo latency numbers
 #run_npf_w_rr ${SELECTED_T} ${SELECTED_TT} ${OUTDIR}
@@ -150,7 +151,7 @@ run_npf_w_rr ${SF_T} "SF_T" ${OUTDIR}
 }
 
 
-OUTDIRPP="../myplots/SF/"
+OUTDIRPP="../myplots/SF2/"
 OUTDIRP="../myplots/TP_stream/"
 INTEL_T="10.22.4.11"
 INTEL_S_T="10.113.4.11"
@@ -163,13 +164,19 @@ DEFAULT_PLOT="userlatency2"
 #"LOCAL_SEND_SIZE": "65507"
 BRUST=1
 
+ONLOADTYPE=""
+ONLOADTEXT=""
 ONLOADTYPE="--onloadLatency"
+ONLOADTEXT="onloadLatency"
+
 ECHO_SERVER="netserver"
 ECHO_SERVER="CImplDpdk"
 ECHO_SERVER="HImplDpdk"
 ECHO_SERVER="HImplOnload"
 ECHO_SERVER="CImplOnload"
 ECHO_SERVER="netcat"
+
+
 
 OUTDIRP="${OUTDIRPP}/${ECHO_SERVER}"
 mkdir -p ${OUTDIRP}
@@ -178,23 +185,28 @@ OUTDIR=${OUTDIRP}
 if [ "${ONLOADTYPE}" == "" ] ; then
     echo "Wthout onload"
 else
-    trimmed=`echo ${ONLOADTYPE} | tr -d '-'`
-    OUTDIR="${OUTDIR}/${trimmed}/"
+    OUTDIR="${OUTDIR}/${ONLOADTEXT}/"
 fi
 
-echo ${OUTDIR}
+#echo ${OUTDIR}
+#get_best_latency 64
+#get_best_latency 1024
+#get_best_latency 1400
+#get_best_latency 8000
 
-get_best_latency
-sleep 5
+#exit 0
+#sleep 5
 
 OUTDIR="${OUTDIR}/TP_MAX/"
 
 mkdir -p ${OUTDIR}
-PKTSIZE=1024
-
+PKTSIZE=64
 # for increasing TP on transaction based benchmark
 run_bm_tp_rr ${SF_T} "SF_T" ${OUTDIR}
 
+sleep 5
+PKTSIZE=1024
+run_bm_tp_rr ${SF_T} "SF_T" ${OUTDIR}
 sleep 5
 
 PKTSIZE=1400
@@ -202,7 +214,6 @@ PKTSIZE=1400
 run_bm_tp_rr ${SF_T} "SF_T" ${OUTDIR}
 
 sleep 5
-
 PKTSIZE=8000
 # for increasing TP on transaction based benchmark
 run_bm_tp_rr ${SF_T} "SF_T" ${OUTDIR}

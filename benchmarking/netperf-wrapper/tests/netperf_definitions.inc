@@ -6,9 +6,9 @@ NETPERF_CMD="../netperf-2.6.0/src/netperf -fg "
 
 SRV_CMDS = {
     "netserver" : {
-                    "init_cmd" : ["sudo killall netserver || true"],
+                    "init_cmd" : ["killall netserver || true"],
                     "exec_cmd" : "../netperf-2.6.0/src/netserver -D ",
-                    "kill_cmd" : ["sudo killall netserver || true"],
+                    "kill_cmd" : ["killall netserver || true"],
                     "out_cmd" : [],
                 },
     "netcat" : {
@@ -25,8 +25,8 @@ SRV_CMDS = {
                 },
     "CImplOnload" : {
                     "init_cmd" : [],
-                    "exec_cmd" : "echo ",
-                    "kill_cmd" : [],
+                    "exec_cmd" : "echo ",  # "/home/ubuntu/dragonet/Dragonet/c_impl ; make sfOnload_run"  # "sudo taskset -c 3"
+                    "kill_cmd" : [],  # sudo killall sfOnload
                     "out_cmd" : [],
                 },
     "HImplDpdk" : {

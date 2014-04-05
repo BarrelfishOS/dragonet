@@ -625,7 +625,7 @@ def load():
         if settings.SERVER_ONLOAD_LATENCY:
             settings.SERVER_ONLOAD_CMDLINE = "onload --profile=latency --preload=/usr/lib64/libonload.so"
         elif settings.SERVER_ONLOAD_ENABLED :
-            settings.SERVER_ONLOAD_CMDLINE = "onload --profile=latency --preload=/usr/lib64/libonload.so"
+            settings.SERVER_ONLOAD_CMDLINE = "onload  --preload=/usr/lib64/libonload.so"
         else :
             settings.SERVER_ONLOAD_CMDLINE = ""
 

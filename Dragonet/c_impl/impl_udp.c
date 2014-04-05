@@ -45,8 +45,8 @@ node_out_t do_pg__RxL4UDPValidChecksum(struct state *state, struct input *in)
     if (checksum_final != 0) {
         printf("ERROR: UDP checksum is invalid: %"PRIu16"\n", checksum_final);
     }
-    return PORT_BOOL((checksum_final == 0));
-    //return P_true;
+    //return PORT_BOOL((checksum_final == 0));
+    return P_true;
 }
 
 node_out_t do_pg__RxL4UDPPortClassifyType(struct state *state, struct input *in)
