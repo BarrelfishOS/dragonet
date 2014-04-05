@@ -53,7 +53,7 @@ import qualified LLVM.General.PassManager as LLVM.PM
 
 import qualified Text.Show.Pretty as Pr
 import Debug.Trace (trace, traceShow)
-import System.Environment (getArgs)
+import System.Environment (getArgs, getProgName)
 import System.IO  (writeFile)
 
 -- heavily based on: http://www.stephendiehl.com/llvm/
@@ -1477,8 +1477,8 @@ pg4tap pg = DGI.nmap fixN pg
 
 
 -- Prepeares and runs the pipeline
-runPipeline :: PL.PLGraph -> String -> PLI.PipelineImpl -> IO ()
-runPipeline plg stackname pli = fmap (const ()) $ forkOS $ do
+runPipeline :: PL.PLGraph -> String -> String -> PLI.PipelineImpl -> IO ()
+runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
     writeFile ("pipeline-" ++ mname ++ ".dot") $ toDot pgraph
     LLVM.Ctx.withContext $ \ctx ->
         liftError $ LLVM.Mod.withModuleFromBitcode ctx llvm_helpers $ \mod2 -> do
@@ -1510,7 +1510,8 @@ runPipeline plg stackname pli = fmap (const ()) $ forkOS $ do
         pl = PLI.pliPipeline pli
         pgraph = PL.plGraph pl
         mname = PL.plLabel pl
-        llvm_helpers = LLVM.Mod.File "dist/build/llvm-helpers.bc"  -- LLVM file with helper utilities
+        -- LLVM file with helper utilities
+        llvm_helpers = LLVM.Mod.File $ "dist/build/" ++ helpers ++ ".bc"
 
 plAssign :: PG.PGNode -> PL.PLabel
 plAssign (_,n)
@@ -1530,8 +1531,11 @@ main = do
     xargs <- getArgs
     let fname = if (length xargs) == 0 then fname_def else xargs !! 0
 
-    -- oneliner: useful for ghci
-    -- pg <- liftM Unicorn.constructGraph $ readFile fname >>= UnicornAST.parseGraph
+    pname <- getProgName
+    let helpers = case pname of
+            "llvm-cgen" -> "llvm-helpers"
+            "llvm-cgen-dpdk" -> "llvm-helpers-dpdk"
+            _ -> error "Unknown executable name, don't know what helpers to use :-/"
 
     txt <- readFile fname
     graph <- UnicornAST.parseGraph txt
@@ -1541,6 +1545,6 @@ main = do
     writeFile "pipelines.dot" $ pipelinesDot Nothing plg
 
     let stackname = "dragonet"
-    PLI.runPipelines stackname plConnect (runPipeline plg stackname) plg
+    PLI.runPipelines stackname plConnect (runPipeline plg stackname helpers) plg
     forever yield
 
