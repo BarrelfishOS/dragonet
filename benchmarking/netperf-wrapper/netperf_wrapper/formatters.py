@@ -725,15 +725,6 @@ class PlotFormatter(Formatter):
             print "|%10s " % (mystr(k)),
         print "|\n",
 
-
-
-        #sys.stdout.write("| " + " | ".join(trow) + " |\n")
-        #sys.stdout.write("|-" + "-|-".join(["-"*len(i) for i in trow]) + "-|\n")
-
-#        for k in trow:
-#            print "%10s |" % (k),
-#        print "\n",
-
         nr = len(infod[trow[0]])
         for i in range(0, nr):
 #            if infod['BURST_SIZE'][i][0] != 1.0 :
@@ -743,7 +734,10 @@ class PlotFormatter(Formatter):
 
             for k in trow:
                 data = infod[k][i]
-                print "|%10s " % (mystr(data)),
+                if k == "TITLE":
+                    print "|%30s " % (str(data)),
+                else :
+                    print "|%10s " % (mystr(data)),
             print "|\n",
 
 def mystr(obj):

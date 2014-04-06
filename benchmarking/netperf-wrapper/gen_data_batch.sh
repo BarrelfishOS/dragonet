@@ -8,12 +8,12 @@ result="${3}/latency_${target_t}_${ECHO_SERVER}"
 plotpath="${result}.png"
 log="${result}.log"
 tmpfile="${result}.tmp"
-title="${ECHO_SERVER}_${target_t}_PKT_${PKTSIZE}_B_${BRUST}${ONLOADTEXT}"
+title="${JUMBO}${ECHO_SERVER}_${target_t}_PKT_${PKTSIZE}_B_${BRUST}${ONLOADTEXT}"
 
    ./netperf-wrapper -l 10 ${ONLOADTYPE} -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${BRUST} -H asiago -C burrata -T ${target} udp_rr -t "${title}" -o "${result}" -L "${log}" | tee ${tmpfile}
 
 outfile=`cat ${tmpfile} | grep  'Test data is in ' | cut -d'[' -f2 | cut -d']' -f1`
-./netperf-wrapper -i ${outfile} -p 'userbw2' -o ${plotpath}
+./netperf-wrapper -i ${outfile} -p ${PLOTTYPE} -o ${plotpath}
 }
 
 
@@ -22,7 +22,6 @@ run_bm_tp_rr() {
     target_t=${2}
     result="${3}/latency_${target_t}.png"
     log="${3}/latency_${target_t}.log"
-    title="${target_t}_PKT_${PKTSIZE}_B_${BRUST}"
 
     ALLRESULTS="${3}/maxTP_${target_t}_${PKTSIZE}/"
     mkdir -p ${ALLRESULTS}
@@ -50,11 +49,11 @@ run_bm_tp_rr() {
         let CBRUST=NBRUST
         let NBRUST=CBRUST+CBRUST
 
-        title="${ECHO_SERVER}_${target_t}_PKT_${PKTSIZE}_B_${CBRUST}${ONLOADTEXT}"
+        title="${JUMBO}${ECHO_SERVER}_${target_t}_PKT_${PKTSIZE}_B_${CBRUST}${ONLOADTEXT}"
 
         ./netperf-wrapper -l 10  ${ONLOADTYPE} -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${CBRUST} -H asiago -C burrata -T ${target} udp_rr -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
         outfile=`cat ${TMPFILE} | grep  'Test data is in ' | cut -d'[' -f2 | cut -d']' -f1`
-        ./netperf-wrapper -i ${outfile} -p 'userbw2' -o ${TMPPLOT} | tee ${TMPRES}
+        ./netperf-wrapper -i ${outfile} -p ${PLOTTYPE} -o ${TMPPLOT} | tee ${TMPRES}
 
         let CTP=NTP
 
@@ -102,7 +101,7 @@ title="${target_t}_PKT_${PKTSIZE}"
 ./netperf-wrapper -l 10 ${ONLOADTYPE}  -c ${ECHO_SERVER} -P ${PKTSIZE} -H asiago -C burrata -T ${target} udp_localhost_stream -t "${title}" -o "${result}" -L "${log}" | tee ${tmpfile}
 
 outfile=`cat ${tmpfile} | grep  'Test data is in ' | cut -d'[' -f2 | cut -d']' -f1`
-./netperf-wrapper -i ${outfile} -p 'userbw2' -o ${plotpath} | tee -a ${FINALRESULT}
+./netperf-wrapper -i ${outfile} -p ${PLOTTYPE} -o ${plotpath} | tee -a ${FINALRESULT}
 
 }
 
@@ -140,64 +139,127 @@ sleep 5
 
 get_best_latency()
 {
+PKTSIZE=$1
+BRUST=$2
+
 OUTDIR="${OUTDIRP}/LATENCY/"
 mkdir -p ${OUTDIR}
-
-PKTSIZE=$1
-BRUST=1
 # echo latency numbers
-#run_npf_w_rr ${SELECTED_T} ${SELECTED_TT} ${OUTDIR}
-run_npf_w_rr ${SF_T} "SF_T" ${OUTDIR}
+run_npf_w_rr ${SELTARGET} ${SELTARGET_T} ${OUTDIR}
+}
+
+get_best_tp()
+{
+PKTSIZE=$1
+OUTDIR="${OUTDIRP}/TP_MAX/"
+mkdir -p ${OUTDIR}
+# for increasing TP on transaction based benchmark
+run_bm_tp_rr  ${SELTARGET} ${SELTARGET_T} ${OUTDIR}
 }
 
 
-OUTDIRPP="../myplots/SF2/"
-OUTDIRP="../myplots/TP_stream/"
 INTEL_T="10.22.4.11"
 INTEL_S_T="10.113.4.11"
 SF_T="10.23.4.21"
 SF_S_T="10.113.4.21"
-DEFAULT_PLOT="userlatency2"
-#PKTSIZE=1024
-#PKTSIZE=8000
-#PKTSIZE=60000
-#"LOCAL_SEND_SIZE": "65507"
-BRUST=1
+PLOTTYPE="bbest"
 
-ONLOADTYPE=""
-ONLOADTEXT=""
+SELTARGET=${SF_T}
+SELTARGET_T="SF_T"
+
+SELTARGET=${INTEL_T}
+SELTARGET_T="IntelD"
+
 ONLOADTYPE="--onloadLatency"
 ONLOADTEXT="onloadLatency"
+ONLOADTYPE=""
+ONLOADTEXT=""
 
-ECHO_SERVER="netserver"
 ECHO_SERVER="CImplDpdk"
 ECHO_SERVER="HImplDpdk"
 ECHO_SERVER="HImplOnload"
 ECHO_SERVER="CImplOnload"
+ECHO_SERVER="netserver"
 ECHO_SERVER="netcat"
+ECHO_SERVER="socat_opt"
+ECHO_SERVER="socat"
+ECHO_SERVER="netcat_opt"
 
+#JUMBO="JUMBO"
+JUMBO=""
 
+echo "Running BM for Echo server: ${ECHO_SERVER}, Target: [${SELTARGET} , ${SELTARGET_T}]"
+echo "Onload: [${ONLOADTYPE}, ${ONLOADTEXT}], Jumbo: [${JUMBO}] "
+
+OUTDIRPP="../myplots/${SELTARGET_T}/"
+
+echo "OUTPUT Location: ${OUTDIRPP}"
 
 OUTDIRP="${OUTDIRPP}/${ECHO_SERVER}"
 mkdir -p ${OUTDIRP}
 OUTDIR=${OUTDIRP}
 
+if [ "${JUMBO}" == "" ] ; then
+    echo "Wthout JUMBO"
+else
+    OUTDIRP="${OUTDIRP}/${JUMBO}/"
+fi
+
 if [ "${ONLOADTYPE}" == "" ] ; then
     echo "Wthout onload"
 else
-    OUTDIR="${OUTDIR}/${ONLOADTEXT}/"
+    OUTDIRP="${OUTDIRP}/${ONLOADTEXT}/"
 fi
 
-#echo ${OUTDIR}
-#get_best_latency 64
-#get_best_latency 1024
-#get_best_latency 1400
-#get_best_latency 8000
+get_best_latency 64 1
+exit 0
 
-#exit 0
-#sleep 5
+get_best_tp 32000 1
+get_best_tp 16000 1
+get_best_tp 8000 1
+get_best_tp 1400 1
+get_best_tp 1024 1
+get_best_tp 64 1
+exit 0
+
+get_best_latency 64 1
+get_best_latency 1024 1
+get_best_latency 1400 1
+get_best_latency 8000 1
+get_best_latency 16000 1
+get_best_latency 32000 1
+#get_best_latency 64000 1
+exit 0
+
+######################################################################
+######################################################################
+######################################################################
+######################################################################
+
+#get_best_latency 8000 1
+#get_best_latency 1400 1
 
 OUTDIR="${OUTDIR}/TP_MAX/"
+
+PKTSIZE=8000
+# for increasing TP on transaction based benchmark
+run_bm_tp_rr ${SF_T} "SF_T" ${OUTDIR}
+
+exit 0
+
+PKTSIZE=32000
+# for increasing TP on transaction based benchmark
+run_bm_tp_rr ${SF_T} "SF_T" ${OUTDIR}
+
+
+PKTSIZE=63000
+# for increasing TP on transaction based benchmark
+run_bm_tp_rr ${SF_T} "SF_T" ${OUTDIR}
+
+
+PKTSIZE=64000
+# for increasing TP on transaction based benchmark
+run_bm_tp_rr ${SF_T} "SF_T" ${OUTDIR}
 
 mkdir -p ${OUTDIR}
 PKTSIZE=64
@@ -213,12 +275,17 @@ PKTSIZE=1400
 # for increasing TP on transaction based benchmark
 run_bm_tp_rr ${SF_T} "SF_T" ${OUTDIR}
 
-sleep 5
-PKTSIZE=8000
-# for increasing TP on transaction based benchmark
-run_bm_tp_rr ${SF_T} "SF_T" ${OUTDIR}
-
 exit 0
+
+echo ${OUTDIRP}
+get_best_latency 64 1
+get_best_latency 1024 1
+get_best_latency 1400 1
+get_best_latency 8000 1
+get_best_latency 16000 1
+get_best_latency 32000 1
+get_best_latency 64000 1
+
 
 #run_npf_w_rr ${SF_S_T} "SF_S_T" ${OUTDIR}
 #run_npf_w_rr ${INTEL_S_T} "INTEL_S_T" ${OUTDIR}

@@ -6,36 +6,88 @@ NETPERF_CMD="../netperf-2.6.0/src/netperf -fg "
 
 SRV_CMDS = {
     "netserver" : {
-                    "init_cmd" : ["killall netserver || true"],
+                    "client_extra_opts" : "",
+                    "init_cmd" : ["sudo killall netserver || true",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_read",
+                    ],
                     "exec_cmd" : "../netperf-2.6.0/src/netserver -D ",
-                    "kill_cmd" : ["killall netserver || true"],
+                    "kill_cmd" : ["sudo killall netserver || true"],
+                    "out_cmd" : [],
+                },
+
+    "socat" : {
+                    "client_extra_opts" : "-N",
+                    "init_cmd" : [
+                        "sudo killall socat || true",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                        "echo 0 | sudo tee  /proc/sys/net/core/busy_read",
+                                ],
+                    "exec_cmd" : "socat -b 64000 PIPE UDP-LISTEN:7,fork ",
+                    "kill_cmd" : ["sudo killall socat || true"],
+                    "out_cmd" : [],
+                },
+    "socat_opt" : {
+                    "client_extra_opts" : "-N",
+                    "init_cmd" : [
+                        "sudo killall socat || true",
+                        "echo 50 | sudo tee /proc/sys/net/core/busy_poll",
+                        "echo 50 | sudo tee  /proc/sys/net/core/busy_read",
+                                ],
+                    "exec_cmd" : "socat -b 64000 PIPE UDP-LISTEN:7,fork ",
+                    "kill_cmd" : ["sudo killall socat || true",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_read",
+                            ],
                     "out_cmd" : [],
                 },
     "netcat" : {
-                    "init_cmd" : ["sudo killall nc.traditional || true"],
+                    "client_extra_opts" : "-N",
+                    "init_cmd" : ["sudo killall nc.traditional || true",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_read",
+                    ],
                     "exec_cmd" : "nc.traditional -nlup 7 -e /bin/cat",
                     "kill_cmd" : ["sudo killall nc.traditional || true"],
                     "out_cmd" : [],
                 },
+    "netcat_opt" : {
+                    "client_extra_opts" : "-N",
+                    "init_cmd" : [
+                        "sudo killall nc.traditional || true",
+                        "echo 50 | sudo tee /proc/sys/net/core/busy_poll",
+                        "echo 50 | sudo tee /proc/sys/net/core/busy_read",
+                                ],
+                        "exec_cmd" : "nc.traditional -nlup 7 -e /bin/cat",
+                        "kill_cmd" : ["sudo killall nc.traditional || true",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_read",
+                        ],
+                    "out_cmd" : [],
+                },
     "HImplOnload" : {
+                    "client_extra_opts" : "-N",
                     "init_cmd" : [],
                     "exec_cmd" : "echo ",
                     "kill_cmd" : [],
                     "out_cmd" : [],
                 },
     "CImplOnload" : {
+                    "client_extra_opts" : "-N",
                     "init_cmd" : [],
                     "exec_cmd" : "echo ",  # "/home/ubuntu/dragonet/Dragonet/c_impl ; make sfOnload_run"  # "sudo taskset -c 3"
                     "kill_cmd" : [],  # sudo killall sfOnload
                     "out_cmd" : [],
                 },
     "HImplDpdk" : {
+                    "client_extra_opts" : "-N",
                     "init_cmd" : [],
                     "exec_cmd" : "echo ",
                     "kill_cmd" : [],
                     "out_cmd" : [],
                 },
     "CImplDpdk" : {
+                    "client_extra_opts" : "-N",
                     "init_cmd" : [],
                     "exec_cmd" : "echo ",
                     "kill_cmd" : [],
