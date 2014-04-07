@@ -51,6 +51,54 @@ PLOT_KWARGS = (
     'zorder'
     )
 
+
+def collect_attributes(result, config, titles, values):
+    #for s in config['series']:
+    for s in config['attrs']['attrlist']:
+        args = None
+        if 'args' in s.keys():
+            args = s['args']
+            ans = s['data'](result._results, result.metadata, **args)
+        else:
+            ans = s['data'](result._results, result.metadata)
+
+        #print "%s: %s " % (s['label'], str(ans))
+        print "%s: %s: %s" % (s['label'], str(ans),
+               result.metadata['TITLE'])
+        if (s['label'] not in values.keys()) :
+            titles.append(s['label'])
+            values[s['label']] = [ans]
+        else :
+            values[s['label']].append(ans)
+
+def mystr(obj):
+    return str(obj)[:9]
+
+def show_attr_details(trow, infod):
+
+#    trow = self.nresults_titles
+#    infod = self.nresults
+
+    for k in trow:
+        print "|%10s " % (mystr(k)),
+    print "|\n",
+
+    nr = len(infod[trow[0]])
+    for i in range(0, nr):
+#        if infod['BURST_SIZE'][i][0] != 1.0 :
+#            continue
+#        if infod['TARGET'][i] != "10.23.4.21" :
+#            continue
+
+        for k in trow:
+            data = infod[k][i]
+            if k == "TITLE":
+                print "|%30s " % (str(data)),
+            else :
+                print "|%10s " % (mystr(data)),
+        print "|\n",
+
+
 class Formatter(object):
 
     open_mode = "w"
@@ -717,10 +765,11 @@ class PlotFormatter(Formatter):
 
 
     def show_nresults(self):
+        show_attr_details(self.nresults_titles, self.nresults)
+        return
 
         trow = self.nresults_titles
         infod = self.nresults
-
         for k in trow:
             print "|%10s " % (mystr(k)),
         print "|\n",

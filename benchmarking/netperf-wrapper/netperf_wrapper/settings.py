@@ -128,7 +128,7 @@ CONFIG_TYPES = {
     }
 
 TEST_PATH = os.path.join(DATA_DIR, 'tests')
-DICT_SETTINGS = ('DATA_SETS', 'PLOTS')
+DICT_SETTINGS = ('DATA_SETS', 'PLOTS', 'ATTRIBUTES' )
 
 def version(*args):
     print("Netperf-wrapper v%s.\nRunning on Python %s." %(VERSION, sys.version.replace("\n", " ")))

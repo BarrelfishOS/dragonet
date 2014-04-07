@@ -27,7 +27,7 @@ try:
 
     from netperf_wrapper import aggregators, formatters, util
     from netperf_wrapper.settings import settings, load
-
+    import netperf_wrapper.formatters as FORMATTER
 
     config = util.DefaultConfigParser({'delay': 0})
     config.add_section('global')
@@ -36,6 +36,9 @@ try:
     config.set('global', 'output', 'org_table')
     config.set('global', 'cmd_opts', '-P 0 -v 0')
     config.set('global', 'cmd_binary', '/usr/bin/netperf')
+
+
+
 
     if __name__ == "__main__":
         try:
@@ -52,6 +55,20 @@ try:
             for s in list(settings.DATA_SETS.items()):
                 #print "Adding machine for %s" % (str(s))
                 agg.add_machine(*s)
+
+            #print "The attributes are %s" % (settings.ATTRIBUTES['attrs']['attrlist'])
+            attribute_vals = {}
+            attributes_titles = []
+            if len(results) > 1:
+                for r in results:
+                    FORMATTER.collect_attributes(r,
+                        settings.ATTRIBUTES,
+                        #settings.ATTRIBUTES['attrs']['attrlist'],
+                        attributes_titles, attribute_vals)
+
+            FORMATTER.show_attr_details(attributes_titles,  attribute_vals)
+            print "FIXME: Just showing attribute values, as this is dryrun"
+            sys.exit(0)
 
             formatter_name = util.classname(settings.FORMAT, 'Formatter')
             if hasattr(formatters, formatter_name):
