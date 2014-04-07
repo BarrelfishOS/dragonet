@@ -80,6 +80,19 @@ prepare_machine() {
     # copy the script which can initialize code repository
     scp  "get_repository.sh" "${HOST}:"
 
+
+    # my vim configuration
+    scp  "${HOME}/vimconf.tar" "${HOST}:"
+    echo 'tar -xvf vimconf.tar' | on_machine_nosudo ${MACHINE}
+    echo 'mkdir -p .vimbackup/backup' | on_machine_nosudo ${MACHINE}
+    echo 'echo export="$PATH:$HOME/bin/" >> .bashrc' | on_machine_nosudo ${MACHINE}
+    echo 'cd /root/ ; tar -xvf /home/ubuntu/vimconf.tar' | on_machine ${MACHINE}
+    echo 'cd /root/ ; mkdir -p .vimbackup/backup' | on_machine ${MACHINE}
+    echo 'mkdir -p bin' | on_machine_nosudo ${MACHINE}
+    scp "${HOME}/bin/cs_create.sh" "${HOST}:bin/"
+    scp "${HOME}/bin/cscope" "${HOST}:bin/"
+
+
     # NOTE: This is repeated in haskell installation part.
     echo 'cabal update' | on_machine_nosudo ${MACHINE}
     echo 'cabal install graphviz' | on_machine_nosudo ${MACHINE}
@@ -92,17 +105,6 @@ prepare_machine() {
     echo 'cabal install hscope' | on_machine_nosudo ${MACHINE}
     echo 'cabal install SourceGraph' | on_machine_nosudo ${MACHINE}
 
-
-    # my vim configuration
-    scp  "${HOME}/vimconf.tar" "${HOST}:"
-    echo 'tar -xvf vimconf.tar' | on_machine_nosudo ${MACHINE}
-    echo 'mkdir -p .vimbackup/backup' | on_machine_nosudo ${MACHINE}
-    echo 'echo export="$PATH:$HOME/bin/" >> .bashrc' | on_machine_nosudo ${MACHINE}
-    echo 'cd /root/ ; tar -xvf /home/ubuntu/vimconf.tar' | on_machine ${MACHINE}
-    echo 'cd /root/ ; mkdir -p .vimbackup/backup' | on_machine ${MACHINE}
-    echo 'mkdir -p bin' | on_machine_nosudo ${MACHINE}
-    scp "${HOME}/bin/cs_create.sh" "${HOST}:bin/"
-    scp "${HOME}/bin/cscope" "${HOST}:bin/"
 }
 
 compile_linux_kernel() {
