@@ -53,7 +53,9 @@ def get_netperf_attr(allResults, meta, attribute):
                     out = t["CMD_OUTPUT"]
                     per_run.append(float(out[attribute]))
 
-        assert(len(per_run) > 0)
+        if not (len(per_run) > 0):
+            print "There are not values for attribute %s in run %s" % (
+                attribute, rn )
         #ans.append(sum(per_run))
         ans.append(myavg(per_run))
     return (ans)

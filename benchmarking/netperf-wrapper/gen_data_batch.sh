@@ -175,15 +175,15 @@ ONLOADTEXT="onloadLatency"
 ONLOADTYPE=""
 ONLOADTEXT=""
 
-ECHO_SERVER="CImplDpdk"
 ECHO_SERVER="HImplDpdk"
 ECHO_SERVER="HImplOnload"
 ECHO_SERVER="CImplOnload"
 ECHO_SERVER="netserver"
 ECHO_SERVER="netcat"
-ECHO_SERVER="socat_opt"
 ECHO_SERVER="socat"
 ECHO_SERVER="netcat_opt"
+ECHO_SERVER="CImplDpdk"
+ECHO_SERVER="socat_opt"
 
 #JUMBO="JUMBO"
 JUMBO=""
@@ -211,23 +211,23 @@ else
     OUTDIRP="${OUTDIRP}/${ONLOADTEXT}/"
 fi
 
-get_best_latency 64 1
-exit 0
-
 get_best_tp 32000 1
 get_best_tp 16000 1
 get_best_tp 8000 1
 get_best_tp 1400 1
 get_best_tp 1024 1
 get_best_tp 64 1
-exit 0
 
 get_best_latency 64 1
 get_best_latency 1024 1
 get_best_latency 1400 1
+
+exit 0
+
+echo "Following is to test if everything works"
 get_best_latency 8000 1
-get_best_latency 16000 1
-get_best_latency 32000 1
+#get_best_latency 16000 1
+#get_best_latency 32000 1
 #get_best_latency 64000 1
 exit 0
 
