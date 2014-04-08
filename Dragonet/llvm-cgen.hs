@@ -1479,9 +1479,11 @@ pg4tap pg = DGI.nmap fixN pg
 -- Prepeares and runs the pipeline
 runPipeline :: PL.PLGraph -> String -> String -> PLI.PipelineImpl -> IO ()
 runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
+    putStrLn $ "Initializing pipeline " ++ mname
     writeFile ("pipeline-" ++ mname ++ ".dot") $ toDot pgraph
     LLVM.Ctx.withContext $ \ctx ->
         liftError $ LLVM.Mod.withModuleFromBitcode ctx llvm_helpers $ \mod2 -> do
+            putStrLn "foo"
             ast2 <- LLVM.Mod.moduleAST mod2
             -- load input type and state type from module
             let input_ty = case findTy ast2 "struct.input" of

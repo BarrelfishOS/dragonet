@@ -303,17 +303,17 @@ int init_dpdk_setupV2(void)
         return -1;
     }
     const char *myArgs[ARGNOS] = {"./a.out",
-        "-c", "0xf",  // coremask
+        "-c", "0x18",  // coremask
         "-n", "1",  // no of ports
         "--",
         "--pkt-filter-mode=perfect",
 //        "--pkt-filter-mode=signature",
         "--rxq=2",
         "--txq=2",
-        "--brust=1",
+	"--burst=1",
         "--disable-rss",
         "--disable-hw-vlan",
-        ""}; // 13 arguments
+        "", ""}; // 13 arguments
 
     char *myArgs2[ARGNOS];
     int i;
@@ -327,8 +327,8 @@ int init_dpdk_setupV2(void)
         }
     }
 
-    printf("Hello world from DPDK....\n");
-    int ret = init_dpdkControl(12, myArgs2);
+    printf("Hello world from DPDK...., V3\n");
+    int ret = init_dpdkControl(13, myArgs2);
     if (ret < 0) {
         printf("ERROR: %s: Initialization failed (ret val=%d)\n",
                 __func__, ret);
