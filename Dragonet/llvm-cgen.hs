@@ -20,7 +20,7 @@ import Control.Concurrent (forkOS,yield)
 
 import qualified Data.Map as M
 import qualified Data.List as L
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust,isNothing)
 import Data.Word (Word32, Word64, Word)
 import Data.Char (ord)
 import Data.Function (on)
@@ -969,12 +969,16 @@ llvm_pg_fnode :: DGI.Node -> PG.Node -> PG.PGAdjFull -> LLVM ()
 llvm_pg_fnode nid node adj_out = do
     -- group outputs by port
     let outs' = PG.pgGroupAdjFull adj_out
+    -- We also want ports without outgoing edges
+    let eouts = map (\p -> (p,[])) $ filter (isNothing . (`lookup` outs'))
+                    $ PG.nPorts node
+    let outs'' = outs' ++ eouts
 
     -- sort the out ports by the order they appear in the node
     let f = \x -> fromJust $ L.elemIndex x (PG.nPorts node)
-    let outs = L.sortBy (compare `on` (f . fst)) outs'
+    let outs = L.sortBy (compare `on` (f . fst)) outs''
 
-    if length outs > 0 then llvm_pg_fnode_nonterminal nid node outs
+    if length outs' > 0 then llvm_pg_fnode_nonterminal nid node outs
     else llvm_pg_fnode_terminal nid node outs
 
 -- build a function for a terminal F-node
