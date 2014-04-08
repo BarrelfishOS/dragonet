@@ -23,7 +23,11 @@ node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
     }
 
     static uint8_t tmpbuf[2048];
-    size_t len = tap_read(state->tap_handler, (char *) tmpbuf, sizeof(tmpbuf));
+    ssize_t len =
+        tap_read(state->tap_handler, (char *) tmpbuf, sizeof(tmpbuf), 500);
+    if (len == 0) {
+        return P_Queue_drop;
+    }
     /*puts("\n\n\n---------------------------------------------------------");
     printf("Got packet! :-D\n");*/
     input_copy_packet(in, tmpbuf, len);

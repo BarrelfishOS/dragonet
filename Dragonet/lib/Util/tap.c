@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <linux/if.h>
 #include <linux/if_tun.h>
+#include <sys/select.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -88,7 +89,7 @@ tap_set_mask(struct tap_handler *tap, const char *mask)
 }
 
 ssize_t
-tap_read(struct tap_handler *tap, char *buff, size_t len)
+tap_read(struct tap_handler *tap, char *buff, size_t len, long timeout)
 {
 	ssize_t ret;
 
@@ -99,13 +100,26 @@ tap_read(struct tap_handler *tap, char *buff, size_t len)
 	pi->proto = 666;
 	*/
 
+    if (timeout != 0) {
+        fd_set reads;
+        struct timeval tv;
+
+        FD_ZERO(&reads);
+        FD_SET(tap->tun_fd, &reads);
+        tv.tv_sec = timeout / 1000;
+        tv.tv_usec = (timeout % 1000) * 1000;
+        ret = select(tap->tun_fd + 1, &reads, NULL, NULL, &tv);
+        if (ret == 0) {
+            return 0;
+        }
+    }
+
 	// we will want to handle some (e.g., EAGAIN), but for now just die
 	if ((ret = read(tap->tun_fd, buff, len)) < 0)
 		err(1, "read failed");
 	else if (ret == 0)    // ditto for EOF
 		err(1, "read returned 0");
-
-	return ret;
+    return ret;
 }
 
 void

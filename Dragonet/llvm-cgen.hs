@@ -1045,6 +1045,7 @@ llvm_pg_fnode_demux nid node = do
     input_ty <- cgInputTy
     fnode_args <- cgFnodeArgs
     fnAdd (pg_fimplname node) i32Ty fnode_args $ do
+        bldNewPhi i32Ty "ret_phi"
         -- print message on entering the function
         (AST.Name fnstr) <- gets fnName
         bldDbgPrintf ("Entering demux node: " ++ fnstr ++ "\n") []
@@ -1052,12 +1053,14 @@ llvm_pg_fnode_demux nid node = do
 
         -- Basic Block for polling queue
         bldAddBB "bb_poll"
+        -- Poll queue
         plh <- bldAddInstruction $ mkLd $ getGlobalOp glblPipeline
         poll_ret <- bldAddInstruction $ mkFnCall "pl_poll" [plh]
         t <- bldAddInstruction $ mkICmpEq poll_ret (mkNullPtrOp input_ty)
-        bldTerminate $ termCondBr t "bb_poll" "bb_ret"
+        bldTerminate $ termCondBr t "bb_none" "bb_success"
 
-        bldAddBB "bb_ret"
+        -- We got a packet, yay!
+        bldAddBB "bb_success"
         mux_ret <- bldAddInstruction $ mkFnCall "input_muxid" [poll_ret]
         -- clear mux id
         bldAddInstruction $ mkFnCall "input_set_muxid" [poll_ret, operandInt32_0]
@@ -1065,7 +1068,18 @@ llvm_pg_fnode_demux nid node = do
         let inp = getLocalRef "input"
         bldAddInstruction $ mkFnCall "input_xchg" [inp, poll_ret]
         bldAddInstruction $ mkFnCall "input_free" [poll_ret]
-        bldTerminate $ termRetOp mux_ret
+        bldAddPhi "ret_phi" (mux_ret,"bb_success")
+        bldTerminate $ termBr "bb_ret"
+
+        -- No packet :(
+        bldAddBB "bb_none"
+        bldAddPhi "ret_phi" (operandInt32_0,"bb_none")
+        bldTerminate $ termBr "bb_ret"
+
+
+        bldAddBB "bb_ret"
+        ret <- bldPhi "ret_phi"
+        bldTerminate $ termRetOp ret
 
 -- Generate function transfering packet to alternative pipeline
 llvm_pg_fnode_enqueue :: DGI.Node -> PG.Node -> String -> LLVM ()
