@@ -4,7 +4,9 @@ module Dragonet.Pipelines.Implementation(
     PInput(..),
     POutput(..),
     PipelineImpl(..),
-    runPipelines
+    StackHandle,
+    runPipelines,
+    stopPipelines
 ) where
 
 import Dragonet.Pipelines
@@ -33,6 +35,8 @@ data PipelineImpl = PipelineImpl {
     pliOutQs :: [(PLabel,POutput)]
 } deriving (Show)
 
+newtype StackHandle = StackHandle (Ptr StackHandle)
+
 
 
 getPLIs :: (Pipeline -> Pipeline -> (POutput,PInput)) -> PLGraph
@@ -56,22 +60,26 @@ runPipelines ::
     (Pipeline -> Pipeline -> (POutput,PInput)) ->
     -- Initialize pipeline
     (PipelineImpl -> IO ()) ->
-    PLGraph -> IO ()
+    PLGraph -> IO StackHandle
 runPipelines sname qconf prun plg = do
     let plis = getPLIs qconf plg
-    init_shared_state sname (length $ concatMap pliInQs plis)
+    handle <- init_shared_state sname (length $ concatMap pliInQs plis)
     mapM_ prun plis
-    return ()
+    return handle
 
+stopPipelines :: StackHandle -> IO ()
+stopPipelines h = c_stop_stack h
 
 
 -- C interface
 
 foreign import ccall "init_shared_state"
-    c_init_shared_state :: CString -> CSize -> IO ()
+    c_init_shared_state :: CString -> CSize -> IO StackHandle
 
-init_shared_state :: String -> Int -> IO ()
+foreign import ccall "stop_stack"
+    c_stop_stack :: StackHandle -> IO ()
+
+init_shared_state :: String -> Int -> IO StackHandle
 init_shared_state n c = withCString n $ \cs ->
     c_init_shared_state cs (fromIntegral c)
-
 

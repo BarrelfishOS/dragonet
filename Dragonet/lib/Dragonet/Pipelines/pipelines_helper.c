@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <signal.h>
 
 #include <barrelfish/waitset.h>
 #include <bulk_transfer/bulk_transfer.h>
@@ -31,9 +32,11 @@
 
 
 struct dragonet_shared_state {
+    volatile bool running;
     size_t count;
     volatile size_t ch_created;
     volatile size_t ch_bound;
+    volatile size_t num_running;
     volatile uint32_t pl_id_alloc;
 
     struct state state;
@@ -61,7 +64,7 @@ struct dragonet_queue {
 
 void pg_state_init(struct state *st);
 
-void init_shared_state(const char *name, size_t chancount)
+void* init_shared_state(const char *name, size_t chancount)
 {
     int fd, res;
     struct dragonet_shared_state *dss;
@@ -79,14 +82,25 @@ void init_shared_state(const char *name, size_t chancount)
             0);
     assert(dss != MAP_FAILED);
 
+    dss->running = true;
     dss->count = chancount;
     pg_state_init(&dss->state);
     /*dss->gstate_len = gs_len;
     memcpy(dss->gstate, gs, gs_len);*/
 
-    munmap(dss, SHARED_STATE_SIZE);
+    //munmap(dss, SHARED_STATE_SIZE);
     close(fd);
+    return dss;
+}
 
+void stop_stack(void *handle)
+{
+    struct dragonet_shared_state *dss = handle;
+    printf("stop_stack()\n");
+    dss->running = false;
+    while (dss->num_running > 0) {
+    }
+    printf("All pipelines terminated\n");
 }
 
 pipeline_handle_t pl_init(const char *stackname, const char *plname)
@@ -109,6 +123,7 @@ pipeline_handle_t pl_init(const char *stackname, const char *plname)
     assert(pl->shared != MAP_FAILED);
     close(fd);
 
+    __sync_fetch_and_add(&pl->shared->num_running, 1);
     pl->id = __sync_fetch_and_add(&pl->shared->pl_id_alloc, 1);
 
     // Make sure we get a unique machine id for each pipeline, so we get unique
@@ -130,6 +145,18 @@ struct state *pl_get_state(pipeline_handle_t plh)
 {
     struct dragonet_pipeline *pl = plh;
     return &pl->shared->state;
+}
+
+bool pl_get_running(pipeline_handle_t plh)
+{
+    struct dragonet_pipeline *pl = plh;
+    return pl->shared->running;
+}
+
+void pl_terminated(pipeline_handle_t plh)
+{
+    struct dragonet_pipeline *pl = plh;
+    __sync_fetch_and_sub(&pl->shared->num_running, 1);
 }
 
 static void cb_assign_done(void *arg, errval_t err, struct bulk_channel *chan)

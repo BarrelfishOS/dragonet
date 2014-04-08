@@ -54,7 +54,9 @@ import qualified LLVM.General.PassManager as LLVM.PM
 import qualified Text.Show.Pretty as Pr
 import Debug.Trace (trace, traceShow)
 import System.Environment (getArgs, getProgName)
-import System.IO  (writeFile)
+import System.IO  (writeFile,hFlush,stdout)
+
+import Prelude hiding (catch)
 
 -- heavily based on: http://www.stephendiehl.com/llvm/
 
@@ -615,6 +617,7 @@ i32Ty = mkIntTy 32
 i8Ty  = mkIntTy 8
 i1Ty  = mkIntTy 1
 voidTy = AST.T.VoidType
+boolTy = i1Ty
 muxIdTy = i32Ty
 
 mkArrayTy :: AST.T.Type -> Word64 -> AST.T.Type
@@ -1303,9 +1306,9 @@ llvm_pg_main_func entry_node stackname = do
         bldAddBB "body" -- main loop (for now, loop forever)
         entry <- gets entryBB
         -- setup a loop counter
-        cnt <- bldAddInstruction $ mkPhi i32Ty [(operandInt32_0, entry), (getLocalRef "cnt_next", "body")]
+        {-cnt <- bldAddInstruction $ mkPhi i32Ty [(operandInt32_0, entry), (getLocalRef "cnt_next", "body")]
         bldDbgPrintf "count: %d\n" [cnt]
-        cnt_next <- bldAddNamedInstruction "cnt_next" $ mkAdd cnt operandInt32_1
+        cnt_next <- bldAddNamedInstruction "cnt_next" $ mkAdd cnt operandInt32_1-}
 
         bldAddInstruction $ mkCall (getFnOp $ pg_fname entry_node) [state, input] -- call entry
         bldAddInstruction $ mkFnCall "input_clean_attrs" [input] -- clean up input
@@ -1316,8 +1319,14 @@ llvm_pg_main_func entry_node stackname = do
         forM_ on_cnt $ \cnt_name ->
             bldAddInstruction $ mkSt (getGlobalOp cnt_name) operandInt32_0
 
-        -- start over again :-)
-        bldTerminate $ termBr "body"
+        -- Check if we should keep running
+        running <- bldAddInstruction $ mkFnCall "pl_get_running" [plh]
+        t <- bldAddInstruction $ mkICmpEq running $ mkConstIntOperand 1 1
+        bldTerminate $ termCondBr t "body" "exit"
+
+        bldAddBB "exit"
+        bldAddInstruction $ mkFnCall "pl_terminated" [plh]
+        bldTerminate $ termRetVoid
 
 
 
@@ -1465,6 +1474,8 @@ codegen_all pgraph stackname = do
     addExternalFn qp_ty "pl_inqueue_create" [(plp_ty, "plh"), ((mkPtrTy i8Ty), "name")]
     addExternalFn qp_ty "pl_outqueue_bind" [(plp_ty, "plh"), ((mkPtrTy i8Ty), "name")]
     addExternalFn voidTy "pl_wait_ready" [(plp_ty, "plh")]
+    addExternalFn boolTy "pl_get_running" [(plp_ty, "plh")]
+    addExternalFn voidTy "pl_terminated" [(plp_ty, "plh")]
 
     -- Queue interaction
     addExternalFn voidTy "pl_enqueue" [(qp_ty, "queue"), ((mkPtrTy input_ty), "input")]
@@ -1497,6 +1508,7 @@ pg4tap pg = DGI.nmap fixN pg
 -- Prepeares and runs the pipeline
 runPipeline :: PL.PLGraph -> String -> String -> PLI.PipelineImpl -> IO ()
 runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
+    putStrLn $ "Initializing pipeline " ++ mname
     writeFile ("pipeline-" ++ mname ++ ".dot") $ toDot pgraph
     LLVM.Ctx.withContext $ \ctx ->
         liftError $ LLVM.Mod.withModuleFromBitcode ctx llvm_helpers $ \mod2 -> do
@@ -1524,6 +1536,7 @@ runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
                     modWriteFile mod $ mname ++ "-optimized-cg.ll"
                     modExec ctx mod "pg_main"
                     return ()
+    putStrLn $ "Pipeline " ++ mname ++ " stopped running"
     where
         pl = PLI.pliPipeline pli
         pgraph = PL.plGraph pl
@@ -1541,6 +1554,21 @@ plAssign (_,n)
 plConnect :: PL.Pipeline -> PL.Pipeline -> (PLI.POutput,PLI.PInput)
 plConnect i o = (PLI.POQueue n, PLI.PIQueue n)
     where n = PL.plLabel i ++ "_to_" ++ PL.plLabel o
+
+
+commandLineInterface :: IO ()
+commandLineInterface = do
+    putStr "> "
+    hFlush stdout
+    l <- getLine
+    putStrLn ""
+    done <- case l of
+        "quit" -> return True
+        "" -> return False
+        _ -> do
+            putStrLn "Unknown command"
+            return False
+    if done then return () else commandLineInterface
 
 main :: IO ()
 main = do
@@ -1563,6 +1591,12 @@ main = do
     writeFile "pipelines.dot" $ pipelinesDot Nothing plg
 
     let stackname = "dragonet"
-    PLI.runPipelines stackname plConnect (runPipeline plg stackname helpers) plg
-    forever yield
+    let runner = runPipeline plg stackname helpers
+    h <- PLI.runPipelines stackname plConnect runner plg
+
+    commandLineInterface
+
+    putStrLn "Doing cleanup..."
+    PLI.stopPipelines h
+
 
