@@ -163,12 +163,13 @@ INTEL_S_T="10.113.4.11"
 SF_T="10.23.4.21"
 SF_S_T="10.113.4.21"
 PLOTTYPE="bbest"
+PLOTTYPE="lbest"
 
 SELTARGET=${SF_T}
 SELTARGET_T="SF_T"
 
 SELTARGET=${INTEL_T}
-SELTARGET_T="IntelD"
+SELTARGET_T="IntelD_exp"
 
 ONLOADTYPE="--onloadLatency"
 ONLOADTEXT="onloadLatency"
@@ -182,8 +183,9 @@ ECHO_SERVER="netserver"
 ECHO_SERVER="netcat"
 ECHO_SERVER="socat"
 ECHO_SERVER="netcat_opt"
-ECHO_SERVER="CImplDpdk"
 ECHO_SERVER="socat_opt"
+ECHO_SERVER="llvmDpdk"
+ECHO_SERVER="CImplDpdk"
 
 #JUMBO="JUMBO"
 JUMBO=""
@@ -193,11 +195,11 @@ echo "Onload: [${ONLOADTYPE}, ${ONLOADTEXT}], Jumbo: [${JUMBO}] "
 
 OUTDIRPP="../myplots/${SELTARGET_T}/"
 
-echo "OUTPUT Location: ${OUTDIRPP}"
 
 OUTDIRP="${OUTDIRPP}/${ECHO_SERVER}"
 mkdir -p ${OUTDIRP}
 OUTDIR=${OUTDIRP}
+
 
 if [ "${JUMBO}" == "" ] ; then
     echo "Wthout JUMBO"
@@ -211,12 +213,20 @@ else
     OUTDIRP="${OUTDIRP}/${ONLOADTEXT}/"
 fi
 
-get_best_tp 32000 1
-get_best_tp 16000 1
-get_best_tp 8000 1
-get_best_tp 1400 1
-get_best_tp 1024 1
-get_best_tp 64 1
+echo "OUTPUT Location: ${OUTDIRP}"
+
+#get_best_latency 64 1
+get_best_latency 1400 64
+exit 0
+
+get_best_tp 1400
+
+get_best_tp 32000
+get_best_tp 16000
+get_best_tp 8000
+get_best_tp 1400
+get_best_tp 1024
+get_best_tp 64
 
 get_best_latency 64 1
 get_best_latency 1024 1

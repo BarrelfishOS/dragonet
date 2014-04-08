@@ -93,6 +93,13 @@ SRV_CMDS = {
                     "kill_cmd" : [],
                     "out_cmd" : [],
                 },
+    "llvmDpdk" : {
+                    "client_extra_opts" : "-N",
+                    "init_cmd" : [],
+                    "exec_cmd" : "echo ", # "/home/ubuntu/dragonet/Dragonet/ ; sudo LD_LIBRARY_PATH=.cabal-sandbox/lib/x86_64-linux-ghc-7.4.1/dpdk-0.1.0.0/ ./dist/build/llvm-cgen-dpdk/llvm-cgen-dpdk ./lpgImpl.unicorn "
+                    "kill_cmd" : [],
+                    "out_cmd" : [],
+                },
 }
 
 PING4="ping"

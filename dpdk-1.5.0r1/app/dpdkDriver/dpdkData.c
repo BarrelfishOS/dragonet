@@ -310,9 +310,10 @@ int init_dpdk_setupV2(void)
 //        "--pkt-filter-mode=signature",
         "--rxq=2",
         "--txq=2",
+        "--brust=1",
         "--disable-rss",
         "--disable-hw-vlan",
-        ""}; // 12 arguments
+        ""}; // 13 arguments
 
     char *myArgs2[ARGNOS];
     int i;

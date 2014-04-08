@@ -9,6 +9,11 @@
 #define CONFIG_LOCAL_IP_sf   0x0a160425          //   "10.22.4.37"
         // NOTE: Can be generated in python with ``print "%02x%02x%02x%02x" % (10,113,4,71)``
 
+
+#define IFNAME              "eth3"
+#define CONFIG_LOCAL_MAC_sf  0x06459F671E00ULL   //  "00:1E:67:9F:45:06 " 
+#define CONFIG_LOCAL_IP_sf   0x0a16040b //   "10.22.4.11"
+
 struct dpdk_info;
 static
 uint64_t dpdk_mac_read(device_t ttd) {

@@ -13,12 +13,19 @@
 #define CONFIG_LOCAL_IP     0x0a6e0431          //   "10.110.4.49"
 #endif
 
-// Ziger1 to switch
+
+// asiago directly to burrata
 #define CONFIG_DPDK_IFNAME  "eth3"
-//#define CONFIG_LOCAL_MAC    0x65188f211b00ULL   //   "00:1b:21:8f:18:65"
-#define CONFIG_LOCAL_MAC    0x64188f211b00ULL   //   "00:1b:21:8f:18:64"
-//#define CONFIG_LOCAL_IP     0x0a6e0426          //   "10.110.4.38"
-#define CONFIG_LOCAL_IP     0x0a160427          //   "10.22.4.39"
+#define CONFIG_LOCAL_MAC    0x06459F671E00ULL   //  "00:1E:67:9F:45:06 "
+#define CONFIG_LOCAL_IP     0x0a16040b //   "10.22.4.11"
+
+
+//   // Ziger1 to switch
+//#define CONFIG_DPDK_IFNAME  "eth3"
+//   //#define CONFIG_LOCAL_MAC    0x65188f211b00ULL   //   "00:1b:21:8f:18:65"
+//#define CONFIG_LOCAL_MAC    0x64188f211b00ULL   //   "00:1b:21:8f:18:64"
+//    //#define CONFIG_LOCAL_IP     0x0a6e0426          //   "10.110.4.38"
+//#define CONFIG_LOCAL_IP     0x0a160427          //   "10.22.4.39"
 
 struct dpdk_info;
 /*struct dpdk_info *init_dpdk_setup_and_get_default_queue(char *);

@@ -56,6 +56,16 @@ try:
                 #print "Adding machine for %s" % (str(s))
                 agg.add_machine(*s)
 
+
+            if not results[0]:
+                #print "FIXME: not computing results, as this is dryrun"
+                #sys.exit(1)
+                results[0] = agg.postprocess(agg.aggregate(results[0]))
+                results[0].dump_dir(os.path.dirname(settings.OUTPUT) or ".")
+                print ("Test data is in [%s] (use with -i to format).\n" % results[0].dump_file)
+                sys.exit(0)
+
+
             #print "The attributes are %s" % (settings.ATTRIBUTES['attrs']['attrlist'])
             attribute_vals = {}
             attributes_titles = []
@@ -66,23 +76,13 @@ try:
                         #settings.ATTRIBUTES['attrs']['attrlist'],
                         attributes_titles, attribute_vals)
 
-            FORMATTER.show_attr_details(attributes_titles,  attribute_vals)
-            print "FIXME: Just showing attribute values, as this is dryrun"
-            sys.exit(0)
+            #FORMATTER.show_attr_details(attributes_titles, attribute_vals)
 
             formatter_name = util.classname(settings.FORMAT, 'Formatter')
             if hasattr(formatters, formatter_name):
                 formatter = getattr(formatters, formatter_name)(settings)
             else:
                 raise RuntimeError("Formatter [%s] not found. Make sure this formatter is supported" % (formatter_name))
-
-            if not results[0]:
-                #print "FIXME: not computing results, as this is dryrun"
-                #sys.exit(1)
-                results[0] = agg.postprocess(agg.aggregate(results[0]))
-                results[0].dump_dir(os.path.dirname(settings.OUTPUT) or ".")
-                print ("Test data is in [%s] (use with -i to format).\n" % results[0].dump_file)
-                sys.exit(0)
 
             formatter.format(results)
             formatter.show_nresults()
