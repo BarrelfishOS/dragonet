@@ -23,6 +23,8 @@ bool pl_get_running(pipeline_handle_t plh);
 void pl_terminated(pipeline_handle_t plh);
 void pl_cleanup_handler(pipeline_handle_t plh, bool irregular,
                         void (*handler)(pipeline_handle_t,void *), void * data);
+void pl_panic(pipeline_handle_t plh, const char *fmt, ...)
+    __attribute__((noreturn));
 
 #endif
 

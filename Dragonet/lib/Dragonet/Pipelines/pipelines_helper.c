@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <signal.h>
+#include <stdarg.h>
 
 #include <barrelfish/waitset.h>
 #include <bulk_transfer/bulk_transfer.h>
@@ -499,3 +500,13 @@ struct input *pl_poll(pipeline_handle_t plh)
     return in;
 }
 
+void pl_panic(pipeline_handle_t plh, const char *fmt, ...)
+{
+    struct dragonet_pipeline *pl = plh;
+    va_list val;
+    fprintf(stderr, "panic in pipeline %s:", pl->name);
+    va_start(val, fmt);
+    vfprintf(stderr, fmt, val);
+    va_end(val);
+    abort();
+}
