@@ -285,6 +285,15 @@ addGlobalVar v_ty v_name = addDefn $
         , AST.G.initializer = Nothing
     }
 
+addGlobalVarInit :: AST.Type -> String -> AST.C.Constant -> LLVM ()
+addGlobalVarInit v_ty v_name v_val = addDefn $
+    AST.GlobalDefinition $ AST.globalVariableDefaults {
+          AST.G.name = AST.Name v_name
+        , AST.G.type' = v_ty
+        , AST.G.isConstant = False
+        , AST.G.initializer = Just v_val
+    }
+
 -- add a static var -- i.e., global with internal linkage
 addStaticVar :: AST.Type -> String -> AST.C.Constant -> LLVM ()
 addStaticVar v_ty v_name v_val = addDefn $ mkStaticVar v_ty v_name v_val
@@ -1481,7 +1490,7 @@ codegen_all pgraph stackname = do
     addExternalFn voidTy "pl_enqueue" [(qp_ty, "queue"), ((mkPtrTy input_ty), "input")]
     addExternalFn (mkPtrTy input_ty) "pl_poll" [(plp_ty, "plh")]
     addExternalFn voidTy "pl_process_events" [(plp_ty, "plh")]
-    addStaticVar plp_ty glblPipeline (AST.C.Null plp_ty)
+    addGlobalVarInit plp_ty glblPipeline (AST.C.Null plp_ty)
     --addGlobalVar (mkPtrTy pipelineTy) glblPipeline
     pli <- cgPLI
     forM_ (PLI.pliOutQs pli) $ \(_,(PLI.POQueue queue)) -> do
@@ -1581,6 +1590,7 @@ main = do
     let helpers = case pname of
             "llvm-cgen" -> "llvm-helpers"
             "llvm-cgen-dpdk" -> "llvm-helpers-dpdk"
+            "llvm-cgen-e10k" -> "llvm-helpers-e10k"
             _ -> error "Unknown executable name, don't know what helpers to use :-/"
 
     txt <- readFile fname
