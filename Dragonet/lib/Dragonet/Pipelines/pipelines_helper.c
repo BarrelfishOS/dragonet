@@ -13,6 +13,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <signal.h>
+#include <stdarg.h>
 
 #include <barrelfish/waitset.h>
 #include <bulk_transfer/bulk_transfer.h>
@@ -30,14 +32,28 @@
 #define dprintf(...) do {} while (0)
 
 
+struct dragonet_termination_handler {
+    void (*handler)(pipeline_handle_t,void *);
+    pipeline_handle_t *plh;
+    void *data;
+    struct dragonet_termination_handler *next;
+};
+
 struct dragonet_shared_state {
+    volatile bool running;
     size_t count;
     volatile size_t ch_created;
     volatile size_t ch_bound;
+    volatile size_t num_running;
     volatile uint32_t pl_id_alloc;
+
+    // HACK: Only works as long as the pipelines are executing in the same
+    // address space
+    struct dragonet_termination_handler *term;
 
     struct state state;
 };
+
 
 struct dragonet_pipeline {
     struct dragonet_shared_state *shared;
@@ -50,6 +66,7 @@ struct dragonet_pipeline {
     struct bulk_allocator alloc;
 
     struct input *queue;
+    struct dragonet_termination_handler *term;
 };
 
 struct dragonet_queue {
@@ -59,12 +76,43 @@ struct dragonet_queue {
     struct input *pending;
 };
 
+// HACK: Don't know where else to put this for the signal handlers
+static struct dragonet_shared_state *sig_dss = NULL;
+
 void pg_state_init(struct state *st);
 
-void init_shared_state(const char *name, size_t chancount)
+static void signal_abort(int sig)
+{
+    struct dragonet_termination_handler *th;
+
+    printf("Oops received signal: %s\n", strsignal(sig));
+    puts("Terminating ASAP");
+
+    if (sig_dss == NULL) {
+        puts("Oh no, sig_dss=NULL, nothing we can do. :'(");
+        _exit(-1);
+    }
+
+    th = sig_dss->term;
+    while (th != NULL) {
+        th->handler(th->plh, th->data);
+        th = th->next;
+    }
+    puts("Done with cleanup");
+    _exit(-1);
+}
+
+// Eventually this should be the nicer variant, that induces regular termination
+static void signal_terminate(int sig)
+{
+    signal_abort(sig);
+}
+
+void* init_shared_state(const char *name, size_t chancount)
 {
     int fd, res;
     struct dragonet_shared_state *dss;
+    sighandler_t sigh;
     dprintf("init_shared_state(%s,%"PRIx64")\n", name, chancount);
 
     assert(sizeof(*dss) <= SHARED_STATE_SIZE);
@@ -79,14 +127,43 @@ void init_shared_state(const char *name, size_t chancount)
             0);
     assert(dss != MAP_FAILED);
 
+    dss->running = true;
     dss->count = chancount;
     pg_state_init(&dss->state);
     /*dss->gstate_len = gs_len;
     memcpy(dss->gstate, gs, gs_len);*/
 
-    munmap(dss, SHARED_STATE_SIZE);
-    close(fd);
+    // Add some signal handlers to deal with problems during execution, so we
+    // can at least do some minimal cleanup (i.e. stopping the NIC from writing
+    // to memory.
+    sig_dss = dss;
+    sigh = signal(SIGTERM, signal_terminate);
+    sigh = signal(SIGINT,  signal_terminate);
+    sigh = signal(SIGHUP,  signal_terminate);
+    sigh = signal(SIGUSR1, signal_terminate);
+    sigh = signal(SIGUSR2, signal_terminate);
+    sigh = signal(SIGTERM, signal_abort);
+    sigh = signal(SIGABRT, signal_abort);
+    sigh = signal(SIGFPE,  signal_abort);
+    sigh = signal(SIGILL,  signal_abort);
+    sigh = signal(SIGPIPE, signal_abort);
+    sigh = signal(SIGPIPE, signal_abort);
+    sigh = signal(SIGQUIT, signal_abort);
+    sigh = signal(SIGSEGV, signal_abort);
 
+    //munmap(dss, SHARED_STATE_SIZE);
+    close(fd);
+    return dss;
+}
+
+void stop_stack(void *handle)
+{
+    struct dragonet_shared_state *dss = handle;
+    printf("stop_stack()\n");
+    dss->running = false;
+    while (dss->num_running > 0) {
+    }
+    printf("All pipelines terminated\n");
 }
 
 pipeline_handle_t pl_init(const char *stackname, const char *plname)
@@ -109,6 +186,8 @@ pipeline_handle_t pl_init(const char *stackname, const char *plname)
     assert(pl->shared != MAP_FAILED);
     close(fd);
 
+    sig_dss = pl->shared;
+    __sync_fetch_and_add(&pl->shared->num_running, 1);
     pl->id = __sync_fetch_and_add(&pl->shared->pl_id_alloc, 1);
 
     // Make sure we get a unique machine id for each pipeline, so we get unique
@@ -130,6 +209,40 @@ struct state *pl_get_state(pipeline_handle_t plh)
 {
     struct dragonet_pipeline *pl = plh;
     return &pl->shared->state;
+}
+
+bool pl_get_running(pipeline_handle_t plh)
+{
+    struct dragonet_pipeline *pl = plh;
+    return pl->shared->running;
+}
+
+void pl_terminated(pipeline_handle_t plh)
+{
+    struct dragonet_pipeline *pl = plh;
+    struct dragonet_termination_handler *h = pl->term;
+    while (h != NULL) {
+        h->handler(plh, h->data);
+        h = h->next;
+    }
+    __sync_fetch_and_sub(&pl->shared->num_running, 1);
+}
+
+void pl_cleanup_handler(pipeline_handle_t plh, bool irregular,
+                        void (*handler)(pipeline_handle_t,void *), void * data)
+{
+    struct dragonet_pipeline *pl = plh;
+    struct dragonet_termination_handler *h = malloc(sizeof(*h));
+    h->handler = handler;
+    h->plh = plh;
+    h->data = data;
+    if (irregular) {
+        h->next = pl->shared->term;
+        pl->shared->term = h;
+    } else {
+        h->next = pl->term;
+        pl->term = h;
+    }
 }
 
 static void cb_assign_done(void *arg, errval_t err, struct bulk_channel *chan)
@@ -387,3 +500,13 @@ struct input *pl_poll(pipeline_handle_t plh)
     return in;
 }
 
+void pl_panic(pipeline_handle_t plh, const char *fmt, ...)
+{
+    struct dragonet_pipeline *pl = plh;
+    va_list val;
+    fprintf(stderr, "panic in pipeline %s:", pl->name);
+    va_start(val, fmt);
+    vfprintf(stderr, fmt, val);
+    va_end(val);
+    abort();
+}

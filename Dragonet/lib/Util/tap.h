@@ -31,7 +31,7 @@ void tap_up(struct tap_handler *tap);
 int tap_set_addr(struct tap_handler *tap, int cmd, const char *addr_str);
 void tap_set_ip(struct tap_handler *tap, const char *ip);
 void tap_set_mask(struct tap_handler *tap, const char *mask);
-ssize_t tap_read(struct tap_handler *tap, char *buff, size_t len);
+ssize_t tap_read(struct tap_handler *tap, char *buff, size_t len, long timeout);
 void tap_write(struct tap_handler *tap, char *buff, size_t len);
 struct tap_handler *tap_create(char *name);
 

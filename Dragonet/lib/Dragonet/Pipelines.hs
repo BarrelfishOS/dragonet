@@ -66,8 +66,7 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
             if null inE then
                 return () -- No incoming edges from other pipelines, we're good
             else (do
-                let demuxPs =
-                        (if null sources then [] else ["_"]) ++ map labN inDN
+                let demuxPs = ["_"] ++ map labN inDN
                 demuxN <- GM.newNode $
                     PG.baseFNode "Demux" ["source"] demuxPs Nothing
                 mapM_ (\n -> GM.newEdge (demuxN, n, labN n)) inDN

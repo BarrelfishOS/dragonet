@@ -20,7 +20,7 @@ import Control.Concurrent (forkOS,yield)
 
 import qualified Data.Map as M
 import qualified Data.List as L
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust,isNothing)
 import Data.Word (Word32, Word64, Word)
 import Data.Char (ord)
 import Data.Function (on)
@@ -54,7 +54,9 @@ import qualified LLVM.General.PassManager as LLVM.PM
 import qualified Text.Show.Pretty as Pr
 import Debug.Trace (trace, traceShow)
 import System.Environment (getArgs, getProgName)
-import System.IO  (writeFile)
+import System.IO  (writeFile,hFlush,stdout)
+
+import Prelude hiding (catch)
 
 -- heavily based on: http://www.stephendiehl.com/llvm/
 
@@ -281,6 +283,15 @@ addGlobalVar v_ty v_name = addDefn $
         , AST.G.type' = v_ty
         , AST.G.isConstant = False
         , AST.G.initializer = Nothing
+    }
+
+addGlobalVarInit :: AST.Type -> String -> AST.C.Constant -> LLVM ()
+addGlobalVarInit v_ty v_name v_val = addDefn $
+    AST.GlobalDefinition $ AST.globalVariableDefaults {
+          AST.G.name = AST.Name v_name
+        , AST.G.type' = v_ty
+        , AST.G.isConstant = False
+        , AST.G.initializer = Just v_val
     }
 
 -- add a static var -- i.e., global with internal linkage
@@ -615,6 +626,7 @@ i32Ty = mkIntTy 32
 i8Ty  = mkIntTy 8
 i1Ty  = mkIntTy 1
 voidTy = AST.T.VoidType
+boolTy = i1Ty
 muxIdTy = i32Ty
 
 mkArrayTy :: AST.T.Type -> Word64 -> AST.T.Type
@@ -969,12 +981,16 @@ llvm_pg_fnode :: DGI.Node -> PG.Node -> PG.PGAdjFull -> LLVM ()
 llvm_pg_fnode nid node adj_out = do
     -- group outputs by port
     let outs' = PG.pgGroupAdjFull adj_out
+    -- We also want ports without outgoing edges
+    let eouts = map (\p -> (p,[])) $ filter (isNothing . (`lookup` outs'))
+                    $ PG.nPorts node
+    let outs'' = outs' ++ eouts
 
     -- sort the out ports by the order they appear in the node
     let f = \x -> fromJust $ L.elemIndex x (PG.nPorts node)
-    let outs = L.sortBy (compare `on` (f . fst)) outs'
+    let outs = L.sortBy (compare `on` (f . fst)) outs''
 
-    if length outs > 0 then llvm_pg_fnode_nonterminal nid node outs
+    if length outs' > 0 then llvm_pg_fnode_nonterminal nid node outs
     else llvm_pg_fnode_terminal nid node outs
 
 -- build a function for a terminal F-node
@@ -1041,6 +1057,7 @@ llvm_pg_fnode_demux nid node = do
     input_ty <- cgInputTy
     fnode_args <- cgFnodeArgs
     fnAdd (pg_fimplname node) i32Ty fnode_args $ do
+        bldNewPhi i32Ty "ret_phi"
         -- print message on entering the function
         (AST.Name fnstr) <- gets fnName
         bldDbgPrintf ("Entering demux node: " ++ fnstr ++ "\n") []
@@ -1048,12 +1065,14 @@ llvm_pg_fnode_demux nid node = do
 
         -- Basic Block for polling queue
         bldAddBB "bb_poll"
+        -- Poll queue
         plh <- bldAddInstruction $ mkLd $ getGlobalOp glblPipeline
         poll_ret <- bldAddInstruction $ mkFnCall "pl_poll" [plh]
         t <- bldAddInstruction $ mkICmpEq poll_ret (mkNullPtrOp input_ty)
-        bldTerminate $ termCondBr t "bb_poll" "bb_ret"
+        bldTerminate $ termCondBr t "bb_none" "bb_success"
 
-        bldAddBB "bb_ret"
+        -- We got a packet, yay!
+        bldAddBB "bb_success"
         mux_ret <- bldAddInstruction $ mkFnCall "input_muxid" [poll_ret]
         -- clear mux id
         bldAddInstruction $ mkFnCall "input_set_muxid" [poll_ret, operandInt32_0]
@@ -1061,7 +1080,18 @@ llvm_pg_fnode_demux nid node = do
         let inp = getLocalRef "input"
         bldAddInstruction $ mkFnCall "input_xchg" [inp, poll_ret]
         bldAddInstruction $ mkFnCall "input_free" [poll_ret]
-        bldTerminate $ termRetOp mux_ret
+        bldAddPhi "ret_phi" (mux_ret,"bb_success")
+        bldTerminate $ termBr "bb_ret"
+
+        -- No packet :(
+        bldAddBB "bb_none"
+        bldAddPhi "ret_phi" (operandInt32_0,"bb_none")
+        bldTerminate $ termBr "bb_ret"
+
+
+        bldAddBB "bb_ret"
+        ret <- bldPhi "ret_phi"
+        bldTerminate $ termRetOp ret
 
 -- Generate function transfering packet to alternative pipeline
 llvm_pg_fnode_enqueue :: DGI.Node -> PG.Node -> String -> LLVM ()
@@ -1285,9 +1315,9 @@ llvm_pg_main_func entry_node stackname = do
         bldAddBB "body" -- main loop (for now, loop forever)
         entry <- gets entryBB
         -- setup a loop counter
-        cnt <- bldAddInstruction $ mkPhi i32Ty [(operandInt32_0, entry), (getLocalRef "cnt_next", "body")]
+        {-cnt <- bldAddInstruction $ mkPhi i32Ty [(operandInt32_0, entry), (getLocalRef "cnt_next", "body")]
         bldDbgPrintf "count: %d\n" [cnt]
-        cnt_next <- bldAddNamedInstruction "cnt_next" $ mkAdd cnt operandInt32_1
+        cnt_next <- bldAddNamedInstruction "cnt_next" $ mkAdd cnt operandInt32_1-}
 
         bldAddInstruction $ mkCall (getFnOp $ pg_fname entry_node) [state, input] -- call entry
         bldAddInstruction $ mkFnCall "input_clean_attrs" [input] -- clean up input
@@ -1298,8 +1328,14 @@ llvm_pg_main_func entry_node stackname = do
         forM_ on_cnt $ \cnt_name ->
             bldAddInstruction $ mkSt (getGlobalOp cnt_name) operandInt32_0
 
-        -- start over again :-)
-        bldTerminate $ termBr "body"
+        -- Check if we should keep running
+        running <- bldAddInstruction $ mkFnCall "pl_get_running" [plh]
+        t <- bldAddInstruction $ mkICmpEq running $ mkConstIntOperand 1 1
+        bldTerminate $ termCondBr t "body" "exit"
+
+        bldAddBB "exit"
+        bldAddInstruction $ mkFnCall "pl_terminated" [plh]
+        bldTerminate $ termRetVoid
 
 
 
@@ -1447,12 +1483,14 @@ codegen_all pgraph stackname = do
     addExternalFn qp_ty "pl_inqueue_create" [(plp_ty, "plh"), ((mkPtrTy i8Ty), "name")]
     addExternalFn qp_ty "pl_outqueue_bind" [(plp_ty, "plh"), ((mkPtrTy i8Ty), "name")]
     addExternalFn voidTy "pl_wait_ready" [(plp_ty, "plh")]
+    addExternalFn boolTy "pl_get_running" [(plp_ty, "plh")]
+    addExternalFn voidTy "pl_terminated" [(plp_ty, "plh")]
 
     -- Queue interaction
     addExternalFn voidTy "pl_enqueue" [(qp_ty, "queue"), ((mkPtrTy input_ty), "input")]
     addExternalFn (mkPtrTy input_ty) "pl_poll" [(plp_ty, "plh")]
     addExternalFn voidTy "pl_process_events" [(plp_ty, "plh")]
-    addStaticVar plp_ty glblPipeline (AST.C.Null plp_ty)
+    addGlobalVarInit plp_ty glblPipeline (AST.C.Null plp_ty)
     --addGlobalVar (mkPtrTy pipelineTy) glblPipeline
     pli <- cgPLI
     forM_ (PLI.pliOutQs pli) $ \(_,(PLI.POQueue queue)) -> do
@@ -1508,6 +1546,7 @@ runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
                     modWriteFile mod $ mname ++ "-optimized-cg.ll"
                     modExec ctx mod "pg_main"
                     return ()
+    putStrLn $ "Pipeline " ++ mname ++ " stopped running"
     where
         pl = PLI.pliPipeline pli
         pgraph = PL.plGraph pl
@@ -1526,6 +1565,21 @@ plConnect :: PL.Pipeline -> PL.Pipeline -> (PLI.POutput,PLI.PInput)
 plConnect i o = (PLI.POQueue n, PLI.PIQueue n)
     where n = PL.plLabel i ++ "_to_" ++ PL.plLabel o
 
+
+commandLineInterface :: IO ()
+commandLineInterface = do
+    putStr "> "
+    hFlush stdout
+    l <- getLine
+    putStrLn ""
+    done <- case l of
+        "quit" -> return True
+        "" -> return False
+        _ -> do
+            putStrLn "Unknown command"
+            return False
+    if done then return () else commandLineInterface
+
 main :: IO ()
 main = do
     let fname_def = "unicorn-tests/hello.unicorn"       -- default unicorn file name
@@ -1537,6 +1591,7 @@ main = do
     let helpers = case pname of
             "llvm-cgen" -> "llvm-helpers"
             "llvm-cgen-dpdk" -> "llvm-helpers-dpdk"
+            "llvm-cgen-e10k" -> "llvm-helpers-e10k"
             _ -> error "Unknown executable name, don't know what helpers to use :-/"
 
     txt <- readFile fname
@@ -1547,6 +1602,12 @@ main = do
     writeFile "pipelines.dot" $ pipelinesDot Nothing plg
 
     let stackname = "dragonet"
-    PLI.runPipelines stackname plConnect (runPipeline plg stackname helpers) plg
-    forever yield
+    let runner = runPipeline plg stackname helpers
+    h <- PLI.runPipelines stackname plConnect runner plg
+
+    commandLineInterface
+
+    putStrLn "Doing cleanup..."
+    PLI.stopPipelines h
+
 

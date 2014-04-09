@@ -6,6 +6,7 @@ enum out_ports {
     P_false = 0,
     P_true = 1,
     P_Queue_out = 0,
+    P_Queue_drop = 1,
     P_RxEchoAPP_out = 0,
     P_RxEchoAPP_drop = 1,
     P_RxDnsAPP_out = 0,
