@@ -21,6 +21,8 @@ void pl_process_events(pipeline_handle_t plh);
 struct input *pl_poll(pipeline_handle_t plh);
 bool pl_get_running(pipeline_handle_t plh);
 void pl_terminated(pipeline_handle_t plh);
+void pl_cleanup_handler(pipeline_handle_t plh, bool irregular,
+                        void (*handler)(pipeline_handle_t,void *), void * data);
 
 #endif
 
