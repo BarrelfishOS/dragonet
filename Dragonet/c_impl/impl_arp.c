@@ -118,12 +118,12 @@ node_out_t do_pg__RxL3ARPProcessPendingResponse(struct state *state, struct inpu
 node_out_t do_pg__TxL3ARPInitiateResponse(struct state *state, struct input *in)
 {
     // P_TxL3ARPInitiateResponse_true, P_TxL3ARPInitiateResponse_false, P_TxL3ARPInitiateResponse_drop
-    in->arp_src_mac = state->local_mac;
-    in->arp_src_ip = arp_tpa_ipv4_rd(in);
-    in->arp_dst_mac = arp_sha_eth_rd(in);
-    in->arp_dst_ip = arp_spa_ipv4_rd(in);
-    in->arp_oper = ARP_OPER_REPLY;
-    in->eth_dst_mac = arp_sha_eth_rd(in);
+    in->attr->arp_src_mac = state->local_mac;
+    in->attr->arp_src_ip = arp_tpa_ipv4_rd(in);
+    in->attr->arp_dst_mac = arp_sha_eth_rd(in);
+    in->attr->arp_dst_ip = arp_spa_ipv4_rd(in);
+    in->attr->arp_oper = ARP_OPER_REPLY;
+    in->attr->eth_dst_mac = arp_sha_eth_rd(in);
 
     // empty packet
     pkt_prepend(in, - (ssize_t) in->len);
@@ -134,7 +134,7 @@ node_out_t do_pg__TxL3ARPAllocateHeader(struct state *state, struct input *in)
 {
     // P_TxL3ARPAllocateHeader_out
     pkt_prepend(in, arp_alloclen(ARP_HTYPE_ETHERNET, ARP_PTYPE_IPV4));
-    in->offset_l3 = 0;
+    in->attr->offset_l3 = 0;
     return P_TxL3ARPAllocateHeader_out;
 }
 
@@ -145,14 +145,14 @@ node_out_t do_pg__TxL3ARPFillHeader(struct state *state, struct input *in)
     arp_ptype_wr(in, ARP_PTYPE_IPV4);
     arp_hlen_wr(in, 6);
     arp_plen_wr(in, 4);
-    arp_oper_wr(in, in->arp_oper);
-    arp_sha_eth_wr(in, in->arp_src_mac);
-    arp_spa_ipv4_wr(in, in->arp_src_ip);
-    arp_tha_eth_wr(in, in->arp_dst_mac);
-    arp_tpa_ipv4_wr(in, in->arp_dst_ip);
+    arp_oper_wr(in, in->attr->arp_oper);
+    arp_sha_eth_wr(in, in->attr->arp_src_mac);
+    arp_spa_ipv4_wr(in, in->attr->arp_src_ip);
+    arp_tha_eth_wr(in, in->attr->arp_dst_mac);
+    arp_tpa_ipv4_wr(in, in->attr->arp_dst_ip);
 
-    in->eth_src_mac = in->arp_src_mac;
-    in->eth_type = eth_type_ARP;
+    in->attr->eth_src_mac = in->attr->arp_src_mac;
+    in->attr->eth_type = eth_type_ARP;
     return P_true;
 }
 
@@ -164,14 +164,14 @@ node_out_t do_pg__TxL3ARPLookupRequestIn(struct state *state, struct input *in)
 
 node_out_t do_pg__TxL3ARPLookup_(struct state *state, struct input *in)
 {
-    dprint("%s: arp lookup for : %"PRIx32"\n", __func__, in->ip4_dst);
+    dprint("%s: arp lookup for : %"PRIx32"\n", __func__, in->attr->ip4_dst);
     // P_TxL3ARPLookup__true, P_TxL3ARPLookup__false, P_TxL3ARPLookup__miss
-    struct arp_cache *cache = arp_cache_lookup(state, in->ip4_dst);
+    struct arp_cache *cache = arp_cache_lookup(state, in->attr->ip4_dst);
     if (cache == NULL) {
         return P_TxL3ARPLookup__miss;
     }
 
-    in->eth_dst_mac = cache->mac;
+    in->attr->eth_dst_mac = cache->mac;
     return P_TxL3ARPLookup__true;
 }
 
@@ -184,7 +184,7 @@ node_out_t do_pg__TxL3ARPSendRequest(struct state *state, struct input *in)
     pending = malloc(sizeof(*pending));
     pending->next = state->arp_pending;
     state->arp_pending = pending;
-    pending->ip = in->ip4_dst;
+    pending->ip = in->attr->ip4_dst;
 
     // Allocate new input for pending, and exchange it with current in
     pending->input = input_alloc();
@@ -192,12 +192,12 @@ node_out_t do_pg__TxL3ARPSendRequest(struct state *state, struct input *in)
     memcpy(pending->input, in, sizeof(*in));
     memcpy(in, &i, sizeof(*in));
 
-    in->arp_src_mac = state->local_mac;
-    in->arp_dst_mac = 0;
-    in->arp_src_ip = pending->input->ip4_src;
-    in->arp_dst_ip = pending->input->ip4_dst;
-    in->arp_oper = ARP_OPER_REQUEST;
-    in->eth_dst_mac = eth_broadcast_addr;
+    in->attr->arp_src_mac = state->local_mac;
+    in->attr->arp_dst_mac = 0;
+    in->attr->arp_src_ip = pending->input->attr->ip4_src;
+    in->attr->arp_dst_ip = pending->input->attr->ip4_dst;
+    in->attr->arp_oper = ARP_OPER_REQUEST;
+    in->attr->eth_dst_mac = eth_broadcast_addr;
     return P_TxL3ARPSendRequest_true;
 }
 

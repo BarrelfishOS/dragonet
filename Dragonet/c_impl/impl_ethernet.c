@@ -6,7 +6,7 @@ node_out_t do_pg__RxL2EtherClassified(struct state *state, struct input *in)
 {
     // P_true, P_false
     // setting the offset of Ethernet packet starting
-    in->offset_l2 = 0;
+    in->attr->offset_l2 = 0;
     return P_true;
 }
 
@@ -59,7 +59,7 @@ node_out_t do_pg__RxL2EtherValidType(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL2EtherClassifyL3(struct state *state, struct input *in)
 {
-    in->offset_l3 = 14;
+    in->attr->offset_l3 = 14;
     switch (eth_type_read(in)) {
         case eth_type_IPv4  : dprint("%s: pkt IPv4\n", __func__);
                               return P_RxL2EtherClassifyL3_ipv4;
@@ -80,18 +80,18 @@ node_out_t do_pg__TxL2EtherAllocateHeader(struct state *state, struct input *in)
     pkt_clear(in,  l2Offset(in), ethernet_header_len);
 
     // Moving L3 and L4 header offset (in case someone still modifies them)
-    in->offset_l3 += (ethernet_header_len);
-    in->offset_l4 += (ethernet_header_len);
-    in->offset_l5 += (ethernet_header_len);
+    in->attr->offset_l3 += (ethernet_header_len);
+    in->attr->offset_l4 += (ethernet_header_len);
+    in->attr->offset_l5 += (ethernet_header_len);
     return P_TxL2EtherAllocateHeader_out;
 }
 
 node_out_t do_pg__TxL2EtherFillHeader(struct state *state, struct input *in)
 {
 
-    mac_t src_mac = in->eth_src_mac;
-    mac_t dst_mac = in->eth_dst_mac;
-    uint16_t ethType = in->eth_type;
+    mac_t src_mac = in->attr->eth_src_mac;
+    mac_t dst_mac = in->attr->eth_dst_mac;
+    uint16_t ethType = in->attr->eth_type;
     eth_src_mac_write(in, src_mac);
     eth_dst_mac_write(in, dst_mac);
     eth_type_write(in, ethType);

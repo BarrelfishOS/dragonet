@@ -16,8 +16,9 @@ struct input *input_alloc(void)
         return in;
     }
 
-    in = calloc(1, sizeof(*in));
+    in = calloc(1, sizeof(*in) + sizeof(*in->attr));
     in->data = malloc(DEFAULT_BUFFER_SIZE);
+    in->attr = (struct input_attributes *) (in + 1);
     in->len = 0;
     // Currently we start filling the buffer from the rear
     in->data = (void *) ((uintptr_t) in->data + DEFAULT_BUFFER_SIZE);
@@ -45,16 +46,7 @@ void input_free(struct input *in)
 
 void input_clean_attrs(struct input *in)
 {
-    void *data = in->data;
-    size_t len = in->len;
-    size_t space_before = in->space_before;
-    size_t space_after = in->space_after;
-
-    memset(in, 0, sizeof(*in));
-    in->data = data;
-    in->len  = len;
-    in->space_before = space_before;
-    in->space_after = space_after;
+    memset(in->attr, 0, sizeof(*in->attr));
 }
 
 void input_zero(struct input *in)
@@ -73,7 +65,7 @@ void input_clean_packet(struct input *in)
 void input_dump(struct input *in)
 {
     pktoff_t len = in->len;
-    printf("input[%"PRIx64"]: ", in->len);
+    printf("input[%"PRIx32"]: ", in->len);
     pktoff_t i = 0;
     while (i < len) {
         printf("%02"PRIx8" ", *((uint8_t *) in->data + i));
@@ -95,12 +87,12 @@ void pg_state_init(struct state *st)
 
 int32_t input_muxid(struct input *in)
 {
-    return in->mux_id;
+    return in->attr->mux_id;
 }
 
 void input_set_muxid(struct input *in, int32_t mux)
 {
-    in->mux_id = mux;
+    in->attr->mux_id = mux;
 }
 
 void input_xchg(struct input *a, struct input *b)

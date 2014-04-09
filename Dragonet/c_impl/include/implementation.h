@@ -80,18 +80,9 @@ struct arp_cache {
     struct arp_cache *next;
 };
 
-struct input {
-    // Buffer
-    void  *data;
-    size_t len;
-    size_t space_before;
-    size_t space_after;
-
-// Attributes ----------------------------------------
-
+struct input_attributes {
     // Offset for headers on different layers
-    pktoff_t offset_l2; // XXX CAUTION: Code in pipeline-helper depends on this
-                        //              being the first attribute!!!
+    pktoff_t offset_l2;
     pktoff_t offset_l3;
     pktoff_t offset_l4;
     pktoff_t offset_l5;
@@ -122,7 +113,15 @@ struct input {
 
     // Misc
     int32_t mux_id;
+};
 
+struct input {
+    // Buffer
+    void  *data;
+    struct input_attributes *attr;
+    pktoff_t len;
+    pktoff_t space_before;
+    pktoff_t space_after;
     struct input *next;
 };
 

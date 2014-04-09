@@ -68,7 +68,7 @@ node_out_t do_pg__RxL3IPv4ValidLocalIP(struct state *state, struct input *in)
 node_out_t do_pg__RxL3IPv4Classify(struct state *state, struct input *in)
 {
     // P_RxL3IPv4Classify_udp, P_RxL3IPv4Classify_icmp, P_RxL3IPv4Classify_drop
-    in->offset_l4 = ipv4_payload_off(in);
+    in->attr->offset_l4 = ipv4_payload_off(in);
     switch (ipv4_protocol_rd(in)) {
         case IPV4_PROTO_ICMP:   return P_RxL3IPv4Classify_icmp;
         case IPV4_PROTO_UDP:    return P_RxL3IPv4Classify_udp;
@@ -82,9 +82,9 @@ node_out_t do_pg__TxL3IPv4AllocateHeader(struct state *state, struct input *in)
     pktoff_t hlen = IPV4_HDRLEN_MIN;
     pkt_prepend(in, hlen);
 
-    in->offset_l3 = 0;
-    in->offset_l4 += hlen;
-    in->offset_l5 += hlen;
+    in->attr->offset_l3 = 0;
+    in->attr->offset_l4 += hlen;
+    in->attr->offset_l5 += hlen;
 
     ipv4_ihl_wr(in, 5);
     return P_TxL3IPv4AllocateHeader_out;
@@ -100,21 +100,21 @@ node_out_t do_pg__TxL3IPv4FillHeader(struct state *state, struct input *in)
     ipv4_flags_wr(in, IPV4_FLAGS_DF);
     ipv4_fragment_wr(in, 0);
     ipv4_ttl_wr(in, 17);
-    ipv4_protocol_wr(in, in->ip4_proto);
-    ipv4_srcIP_wr(in, in->ip4_src);
-    ipv4_dstIP_wr(in, in->ip4_dst);
+    ipv4_protocol_wr(in, in->attr->ip4_proto);
+    ipv4_srcIP_wr(in, in->attr->ip4_src);
+    ipv4_dstIP_wr(in, in->attr->ip4_dst);
 
     ipv4_checksum_wr(in, 0);
     ipv4_checksum_wr(in, ipv4_checksum(in, hoff, ipv4_hdrlen(in)));
 
-    in->eth_type = eth_type_IPv4;
+    in->attr->eth_type = eth_type_IPv4;
     return 0;
 }
 
 node_out_t do_pg__TxL3IPv4Routing(struct state *state, struct input *in)
 {
     // P_true, P_false
-    in->eth_src_mac = state->local_mac;
+    in->attr->eth_src_mac = state->local_mac;
     return P_true;
 }
 

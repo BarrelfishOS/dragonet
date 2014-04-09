@@ -1456,6 +1456,7 @@ codegen_all pgraph stackname = do
     input_ty <- cgInputTy
 
     addDefn $ AST.TypeDefinition (AST.Name "struct.input") Nothing
+    addDefn $ AST.TypeDefinition (AST.Name "struct.input_attributes") Nothing
     addDefn $ AST.TypeDefinition (AST.Name "struct.state") Nothing
     addDefn $ AST.TypeDefinition (AST.Name "struct.driver") Nothing
     addDefn $ AST.TypeDefinition (AST.Name "struct.tap_handler") Nothing

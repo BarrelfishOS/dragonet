@@ -290,6 +290,7 @@ static void cb_move_received(struct bulk_channel *chan,
     struct dragonet_queue *q = chan->user_state;
     struct dragonet_pipeline *pl = q->pl;
     struct input *in, *prev;
+    struct input_attributes *attrs;
     errval_t err;
     uint32_t *len = meta;
 
@@ -297,10 +298,9 @@ static void cb_move_received(struct bulk_channel *chan,
     if (q->pending == NULL) {
         q->pending = input_alloc();
 
-        in = buffer->address;
+        attrs = buffer->address;
         // Copy attributes
-        memcpy(&q->pending->offset_l2, &in->offset_l2,
-                sizeof(*in) - offsetof(struct input, offset_l2));
+        memcpy(q->pending->attr, attrs, sizeof(*attrs));
         q->pending->next = NULL;
     } else {
         in = q->pending;
@@ -455,7 +455,7 @@ void pl_enqueue(queue_handle_t queue, struct input *in)
     data_buf = bulk_alloc_new_buffer(&pl->alloc);
     assert(data_buf != NULL);
 
-    memcpy(in_buf->address, in, sizeof(*in));
+    memcpy(in_buf->address, in->attr, sizeof(*in->attr));
     memcpy(data_buf->address, in->data, in->len);
 
     err = bulk_channel_move(chan, in_buf, &len,

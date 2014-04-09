@@ -15,7 +15,7 @@
 
 static inline pktoff_t l4Offset(struct input *pkt)
 {
-    return pkt->offset_l4;
+    return pkt->attr->offset_l4;
 }
 
 
