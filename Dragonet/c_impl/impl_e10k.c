@@ -20,8 +20,12 @@
 #define E10K_BUFSZ 0x1000
 #define NUM_RXBUFS 256
 
-#define CONFIG_PCI_ADDR "0000:81:00.0"
-#define CONFIG_LOCAL_IP 0x0a160427 // "10.22.4.39"
+//#define CONFIG_PCI_ADDR "0000:81:00.0"
+//#define CONFIG_LOCAL_IP 0x0a160427 // "10.22.4.39"
+//  For asigao, directly connected NIC
+#define CONFIG_PCI_ADDR "0000:04:00.0"
+#define CONFIG_LOCAL_IP  0x0a16040b //   "10.22.4.11"
+
 
 struct mem_region_alloc {
     void    *virt;
