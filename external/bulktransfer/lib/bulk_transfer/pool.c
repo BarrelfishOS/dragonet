@@ -28,7 +28,7 @@ struct pool_meta {
     key_t  key;
 };
 
-static struct bulk_pool *pools = NULL;
+struct bulk_pool *bulk_pools = NULL;
 uint32_t bulk_machine_id = 0;
 
 static void alloc_poolid(struct bulk_pool_id *id)
@@ -148,6 +148,7 @@ errval_t bulk_int_pool_map(struct bulk_pool      *p,
         assert(datahandle != -1);
 
     }
+    p->internal.shmid = datahandle;
     buffers_vbase = shmat(datahandle, NULL, 0);
     assert_fix(buffers_vbase != MAP_FAILED);
     memset(buffers_vbase, 0, meta->pool_size);
@@ -174,8 +175,8 @@ errval_t bulk_int_pool_map(struct bulk_pool      *p,
         buffers_vbase = (void *) ((uintptr_t) buffers_vbase + bufsz);
     }
 
-    p->internal.next = pools;
-    pools = p;
+    p->internal.next = bulk_pools;
+    bulk_pools = p;
 
     return SYS_ERR_OK;
 
@@ -184,7 +185,7 @@ errval_t bulk_int_pool_map(struct bulk_pool      *p,
 struct bulk_pool *bulk_int_pool_byid(struct bulk_pool_id id)
 {
     struct bulk_pool *p;
-    for (p = pools; p != NULL; p = p->internal.next) {
+    for (p = bulk_pools; p != NULL; p = p->internal.next) {
         if (!memcmp(&id, &p->id, sizeof(id))) {
             return p;
         }
@@ -249,7 +250,7 @@ errval_t bulk_pool_free(struct bulk_pool *pool)
 
 
     // Unmap region
-    res = munmap(pool->base_address, pool->num_buffers * pool->buffer_size);
+    res = shmdt(pool->base_address);
     assert_fix(res == 0);
 
     // Free other memory associated
@@ -258,11 +259,9 @@ errval_t bulk_pool_free(struct bulk_pool *pool)
 
     // Unlink shm region, if noone else has it mapped
     meta = pool->internal.meta;
-    if (__sync_sub_and_fetch(&meta->refs, 1) == 0) {
-        get_poolname(&pool->id, name);
-        res = shm_unlink(name);
-        assert_fix(res == 0);
-    }
+    get_poolname(&pool->id, name);
+    res = shm_unlink(name);
+    assert_fix(res == 0);
 
     // Unmap meta region
     res = munmap(meta, POOL_EXTRA);
@@ -270,5 +269,13 @@ errval_t bulk_pool_free(struct bulk_pool *pool)
 
     return SYS_ERR_OK;
 
+}
+
+void bulk_pool_emergency_cleanup(struct bulk_pool *p)
+{
+    char name[MAX_POOLNAME];
+    shmctl(p->internal.shmid, IPC_RMID, NULL);
+    get_poolname(&p->id, name);
+    shm_unlink(name);
 }
 

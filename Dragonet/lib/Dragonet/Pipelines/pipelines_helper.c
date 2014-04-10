@@ -44,6 +44,7 @@ struct dragonet_termination_handler {
 };
 
 struct dragonet_shared_state {
+    char name[64];
     volatile bool running;
     size_t count;
     volatile size_t ch_created;
@@ -112,6 +113,24 @@ static void signal_terminate(int sig)
     signal_abort(sig);
 }
 
+static void dss_cleanup_handler(struct dragonet_shared_state *dss,
+        void (*handler)(pipeline_handle_t,void *), void * data)
+{
+    struct dragonet_termination_handler *h = malloc(sizeof(*h));
+    h->handler = handler;
+    h->plh = NULL;
+    h->data = data;
+    h->next = dss->term;
+    dss->term = h;
+}
+
+static void shared_state_cleanup(pipeline_handle_t plh, void *data)
+{
+    struct dragonet_shared_state *dss = data;
+    shm_unlink(dss->name);
+    bulk_emergency_cleanup();
+}
+
 void* init_shared_state(const char *name, size_t chancount)
 {
     int fd, res;
@@ -130,6 +149,9 @@ void* init_shared_state(const char *name, size_t chancount)
     dss = mmap(NULL, SHARED_STATE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
             0);
     assert(dss != MAP_FAILED);
+
+    strncpy(dss->name, name, sizeof(dss->name));
+    dss->name[sizeof(dss->name) - 1] = 0;
 
     dss->running = true;
     dss->count = chancount;
@@ -155,6 +177,8 @@ void* init_shared_state(const char *name, size_t chancount)
     sigh = signal(SIGQUIT, signal_abort);
     sigh = signal(SIGSEGV, signal_abort);
 
+    dss_cleanup_handler(dss, shared_state_cleanup, dss);
+
     //munmap(dss, SHARED_STATE_SIZE);
     close(fd);
     return dss;
@@ -168,6 +192,15 @@ void stop_stack(void *handle)
     while (dss->num_running > 0) {
     }
     printf("All pipelines terminated\n");
+
+    shm_unlink(dss->name);
+    bulk_emergency_cleanup();
+}
+
+static void pl_cleanup_irregular(pipeline_handle_t plh, void *data)
+{
+    struct dragonet_pipeline *pl = plh;
+    bulk_emergency_cleanup();
 }
 
 pipeline_handle_t pl_init(const char *stackname, const char *plname)
@@ -182,6 +215,7 @@ pipeline_handle_t pl_init(const char *stackname, const char *plname)
     pl->stackname = stackname;
     ws_init(&pl->ws);
 
+
     // Map shared state
     fd = shm_open(stackname, O_RDWR, 0600);
     assert(fd != -1);
@@ -193,6 +227,9 @@ pipeline_handle_t pl_init(const char *stackname, const char *plname)
     sig_dss = pl->shared;
     __sync_fetch_and_add(&pl->shared->num_running, 1);
     pl->id = __sync_fetch_and_add(&pl->shared->pl_id_alloc, 1);
+
+    pl_cleanup_handler(pl, true, pl_cleanup_irregular, NULL);
+    pl_cleanup_handler(pl, false, pl_cleanup_irregular, NULL);
 
     // Make sure we get a unique machine id for each pipeline, so we get unique
     // pool ids

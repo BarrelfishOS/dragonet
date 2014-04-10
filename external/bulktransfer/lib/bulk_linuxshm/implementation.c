@@ -693,3 +693,22 @@ errval_t bulk_linuxshm_ep_create(struct bulk_linuxshm_endpoint_descriptor *ep,
     return SYS_ERR_OK;
 }
 
+void bulk_linuxshm_emergency_cleanup(struct bulk_channel *chan)
+{
+    struct lsm_internal *internal = chan->impl_data;
+    char name[strlen(internal->name) + 5];
+
+    get_metas_name(internal, true, name);
+    shm_unlink(name);
+    get_metas_name(internal, false, name);
+    shm_unlink(name);
+
+    strcpy(name, internal->name);
+    strcat(name, "_rxc");
+    shm_unlink(name);
+
+    strcpy(name, internal->name);
+    strcat(name, "_txc");
+    shm_unlink(name);
+}
+
