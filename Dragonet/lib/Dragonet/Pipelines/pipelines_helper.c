@@ -309,6 +309,7 @@ static void cb_move_received(struct bulk_channel *chan,
         q->pending = NULL;
 
         in->data = (void *) ((uintptr_t) buffer->address + dbmeta->off);
+        in->phys = buffer->phys + dbmeta->off;
         in->len = dbmeta->len;
         in->space_before = dbmeta->off;
         in->space_after =
@@ -496,6 +497,7 @@ void pl_enqueue(queue_handle_t queue, struct input *in)
     len = data_buf->pool->buffer_size;
     in->space_before = len;
     in->data = (void *) ((uintptr_t) data_buf->address + len);
+    in->phys = data_buf->phys + len;
     in->attr = attr_buf->address;
     in->data_buffer = data_buf;
     in->attr_buffer = attr_buf;
@@ -545,7 +547,8 @@ void pl_panic(pipeline_handle_t plh, const char *fmt, ...)
     abort();
 }
 
-buffer_handle_t pl_buffer_alloc(pipeline_handle_t plh, void **buf, size_t *len)
+buffer_handle_t pl_buffer_alloc(pipeline_handle_t plh, void **buf,
+                                uint64_t *phys, size_t *len)
 {
     struct dragonet_pipeline *pl = plh;
     struct bulk_buffer *buffer;
@@ -554,10 +557,13 @@ buffer_handle_t pl_buffer_alloc(pipeline_handle_t plh, void **buf, size_t *len)
     assert(buffer != NULL);
     buffer->opaque = NULL;
 
-    if (buf) {
+    if (buf != NULL) {
         *buf = buffer->address;
     }
-    if (len) {
+    if (phys != NULL) {
+        *phys = buffer->phys;
+    }
+    if (len != NULL) {
         *len = buffer->pool->buffer_size;
     }
     return buffer;

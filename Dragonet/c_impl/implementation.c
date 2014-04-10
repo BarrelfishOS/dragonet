@@ -16,6 +16,7 @@ struct input *input_alloc(void)
 {
     struct input *in = in_pool;
     void *data;
+    uint64_t phys;
     size_t len;
     buffer_handle_t buf_data, buf_attr;
     if (in != NULL) {
@@ -26,15 +27,16 @@ struct input *input_alloc(void)
 
     in = input_struct_alloc();
 
-    buf_data = pl_buffer_alloc(pipeline_handle, &data, &len);
+    buf_data = pl_buffer_alloc(pipeline_handle, &data, &phys, &len);
     assert(buf_data != NULL);
     in->data = (void *) ((uintptr_t) data + len);
+    in->phys = phys + len;
     in->space_before = len;
     in->space_after = 0;
     in->len = 0;
     in->data_buffer = buf_data;
 
-    buf_attr = pl_buffer_alloc(pipeline_handle, &data, &len);
+    buf_attr = pl_buffer_alloc(pipeline_handle, &data, &phys, &len);
     assert(buf_attr != NULL);
     in->attr = data;
     in->attr_buffer = buf_attr;
@@ -79,9 +81,10 @@ void input_zero(struct input *in)
 
 void input_clean_packet(struct input *in)
 {
-    in->space_before = in->space_before + in->space_after + in->len;
+    in->space_before += in->space_after + in->len;
     in->space_after = 0;
     in->data = (void *) ((uintptr_t) in->data + in->space_after + in->len);
+    in->phys += in->space_after + in->len;
     in->len = 0;
 }
 

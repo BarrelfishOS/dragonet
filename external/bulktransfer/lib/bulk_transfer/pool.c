@@ -1,3 +1,4 @@
+#define _LARGEFILE64_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +8,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <errno.h>
+
 
 #include <bulk_transfer/bulk_transfer.h>
 #include <bulk_helpers.h>
@@ -38,6 +41,57 @@ static void get_poolname(struct bulk_pool_id *id, char *name)
             id->machine, id->dom, id->local);
 }
 
+/** Resolve virtual address into physical address */
+bool linux_virt_to_phys(void *addr, uint64_t *phys)
+{
+    int fd;
+    bool success = true;
+    uint64_t val;
+    size_t page_size;
+    off64_t off;
+
+    if ((fd = open("/proc/self/pagemap", O_RDONLY)) < 0) {
+        fprintf(stderr, "page_virt_to_phys: opening pagemap failed\n");
+        return false;
+    }
+
+    page_size = getpagesize();
+    off = (uintptr_t) addr / page_size * 8;
+    if (lseek64(fd, off, SEEK_SET) != off) {
+        fprintf(stderr, "page_virt_to_phys: lseek failed\n");
+        success = false;
+    }
+
+    if (success && read(fd, &val, sizeof(val)) != sizeof(val)) {
+        fprintf(stderr, "page_virt_to_phys: read failed\n");
+        success = false;
+    }
+    close(fd);
+
+    if (success) {
+        /* See: https://www.kernel.org/doc/Documentation/vm/pagemap.txt
+         *
+         * Bits 0-54  page frame number (PFN) if present
+         * Bits 0-4   swap type if swapped
+         * Bits 5-54  swap offset if swapped
+         * Bit  55    pte is soft-dirty (see Documentation/vm/soft-dirty.txt)
+         * Bits 56-60 zero
+         * Bit  61    page is file-page or shared-anon
+         * Bit  62    page swapped
+         * Bit  63    page present
+         */
+        if ((val & (1ULL << 63)) == 0 || (val & (1ULL << 62)) == 1) {
+            fprintf(stderr, "page_virt_to_phys: read failed\n");
+            success = false;
+        } else {
+            *phys = (val & ~(-1ULL << 55)) * page_size +
+                    (uintptr_t) addr % page_size;
+        }
+    }
+
+    return success;
+}
+
 errval_t bulk_int_pool_map(struct bulk_pool      *p,
                            enum bulk_buffer_state state)
 {
@@ -67,7 +121,7 @@ errval_t bulk_int_pool_map(struct bulk_pool      *p,
 
     // Map buffers
     buffers_vbase = mmap(NULL, bufsz * bufcnt,
-            PROT_READ | PROT_WRITE, MAP_SHARED, fd, POOL_EXTRA);
+            PROT_READ | PROT_WRITE, MAP_SHARED | MAP_LOCKED, fd, POOL_EXTRA);
     assert_fix(buffers_vbase != MAP_FAILED);
 
 
@@ -81,12 +135,14 @@ errval_t bulk_int_pool_map(struct bulk_pool      *p,
     buffers = calloc(bufcnt, sizeof(*buffers));
     assert_fix(buffers != NULL);
 
+    assert(bufsz <= 0x1000 && "FIXME: Buffers larger than a page are not "
+            "guaranteed to be contiguous at the moment");
 
     for (i = 0; i < bufcnt; i++) {
         p->buffers[i] = buffers + i;
 
         buffers[i].address = buffers_vbase;
-        // TODO: buffers[i].phys
+        assert_fix(linux_virt_to_phys(buffers_vbase, &buffers[i].phys));
         buffers[i].pool = p;
         buffers[i].bufferid = i;
         buffers[i].state = state;
@@ -113,6 +169,7 @@ struct bulk_pool *bulk_int_pool_byid(struct bulk_pool_id id)
 
     return NULL;
 }
+
 
 errval_t bulk_pool_alloc(struct bulk_pool             *p,
                          size_t                        buffer_size,
