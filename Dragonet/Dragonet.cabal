@@ -216,3 +216,11 @@ executable generateCSkeleton
     main-is:            generateCSkeleton.hs
     build-depends:      Dragonet, base, fgl
 
+executable bench-echo
+    main-is:            microbenchmark/echo.c
+    Hs-source-dirs:     apps
+    other-modules:      Dummy
+    build-depends:      Dragonet, base
+    c-sources:          c_impl/state.c,
+                        c_impl/implementation.c
+    --Include-dirs:       c_impl/include/

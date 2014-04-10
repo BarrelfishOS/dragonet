@@ -8,6 +8,7 @@
 
 node_out_t do_pg__RxL4UDPValidHeaderLength(struct state *state, struct input *in)
 {
+    in->attr->offset_l5 = udp_payload_offset(in);
     return PORT_BOOL(((in->len) - (udp_header_offset(in))) >= udp_header_len);
 }
 

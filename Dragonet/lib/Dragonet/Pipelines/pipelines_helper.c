@@ -55,6 +55,7 @@ struct dragonet_shared_state {
     // HACK: Only works as long as the pipelines are executing in the same
     // address space
     struct dragonet_termination_handler *term;
+    pid_t control_pid;
 
     struct state state;
 };
@@ -155,6 +156,7 @@ void* init_shared_state(const char *name, size_t chancount)
 
     dss->running = true;
     dss->count = chancount;
+    dss->control_pid = getpid();
     pg_state_init(&dss->state);
     /*dss->gstate_len = gs_len;
     memcpy(dss->gstate, gs, gs_len);*/
@@ -277,7 +279,7 @@ void pl_cleanup_handler(pipeline_handle_t plh, bool irregular,
     h->handler = handler;
     h->plh = plh;
     h->data = data;
-    if (irregular) {
+    if (irregular && pl->shared->control_pid == getpid()) {
         h->next = pl->shared->term;
         pl->shared->term = h;
     } else {
