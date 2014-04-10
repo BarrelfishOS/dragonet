@@ -26,7 +26,7 @@
 #define SHARED_STATE_SIZE 8192
 #define QUEUE_SLOTS 512
 #define BULK_BUFFERSZ 2048
-#define BULK_BUFFERNUM 512
+#define BULK_BUFFERNUM 1024
 
 //#define dprintf printf
 #define dprintf(...) do {} while (0)
