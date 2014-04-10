@@ -161,7 +161,6 @@ errval_t bulk_int_pool_map(struct bulk_pool      *p,
     buffers = calloc(bufcnt, sizeof(*buffers));
     assert_fix(buffers != NULL);
 
-    printf("buffer_vbase: %p\n", buffers_vbase);
     for (i = 0; i < bufcnt; i++) {
         p->buffers[i] = buffers + i;
 
