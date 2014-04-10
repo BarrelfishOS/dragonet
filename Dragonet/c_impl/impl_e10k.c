@@ -17,7 +17,7 @@
 
 #define NUM_RXDESCS 512
 #define NUM_TXDESCS 512
-#define E10K_BUFSZ 0x1000
+#define E10K_BUFSZ 2048
 #define NUM_RXBUFS 256
 
 #define CONFIG_PCI_ADDR "0000:81:00.0"
@@ -29,23 +29,10 @@ struct mem_region_alloc {
     size_t   left;
 };
 
-struct buffer {
-    void          *virt;
-    uint64_t       phys;
-
-    size_t data_len; // NOTE: NOT buffer size
-    struct buffer *next;
-};
-
-struct buffer_allocator {
-    struct buffer *buffers;
-};
-
 struct dragonet_e10k {
-    struct buffer_allocator bufa;
     struct usp_pci_desc dev;
     struct e10k_card card;
-    struct buffer *chain;
+    bool chained;
     e10k_queue_t *queue;
 };
 
@@ -121,29 +108,6 @@ static bool mem_region_alloc(struct mem_region_alloc *alloc, size_t size,
     return true;
 }
 
-/** Allocates a number of buffers */
-static bool allocate_buffers(struct mem_region_alloc *mem,
-                             struct buffer_allocator *bufs,
-                             size_t buffer_size, size_t buffer_count)
-{
-    struct buffer *buf;
-    bufs->buffers = NULL;
-    while (buffer_count > 0) {
-        buf = malloc(sizeof(*buf));
-        if (!mem_region_alloc(mem, buffer_size, &buf->virt, &buf->phys)) {
-            if (!mem_region_create(mem)) {
-                fprintf(stderr, "allocate_buffers: Failed allocating new"
-                                " memory region\n");
-                return false;
-            }
-        }
-        buf->next = bufs->buffers;
-        bufs->buffers = buf;
-        buffer_count--;
-    }
-    return true;
-}
-
 static void queue_update_txtail(void *opaque, size_t index)
 {
     struct dragonet_e10k *i = opaque;
@@ -209,6 +173,13 @@ static void cleanup_handler(pipeline_handle_t plh, void *op)
     }
 }
 
+static void queue_add_rxbuf(e10k_queue_t *q, struct input *in)
+{
+    pkt_append(in, in->space_after);
+    pkt_prepend(in, in->space_before);
+    e10k_queue_add_rxbuf(q, in->phys, in);
+}
+
 static bool e10k_if_init(struct state *state, const char *pciaddr)
 {
     struct dragonet_e10k *i = calloc(1, sizeof(*i));
@@ -238,18 +209,15 @@ static bool e10k_if_init(struct state *state, const char *pciaddr)
         goto out_err;
     }
 
-    printf("Allocating buffers...\n");
-    struct buffer_allocator bufa;
-    if (!allocate_buffers(&alloc, &i->bufa, E10K_BUFSZ, 500)) {
-        fprintf(stderr, "Allocating buffers failed\n");
-        goto out_err;
-    }
-
     int j;
     for (j = 0; j < NUM_RXBUFS; j++) {
-        struct buffer *buf = i->bufa.buffers;
-        i->bufa.buffers = buf->next;
-        e10k_queue_add_rxbuf(i->queue, buf->phys, buf);
+        struct input *in = input_alloc();
+        if (in == NULL) {
+            fprintf(stderr, "Allocating receive buffer failed\n");
+            goto out_err;
+        }
+
+        queue_add_rxbuf(i->queue, in);
     }
 
     // Start initializing card
@@ -300,7 +268,8 @@ node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
     size_t len;
     int last;
     uint64_t flags;
-    struct buffer *buf, *pr;
+    struct input *qin;
+    node_out_t port;
 
     if (e10k == NULL) {
         if (!e10k_if_init(state, CONFIG_PCI_ADDR)) {
@@ -317,44 +286,45 @@ node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
 	//usleep(1000*1000);
         return P_Queue_drop;
     }
-    buf = op;
+    qin = op;
 
-    buf->data_len = len;
-    if (!last) {
-        //printf("e10k: Received non-last buffer\n");
-        buf->next = e10k->chain;
-        e10k->chain = buf;
-        return P_Queue_drop;
+    if (!last || e10k->chained) {
+        if (!e10k->chained) {
+            printf("e10k: Received chained buffer, we cannot currently deal "
+                    "with this, dropping packet\n");
+            e10k->chained = true;
+        } else if (last) {
+            e10k->chained = false;
+        }
+        port = P_Queue_drop;
+        goto add_buf;
     }
     //printf("e10k: Yay, we got a full packet!\n");
 
-    buf->next = e10k->chain;
-    e10k->chain = NULL;
+    // Set packet boundaries
+    pkt_append(qin, -(qin->len - len));
 
-    while (buf != NULL) {
-        pkt_prepend(in, len);
-        pkt_write(in, 0, buf->data_len, buf->virt);
-        e10k_queue_add_rxbuf(e10k->queue, buf->phys, buf);
-        buf = buf->next;
-    }
+    // Add current in as replacement buffer
+    input_xchg(qin, in);
+    port = P_Queue_out;
+
+add_buf:
+    queue_add_rxbuf(e10k->queue, qin);
     e10k_queue_bump_rxtail(e10k->queue);
-
-    return P_Queue_out;
+    return port;
 }
 
 node_out_t do_pg__TapTxQueue(struct state *state, struct input *in)
 {
     struct dragonet_e10k *e10k = (struct dragonet_e10k *) state->tap_handler;
     void *op;
-    struct buffer *buf;
+    struct input *qin;
 
-    // We need a buffer to send in
-    buf = e10k->bufa.buffers;
-    e10k->bufa.buffers = buf->next;
+    // Replacement input
+    qin = input_alloc();
+    input_xchg(qin, in);
 
-    assert(in->len <= E10K_BUFSZ);
-    memcpy(buf->virt, in->data, in->len);
-    e10k_queue_add_txbuf(e10k->queue, buf->phys, in->len, buf, 1, 1, in->len);
+    e10k_queue_add_txbuf(e10k->queue, qin->phys, qin->len, qin, 1, 1, qin->len);
     e10k_queue_bump_txtail(e10k->queue);
 
     /*printf("Sent packet! :-D\n");
@@ -362,9 +332,8 @@ node_out_t do_pg__TapTxQueue(struct state *state, struct input *in)
 
     // Check if there are processed buffers on the TX queue
     while (e10k_queue_get_txbuf(e10k->queue, &op) == 0) {
-        buf = op;
-        buf->next = e10k->bufa.buffers;
-        e10k->bufa.buffers = buf;
+        qin = op;
+        input_free(qin);
     }
     return 0;
 }
