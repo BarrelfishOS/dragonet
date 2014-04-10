@@ -548,7 +548,7 @@ static void msg_assign(struct lsm_internal *internal, struct shm_message *msg)
     }
 
     p->id = msg->content.assign.pool;
-    err = bulk_int_pool_map(p, BULK_BUFFER_INVALID);
+    err = bulk_int_pool_map(p, BULK_BUFFER_INVALID, NULL, -1);
     if (!err_is_ok(err)) {
         goto fail_map;
     }

@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <unistd.h>
 #include <inttypes.h>
 #include <errno.h>
@@ -16,12 +18,14 @@
 
 #define MAX_POOLNAME 32
 #define POOL_EXTRA 4096
+#define HUGEPAGESZ (2*1024*1024)
 
 struct pool_meta {
     int refs;
     size_t buffer_size;
     size_t num_buffers;
     size_t pool_size;
+    key_t  key;
 };
 
 static struct bulk_pool *pools = NULL;
@@ -92,27 +96,46 @@ bool linux_virt_to_phys(void *addr, uint64_t *phys)
     return success;
 }
 
+/** Resolve virtual address of huge page into physical address */
+bool linux_huge_virt_to_phys(void *addr, uint64_t *phys)
+{
+    uintptr_t off = (uintptr_t) addr & (HUGEPAGESZ - 1);
+    addr = (void *) ((uintptr_t) addr - off);
+    if (!linux_virt_to_phys(addr, phys)) {
+        return false;
+    }
+
+    (*phys) += off;
+    return true;
+}
+
 errval_t bulk_int_pool_map(struct bulk_pool      *p,
-                           enum bulk_buffer_state state)
+                           enum bulk_buffer_state state,
+                           struct pool_meta *meta,
+                           int datahandle)
 {
     struct bulk_buffer *buffers;
     void *buffers_vbase;
     size_t i;
-    struct pool_meta *meta;
     char name[MAX_POOLNAME];
     size_t bufsz, bufcnt;
     int fd;
 
 
 
-    // Open pool SHM
-    get_poolname(&p->id, name);
-    fd = shm_open(name, O_RDWR, 0600);
-    assert_fix(fd != -1);
 
     // Map meta
-    meta = mmap(NULL, POOL_EXTRA, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    assert_fix(meta != MAP_FAILED);
+    if (meta == NULL) {
+        // Open pool SHM
+        get_poolname(&p->id, name);
+        fd = shm_open(name, O_RDWR, 0600);
+        assert_fix(fd != -1);
+
+        meta = mmap(NULL, POOL_EXTRA, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        assert_fix(meta != MAP_FAILED);
+        close(fd);
+    }
+
     p->internal.meta = meta;
     __sync_add_and_fetch(&meta->refs, 1);
 
@@ -120,12 +143,14 @@ errval_t bulk_int_pool_map(struct bulk_pool      *p,
     bufcnt = p->num_buffers = meta->num_buffers;
 
     // Map buffers
-    buffers_vbase = mmap(NULL, bufsz * bufcnt,
-            PROT_READ | PROT_WRITE, MAP_SHARED | MAP_LOCKED, fd, POOL_EXTRA);
+    if (datahandle == -1) {
+        datahandle = shmget(meta->key, meta->pool_size, SHM_HUGETLB | 0666);
+        assert(datahandle != -1);
+
+    }
+    buffers_vbase = shmat(datahandle, NULL, 0);
     assert_fix(buffers_vbase != MAP_FAILED);
-
-
-    close(fd);
+    memset(buffers_vbase, 0, meta->pool_size);
 
     p->base_address = buffers_vbase;
 
@@ -135,14 +160,12 @@ errval_t bulk_int_pool_map(struct bulk_pool      *p,
     buffers = calloc(bufcnt, sizeof(*buffers));
     assert_fix(buffers != NULL);
 
-    assert(bufsz <= 0x1000 && "FIXME: Buffers larger than a page are not "
-            "guaranteed to be contiguous at the moment");
-
+    printf("buffer_vbase: %p\n", buffers_vbase);
     for (i = 0; i < bufcnt; i++) {
         p->buffers[i] = buffers + i;
 
         buffers[i].address = buffers_vbase;
-        assert_fix(linux_virt_to_phys(buffers_vbase, &buffers[i].phys));
+        assert_fix(linux_huge_virt_to_phys(buffers_vbase, &buffers[i].phys));
         buffers[i].pool = p;
         buffers[i].bufferid = i;
         buffers[i].state = state;
@@ -177,9 +200,11 @@ errval_t bulk_pool_alloc(struct bulk_pool             *p,
                          struct bulk_pool_constraints *constraints)
 {
     char name[MAX_POOLNAME];
+    char path[MAX_POOLNAME + 16];
     int fd;
     int res;
     struct pool_meta *meta;
+    size_t sz;
 
     // Allocate ID for pool
     alloc_poolid(&p->id);
@@ -191,7 +216,7 @@ errval_t bulk_pool_alloc(struct bulk_pool             *p,
     get_poolname(&p->id, name);
     fd = shm_open(name, O_CREAT | O_RDWR | O_EXCL, 0600);
     assert_fix(fd != -1);
-    res = ftruncate(fd, buffer_size * buffer_count + POOL_EXTRA);
+    res = ftruncate(fd, POOL_EXTRA);
     assert_fix(res == 0);
 
     // Initialize meta data
@@ -200,10 +225,20 @@ errval_t bulk_pool_alloc(struct bulk_pool             *p,
 
     meta->buffer_size = buffer_size;
     meta->num_buffers = buffer_count;
-
+    sz = buffer_size * buffer_count;
+    meta->pool_size = (sz % HUGEPAGESZ != 0 ?
+            ((sz + HUGEPAGESZ - 1) & ~(HUGEPAGESZ - 1)) :
+            sz);
+    snprintf(path, sizeof(path), "/dev/shm/%s", name);
+    meta->key = ftok(path, 1);
+    assert(meta->key != -1);
     close(fd);
 
-    return bulk_int_pool_map(p, BULK_BUFFER_READ_WRITE);
+    fd = shmget(meta->key, meta->pool_size,
+            IPC_CREAT | IPC_EXCL | SHM_HUGETLB | 0666);
+    assert(fd != -1);
+
+    return bulk_int_pool_map(p, BULK_BUFFER_READ_WRITE, meta, fd);
 }
 
 errval_t bulk_pool_free(struct bulk_pool *pool)
