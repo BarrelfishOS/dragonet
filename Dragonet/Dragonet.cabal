@@ -24,8 +24,8 @@ library
     Hs-source-dirs:     lib
     C-sources:          lib/Util/tap.c,
                         lib/Dragonet/Pipelines/pipelines_helper.c,
-                        c_impl/implementation.c
-    Include-dirs:       c_impl/include/
+                        c_impl/state.c
+    Include-dirs:       c_impl/include/, lib/Dragonet/Pipelines/
     CC-options:         -std=gnu99
     Exposed-modules:    Dragonet.Configuration,
                         Dragonet.Constraints,
@@ -114,6 +114,7 @@ executable llvm-cgen
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
     x-llvm-c-includes:  c_impl/include,
+                        lib/Dragonet/Pipelines,
                         ../external/bulktransfer/lib/include
     x-llvm-c-helpers:   llvm-helpers.bc,
                         c_impl/impl_arp.c,
@@ -125,6 +126,7 @@ executable llvm-cgen
                         c_impl/impl_misc.c,
                         c_impl/impl_tap.c,
                         c_impl/implementation.c,
+                        c_impl/state.c,
                         c_impl/support/Ethernet.c,
                         c_impl/support/Icmp.c,
                         lib/Util/tap.c,
@@ -156,6 +158,7 @@ executable llvm-cgen-e10k
                         c_impl/impl_tcp.c,
                         c_impl/impl_misc.c,
                         c_impl/implementation.c,
+                        c_impl/state.c,
                         c_impl/support/Ethernet.c,
                         c_impl/support/Icmp.c,
                         c_impl/impl_e10k.c,
@@ -182,6 +185,7 @@ executable llvm-cgen-dpdk
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
     x-llvm-c-includes:  c_impl/include,
+                        lib/Dragonet/Pipelines,
                         ../external/bulktransfer/lib/include
     x-llvm-c-helpers:   llvm-helpers-dpdk.bc,
                         c_impl/impl_arp.c,
@@ -193,6 +197,7 @@ executable llvm-cgen-dpdk
                         c_impl/impl_misc.c,
                         c_impl/impl_dpdk.c,
                         c_impl/implementation.c,
+                        c_impl/state.c,
                         c_impl/support/Ethernet.c,
                         c_impl/support/Icmp.c,
                         lib/Util/tap.c,

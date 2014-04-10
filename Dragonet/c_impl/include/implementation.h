@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <pipelines.h>
 #include "../../lib/Util/tap.h"
 
 //#define MYDEBUG     1
@@ -123,6 +124,9 @@ struct input {
     pktoff_t space_before;
     pktoff_t space_after;
     struct input *next;
+
+    buffer_handle_t data_buffer;
+    buffer_handle_t attr_buffer;
 };
 
 enum attr_mux_id {
@@ -159,6 +163,9 @@ void input_dump(struct input *in);
 int32_t input_muxid(struct input *in);
 void input_set_muxid(struct input *in, int32_t mux);
 void input_xchg(struct input *a, struct input *b);
+
+struct input *input_struct_alloc(void);
+void input_struct_free(struct input *in);
 
 //void testFun(struct state * st, struct input *in);
 

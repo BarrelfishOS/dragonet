@@ -31,6 +31,10 @@
 //#define dprintf printf
 #define dprintf(...) do {} while (0)
 
+struct dragonet_bulk_meta {
+    pktoff_t off;
+    pktoff_t len;
+};
 
 struct dragonet_termination_handler {
     void (*handler)(pipeline_handle_t,void *);
@@ -290,23 +294,26 @@ static void cb_move_received(struct bulk_channel *chan,
     struct dragonet_queue *q = chan->user_state;
     struct dragonet_pipeline *pl = q->pl;
     struct input *in, *prev;
-    struct input_attributes *attrs;
-    errval_t err;
-    uint32_t *len = meta;
+    struct dragonet_bulk_meta *dbmeta = meta;
 
-    dprintf("cb_move_received: %s %"PRIx32"\n", pl->name, buffer->bufferid);
+    buffer->opaque = chan;
+    dprintf("cb_move_received: %s %"PRIx32" len=%d off=%d\n", pl->name,
+            buffer->bufferid, dbmeta->len, dbmeta->off);
     if (q->pending == NULL) {
-        q->pending = input_alloc();
-
-        attrs = buffer->address;
-        // Copy attributes
-        memcpy(q->pending->attr, attrs, sizeof(*attrs));
-        q->pending->next = NULL;
+        in = input_struct_alloc();
+        in->attr = buffer->address;
+        in->attr_buffer = buffer;
+        q->pending = in;
     } else {
         in = q->pending;
         q->pending = NULL;
 
-        input_copy_packet(in, buffer->address, *len);
+        in->data = (void *) ((uintptr_t) buffer->address + dbmeta->off);
+        in->len = dbmeta->len;
+        in->space_before = dbmeta->off;
+        in->space_after =
+            buffer->pool->buffer_size - (dbmeta->len + dbmeta->off);
+        in->data_buffer = buffer;
 
         // Add packet to pl->queue
         in->next = NULL;
@@ -321,9 +328,24 @@ static void cb_move_received(struct bulk_channel *chan,
         }
     }
 
-    err = bulk_channel_pass(chan, buffer, NULL,
+}
+
+static void free_bulk_buffer(struct dragonet_pipeline *pl,
+                             struct bulk_buffer *buf)
+{
+    struct bulk_channel *chan = buf->opaque;
+    errval_t err;
+
+    if (chan == NULL) {
+        // Our own buffer
+        bulk_alloc_return_buffer(&pl->alloc, buf);
+    } else {
+        // We received it over this channel
+        //
+        err = bulk_channel_pass(chan, buf, NULL,
             MK_BULK_CONT(cb_pass_done, NULL));
-    err_expect_ok(err);
+        err_expect_ok(err);
+    }
 }
 
 static void cb_buffer_received(struct bulk_channel *chan,
@@ -333,7 +355,7 @@ static void cb_buffer_received(struct bulk_channel *chan,
     struct dragonet_queue *q = chan->user_state;
     struct dragonet_pipeline *pl = q->pl;
     dprintf("cb_buffer_received: %s\n", pl->name);
-    bulk_alloc_return_buffer(&pl->alloc, buffer);
+    free_bulk_buffer(pl, buffer);
 }
 
 
@@ -352,7 +374,7 @@ queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name)
     errval_t err;
     struct bulk_channel_setup setup = { .direction = BULK_DIRECTION_RX,
         .role = BULK_ROLE_SLAVE, .trust = BULK_TRUST_FULL,
-        .meta_size = 4, .waitset = &pl->ws };
+        .meta_size = sizeof(struct dragonet_bulk_meta), .waitset = &pl->ws };
     struct dragonet_queue *dq = calloc(1, sizeof(*dq));
 
     asprintf(&dq->name, "%s_%s", pl->stackname, name);
@@ -444,27 +466,39 @@ void pl_enqueue(queue_handle_t queue, struct input *in)
     struct bulk_channel *chan = queue;
     struct dragonet_queue *q = chan->user_state;
     struct dragonet_pipeline *pl = q->pl;
-    struct bulk_buffer *in_buf, *data_buf;
-    uint32_t len = in->len;
+    struct bulk_buffer *data_buf = in->data_buffer;
+    struct bulk_buffer *attr_buf = in->attr_buffer;
+    struct dragonet_bulk_meta meta = {
+        .len = in->len, .off = in->space_before, };
+    uint32_t len;
     errval_t err;
 
     //printf("pl_enqueue: pl=%s q=%s\n", q->name, pl->name);
+    err = bulk_channel_move(chan, attr_buf, &meta,
+            MK_BULK_CONT(cb_move_done, NULL));
+    err_expect_ok(err);
 
-    in_buf = bulk_alloc_new_buffer(&pl->alloc);
-    assert(in_buf != NULL);
+    err = bulk_channel_move(chan, data_buf, &meta,
+            MK_BULK_CONT(cb_move_done, NULL));
+    err_expect_ok(err);
+
+    // We need to replace these buffers in the current input, and make it empty
+    attr_buf = bulk_alloc_new_buffer(&pl->alloc);
+    assert(attr_buf != NULL);
+    attr_buf->opaque = NULL;
+
     data_buf = bulk_alloc_new_buffer(&pl->alloc);
     assert(data_buf != NULL);
+    data_buf->opaque = NULL;
 
-    memcpy(in_buf->address, in->attr, sizeof(*in->attr));
-    memcpy(data_buf->address, in->data, in->len);
-
-    err = bulk_channel_move(chan, in_buf, &len,
-            MK_BULK_CONT(cb_move_done, NULL));
-    err_expect_ok(err);
-
-    err = bulk_channel_move(chan, data_buf, &len,
-            MK_BULK_CONT(cb_move_done, NULL));
-    err_expect_ok(err);
+    in->len = 0;
+    in->space_after = 0;
+    len = data_buf->pool->buffer_size;
+    in->space_before = len;
+    in->data = (void *) ((uintptr_t) data_buf->address + len);
+    in->attr = attr_buf->address;
+    in->data_buffer = data_buf;
+    in->attr_buffer = attr_buf;
 }
 
 void pl_process_events(pipeline_handle_t plh)
@@ -510,3 +544,28 @@ void pl_panic(pipeline_handle_t plh, const char *fmt, ...)
     va_end(val);
     abort();
 }
+
+buffer_handle_t pl_buffer_alloc(pipeline_handle_t plh, void **buf, size_t *len)
+{
+    struct dragonet_pipeline *pl = plh;
+    struct bulk_buffer *buffer;
+
+    buffer = bulk_alloc_new_buffer(&pl->alloc);
+    assert(buffer != NULL);
+    buffer->opaque = NULL;
+
+    if (buf) {
+        *buf = buffer->address;
+    }
+    if (len) {
+        *len = buffer->pool->buffer_size;
+    }
+    return buffer;
+}
+
+void pl_buffer_free(pipeline_handle_t plh, buffer_handle_t bufh)
+{
+    free_bulk_buffer((struct dragonet_pipeline *) plh,
+                     (struct bulk_buffer *) bufh);
+}
+

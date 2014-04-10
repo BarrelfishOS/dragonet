@@ -304,6 +304,7 @@ struct bulk_buffer {
     uint32_t                  local_ref_count;
     /** platform specific data, must be treated as opaque */
     struct bulk_int_buffer    internal;
+    void                     *opaque;
 };
 
 
