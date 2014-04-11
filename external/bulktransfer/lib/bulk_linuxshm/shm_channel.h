@@ -29,12 +29,12 @@ struct shm_message {
     union {
         struct {
             uint8_t role;
-            uint8_t direction;
             uint32_t num_slots;
         } bind_request;
         struct {
             errval_t err;
             uint32_t meta_size;
+            uint8_t direction;
         } bind_done;
         struct {
             uint32_t op;

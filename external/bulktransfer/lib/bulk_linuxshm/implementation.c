@@ -310,7 +310,6 @@ static errval_t op_channel_bind(struct bulk_channel     *channel,
     msg->type = SHM_MSG_BIND;
     //msg->content.bind_request.op = ops_id(ops);
     msg->content.bind_request.role = channel->role;
-    msg->content.bind_request.direction = channel->direction;
     shm_chan_send(&internal->tx);
 
     return SYS_ERR_OK;
@@ -492,10 +491,6 @@ static void msg_bind(struct lsm_internal *internal, struct shm_message *msg)
         err = BULK_TRANSFER_CHAN_ROLE;
         goto out;
     }
-    if (msg->content.bind_request.direction ==  internal->chan->direction) {
-        err = BULK_TRANSFER_CHAN_DIRECTION;
-        goto out;
-    }
 
     internal->chan->state = BULK_STATE_CONNECTED;
 
@@ -509,6 +504,9 @@ out:
 
     out->type = SHM_MSG_BIND_DONE;
     out->content.bind_done.meta_size = internal->chan->meta_size;
+    out->content.bind_done.direction =
+        (internal->chan->direction == BULK_DIRECTION_TX ?
+            BULK_DIRECTION_RX : BULK_DIRECTION_TX);
     out->content.bind_done.err = err;
 
     shm_chan_send(&internal->tx);
@@ -521,6 +519,7 @@ static void msg_bind_done(struct lsm_internal *internal, struct shm_message *msg
 
     if (err_is_ok(err)) {
         internal->chan->meta_size = msg->content.bind_done.meta_size;
+        internal->chan->direction = msg->content.bind_done.direction;
 
         // Map meta buffers
         err = map_metas(internal, false, false);
