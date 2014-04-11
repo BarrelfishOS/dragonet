@@ -294,6 +294,26 @@ class NetperfSumaryRunner(ProcessRunner):
 
         return result
 
+class LatencyBmRunner(ProcessRunner):
+    """Runner for ../latencyBench/latencybm"""
+
+    def parse(self, output):
+        """Parses the interim result lines and returns a list of (time,value)
+        pairs."""
+
+        result = {}
+
+        vals = []
+        lines = output.split("\n")
+        for line in lines:
+            if line.startswith("Interim: "):
+                parts = line.split()
+                vals.append(float(parts[2]))
+
+        result['RESULT'] = vals
+        return result
+
+
 class NetperfDemoRunner(ProcessRunner):
     """Runner for netperf demo mode."""
 

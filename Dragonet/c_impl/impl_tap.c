@@ -1,4 +1,5 @@
 #include <implementation.h>
+#include <packet_access.h>
 
 static void tap_init(struct state *state)
 {
@@ -14,6 +15,7 @@ static void tap_init(struct state *state)
 
 node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
 {
+    pktoff_t maxlen;
     if (state->tap_handler == NULL) {
         tap_init(state);
 
@@ -22,15 +24,13 @@ node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
         printf("Initialized\n");
     }
 
-    static uint8_t tmpbuf[2048];
-    ssize_t len =
-        tap_read(state->tap_handler, (char *) tmpbuf, sizeof(tmpbuf), 500);
+    pkt_prepend(in, in->space_before);
+    ssize_t len = tap_read(state->tap_handler, (char *) in->data, in->len, 500);
     if (len == 0) {
+        pkt_prepend(in, -in->len);
         return P_Queue_drop;
     }
-    /*puts("\n\n\n---------------------------------------------------------");
-    printf("Got packet! :-D\n");*/
-    input_copy_packet(in, tmpbuf, len);
+    pkt_append(in, -(in->len - len));
     return P_Queue_out;
 }
 

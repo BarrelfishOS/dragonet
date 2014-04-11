@@ -1,5 +1,7 @@
 #include <bulk_transfer/bulk_transfer.h>
 
+struct bulk_channel *bulk_channels = NULL;
+
 errval_t bulk_channel_create(struct bulk_channel              *channel,
                              struct bulk_endpoint_descriptor  *ep_desc,
                              struct bulk_channel_callbacks    *callbacks,
@@ -14,6 +16,10 @@ errval_t bulk_channel_create(struct bulk_channel              *channel,
     channel->constraints = setup->constraints;
     channel->meta_size = setup->meta_size;
     channel->waitset = setup->waitset;
+    channel->internal.creator = true;
+
+    channel->internal.next = bulk_channels;
+    bulk_channels = channel;
 
     return ep_desc->f->channel_create(channel);
 }
@@ -31,6 +37,10 @@ errval_t bulk_channel_bind(struct bulk_channel              *channel,
     channel->trust = params->trust;
     channel->constraints = params->constraints;
     channel->waitset = params->waitset;
+    channel->internal.creator = false;
+
+    channel->internal.next = bulk_channels;
+    bulk_channels = channel;
 
     // To be set when binding: channel->{direction,meta_size}
     return ep_desc->f->channel_bind(channel, cont);

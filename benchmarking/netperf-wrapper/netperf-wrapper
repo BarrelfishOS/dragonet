@@ -58,6 +58,7 @@ try:
 
 
             if not results[0]:
+                print "Actually running the benchmark to collect data"
                 #print "FIXME: not computing results, as this is dryrun"
                 #sys.exit(1)
                 results[0] = agg.postprocess(agg.aggregate(results[0]))
@@ -69,24 +70,26 @@ try:
             #print "The attributes are %s" % (settings.ATTRIBUTES['attrs']['attrlist'])
             attribute_vals = {}
             attributes_titles = []
-            if len(results) > 1:
+            if results[0]:
+                print "Data available for processing, analyzing it"
                 for r in results:
                     FORMATTER.collect_attributes(r,
                         settings.ATTRIBUTES,
                         #settings.ATTRIBUTES['attrs']['attrlist'],
                         attributes_titles, attribute_vals)
 
-            #FORMATTER.show_attr_details(attributes_titles, attribute_vals)
+                FORMATTER.show_attr_details(attributes_titles, attribute_vals)
+                #FORMATTER.plot_attr_details(attributes_titles, attribute_vals)
+            else :
+                print "No data available for processing, results = %d" % (len(results))
+                sys.exit(1)
 
             formatter_name = util.classname(settings.FORMAT, 'Formatter')
             if hasattr(formatters, formatter_name):
                 formatter = getattr(formatters, formatter_name)(settings)
             else:
                 raise RuntimeError("Formatter [%s] not found. Make sure this formatter is supported" % (formatter_name))
-
-            formatter.format(results)
-            formatter.show_nresults()
-
+            formatter.format2(results, attributes_titles, attribute_vals)
 
         except RuntimeError as e:
             sys.stderr.write("Error occurred: %s\n"% str(e))

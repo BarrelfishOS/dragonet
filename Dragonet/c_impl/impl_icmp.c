@@ -57,9 +57,9 @@ node_out_t do_pg__TxL3ICMPInitiateResponse(struct state *state, struct input *in
     pkt_write(in, 0, payload_len, payload);
 #endif // DO_EXPLICIT_COPY
 
-    in->ip4_dst = srcIP;
-    in->ip4_src = dstIP;  // FIXME: maybe I should read it from global state
-    in->icmp_id = id;
+    in->attr->ip4_dst = srcIP;
+    in->attr->ip4_src = dstIP;  // FIXME: maybe I should read it from global state
+    in->attr->icmp_id = id;
 
     return P_TxL3ICMPInitiateResponse_out;
 }
@@ -68,7 +68,7 @@ node_out_t do_pg__TxL3ICMPAllocateHeader(struct state *state, struct input *in)
 {
     pktoff_t len = icmp_header_len;
     pkt_prepend(in, len);
-    in->offset_l5 = 0;
+    in->attr->offset_l5 = 0;
     return P_TxL3ICMPAllocateHeader_out;
 }
 
@@ -77,7 +77,7 @@ node_out_t do_pg__TxL3ICMPFillHeader(struct state *state, struct input *in)
 
     icmp_hdr_type_write(in, icmpTypeEchoReply);
     icmp_hdr_code_write(in, 0);
-    icmp_hdr_misc_write(in, in->icmp_id);
+    icmp_hdr_misc_write(in, in->attr->icmp_id);
 
     uint16_t checksum = 0;
     icmp_hdr_checksum_write(in, checksum);
@@ -88,7 +88,7 @@ node_out_t do_pg__TxL3ICMPFillHeader(struct state *state, struct input *in)
     checksum = ipv4_checksum(in, off, (len - off));
     icmp_hdr_checksum_write(in, checksum);
 
-    in->ip4_proto = IPV4_PROTO_ICMP;
+    in->attr->ip4_proto = IPV4_PROTO_ICMP;
 
     return P_true;
 }

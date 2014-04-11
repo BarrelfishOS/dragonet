@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <pipelines.h>
 #include "../../lib/Util/tap.h"
 
 //#define MYDEBUG     1
@@ -80,18 +81,9 @@ struct arp_cache {
     struct arp_cache *next;
 };
 
-struct input {
-    // Buffer
-    void  *data;
-    size_t len;
-    size_t space_before;
-    size_t space_after;
-
-// Attributes ----------------------------------------
-
+struct input_attributes {
     // Offset for headers on different layers
-    pktoff_t offset_l2; // XXX CAUTION: Code in pipeline-helper depends on this
-                        //              being the first attribute!!!
+    pktoff_t offset_l2;
     pktoff_t offset_l3;
     pktoff_t offset_l4;
     pktoff_t offset_l5;
@@ -122,8 +114,20 @@ struct input {
 
     // Misc
     int32_t mux_id;
+};
 
+struct input {
+    // Buffer
+    void  *data;
+    struct input_attributes *attr;
+    uint64_t phys;
+    pktoff_t len;
+    pktoff_t space_before;
+    pktoff_t space_after;
     struct input *next;
+
+    buffer_handle_t data_buffer;
+    buffer_handle_t attr_buffer;
 };
 
 enum attr_mux_id {
@@ -160,6 +164,9 @@ void input_dump(struct input *in);
 int32_t input_muxid(struct input *in);
 void input_set_muxid(struct input *in, int32_t mux);
 void input_xchg(struct input *a, struct input *b);
+
+struct input *input_struct_alloc(void);
+void input_struct_free(struct input *in);
 
 //void testFun(struct state * st, struct input *in);
 

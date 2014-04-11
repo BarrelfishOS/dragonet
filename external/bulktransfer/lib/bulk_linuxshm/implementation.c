@@ -310,7 +310,6 @@ static errval_t op_channel_bind(struct bulk_channel     *channel,
     msg->type = SHM_MSG_BIND;
     //msg->content.bind_request.op = ops_id(ops);
     msg->content.bind_request.role = channel->role;
-    msg->content.bind_request.direction = channel->direction;
     shm_chan_send(&internal->tx);
 
     return SYS_ERR_OK;
@@ -492,10 +491,6 @@ static void msg_bind(struct lsm_internal *internal, struct shm_message *msg)
         err = BULK_TRANSFER_CHAN_ROLE;
         goto out;
     }
-    if (msg->content.bind_request.direction ==  internal->chan->direction) {
-        err = BULK_TRANSFER_CHAN_DIRECTION;
-        goto out;
-    }
 
     internal->chan->state = BULK_STATE_CONNECTED;
 
@@ -509,6 +504,9 @@ out:
 
     out->type = SHM_MSG_BIND_DONE;
     out->content.bind_done.meta_size = internal->chan->meta_size;
+    out->content.bind_done.direction =
+        (internal->chan->direction == BULK_DIRECTION_TX ?
+            BULK_DIRECTION_RX : BULK_DIRECTION_TX);
     out->content.bind_done.err = err;
 
     shm_chan_send(&internal->tx);
@@ -521,6 +519,7 @@ static void msg_bind_done(struct lsm_internal *internal, struct shm_message *msg
 
     if (err_is_ok(err)) {
         internal->chan->meta_size = msg->content.bind_done.meta_size;
+        internal->chan->direction = msg->content.bind_done.direction;
 
         // Map meta buffers
         err = map_metas(internal, false, false);
@@ -548,7 +547,7 @@ static void msg_assign(struct lsm_internal *internal, struct shm_message *msg)
     }
 
     p->id = msg->content.assign.pool;
-    err = bulk_int_pool_map(p, BULK_BUFFER_INVALID);
+    err = bulk_int_pool_map(p, BULK_BUFFER_INVALID, NULL, -1);
     if (!err_is_ok(err)) {
         goto fail_map;
     }
@@ -691,5 +690,24 @@ errval_t bulk_linuxshm_ep_create(struct bulk_linuxshm_endpoint_descriptor *ep,
     ep->name = name;
     ep->num_slots = num_slots;
     return SYS_ERR_OK;
+}
+
+void bulk_linuxshm_emergency_cleanup(struct bulk_channel *chan)
+{
+    struct lsm_internal *internal = chan->impl_data;
+    char name[strlen(internal->name) + 5];
+
+    get_metas_name(internal, true, name);
+    shm_unlink(name);
+    get_metas_name(internal, false, name);
+    shm_unlink(name);
+
+    strcpy(name, internal->name);
+    strcat(name, "_rxc");
+    shm_unlink(name);
+
+    strcpy(name, internal->name);
+    strcat(name, "_txc");
+    shm_unlink(name);
 }
 

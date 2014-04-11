@@ -17,7 +17,7 @@ static inline uint16_t ipv4_length_rd(struct input *in);
 
 static inline pktoff_t ipv4_hdroff(struct input *in)
 {
-    return in->offset_l3;
+    return in->attr->offset_l3;
 }
 
 static inline pktoff_t ipv4_hdrlen(struct input *in)
@@ -303,9 +303,9 @@ static void psudo_header_rx(struct input *in, struct input *header)
 
 static inline void psudo_header_tx(struct input *in, struct input *header)
 {
-    uint32_t src = in->ip4_src;
-    uint32_t dst = in->ip4_dst;
-    uint8_t proto = in->ip4_proto;
+    uint32_t src = in->attr->ip4_src;
+    uint32_t dst = in->attr->ip4_dst;
+    uint8_t proto = in->attr->ip4_proto;
     uint8_t zeroes = 0;
     uint16_t len = in->len;
     psudo_header_write(header, src, dst, proto, zeroes, len);

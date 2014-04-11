@@ -15,7 +15,7 @@ static inline uint8_t arp_plen_rd(struct input *in);
 
 static inline pktoff_t arp_hdroff(struct input *in)
 {
-    return in->offset_l3;
+    return in->attr->offset_l3;
 }
 
 static inline pktoff_t arp_hdrlen(struct input *in)

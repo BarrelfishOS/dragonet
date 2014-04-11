@@ -26,6 +26,32 @@ def get_server_bw(allResults, meta, ifname1=None, takeAvg=False):
         ll = myavg(ans)
         return [ll]
 
+
+def get_latency_nums(allResults, meta, mname, func=None, takeAvg=False):
+    """get all the data points related to latency"""
+    res = allResults['1'][mname]['latencybm']['RESULT']
+    res = res[2:-1]
+    if func:
+        return func(res)
+    return res
+
+def get_interrupts(allResults, meta, mname, takeAvg=False):
+    """should total interrupts core"""
+    res = allResults['1'][mname]['dstat']['dstat_outlist']['interrupts']
+    allSum = []
+    for k in res.keys():
+        curr = res[k][2:-1]
+        if allSum == [] :
+            allSum = curr
+        else:
+            allSum =[x+y for x,y in zip(allSum,curr)]
+    if (not takeAvg) :
+        return allSum
+    else :
+        ll = int(myavg(allSum))
+        return [ll]
+
+
 def get_cpu(allResults, meta, mname, coreid, takeAvg=False):
     """should return idle CPU time for given machine on given core"""
     res = allResults['1'][mname]['dstat']['dstat_outlist']['cpu%1d usage' % coreid]['idl'][2:-1]
@@ -35,6 +61,8 @@ def get_cpu(allResults, meta, mname, coreid, takeAvg=False):
     else :
         ll = int(myavg(ans))
         return [ll]
+
+
 
 def get_server_cpu(allResults, meta, takeAvg=False):
     return get_cpu(allResults, meta, 'server-1', int(server_core), takeAvg)
@@ -53,11 +81,14 @@ def get_netperf_attr(allResults, meta, attribute):
                     out = t["CMD_OUTPUT"]
                     per_run.append(float(out[attribute]))
 
-        if not (len(per_run) > 0):
-            print "There are not values for attribute %s in run %s" % (
+        if not (len(per_run) == 1):
+            print "There are more than expected (1) answers fo for attribute %s in run %s" % (
                 attribute, rn )
+
+        assert(len(per_run) == 1)
         #ans.append(sum(per_run))
-        ans.append(myavg(per_run))
+        #ans.append(myavg(per_run))
+        ans.append((per_run[0]))
     return (ans)
 
 def get_netperf_str(allResults, meta, attribute):
@@ -100,6 +131,7 @@ def get_metadata_attr(allResults, meta, attribute):
         return meta[attribute]
     else:
         return ""
+
 
 def meta_attr_wrapper(p, l=None, func=get_metadata_attr):
     if l == None or l == "":

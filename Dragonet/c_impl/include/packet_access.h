@@ -59,6 +59,7 @@ static inline void pkt_prepend(struct input *in, ssize_t change)
         }
     }
     in->data = (void *) ((uintptr_t) in->data - change);
+    in->phys -= change;
     in->space_before -= change;
     in->len += change;
 }

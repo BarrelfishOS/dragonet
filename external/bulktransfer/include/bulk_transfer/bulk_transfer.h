@@ -218,6 +218,8 @@ struct bulk_channel {
     size_t                           meta_size;
     /** the waitset for this channel */
     struct waitset                  *waitset;
+    /** platform specific data, must be treated as opaque */
+    struct bulk_int_channel         internal;
     /** pointer to user specific state for this channel */
     void                            *user_state;
     /** implementation specific data */
@@ -304,6 +306,7 @@ struct bulk_buffer {
     uint32_t                  local_ref_count;
     /** platform specific data, must be treated as opaque */
     struct bulk_int_buffer    internal;
+    void                     *opaque;
 };
 
 
@@ -494,6 +497,8 @@ errval_t bulk_pool_alloc(struct bulk_pool             *p,
 
 errval_t bulk_pool_free(struct bulk_pool *pool);
 
+
+void bulk_emergency_cleanup(void);
 
 #endif /* BULK_TRANSFER_H */
 

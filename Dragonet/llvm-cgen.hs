@@ -1456,6 +1456,7 @@ codegen_all pgraph stackname = do
     input_ty <- cgInputTy
 
     addDefn $ AST.TypeDefinition (AST.Name "struct.input") Nothing
+    addDefn $ AST.TypeDefinition (AST.Name "struct.input_attributes") Nothing
     addDefn $ AST.TypeDefinition (AST.Name "struct.state") Nothing
     addDefn $ AST.TypeDefinition (AST.Name "struct.driver") Nothing
     addDefn $ AST.TypeDefinition (AST.Name "struct.tap_handler") Nothing
@@ -1515,8 +1516,8 @@ pg4tap pg = DGI.nmap fixN pg
 
 
 -- Prepeares and runs the pipeline
-runPipeline :: PL.PLGraph -> String -> String -> PLI.PipelineImpl -> IO ()
-runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
+runPipeline' :: PL.PLGraph -> String -> String -> PLI.PipelineImpl -> IO ()
+runPipeline' plg stackname helpers pli = fmap (const ()) $ forkOS $ do
     putStrLn $ "Initializing pipeline " ++ mname
     writeFile ("pipeline-" ++ mname ++ ".dot") $ toDot pgraph
     LLVM.Ctx.withContext $ \ctx ->
@@ -1554,8 +1555,27 @@ runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
         -- LLVM file with helper utilities
         llvm_helpers = LLVM.Mod.File $ "dist/build/" ++ helpers ++ ".bc"
 
+
+-- Wrapper to execute pipelines, but handle application pipelines separatly
+runPipeline :: PL.PLGraph -> String -> String -> PLI.PipelineImpl -> IO ()
+runPipeline plg stackname helpers pli
+    | take 3 lbl == "App" = do
+        putStrLn $ "Application Pipeline " ++ lbl
+        putStrLn "  Input queues:"
+        forM_ (PLI.pliInQs pli) $ \(ql,qc) -> do
+            putStrLn $ "    " ++ ql ++ ": " ++ show qc
+        putStrLn "  Output queues:"
+        forM_ (PLI.pliOutQs pli) $ \(ql,qc) -> do
+            putStrLn $ "    " ++ ql ++ ": " ++ show qc
+    | otherwise = runPipeline' plg stackname helpers pli
+
+    where lbl = PL.plLabel $ PLI.pliPipeline pli
+
+
+-- Assigns nodes to Pipelines
 plAssign :: PG.PGNode -> PL.PLabel
 plAssign (_,n)
+    | lbl == "RxEchoAPP" = "AppEcho"
     | take 2 lbl == "Tx" || take 5 lbl == "TapTx" = "Tx"
     | otherwise = "Rx"
     where
