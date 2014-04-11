@@ -10,7 +10,7 @@ log="${result}.log"
 tmpfile="${result}.tmp"
 title="${JUMBO}${ECHO_SERVER}_${target_t}_PKT_${PKTSIZE}_B_${BRUST}${ONLOADTEXT}"
 
-   ./netperf-wrapper -l 10 ${ONLOADTYPE} -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${BRUST} -H asiago -C burrata -T ${target} udp_rr -t "${title}" -o "${result}" -L "${log}" | tee ${tmpfile}
+   ./netperf-wrapper -I ${ITERATIONS} -l ${DURATION}${ONLOADTYPE} -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${BRUST} -H asiago -C burrata -T ${target} ${UDP_TEST_NAME} -t "${title}" -o "${result}" -L "${log}" | tee ${tmpfile}
 
 outfile=`cat ${tmpfile} | grep  'Test data is in ' | cut -d'[' -f2 | cut -d']' -f1`
 ./netperf-wrapper -i ${outfile} -p ${PLOTTYPE} -o ${plotpath}
@@ -51,17 +51,17 @@ run_bm_tp_rr() {
 
         title="${JUMBO}${ECHO_SERVER}_${target_t}_PKT_${PKTSIZE}_B_${CBRUST}${ONLOADTEXT}"
 
-        ./netperf-wrapper -l 10  ${ONLOADTYPE} -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${CBRUST} -H asiago -C burrata -T ${target} udp_rr -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
+        ./netperf-wrapper -l ${DURATION} ${ONLOADTYPE} -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${CBRUST} -H asiago -C burrata -T ${target} ${UDP_TEST_NAME} -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
         outfile=`cat ${TMPFILE} | grep  'Test data is in ' | cut -d'[' -f2 | cut -d']' -f1`
         ./netperf-wrapper -i ${outfile} -p ${PLOTTYPE} -o ${TMPPLOT} | tee ${TMPRES}
 
         let CTP=NTP
 
-        NBWD=`cat ${TMPRES} | grep "^THROUGHPUT: " | cut -d'[' -f2 | cut -d']' -f1`
-        NLATENCY=`cat ${TMPRES} | grep "^RT_LATENCY: " | cut -d'[' -f2 | cut -d']' -f1`
-        NTP=`cat ${TMPRES} | grep "^TRANSACTION_RATE: " | cut -d'[' -f2 | cut -d'.' -f1`
-        SCPU=`cat ${TMPRES} | grep "^Server CPU: " | cut -d'[' -f2 | cut -d']' -f1`
-        CCPU=`cat ${TMPRES} | grep "^Client CPU: " | cut -d'[' -f2 | cut -d']' -f1`
+        NBWD=`cat ${TMPRES} | grep "^THROUGHPUT: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1`
+        NLATENCY=`cat ${TMPRES} | grep "^RT_LATENCY: " | head -n1 |cut -d'[' -f2 | cut -d']' -f1`
+        NTP=`cat ${TMPRES} | grep "^TRANSACTION_RATE: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1 | cut -d'.' -f1`
+        SCPU=`cat ${TMPRES} | grep "^Server CPU: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1`
+        CCPU=`cat ${TMPRES} | grep "^Client CPU: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1`
         echo "TPITERATOR: ${title}, ${target}, ${PKTSIZE}, ${CBRUST}, ${SCPU}, ${CCPU}, ${NTP}, ${NLATENCY}, ${NBWD}" >> ${SAMARRYFILE}
         echo "TP of $NTP for $CBRUST"
 
@@ -69,14 +69,13 @@ run_bm_tp_rr() {
         rm -f ${TMPFILE}
         rm -f ${TMPRES}
         rm -f ${TMPPLOT}
-        sleep 5
     done
 
     set -x
     set -e
 
         title="${ECHO_SERVER}_${target_t}_PKT_${PKTSIZE}_B_${LBRUST}${ONLOADTEXT}_BEST"
-        ./netperf-wrapper -l 10 ${ONLOADTYPE}  -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${LBRUST} -H asiago -C burrata -T ${target} udp_rr -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
+        ./netperf-wrapper -I ${ITERATIONS} -l ${DURATION}${ONLOADTYPE}  -c ${ECHO_SERVER} -P ${PKTSIZE} -b ${LBRUST} -H asiago -C burrata -T ${target} ${UDP_TEST_NAME} -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
     set +x
     set +e
     cat ${SAMARRYFILE} >> ${FINALRESULT}
@@ -98,7 +97,7 @@ FINALRESULT="${3}/${target_t}finalResult.result"
 log="${3}/stream_tp_${target_t}.log"
 tmpfile="${3}/stream_tp_${target_t}.tmp"
 title="${target_t}_PKT_${PKTSIZE}"
-./netperf-wrapper -l 10 ${ONLOADTYPE}  -c ${ECHO_SERVER} -P ${PKTSIZE} -H asiago -C burrata -T ${target} udp_localhost_stream -t "${title}" -o "${result}" -L "${log}" | tee ${tmpfile}
+./netperf-wrapper -l ${DURATION}${ONLOADTYPE}  -c ${ECHO_SERVER} -P ${PKTSIZE} -H asiago -C burrata -T ${target} udp_localhost_stream -t "${title}" -o "${result}" -L "${log}" | tee ${tmpfile}
 
 outfile=`cat ${tmpfile} | grep  'Test data is in ' | cut -d'[' -f2 | cut -d']' -f1`
 ./netperf-wrapper -i ${outfile} -p ${PLOTTYPE} -o ${plotpath} | tee -a ${FINALRESULT}
@@ -165,14 +164,19 @@ SF_S_T="10.113.4.21"
 PLOTTYPE="bbest"
 PLOTTYPE="lbest"
 
-SELTARGET=${SF_T}
-SELTARGET_T="SF_T"
-
 SELTARGET=${INTEL_T}
-SELTARGET_T="IntelD_exp"
+SELTARGET_T="Intel"
+
+SELTARGET=${SF_T}
+SELTARGET_T="SF"
+
+UDP_TEST_NAME="udp_rr1"
+UDP_TEST_NAME="udp_latency"
+UDP_TEST_NAME="udp_rr"
 
 ONLOADTYPE="--onloadLatency"
 ONLOADTEXT="onloadLatency"
+
 ONLOADTYPE=""
 ONLOADTEXT=""
 
@@ -182,24 +186,29 @@ ECHO_SERVER="CImplOnload"
 ECHO_SERVER="netserver"
 ECHO_SERVER="netcat"
 ECHO_SERVER="socat"
-ECHO_SERVER="netcat_opt"
-ECHO_SERVER="socat_opt"
+ECHO_SERVER="netcat_poll"
 ECHO_SERVER="llvmDpdk"
 ECHO_SERVER="CImplDpdk"
+ECHO_SERVER="CImplOnload"
+ECHO_SERVER="llvmE10k"
+ECHO_SERVER="socat_pollL"
+ECHO_SERVER="socat_poll"
+ECHO_SERVER="socat_onload"
+ECHO_SERVER="socat"
+DURATION=10
+ITERATIONS=5
 
-#JUMBO="JUMBO"
+JUMBO="JUMBO"
 JUMBO=""
 
 echo "Running BM for Echo server: ${ECHO_SERVER}, Target: [${SELTARGET} , ${SELTARGET_T}]"
 echo "Onload: [${ONLOADTYPE}, ${ONLOADTEXT}], Jumbo: [${JUMBO}] "
 
-OUTDIRPP="../myplots/${SELTARGET_T}/"
+OUTDIRPP="../myplots/resultsI/${SELTARGET_T}/"
 
-
-OUTDIRP="${OUTDIRPP}/${ECHO_SERVER}"
+OUTDIRP="${OUTDIRPP}/${ECHO_SERVER}/${UDP_TEST_NAME}/"
 mkdir -p ${OUTDIRP}
 OUTDIR=${OUTDIRP}
-
 
 if [ "${JUMBO}" == "" ] ; then
     echo "Wthout JUMBO"
@@ -215,18 +224,24 @@ fi
 
 echo "OUTPUT Location: ${OUTDIRP}"
 
-#get_best_latency 64 1
-get_best_latency 1400 64
+
+get_best_latency 64 1
 exit 0
+get_best_latency 1400 1
+
+#get_best_latency 64 1
+#get_best_latency 1400 64
+#exit 0
 
 get_best_tp 1400
-
-get_best_tp 32000
-get_best_tp 16000
+get_best_latency 1400 64
 get_best_tp 8000
-get_best_tp 1400
-get_best_tp 1024
-get_best_tp 64
+get_best_tp 32000
+#get_best_tp 16000
+#get_best_tp 1400
+#get_best_tp 1024
+#get_best_tp 64
+exit 0
 
 get_best_latency 64 1
 get_best_latency 1024 1

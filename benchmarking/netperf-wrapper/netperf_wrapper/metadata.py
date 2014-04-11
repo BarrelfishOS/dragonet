@@ -267,6 +267,7 @@ def get_egress_info(target, ip_version, ifaces={}):
     if route:
         route['qdiscs'] = get_qdiscs(route['iface'])
         route['MTU'] = get_mtu(route['iface'])
+        route['INTERRUPTS'] = get_interrupts(route['iface'])
         route['classes'] = get_classes(route['iface'])
         route['offloads'] = get_offloads(route['iface'])
         route['bql'] = get_bql(route['iface'])
@@ -309,8 +310,15 @@ def parse_tc(cmd, kind):
 
 def get_mtu(iface):
     # FIXME: use python parsing instead of grep and cut
-    cmd = "ifconfig %s | grep MTU | cut -d: -f2 | cut -d' ' -f1" % (iface)
+    cmd = 'ifconfig %s | grep MTU | cut -d: -f2 | cut -d" " -f1' % (iface)
     output = get_command_output(cmd)
+    return output
+
+def get_interrupts(iface):
+    # FIXME: use python parsing instead of grep and cut
+    cmd = 'cat /proc/interrupts | grep %s | cut -d":" -f1 | tr "\n" "," | tr -d " "' % (iface)
+    output = get_command_output(cmd)
+    #print "get_interrupts: command %s ===> %s" % (cmd, output)
     return output
 
 def get_qdiscs(iface):

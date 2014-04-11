@@ -53,6 +53,7 @@ DEFAULT_SETTINGS = {
     'TARGET': None,
     'SERVERS': [],
     'SERVERS_IF': {},
+    'SERVERS_DRV': {},
     'CLIENTS': [],
     'CLIENTS_IF': {},
     'BRUST_SIZE': 1,
@@ -75,7 +76,8 @@ DEFAULT_SETTINGS = {
     'TIME': datetime.now(),
     'SCALE_DATA': [],
     'SCALE_MODE': False,
-    'ANNOTATE': True,
+#    'ANNOTATE': True,
+    'ANNOTATE': False,
     'PRINT_TITLE': True,
     'PRINT_LEGEND': True,
     'ZERO_Y': True,
@@ -617,6 +619,7 @@ def load():
         for m in settings.SERVERS:
             settings.MINFO_SERVER[m] = record_machine_metadata(m, settings.TARGET)
             settings.SERVERS_IF[m] = settings.MINFO_SERVER[m]["EGRESS_INFO"]["iface"]
+            settings.SERVERS_DRV[m] = settings.MINFO_SERVER[m]["EGRESS_INFO"]["driver"]
 
         for m in settings.CLIENTS:
             settings.MINFO_CLIENT[m] = record_machine_metadata(m, settings.TARGET)
@@ -644,6 +647,7 @@ def load():
                             CLIENTS=settings.CLIENTS,
                             CLIENTS_IF=settings.CLIENTS_IF,
                             SERVERS_IF=settings.SERVERS_IF,
+                            SERVERS_DRV=settings.SERVERS_DRV,
                             TIME=settings.TIME,
                             LOCAL_HOST=settings.LOCAL_HOST,
                             TITLE=settings.TITLE,

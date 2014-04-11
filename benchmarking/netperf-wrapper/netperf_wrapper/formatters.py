@@ -22,6 +22,29 @@
 import json, sys, csv, math, inspect, os
 #import settings as settings
 
+from itertools import cycle
+
+import random
+
+import matplotlib as mpl
+## agg backend is used to create plot as a .png file
+mpl.use('agg')
+import matplotlib.pyplot as plt
+
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.cbook as cbook
+
+
+boxprops = dict(linestyle='--', linewidth=3, color='darkgoldenrod')
+flierprops = dict(marker='o', markerfacecolor='green', markersize=12,
+                  linestyle='none')
+medianprops = dict(linestyle='-.', linewidth=2.5, color='firebrick')
+meanpointprops = dict(marker='D', markeredgecolor='black',
+                      markerfacecolor='firebrick')
+meanlineprops = dict(linestyle='--', linewidth=2.5, color='purple')
+
+
 from .util import cum_prob, frange
 from functools import reduce
 
@@ -52,24 +75,68 @@ PLOT_KWARGS = (
     )
 
 
+def target_lookup (addr):
+    if (addr.startswith("127.")) :
+        return "localhost"
+    if (addr == "10.23.4.21") :
+        return "SFD"
+    if (addr == "10.22.4.11") :
+        return "IntelD"
+    if (addr == "192.168.123.1") :
+        return "Tuntap"
+    return addr
+
+
+def plot_attr_details(trow, infod):
+    nr = len(infod[trow[0]])
+    data_to_plot = []
+    axis_to_plot = []
+    for i in range(0, nr):
+        data_to_plot.append(infod["THROUGHPUT"][i])
+        title="%s_%s_%d" % (
+                    infod["ECHO_SERVER"][i],
+                    target_lookup(infod["TARGET"][i]),
+                    infod["REQUEST_SIZE"][i][0],
+                    )
+        title2= infod["TITLE"][i]
+        axis_to_plot.append(title2)
+    # Create a figure instance
+    fig = plt.figure(1, figsize=(9, 6))
+    # Create an axes instance
+    ax = fig.add_subplot(111)
+    # Create the boxplot
+    bp = ax.boxplot(data_to_plot)
+
+    ## Custom x-axis labels
+    ax.set_xticklabels(axis_to_plot, fontsize=8, rotation=90)
+    #ax.set_ylim(ymin=0, ymax=10)
+    ax.set_ylim(ymin=0)
+    # Save the figure
+    fig.savefig('fig1.png', bbox_inches='tight')
+
+
 def collect_attributes(result, config, titles, values):
     #for s in config['series']:
     for s in config['attrs']['attrlist']:
         args = None
-        if 'args' in s.keys():
+        if 'value' in s.keys():
+            ans = s['value']
+        elif 'args' in s.keys():
             args = s['args']
             ans = s['data'](result._results, result.metadata, **args)
         else:
             ans = s['data'](result._results, result.metadata)
 
         #print "%s: %s " % (s['label'], str(ans))
-        print "%s: %s: %s" % (s['label'], str(ans),
+        print "%s: %s: %s" % (s['label'], str(ans)[:100],
                result.metadata['TITLE'])
         if (s['label'] not in values.keys()) :
             titles.append(s['label'])
             values[s['label']] = [ans]
         else :
             values[s['label']].append(ans)
+
+
 
 def mystr(obj):
     return str(obj)[:9]
@@ -151,6 +218,9 @@ class Formatter(object):
     def format(self, results):
         if results[0].dump_file is not None:
             sys.stderr.write("No output formatter selected.\nTest data is in %s (use with -i to format).\n" % results[0].dump_file)
+
+    def format2(self, results, trow=None, infod=None):
+        self.format(results)
 
 DefaultFormatter = Formatter
 
@@ -297,6 +367,12 @@ class PlotFormatter(Formatter):
             self.np = numpy
             self.figure = self.plt.figure()
             self.init_plots()
+
+            font = {'family' : 'normal',
+                    'weight' : 'bold',
+                    'size'   : 22}
+            matplotlib.rc('font', **font)
+
         except ImportError:
             raise
             raise RuntimeError("Unable to plot -- matplotlib is missing! Please install it if you want plots.")
@@ -366,6 +442,40 @@ class PlotFormatter(Formatter):
         axis.set_xlabel('')
 
         self.start_position = 1
+
+    def _init_box2_plot(self, config=None, axis=None):
+        if axis is None:
+            axis = self.figure.gca()
+        if config is None:
+            config = self.config
+
+        self._init_timeseries_plot(config, axis)
+        axis.set_xlabel('')
+
+        self.start_position = 1
+
+    def _init_boxc_plot(self, config=None, axis=None):
+        if axis is None:
+            axis = self.figure.gca()
+        if config is None:
+            config = self.config
+
+        self._init_timeseries_plot(config, axis)
+        axis.set_xlabel('')
+
+        self.start_position = 1
+
+    def _init_cdf2_plot(self, config=None, axis=None):
+        if axis is None:
+            axis = self.figure.gca()
+        if config is None:
+            config = self.config
+
+        self._init_timeseries_plot(config, axis)
+        axis.set_xlabel('')
+
+        self.start_position = 1
+
 
 
     def _init_cdf_plot(self, config=None, axis=None):
@@ -498,6 +608,243 @@ class PlotFormatter(Formatter):
                 self._do_scaling(config['axes'][a], data[a], btm, top)
 
 
+
+    def do_cdf2_plot(self, results, config=None, axis=None):
+        if config is None:
+            config = self.config
+        axis = config['axes'][0]
+
+        nr = len(self.infod[self.trow[0]])
+        data_to_plot = []
+        axis_to_plot = []
+
+        group_size = nr # len(results)
+        ticklabels = []
+        ticks = []
+        pos = 1
+
+        for i in range(0, nr):
+            title="%s_%s" % (
+                    self.infod["ECHO_SERVER"][i],
+                    target_lookup(self.infod["TARGET"][i]),
+                    )
+            title2 = self.infod["TITLE"][i]
+            axis_to_plot.append(title2)
+            ticklabels.append(title2)
+            #positions = range(i,pos+group_size)
+            #ticks.append(self.np.mean(positions))
+
+        colours = ['b', 'g', 'c', 'm', 'k']
+        while len(colours) < len(results):
+            colours = colours *2
+
+
+
+        kk = 0
+        for i,s in enumerate(config['series']):
+            if 'axis' in s and s['axis'] == 2:
+                a = 1
+            else:
+                a = 0
+
+            print i
+            data = []
+            data_labels = []
+
+            if 'label' in s:
+                for i in range(0, nr):
+                    data_to_plot.append(self.infod[s['label']][i])
+                    dd = map ((lambda x: int(x)), self.infod[s['label']][i])
+                    title="%s_%s" % (
+                            self.infod["ECHO_SERVER"][i],
+                            target_lookup(self.infod["TARGET"][i]),
+                            )
+                    title2 = self.infod["TITLE"][i][:-11]
+                    title2 = title2.replace('_', ' ')
+                    title2 = title2.replace('Dpdk', ' Dragonet')
+                    title2 = title2.replace('llvmE10k', 'llvm E10k Dragonet')
+                    title2 = title2.replace('CImplOnload', 'CImpl Dragonet')
+                    title2 = title2.replace('CImpl', 'C')
+                    data.append((dd, title2))
+
+            lines = ["-","--","-.",":"]
+            linecycler = cycle(lines)
+            print "The length of data is %d"  % (len(data))
+            for dd,t in data:
+                num_bins = 100
+                randIndex = random.sample(range(len(dd)), 10000)
+                randIndex.sort()
+                rand = [dd[i] for i in randIndex]
+                samples = rand # dd
+                counts, bin_edges = np.histogram(samples, bins=num_bins, normed=False)
+                cdf = np.cumsum(counts)
+                #pylab.plot(bin_edges[1:], cdf)
+                bp = config['axes'][a].plot( bin_edges[1:], cdf, next(linecycler) ,label=t) #   boxplot(data)
+                                           #positions=positions)
+            #self.plt.setp(bp['boxes'][a], color=colours[kk])
+            #kk = kk + 1
+#                if i == 0 and group_size > 1:
+#                    bp['caps'][j*2].set_label(r.label())
+#                for k in 'caps','whiskers','fliers':
+#                    if bp[k]:
+#                        self.plt.setp(bp[k][j*2], color=colours[j])
+#                        self.plt.setp(bp[k][j*2+1], color=colours[j])
+#
+#            pos += group_size+1
+
+        #axis.set_xticks(ticks)
+        #axis.set_xticklabels(ticklabels, fontsize=9, rotation=90)
+
+
+        #axis.set_xlim(0,pos-1)
+        #axis.set_ylim(ymin=0, ymax=5000)
+
+        #axis.set_yscale('log')
+
+        #axis.set_xscale('log')
+
+        axis.set_ylim(ymin=0, ymax=11000)
+        axis.set_xlim(xmin=10, xmax=80)
+        axis.set_xlabel("RTT Latency (usec)")
+
+
+    def do_boxc_plot(self, results, config=None, axis=None):
+        if config is None:
+            config = self.config
+        axis = config['axes'][0]
+
+        nr = len(self.infod[self.trow[0]])
+        data_to_plot = []
+        axis_to_plot = []
+
+        stats = []
+        ticklabels = []
+        ymax = 0
+        #myselector = np.mean
+        myselector = (lambda x: x[0])
+        for i in range(0, nr):
+            s1 = {}
+            title="%s_%s" % (
+                    self.infod["ECHO_SERVER"][i],
+                    target_lookup(self.infod["TARGET"][i]),
+                    )
+
+            ticklabels.append(title)
+            s1['label'] = title
+            s1['q1'] = myselector(self.infod["P50_LATENCY"][i])
+            s1['med'] = myselector(self.infod["P90_LATENCY"][i])
+            s1['q3'] = myselector(self.infod["P99_LATENCY"][i])
+            s1['whislo'] = myselector(self.infod["MIN_LATENCY"][i])
+            s1['whishi'] = myselector(self.infod["MAX_LATENCY"][i])
+            s1['fliers'] = []
+            if s1['q3'] > ymax :
+                ymax = s1['q3']
+            stats.append(s1)
+            #positions = range(i,pos+group_size)
+            #ticks.append(self.myselector(positions))
+
+        colours = ['b', 'g', 'c', 'm', 'k']
+
+        #axis.bxp(stats, boxprops=boxprops)
+        axis.bxp(stats, showfliers=False)
+
+        #axis.set_xticks(ticks)
+        axis.set_xticklabels(ticklabels, fontsize=9, rotation=90)
+
+
+        #axis.set_xlim(0,pos-1)
+        #axis.set_ylim(ymin=0, ymax=10)
+        axis.set_ylim(ymin=0, ymax=(ymax * 1.1))
+
+    def do_box2_plot(self, results, config=None, axis=None):
+        if config is None:
+            config = self.config
+        axis = config['axes'][0]
+
+        nr = len(self.infod[self.trow[0]])
+        data_to_plot = []
+        axis_to_plot = []
+
+        group_size = nr # len(results)
+        ticklabels = []
+        ticks = []
+        pos = 1
+
+        boxprops = dict(linestyle='--', linewidth=3, color='darkgoldenrod')
+        flierprops = dict(marker='o', markerfacecolor='green', markersize=12,
+                  linestyle='none')
+        medianprops = dict(linestyle='-.', linewidth=2.5, color='firebrick')
+        meanpointprops = dict(marker='D', markeredgecolor='black',
+                      markerfacecolor='firebrick')
+        meanlineprops = dict(linestyle='--', linewidth=2.5, color='purple')
+
+        for i in range(0, nr):
+            title="%s_%s" % (
+                    self.infod["ECHO_SERVER"][i],
+                    target_lookup(self.infod["TARGET"][i]),
+                    )
+            title1 = self.infod["TITLE"][i]
+            title1 = title1.replace('_', ' ')
+            t3 = title1.split()
+            title2 = ""
+            for t in t3:
+                if t == "PKT":
+                    break
+                title2 = " %s %s" % (title2, t)
+            title2 = title2.replace('Dpdk', ' Dragonet')
+            title2 = title2.replace('llvmE10k', 'llvm E10k Dragonet')
+            title2 = title2.replace('CImplOnload', 'CImpl Dragonet')
+            title2 = title2.replace('CImpl', 'C')
+
+            axis_to_plot.append(title2)
+            ticklabels.append(title2)
+            #positions = range(i,pos+group_size)
+            #ticks.append(self.np.mean(positions))
+
+        colours = ['b', 'g', 'c', 'm', 'k']
+        while len(colours) < len(results):
+            colours = colours *2
+
+        kk = 0
+        for i,s in enumerate(config['series']):
+            if 'axis' in s and s['axis'] == 2:
+                a = 1
+            else:
+                a = 0
+
+            print i
+            data = []
+
+            if 'label' in s:
+                for i in range(0, nr):
+                    data_to_plot.append(self.infod[s['label']][i])
+                    data.append(self.infod[s['label']][i])
+
+            bp = config['axes'][a].boxplot(data)
+                                           #positions=positions)
+            #self.plt.setp(bp['boxes'][a], color=colours[kk])
+            #kk = kk + 1
+#                if i == 0 and group_size > 1:
+#                    bp['caps'][j*2].set_label(r.label())
+#                for k in 'caps','whiskers','fliers':
+#                    if bp[k]:
+#                        self.plt.setp(bp[k][j*2], color=colours[j])
+#                        self.plt.setp(bp[k][j*2+1], color=colours[j])
+#
+#            pos += group_size+1
+
+        #axis.set_xticks(ticks)
+        axis.set_xticklabels(ticklabels, fontsize=15, rotation=90)
+        #axis.set_xticklabels(ticklabels, rotation=90)
+
+
+
+
+        #axis.set_xlim(0,pos-1)
+        #axis.set_ylim(ymin=0, ymax=110)
+        axis.set_ylim(ymin=0 )
+
+
     def do_box_plot(self, results, config=None, axis=None):
         if config is None:
             config = self.config
@@ -533,8 +880,10 @@ class PlotFormatter(Formatter):
 
             if 'label' in s:
                 ticklabels.append(s['label'])
+                print "appending %s" % (s['label'])
             else:
                 ticklabels.append(i)
+                print "appending-2 %s" % (s['label'])
 
             positions = range(pos,pos+group_size)
             ticks.append(self.np.mean(positions))
@@ -639,6 +988,46 @@ class PlotFormatter(Formatter):
         for i,config in enumerate(self.configs):
             getattr(self, 'do_%s_plot' % config['type'])(results, config=config)
 
+    def format2(self, results, trow, infod):
+        if not trow[0]:
+            return
+        self.trow = trow
+        self.infod = infod
+        getattr(self, 'do_%s_plot' % self.config['type'])(results)
+        skip_title = len(results) > 1
+
+        artists = []
+        legend_exists = False
+        for c in self.configs:
+            legends = self._do_legend(c)
+            if legends:
+                artists += legends
+                legend_exists = True
+
+        artists += self._annotate_plot(skip_title)
+
+        # Since outputting image data to stdout does not make sense, we launch
+        # the interactive matplotlib viewer if stdout is set for output.
+        # Otherwise, the filename is passed to matplotlib, which selects an
+        # appropriate output format based on the file name.
+        if self.output == "-":
+            # For the interactive viewer there's no bbox_extra_artists, so we
+            # need to reduce the axis sizes to make room for the legend (which
+            # might still be slightly cut off).
+            if self.settings.PRINT_LEGEND and legend_exists:
+                for a in reduce(lambda x,y:x+y, [i['axes'] for i in self.configs]):
+                    box = a.get_position()
+                    a.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            if not self.settings.GUI:
+                self.plt.show()
+        else:
+            try:
+                self.figure.savefig(self.output, bbox_extra_artists=artists, bbox_inches='tight')
+            except IOError as e:
+                raise RuntimeError("Unable to save output plot: %s" % e)
+
+
+
     def format(self, results):
         if not results[0]:
             return
@@ -702,6 +1091,7 @@ class PlotFormatter(Formatter):
         return titles
 
     def _do_legend(self, config, postfix=""):
+        print "called _do_legend"
         if not self.settings.PRINT_LEGEND:
             return []
 
@@ -714,6 +1104,7 @@ class PlotFormatter(Formatter):
                                  [a.get_legend_handles_labels() for a in axes])
 
         if not labels:
+            print "no labels"
             return []
 
         kwargs = {}
