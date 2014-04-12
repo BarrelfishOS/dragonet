@@ -23,6 +23,11 @@ void stack_init(const char *name, const char *inq, const char *outq)
     printf("Application ready\n");
 }
 
+struct state *stack_get_state(void)
+{
+    return state;
+}
+
 struct input *stack_get_packet(void)
 {
     struct input *in;

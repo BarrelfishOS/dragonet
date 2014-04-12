@@ -4,6 +4,7 @@
 #include <implementation.h>
 
 void stack_init(const char *name, const char *inq, const char *outq);
+struct state *stack_get_state(void);
 struct input *stack_get_packet(void);
 void stack_send_udp_packet(struct input *in);
 
