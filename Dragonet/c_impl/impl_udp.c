@@ -88,9 +88,13 @@ node_out_t do_pg__RxEchoAPP(struct state *state, struct input *in)
     // get packet fields to be sent out.
     portno_t sport = udp_hdr_sport_read(in);
     portno_t dport = udp_hdr_dport_read(in);
+    uint32_t srcIP = ipv4_srcIP_rd(in);
+    uint32_t dstIP = ipv4_dstIP_rd(in);
+
     in->attr->udp_sport = dport;
     in->attr->udp_dport = sport;
-
+    in->attr->ip4_dst = srcIP;
+    in->attr->ip4_src = dstIP;  // FIXME: maybe I should read it from global state
 
     contents[ret] = '\0';
     //printf
@@ -106,8 +110,13 @@ node_out_t do_pg__RxDnsAPP(struct state *state, struct input *in)
     int ret = udp_copy_payload(in, contents, sizeof(contents));
     portno_t sport = udp_hdr_sport_read(in);
     portno_t dport = udp_hdr_dport_read(in);
+    uint32_t srcIP = ipv4_srcIP_rd(in);
+    uint32_t dstIP = ipv4_dstIP_rd(in);
+
     in->attr->udp_sport = dport;
     in->attr->udp_dport = (sport + 1);
+    in->attr->ip4_dst = srcIP;
+    in->attr->ip4_src = dstIP;  // FIXME: maybe I should read it from global state
 
     contents[ret] = '\0';
     dprint
@@ -127,14 +136,6 @@ node_out_t do_pg__RxDnsAPP(struct state *state, struct input *in)
 node_out_t do_pg__TxL4UDPInitiateResponse(struct state *state, struct input *in)
 {
 
-    uint32_t srcIP = ipv4_srcIP_rd(in);
-    uint32_t dstIP = ipv4_dstIP_rd(in);
-
-    // copy out application set attributes so that they will not get cleared
-    // get packet fields to be sent out.
-    portno_t sport = in->attr->udp_sport; // udp_hdr_sport_read(in);
-    portno_t dport = in->attr->udp_dport; // udp_hdr_dport_read(in);
-
 #if DO_EXPLICIT_COPY
     pktoff_t payload_len = udp_payload_length(in);
     uint8_t payload[DEFAULT_BUFFER_SIZE];
@@ -145,18 +146,11 @@ node_out_t do_pg__TxL4UDPInitiateResponse(struct state *state, struct input *in)
 #endif // DO_EXPLICIT_COPY
 
     // Throw out all headers up to and including ICMP
-    pkt_prepend(in, - (ssize_t) udp_payload_offset(in));
-    // clean up the attributes
-    input_clean_attrs(in);
+    pkt_prepend(in, -in->attr->offset_l5);
 
 #if DO_EXPLICIT_COPY
     pkt_write(in, 0, payload_len, payload);
 #endif // DO_EXPLICIT_COPY
-
-    in->attr->ip4_dst = srcIP;
-    in->attr->ip4_src = dstIP;  // FIXME: maybe I should read it from global state
-    in->attr->udp_sport = sport;
-    in->attr->udp_dport = dport;
 
     // P_TxL4UDPInitiateResponse_drop
     return P_TxL4UDPInitiateResponse_out;
@@ -166,7 +160,10 @@ node_out_t do_pg__TxL4UDPAllocateHeader(struct state *state, struct input *in)
 {
     pktoff_t len = udp_header_len;
     pkt_prepend(in, len);
-    in->attr->offset_l5 = 0;
+    in->attr->offset_l5 = udp_header_len;
+    in->attr->offset_l4 = 0;
+    in->attr->offset_l3 = 0;
+    in->attr->offset_l2 = 0;
     // P_TxL4UDPAllocateHeader_out
     return P_TxL4UDPAllocateHeader_out;
 }
