@@ -225,4 +225,14 @@ executable bench-echo
     c-sources:          c_impl/state.c,
                         c_impl/implementation.c,
                         apps/lib/helpers.c
-    --Include-dirs:       c_impl/include/
+
+executable bench-udp-rtt
+    main-is:            microbenchmark/udp_rtt.c
+    Hs-source-dirs:     apps
+    other-modules:      Dummy
+    build-depends:      Dragonet, base
+    include-dirs:       apps/lib/include
+    c-sources:          c_impl/state.c,
+                        c_impl/implementation.c,
+                        apps/lib/helpers.c
+
