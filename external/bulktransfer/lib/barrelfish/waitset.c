@@ -50,15 +50,20 @@ errval_t ws_event_dispatch(struct waitset *ws)
 
 errval_t ws_event_dispatch_nonblock(struct waitset *ws)
 {
-    struct waitset_chanstate *cs;
+    struct waitset_chanstate *cs, *csfirst = NULL;
     bool event_fired = false;
 
-    cs = get_next(ws);
-    if (cs != NULL) {
+    while (!event_fired && ws->chans_head != csfirst) {
+        cs = get_next(ws);
+        if (cs == NULL) {
+            // No channels on the waitset
+            break;
+        } else if (csfirst == NULL) {
+            csfirst = cs;
+        }
+
         event_fired = cs->poll(cs);
         ws_addchan(ws, cs);
-    } else {
-        return WS_NO_EVENT;
     }
 
     return (event_fired ? SYS_ERR_OK : WS_NO_EVENT);
