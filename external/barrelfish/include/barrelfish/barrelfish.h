@@ -6,9 +6,12 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 
 #define BULK_LINUX 1
 #define STATIC_ASSERT(COND,MSG) typedef char static_assertion_##MSG[(COND)?1:-1]
+
+#define assert_fix assert
 
 typedef uintptr_t lvaddr_t;
 typedef uintptr_t lpaddr_t;

@@ -229,7 +229,7 @@ static errval_t op_channel_create(struct bulk_channel *channel)
     if (err_is_fail(err)) {
         goto fail_rx;
     }
-    shm_waitset_register(&internal->rx, &internal->rx_wss, msg_handler,
+    shm_chan_waitset_register(&internal->rx, &internal->rx_wss, msg_handler,
             internal, channel->waitset);
 
     strcpy(name, internal->name);
@@ -279,7 +279,7 @@ static errval_t op_channel_bind(struct bulk_channel     *channel,
     if (err_is_fail(err)) {
         goto fail_rx;
     }
-    shm_waitset_register(&internal->rx, &internal->rx_wss, msg_handler,
+    shm_chan_waitset_register(&internal->rx, &internal->rx_wss, msg_handler,
             internal, channel->waitset);
 
     strcpy(name, internal->name);
@@ -310,7 +310,7 @@ static errval_t op_channel_bind(struct bulk_channel     *channel,
     msg->type = SHM_MSG_BIND;
     //msg->content.bind_request.op = ops_id(ops);
     msg->content.bind_request.role = channel->role;
-    shm_chan_send(&internal->tx);
+    shm_chan_send(&internal->tx, msg);
 
     return SYS_ERR_OK;
 
@@ -378,7 +378,7 @@ static errval_t op_assign_pool(struct bulk_channel *channel,
     msg->content.assign.op = ops_id(ops);
     msg->content.assign.pool = pool->id;
 
-    shm_chan_send(&internal->tx);
+    shm_chan_send(&internal->tx, msg);
     return SYS_ERR_OK;
 }
 
@@ -428,7 +428,7 @@ static errval_t buffer_op_helper(struct bulk_channel  *channel,
         memcpy(destmeta, meta, channel->meta_size);
     }
 
-    shm_chan_send(&internal->tx);
+    shm_chan_send(&internal->tx, msg);
     return SYS_ERR_OK;
 }
 
@@ -509,7 +509,7 @@ out:
             BULK_DIRECTION_RX : BULK_DIRECTION_TX);
     out->content.bind_done.err = err;
 
-    shm_chan_send(&internal->tx);
+    shm_chan_send(&internal->tx, out);
 }
 
 static void msg_bind_done(struct lsm_internal *internal, struct shm_message *msg)
@@ -571,7 +571,7 @@ out:
     out->content.status.op = msg->content.assign.op;
     out->content.status.err = err;
 
-    shm_chan_send(&internal->tx);
+    shm_chan_send(&internal->tx, out);
 }
 
 static void msg_buffer(struct lsm_internal *internal, struct shm_message *msg)
@@ -630,7 +630,7 @@ out:
     out->content.status.op = msg->content.buffer.op;
     out->content.status.err = err;
 
-    shm_chan_send(&internal->tx);
+    shm_chan_send(&internal->tx, out);
 }
 
 static void msg_status(struct lsm_internal *internal, struct shm_message *msg)

@@ -6,16 +6,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <bulk_transfer/bulk_internal.h>
-#include "shm_channel.h"
+#include <shmchan.h>
 
 #define SHM_CHAN_EXTRA 4096
 struct shm_chan_meta {
     size_t num_slots;
 };
 
-errval_t shm_chan_create(struct shm_channel *chan, const char *name,
-                         size_t num_slots, bool sender)
+errval_t shmchan_create_(struct shm_channel *chan, const char *name,
+                         size_t slotsz, size_t num_slots, bool sender)
 {
     errval_t err;
     int fd, res;
@@ -24,7 +23,7 @@ errval_t shm_chan_create(struct shm_channel *chan, const char *name,
     // Create and initialize shm area
     fd = shm_open(name, O_CREAT | O_RDWR | O_EXCL, 0600);
     assert_fix(fd != -1);
-    res = ftruncate(fd, num_slots * SHM_MSGLEN + SHM_CHAN_EXTRA);
+    res = ftruncate(fd, num_slots * slotsz + SHM_CHAN_EXTRA);
     assert_fix(res == 0);
     meta = mmap(NULL, SHM_CHAN_EXTRA, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
                 0);
@@ -36,13 +35,13 @@ errval_t shm_chan_create(struct shm_channel *chan, const char *name,
     assert_fix(res == 0);
     close(fd);
 
-    err = shm_chan_bind(chan, name, sender);
+    err = shmchan_bind_(chan, name, slotsz, sender);
     chan->creator = true;
     return err;
 }
 
-errval_t shm_chan_bind(struct shm_channel *chan, const char *name,
-                       bool sender)
+errval_t shmchan_bind_(struct shm_channel *chan, const char *name,
+                       size_t slotsz, bool sender)
 {
     int fd, res;
     struct shm_chan_meta *meta;
@@ -54,7 +53,7 @@ errval_t shm_chan_bind(struct shm_channel *chan, const char *name,
     meta = mmap(NULL, SHM_CHAN_EXTRA, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
                 0);
     assert_fix(meta != MAP_FAILED);
-    chan->data = mmap(NULL, meta->num_slots * SHM_MSGLEN,
+    chan->data = mmap(NULL, meta->num_slots * slotsz,
                       PROT_READ | PROT_WRITE, MAP_SHARED, fd, SHM_CHAN_EXTRA);
     assert_fix(chan->data != MAP_FAILED);
 
@@ -71,11 +70,11 @@ errval_t shm_chan_bind(struct shm_channel *chan, const char *name,
     return SYS_ERR_OK;
 }
 
-errval_t shm_chan_release(struct shm_channel *chan)
+errval_t shmchan_release_(struct shm_channel *chan, size_t slotsz)
 {
     int res;
 
-    res = munmap(chan->data, chan->size * SHM_MSGLEN);
+    res = munmap(chan->data, chan->size * slotsz);
     assert_fix(res == 0);
 
     if (chan->creator) {
@@ -89,9 +88,9 @@ errval_t shm_chan_release(struct shm_channel *chan)
 static bool ws_poll(struct waitset_chanstate *wscs)
 {
     struct shm_channel_wsstate *wss = (struct shm_channel_wsstate *) wscs;
-    struct shm_message *msg;
+    void *msg;
 
-    if (!err_is_ok(shm_chan_poll(wss->chan, &msg))) {
+    if (!err_is_ok(shmchan_poll_(wss->chan, wss->slotsz, &msg))) {
         return false;
     }
 
@@ -99,13 +98,15 @@ static bool ws_poll(struct waitset_chanstate *wscs)
     return true;
 }
 
-void shm_waitset_register(
+void shmchan_waitset_register_(
                 struct shm_channel *chan,
+                size_t slotsz,
                 struct shm_channel_wsstate *wscs,
-                void (*msg_handler)(struct shm_message *msg, void *opaque),
+                void (*msg_handler)(void *msg, void *opaque),
                 void *opaque, struct waitset *ws)
 {
     wscs->chan = chan;
+    wscs->slotsz = slotsz;
     wscs->msg_handler = msg_handler;
     wscs->opaque = opaque;
     wscs->wscs.poll = ws_poll;

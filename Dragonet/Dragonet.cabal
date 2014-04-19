@@ -52,7 +52,8 @@ library
                         Util.Tap
     build-depends:      base, containers, template-haskell, fgl, parsec,
                         bytestring, pretty-show, stm, mtl, graphviz>=2999.16,
-                        text, process, temporary, Bulktransfer
+                        text, process, temporary, bulktransfer, shmchan,
+                        barrelfish
     extensions:         DoAndIfThenElse, RankNTypes, EmptyDataDecls
 
 executable confgen
@@ -131,13 +132,13 @@ executable llvm-cgen
                         c_impl/support/Icmp.c,
                         lib/Util/tap.c,
                         lib/Dragonet/Pipelines/pipelines_helper.c,
-                        ../external/bulktransfer/lib/bulk_linuxshm/shm_channel.c,
                         ../external/bulktransfer/lib/bulk_linuxshm/implementation.c,
                         ../external/bulktransfer/lib/bulk_alloc/alloc.c,
                         ../external/bulktransfer/lib/bulk_transfer/channel.c,
                         ../external/bulktransfer/lib/bulk_transfer/pool.c,
                         ../external/bulktransfer/lib/bulk_transfer/emergency.c,
-                        ../external/bulktransfer/lib/barrelfish/waitset.c,
+                        ../external/shmchan/lib/shmchan.c,
+                        ../external/barrelfish/lib/waitset.c,
 
 executable llvm-cgen-e10k
     main-is:            llvm-cgen.hs
@@ -169,13 +170,13 @@ executable llvm-cgen-e10k
                         c_impl/e10k/linux_pci_uio.c,
                         lib/Util/tap.c,
                         lib/Dragonet/Pipelines/pipelines_helper.c,
-                        ../external/bulktransfer/lib/bulk_linuxshm/shm_channel.c,
                         ../external/bulktransfer/lib/bulk_linuxshm/implementation.c,
                         ../external/bulktransfer/lib/bulk_alloc/alloc.c,
                         ../external/bulktransfer/lib/bulk_transfer/channel.c,
                         ../external/bulktransfer/lib/bulk_transfer/pool.c,
                         ../external/bulktransfer/lib/bulk_transfer/emergency.c,
-                        ../external/bulktransfer/lib/barrelfish/waitset.c,
+                        ../external/shmchan/lib/shmchan.c,
+                        ../external/barrelfish/lib/waitset.c,
 
 
 
@@ -204,13 +205,13 @@ executable llvm-cgen-dpdk
                         c_impl/support/Icmp.c,
                         lib/Util/tap.c,
                         lib/Dragonet/Pipelines/pipelines_helper.c,
-                        ../external/bulktransfer/lib/bulk_linuxshm/shm_channel.c,
                         ../external/bulktransfer/lib/bulk_linuxshm/implementation.c,
                         ../external/bulktransfer/lib/bulk_alloc/alloc.c,
                         ../external/bulktransfer/lib/bulk_transfer/channel.c,
                         ../external/bulktransfer/lib/bulk_transfer/pool.c,
                         ../external/bulktransfer/lib/bulk_transfer/emergency.c,
-                        ../external/bulktransfer/lib/barrelfish/waitset.c,
+                        ../external/shmchan/lib/shmchan.c,
+                        ../external/barrelfish/lib/waitset.c,
 
 executable generateCSkeleton
     main-is:            generateCSkeleton.hs
