@@ -26,7 +26,7 @@ library
                         lib/Dragonet/Pipelines/pipelines_helper.c,
                         c_impl/state.c
     Include-dirs:       c_impl/include/, lib/Dragonet/Pipelines/
-    CC-options:         -std=gnu99
+    CC-options:         -Wall -std=gnu99 -Wno-unused-function
     Exposed-modules:    Dragonet.Configuration,
                         Dragonet.Constraints,
                         Dragonet.DotGenerator,
@@ -117,6 +117,7 @@ executable llvm-cgen
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
     C-sources:          Runner/dynamic.c
+    CC-options:         -Wall -Wno-unused-function
     x-llvm-c-includes:  c_impl/include,
                         lib/Dragonet/Pipelines,
                         ../external/bulktransfer/lib/include
@@ -153,6 +154,7 @@ executable llvm-cgen-e10k
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
     C-sources:          Runner/dynamic.c
+    CC-options:         -Wall -Wno-unused-function
     x-llvm-c-includes:  c_impl/include,
                         c_impl/e10k/include,
                         lib/Dragonet/Pipelines,
@@ -196,6 +198,7 @@ executable llvm-cgen-dpdk
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
     C-sources:          Runner/dynamic.c
+    CC-options:         -Wall -Wno-unused-function
     x-llvm-c-includes:  c_impl/include,
                         lib/Dragonet/Pipelines,
                         ../external/bulktransfer/lib/include
@@ -235,6 +238,7 @@ executable bench-echo
     c-sources:          c_impl/state.c,
                         c_impl/implementation.c,
                         apps/lib/helpers.c
+    CC-options:         -Wall -Wno-unused-function
 
 executable bench-udp-rtt
     main-is:            microbenchmark/udp_rtt.c
@@ -245,4 +249,5 @@ executable bench-udp-rtt
     c-sources:          c_impl/state.c,
                         c_impl/implementation.c,
                         apps/lib/helpers.c
+    CC-options:         -Wall -Wno-unused-function
 
