@@ -109,6 +109,7 @@ executable tuntapPing
 
 executable llvm-cgen
     main-is:            llvm-cgen.hs
+    other-modules:      Runner.LLVM
     build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
                         llvm-general==3.4.*, llvm-general-pure
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
@@ -142,6 +143,7 @@ executable llvm-cgen
 
 executable llvm-cgen-e10k
     main-is:            llvm-cgen.hs
+    other-modules:      Runner.LLVM
     build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
                         llvm-general==3.4.*, llvm-general-pure
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
@@ -182,6 +184,7 @@ executable llvm-cgen-e10k
 
 executable llvm-cgen-dpdk
     main-is:            llvm-cgen.hs
+    other-modules:      Runner.LLVM
     build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
                         llvm-general==3.4.*, llvm-general-pure, dpdk
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
