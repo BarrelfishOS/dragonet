@@ -28,6 +28,7 @@ import System.Environment (getArgs, getProgName)
 import System.IO  (writeFile,hFlush,stdout)
 
 import qualified Runner.LLVM as LLVM
+import qualified Runner.Dynamic as Dyn
 
 
 

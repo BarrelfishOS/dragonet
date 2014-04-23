@@ -109,12 +109,14 @@ executable tuntapPing
 
 executable llvm-cgen
     main-is:            llvm-cgen.hs
-    other-modules:      Runner.LLVM
+    other-modules:      Runner.LLVM,
+                        Runner.Dynamic
     build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
                         llvm-general==3.4.*, llvm-general-pure
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
+    C-sources:          Runner/dynamic.c
     x-llvm-c-includes:  c_impl/include,
                         lib/Dragonet/Pipelines,
                         ../external/bulktransfer/lib/include
@@ -143,12 +145,14 @@ executable llvm-cgen
 
 executable llvm-cgen-e10k
     main-is:            llvm-cgen.hs
-    other-modules:      Runner.LLVM
+    other-modules:      Runner.LLVM,
+                        Runner.Dynamic
     build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
                         llvm-general==3.4.*, llvm-general-pure
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
+    C-sources:          Runner/dynamic.c
     x-llvm-c-includes:  c_impl/include,
                         c_impl/e10k/include,
                         lib/Dragonet/Pipelines,
@@ -184,12 +188,14 @@ executable llvm-cgen-e10k
 
 executable llvm-cgen-dpdk
     main-is:            llvm-cgen.hs
-    other-modules:      Runner.LLVM
+    other-modules:      Runner.LLVM,
+                        Runner.Dynamic
     build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
                         llvm-general==3.4.*, llvm-general-pure, dpdk
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
+    C-sources:          Runner/dynamic.c
     x-llvm-c-includes:  c_impl/include,
                         lib/Dragonet/Pipelines,
                         ../external/bulktransfer/lib/include
