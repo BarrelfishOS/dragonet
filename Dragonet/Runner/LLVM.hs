@@ -1504,7 +1504,24 @@ codegen_all pgraph stackname = do
 
 
 passes :: LLVM.PM.PassSetSpec
-passes = LLVM.PM.defaultCuratedPassSetSpec { LLVM.PM.optLevel = Just 3 }
+passes = LLVM.PM.defaultCuratedPassSetSpec {
+            LLVM.PM.optLevel = Just 3,
+            LLVM.PM.useInlinerWithThreshold = Just 5000 }
+
+makeNodeFunsInternal :: AST.Module -> AST.Module
+makeNodeFunsInternal m = m {
+        AST.moduleDefinitions = map fixDef $ AST.moduleDefinitions m }
+    where
+        fixDef (AST.GlobalDefinition g) = AST.GlobalDefinition $ fixGlob g
+        fixDef x = x
+
+        fixGlob f@(AST.Function l v c pas t n ps fas x y z bbs) = case n of
+            (AST.N.Name name) ->
+                if L.isPrefixOf "pg__" name -- || L.isPrefixOf "do_pg__" name
+                    then AST.Function AST.L.Internal v c pas t n ps fas x y z bbs
+                    else f
+            _ -> f
+        fixGlob x = x
 
 
 -- Prepeares and runs the pipeline
@@ -1523,7 +1540,7 @@ runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
             let state_ty = case findTy ast2 "struct.state" of
                                 Just ty -> ty
                                 Nothing -> error "Could not find struct state"
-            let ast_mod = cgAstModule $ codeGen mname state_ty input_ty pli plg (codegen_all pgraph stackname)
+            let ast_mod = makeNodeFunsInternal $ cgAstModule $ codeGen mname state_ty input_ty pli plg (codegen_all pgraph stackname)
             liftError $ LLVM.Mod.withModuleFromAST ctx ast_mod $ \mod -> do
                 modWriteFile mod $ mname ++ "-cg.ll"
                 liftError $ LLVM.Mod.linkModules False mod mod2
