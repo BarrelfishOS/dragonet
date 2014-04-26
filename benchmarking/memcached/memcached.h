@@ -120,6 +120,26 @@
 #define APPEND_NUM_STAT(num, name, fmt, val) \
     APPEND_NUM_FMT_STAT("%d:%s", num, name, fmt, val)
 
+//#define MYDEBUG     1
+#ifdef MYDEBUG
+#define mprint(x...)    printf("debug:" x)
+#else
+//#define mprint(x...)   ((void)0)
+#define mprint(...)   ((void)0)
+#endif // MYDEBUG
+
+#ifdef ENABLE_DRAGONET
+// If not enabled, enable DRAGONET
+#ifndef DRAGONET
+#define DRAGONET        1
+#endif // DRAGONET
+#endif // ENABLE_DRAGONET
+
+#ifdef DRAGONET
+#include <dragonet/helpers.h>
+extern int use_dragonet_stack;
+#endif // DRAGONET
+
 /**
  * Callback for any function producing stats.
  *
@@ -458,6 +478,9 @@ struct conn {
     short cmd; /* current command being processed */
     int opaque;
     int keylen;
+#ifdef DRAGONET
+    int is_dragonet;
+#endif // DRAGONET
     conn   *next;     /* Used for generating a list of conn structures */
     LIBEVENT_THREAD *thread; /* Pointer to the thread object serving this connection */
 };
@@ -574,6 +597,7 @@ extern void drop_privileges(void);
 #if !defined(__GNUC__) || (__GNUC__ == 2 && __GNUC_MINOR__ < 96)
 #define __builtin_expect(x, expected_value) (x)
 #endif
+
 
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)

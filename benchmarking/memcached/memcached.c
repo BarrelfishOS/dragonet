@@ -54,6 +54,11 @@
 #endif
 #endif
 
+
+#ifdef DRAGONET
+int use_dragonet_stack = 0;
+#endif // DRAGONET
+
 /*
  * forward declarations
  */
@@ -466,6 +471,20 @@ conn *conn_new(const int sfd, enum conn_states init_state,
 
     c->noreply = false;
 
+#ifdef DRAGONET
+    if (use_dragonet_stack) {
+        // Make sure that it is UDP and should go to dragonet
+        if (! IS_UDP(transport)) {
+            printf("Error: Dragonet: NON-UDP new_conn request on on Dragonet stack\n");
+            exit(1);
+        }
+
+        c->is_dragonet = 1;
+        // Register callback with dragonet
+        // Callback is event_handler(sfd, ??,  (void *)c);
+        register_callback_dn(event_handler, sfd, 0, (void *)c);
+    } else {
+#endif // DRAGONET
     event_set(&c->event, sfd, event_flags, event_handler, (void *)c);
     event_base_set(base, &c->event);
     c->ev_flags = event_flags;
@@ -477,6 +496,9 @@ conn *conn_new(const int sfd, enum conn_states init_state,
         perror("event_add");
         return NULL;
     }
+#ifdef DRAGONET
+    } // end else:  use_dragonet_stack
+#endif // DRAGONET
 
     STATS_LOCK();
     stats.curr_conns++;
@@ -3604,11 +3626,23 @@ static enum try_read_result try_read_udp(conn *c) {
     assert(c != NULL);
 
     c->request_addr_size = sizeof(c->request_addr);
+#ifdef DRAGONET
+    if (use_dragonet_stack) {
+        res = recvfrom_dn((uint8_t *)c->rbuf, c->rsize);
+    } else {
+#endif // DRAGONET
     res = recvfrom(c->sfd, c->rbuf, c->rsize,
                    0, (struct sockaddr *)&c->request_addr,
                    &c->request_addr_size);
+#ifdef DRAGONET
+    }
+#endif // DRAGONET
+
     if (res > 8) {
         unsigned char *buf = (unsigned char *)c->rbuf;
+
+        assert(&c->thread != NULL);
+        assert(&c->thread->stats.mutex != NULL);
         pthread_mutex_lock(&c->thread->stats.mutex);
         c->thread->stats.bytes_read += res;
         pthread_mutex_unlock(&c->thread->stats.mutex);
@@ -3713,6 +3747,16 @@ static bool update_event(conn *c, const int new_flags) {
     struct event_base *base = c->event.ev_base;
     if (c->ev_flags == new_flags)
         return true;
+
+#ifdef DRAGONET
+    if (use_dragonet_stack) {
+        if (c->is_dragonet == 1) {
+            // FIXME: I should do something about updating the event.
+            return true;
+        }
+    }
+#endif // DRAGONET
+
     if (event_del(&c->event) == -1) return false;
     event_set(&c->event, c->sfd, new_flags, event_handler, (void *)c);
     event_base_set(base, &c->event);
@@ -3768,17 +3812,44 @@ void do_accept_new_conns(const bool do_accept) {
 static enum transmit_result transmit(conn *c) {
     assert(c != NULL);
 
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
     if (c->msgcurr < c->msgused &&
             c->msglist[c->msgcurr].msg_iovlen == 0) {
         /* Finished writing the current msg; advance to the next. */
         c->msgcurr++;
     }
     if (c->msgcurr < c->msgused) {
-        ssize_t res;
+        ssize_t res = 0;
         struct msghdr *m = &c->msglist[c->msgcurr];
 
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+
+#ifdef DRAGONET
+        if ((use_dragonet_stack == 1) && (c->is_dragonet == 1)) {
+            assert(!"transmit on dragonet is not yet supported\n");
+            uint8_t buff[1410];
+            int bufsize = 0;
+            int ii = 0;
+            for(ii = 0; ii < m->msg_iovlen; ++ii)  {
+                memcpy(buff + bufsize, m->msg_iov[ii].iov_base,  m->msg_iov[ii].iov_len);
+                bufsize = bufsize + m->msg_iov[ii].iov_len;
+                mprint("%s:%s:%d: %d, copying data of size %d\n",
+                    __FILE__, __func__, __LINE__, ii,  bufsize);
+            }
+
+            mprint("%s:%s:%d: sending data of size %d\n",
+                    __FILE__, __func__, __LINE__, bufsize);
+            res = send_dn(buff, bufsize);
+        } else {
+            res = sendmsg(c->sfd, m, 0);
+        }
+#else // DRAGONET
         res = sendmsg(c->sfd, m, 0);
+#endif // DRAGONET
+    mprint("%s:%s:%d: sendmsg ret = %zu\n",
+            __FILE__, __func__, __LINE__, res);
         if (res > 0) {
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
             pthread_mutex_lock(&c->thread->stats.mutex);
             c->thread->stats.bytes_written += res;
             pthread_mutex_unlock(&c->thread->stats.mutex);
@@ -3797,6 +3868,7 @@ static enum transmit_result transmit(conn *c) {
                 m->msg_iov->iov_base = (caddr_t)m->msg_iov->iov_base + res;
                 m->msg_iov->iov_len -= res;
             }
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
             return TRANSMIT_INCOMPLETE;
         }
         if (res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
@@ -3804,8 +3876,10 @@ static enum transmit_result transmit(conn *c) {
                 if (settings.verbose > 0)
                     fprintf(stderr, "Couldn't update event\n");
                 conn_set_state(c, conn_closing);
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
                 return TRANSMIT_HARD_ERROR;
             }
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
             return TRANSMIT_SOFT_ERROR;
         }
         /* if res == 0 or res == -1 and error is not EAGAIN or EWOULDBLOCK,
@@ -3817,8 +3891,10 @@ static enum transmit_result transmit(conn *c) {
             conn_set_state(c, conn_read);
         else
             conn_set_state(c, conn_closing);
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
         return TRANSMIT_HARD_ERROR;
     } else {
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
         return TRANSMIT_COMPLETE;
     }
 }
@@ -4094,6 +4170,7 @@ static void drive_machine(conn *c) {
                 }
             }
 
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
             /* fall through... */
 
         case conn_mwrite:
@@ -4103,14 +4180,17 @@ static void drive_machine(conn *c) {
             conn_set_state(c, conn_closing);
             break;
           }
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
             switch (transmit(c)) {
             case TRANSMIT_COMPLETE:
                 if (c->state == conn_mwrite) {
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
                     conn_release_items(c);
                     /* XXX:  I don't know why this wasn't the general case */
                     if(c->protocol == binary_prot) {
                         conn_set_state(c, c->write_and_go);
                     } else {
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
                         conn_set_state(c, conn_new_cmd);
                     }
                 } else if (c->state == conn_write) {
@@ -4156,6 +4236,7 @@ static void drive_machine(conn *c) {
 void event_handler(const int fd, const short which, void *arg) {
     conn *c;
 
+    mprint("event_handler called\n");
     c = (conn *)arg;
     assert(c != NULL);
 
@@ -4168,7 +4249,6 @@ void event_handler(const int fd, const short which, void *arg) {
         conn_close(c);
         return;
     }
-
     drive_machine(c);
 
     /* wait for next event */
@@ -4267,7 +4347,6 @@ static int server_socket(const char *interface,
     }
 
     for (next= ai; next; next= next->ai_next) {
-        conn *listen_conn_add;
         if ((sfd = new_socket(next)) == -1) {
             /* getaddrinfo can return "junk" addresses,
              * we make sure at least one works before erroring.
@@ -4307,6 +4386,36 @@ static int server_socket(const char *interface,
             if (error != 0)
                 perror("setsockopt");
         }
+
+#ifdef DRAGONET
+        if (use_dragonet_stack) {
+            if (next->ai_addr->sa_family != AF_INET) {
+                printf("Error: non AF_INET address requested from dragonet\n");
+                return 1;
+            }
+            // FIXME: make sure that this is correct address
+            /*
+               if (next->ai_addr == "") {
+               }
+               */
+            // Make sure that this is UDP protocol
+            printf("checking udp proto\n");
+            if (!IS_UDP(transport)) {
+                printf("Error: Non-UDP socket requested from dragonet\n");
+                return 1;
+            }
+
+            printf("checking udp port\n");
+            printf("setting threads\n");
+            success++;
+            int c;
+            for (c = 0; c < settings.num_threads_per_udp; c++) {
+                /* this is guaranteed to hit all threads because we round-robin */
+                dispatch_conn_new(sfd, conn_read, EV_READ | EV_PERSIST,
+                        UDP_READ_BUFFER_SIZE, transport);
+            }
+        } else {
+#endif // DRAGONET
 
         if (bind(sfd, next->ai_addr, next->ai_addrlen) == -1) {
             if (errno != EADDRINUSE) {
@@ -4356,6 +4465,7 @@ static int server_socket(const char *interface,
                                   UDP_READ_BUFFER_SIZE, transport);
             }
         } else {
+            conn *listen_conn_add;
             if (!(listen_conn_add = conn_new(sfd, conn_listening,
                                              EV_READ | EV_PERSIST, 1,
                                              transport, main_base))) {
@@ -4365,12 +4475,16 @@ static int server_socket(const char *interface,
             listen_conn_add->next = listen_conn;
             listen_conn = listen_conn_add;
         }
-    }
 
+#ifdef DRAGONET
+        } // end else: use_dragonet_stack
+#endif // DRAGONET
+
+    } // end for:
     freeaddrinfo(ai);
-
     /* Return zero iff we detected no errors in starting up connections */
     return success == 0;
+    //return 1;
 }
 
 static int server_sockets(int port, enum network_transport transport,
@@ -4597,6 +4711,10 @@ static void usage(void) {
     printf("-C            Disable use of CAS\n");
     printf("-b            Set the backlog queue limit (default: 1024)\n");
     printf("-B            Binding protocol - one of ascii, binary, or auto (default)\n");
+
+#ifdef DRAGONET
+    printf("-N            Use Dragonet Network Stack\n");
+#endif // DRAGONET
     printf("-I            Override the size of each slab page. Adjusts max item size\n"
            "              (default: 1mb, min: 1k, max: 128m)\n");
 #ifdef ENABLE_SASL
@@ -4902,6 +5020,7 @@ int main (int argc, char **argv) {
           "I:"  /* Max item size */
           "S"   /* Sasl ON */
           "F"   /* Disable flush_all */
+          "N"   /* Use Dragonet network stack */
           "o:"  /* Extended generic options */
         ))) {
         switch (c) {
@@ -4932,6 +5051,11 @@ int main (int argc, char **argv) {
         case 'M':
             settings.evict_to_free = 0;
             break;
+#ifdef DRAGONET
+        case 'N':
+            use_dragonet_stack = 1;
+            break;
+#endif // DRAGONET
         case 'c':
             settings.maxconns = atoi(optarg);
             break;
@@ -5152,6 +5276,21 @@ int main (int argc, char **argv) {
             return 1;
         }
     }
+
+#ifdef DRAGONET
+    if (use_dragonet_stack) {
+        printf("memcached Dragonet\n");
+        stack_init("AppEcho", "Rx_to_AppEcho", "AppEcho_to_Tx");
+        printf("memcached Dragonet: end\n");
+    } else {
+#endif // DRAGONET
+    printf("memcached with Dragonet disabled with option -N\n");
+#ifdef DRAGONET
+    }
+#else // DRAGONET
+    printf("memcached without Dragonet support\n");
+#endif // DRAGONET
+
 
     /*
      * Use one workerthread to serve each UDP port if the user specified
@@ -5392,3 +5531,4 @@ int main (int argc, char **argv) {
 
     return retval;
 }
+

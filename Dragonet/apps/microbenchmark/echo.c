@@ -8,9 +8,11 @@ int main(int argc, char *argv[])
 {
     struct input *in;
     stack_init("AppEcho", "Rx_to_AppEcho", "AppEcho_to_Tx");
+    int i = 0;
     while (1) {
         in = stack_get_packet();
-        printf("got packet! len=%d  l5off=%d\n", in->len, in->attr->offset_l5);
+        printf("got packet %d! len=%d  l5off=%d\n", ++i, in->len,
+                in->attr->offset_l5);
 
         in->attr->udp_sport = udp_hdr_dport_read(in);
         in->attr->udp_dport = udp_hdr_sport_read(in);

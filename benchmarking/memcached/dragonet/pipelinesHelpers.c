@@ -21,7 +21,7 @@
 #include <bulk_transfer/bulk_linuxshm.h>
 #include <bulk_transfer/bulk_allocator.h>
 
-#include <implementation.h>
+#include "implementation.h"
 
 #define SHARED_STATE_SIZE 8192
 #define QUEUE_SLOTS 5120
@@ -513,6 +513,7 @@ void pl_enqueue(queue_handle_t queue, struct input *in)
     uint32_t len;
     errval_t err;
 
+    //printf("pl_enqueue: pl=%s q=%s\n", q->name, pl->name);
     err = bulk_channel_move(chan, attr_buf, &meta,
             MK_BULK_CONT(cb_move_done, NULL));
     err_expect_ok(err);
@@ -523,10 +524,6 @@ void pl_enqueue(queue_handle_t queue, struct input *in)
 
     // We need to replace these buffers in the current input, and make it empty
     attr_buf = bulk_alloc_new_buffer(&pl->alloc);
-    if (attr_buf == NULL) {
-        printf("ERROR: pl_enqueue: no more space left pl=%s q=%s\n", q->name, pl->name);
-        exit(1);
-    }
     assert(attr_buf != NULL);
     attr_buf->opaque = NULL;
 

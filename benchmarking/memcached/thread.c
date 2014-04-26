@@ -402,10 +402,12 @@ static void thread_libevent_process(int fd, short which, void *arg) {
 
     switch (buf[0]) {
     case 'c':
-    item = cq_pop(me->new_conn_queue);
+        {
+        conn *c = NULL;
+        item = cq_pop(me->new_conn_queue);
 
     if (NULL != item) {
-        conn *c = conn_new(item->sfd, item->init_state, item->event_flags,
+        c = conn_new(item->sfd, item->init_state, item->event_flags,
                            item->read_buffer_size, item->transport, me->base);
         if (c == NULL) {
             if (IS_UDP(item->transport)) {
@@ -423,7 +425,23 @@ static void thread_libevent_process(int fd, short which, void *arg) {
         }
         cqi_free(item);
     }
-        break;
+
+#ifdef DRAGONET
+    if (use_dragonet_stack) {
+        // FIXME: Either I should break the libevent loop,
+        //  or I should just call dragonet event handler directly from here.
+        if (c != NULL) {
+            if (c->is_dragonet == 1) {
+                printf("Handling incomming packets on Dragonet\n");
+                event_handle_loop_dn();
+            }
+        } else {
+            printf("WARNING: Dragonet: new_conn returned empty!!!\n");
+        }
+    }
+#endif // DRAGONET
+    } // end : unnamed block
+    break;
     /* we were told to flip the lock type and report in */
     case 'l':
     me->item_lock_type = ITEM_LOCK_GRANULAR;
@@ -434,6 +452,9 @@ static void thread_libevent_process(int fd, short which, void *arg) {
     register_thread_initialized();
         break;
     }
+
+
+
 }
 
 /* Which thread we assigned a connection to most recently. */

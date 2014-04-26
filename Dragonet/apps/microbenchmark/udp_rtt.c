@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 
             long double t = (end.tv_sec - start.tv_sec) * 1000000.L;
             t += (end.tv_nsec - start.tv_nsec) / 1000.L;
-            printf("%d %Lf\n", size, t);
+            printf("%zu %Lf\n", size, t);
         }
     }
 

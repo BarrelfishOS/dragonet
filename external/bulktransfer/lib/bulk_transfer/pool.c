@@ -236,6 +236,12 @@ errval_t bulk_pool_alloc(struct bulk_pool             *p,
 
     fd = shmget(meta->key, meta->pool_size,
             IPC_CREAT | IPC_EXCL | SHM_HUGETLB | 0666);
+    if (fd == ENOMEM) {
+        printf("shmget failed with ENOMEM for size %d \n", (int)meta->pool_size);
+    }
+    if (fd == -1) {
+        perror("shmget failed: ");
+    }
     assert(fd != -1);
 
     return bulk_int_pool_map(p, BULK_BUFFER_READ_WRITE, meta, fd);

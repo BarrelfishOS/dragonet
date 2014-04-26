@@ -9,6 +9,7 @@
 #define assert_fix assert
 
 struct bulk_int_buffer {
+    bool nouse;
 };
 
 struct bulk_channel;

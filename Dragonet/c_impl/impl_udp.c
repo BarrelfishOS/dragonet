@@ -9,6 +9,10 @@
 node_out_t do_pg__RxL4UDPValidHeaderLength(struct state *state, struct input *in)
 {
     in->attr->offset_l5 = udp_payload_offset(in);
+    in->attr->udp_dport = udp_hdr_dport_read(in);
+    in->attr->udp_sport = udp_hdr_sport_read(in);
+    in->attr->ip4_src =  ipv4_srcIP_rd(in);
+    in->attr->ip4_dst =  ipv4_dstIP_rd(in);
     return PORT_BOOL(((in->len) - (udp_header_offset(in))) >= udp_header_len);
 }
 
