@@ -44,6 +44,8 @@ graph lpg {
             boolean ValidLocalMAC {
                 port true false[Valid] }
 
+            /* Note that .L3ARPNeedsResponse .L3ARPValidPendingResponse probably
+             * belong in here */
             and Valid {
                 port true false[.L3IPAndBelowValid] }
 
@@ -93,8 +95,8 @@ graph lpg {
                 port false[] }
 
             node ProcessPendingResponse {
-                port true [..TxL3ARPLookupRequestIn]
-                port false [] }
+                port false []
+                port true [..TxL3ARPLookupRequestIn] }
         }
 
 
@@ -428,7 +430,7 @@ graph lpg {
 
         cluster L3ARP {
             node InitiateResponse {
-                port true false[Prepare]
+                port false true[Prepare]
 		port drop[] }
 
             or Prepare {
@@ -450,11 +452,11 @@ graph lpg {
                 port false[] }
 
             node Lookup_ {
-                port true false[.L2EtherPrepare]
+                port false true[.L2EtherPrepare]
                 port miss[SendRequest] }
 
             node SendRequest {
-                port true false[Prepare]
+                port false true[Prepare]
                 port drop[] }
         }
 

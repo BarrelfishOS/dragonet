@@ -26,7 +26,7 @@ library
                         lib/Dragonet/Pipelines/pipelines_helper.c,
                         c_impl/state.c
     Include-dirs:       c_impl/include/, lib/Dragonet/Pipelines/
-    CC-options:         -std=gnu99
+    CC-options:         -Wall -std=gnu99 -Wno-unused-function
     Exposed-modules:    Dragonet.Configuration,
                         Dragonet.Constraints,
                         Dragonet.DotGenerator,
@@ -52,7 +52,8 @@ library
                         Util.Tap
     build-depends:      base, containers, template-haskell, fgl, parsec,
                         bytestring, pretty-show, stm, mtl, graphviz>=2999.16,
-                        text, process, temporary, Bulktransfer
+                        text, process, temporary, bulktransfer, shmchan,
+                        barrelfish
     extensions:         DoAndIfThenElse, RankNTypes, EmptyDataDecls
 
 executable confgen
@@ -108,11 +109,15 @@ executable tuntapPing
 
 executable llvm-cgen
     main-is:            llvm-cgen.hs
+    other-modules:      Runner.LLVM,
+                        Runner.Dynamic
     build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
                         llvm-general==3.4.*, llvm-general-pure
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
+    C-sources:          Runner/dynamic.c
+    CC-options:         -Wall -Wno-unused-function
     x-llvm-c-includes:  c_impl/include,
                         lib/Dragonet/Pipelines,
                         ../external/bulktransfer/lib/include
@@ -131,21 +136,25 @@ executable llvm-cgen
                         c_impl/support/Icmp.c,
                         lib/Util/tap.c,
                         lib/Dragonet/Pipelines/pipelines_helper.c,
-                        ../external/bulktransfer/lib/bulk_linuxshm/shm_channel.c,
                         ../external/bulktransfer/lib/bulk_linuxshm/implementation.c,
                         ../external/bulktransfer/lib/bulk_alloc/alloc.c,
                         ../external/bulktransfer/lib/bulk_transfer/channel.c,
                         ../external/bulktransfer/lib/bulk_transfer/pool.c,
                         ../external/bulktransfer/lib/bulk_transfer/emergency.c,
-                        ../external/bulktransfer/lib/barrelfish/waitset.c,
+                        ../external/shmchan/lib/shmchan.c,
+                        ../external/barrelfish/lib/waitset.c,
 
 executable llvm-cgen-e10k
     main-is:            llvm-cgen.hs
+    other-modules:      Runner.LLVM,
+                        Runner.Dynamic
     build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
                         llvm-general==3.4.*, llvm-general-pure
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
+    C-sources:          Runner/dynamic.c
+    CC-options:         -Wall -Wno-unused-function
     x-llvm-c-includes:  c_impl/include,
                         c_impl/e10k/include,
                         lib/Dragonet/Pipelines,
@@ -169,23 +178,27 @@ executable llvm-cgen-e10k
                         c_impl/e10k/linux_pci_uio.c,
                         lib/Util/tap.c,
                         lib/Dragonet/Pipelines/pipelines_helper.c,
-                        ../external/bulktransfer/lib/bulk_linuxshm/shm_channel.c,
                         ../external/bulktransfer/lib/bulk_linuxshm/implementation.c,
                         ../external/bulktransfer/lib/bulk_alloc/alloc.c,
                         ../external/bulktransfer/lib/bulk_transfer/channel.c,
                         ../external/bulktransfer/lib/bulk_transfer/pool.c,
                         ../external/bulktransfer/lib/bulk_transfer/emergency.c,
-                        ../external/bulktransfer/lib/barrelfish/waitset.c,
+                        ../external/shmchan/lib/shmchan.c,
+                        ../external/barrelfish/lib/waitset.c,
 
 
 
 executable llvm-cgen-dpdk
     main-is:            llvm-cgen.hs
+    other-modules:      Runner.LLVM,
+                        Runner.Dynamic
     build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
                         llvm-general==3.4.*, llvm-general-pure, dpdk
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
+    C-sources:          Runner/dynamic.c
+    CC-options:         -Wall -Wno-unused-function
     x-llvm-c-includes:  c_impl/include,
                         lib/Dragonet/Pipelines,
                         ../external/bulktransfer/lib/include
@@ -204,36 +217,57 @@ executable llvm-cgen-dpdk
                         c_impl/support/Icmp.c,
                         lib/Util/tap.c,
                         lib/Dragonet/Pipelines/pipelines_helper.c,
-                        ../external/bulktransfer/lib/bulk_linuxshm/shm_channel.c,
                         ../external/bulktransfer/lib/bulk_linuxshm/implementation.c,
                         ../external/bulktransfer/lib/bulk_alloc/alloc.c,
                         ../external/bulktransfer/lib/bulk_transfer/channel.c,
                         ../external/bulktransfer/lib/bulk_transfer/pool.c,
                         ../external/bulktransfer/lib/bulk_transfer/emergency.c,
-                        ../external/bulktransfer/lib/barrelfish/waitset.c,
+                        ../external/shmchan/lib/shmchan.c,
+                        ../external/barrelfish/lib/waitset.c,
 
 executable generateCSkeleton
     main-is:            generateCSkeleton.hs
     build-depends:      Dragonet, base, fgl
 
+--executable bench-echo
+--    main-is:            microbenchmark/echo.c
+--    Hs-source-dirs:     apps
+--    other-modules:      Dummy
+--    build-depends:      Dragonet, base
+--    include-dirs:       apps/lib/include
+--    c-sources:          c_impl/state.c,
+--                        c_impl/implementation.c,
+--                        apps/lib/helpers.c
+--    CC-options:         -Wall -Wno-unused-function
+
+--executable bench-udp-rtt
+--    main-is:            microbenchmark/udp_rtt.c
+--    Hs-source-dirs:     apps
+--    other-modules:      Dummy
+--    build-depends:      Dragonet, base
+--    include-dirs:       apps/lib/include
+--    c-sources:          c_impl/state.c,
+--                        c_impl/implementation.c,
+--                        apps/lib/helpers.c
+--    CC-options:         -Wall -Wno-unused-function
+
 executable bench-echo
     main-is:            microbenchmark/echo.c
     Hs-source-dirs:     apps
     other-modules:      Dummy
-    build-depends:      Dragonet, base
-    include-dirs:       apps/lib/include
-    c-sources:          c_impl/state.c,
-                        c_impl/implementation.c,
-                        apps/lib/helpers.c
+    build-depends:      apps, base
+    include-dirs:       apps/lib/include,
+                        c_impl/include/,
+                        lib/Dragonet/Pipelines/
+    CC-options:         -Wall -Wno-unused-function
 
 executable bench-udp-rtt
-    main-is:            microbenchmark/udp_rtt.c
     Hs-source-dirs:     apps
+    main-is:            microbenchmark/udp_rtt.c
     other-modules:      Dummy
-    build-depends:      Dragonet, base
-    include-dirs:       apps/lib/include
-    c-sources:          c_impl/state.c,
-                        c_impl/implementation.c,
-                        apps/lib/helpers.c
-
+    build-depends:      apps, base
+    include-dirs:       apps/lib/include,
+                        c_impl/include/,
+                        lib/Dragonet/Pipelines/
+    CC-options:         -Wall -Wno-unused-function
 

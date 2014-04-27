@@ -5,9 +5,6 @@
 #include <barrelfish/barrelfish.h>
 #include <barrelfish/waitset.h>
 
-#include <assert.h>
-#define assert_fix assert
-
 struct bulk_int_buffer {
     bool nouse;
 };

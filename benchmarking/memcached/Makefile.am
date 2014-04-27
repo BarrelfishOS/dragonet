@@ -16,16 +16,17 @@ memcached_SOURCES = memcached.c memcached.h \
                     thread.c daemon.c \
                     stats.c stats.h \
                     util.c util.h \
-                    trace.h cache.h sasl_defs.h \
-		    dragonet/helpers.c \
-		    dragonet/implementation.c \
-		    dragonet/state.c \
-		    dragonet/pipelinesHelpers.c \
-		    dragonet/helpers.h \
-		    dragonet/implementation.h \
-		    dragonet/packet_access.h \
-		    dragonet/pipelines.h \
-		    dragonet/tap.h
+                    trace.h cache.h sasl_defs.h
+
+#		    dragonet/helpers.c \
+#		    dragonet/implementation.c \
+#		    dragonet/state.c \
+#		    dragonet/pipelinesHelpers.c \
+#		    dragonet/helpers.h \
+#		    dragonet/implementation.h \
+#		    dragonet/packet_access.h \
+#		    dragonet/pipelines.h \
+#		    dragonet/tap.h
 
 if BUILD_CACHE
 memcached_SOURCES += cache.c
@@ -40,15 +41,32 @@ if ENABLE_SASL
 memcached_SOURCES += sasl_defs.c
 endif
 
-DRAGONET_INCLUDES = "-I../../external/bulktransfer/include/"
-BULKTRANSPORTLIB = $(shell find ../../external/bulktransfer/dist/ -name "libHSBulktransfer*" -exec dirname {} \;)
+BULKTRANSPORT_INCLUDES = "-I../../external/bulktransfer/include/"
+BULKTRANSPORTLIB = $(shell find ../../external/bulktransfer/dist/ -name "libHSbulktransfer*" -exec dirname {} \;)
+
+BARRELFISHLIB = $(shell find ../../external/barrelfish/dist/ -name "libHSbarrelfish*" -exec dirname {} \;)
+
+SHMCHANLIB = $(shell find ../../external/shmchan/dist/ -name "libHSshmchan*" -exec dirname {} \;)
+
+DRAGONETAPP_INCLUDES = -I../../Dragonet/c_impl/include/ \
+		       -I../../Dragonet/lib/Dragonet/Pipelines/ \
+		       -I../../Dragonet/apps/lib/include/
+DRAGONETAPPLIB = $(shell find ../../Dragonet/apps/dist/ -name "libHSapps*" -exec dirname {} \;)
 
 memcached_debug_SOURCES = $(memcached_SOURCES)
-memcached_CPPFLAGS = -DNDEBUG -DENABLE_DRAGONET $(DRAGONET_INCLUDES)
+memcached_CPPFLAGS = -DNDEBUG -DENABLE_DRAGONET $(BULKTRANSPORT_INCLUDES) $(DRAGONETAPP_INCLUDES)
 memcached_debug_LDADD = @PROFILER_LDFLAGS@
 memcached_debug_CFLAGS = @PROFILER_FLAGS@
 
-memcached_LDADD = -lrt -L$(BULKTRANSPORTLIB) -lHSBulktransfer-0.1.0.0
+# Note: the order in which you link the library is important.  The apps library
+# needs to be first as it is using things from bulktransfer, shm and barrelfish
+# libraries.
+memcached_LDADD = -lrt \
+		    -L$(DRAGONETAPPLIB) -lHSapps-0.1.0.0 \
+		    -L$(BULKTRANSPORTLIB) -lHSbulktransfer-0.1.0.0 \
+		    -L$(SHMCHANLIB) -lHSshmchan-0.1.0.0 \
+		    -L$(BARRELFISHLIB) -lHSbarrelfish-0.1.0.0
+
 memcached_DEPENDENCIES =
 memcached_debug_DEPENDENCIES =
 CLEANFILES=

@@ -92,8 +92,10 @@ myBuildHook pkg_descr local_bld_info user_hooks bld_flags = do
                 depIncls = concatMap IPI.includeDirs $ PI.allPackages $
                     installedPkgs local_bld_info
                 incls = inc_llvm ++ inc_dirs ++ depIncls
+                cOpts = ["-O3","-Wall","-Wno-unused-variable",
+                    "-Wno-unused-function"]
             -- Build llvm bitcode for C implementation of graph
-            llvmBCs <- mapM (llvmClang clang verb ["-O3"] incls bld_dir) c_files
+            llvmBCs <- mapM (llvmClang clang verb cOpts incls bld_dir) c_files
             -- Combine into one bitcode file
             llvmLink llvmlink verb [] bld_dir out_file llvmBCs
 

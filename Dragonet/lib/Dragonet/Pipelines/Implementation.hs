@@ -1,12 +1,25 @@
-{-# LANGUAGE ForeignFunctionInterface, DeriveGeneric #-}
+{-# LANGUAGE ForeignFunctionInterface, GeneralizedNewtypeDeriving #-}
 
 module Dragonet.Pipelines.Implementation(
     PInput(..),
     POutput(..),
     PipelineImpl(..),
-    StackHandle,
+
+    StackHandle(..),
+    StateHandle(..),
+    PipelineHandle(..),
+    QueueHandle(..),
+    InputHandle(..),
+
     runPipelines,
-    stopPipelines
+    stopPipelines,
+
+    init_shared_state,
+    pipeline_init,
+    pipeline_get_state,
+    pipeline_inqueue_create,
+    pipeline_outqueue_bind,
+    pipeline_wait_ready
 ) where
 
 import Dragonet.Pipelines
@@ -21,6 +34,7 @@ import Foreign.Ptr
 import Foreign.ForeignPtr
 import Foreign.C.String
 import Foreign.C.Types
+import Foreign.Storable
 
 data PInput = PIQueue String
     deriving (Show, Eq, Ord)
@@ -36,6 +50,11 @@ data PipelineImpl = PipelineImpl {
 } deriving (Show)
 
 newtype StackHandle = StackHandle (Ptr StackHandle)
+newtype StateHandle = StateHandle (Ptr StateHandle)
+newtype PipelineHandle = PipelineHandle (Ptr PipelineHandle)
+newtype QueueHandle = QueueHandle (Ptr QueueHandle)
+    deriving (Storable)
+newtype InputHandle = InputHandle (Ptr InputHandle)
 
 
 
@@ -79,7 +98,42 @@ foreign import ccall "init_shared_state"
 foreign import ccall "stop_stack"
     c_stop_stack :: StackHandle -> IO ()
 
+foreign import ccall "pl_init"
+    c_pl_init :: CString -> CString -> IO PipelineHandle
+
+foreign import ccall "pl_get_state"
+    c_pl_get_state :: PipelineHandle -> IO StateHandle
+
+foreign import ccall "pl_inqueue_create"
+    c_pl_inqueue_create :: PipelineHandle -> CString -> IO QueueHandle
+
+foreign import ccall "pl_outqueue_bind"
+    c_pl_outqueue_bind :: PipelineHandle -> CString -> IO QueueHandle
+
+foreign import ccall "pl_wait_ready"
+    c_pl_wait_ready :: PipelineHandle -> IO ()
+
+
 init_shared_state :: String -> Int -> IO StackHandle
 init_shared_state n c = withCString n $ \cs ->
     c_init_shared_state cs (fromIntegral c)
+
+pipeline_init :: String -> String -> IO PipelineHandle
+pipeline_init stackN plN =
+    withCString stackN $ \csn -> withCString plN $ \cpn ->
+        c_pl_init csn cpn
+
+pipeline_get_state :: PipelineHandle -> IO StateHandle
+pipeline_get_state = c_pl_get_state
+
+pipeline_inqueue_create :: PipelineHandle -> String -> IO QueueHandle
+pipeline_inqueue_create plh n = withCString n $ \cn ->
+    c_pl_inqueue_create plh cn
+
+pipeline_outqueue_bind :: PipelineHandle -> String -> IO QueueHandle
+pipeline_outqueue_bind plh n = withCString n $ \cn ->
+    c_pl_outqueue_bind plh cn
+
+pipeline_wait_ready :: PipelineHandle -> IO ()
+pipeline_wait_ready = c_pl_wait_ready
 

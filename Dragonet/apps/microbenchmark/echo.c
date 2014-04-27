@@ -13,7 +13,6 @@ int main(int argc, char *argv[])
         in = stack_get_packet();
         printf("got packet %d! len=%d  l5off=%d\n", ++i, in->len,
                 in->attr->offset_l5);
-
         in->attr->udp_sport = udp_hdr_dport_read(in);
         in->attr->udp_dport = udp_hdr_sport_read(in);
         in->attr->ip4_dst   = ipv4_srcIP_rd(in);

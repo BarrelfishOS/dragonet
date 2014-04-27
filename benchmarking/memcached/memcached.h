@@ -136,7 +136,7 @@
 #endif // ENABLE_DRAGONET
 
 #ifdef DRAGONET
-#include <dragonet/helpers.h>
+#include <helpers.h>
 extern int use_dragonet_stack;
 #endif // DRAGONET
 
