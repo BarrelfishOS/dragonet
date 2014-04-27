@@ -29,7 +29,8 @@
 #define BULK_BUFFERNUM 1024
 
 //#define dprintf printf
-#define dprintf(...) do {} while (0)
+#define dprintf printf_dummy
+static inline void printf_dummy(const char *fmt, ...) { }
 
 struct dragonet_bulk_meta {
     pktoff_t off;
@@ -136,7 +137,6 @@ void* init_shared_state(const char *name, size_t chancount)
 {
     int fd, res;
     struct dragonet_shared_state *dss;
-    sighandler_t sigh;
     dprintf("init_shared_state(%s,%"PRIx64")\n", name, chancount);
 
     assert(sizeof(*dss) <= SHARED_STATE_SIZE);
@@ -165,19 +165,19 @@ void* init_shared_state(const char *name, size_t chancount)
     // can at least do some minimal cleanup (i.e. stopping the NIC from writing
     // to memory.
     sig_dss = dss;
-    sigh = signal(SIGTERM, signal_terminate);
-    sigh = signal(SIGINT,  signal_terminate);
-    sigh = signal(SIGHUP,  signal_terminate);
-    sigh = signal(SIGUSR1, signal_terminate);
-    sigh = signal(SIGUSR2, signal_terminate);
-    sigh = signal(SIGTERM, signal_abort);
-    sigh = signal(SIGABRT, signal_abort);
-    sigh = signal(SIGFPE,  signal_abort);
-    sigh = signal(SIGILL,  signal_abort);
-    sigh = signal(SIGPIPE, signal_abort);
-    sigh = signal(SIGPIPE, signal_abort);
-    sigh = signal(SIGQUIT, signal_abort);
-    sigh = signal(SIGSEGV, signal_abort);
+    signal(SIGTERM, signal_terminate);
+    signal(SIGINT,  signal_terminate);
+    signal(SIGHUP,  signal_terminate);
+    signal(SIGUSR1, signal_terminate);
+    signal(SIGUSR2, signal_terminate);
+    signal(SIGTERM, signal_abort);
+    signal(SIGABRT, signal_abort);
+    signal(SIGFPE,  signal_abort);
+    signal(SIGILL,  signal_abort);
+    signal(SIGPIPE, signal_abort);
+    signal(SIGPIPE, signal_abort);
+    signal(SIGQUIT, signal_abort);
+    signal(SIGSEGV, signal_abort);
 
     dss_cleanup_handler(dss, shared_state_cleanup, dss);
 
@@ -201,7 +201,6 @@ void stop_stack(void *handle)
 
 static void pl_cleanup_irregular(pipeline_handle_t plh, void *data)
 {
-    struct dragonet_pipeline *pl = plh;
     bulk_emergency_cleanup();
 }
 
@@ -321,7 +320,7 @@ static void cb_pass_done(void *arg, errval_t err, struct bulk_channel *chan)
 {
     struct dragonet_queue *q = chan->user_state;
     struct dragonet_pipeline *pl = q->pl;
-    //printf("cb_pass_done: pl=%s\n", pl->name);
+    dprintf("cb_pass_done: pl=%s\n", pl->name);
     err_expect_ok(err);
 }
 
@@ -497,7 +496,7 @@ static void cb_move_done(void *arg, errval_t err, struct bulk_channel *chan)
 {
     struct dragonet_queue *q = chan->user_state;
     struct dragonet_pipeline *pl = q->pl;
-    //printf("cb_move_done: pl=%s\n", pl->name);
+    dprintf("cb_move_done: pl=%s\n", pl->name);
     err_expect_ok(err);
 }
 

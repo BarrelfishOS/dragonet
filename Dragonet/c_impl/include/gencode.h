@@ -169,6 +169,7 @@ node_out_t do_pg__TxL3ARPSendRequest(struct state *state, struct input *in);
 node_out_t do_pg__TxL2EtherAllocateHeader(struct state *state, struct input *in);
 node_out_t do_pg__TxL2EtherFillHeader(struct state *state, struct input *in);
 
+#ifdef EXECUTE_GRAPH
 
 static inline void executeGraph(struct state * st, struct input *in)
 {
@@ -667,7 +668,7 @@ static inline void executeGraph(struct state * st, struct input *in)
     }
 }
 
-
+#endif
 
 #if 0
 

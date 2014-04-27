@@ -17,10 +17,6 @@ void set_pipeline_handle(pipeline_handle_t h)
 struct input *input_alloc(void)
 {
     struct input *in = in_pool;
-    void *data;
-    uint64_t phys;
-    size_t len;
-    buffer_handle_t buf_data, buf_attr;
     if (in != NULL) {
         in_pool = in->next;
         pool_count--;
