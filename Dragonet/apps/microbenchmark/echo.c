@@ -18,9 +18,8 @@ static void recv_foo_cb(socket_handle_t sh, struct input *in, void *data)
 
 int main(int argc, char *argv[])
 {
-    struct input *in;
     socket_handle_t sh, si;
-    stack_init("AppEcho", "Rx_to_AppEcho", "AppEcho_to_Tx");
+    stack_init("AppEcho", "AppInterface_to_AppEcho", "AppEcho_to_AppInterface");
 
     sh = socket_create(recv_cb, NULL);
     si = socket_create(recv_foo_cb, NULL);

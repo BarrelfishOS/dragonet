@@ -50,9 +50,7 @@ int main(int argc, char *argv[])
     struct timespec start;
     socket_handle_t sh;
 
-    stack_init("AppEcho", "Rx_to_AppEcho", "AppEcho_to_Tx");
-    // make sure tap device is initialized
-    usleep(1000*1000);
+    stack_init("AppEcho", "AppInterface_to_AppEcho", "AppEcho_to_AppInterface");
 
     sh = socket_create(recv_cb, NULL);
     if (!socket_bind_udp_listen(sh, 0, 7)) {

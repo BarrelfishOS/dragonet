@@ -74,13 +74,26 @@ struct dragonet_pipeline {
 
     struct input *queue;
     struct dragonet_termination_handler *term;
+
+    struct dragonet_queue *outqs;
+};
+
+struct dragonet_queue_pool {
+    struct bulk_pool *pool;
+    struct dragonet_queue_pool *next;
 };
 
 struct dragonet_queue {
     struct dragonet_pipeline *pl;
+    struct bulk_channel *chan;
     char *name;
 
     struct input *pending;
+
+    bool bound;
+    struct dragonet_queue_pool *pools;
+
+    struct dragonet_queue *next;
 };
 
 // HACK: Don't know where else to put this for the signal handlers
@@ -298,11 +311,37 @@ static void cb_assign_done(void *arg, errval_t err, struct bulk_channel *chan)
     struct dragonet_queue *q = chan->user_state;
     struct dragonet_pipeline *pl = q->pl;
     err_expect_ok(err);
-    __sync_fetch_and_add(&pl->shared->ch_bound, 1);
+    if (arg == &pl->pool) {
+        __sync_fetch_and_add(&pl->shared->ch_bound, 1);
+    }
     dprintf("cb_assign_done: pl=%s bound=%d count=%d\n", pl->name, (int)
             pl->shared->ch_bound, (int) pl->shared->count);
 }
 
+static void queue_assign_pool(struct dragonet_queue *q, struct bulk_pool *bp)
+{
+    struct dragonet_queue_pool *qp = q->pools;
+    errval_t err;
+
+    // Don't assign more than once
+    while (qp != NULL) {
+        if (qp->pool == bp) {
+            return;
+        }
+	qp = qp->next;
+    }
+
+    qp = malloc(sizeof(*qp));
+    qp->pool = bp;
+    qp->next = q->pools;
+    q->pools = qp;
+
+    if (q->bound) {
+        err = bulk_channel_assign_pool(
+                q->chan, qp->pool, MK_BULK_CONT(cb_assign_done, qp->pool));
+        err_expect_ok(err);
+    }
+}
 
 static errval_t cb_bind_received(struct bulk_channel *chan)
 {
@@ -316,9 +355,15 @@ static errval_t cb_bind_received(struct bulk_channel *chan)
 static errval_t cb_pool_assigned(struct bulk_channel *chan,
                                  struct bulk_pool    *pool)
 {
-    struct dragonet_queue *q = chan->user_state;
+    struct dragonet_queue *q = chan->user_state, *oq;
     struct dragonet_pipeline *pl = q->pl;
     dprintf("cb_pool_assigned: %s\n", pl->name);
+
+    oq = pl->outqs;
+    while (oq != NULL) {
+        queue_assign_pool(oq, pool);
+        oq = oq->next;
+    }
     return SYS_ERR_OK;
 }
 
@@ -429,6 +474,7 @@ queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name)
     err_expect_ok(err);
 
     dq->pl = pl;
+    dq->chan = chan;
     chan->user_state = dq;
     err = bulk_channel_create(chan, &epd->generic, &cbs, &setup);
     err_expect_ok(err);
@@ -444,13 +490,22 @@ static void cb_bind_done(void *arg, errval_t err, struct bulk_channel *chan)
 {
     struct dragonet_queue *q = chan->user_state;
     struct dragonet_pipeline *pl = q->pl;
+    struct dragonet_queue_pool *qp;
     err_expect_ok(err);
     dprintf("cb_bind_done: pl=%s bound=%d count=%d\n", pl->name, (int)
             pl->shared->ch_bound, (int) pl->shared->count);
 
-    err = bulk_channel_assign_pool(chan, &pl->pool,
-            MK_BULK_CONT(cb_assign_done,NULL));
-    err_expect_ok(err);
+    qp = q->pools;
+    while (qp != NULL) {
+        err = bulk_channel_assign_pool(chan, qp->pool,
+                MK_BULK_CONT(cb_assign_done, qp->pool));
+        err_expect_ok(err);
+
+        qp = qp->next;
+    }
+
+    q->bound = true;
+    queue_assign_pool(q, &pl->pool);
 }
 
 queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name)
@@ -477,6 +532,9 @@ queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name)
     err_expect_ok(err);
 
     dq->pl = pl;
+    dq->chan = chan;
+    dq->next = pl->outqs;
+    pl->outqs = dq;
     chan->user_state = dq;
     err = bulk_channel_bind(chan, &epd->generic, &cbs, &params,
             MK_BULK_CONT(cb_bind_done, NULL));

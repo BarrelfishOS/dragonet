@@ -4,10 +4,11 @@ module Util.GraphMonad(
     getGr,
     withGr,
     newNode,
-    newEdge
+    newEdge,
+    delEdge
 ) where
 
-import Data.Graph.Inductive
+import Data.Graph.Inductive hiding (delEdge)
 import Control.Monad.State
 
 type GraphMonad a b c = State (Gr a b) c
@@ -37,5 +38,10 @@ newEdge :: (Node,Node,b) -> GraphMonad a b ()
 newEdge edge = do
     g <- getGr
     putGr $ insEdge edge g
+
+delEdge :: Eq b => (Node,Node,b) -> GraphMonad a b ()
+delEdge edge = do
+    g <- getGr
+    putGr $ delLEdge edge g
 
 

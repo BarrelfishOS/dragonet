@@ -8,7 +8,8 @@ import Dragonet.DotGenerator (toDot, toDotWith, pipelinesDot)
 import qualified Dragonet.Pipelines as PL
 import qualified Dragonet.Pipelines.Implementation as PLI
 import qualified Dragonet.Pipelines.Applications as APP
-import Util.GraphHelpers (findNodeByL)
+import Util.GraphHelpers (findNodeByL,mergeGraphsBy)
+import qualified Util.GraphMonad as GM
 
 import Control.Applicative
 import Control.Monad
@@ -32,22 +33,65 @@ import System.IO  (writeFile,hFlush,stdout)
 import qualified Runner.LLVM as LLVM
 import qualified Runner.Dynamic as Dyn
 
+tagNodes :: String -> PGraph -> PGraph
+tagNodes tag = DGI.nmap (\n -> n { nTag = tag })
+
+renameQueues :: String -> String -> PGraph -> PGraph
+renameQueues rx tx pg = DGI.nmap fixN pg
+    where
+        fixN n
+            | l == "Queue" = n { nLabel = rx }
+            | l == "TxQueue" = n { nLabel = tx }
+            | otherwise = n
+            where l = nLabel n
+
 
 
 -- Simulates a basic embedding (replace rx and tx queue by tap specific node)
 pg4tap :: PGraph -> PGraph
-pg4tap pg = DGI.nmap fixN pg
+pg4tap pg = tagNodes "" $ renameQueues "TapRxQueue" "TapTxQueue" pg
+
+-- Simplistic e10k multi queue embedding
+pg4e10k :: PGraph -> PGraph
+pg4e10k pg =
+    addTxQueueDemux $ untagApp $ foldl1 merge $ map queueGraph [0..(nQueues - 1)]
     where
-        fixN n
-            | l == "Queue" = n { nLabel = "TapRxQueue" }
-            | l == "TxQueue" = n { nLabel = "TapTxQueue" }
+        nQueues = 2
+        queueGraph q = tagNodes ("Queue" ++ show q) $
+            renameQueues ("RxE10kQueue" ++ show q) ("TxE10kQueue" ++ show q) pg
+        merge = mergeGraphsBy nodesMatch
+        nodesMatch a b =  nLabel a == "RxEchoAPP" && nLabel b == "RxEchoAPP"
+        untagApp = DGI.nmap fixAppN
+        fixAppN n
+            | nLabel n == "RxEchoAPP" = n { nTag = "App" }
             | otherwise = n
-            where l = nLabel n
+
+addTxQueueDemux :: PGraph -> PGraph
+addTxQueueDemux pg = snd $ flip GM.runOn pg $ do
+        -- Create node
+        let dNode = baseFNode "TxQueueDemux" [] queues Nothing
+            mNode = baseFNode "RxQueueMux" [] ["out"] Nothing
+        dN <- GM.newNode $ dNode { nTag = "App" }
+        mN <- GM.newNode $ mNode { nTag = "App" }
+        forM sucs $ \(a,l) -> do
+            let Just port = nTag <$> DGI.lab pg a
+            GM.newEdge (dN,a,port)
+            GM.delEdge (n,a,l)
+        forM pres $ \(a,l) -> do
+            GM.newEdge (a,mN,l)
+            GM.delEdge (a,n,l)
+        GM.newEdge (n,dN,"out")
+        GM.newEdge (mN,n,"out")
+    where
+        Just (n,_) = findNodeByL (("RxEchoAPP" ==) . nLabel) pg
+        sucs = DGI.lsuc pg n
+        pres = DGI.lpre pg n
+        queues = map (nTag . fromJust . DGI.lab pg . fst) sucs
 
 -- Wrapper to execute pipelines, but handle application pipelines separatly
 runPipeline :: PL.PLGraph -> String -> String -> PLI.PipelineImpl -> IO ()
 runPipeline plg stackname helpers pli
-    | take 3 lbl == "App" = do
+    | lbl == "AppEcho" = do
         putStrLn $ "Application Pipeline " ++ lbl
         putStrLn "  Input queues:"
         forM_ (PLI.pliInQs pli) $ \(ql,qc) -> do
@@ -65,10 +109,12 @@ runPipeline plg stackname helpers pli
 plAssign :: PG.PGNode -> PL.PLabel
 plAssign (_,n)
     | lbl == "RxEchoAPP" = "AppEcho"
-    | take 2 lbl == "Tx" || take 5 lbl == "TapTx" = "Tx"
-    | otherwise = "Rx"
+    | tag == "App" = "AppInterface"
+    | take 2 lbl == "Tx" || take 5 lbl == "TapTx" = "Tx" ++ tag
+    | otherwise = "Rx" ++ tag
     where
         lbl = nLabel n
+        tag = nTag n
 
 plConnect :: PL.Pipeline -> PL.Pipeline -> (PLI.POutput,PLI.PInput)
 plConnect i o = (PLI.POQueue n, PLI.PIQueue n)
@@ -135,18 +181,23 @@ main = do
     let fname = if (length xargs) == 0 then fname_def else xargs !! 0
 
     pname <- getProgName
-    let helpers = case pname of
-            "llvm-cgen" -> "llvm-helpers"
-            "llvm-cgen-dpdk" -> "llvm-helpers-dpdk"
-            "llvm-cgen-e10k" -> "llvm-helpers-e10k"
+    let (helpers,embed) = case pname of
+            "llvm-cgen" -> ("llvm-helpers",pg4tap)
+            "llvm-cgen-dpdk" -> ("llvm-helpers-dpdk",pg4tap)
+            "llvm-cgen-e10k" -> ("llvm-helpers-e10k",pg4e10k)
             _ -> error "Unknown executable name, don't know what helpers to use :-/"
 
     txt <- readFile fname
     graph <- UnicornAST.parseGraph txt
-    let pgraph = pg4tap $ Unicorn.constructGraph graph
+    let pgraph = embed $ Unicorn.constructGraph graph
     writeFile "DELETEME.dot" $ toDot pgraph
     let plg = PL.generatePLG plAssign pgraph
-    writeFile "pipelines.dot" $ pipelinesDot Nothing plg
+
+    let linkMap pl = "pl_" ++ PL.plLabel pl ++ ".svg"
+    writeFile "pipelines.dot" $ pipelinesDot (Just linkMap) plg
+    mapM_ (\pl ->
+        writeFile ("pl_" ++ PL.plLabel pl ++ ".dot") $ toDot $ PL.plGraph pl
+        ) $ map snd $ DGI.labNodes plg
 
     let stackname = "dragonet"
     let runner = runPipeline plg stackname helpers
