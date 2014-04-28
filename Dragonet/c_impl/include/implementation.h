@@ -65,6 +65,10 @@ struct state {
 
     // XXX: HACK
     struct tap_handler *tap_handler;
+
+    void *udp_lock;
+    void *udp_flow_ht;
+    void *udp_listen_ht;
 };
 
 struct arp_pending {
@@ -114,6 +118,7 @@ struct input_attributes {
 
     // Misc
     int32_t mux_id;
+    int32_t socket_id;
 };
 
 struct input {

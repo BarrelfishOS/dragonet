@@ -199,6 +199,12 @@ void stop_stack(void *handle)
     bulk_emergency_cleanup();
 }
 
+struct state* stack_state(void *data)
+{
+    struct dragonet_shared_state *dss = data;
+    return &dss->state;
+}
+
 static void pl_cleanup_irregular(pipeline_handle_t plh, void *data)
 {
     bulk_emergency_cleanup();

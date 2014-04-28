@@ -2,8 +2,10 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <pthread.h>
 
 #include <implementation.h>
+#include <demuxstate.h>
 #include "config.h"
 
 #define STRUCT_POOL_MAX 16
@@ -13,12 +15,18 @@ static size_t s_count;
 
 void pg_state_init(struct state *st)
 {
+    int r;
     st->local_mac      = 0;
     st->local_ip       = 0;
     st->arp_pending    = NULL;
     st->arp_cache      = NULL;
     st->pkt_counter    = 0;
     st->driver_handler = 0;
+    st->udp_flow_ht = NULL;
+    st->udp_listen_ht = NULL;
+    st->udp_lock = malloc(sizeof(pthread_rwlock_t));
+    r = pthread_rwlock_init(st->udp_lock, NULL);
+    assert(r == 0);
 }
 
 struct input *input_struct_alloc(void)
@@ -138,5 +146,87 @@ void input_xchg(struct input *a, struct input *b)
     memcpy(b, &tmp, sizeof(*b));
 }
 
+void *udp_state_add_listen(struct state *st, uint64_t socketid, uint16_t port)
+{
+    struct udp_listen_entry *l, *ht;
 
+    l = calloc(1, sizeof(*l));
+    l->socketid = socketid;
+    l->port = port;
+
+
+    if (pthread_rwlock_wrlock(st->udp_lock) != 0) {
+        fprintf(stderr, "udp_state_add_listen: wrlock failed\n");
+        abort();
+    }
+
+    ht = st->udp_listen_ht;
+    HASH_ADD(hh, ht, port, UDP_LISTEN_KEYLEN, l);
+    st->udp_listen_ht = ht;
+
+    pthread_rwlock_unlock(st->udp_lock);
+
+    return l;
+}
+
+void udp_state_remove_listen(struct state *st, void *listen)
+{
+    struct udp_listen_entry *l, *ht;
+    l = listen;
+
+    if (pthread_rwlock_wrlock(st->udp_lock) != 0) {
+        fprintf(stderr, "udp_state_add_listen: wrlock failed\n");
+        abort();
+    }
+
+    ht = st->udp_listen_ht;
+    HASH_DEL(ht, l);
+    st->udp_listen_ht = ht;
+
+    pthread_rwlock_unlock(st->udp_lock);
+}
+
+void *udp_state_add_flow(struct state *st, uint64_t socketid,
+                         uint32_t s_ip, uint16_t s_port,
+                         uint32_t d_ip, uint16_t d_port)
+{
+    struct udp_flow_entry *f, *ht;
+
+    f = calloc(1, sizeof(*f));
+    f->socketid = socketid;
+    f->s_ip = s_ip;
+    f->d_ip = d_ip;
+    f->s_port = s_port;
+    f->d_port = d_port;
+
+    if (pthread_rwlock_wrlock(st->udp_lock) != 0) {
+        fprintf(stderr, "udp_state_add_listen: wrlock failed\n");
+        abort();
+    }
+
+    ht = st->udp_flow_ht;
+    HASH_ADD(hh, ht, s_ip, UDP_FLOW_KEYLEN, f);
+    st->udp_flow_ht = ht;
+
+    pthread_rwlock_unlock(st->udp_lock);
+
+    return f;
+}
+
+void udp_state_remove_flow(struct state *st, void *flow)
+{
+    struct udp_flow_entry *f, *ht;
+    f = flow;
+
+    if (pthread_rwlock_wrlock(st->udp_lock) != 0) {
+        fprintf(stderr, "udp_state_add_listen: wrlock failed\n");
+        abort();
+    }
+
+    ht = st->udp_flow_ht;
+    HASH_DEL(ht, f);
+    st->udp_flow_ht = ht;
+
+    pthread_rwlock_unlock(st->udp_lock);
+}
 

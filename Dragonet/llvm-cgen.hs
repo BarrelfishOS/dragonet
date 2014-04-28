@@ -7,11 +7,13 @@ import Dragonet.Unicorn  as Unicorn
 import Dragonet.DotGenerator (toDot, toDotWith, pipelinesDot)
 import qualified Dragonet.Pipelines as PL
 import qualified Dragonet.Pipelines.Implementation as PLI
+import qualified Dragonet.Pipelines.Applications as APP
 import Util.GraphHelpers (findNodeByL)
 
 import Control.Applicative
 import Control.Monad
 import Control.Concurrent (forkOS,yield)
+import qualified Control.Concurrent.STM as STM
 
 --import Control.Applicative
 
@@ -87,6 +89,44 @@ commandLineInterface = do
             return False
     if done then return () else commandLineInterface
 
+data SocketDesc =
+    SockUDPListen PLI.UDPListenHandle |
+    SockUDPFlow PLI.UDPFlowHandle
+
+appEvent ::
+    PLI.StateHandle ->
+    STM.TVar (M.Map (APP.ChanHandle,APP.SocketId) SocketDesc) ->
+     APP.ChanHandle -> APP.Event -> IO ()
+appEvent ss _ ch APP.EvAppRegister = do
+    putStrLn "AppRegister"
+    APP.sendMessage ch $ APP.MsgWelcome 42
+appEvent ss sm ch (APP.EvSocketUDPListen sid (0,port)) = do
+    putStrLn $ "SocketUDPListen s=" ++ show sid ++ " p=" ++ show port
+    lh <- PLI.udpAddListen ss sid port
+    STM.atomically $ do
+        m <- STM.readTVar sm
+        STM.writeTVar sm $ M.insert (ch,sid) (SockUDPListen lh) m
+    APP.sendMessage ch $ APP.MsgStatus True
+    return ()
+appEvent ss sm ch (APP.EvSocketUDPFlow sid (sIP,sPort) (dIP,dPort)) = do
+    putStrLn $ "SocketUDPFlow s=" ++ show sid ++ " s=" ++
+        show (sIP,sPort) ++ " d=" ++ show (dIP,dPort)
+    fh <- PLI.udpAddFlow ss sid sIP sPort dIP dPort
+    STM.atomically $ do
+        m <- STM.readTVar sm
+        STM.writeTVar sm $ M.insert (ch,sid) (SockUDPFlow fh) m
+    APP.sendMessage ch $ APP.MsgStatus True
+    return ()
+appEvent ss _ ch ev = do
+    putStrLn $ "appEvent " ++ show ch ++ " " ++ show ev
+
+initAppInterface :: String -> PLI.StackHandle -> IO ()
+initAppInterface stackname sh = do
+    st <- PLI.stackState sh
+    sm <- STM.newTVarIO $ M.empty
+    tid <- forkOS $ APP.interfaceThread stackname (appEvent st sm)
+    return ()
+
 main :: IO ()
 main = do
     let fname_def = "unicorn-tests/hello.unicorn"       -- default unicorn file name
@@ -112,6 +152,7 @@ main = do
     let runner = runPipeline plg stackname helpers
     h <- PLI.runPipelines stackname plConnect runner plg
 
+    initAppInterface stackname h
     commandLineInterface
 
     putStrLn "Doing cleanup..."

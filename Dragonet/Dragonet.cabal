@@ -24,6 +24,7 @@ library
     Hs-source-dirs:     lib
     C-sources:          lib/Util/tap.c,
                         lib/Dragonet/Pipelines/pipelines_helper.c,
+                        lib/Dragonet/Pipelines/app_control.c,
                         c_impl/state.c
     Include-dirs:       c_impl/include/, lib/Dragonet/Pipelines/
     CC-options:         -Wall -std=gnu99 -Wno-unused-function
@@ -40,6 +41,7 @@ library
                         Dragonet.Implementation.UDP,
                         Dragonet.Pipelines,
                         Dragonet.Pipelines.Implementation,
+                        Dragonet.Pipelines.Applications,
                         Dragonet.ProtocolGraph,
                         Dragonet.Unicorn,
                         Dragonet.Unicorn.Parser,
@@ -111,7 +113,7 @@ executable llvm-cgen
     main-is:            llvm-cgen.hs
     other-modules:      Runner.LLVM,
                         Runner.Dynamic
-    build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
+    build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl, stm,
                         llvm-general==3.4.*, llvm-general-pure
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
                         GeneralizedNewtypeDeriving
@@ -148,7 +150,7 @@ executable llvm-cgen-e10k
     main-is:            llvm-cgen.hs
     other-modules:      Runner.LLVM,
                         Runner.Dynamic
-    build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
+    build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl, stm,
                         llvm-general==3.4.*, llvm-general-pure
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
                         GeneralizedNewtypeDeriving
@@ -192,7 +194,7 @@ executable llvm-cgen-dpdk
     main-is:            llvm-cgen.hs
     other-modules:      Runner.LLVM,
                         Runner.Dynamic
-    build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl,
+    build-depends:      Dragonet, base, containers, pretty-show, mtl, fgl, stm,
                         llvm-general==3.4.*, llvm-general-pure, dpdk
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
                         GeneralizedNewtypeDeriving

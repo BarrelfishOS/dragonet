@@ -191,21 +191,19 @@ graph lpg {
                 port true false[Valid] }
 
             and Valid {
-                port true[PortClassifyType]
+                port true[PortClassifyDynamic]
                 port false[..PacketDrop] }
 
-            node PortClassifyType {
-                port static[PortClassifyStatic]
-                port dynamic[PortClassifyDynamic]
-            }
-
-            node PortClassifyStatic {
+            /*node PortClassifyStatic {
                 port appDNS [.DnsAPP]
                 port appEcho [.EchoAPP]
                 port closedPort [ClosedPortAction]
-            }
+            }*/
 
             node PortClassifyDynamic {
+                port appDNS [.DnsAPP]
+                port appEcho [.EchoAPP]
+                port closedPort [ClosedPortAction]
             }
 
             node ClosedPortAction {

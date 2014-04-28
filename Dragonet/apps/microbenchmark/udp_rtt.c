@@ -5,23 +5,60 @@
 #include <udpproto.h>
 #include <proto_ipv4.h>
 
+static volatile bool received;
+static struct timespec end;
+static size_t size;
+static char templ[1024];
+
+static void recv_cb(socket_handle_t sh, struct input *in, void *data)
+{
+    int res;
+    pktoff_t len;
+
+    len = in->len - in->attr->offset_l5;
+    if (len <= 1024) {
+        res = memcmp((uint8_t *) in->data + in->attr->offset_l5, templ,
+                len);
+    } else {
+        res = -1;
+    }
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    if (len != size) {
+        printf("invalid payload len\n");
+        abort();
+    }
+    if (res != 0) {
+        printf("payload not as expected\n");
+        printf("l5off=%d\n", in->attr->offset_l5);
+        input_dump(in);
+        abort();
+    }
+    input_free(in);
+
+    received = true;
+}
+
 int main(int argc, char *argv[])
 {
     struct input *in;
     struct state *state;
     uint32_t dstIP = 0xc0a87b64; // 192.168.123.100
     uint16_t dstPort = 7;
-    pktoff_t len;
-    int res;
-    size_t size;
     unsigned long i;
-    unsigned long n = 8;
-    struct timespec start, end;
-    char templ[1024];
+    unsigned long n = 10000;
+    struct timespec start;
+    socket_handle_t sh;
 
     stack_init("AppEcho", "Rx_to_AppEcho", "AppEcho_to_Tx");
     // make sure tap device is initialized
     usleep(1000*1000);
+
+    sh = socket_create(recv_cb, NULL);
+    if (!socket_bind_udp_listen(sh, 0, 7)) {
+        fprintf(stderr, "socket_bind_udp_listen failed\n");
+        return 1;
+    }
 
     memset(templ, 'a', sizeof(templ));
 
@@ -34,42 +71,18 @@ int main(int argc, char *argv[])
             pkt_prepend(in, size);
             memset(in->data, 'a', size);
 
-            in->attr->udp_sport = 7;
-            in->attr->udp_dport = dstPort;
-            in->attr->ip4_dst   = dstIP;
-            in->attr->ip4_src   = state->local_ip;
+            received = false;
+            socket_send_udp(sh, in, state->local_ip, 7, dstIP, dstPort);
 
-            stack_send_udp_packet(in);
-
-
-            in = stack_get_packet();
-            len = in->len - in->attr->offset_l5;
-            if (len <= 1024) {
-                res = memcmp((uint8_t *) in->data + in->attr->offset_l5, templ,
-                        len);
-            } else {
-                res = -1;
+            while (!received) {
+                stack_process_event();
             }
-            clock_gettime(CLOCK_MONOTONIC, &end);
-
-            if (len != size) {
-                printf("invalid payload len\n");
-                goto out;
-            }
-            if (res != 0) {
-                printf("payload not as expected\n");
-                printf("l5off=%d\n", in->attr->offset_l5);
-                input_dump(in);
-                goto out;
-            }
-            input_free(in);
 
             long double t = (end.tv_sec - start.tv_sec) * 1000000.L;
             t += (end.tv_nsec - start.tv_nsec) / 1000.L;
-            printf("%d %Lf\n", size, t);
+            printf("%d %Lf\n", (int) size, t);
         }
     }
 
-out:
     return 0;
 }
