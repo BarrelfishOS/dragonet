@@ -143,4 +143,54 @@ def meta_attr_wrapper(p, l=None, func=get_metadata_attr):
        }
     return res
 
+################################################
+
+def get_result_attr(allResults, meta, client, attribute):
+    """should return value series to plot from whole result"""
+    ans = []
+    for rn, r in allResults.items():
+        per_run = []
+        for mn, m in r.items():
+            for tn, t in m.items():
+                if (tn == client):
+                    out = t["CMD_OUTPUT"]
+                    per_run.append(float(out[attribute]))
+
+        if not (len(per_run) == 1):
+            print "There are more than expected (1) answers fo for attribute %s in run %s" % (
+                attribute, rn )
+
+        assert(len(per_run) == 1)
+        #ans.append(sum(per_run))
+        #ans.append(myavg(per_run))
+        ans.append((per_run[0]))
+    return (ans)
+
+def get_result_str(allResults, meta, client, attribute):
+    """should return value series to plot from whole result"""
+    ans = []
+    for rn, r in allResults.items():
+        per_run = []
+        for mn, m in r.items():
+            for tn, t in m.items():
+                if (tn == client):
+                    out = t["CMD_OUTPUT"]
+                    per_run.append((out[attribute]))
+
+        assert(len(per_run) > 0)
+        return per_run
+        #ans.append(per_run)
+        #return ans
+
+def result_attr_wrapper(p, l=None, c="memaslap", func=get_result_attr):
+    if l == None or l == "":
+       l = p
+    res =  {
+        'data': func,
+        'args' : {
+            'client': c,
+            'attribute': p},
+        'label': l
+       }
+    return res
 

@@ -294,6 +294,65 @@ class NetperfSumaryRunner(ProcessRunner):
 
         return result
 
+class MemaslapSumaryRunner(ProcessRunner):
+    """Runner for memaslap summary """
+
+    def parse(self, output):
+        """Parses the final results and gives (key,value) pairs."""
+        result_keys = ["cmd_get", "cmd_set", "get_misses",
+                        "written_bytes", "read_bytes", "object_bytes",
+                        "packet_disorder", "packet_drop", "udp_timeout"
+                      ]
+        stats_keys = ["Min", "Max", "Avg", "Geo", "Std"]
+        summary_keys = ["Ops", "TPS", "Net_rate"]
+        cmd_keys = ["servers", "threads count", "concurrency",
+                    "run time", "windows size", "set proportion",
+                    "get proportion"
+                   ]
+
+        result = {}
+        cmd_output = {}
+        prefix = ""
+
+        try:
+            lines = output.split("\n")
+            for line in lines:
+                parts = line.split(":")
+                key = parts[0].strip()
+                #print "Key is [%s] and parts are [%s]" % (str(key), str(parts))
+                if (key in cmd_keys):
+                    cmd_output[key] = parts[1].strip()
+
+                if (key in result_keys):
+                    cmd_output[key] = float(parts[1].strip())
+                elif (key.startswith('Get Statistics (')) :
+                    prefix = "Get"
+                elif (key.startswith('Total Statistics (')) :
+                    prefix = "Total"
+                elif (key in stats_keys):
+                    nkey = "%s_%s" % (prefix, key)
+                    cmd_output[nkey] = float(parts[1].strip())
+                elif (key == "Run time") :
+                    for i in range(1, (len(parts)-1)):
+                        p2 = parts[i].strip().split(" ")
+                        k2 = p2[1].strip()
+                        if (k2 in summary_keys):
+                            v2 = parts[i+1].strip().split(" ")[0]
+                            cmd_output[k2] = v2.strip()
+
+            result['RESULT'] = cmd_output["TPS"]
+            if (cmd_output['get_misses'] > 0
+                or cmd_output['packet_drop'] > 0
+                or cmd_output['udp_timeout'] > 0):
+                result['RESULT'] = 0
+
+        finally:
+            e = sys.exc_info()
+            cmd_output['EXCEPTION'] = str(e)
+
+        result['CMD_OUTPUT'] = cmd_output
+        return result
+
 class LatencyBmRunner(ProcessRunner):
     """Runner for ../latencyBench/latencybm"""
 
