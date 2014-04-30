@@ -350,6 +350,7 @@ class MemaslapSumaryRunner(ProcessRunner):
             e = sys.exc_info()
             cmd_output['EXCEPTION'] = str(e)
 
+        cmd_output['RESULT'] = float(result['RESULT'])
         result['CMD_OUTPUT'] = cmd_output
         return result
 

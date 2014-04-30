@@ -68,7 +68,7 @@ def get_server_cpu(allResults, meta, takeAvg=False):
     return get_cpu(allResults, meta, 'server-1', int(server_core), takeAvg)
 
 def get_client_cpu(allResults, meta, takeAvg=False):
-    return get_cpu(allResults, meta, 'client-1', int(client_core), takeAvg)
+    return get_cpu(allResults, meta, 'client-0', int(client_core), takeAvg)
 
 def get_netperf_attr(allResults, meta, attribute):
     """should return value series to plot from whole result"""
@@ -182,9 +182,12 @@ def get_result_str(allResults, meta, client, attribute):
         #ans.append(per_run)
         #return ans
 
-def result_attr_wrapper(p, l=None, c="memaslap", func=get_result_attr):
+def result_attr_wrapper(p, l=None, c="memaslap0", func=get_result_attr):
     if l == None or l == "":
        l = p
+    if func == None or func == "":
+        func = get_result_attr
+
     res =  {
         'data': func,
         'args' : {

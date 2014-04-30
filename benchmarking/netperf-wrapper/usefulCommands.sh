@@ -15,3 +15,4 @@ gunzip -d udp_demo-2014-03-31T123917.623880.json.gz
 ./netperf-wrapper -i ../myplots/IntelD_exp//CImplDpdk/LATENCY/udp_rr-2014-04-08T120436.862794.CImplDpdk_IntelD_exp_PKT_1400_B_64.json.gz
 ./netperf-wrapper -p bbox -o t.png -i `find ../myplots/results2/ -name "*.json*" | grep -i "best"`
 ./netperf-wrapper  -i `find ../myplots/results2/ -name "*.json*" | grep -i "64_B_1"`
+./netperf-wrapper -c memcached -C ziger2 -C ziger2 -T 10.110.4.95  -H asiago -l 10 -L mylog1.log memcached_rr
