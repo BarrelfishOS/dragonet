@@ -539,17 +539,20 @@ static void msg_assign(struct lsm_internal *internal, struct shm_message *msg)
     errval_t e;
     struct bulk_pool *p;
     struct shm_message *out;
-    debug_printf("msg_assign\n");
 
-    if ((p = calloc(1, sizeof(*p))) == NULL) {
-        err = BULK_TRANSFER_MEM;
-        goto out;
-    }
+    // Check if we already know the pool
+    p = bulk_int_pool_byid(msg->content.assign.pool);
+    if (p == NULL) {
+        if ((p = calloc(1, sizeof(*p))) == NULL) {
+            err = BULK_TRANSFER_MEM;
+            goto out;
+        }
 
-    p->id = msg->content.assign.pool;
-    err = bulk_int_pool_map(p, BULK_BUFFER_INVALID, NULL, -1);
-    if (!err_is_ok(err)) {
-        goto fail_map;
+        p->id = msg->content.assign.pool;
+        err = bulk_int_pool_map(p, BULK_BUFFER_INVALID, NULL, -1);
+        if (!err_is_ok(err)) {
+            goto fail_map;
+        }
     }
 
     err = internal->chan->callbacks->pool_assigned(internal->chan, p);
