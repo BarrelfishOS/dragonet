@@ -140,12 +140,15 @@ void app_control_init(
     }
 }
 
-void app_control_send_welcome(int fd, app_id_t id)
+void app_control_send_welcome(int fd, app_id_t id,
+                              uint8_t num_inq, uint8_t num_outq)
 {
     printf("app_control_send_welcome\n");
     struct app_control_message msg;
     msg.type = APPCTRL_WELCOME;
     msg.data.welcome.id = id;
+    msg.data.welcome.num_inq = num_inq;
+    msg.data.welcome.num_outq = num_outq;
     if (send(fd, &msg, sizeof(msg), 0) < sizeof(msg)) {
         fprintf(stderr, "app_control_send_welcome: incomplete send\n");
     }
@@ -161,4 +164,20 @@ void app_control_send_status(int fd, bool success)
         fprintf(stderr, "app_control_send_status: incomplete send\n");
     }
 }
+
+void app_control_send_queue(int fd, bool out, const char *label)
+{
+    printf("app_control_send_status\n");
+    struct app_control_message msg;
+    msg.type = (out ? APPCTRL_OUTQUEUE : APPCTRL_INQUEUE);
+    if (strlen(label) >= MAX_QUEUELBL) {
+        fprintf(stderr, "app_control_send_queue: Queue label too long\n");
+        return;
+    }
+    strcpy(msg.data.queue.label, label);
+    if (send(fd, &msg, sizeof(msg), 0) < sizeof(msg)) {
+        fprintf(stderr, "app_control_send_queue: incomplete send\n");
+    }
+}
+
 

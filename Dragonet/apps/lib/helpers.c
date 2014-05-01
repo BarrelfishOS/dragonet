@@ -18,8 +18,8 @@
 
 pipeline_handle_t pipeline_handle = NULL;
 static struct state *state = NULL;
-static queue_handle_t in_queue = NULL;
-static queue_handle_t out_queue = NULL;
+static queue_handle_t *in_queue = NULL;
+static queue_handle_t *out_queue = NULL;
 static struct socket_handle *socks = NULL;
 static int control_fd = -1;
 
@@ -41,23 +41,13 @@ static void control_recv(struct app_control_message *msg)
 
 
 
-void stack_init(const char *name, const char *inq, const char *outq)
+void stack_init(const char *stackname, const char *name)
 {
-    const char *stackname = "dragonet";
-    pipeline_handle = pl_init(stackname, name);
-    state = pl_get_state(pipeline_handle);
-
-    in_queue = pl_inqueue_create(pipeline_handle, inq);
-    out_queue = pl_outqueue_bind(pipeline_handle, outq);
-
-    pl_wait_ready(pipeline_handle);
-    printf("Data path ready\n");
-
-
-    int s;
+    int s, i, num_in, num_out;
     struct sockaddr_un addr;
     struct app_control_message msg;
 
+    // Establish Control connection
     if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         perror("stack_init: creating socket failed");
         abort();
@@ -73,9 +63,41 @@ void stack_init(const char *name, const char *inq, const char *outq)
     }
     control_fd = s;
 
+    // Get welcome message
     control_recv(&msg);
     assert(msg.type == APPCTRL_WELCOME);
     printf("App ID=%"PRId64"\n", msg.data.welcome.id);
+    num_in = msg.data.welcome.num_inq;
+    num_out = msg.data.welcome.num_outq;
+    in_queue = calloc(num_in, sizeof(*in_queue));
+    out_queue = calloc(num_out, sizeof(*out_queue));
+
+    // Initialize pipeline interface
+    pipeline_handle = pl_init(stackname, name);
+    state = pl_get_state(pipeline_handle);
+
+    // Creating in queues
+    for (i = 0; i < num_in; i++) {
+        control_recv(&msg);
+        assert(msg.type == APPCTRL_INQUEUE);
+        printf("  Creating in-queue: %s\n", msg.data.queue.label);
+        in_queue[i] = pl_inqueue_create(pipeline_handle, msg.data.queue.label);
+    }
+
+    // Binding to outqueues
+    for (i = 0; i < num_out; i++) {
+        control_recv(&msg);
+        assert(msg.type == APPCTRL_OUTQUEUE);
+        printf("  Binding out-queue: %s\n", msg.data.queue.label);
+        out_queue[i] = pl_outqueue_bind(pipeline_handle, msg.data.queue.label);
+    }
+
+    // Make sure everything is ready
+    pl_wait_ready(pipeline_handle);
+    printf("Data path ready\n");
+
+
+
 }
 
 struct state *stack_get_state(void)
@@ -92,11 +114,11 @@ struct input *stack_get_packet(void)
     return in;
 }
 
-void stack_send_udp_packet(struct input *in)
+void stack_send_udp_packet(queue_handle_t queue, struct input *in)
 {
     input_set_muxid(in, 1); // Hardcoded value to get to the UDPInitiateResponse
                             // node. Not sure yet how to fix this
-    pl_enqueue(out_queue, in);
+    pl_enqueue(queue, in);
     input_free(in); // Weird, but necessary since pl_enqueue replaces the buffer
                     // in in with a new one
 }
@@ -179,7 +201,7 @@ bool socket_send_udp(socket_handle_t handle, struct input *in,
     in->attr->ip4_src   = s_ip;
     in->attr->ip4_dst   = d_ip;
 
-    stack_send_udp_packet(in);
+    stack_send_udp_packet(out_queue[0], in);
     return true;
 }
 

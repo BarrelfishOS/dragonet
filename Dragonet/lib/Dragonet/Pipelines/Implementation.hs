@@ -88,13 +88,13 @@ runPipelines ::
     -- pipeline
     (Pipeline -> Pipeline -> (POutput,PInput)) ->
     -- Initialize pipeline
-    (PipelineImpl -> IO ()) ->
-    PLGraph -> IO StackHandle
+    (PipelineImpl -> IO a) ->
+    PLGraph -> IO (StackHandle,[a])
 runPipelines sname qconf prun plg = do
     let plis = getPLIs qconf plg
     handle <- init_shared_state sname (length $ concatMap pliInQs plis)
-    mapM_ prun plis
-    return handle
+    results <- mapM prun plis
+    return (handle,results)
 
 stopPipelines :: StackHandle -> IO ()
 stopPipelines h = c_stop_stack h

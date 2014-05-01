@@ -38,7 +38,9 @@ data Event =
     deriving (Show,Eq,Ord)
 
 data TxMessage =
-    MsgWelcome AppId |
+    MsgWelcome AppId Int Int |
+    MsgInQueue String |
+    MsgOutQueue String |
     MsgStatus Bool
     deriving (Show,Eq,Ord)
 
@@ -56,10 +58,13 @@ foreign import ccall "app_control_init"
             FunPtr OpUDPFlow -> FunPtr OpSocketClose -> IO ()
 foreign import ccall "app_control_send_welcome"
     c_app_control_send_welcome ::
-        ChanHandle -> AppId -> IO ()
+        ChanHandle -> AppId -> Word8 -> Word8 -> IO ()
 foreign import ccall "app_control_send_status"
     c_app_control_send_status ::
         ChanHandle -> Bool -> IO ()
+foreign import ccall "app_control_send_queue"
+    c_app_control_send_queue ::
+        ChanHandle -> Bool -> CString -> IO ()
 
 
 foreign import ccall "wrapper"
@@ -108,6 +113,12 @@ interfaceThread stackname eh = do
         (hOpUDPFlow eh) (hOpSocketClose eh)
 
 sendMessage :: ChanHandle -> TxMessage -> IO ()
-sendMessage ch (MsgWelcome appid) = c_app_control_send_welcome ch appid
+sendMessage ch (MsgWelcome appid i o) =
+    c_app_control_send_welcome ch appid i' o'
+    where (i',o') = (fromIntegral i, fromIntegral o)
+sendMessage ch (MsgOutQueue l) =
+    withCString l $ \l' -> c_app_control_send_queue ch True l'
+sendMessage ch (MsgInQueue l) =
+    withCString l $ \l' -> c_app_control_send_queue ch False l'
 sendMessage ch (MsgStatus status) = c_app_control_send_status ch status
 

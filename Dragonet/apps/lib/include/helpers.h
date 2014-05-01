@@ -4,7 +4,7 @@
 #include <implementation.h>
 #include <app_control.h>
 
-void stack_init(const char *name, const char *inq, const char *outq);
+void stack_init(const char *stackname, const char *name);
 struct state *stack_get_state(void);
 void stack_process_event(void);
 

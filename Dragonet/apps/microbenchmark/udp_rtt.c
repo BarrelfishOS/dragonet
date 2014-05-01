@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
     struct timespec start;
     socket_handle_t sh;
 
-    stack_init("AppEcho", "AppInterface_to_AppEcho", "AppEcho_to_AppInterface");
+    stack_init("dragonet", "AppEcho");
 
     sh = socket_create(recv_cb, NULL);
     if (!socket_bind_udp_listen(sh, 0, 7)) {

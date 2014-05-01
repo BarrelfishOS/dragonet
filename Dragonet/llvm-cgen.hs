@@ -140,38 +140,58 @@ data SocketDesc =
     SockUDPListen PLI.UDPListenHandle |
     SockUDPFlow PLI.UDPFlowHandle
 
-appEvent ::
-    PLI.StateHandle ->
-    STM.TVar (M.Map (APP.ChanHandle,APP.SocketId) SocketDesc) ->
-     APP.ChanHandle -> APP.Event -> IO ()
-appEvent ss _ ch APP.EvAppRegister = do
+data AppIfState = AppIfState {
+    aiStackState :: PLI.StateHandle,
+    aiSocketMap  :: STM.TVar (M.Map (APP.ChanHandle,APP.SocketId) SocketDesc),
+    aiPLI        :: PLI.PipelineImpl
+}
+
+appEvent :: AppIfState -> APP.ChanHandle -> APP.Event -> IO ()
+appEvent ais ch APP.EvAppRegister = do
     putStrLn "AppRegister"
-    APP.sendMessage ch $ APP.MsgWelcome 42
-appEvent ss sm ch (APP.EvSocketUDPListen sid (0,port)) = do
+    let pli = aiPLI ais
+        inq = PLI.pliInQs pli
+        outq = PLI.pliOutQs pli
+        inMsg = map (\(_,PLI.PIQueue l) -> APP.MsgInQueue l) inq
+        outMsg = map (\(_,PLI.POQueue l) -> APP.MsgOutQueue l) outq
+
+    APP.sendMessage ch $ APP.MsgWelcome 42 (length inq) (length outq)
+    mapM_ (APP.sendMessage ch) $ inMsg ++ outMsg
+
+appEvent ais ch (APP.EvSocketUDPListen sid (0,port)) = do
     putStrLn $ "SocketUDPListen s=" ++ show sid ++ " p=" ++ show port
-    lh <- PLI.udpAddListen ss sid port
+    lh <- PLI.udpAddListen (aiStackState ais) sid port
+    let sm = aiSocketMap ais
     STM.atomically $ do
         m <- STM.readTVar sm
         STM.writeTVar sm $ M.insert (ch,sid) (SockUDPListen lh) m
     APP.sendMessage ch $ APP.MsgStatus True
     return ()
-appEvent ss sm ch (APP.EvSocketUDPFlow sid (sIP,sPort) (dIP,dPort)) = do
+
+appEvent ais ch (APP.EvSocketUDPFlow sid (sIP,sPort) (dIP,dPort)) = do
     putStrLn $ "SocketUDPFlow s=" ++ show sid ++ " s=" ++
         show (sIP,sPort) ++ " d=" ++ show (dIP,dPort)
-    fh <- PLI.udpAddFlow ss sid sIP sPort dIP dPort
+    fh <- PLI.udpAddFlow (aiStackState ais) sid sIP sPort dIP dPort
+    let sm = aiSocketMap ais
     STM.atomically $ do
         m <- STM.readTVar sm
         STM.writeTVar sm $ M.insert (ch,sid) (SockUDPFlow fh) m
     APP.sendMessage ch $ APP.MsgStatus True
     return ()
-appEvent ss _ ch ev = do
+
+appEvent _ ch ev = do
     putStrLn $ "appEvent " ++ show ch ++ " " ++ show ev
 
-initAppInterface :: String -> PLI.StackHandle -> IO ()
-initAppInterface stackname sh = do
+
+initAppInterface :: String -> PLI.StackHandle -> PLI.PipelineImpl -> IO ()
+initAppInterface stackname sh pli = do
     st <- PLI.stackState sh
     sm <- STM.newTVarIO $ M.empty
-    tid <- forkOS $ APP.interfaceThread stackname (appEvent st sm)
+    let ais = AppIfState {
+            aiStackState = st,
+            aiSocketMap = sm,
+            aiPLI = pli }
+    tid <- forkOS $ APP.interfaceThread stackname (appEvent ais)
     return ()
 
 failUsage :: IO ()
@@ -207,10 +227,14 @@ main = do
         ) $ map snd $ DGI.labNodes plg
 
     let stackname = "dragonet"
-    let runner = runPipeline plg stackname helpers
-    h <- PLI.runPipelines stackname plConnect runner plg
+    let runner pli = do
+        runPipeline plg stackname helpers pli
+        return pli
+    (h,plis) <- PLI.runPipelines stackname plConnect runner plg
 
-    initAppInterface stackname h
+    let Just appPLI =
+            L.find ((== "AppEcho") . PL.plLabel . PLI.pliPipeline) plis
+    initAppInterface stackname h appPLI
     commandLineInterface
 
     putStrLn "Doing cleanup..."

@@ -19,7 +19,7 @@ static void recv_foo_cb(socket_handle_t sh, struct input *in, void *data)
 int main(int argc, char *argv[])
 {
     socket_handle_t sh, si;
-    stack_init("AppEcho", "AppInterface_to_AppEcho", "AppEcho_to_AppInterface");
+    stack_init("dragonet", "AppEcho");
 
     sh = socket_create(recv_cb, NULL);
     si = socket_create(recv_foo_cb, NULL);
