@@ -8,7 +8,7 @@ import Dragonet.DotGenerator (toDot, toDotWith, pipelinesDot)
 import qualified Dragonet.Pipelines as PL
 import qualified Dragonet.Pipelines.Implementation as PLI
 import qualified Dragonet.Pipelines.Applications as APP
-import Util.GraphHelpers (findNodeByL,mergeGraphsBy)
+import Util.GraphHelpers (findNodeByL,mergeGraphsBy,delLEdges)
 import qualified Util.GraphMonad as GM
 
 import Control.Applicative
@@ -30,6 +30,7 @@ import Debug.Trace (trace, traceShow)
 import System.Environment (getArgs, getProgName)
 import System.IO  (writeFile,hFlush,stdout)
 import System.Exit (exitFailure)
+import Text.Printf (printf)
 
 import qualified Runner.LLVM as LLVM
 import qualified Runner.Dynamic as Dyn
@@ -55,17 +56,37 @@ pg4tap pg = tagNodes "" $ renameQueues "TapRxQueue" "TapTxQueue" pg
 -- Simplistic e10k multi queue embedding
 pg4e10k :: PGraph -> PGraph
 pg4e10k pg =
-    addTxQueueDemux $ untagApp $ foldl1 merge $ map queueGraph [0..(nQueues - 1)]
+    appQueuePorts $ untagApp $ foldl1 merge $ map queueGraph queueIDs
     where
         nQueues = 2
-        queueGraph q = tagNodes ("Queue" ++ show q) $
-            renameQueues ("RxE10kQueue" ++ show q) ("TxE10kQueue" ++ show q) pg
+        queueIDs = [0..(nQueues - 1)] :: [Int]
+        ql i = printf "%03d" i
+        queueGraph q = tagNodes ("Queue" ++ ql q) $
+            renameQueues ("RxE10kQueue" ++ ql q) ("TxE10kQueue" ++ ql q) pg
         merge = mergeGraphsBy nodesMatch
         nodesMatch a b =  nLabel a == "RxEchoAPP" && nLabel b == "RxEchoAPP"
         untagApp = DGI.nmap fixAppN
         fixAppN n
             | nLabel n == "RxEchoAPP" = n { nTag = "App" }
             | otherwise = n
+
+updateN :: DGI.DynGraph gr => (a -> a) -> DGI.Node -> gr a b -> gr a b
+updateN f n g = DGI.gmap change g
+    where
+        change ctx@(i,n',l,o)
+            | n' == n = (i,n',f l,o)
+            | otherwise = ctx
+
+appQueuePorts :: PGraph -> PGraph
+appQueuePorts pg = DGI.insEdges newE $ updateN addPorts n $ delLEdges oldE pg
+    where
+        Just (n,_) = findNodeByL (("RxEchoAPP" ==) . nLabel) pg
+        tag m = nTag $ fromJust $ DGI.lab pg m
+        sucs = L.sortBy (compare `on` (tag . fst)) $ DGI.lsuc pg n
+        oldE = map (\(a,b) -> (n,a,b)) sucs
+        newE = map (\(a,_) -> (n,a,tag a)) sucs
+        ports = map (\(_,_,p) -> p) newE
+        addPorts l = l { PG.nPorts = ports }
 
 addTxQueueDemux :: PGraph -> PGraph
 addTxQueueDemux pg = snd $ flip GM.runOn pg $ do
