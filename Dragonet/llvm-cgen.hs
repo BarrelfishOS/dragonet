@@ -29,6 +29,7 @@ import qualified Text.Show.Pretty as Pr
 import Debug.Trace (trace, traceShow)
 import System.Environment (getArgs, getProgName)
 import System.IO  (writeFile,hFlush,stdout)
+import System.Exit (exitFailure)
 
 import qualified Runner.LLVM as LLVM
 import qualified Runner.Dynamic as Dyn
@@ -173,12 +174,18 @@ initAppInterface stackname sh = do
     tid <- forkOS $ APP.interfaceThread stackname (appEvent st sm)
     return ()
 
+failUsage :: IO ()
+failUsage = do
+    putStrLn "Usage: llvm-cgen <unicorn file>"
+    exitFailure
+
 main :: IO ()
 main = do
-    let fname_def = "unicorn-tests/hello.unicorn"       -- default unicorn file name
-
     xargs <- getArgs
-    let fname = if (length xargs) == 0 then fname_def else xargs !! 0
+    if length xargs == 0
+        then failUsage
+        else return ()
+    let fname = xargs !! 0
 
     pname <- getProgName
     let (helpers,embed) = case pname of
