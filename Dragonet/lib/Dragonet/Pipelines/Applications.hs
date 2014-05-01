@@ -21,6 +21,7 @@ import Foreign.C.Types
 import Foreign.Storable
 
 import Data.Word
+import Data.Int
 
 type ChanHandle = Int
 type SocketId = Word64
@@ -41,7 +42,8 @@ data TxMessage =
     MsgWelcome AppId Int Int |
     MsgInQueue String |
     MsgOutQueue String |
-    MsgStatus Bool
+    MsgStatus Bool |
+    MsgSocketInfo Word8 Int32
     deriving (Show,Eq,Ord)
 
 
@@ -65,6 +67,9 @@ foreign import ccall "app_control_send_status"
 foreign import ccall "app_control_send_queue"
     c_app_control_send_queue ::
         ChanHandle -> Bool -> CString -> IO ()
+foreign import ccall "app_control_send_socket_info"
+    c_app_control_send_socket_info ::
+        ChanHandle -> Word8 -> Int32 -> IO ()
 
 
 foreign import ccall "wrapper"
@@ -121,4 +126,5 @@ sendMessage ch (MsgOutQueue l) =
 sendMessage ch (MsgInQueue l) =
     withCString l $ \l' -> c_app_control_send_queue ch False l'
 sendMessage ch (MsgStatus status) = c_app_control_send_status ch status
+sendMessage ch (MsgSocketInfo oq mux) = c_app_control_send_socket_info ch oq mux
 

@@ -180,4 +180,15 @@ void app_control_send_queue(int fd, bool out, const char *label)
     }
 }
 
+void app_control_send_socket_info(int fd, uint8_t outq, int32_t mux_id)
+{
+    printf("app_control_send_socket_info\n");
+    struct app_control_message msg;
+    msg.type = APPCTRL_SOCKET_INFO;
+    msg.data.socket_info.outq = outq;
+    msg.data.socket_info.mux_id = mux_id;
+    if (send(fd, &msg, sizeof(msg), 0) < sizeof(msg)) {
+        fprintf(stderr, "app_control_send_socket_info: incomplete send\n");
+    }
+}
 

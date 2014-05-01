@@ -14,6 +14,7 @@ enum app_control_type {
     APPCTRL_OUTQUEUE,           // Dragonet -> App
     APPCTRL_INQUEUE,            // Dragonet -> App
     APPCTRL_STATUS,             // Dragonet -> App
+    APPCTRL_SOCKET_INFO,        // Dragonet -> App
     APPCTRL_SOCKET_UDPLISTEN,   // App -> Dragonet
     APPCTRL_SOCKET_UDPFLOW,     // App -> Dragonet
     APPCTRL_SOCKET_CLOSE,       // App -> Dragonet
@@ -33,6 +34,10 @@ struct app_control_message {
         struct {
             bool success;
         } status;
+        struct {
+            int32_t mux_id;
+            uint8_t outq;
+        } socket_info;
         struct {
             socket_id_t id;
             uint32_t ip;
@@ -63,6 +68,7 @@ void app_control_send_welcome(int fd, app_id_t id,
                               uint8_t num_inq, uint8_t num_outq);
 void app_control_send_status(int fd, bool success);
 void app_control_send_queue(int fd, bool out, const char *label);
+void app_control_send_socket_info(int fd, uint8_t outq, int32_t mux_id);
 
 
 #endif // ndef APP_CONTROL_H_

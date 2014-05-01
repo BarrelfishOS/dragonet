@@ -12,6 +12,8 @@ struct socket_handle;
 typedef struct socket_handle *socket_handle_t;
 struct socket_handle {
     uint64_t id;
+    int32_t  mux_id;
+    uint8_t  outqueue;
     bool bound;
     bool ready;
     void (*cb_receive)(socket_handle_t, struct input *, void *);

@@ -114,11 +114,11 @@ struct input *stack_get_packet(void)
     return in;
 }
 
-void stack_send_udp_packet(queue_handle_t queue, struct input *in)
+static void stack_send_packet(socket_handle_t handle, struct input *in)
 {
-    input_set_muxid(in, 1); // Hardcoded value to get to the UDPInitiateResponse
-                            // node. Not sure yet how to fix this
-    pl_enqueue(queue, in);
+    input_set_muxid(in, handle->mux_id);
+    pl_enqueue(out_queue[handle->outqueue], in);
+
     input_free(in); // Weird, but necessary since pl_enqueue replaces the buffer
                     // in in with a new one
 }
@@ -177,9 +177,13 @@ bool socket_bind_udp_listen(socket_handle_t handle, uint32_t ip, uint16_t port)
     control_send(&msg);
 
     control_recv(&msg);
-    assert(msg.type == APPCTRL_STATUS);
-    if (msg.data.status.success) {
+    if (msg.type == APPCTRL_SOCKET_INFO) {
         handle->bound = true;
+        handle->mux_id = msg.data.socket_info.mux_id;
+        handle->outqueue = msg.data.socket_info.outq;
+    } else {
+        assert(msg.type == APPCTRL_STATUS);
+        // Something went wrong
     }
     return handle->bound;
 }
@@ -201,7 +205,7 @@ bool socket_send_udp(socket_handle_t handle, struct input *in,
     in->attr->ip4_src   = s_ip;
     in->attr->ip4_dst   = d_ip;
 
-    stack_send_udp_packet(out_queue[0], in);
+    stack_send_packet(handle, in);
     return true;
 }
 

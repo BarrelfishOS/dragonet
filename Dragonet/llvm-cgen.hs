@@ -165,7 +165,9 @@ appEvent ais ch (APP.EvSocketUDPListen sid (0,port)) = do
     STM.atomically $ do
         m <- STM.readTVar sm
         STM.writeTVar sm $ M.insert (ch,sid) (SockUDPListen lh) m
-    APP.sendMessage ch $ APP.MsgStatus True
+    let muxID = 1 -- FIXME
+        outQ  = 0
+    APP.sendMessage ch $ APP.MsgSocketInfo outQ muxID
     return ()
 
 appEvent ais ch (APP.EvSocketUDPFlow sid (sIP,sPort) (dIP,dPort)) = do
