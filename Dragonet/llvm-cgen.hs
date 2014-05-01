@@ -172,7 +172,7 @@ appEvent ais ch APP.EvAppRegister = do
     putStrLn "AppRegister"
     let pli = aiPLI ais
         inq = PLI.pliInQs pli
-        outq = PLI.pliOutQs pli
+        outq = L.sortBy (compare `on` fst) $ PLI.pliOutQs pli
         inMsg = map (\(_,PLI.PIQueue l) -> APP.MsgInQueue l) inq
         outMsg = map (\(_,PLI.POQueue l) -> APP.MsgOutQueue l) outq
 
