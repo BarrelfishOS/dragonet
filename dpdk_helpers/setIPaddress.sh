@@ -67,7 +67,7 @@ setIPaddr "00:1b:21:8f:1a:c0" "10.44.4.26" "sbrinz1" "intel1" "no" "no" "" ""
 
 echo "for sbrinz2"
 setDHCPIPaddr "00:30:48:d7:99:58" "10.110.4.29" "sbrinz2"
-setIPaddr "90:e2:ba:3a:6d:20" "10.113.4.29" "sbrinz2" "intel1" "direct" "gruyere-intel1" "0000:85:00.0" "cable-nc10-m3"
+setIPaddr "90:e2:ba:3a:6d:20" "10.22.4.29" "sbrinz2" "intel1" "direct" "gruyere-intel1" "0000:85:00.0" "cable-nc10-m3"
 setIPaddr "90:e2:ba:3a:6d:21" "10.113.4.29" "sbrinz2" "intel2" "switch" "18" "0000:85:00.1" "cable-short-thin"
 
 echo "for ziger1"
