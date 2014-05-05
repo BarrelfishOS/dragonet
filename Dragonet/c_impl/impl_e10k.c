@@ -14,6 +14,7 @@
 #include <implementation.h>
 #include <packet_access.h>
 #include <pipelines.h>
+#include <dragonet_e10k.h>
 
 #define NUM_RXDESCS 512
 #define NUM_TXDESCS 512
@@ -26,7 +27,6 @@
 #define CONFIG_PCI_ADDR "0000:04:00.0"
 #define CONFIG_LOCAL_IP  0x0a16040b //   "10.22.4.11"
 
-#define QUEUES 2
 
 struct mem_region_alloc {
     void    *virt;
@@ -34,21 +34,6 @@ struct mem_region_alloc {
     size_t   left;
 };
 
-
-struct dragonet_e10k;
-#define QUEUE_INDEX(q) ((q) - (q)->e10k->queues)
-struct dragonet_e10k_queue {
-    struct dragonet_e10k *e10k;
-    bool populated;
-    bool chained;
-    e10k_queue_t *queue;
-};
-
-struct dragonet_e10k {
-    struct usp_pci_desc dev;
-    struct e10k_card card;
-    struct dragonet_e10k_queue queues[QUEUES];
-};
 
 extern pipeline_handle_t pipeline_handle;
 

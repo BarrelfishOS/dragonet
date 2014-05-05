@@ -118,7 +118,14 @@ executable llvm-cgen
     extensions:         DoAndIfThenElse, ForeignFunctionInterface,
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
-    C-sources:          Runner/dynamic.c
+    C-sources:          Runner/dynamic.c,
+                        c_impl/e10k/e10k_card.c,
+                        c_impl/e10k/e10k_phy.c,
+                        c_impl/e10k/linux_hugepage.c,
+                        c_impl/e10k/linux_pci_uio.c,
+                        c_impl/e10k/dragonet_ctrl.c
+    Include-dirs:       c_impl/include,
+                        c_impl/e10k/include
     CC-options:         -Wall -Wno-unused-function
     x-llvm-c-includes:  c_impl/include,
                         lib/Dragonet/Pipelines,
@@ -156,7 +163,14 @@ executable llvm-cgen-e10k
                         GeneralizedNewtypeDeriving
     ghc-options:        -threaded
     C-sources:          Runner/dynamic.c
+                        c_impl/e10k/e10k_card.c,
+                        c_impl/e10k/e10k_phy.c,
+                        c_impl/e10k/linux_hugepage.c,
+                        c_impl/e10k/linux_pci_uio.c,
+                        c_impl/e10k/dragonet_ctrl.c
     CC-options:         -Wall -Wno-unused-function
+    Include-dirs:       c_impl/include,
+                        c_impl/e10k/include
     x-llvm-c-includes:  c_impl/include,
                         c_impl/e10k/include,
                         lib/Dragonet/Pipelines,

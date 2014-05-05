@@ -21,7 +21,7 @@ import qualified Control.Concurrent.STM as STM
 import qualified Data.Map as M
 import qualified Data.List as L
 import Data.Maybe (fromJust,isNothing)
-import Data.Word (Word32, Word64, Word)
+import Data.Word (Word32, Word64, Word8, Word)
 import Data.Char (ord)
 import Data.Function (on)
 
@@ -34,6 +34,7 @@ import Text.Printf (printf)
 
 import qualified Runner.LLVM as LLVM
 import qualified Runner.Dynamic as Dyn
+import qualified Runner.E10KControl as E10K
 
 tagNodes :: String -> PGraph -> PGraph
 tagNodes tag = DGI.nmap (\n -> n { nTag = tag })
@@ -164,7 +165,8 @@ data SocketDesc =
 data AppIfState = AppIfState {
     aiStackState :: PLI.StateHandle,
     aiSocketMap  :: STM.TVar (M.Map (APP.ChanHandle,APP.SocketId) SocketDesc),
-    aiPLI        :: PLI.PipelineImpl
+    aiPLI        :: PLI.PipelineImpl,
+    aiNext5t     :: STM.TVar Word8
 }
 
 appEvent :: AppIfState -> APP.ChanHandle -> APP.Event -> IO ()
@@ -187,7 +189,19 @@ appEvent ais ch (APP.EvSocketUDPListen sid (0,port)) = do
         m <- STM.readTVar sm
         STM.writeTVar sm $ M.insert (ch,sid) (SockUDPListen lh) m
     let muxID = 1 -- FIXME
-        outQ  = 0
+        outQ  = fromIntegral (port `mod` 2)
+        inQ = outQ
+    if inQ /= 0
+        then do
+            let ftfTV = aiNext5t ais
+            id <- STM.atomically $ do
+                v <- STM.readTVar ftfTV
+                STM.writeTVar ftfTV (v + 1)
+                return v
+            E10K.ftSet (aiStackState ais) id $ E10K.FTuple 1 inQ
+                (Just E10K.L3IPv4) (Just E10K.L4UDP)
+                Nothing Nothing Nothing (Just $ fromIntegral port)
+        else return ()
     APP.sendMessage ch $ APP.MsgSocketInfo outQ muxID
     return ()
 
@@ -209,10 +223,12 @@ appEvent _ ch ev = do
 initAppInterface :: String -> PLI.StackHandle -> PLI.PipelineImpl -> IO ()
 initAppInterface stackname sh pli = do
     st <- PLI.stackState sh
-    sm <- STM.newTVarIO $ M.empty
+    sm <- STM.newTVarIO M.empty
+    ftf <- STM.newTVarIO 0
     let ais = AppIfState {
             aiStackState = st,
             aiSocketMap = sm,
+            aiNext5t = ftf,
             aiPLI = pli }
     tid <- forkOS $ APP.interfaceThread stackname (appEvent ais)
     return ()
