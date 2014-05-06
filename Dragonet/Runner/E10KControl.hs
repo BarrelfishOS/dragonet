@@ -1,5 +1,6 @@
 module Runner.E10KControl (
     FTuple(..),
+    FDirTuple(..),
     L3Proto(..),
     L4Proto(..),
 
@@ -36,6 +37,16 @@ data FTuple = FTuple {
     ftL3Dst    :: Maybe Word32,
     ftL4Src    :: Maybe Word16,
     ftL4Dst    :: Maybe Word16
+} deriving (Eq,Show)
+
+data FDirTuple = FDirTuple {
+    fdtQueue   :: Word8,
+    fdtL3Proto :: L3Proto,
+    fdtL4Proto :: L4Proto,
+    fdtL3Src   :: Word32,
+    fdtL3Dst   :: Word32,
+    fdtL4Src   :: Word16,
+    fdtL4Dst   :: Word16
 } deriving (Eq,Show)
 
 
