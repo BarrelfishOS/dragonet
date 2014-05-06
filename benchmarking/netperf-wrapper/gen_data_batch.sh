@@ -225,8 +225,14 @@ fi
 echo "OUTPUT Location: ${OUTDIRP}"
 
 
-get_best_latency 64 1
+get_best_tp 1024
 exit 0
+
+get_best_latency 64 1
+
+######################################################################
+######################################################################
+
 get_best_latency 1400 1
 
 #get_best_latency 64 1

@@ -19,7 +19,7 @@ SRV_CMDS = {
                         "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
                         "echo 0 | sudo tee /proc/sys/net/core/busy_read",
                     ],
-                    "exec_cmd" : "../memcached/memcached  -p 0  -u ubuntu -t 1  -U %d" % (MEMCACHED_PORT),
+                    "exec_cmd" : "../memcached/memcached  -p 0  -u ubuntu -U %d" % (MEMCACHED_PORT),
                     "kill_cmd" : ["sudo killall memcached || true"],
                     "out_cmd" : [],
                 },

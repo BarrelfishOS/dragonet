@@ -54,8 +54,12 @@ DEFAULT_SETTINGS = {
     'SERVERS': [],
     'SERVERS_IF': {},
     'SERVERS_DRV': {},
+    'SERVERS_CORECOUNT': {},
     'CLIENTS': [],
     'CLIENTS_IF': {},
+    'CLIENTS_CORECOUNT': {},
+    'SERVER_CORES': 1,
+    'CLIENT_CORES': 1,
     'BRUST_SIZE': 1,
     'PKT_SIZE': 1024,
     'LOCAL_HOST': socket.gethostname(),
@@ -356,6 +360,14 @@ parser.add_option("-t", "--title-extra", action="store", type="string", dest="TI
                   help="Text to add to plot title and data file name.")
 parser.add_option("-b", "--brust", action="store", type="int", dest="BRUST_SIZE",
                   help="Number of concurrent transactions")
+
+parser.add_option("-q", "--servercores", action="store", type="int", dest="SERVER_CORES",
+                  help="Number of cores to use in server")
+parser.add_option("-Q", "--clientcores", action="store", type="int", dest="CLIENT_CORES",
+                  help="Number of cores to use in client")
+
+
+
 parser.add_option("-e", "--onload", action="store_true", dest="SERVER_ONLOAD_ENABLED",
                   help="Solarflare openonload library will be loaded for Linux apps")
 parser.add_option("-E", "--onloadLatency", action="store_true", dest="SERVER_ONLOAD_LATENCY",
@@ -620,10 +632,12 @@ def load():
             settings.MINFO_SERVER[m] = record_machine_metadata(m, settings.TARGET)
             settings.SERVERS_IF[m] = settings.MINFO_SERVER[m]["EGRESS_INFO"]["iface"]
             settings.SERVERS_DRV[m] = settings.MINFO_SERVER[m]["EGRESS_INFO"]["driver"]
+            settings.SERVERS_CORECOUNT[m] = int(settings.MINFO_SERVER[m]['CORECOUNT'])
 
         for m in settings.CLIENTS:
             settings.MINFO_CLIENT[m] = record_machine_metadata(m, settings.TARGET)
             settings.CLIENTS_IF[m] = settings.MINFO_CLIENT[m]["EGRESS_INFO"]["iface"]
+            settings.CLIENTS_CORECOUNT[m] = int(settings.MINFO_CLIENT[m]['CORECOUNT'])
 
         if settings.SERVER_ONLOAD_LATENCY:
             settings.SERVER_ONLOAD_CMDLINE = "onload --profile=latency --preload=/usr/lib64/libonload.so"
@@ -644,10 +658,14 @@ def load():
                             PKT_SIZE=settings.PKT_SIZE,
                             TARGET=settings.TARGET,
                             BRUST_SIZE=settings.BRUST_SIZE,
+                            SERVER_CORES=settings.SERVER_CORES,
+                            CLIENT_CORES=settings.CLIENT_CORES,
                             CLIENTS=settings.CLIENTS,
                             CLIENTS_IF=settings.CLIENTS_IF,
+                            CLIENTS_CORECOUNT=settings.CLIENTS_CORECOUNT,
                             SERVERS_IF=settings.SERVERS_IF,
                             SERVERS_DRV=settings.SERVERS_DRV,
+                            SERVERS_CORECOUNT=settings.SERVERS_CORECOUNT,
                             TIME=settings.TIME,
                             LOCAL_HOST=settings.LOCAL_HOST,
                             TITLE=settings.TITLE,

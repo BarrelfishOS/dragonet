@@ -20,6 +20,8 @@
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys, os, socket, subprocess, time, re
+import json as js
+JSON_INDENT = 4
 
 try:
     from collections import OrderedDict
@@ -65,19 +67,48 @@ get_command_output = CommandRunner()
 
 __all__ = ['record_extended_metadata', 'record_machine_metadata']
 
+MACHINE_CONFIG_BASE = "./"
 
-def record_machine_metadata(mname, targetMachine=None, ipv=4):
+def record_machine_metadata(mname, targetMachine=None, ipv=4, forceRefresh=False):
+
     get_command_output.set_hostname(None)
     local_hostname = get_command_output("hostname")
     if mname != None and mname.lower() not in ['localhost', '127.0.0.1', local_hostname] :
         get_command_output.set_hostname(mname)
 
+    # if a json file with mname exist, then read the config from it
+    mconfig_path = "%s/%s_details.mconf" % (MACHINE_CONFIG_BASE, mname)
+
+    if not forceRefresh:
+        if os.path.exists(mconfig_path):
+            # load json dictionary
+            ff = open(mconfig_path, 'r')
+            data = ff.read()
+            ff.close()
+            m = js.loads(data)
+            # verify that is is correct dictionary
+            keysFound = set(map(tuple, m.keys()))
+            mandetoryKeys = set(map(tuple, ['LOCAL_HOST', 'KERNEL_NAME',
+                'IP_ADDRS', 'GATEWAYS', 'EGRESS_INFO', 'INGRESS_INFO', 'CORECOUNT']))
+            if mandetoryKeys <=  keysFound:
+                if m['LOCAL_HOST'] == mname:
+                    # return it
+                    return m
+                else:
+                    print "machine config file %s holds info for wrong machine (%s) insted of (%s)" % (
+                        mconfig_path, m['LOCAL_HOST'], mname)
+            else :
+                print "machine config file %s is invalid" % (mconfig_path)
+                print "It had only [%s] keys whereas expected keys were %s" % (
+                    keysFound, mandetoryKeys)
+    # For whatever reasons, we don't have correct info.  So lets try and collect it
     m = OrderedDict()
     m = {}
     m['IP_VERSION'] = ipv
     m['TARGET_MACHINE'] = targetMachine
     m['LOCAL_HOST'] = get_command_output("hostname")
     m['KERNEL_NAME'] = get_command_output("uname -s")
+    m['CORECOUNT'] = get_command_output('grep "^processor" /proc/cpuinfo | wc -l')
     m['KERNEL_RELEASE'] = get_command_output("uname -r")
     m['IP_ADDRS'] = get_ip_addrs()
     m['GATEWAYS'] = get_gateways()
@@ -86,8 +117,12 @@ def record_machine_metadata(mname, targetMachine=None, ipv=4):
         if 'src' in m['EGRESS_INFO']:
             m['INGRESS_INFO'] = get_egress_info(target=m['EGRESS_INFO']['src'], ip_version=m['IP_VERSION'] )
         m['EGRESS_INFO'] = get_egress_info(target=m['TARGET_MACHINE'], ip_version=m['IP_VERSION'], ifaces=m['IP_ADDRS'])
-    return m
 
+    # write this dictionary into mconfig file
+    f = open(mconfig_path, 'w')
+    f.write(js.dumps(m,indent=JSON_INDENT))
+    f.close()
+    return m
 
 def record_extended_metadata(results, hostnames):
     m = results.meta()

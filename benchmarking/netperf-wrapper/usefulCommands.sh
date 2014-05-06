@@ -16,3 +16,4 @@ gunzip -d udp_demo-2014-03-31T123917.623880.json.gz
 ./netperf-wrapper -p bbox -o t.png -i `find ../myplots/results2/ -name "*.json*" | grep -i "best"`
 ./netperf-wrapper  -i `find ../myplots/results2/ -name "*.json*" | grep -i "64_B_1"`
 ./netperf-wrapper -c memcached -C ziger2 -C ziger2 -T 10.110.4.95  -H asiago -l 10 -L mylog1.log memcached_rr
+./netperf-wrapper -l 10 -c memcached -C ziger2 -C sbrinz2 -C gruyere  -T 10.113.4.95 -Q 2 -q 18  -H asiago -b 100 -L mylog3.log memcached_rr
