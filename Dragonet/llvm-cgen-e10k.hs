@@ -1,8 +1,6 @@
 import qualified Data.Graph.Inductive as DGI
 
 import Dragonet.ProtocolGraph  as PG
-import Dragonet.Unicorn.Parser as UnicornAST
-import Dragonet.Unicorn  as Unicorn
 import qualified Dragonet.Incremental as INC
 import Util.GraphHelpers (findNodeByL,mergeGraphsBy,delLEdges,updateN)
 
@@ -56,15 +54,10 @@ e10kAction ais act = do
 
 main :: IO ()
 main = do
-    let fname = "lpgImpl.unicorn"
-        helpers = "llvm-helpers-e10k"
+    let helpers = "llvm-helpers-e10k"
         nQ = 2
         e10kS = E10KP.e10kPStateInit 128
         pstate = INC.policyStateInit nQ e10kS E10KP.e10kPolicy
 
-    -- Parse graph and perform pseudo-embedding
-    b <- readFile fname >>= UnicornAST.parseGraph
-    let pgraph = pg4e10k nQ $ Unicorn.constructGraph b
-
-    runStack pgraph pstate e10kAction helpers
+    runStack (pg4e10k nQ) pstate e10kAction helpers
 

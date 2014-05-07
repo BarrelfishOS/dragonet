@@ -17,6 +17,8 @@ import qualified Dragonet.Pipelines as PL
 import qualified Dragonet.Pipelines.Implementation as PLI
 import qualified Dragonet.Pipelines.Applications as APP
 import qualified Dragonet.Incremental as INC
+import qualified Dragonet.Unicorn.Parser as UnicornAST
+import qualified Dragonet.Unicorn  as Unicorn
 
 import Control.Monad
 import Control.Concurrent (forkOS)
@@ -38,9 +40,14 @@ import qualified Runner.LLVM as LLVM
 -------------------------------------------------------------------------------
 -- Initialization
 
-runStack :: Show b => PG.PGraph -> INC.PolicyState a b ->
+runStack :: Show b => (PG.PGraph -> PG.PGraph) -> INC.PolicyState a b ->
         (AppIfState a b -> b -> IO ()) -> String -> IO ()
-runStack pgraph pstate hwact helpers = do
+runStack embed pstate hwact helpers = do
+    let fname = "lpgImpl.unicorn"
+    -- Parse graph and perform pseudo-embedding
+    b <- readFile fname >>= UnicornAST.parseGraph
+    let pgraph = embed $ Unicorn.constructGraph b
+
     writeFile "DELETEME.dot" $ toDot pgraph
     let plg = PL.generatePLG plAssign pgraph
 
