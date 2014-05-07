@@ -12,6 +12,7 @@ module Util.GraphHelpers(
     RecContext,
     recurseNFW,
     topsortLN,
+    updateN
 ) where
 
 import Data.Graph.Inductive
@@ -120,4 +121,12 @@ recurseNFW f g = gmap (\(ia,n,_,oa) -> let (Just lbl) = lookup n assocL
 topsortLN :: Graph gr => gr a b -> [LNode a]
 topsortLN g = map (\x -> let (Just y) = L.find ((== x) . fst) ln in y) $ topsort g
     where ln = labNodes g
+
+-- Update the label of a particular node
+updateN :: DynGraph gr => (a -> a) -> Node -> gr a b -> gr a b
+updateN f n g = gmap change g
+    where
+        change ctx@(i,n',l,o)
+            | n' == n = (i,n',f l,o)
+            | otherwise = ctx
 

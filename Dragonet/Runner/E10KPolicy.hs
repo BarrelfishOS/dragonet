@@ -6,7 +6,6 @@ module Runner.E10KPolicy (
 ) where
 
 import Dragonet.Incremental
-import Dragonet.Implementation.IPv4 as IP4
 import Runner.E10KControl
 
 import Control.Monad.State
