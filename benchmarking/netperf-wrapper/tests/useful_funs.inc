@@ -146,20 +146,25 @@ def netperf_attr_wrapper(p, l=None, func=get_netperf_attr):
     return res
 
 
-def get_metadata_attr(allResults, meta, attribute):
+def get_metadata_attr(allResults, meta, attribute, agg=None):
     """should return the metadata attribute"""
     if attribute in meta.keys() :
-        return meta[attribute]
+        if agg != None and agg != False:
+            return agg (meta[attribute])
+        else :
+            return meta[attribute]
     else:
         return ""
 
 
-def meta_attr_wrapper(p, l=None, func=get_metadata_attr):
+def meta_attr_wrapper(p, l=None, func=get_metadata_attr, agg=None):
     if l == None or l == "":
        l = p
     res =  {
         'data': func,
-        'args' : {'attribute': p},
+        'args' : {'attribute': p,
+                   'agg': agg
+                 },
         'label': l
        }
     return res
@@ -201,7 +206,7 @@ def get_result_str(allResults, meta, client, attribute, aggregator):
                     out = t["CMD_OUTPUT"]
                     per_run.append((out[attribute]))
 
-        assert(len(per_run) > 0)
+        #assert(len(per_run) > 0)
         return per_run
         #ans.append(per_run)
         #return ans

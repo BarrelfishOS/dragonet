@@ -51,6 +51,7 @@ DEFAULT_SETTINGS = {
     'HOST': None,
     'HOSTS': [],
     'TARGET': None,
+    'USE_TCP': False,
     'SERVERS': [],
     'SERVERS_IF': {},
     'SERVERS_DRV': {},
@@ -60,6 +61,7 @@ DEFAULT_SETTINGS = {
     'CLIENTS_CORECOUNT': {},
     'SERVER_CORES': 1,
     'CLIENT_CORES': 1,
+    'SPECIAL_CLIENTS_COUNT' : 0,
     'BRUST_SIZE': 1,
     'PKT_SIZE': 1024,
     'LOCAL_HOST': socket.gethostname(),
@@ -123,6 +125,7 @@ CONFIG_TYPES = {
     'SOCKET_TIMEOUT': 'int',
     'SCALE_MODE': 'bool',
     'ANNOTATE': 'bool',
+    'USE_TCP': 'bool',
     'PRINT_TITLE': 'bool',
     'PRINT_LEGEND': 'bool',
     'ZERO_Y': 'bool',
@@ -366,6 +369,8 @@ parser.add_option("-q", "--servercores", action="store", type="int", dest="SERVE
 parser.add_option("-Q", "--clientcores", action="store", type="int", dest="CLIENT_CORES",
                   help="Number of cores to use in client")
 
+parser.add_option("--spClients", action="store", type="int", dest="SPECIAL_CLIENTS_COUNT",
+                  help="Number of clients to be used as 'special' clients")
 
 
 parser.add_option("-e", "--onload", action="store_true", dest="SERVER_ONLOAD_ENABLED",
@@ -454,6 +459,8 @@ plot_group.add_option("-S", "--scale-mode", action="store_true", dest="SCALE_MOD
                   "arguments as if passed as --scale-data (default as if passed as --input).")
 plot_group.add_option("--no-annotation", action="store_false", dest="ANNOTATE",
                   help="Exclude annotation with hostnames, time and test length from plots.")
+plot_group.add_option("--use-tcp", action="store_true", dest="USE_TCP",
+                  help="use TCP protocol instead of UDP for benchmarking")
 plot_group.add_option("--no-legend", action="store_false", dest="PRINT_LEGEND",
                   help="Exclude legend from plots.")
 plot_group.add_option("--no-title", action="store_false", dest="PRINT_TITLE",
@@ -657,8 +664,10 @@ def load():
                             TOOLS_LOCATION=settings.TOOLS_LOCATION,
                             PKT_SIZE=settings.PKT_SIZE,
                             TARGET=settings.TARGET,
+                            USE_TCP=settings.USE_TCP,
                             BRUST_SIZE=settings.BRUST_SIZE,
                             SERVER_CORES=settings.SERVER_CORES,
+                            SPECIAL_CLIENTS_COUNT = settings.SPECIAL_CLIENTS_COUNT,
                             CLIENT_CORES=settings.CLIENT_CORES,
                             CLIENTS=settings.CLIENTS,
                             CLIENTS_IF=settings.CLIENTS_IF,

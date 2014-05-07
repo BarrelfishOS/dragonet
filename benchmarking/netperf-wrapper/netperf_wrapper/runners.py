@@ -128,7 +128,7 @@ class ProcessRunner(threading.Thread):
         else :
             self.command = "bash -c 'cd %s ; %s'" % (self.machine_ref.tools_location, command)
 
-        print "The runner command is [%s]" % (self.command)
+        #print "The runner command is [%s]" % (self.command)
         self.args = shlex.split(self.command)
 
     def fork(self):
@@ -346,8 +346,9 @@ class MemaslapSumaryRunner(ProcessRunner):
                 print "Run imcomplete as attribute 'TPS' is not present in output"
                 print "Existing keys: %s" % (str(cmd_output.keys()))
             if (cmd_output['get_misses'] > 0
-                or cmd_output['packet_drop'] > 0
-                or cmd_output['udp_timeout'] > 0):
+                or ('packet_drop' in cmd_output.keys() and cmd_output['packet_drop'] > 0 )
+                or ('udp_timeout' in cmd_output.keys() and cmd_output['udp_timeout'] > 0)
+               ):
                 result['RESULT'] = 0
 
         finally:
