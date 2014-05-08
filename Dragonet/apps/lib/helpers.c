@@ -17,36 +17,49 @@
 #include <proto_ipv4.h>
 #include <helpers.h>
 
-pipeline_handle_t pipeline_handle = NULL;
-static struct state *state = NULL;
-static queue_handle_t *in_queue = NULL;
-static queue_handle_t *out_queue = NULL;
-static struct socket_handle *socks = NULL;
-static int control_fd = -1;
+struct stack_handle {
+    pipeline_handle_t pipeline_handle;
+    struct state *state;
+    queue_handle_t *in_queue;
+    queue_handle_t *out_queue;
+    struct socket_handle *socks;
+    int control_fd;
+};
 
-static void control_send(struct app_control_message *msg)
+static void control_send(struct stack_handle *sh,
+                         struct app_control_message *msg)
 {
-    if (send(control_fd, msg, sizeof(*msg), 0) != sizeof(*msg)) {
+    if (send(sh->control_fd, msg, sizeof(*msg), 0) != sizeof(*msg)) {
         perror("control_send: Incomplete send");
         abort();
     }
 }
 
-static void control_recv(struct app_control_message *msg)
+static void control_recv(struct stack_handle *sh,
+                         struct app_control_message *msg)
 {
-    if (recv(control_fd, msg, sizeof(*msg), MSG_WAITALL) != sizeof(*msg)) {
+    if (recv(sh->control_fd, msg, sizeof(*msg), MSG_WAITALL) != sizeof(*msg)) {
         perror("control_recv: Incomplete recv");
         abort();
     }
 }
 
+struct input *stack_input_alloc(struct stack_handle *sh)
+{
+    return input_alloc_plh(sh->pipeline_handle);
+}
 
+void stack_input_free(struct stack_handle *sh, struct input *in)
+{
+    input_free_plh(sh->pipeline_handle, in);
+}
 
-void stack_init(const char *stackname, const char *name)
+struct stack_handle *stack_init(const char *stackname, const char *name)
 {
     int s, i, num_in, num_out;
     struct sockaddr_un addr;
     struct app_control_message msg;
+    struct stack_handle *sh;
 
     if (strlen(name) >= MAX_APPLBL) {
         fprintf(stderr, "App label too long\n");
@@ -67,60 +80,66 @@ void stack_init(const char *stackname, const char *name)
         perror("stack_init: connecting socket failed");
         abort();
     }
-    control_fd = s;
+
+    sh = calloc(1, sizeof(*sh));
+    sh->control_fd = s;
 
     // Send register message
     msg.type = APPCTRL_REGISTER;
     strcpy(msg.data.register_app.label, name);
-    control_send(&msg);
+    control_send(sh, &msg);
 
     // Get welcome message
-    control_recv(&msg);
+    control_recv(sh, &msg);
     assert(msg.type == APPCTRL_WELCOME);
     printf("App ID=%"PRId64"\n", msg.data.welcome.id);
     num_in = msg.data.welcome.num_inq;
     num_out = msg.data.welcome.num_outq;
-    in_queue = calloc(num_in, sizeof(*in_queue));
-    out_queue = calloc(num_out, sizeof(*out_queue));
+    sh->in_queue = calloc(num_in, sizeof(*sh->in_queue));
+    sh->out_queue = calloc(num_out, sizeof(*sh->out_queue));
 
     // Initialize pipeline interface
-    pipeline_handle = pl_init(stackname, name);
-    state = pl_get_state(pipeline_handle);
+    sh->pipeline_handle = pl_init(stackname, name);
+    sh->state = pl_get_state(sh->pipeline_handle);
 
     // Creating in queues
     for (i = 0; i < num_in; i++) {
-        control_recv(&msg);
+        control_recv(sh, &msg);
         assert(msg.type == APPCTRL_INQUEUE);
         printf("  Creating in-queue: %s\n", msg.data.queue.label);
-        in_queue[i] = pl_inqueue_create(pipeline_handle, msg.data.queue.label);
+        sh->in_queue[i] =
+                pl_inqueue_create(sh->pipeline_handle, msg.data.queue.label);
     }
 
     // Binding to outqueues
     for (i = 0; i < num_out; i++) {
-        control_recv(&msg);
+        control_recv(sh, &msg);
         assert(msg.type == APPCTRL_OUTQUEUE);
         printf("  Binding out-queue: %s\n", msg.data.queue.label);
-        out_queue[i] = pl_outqueue_bind(pipeline_handle, msg.data.queue.label);
+        sh->out_queue[i] =
+                pl_outqueue_bind(sh->pipeline_handle, msg.data.queue.label);
     }
 
     // Make sure everything is ready
-    pl_wait_ready(pipeline_handle);
-    while (state->tap_handler == NULL) {
+    pl_wait_ready(sh->pipeline_handle);
+    while (sh->state->tap_handler == NULL) {
         sched_yield();
     }
     printf("Data path ready\n");
+
+    return sh;
 }
 
-struct state *stack_get_state(void)
+struct state *stack_get_state(struct stack_handle *sh)
 {
-    return state;
+    return sh->state;
 }
 
-struct input *stack_get_packet(void)
+static struct input *stack_get_packet(struct stack_handle *sh)
 {
     struct input *in;
     do {
-        in = pl_poll(pipeline_handle);
+        in = pl_poll(sh->pipeline_handle);
     } while (in == NULL);
     return in;
 }
@@ -128,22 +147,23 @@ struct input *stack_get_packet(void)
 static void stack_send_packet(socket_handle_t handle, struct input *in)
 {
     input_set_muxid(in, handle->mux_id);
-    pl_enqueue(out_queue[handle->outqueue], in);
+    pl_enqueue(handle->stack->out_queue[handle->outqueue], in);
 
-    input_free(in); // Weird, but necessary since pl_enqueue replaces the buffer
-                    // in in with a new one
+    stack_input_free(handle->stack, in); // Weird, but necessary since
+                                         // pl_enqueue replaces the buffer in
+                                         // in with a new one
 }
 
-void stack_process_event(void)
+void stack_process_event(struct stack_handle *stack)
 {
     struct input *in;
     uint64_t id;
     struct socket_handle *sh;
 
-    in = stack_get_packet();
+    in = stack_get_packet(stack);
     id = in->attr->socket_id;
 
-    sh = socks;
+    sh = stack->socks;
     while (sh != NULL) {
         if (id == sh->id) {
             sh->cb_receive(sh, in, sh->data);
@@ -155,18 +175,20 @@ void stack_process_event(void)
 }
 
 
-socket_handle_t socket_create(void (*receive)(
+socket_handle_t socket_create(struct stack_handle *stack,
+                              void (*receive)(
                                     socket_handle_t, struct input *, void *),
                               void *data)
 {
     struct socket_handle *sh = malloc(sizeof(*sh));
 
+    sh->stack = stack;
     sh->id = -1ULL;
     sh->ready = sh->bound = false;
     sh->cb_receive = receive;
     sh->data = data;
-    sh->next = socks;
-    socks = sh;
+    sh->next = stack->socks;
+    stack->socks = sh;
     return sh;
 }
 // TODO
@@ -175,6 +197,7 @@ socket_handle_t socket_create(void (*receive)(
 bool socket_bind_udp_listen(socket_handle_t handle, uint32_t ip, uint16_t port)
 {
     struct app_control_message msg;
+    struct stack_handle *sh = handle->stack;
 
     if (handle->bound) {
         return false;
@@ -183,9 +206,9 @@ bool socket_bind_udp_listen(socket_handle_t handle, uint32_t ip, uint16_t port)
     msg.type = APPCTRL_SOCKET_UDPLISTEN;
     msg.data.socket_udplisten.ip = ip;
     msg.data.socket_udplisten.port = port;
-    control_send(&msg);
+    control_send(sh, &msg);
 
-    control_recv(&msg);
+    control_recv(sh, &msg);
     if (msg.type == APPCTRL_SOCKET_INFO) {
         handle->bound = true;
         handle->id = msg.data.socket_info.id;

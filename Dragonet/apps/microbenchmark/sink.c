@@ -12,6 +12,7 @@ static void recv_sink_cb(socket_handle_t sh, struct input *in, void *data)
 
 int main(int argc, char *argv[])
 {
+    struct stack_handle *stack;
     socket_handle_t si;
     const char *name;
     uint16_t port;
@@ -27,8 +28,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    stack_init("dragonet", name);
-    si = socket_create(recv_sink_cb, NULL);
+    stack = stack_init("dragonet", name);
+    si = socket_create(stack, recv_sink_cb, NULL);
     if (!socket_bind_udp_listen(si, 0, port)) {
         fprintf(stderr, "socket_bind_udp_listen(%d) failed\n", port);
         return 1;
@@ -36,7 +37,7 @@ int main(int argc, char *argv[])
 
     printf("socket_bind_udp_listen succeeded\n");
     while (1) {
-        stack_process_event();
+        stack_process_event(stack);
     }
     return 0;
 }

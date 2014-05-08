@@ -9,6 +9,7 @@ static volatile bool received;
 static struct timespec end;
 static size_t size;
 static char templ[1024];
+static struct stack_handle *stack;
 
 static void recv_cb(socket_handle_t sh, struct input *in, void *data)
 {
@@ -34,7 +35,7 @@ static void recv_cb(socket_handle_t sh, struct input *in, void *data)
         input_dump(in);
         abort();
     }
-    input_free(in);
+    stack_input_free(stack, in);
 
     received = true;
 }
@@ -72,9 +73,9 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    stack_init("dragonet", name);
+    stack = stack_init("dragonet", name);
 
-    sh = socket_create(recv_cb, NULL);
+    sh = socket_create(stack, recv_cb, NULL);
     if (!socket_bind_udp_listen(sh, 0, srcPort)) {
         fprintf(stderr, "socket_bind_udp_listen failed\n");
         return 1;
@@ -82,12 +83,12 @@ int main(int argc, char *argv[])
 
     memset(templ, 'a', sizeof(templ));
 
-    state = stack_get_state();
+    state = stack_get_state(stack);
     for (size = 64; size <= 1024; size <<= 1) {
         for (i = 0; i < n; i++) {
 
             clock_gettime(CLOCK_MONOTONIC, &start);
-            in = input_alloc();
+            in = stack_input_alloc(stack);
             pkt_prepend(in, size);
             memset(in->data, 'a', size);
 
@@ -95,7 +96,7 @@ int main(int argc, char *argv[])
             socket_send_udp(sh, in, state->local_ip, srcPort, dstIP, dstPort);
 
             while (!received) {
-                stack_process_event();
+                stack_process_event(stack);
             }
 
             long double t = (end.tv_sec - start.tv_sec) * 1000000.L;

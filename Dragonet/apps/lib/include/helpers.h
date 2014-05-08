@@ -4,13 +4,18 @@
 #include <implementation.h>
 #include <app_control.h>
 
-void stack_init(const char *stackname, const char *name);
-struct state *stack_get_state(void);
-void stack_process_event(void);
+struct stack_handle;
+
+struct stack_handle *stack_init(const char *stackname, const char *name);
+struct state *stack_get_state(struct stack_handle *sh);
+void stack_process_event(struct stack_handle *sh);
+struct input *stack_input_alloc(struct stack_handle *sh);
+void stack_input_free(struct stack_handle *sh, struct input *in);
 
 struct socket_handle;
 typedef struct socket_handle *socket_handle_t;
 struct socket_handle {
+    struct stack_handle *stack;
     uint64_t id;
     int32_t  mux_id;
     uint8_t  outqueue;
@@ -23,7 +28,8 @@ struct socket_handle {
 };
 
 
-socket_handle_t socket_create(void (*receive)(
+socket_handle_t socket_create(struct stack_handle *sh,
+                              void (*receive)(
                                     socket_handle_t, struct input *, void *),
                               void *data);
 bool socket_close(socket_handle_t handle);
