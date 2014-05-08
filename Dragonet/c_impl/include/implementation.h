@@ -175,6 +175,9 @@ void input_xchg(struct input *a, struct input *b);
 struct input *input_struct_alloc(void);
 void input_struct_free(struct input *in);
 
+
+bool ip_from_string(const char *ip, uint32_t *dst);
+
 //void testFun(struct state * st, struct input *in);
 
 // does the continuous packet processing by fetching packets from driver
