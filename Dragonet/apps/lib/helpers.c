@@ -221,9 +221,36 @@ bool socket_bind_udp_listen(socket_handle_t handle, uint32_t ip, uint16_t port)
     return handle->bound;
 }
 
-//bool socket_bind_udp_flow(socket_handle_t handle,
-//                          uint32_t s_ip, uint16_t s_port,
-//                          uint32_t d_ip, uint16_t d_port);
+bool socket_bind_udp_flow(socket_handle_t handle,
+                          uint32_t s_ip, uint16_t s_port,
+                          uint32_t d_ip, uint16_t d_port)
+{
+    struct app_control_message msg;
+    struct stack_handle *sh = handle->stack;
+
+    if (handle->bound) {
+        return false;
+    }
+
+    msg.type = APPCTRL_SOCKET_UDPFLOW;
+    msg.data.socket_udpflow.s_ip = s_ip;
+    msg.data.socket_udpflow.d_ip = d_ip;
+    msg.data.socket_udpflow.s_port = s_port;
+    msg.data.socket_udpflow.d_port = d_port;
+    control_send(sh, &msg);
+
+    control_recv(sh, &msg);
+    if (msg.type == APPCTRL_SOCKET_INFO) {
+        handle->bound = true;
+        handle->id = msg.data.socket_info.id;
+        handle->mux_id = msg.data.socket_info.mux_id;
+        handle->outqueue = msg.data.socket_info.outq;
+    } else {
+        assert(msg.type == APPCTRL_STATUS);
+        // Something went wrong
+    }
+    return handle->bound;
+}
 
 bool socket_send_udp(socket_handle_t handle, struct input *in,
                      uint32_t s_ip, uint16_t s_port,
