@@ -43,17 +43,39 @@ int main(int argc, char *argv[])
 {
     struct input *in;
     struct state *state;
-    uint32_t dstIP = 0xc0a87b64; // 192.168.123.100
-    uint16_t dstPort = 7;
+    const char *name, *ipstr;
+    uint32_t dstIP;
+    uint16_t dstPort, srcPort;
     unsigned long i;
     unsigned long n = 10000;
     struct timespec start;
     socket_handle_t sh;
 
-    stack_init("dragonet", "AppEcho");
+    if (argc == 5 || argc == 6) {
+        name = argv[1];
+        srcPort = atoi(argv[2]);
+        dstPort = atoi(argv[3]);
+        ipstr = argv[4];
+        if (argc == 6) {
+            n = atol(argv[5]);
+        }
+    } else {
+        fprintf(stderr,
+                "Usage: bench-udp-rtt app-name srcPort dstPort dstIP [n]\n");
+        fprintf(stderr, "  n: Number of iterations with one packet size\n");
+        fprintf(stderr, "     (default: 10000)\n");
+        return 1;
+    }
+
+    if (!ip_from_string(ipstr, &dstIP)) {
+        fprintf(stderr, "IP address could not be parsed\n");
+        return 1;
+    }
+
+    stack_init("dragonet", name);
 
     sh = socket_create(recv_cb, NULL);
-    if (!socket_bind_udp_listen(sh, 0, 7)) {
+    if (!socket_bind_udp_listen(sh, 0, srcPort)) {
         fprintf(stderr, "socket_bind_udp_listen failed\n");
         return 1;
     }
@@ -70,7 +92,7 @@ int main(int argc, char *argv[])
             memset(in->data, 'a', size);
 
             received = false;
-            socket_send_udp(sh, in, state->local_ip, 7, dstIP, dstPort);
+            socket_send_udp(sh, in, state->local_ip, srcPort, dstIP, dstPort);
 
             while (!received) {
                 stack_process_event();
