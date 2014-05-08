@@ -32,9 +32,13 @@ pg4e10k nQueues pg =
 
 -- Divide edges to outgoing queues from application nodes into different ports
 appQueuePorts :: PGraph -> PGraph
-appQueuePorts pg = DGI.insEdges newE $ updateN addPorts n $ delLEdges oldE pg
+appQueuePorts pg = foldl appQueuePortsN pg $ map fst appNodes
     where
-        Just (n,_) = findNodeByL (("RxEchoAPP" ==) . nLabel) pg
+        appNodes = filter (\(_,l) -> (take 3 $ nLabel l) == "App") $ DGI.labNodes pg
+
+appQueuePortsN :: PGraph -> DGI.Node -> PGraph
+appQueuePortsN pg n = DGI.insEdges newE $ updateN addPorts n $ delLEdges oldE pg
+    where
         tag m = nTag $ fromJust $ DGI.lab pg m
         sucs = L.sortBy (compare `on` (tag . fst)) $ DGI.lsuc pg n
         oldE = map (\(a,b) -> (n,a,b)) sucs
