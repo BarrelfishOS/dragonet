@@ -16,8 +16,8 @@ void app_control_init(
     void (*new_application)(int),
     void (*register_app)(int,const char *),
     void (*stop_application)(int,bool),
-    void (*socket_udplisten)(int,socket_id_t,uint32_t,uint16_t),
-    void (*socket_udpflow)(int,socket_id_t,uint32_t,uint16_t,uint32_t,uint16_t),
+    void (*socket_udplisten)(int,uint32_t,uint16_t),
+    void (*socket_udpflow)(int,uint32_t,uint16_t,uint32_t,uint16_t),
     void (*socket_close)(int,socket_id_t))
 {
     int appfds[MAX_APPS];
@@ -124,13 +124,13 @@ void app_control_init(
                     break;
                 case APPCTRL_SOCKET_UDPLISTEN:
                     printf("APPCTRL_SOCKET_UDPLISTEN\n");
-                    socket_udplisten(appfds[i], msg.data.socket_udplisten.id,
+                    socket_udplisten(appfds[i],
                             msg.data.socket_udplisten.ip,
                             msg.data.socket_udplisten.port);
                     break;
                 case APPCTRL_SOCKET_UDPFLOW:
                     printf("APPCTRL_SOCKET_UDPFLOW\n");
-                    socket_udpflow(appfds[i], msg.data.socket_udpflow.id,
+                    socket_udpflow(appfds[i],
                             msg.data.socket_udpflow.s_ip,
                             msg.data.socket_udpflow.s_port,
                             msg.data.socket_udpflow.d_ip,
@@ -187,11 +187,13 @@ void app_control_send_queue(int fd, bool out, const char *label)
     }
 }
 
-void app_control_send_socket_info(int fd, uint8_t outq, int32_t mux_id)
+void app_control_send_socket_info(int fd, socket_id_t id, uint8_t outq,
+                                  int32_t mux_id)
 {
     printf("app_control_send_socket_info\n");
     struct app_control_message msg;
     msg.type = APPCTRL_SOCKET_INFO;
+    msg.data.socket_info.id = id;
     msg.data.socket_info.outq = outq;
     msg.data.socket_info.mux_id = mux_id;
     if (send(fd, &msg, sizeof(msg), 0) < sizeof(msg)) {

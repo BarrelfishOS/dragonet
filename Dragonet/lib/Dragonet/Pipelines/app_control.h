@@ -37,6 +37,7 @@ struct app_control_message {
             bool success;
         } status;
         struct {
+            socket_id_t id;
             int32_t mux_id;
             uint8_t outq;
         } socket_info;
@@ -44,12 +45,10 @@ struct app_control_message {
             char label[MAX_APPLBL];
         } register_app;
         struct {
-            socket_id_t id;
             uint32_t ip;
             uint16_t port;
         } socket_udplisten;
         struct {
-            socket_id_t id;
             uint32_t s_ip;
             uint32_t d_ip;
             uint16_t s_port;
@@ -66,15 +65,16 @@ void app_control_init(
     void (*new_application)(int),
     void (*register_app)(int,const char *),
     void (*stop_application)(int,bool),
-    void (*socket_udplisten)(int,socket_id_t,uint32_t,uint16_t),
-    void (*socket_udpflow)(int,socket_id_t,uint32_t,uint16_t,uint32_t,uint16_t),
+    void (*socket_udplisten)(int,uint32_t,uint16_t),
+    void (*socket_udpflow)(int,uint32_t,uint16_t,uint32_t,uint16_t),
     void (*socket_close)(int,socket_id_t));
 
 void app_control_send_welcome(int fd, app_id_t id,
                               uint8_t num_inq, uint8_t num_outq);
 void app_control_send_status(int fd, bool success);
 void app_control_send_queue(int fd, bool out, const char *label);
-void app_control_send_socket_info(int fd, uint8_t outq, int32_t mux_id);
+void app_control_send_socket_info(int fd, socket_id_t id, uint8_t outq,
+                                  int32_t mux_id);
 
 
 #endif // ndef APP_CONTROL_H_

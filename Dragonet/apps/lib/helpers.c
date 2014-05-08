@@ -159,10 +159,9 @@ socket_handle_t socket_create(void (*receive)(
                                     socket_handle_t, struct input *, void *),
                               void *data)
 {
-    static uint64_t id = 0;
     struct socket_handle *sh = malloc(sizeof(*sh));
 
-    sh->id = id++;
+    sh->id = -1ULL;
     sh->ready = sh->bound = false;
     sh->cb_receive = receive;
     sh->data = data;
@@ -182,7 +181,6 @@ bool socket_bind_udp_listen(socket_handle_t handle, uint32_t ip, uint16_t port)
     }
 
     msg.type = APPCTRL_SOCKET_UDPLISTEN;
-    msg.data.socket_udplisten.id = handle->id;
     msg.data.socket_udplisten.ip = ip;
     msg.data.socket_udplisten.port = port;
     control_send(&msg);
@@ -190,6 +188,7 @@ bool socket_bind_udp_listen(socket_handle_t handle, uint32_t ip, uint16_t port)
     control_recv(&msg);
     if (msg.type == APPCTRL_SOCKET_INFO) {
         handle->bound = true;
+        handle->id = msg.data.socket_info.id;
         handle->mux_id = msg.data.socket_info.mux_id;
         handle->outqueue = msg.data.socket_info.outq;
     } else {

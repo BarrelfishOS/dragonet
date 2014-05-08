@@ -178,24 +178,25 @@ appEvent ais ch (APP.EvAppRegister n) = do
             (map (\(_,PLI.POQueue l) -> APP.MsgOutQueue l) $ outq p)
 
 
-appEvent ais ch (APP.EvSocketUDPListen sid (ip,port)) = do
-    putStrLn $ "SocketUDPListen s=" ++ show sid ++ " p=" ++ show port
-    addSocket ais ch sid $ INC.UDPIPv4Listen ip port
+appEvent ais ch (APP.EvSocketUDPListen (ip,port)) = do
+    putStrLn $ "SocketUDPListen p=" ++ show port
+    addSocket ais ch $ INC.UDPIPv4Listen ip port
 
-appEvent ais ch (APP.EvSocketUDPFlow sid (sIP,sPort) (dIP,dPort)) = do
-    putStrLn $ "SocketUDPFlow s=" ++ show sid ++ " s=" ++
-        show (sIP,sPort) ++ " d=" ++ show (dIP,dPort)
-    addSocket ais ch sid $ INC.UDPIPv4Flow sIP dIP sPort dPort
+appEvent ais ch (APP.EvSocketUDPFlow (sIP,sPort) (dIP,dPort)) = do
+    putStrLn $ "SocketUDPFlow s=" ++ show (sIP,sPort) ++
+        " d=" ++ show (dIP,dPort)
+    addSocket ais ch $ INC.UDPIPv4Flow sIP dIP sPort dPort
 
 appEvent _ ch ev = do
     putStrLn $ "appEvent " ++ show ch ++ " " ++ show ev
 
 -- Helper
-addSocket ais ch sid f = do
+addSocket ais ch f = do
     sd <- appRunPolicy ais ch $ INC.policyAddSocket f
     let outQ = fromIntegral $ INC.sdQueue sd
+        sockID = fromIntegral $ INC.sdID sd
         muxID = 5 -- FIXME
-    APP.sendMessage ch $ APP.MsgSocketInfo outQ muxID
+    APP.sendMessage ch $ APP.MsgSocketInfo sockID outQ muxID
 
 
 initAppInterface :: Show b =>

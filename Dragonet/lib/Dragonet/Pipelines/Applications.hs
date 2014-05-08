@@ -34,8 +34,8 @@ data Event =
     EvAppConnected |
     EvAppRegister String |
     EvAppStopped Bool | -- The boolean indicates regular termination
-    EvSocketUDPListen SocketId UDPEndpoint |
-    EvSocketUDPFlow SocketId UDPEndpoint UDPEndpoint |
+    EvSocketUDPListen UDPEndpoint |
+    EvSocketUDPFlow UDPEndpoint UDPEndpoint |
     EvSocketClose SocketId
     deriving (Show,Eq,Ord)
 
@@ -44,15 +44,15 @@ data TxMessage =
     MsgInQueue String |
     MsgOutQueue String |
     MsgStatus Bool |
-    MsgSocketInfo Word8 Int32
+    MsgSocketInfo SocketId Word8 Int32
     deriving (Show,Eq,Ord)
 
 
 type OpNewApp = ChanHandle -> IO ()
 type OpRegister = ChanHandle -> CString -> IO ()
 type OpStopApp = ChanHandle -> Bool -> IO ()
-type OpUDPListen = ChanHandle -> SocketId -> IPv4Addr -> UDPPort -> IO ()
-type OpUDPFlow = ChanHandle -> SocketId -> IPv4Addr -> UDPPort -> IPv4Addr ->
+type OpUDPListen = ChanHandle -> IPv4Addr -> UDPPort -> IO ()
+type OpUDPFlow = ChanHandle -> IPv4Addr -> UDPPort -> IPv4Addr ->
                     UDPPort -> IO ()
 type OpSocketClose = ChanHandle -> SocketId -> IO ()
 
@@ -72,7 +72,7 @@ foreign import ccall "app_control_send_queue"
         ChanHandle -> Bool -> CString -> IO ()
 foreign import ccall "app_control_send_socket_info"
     c_app_control_send_socket_info ::
-        ChanHandle -> Word8 -> Int32 -> IO ()
+        ChanHandle -> SocketId -> Word8 -> Int32 -> IO ()
 
 
 foreign import ccall "wrapper"
@@ -113,11 +113,11 @@ hOpStopApp :: (ChanHandle -> Event -> IO ()) -> OpStopApp
 hOpStopApp eh ch reg = eh ch $ EvAppStopped reg
 
 hOpUDPListen :: (ChanHandle -> Event -> IO ()) -> OpUDPListen
-hOpUDPListen eh ch si ip port = eh ch $ EvSocketUDPListen si (ip,port)
+hOpUDPListen eh ch ip port = eh ch $ EvSocketUDPListen (ip,port)
 
 hOpUDPFlow :: (ChanHandle -> Event -> IO ()) -> OpUDPFlow
-hOpUDPFlow eh ch si s_ip s_port d_ip d_port =
-    eh ch $ EvSocketUDPFlow si (s_ip, s_port) (d_ip, d_port)
+hOpUDPFlow eh ch s_ip s_port d_ip d_port =
+    eh ch $ EvSocketUDPFlow (s_ip, s_port) (d_ip, d_port)
 
 hOpSocketClose :: (ChanHandle -> Event -> IO ()) -> OpSocketClose
 hOpSocketClose eh ch si = eh ch $ EvSocketClose si
@@ -137,5 +137,6 @@ sendMessage ch (MsgOutQueue l) =
 sendMessage ch (MsgInQueue l) =
     withCString l $ \l' -> c_app_control_send_queue ch False l'
 sendMessage ch (MsgStatus status) = c_app_control_send_status ch status
-sendMessage ch (MsgSocketInfo oq mux) = c_app_control_send_socket_info ch oq mux
+sendMessage ch (MsgSocketInfo sid oq mux) =
+    c_app_control_send_socket_info ch sid oq mux
 
