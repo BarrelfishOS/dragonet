@@ -14,6 +14,7 @@
 void app_control_init(
     const char *stackname,
     void (*new_application)(int),
+    void (*register_app)(int,const char *),
     void (*stop_application)(int,bool),
     void (*socket_udplisten)(int,socket_id_t,uint32_t,uint16_t),
     void (*socket_udpflow)(int,socket_id_t,uint32_t,uint16_t,uint32_t,uint16_t),
@@ -115,6 +116,12 @@ void app_control_init(
             }
 
             switch (msg.type) {
+                case APPCTRL_REGISTER:
+                    printf("APPCTRL_REGISTER\n");
+                    msg.data.register_app.label[MAX_APPLBL - 1]
+                        = 0;
+                    register_app(appfds[i], msg.data.register_app.label);
+                    break;
                 case APPCTRL_SOCKET_UDPLISTEN:
                     printf("APPCTRL_SOCKET_UDPLISTEN\n");
                     socket_udplisten(appfds[i], msg.data.socket_udplisten.id,

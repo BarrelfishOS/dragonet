@@ -103,14 +103,14 @@ stackState :: StackHandle -> IO StateHandle
 stackState = c_stack_state
 
 
-udpAddListen :: StateHandle -> Word64 -> Word16 -> IO UDPListenHandle
+udpAddListen :: StateHandle -> Word64 -> Word64 -> Word16 -> IO UDPListenHandle
 udpAddListen = c_udp_state_add_listen
 
 udpRemoveListen :: StateHandle -> UDPListenHandle -> IO ()
 udpRemoveListen = c_udp_state_remove_listen
 
-udpAddFlow :: StateHandle -> Word64 -> Word32 -> Word16 -> Word32 -> Word16
-                    -> IO UDPFlowHandle
+udpAddFlow :: StateHandle -> Word64 -> Word64 -> Word32 -> Word16 -> Word32
+                    -> Word16 -> IO UDPFlowHandle
 udpAddFlow = c_udp_state_add_flow
 
 udpRemoveFlow :: StateHandle -> UDPFlowHandle -> IO ()
@@ -145,14 +145,14 @@ foreign import ccall "pl_wait_ready"
 
 foreign import ccall "udp_state_add_listen"
     c_udp_state_add_listen ::
-        StateHandle -> Word64 -> Word16 -> IO UDPListenHandle
+        StateHandle -> Word64 -> Word64 -> Word16 -> IO UDPListenHandle
 
 foreign import ccall "udp_state_remove_listen"
     c_udp_state_remove_listen :: StateHandle -> UDPListenHandle -> IO ()
 
 foreign import ccall "udp_state_add_flow"
     c_udp_state_add_flow ::
-        StateHandle -> Word64 -> Word32 -> Word16 -> Word32 -> Word16
+        StateHandle -> Word64 -> Word64 -> Word32 -> Word16 -> Word32 -> Word16
                     -> IO UDPFlowHandle
 
 foreign import ccall "udp_state_remove_flow"

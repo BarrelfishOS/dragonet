@@ -7,6 +7,7 @@
 typedef uint64_t app_id_t;
 typedef uint64_t socket_id_t;
 
+#define MAX_APPLBL 32
 #define MAX_QUEUELBL 32
 
 enum app_control_type {
@@ -15,6 +16,7 @@ enum app_control_type {
     APPCTRL_INQUEUE,            // Dragonet -> App
     APPCTRL_STATUS,             // Dragonet -> App
     APPCTRL_SOCKET_INFO,        // Dragonet -> App
+    APPCTRL_REGISTER,           // App -> Dragonet
     APPCTRL_SOCKET_UDPLISTEN,   // App -> Dragonet
     APPCTRL_SOCKET_UDPFLOW,     // App -> Dragonet
     APPCTRL_SOCKET_CLOSE,       // App -> Dragonet
@@ -39,6 +41,9 @@ struct app_control_message {
             uint8_t outq;
         } socket_info;
         struct {
+            char label[MAX_APPLBL];
+        } register_app;
+        struct {
             socket_id_t id;
             uint32_t ip;
             uint16_t port;
@@ -59,6 +64,7 @@ struct app_control_message {
 void app_control_init(
     const char *stackname,
     void (*new_application)(int),
+    void (*register_app)(int,const char *),
     void (*stop_application)(int,bool),
     void (*socket_udplisten)(int,socket_id_t,uint32_t,uint16_t),
     void (*socket_udpflow)(int,socket_id_t,uint32_t,uint16_t,uint32_t,uint16_t),

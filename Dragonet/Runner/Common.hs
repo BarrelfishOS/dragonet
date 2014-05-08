@@ -19,15 +19,19 @@ import qualified Dragonet.Pipelines.Applications as APP
 import qualified Dragonet.Incremental as INC
 import qualified Dragonet.Unicorn.Parser as UnicornAST
 import qualified Dragonet.Unicorn  as Unicorn
+import qualified Util.GraphHelpers as GH
 
 import Control.Monad
+import Control.Arrow (second)
 import Control.Concurrent (forkOS)
 import qualified Control.Concurrent.STM as STM
 
 
 import qualified Data.Map as M
+import qualified Data.Bimap as BM
 import qualified Data.List as L
 import Data.Function (on)
+import Data.Maybe
 
 import System.IO  (hFlush,stdout)
 
@@ -36,17 +40,18 @@ import qualified Runner.LLVM as LLVM
 
 
 
-
 -------------------------------------------------------------------------------
 -- Initialization
+
 
 runStack :: Show b => (PG.PGraph -> PG.PGraph) -> INC.PolicyState a b ->
         (AppIfState a b -> b -> IO ()) -> String -> IO ()
 runStack embed pstate hwact helpers = do
     let fname = "lpgImpl.unicorn"
+    let apps = ["AppEcho"]
     -- Parse graph and perform pseudo-embedding
     b <- readFile fname >>= UnicornAST.parseGraph
-    let pgraph = embed $ Unicorn.constructGraph b
+    let pgraph = embed $ addApps apps $ Unicorn.constructGraph b
 
     writeFile "DELETEME.dot" $ toDot pgraph
     let plg = PL.generatePLG plAssign pgraph
@@ -63,18 +68,22 @@ runStack embed pstate hwact helpers = do
         return pli
     (h,plis) <- PLI.runPipelines stackname plConnect runner plg
 
-    let Just appPLI =
-            L.find ((== "AppEcho") . PL.plLabel . PLI.pliPipeline) plis
-    initAppInterface pstate hwact stackname h appPLI
+    let appPLIs = mapMaybe getAppPLI plis
+    initAppInterface pstate hwact stackname h appPLIs
     commandLineInterface
 
     putStrLn "Doing cleanup..."
     PLI.stopPipelines h
+    where
+        getAppPLI pli
+            | take 3 lbl == "App" = Just (drop 3 lbl,pli)
+            | otherwise = Nothing
+            where lbl = PL.plLabel $ PLI.pliPipeline pli
 
 -- Wrapper to execute pipelines, but handle application pipelines separatly
 runPipeline :: PL.PLGraph -> String -> String -> PLI.PipelineImpl -> IO ()
 runPipeline plg stackname helpers pli
-    | lbl == "AppEcho" = do
+    | take 3 lbl == "App" = do
         putStrLn $ "Application Pipeline " ++ lbl
         putStrLn "  Input queues:"
         forM_ (PLI.pliInQs pli) $ \(ql,qc) -> do
@@ -90,8 +99,7 @@ runPipeline plg stackname helpers pli
 -- Assigns nodes to Pipelines
 plAssign :: PG.PGNode -> PL.PLabel
 plAssign (_,n)
-    | lbl == "RxEchoAPP" = "AppEcho"
-    | tag == "App" = "AppInterface"
+    | take 3 lbl == "App" = lbl
     | take 2 lbl == "Tx" || take 5 lbl == "TapTx" = "Tx" ++ tag
     | otherwise = "Rx" ++ tag
     where
@@ -126,49 +134,53 @@ data SocketDesc =
 
 data AppIfState a b = AppIfState {
     aiStackState :: PLI.StateHandle,
+    aiAppIDs     :: M.Map String APP.AppId,
+    aiPLIs       :: M.Map APP.AppId PLI.PipelineImpl,
+    aiHWAct      :: AppIfState a b -> b -> IO (),
     aiSocketMap  :: STM.TVar (M.Map (APP.ChanHandle,APP.SocketId) SocketDesc),
-    aiPLI        :: PLI.PipelineImpl,
-    aiPState     :: STM.TVar (INC.PolicyState a b),
-    aiHWAct      :: AppIfState a b -> b -> IO ()
+    aiAppChans   :: STM.TVar (BM.Bimap APP.AppId APP.ChanHandle),
+    aiPState     :: STM.TVar (INC.PolicyState a b)
 }
 
 -- Handles incoming messages from control channel
 appEvent :: Show b => AppIfState a b -> APP.ChanHandle -> APP.Event -> IO ()
-appEvent ais ch APP.EvAppRegister = do
-    putStrLn "AppRegister"
-    let pli = aiPLI ais
-        inq = PLI.pliInQs pli
-        outq = L.sortBy (compare `on` fst) $ PLI.pliOutQs pli
-        inMsg = map (\(_,PLI.PIQueue l) -> APP.MsgInQueue l) inq
-        outMsg = map (\(_,PLI.POQueue l) -> APP.MsgOutQueue l) outq
+appEvent ais ch (APP.EvAppRegister n) = do
+    putStrLn $ "AppRegister: " ++ n
+    maID <- case M.lookup n $ aiAppIDs ais of
+        Just ai -> do
+            acs <- STM.atomically $ STM.readTVar $ aiAppChans ais
+            case BM.lookup ai acs of
+                Nothing -> return $ Right ai
+                Just _ -> return $ Left "Application already bound!"
+        Nothing -> return $ Left "Invalid application name!"
+    case maID of
+        Right ai -> do
+            let p = (aiPLIs ais) M.! ai
+            -- Add application to channel map
+            STM.atomically $ do
+                let tv = aiAppChans ais
+                acs <- STM.readTVar tv
+                STM.writeTVar tv $ BM.insert ai ch acs
+            -- Send welcome message specifying number of channels and app id
+            APP.sendMessage ch $
+                APP.MsgWelcome ai (length $ inq p) (length $ outq p)
+            -- Send channel specifications
+            mapM_ (APP.sendMessage ch) $ messages p
 
-    APP.sendMessage ch $ APP.MsgWelcome 42 (length inq) (length outq)
-    mapM_ (APP.sendMessage ch) $ inMsg ++ outMsg
+        Left err -> do
+            putStrLn err
+            APP.sendMessage ch $ APP.MsgStatus False
+    where
+        inq p = PLI.pliInQs p
+        outq p = L.sortBy (compare `on` fst) $ PLI.pliOutQs p
+        messages p =
+            (map (\(_,PLI.PIQueue l) -> APP.MsgInQueue l) $ inq p) ++
+            (map (\(_,PLI.POQueue l) -> APP.MsgOutQueue l) $ outq p)
+
 
 appEvent ais ch (APP.EvSocketUDPListen sid (ip,port)) = do
     putStrLn $ "SocketUDPListen s=" ++ show sid ++ " p=" ++ show port
     addSocket ais ch sid $ INC.UDPIPv4Listen ip port
-{-    lh <- PLI.udpAddListen (aiStackState ais) sid port
-    let sm = aiSocketMap ais
-    STM.atomically $ do
-        m <- STM.readTVar sm
-        STM.writeTVar sm $ M.insert (ch,sid) (SockUDPListen lh) m
-    let muxID = 1 -- FIXME
-        outQ  = fromIntegral (port `mod` 2)
-        inQ = outQ
-    if inQ /= 0
-        then do
-            let ftfTV = aiNext5t ais
-            id <- STM.atomically $ do
-                v <- STM.readTVar ftfTV
-                STM.writeTVar ftfTV (v + 1)
-                return v
-            E10K.ftSet (aiStackState ais) id $ E10K.FTuple 1 inQ
-                (Just E10K.L3IPv4) (Just E10K.L4UDP)
-                Nothing Nothing Nothing (Just $ fromIntegral port)
-        else return ()
-    APP.sendMessage ch $ APP.MsgSocketInfo outQ muxID
-    return ()-}
 
 appEvent ais ch (APP.EvSocketUDPFlow sid (sIP,sPort) (dIP,dPort)) = do
     putStrLn $ "SocketUDPFlow s=" ++ show sid ++ " s=" ++
@@ -182,25 +194,33 @@ appEvent _ ch ev = do
 addSocket ais ch sid f = do
     sd <- appRunPolicy ais ch $ INC.policyAddSocket f
     let outQ = fromIntegral $ INC.sdQueue sd
-        muxID = 1 -- FIXME
+        muxID = 5 -- FIXME
     APP.sendMessage ch $ APP.MsgSocketInfo outQ muxID
 
 
 initAppInterface :: Show b =>
         INC.PolicyState a b -> (AppIfState a b -> b -> IO ()) ->
-            String -> PLI.StackHandle -> PLI.PipelineImpl -> IO ()
-initAppInterface pstate hwact stackname sh pli = do
+            String -> PLI.StackHandle -> [(String,PLI.PipelineImpl)] -> IO ()
+initAppInterface pstate hwact stackname sh plis = do
     st <- PLI.stackState sh
     sm <- STM.newTVarIO M.empty
+    acs <- STM.newTVarIO BM.empty
     psTV <- STM.newTVarIO $ pstate
     let ais = AppIfState {
             aiStackState = st,
             aiSocketMap = sm,
             aiPState = psTV,
             aiHWAct = hwact,
-            aiPLI = pli }
+            aiAppIDs = appIDs,
+            aiPLIs = pliMap,
+            aiAppChans = acs }
     tid <- forkOS $ APP.interfaceThread stackname (appEvent ais)
     return ()
+    where
+        apps = map fst plis
+        appIDs = M.fromList $ zip apps [1..]
+        mapPLI (l,p) = (appIDs M.! l,p)
+        pliMap = M.fromList $ map mapPLI plis
 
 
 --------------------------------------------------------------------------------
@@ -208,16 +228,19 @@ initAppInterface pstate hwact stackname sh pli = do
 
 policyAction :: Show b =>
     AppIfState a b -> APP.ChanHandle -> INC.PolicyAction b -> IO ()
-policyAction ais ch (INC.PActLPGAddSocket sd q) =
+policyAction ais ch (INC.PActLPGAddSocket sd q) = do
+    aid <- STM.atomically $ do
+        acm <- STM.readTVar $ aiAppChans ais
+        return $ acm BM.!> ch
     case INC.sdFlow sd of
         INC.UDPIPv4Listen 0 port -> do
-            lh <- PLI.udpAddListen ss sid port
+            lh <- PLI.udpAddListen ss aid sid port
             STM.atomically $ do
                 m <- STM.readTVar sm
                 STM.writeTVar sm $ M.insert (ch,sid) (SockUDPListen lh) m
 
         INC.UDPIPv4Flow sIP dIP sP dP -> do
-            fh <- PLI.udpAddFlow ss sid sIP sP dIP dP
+            fh <- PLI.udpAddFlow ss aid sid sIP sP dIP dP
             STM.atomically $ do
                 m <- STM.readTVar sm
                 STM.writeTVar sm $ M.insert (ch,sid) (SockUDPFlow fh) m
@@ -284,6 +307,23 @@ renameQueues rx tx pg = DGI.nmap fixN pg
             | otherwise = n
             where l = nLabel n
 
+-- Add the specified applications to the graph
+addApps :: [String] -> PGraph -> PGraph
+addApps apps pg = foldl addApp pg apps
 
+addPort :: String -> PG.Node -> PG.Node
+addPort p n = n { PG.nPorts = PG.nPorts n ++ [p] }
+
+-- Add a single application to the graph
+addApp :: PGraph -> String -> PGraph
+addApp pg app =
+    DGI.insEdges edges $ GH.updateN (addPort name) pcN $ DGI.insNode (n,l) pg
+    where
+        name = "App" ++ app
+        [n] = DGI.newNodes 1 pg
+        l = baseFNode name ["application"] ["out","drop"] Nothing
+        Just (pcN,_) = pgFind pg "RxL4UDPPortClassifyDynamic"
+        Just (txN,_) = pgFind pg "TxL4UDPInitiateResponse"
+        edges = [(pcN,n,name),(n,txN,"out")]
 
 

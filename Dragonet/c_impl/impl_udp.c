@@ -76,6 +76,7 @@ node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *
     struct udp_flow_entry f_key;
     struct udp_listen_entry *l, *l_ht;
     uint64_t socketid = -1;
+    uint64_t appid = 0;
     node_out_t out = P_RxL4UDPPortClassifyDynamic_appEcho;
 
     if (pthread_rwlock_rdlock(state->udp_lock) != 0) {
@@ -94,12 +95,14 @@ node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *
     HASH_FIND(hh, f_ht, &f_key.s_ip, UDP_FLOW_KEYLEN, f);
     if (f != NULL) {
         socketid = f->socketid;
+        appid = f->appid;
         goto out_success;
     }
 
     HASH_FIND(hh, l_ht, &f_key.d_port, UDP_LISTEN_KEYLEN, l);
     if (l != NULL) {
         socketid = l->socketid;
+        appid = l->appid;
         goto out_success;
     }
 
@@ -107,10 +110,7 @@ node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *
 out_success:
     in->attr->socket_id = socketid;
     pthread_rwlock_unlock(state->udp_lock);
-    // P_RxL4UDPPortClassifyDynamic_appDNS,
-    //   P_RxL4UDPPortClassifyDynamic_appEcho,
-    //   P_RxL4UDPPortClassifyDynamic_closedPort
-    return out;
+    return appid;
 }
 
 node_out_t do_pg__RxL4UDPClosedPortAction(struct state *state, struct input *in)

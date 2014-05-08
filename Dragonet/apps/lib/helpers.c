@@ -47,6 +47,11 @@ void stack_init(const char *stackname, const char *name)
     struct sockaddr_un addr;
     struct app_control_message msg;
 
+    if (strlen(name) >= MAX_APPLBL) {
+        fprintf(stderr, "App label too long\n");
+        abort();
+    }
+
     // Establish Control connection
     if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         perror("stack_init: creating socket failed");
@@ -62,6 +67,11 @@ void stack_init(const char *stackname, const char *name)
         abort();
     }
     control_fd = s;
+
+    // Send register message
+    msg.type = APPCTRL_REGISTER;
+    strcpy(msg.data.register_app.label, name);
+    control_send(&msg);
 
     // Get welcome message
     control_recv(&msg);

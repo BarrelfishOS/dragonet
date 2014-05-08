@@ -201,9 +201,8 @@ graph lpg {
             }*/
 
             node PortClassifyDynamic {
-                port appDNS [.DnsAPP]
-                port appEcho [.EchoAPP]
                 port closedPort [ClosedPortAction]
+                /** Other ports dynamically added */
             }
 
             node ClosedPortAction {
@@ -358,19 +357,6 @@ graph lpg {
 
 
         } // end cluster: L4TCP
-
-
-        /*******************************************/
-        /* Application RX                          */
-
-    node EchoAPP {
-                port out[.TxL4UDPInitiateResponse]
-                port drop[] }
-
-    node DnsAPP {
-                port out[.TxL4UDPInitiateResponse]
-                port drop[.PacketDrop] }
-
     } // end cluster: Rx
 
 

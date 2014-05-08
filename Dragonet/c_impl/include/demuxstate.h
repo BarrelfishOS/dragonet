@@ -11,6 +11,7 @@
 struct udp_listen_entry {
     UT_hash_handle hh;
     uint64_t socketid;
+    uint64_t appid;
 
     // Key
     uint16_t port;
@@ -22,6 +23,7 @@ struct udp_listen_entry {
 struct udp_flow_entry {
     UT_hash_handle hh;
     uint64_t socketid;
+    uint64_t appid;
 
     // The following elements are the key
     uint32_t s_ip;

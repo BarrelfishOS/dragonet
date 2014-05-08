@@ -31,7 +31,8 @@ type UDPPort = Word16
 type UDPEndpoint = (IPv4Addr,UDPPort)
 
 data Event =
-    EvAppRegister |
+    EvAppConnected |
+    EvAppRegister String |
     EvAppStopped Bool | -- The boolean indicates regular termination
     EvSocketUDPListen SocketId UDPEndpoint |
     EvSocketUDPFlow SocketId UDPEndpoint UDPEndpoint |
@@ -48,6 +49,7 @@ data TxMessage =
 
 
 type OpNewApp = ChanHandle -> IO ()
+type OpRegister = ChanHandle -> CString -> IO ()
 type OpStopApp = ChanHandle -> Bool -> IO ()
 type OpUDPListen = ChanHandle -> SocketId -> IPv4Addr -> UDPPort -> IO ()
 type OpUDPFlow = ChanHandle -> SocketId -> IPv4Addr -> UDPPort -> IPv4Addr ->
@@ -56,8 +58,9 @@ type OpSocketClose = ChanHandle -> SocketId -> IO ()
 
 foreign import ccall "app_control_init"
     c_app_control_init ::
-        CString -> FunPtr OpNewApp -> FunPtr OpStopApp -> FunPtr OpUDPListen ->
-            FunPtr OpUDPFlow -> FunPtr OpSocketClose -> IO ()
+        CString -> FunPtr OpNewApp -> FunPtr OpRegister -> FunPtr OpStopApp ->
+            FunPtr OpUDPListen -> FunPtr OpUDPFlow -> FunPtr OpSocketClose ->
+            IO ()
 foreign import ccall "app_control_send_welcome"
     c_app_control_send_welcome ::
         ChanHandle -> AppId -> Word8 -> Word8 -> IO ()
@@ -75,6 +78,8 @@ foreign import ccall "app_control_send_socket_info"
 foreign import ccall "wrapper"
     mkOpNewApp :: OpNewApp -> IO (FunPtr OpNewApp)
 foreign import ccall "wrapper"
+    mkOpRegister :: OpRegister -> IO (FunPtr OpRegister)
+foreign import ccall "wrapper"
     mkOpStopApp :: OpStopApp -> IO (FunPtr OpStopApp)
 foreign import ccall "wrapper"
     mkOpUDPListen :: OpUDPListen -> IO (FunPtr OpUDPListen)
@@ -83,20 +88,26 @@ foreign import ccall "wrapper"
 foreign import ccall "wrapper"
     mkOpSocketClose :: OpSocketClose -> IO (FunPtr OpSocketClose)
 
-appControlInit :: String -> OpNewApp -> OpStopApp -> OpUDPListen -> OpUDPFlow ->
-                        OpSocketClose -> IO ()
-appControlInit sn a b c d e = do
+appControlInit :: String -> OpNewApp -> OpRegister -> OpStopApp -> OpUDPListen
+        -> OpUDPFlow -> OpSocketClose -> IO ()
+appControlInit sn a b c d e f = do
     a' <- mkOpNewApp a
-    b' <- mkOpStopApp b
-    c' <- mkOpUDPListen c
-    d' <- mkOpUDPFlow d
-    e' <- mkOpSocketClose e
+    b' <- mkOpRegister b
+    c' <- mkOpStopApp c
+    d' <- mkOpUDPListen d
+    e' <- mkOpUDPFlow e
+    f' <- mkOpSocketClose f
     withCString sn $ \sn' ->
-        c_app_control_init sn' a' b' c' d' e'
+        c_app_control_init sn' a' b' c' d' e' f'
 
 
 hOpNewApp :: (ChanHandle -> Event -> IO ()) -> OpNewApp
-hOpNewApp eh ch = eh ch EvAppRegister
+hOpNewApp eh ch = eh ch EvAppConnected
+
+hOpRegister :: (ChanHandle -> Event -> IO ()) -> OpRegister
+hOpRegister eh ch cs = do
+    s <- peekCString cs
+    eh ch $ EvAppRegister s
 
 hOpStopApp :: (ChanHandle -> Event -> IO ()) -> OpStopApp
 hOpStopApp eh ch reg = eh ch $ EvAppStopped reg
@@ -114,8 +125,8 @@ hOpSocketClose eh ch si = eh ch $ EvSocketClose si
 
 interfaceThread :: String -> (ChanHandle -> Event -> IO ()) -> IO ()
 interfaceThread stackname eh = do
-    appControlInit stackname (hOpNewApp eh) (hOpStopApp eh) (hOpUDPListen eh)
-        (hOpUDPFlow eh) (hOpSocketClose eh)
+    appControlInit stackname (hOpNewApp eh) (hOpRegister eh) (hOpStopApp eh)
+        (hOpUDPListen eh) (hOpUDPFlow eh) (hOpSocketClose eh)
 
 sendMessage :: ChanHandle -> TxMessage -> IO ()
 sendMessage ch (MsgWelcome appid i o) =

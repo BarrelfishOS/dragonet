@@ -146,13 +146,15 @@ void input_xchg(struct input *a, struct input *b)
     memcpy(b, &tmp, sizeof(*b));
 }
 
-void *udp_state_add_listen(struct state *st, uint64_t socketid, uint16_t port)
+void *udp_state_add_listen(struct state *st, uint64_t appid, uint64_t socketid,
+                           uint16_t port)
 {
     struct udp_listen_entry *l, *ht;
 
     l = calloc(1, sizeof(*l));
     l->socketid = socketid;
     l->port = port;
+    l->appid = appid;
 
 
     if (pthread_rwlock_wrlock(st->udp_lock) != 0) {
@@ -186,7 +188,7 @@ void udp_state_remove_listen(struct state *st, void *listen)
     pthread_rwlock_unlock(st->udp_lock);
 }
 
-void *udp_state_add_flow(struct state *st, uint64_t socketid,
+void *udp_state_add_flow(struct state *st, uint64_t appid, uint64_t socketid,
                          uint32_t s_ip, uint16_t s_port,
                          uint32_t d_ip, uint16_t d_port)
 {
@@ -198,6 +200,7 @@ void *udp_state_add_flow(struct state *st, uint64_t socketid,
     f->d_ip = d_ip;
     f->s_port = s_port;
     f->d_port = d_port;
+    f->appid = appid;
 
     if (pthread_rwlock_wrlock(st->udp_lock) != 0) {
         fprintf(stderr, "udp_state_add_listen: wrlock failed\n");
