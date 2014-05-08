@@ -41,13 +41,3 @@ void input_free(struct input *in)
     in_pool = in;
 }
 
-
-bool ip_from_string(const char *ip, uint32_t *dst)
-{
-    if (inet_pton(AF_INET, ip, dst) != 1) {
-        return false;
-    }
-    *dst = __builtin_bswap32(*dst);
-    return true;
-}
-

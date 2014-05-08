@@ -233,3 +233,12 @@ void udp_state_remove_flow(struct state *st, void *flow)
     pthread_rwlock_unlock(st->udp_lock);
 }
 
+bool ip_from_string(const char *ip, uint32_t *dst)
+{
+    if (inet_pton(AF_INET, ip, dst) != 1) {
+        return false;
+    }
+    *dst = __builtin_bswap32(*dst);
+    return true;
+}
+
