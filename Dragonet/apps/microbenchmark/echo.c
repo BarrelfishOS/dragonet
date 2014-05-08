@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
 
     if (argc == 1) {
         name = "AppEcho";
-        port = 8;
+        port = 7;
     } else if (argc == 3) {
         name = argv[1];
         port = atoi(argv[2]);
