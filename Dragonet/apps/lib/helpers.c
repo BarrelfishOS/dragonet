@@ -8,6 +8,7 @@
 #include <string.h>
 #include <assert.h>
 #include <inttypes.h>
+#include <sched.h>
 
 #include <pipelines.h>
 #include <app_control.h>
@@ -104,10 +105,10 @@ void stack_init(const char *stackname, const char *name)
 
     // Make sure everything is ready
     pl_wait_ready(pipeline_handle);
+    while (state->tap_handler == NULL) {
+        sched_yield();
+    }
     printf("Data path ready\n");
-
-
-
 }
 
 struct state *stack_get_state(void)
