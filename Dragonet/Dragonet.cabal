@@ -255,6 +255,16 @@ executable bench-echo
                         apps/lib/helpers.c
     CC-options:         -Wall -Wno-unused-function
 
+executable bench-echo-flow
+    main-is:            microbenchmark/echo-flow.c
+    Hs-source-dirs:     apps
+    other-modules:      Dummy
+    build-depends:      Dragonet, base
+    include-dirs:       apps/lib/include
+    c-sources:          c_impl/state.c,
+                        apps/lib/helpers.c
+    CC-options:         -Wall -Wno-unused-function
+
 executable bench-sink
     main-is:            microbenchmark/sink.c
     Hs-source-dirs:     apps
