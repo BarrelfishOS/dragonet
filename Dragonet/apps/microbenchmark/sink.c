@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     uint16_t port;
 
     if (argc == 1) {
-        name = "Sink";
+        name = "AppEcho";
         port = 8;
     } else if (argc == 3) {
         name = argv[1];
