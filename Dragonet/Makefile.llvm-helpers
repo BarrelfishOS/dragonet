@@ -1,0 +1,100 @@
+.PHONY: clean
+
+CLANG           = clang
+LLVM_LINK       = llvm-link
+
+CFLAGS          = -Wall -O2 -flto
+LDFLAGS         = -O2 -flto
+BUILD_DIR       = ./build_dir
+
+
+# external files
+
+cfiles_external  = external/bulktransfer/lib/bulk_linuxshm/implementation.c \
+                   external/bulktransfer/lib/bulk_alloc/alloc.c \
+                   external/bulktransfer/lib/bulk_transfer/channel.c \
+                   external/bulktransfer/lib/bulk_transfer/pool.c \
+                   external/bulktransfer/lib/bulk_transfer/emergency.c \
+                   external/shmchan/lib/shmchan.c \
+                   external/barrelfish/lib/waitset.c
+
+bcfiles_external = $(addprefix $(BUILD_DIR)/, $(addsuffix .bc,$(basename $(cfiles_external))))
+
+$(BUILD_DIR)/external/%.bc : ../external/%.c
+	# build dirs for output as needed
+	@xdir=$$(dirname $@); [ -d $$xdir ] || echo "===> $$xdir does not exist, creating..." & mkdir -p $$xdir
+	$(CLANG) $(CIMPL_CFLAGS) -c -emit-llvm $^ -o $@
+
+$(BUILD_DIR)/llvm-external.bc:  $(bcfiles_external)
+	$(LLVM_LINK) $^ -o $@
+
+# lib files
+
+cfiles_lib       = lib/Util/tap.c \
+                   lib/Dragonet/Pipelines/pipelines_helper.c
+
+bcfiles_lib       = $(addprefix $(BUILD_DIR)/, $(addsuffix .bc,$(basename $(cfiles_lib))))
+
+$(BUILD_DIR)/lib/%.bc : lib/%.c
+	# build dirs for output as needed
+	@xdir=$$(dirname $@); [ -d $$xdir ] || echo "===> $$xdir does not exist, creating..." & mkdir -p $$xdir
+	$(CLANG) $(CIMPL_CFLAGS) -c -emit-llvm $^ -o $@
+
+$(BUILD_DIR)/llvm-lib.bc:  $(bcfiles_lib)
+	$(LLVM_LINK) $^ -o $@
+
+# c-impl files
+
+CIMPL_DIR        = c_impl
+CIMPL_CFLAGS     = $(CFLAGS)
+
+bcmap_cimpl       = $(addprefix $(BUILD_DIR)/, $(addsuffix .bc,$(basename $(1))))
+cfiles_cimpl      = $(CIMPL_DIR)/impl_arp.c \
+                    $(CIMPL_DIR)/impl_ethernet.c \
+                    $(CIMPL_DIR)/impl_icmp.c \
+                    $(CIMPL_DIR)/impl_ipv4.c \
+                    $(CIMPL_DIR)/impl_udp.c \
+                    $(CIMPL_DIR)/impl_tcp.c \
+                    $(CIMPL_DIR)/impl_misc.c \
+                    $(CIMPL_DIR)/implementation.c \
+                    $(CIMPL_DIR)/state.c \
+                    $(CIMPL_DIR)/support/Ethernet.c \
+                    $(CIMPL_DIR)/support/Icmp.c
+cfiles_cimpl_tap  = $(CIMPL_DIR)/impl_tap.c
+cfiles_cimpl_e10k = $(CIMPL_DIR)/impl_e10k.c \
+                    $(CIMPL_DIR)/e10k/e10k_card.c \
+                    $(CIMPL_DIR)/e10k/e10k_phy.c \
+                    $(CIMPL_DIR)/e10k/linux_hugepage.c \
+                    $(CIMPL_DIR)/e10k/linux_pci_uio.c
+
+bcfiles_cimpl      = $(call bcmap_cimpl, $(cfiles_cimpl))
+bcfiles_cimpl_tap  = $(call bcmap_cimpl, $(cfiles_cimpl_tap))
+bcfiles_cimpl_e10k = $(call bcmap_cimpl, $(cfiles_cimpl_e10k))
+
+$(BUILD_DIR)/c_impl/%.bc : $(CIMPL_DIR)/%.c
+	# build dirs for output as needed
+	@xdir=$$(dirname $@); [ -d $$xdir ] || echo "===> $$xdir does not exist, creating..." & mkdir -p $$xdir
+	$(CLANG) $(CIMPL_CFLAGS) -c -emit-llvm $^ -o $@
+
+$(BUILD_DIR)/llvm-c_impl.bc: $(bcfiles_cimpl)
+	$(LLVM_LINK) $^ -o $@
+
+$(BUILD_DIR)/llvm-c_impl-tap.bc: $(bcfiles_cimpl_tap)
+	$(LLVM_LINK) $^ -o $@
+
+$(BUILD_DIR)/llvm-c_impl-e10k.bc: $(bcfiles_cimpl_e10k)
+	$(LLVM_LINK) $^ -o $@
+
+
+helpers_common = $(BUILD_DIR)/llvm-c_impl.bc  $(BUILD_DIR)/llvm-lib.bc $(BUILD_DIR)/llvm-external.bc
+
+$(BUILD_DIR)/llvm-helpers.bc: $(BUILD_DIR)/llvm-c_impl-tap.bc $(helpers_common)
+	$(LLVM_LINK) $^ -o $@
+
+$(BUILD_DIR)/llvm-helpers-e10k.bc: $(BUILD_DIR)/llvm-c_impl-e10k.bc $(helpers_common)
+	$(LLVM_LINK) $^ -o $@
+
+#
+#clean:
+#	rm -f llvm-heelpers.bc
+#	$(MAKE) -C c_impl clean

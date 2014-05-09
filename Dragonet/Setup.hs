@@ -12,6 +12,7 @@ import Data.Maybe
 import Control.Applicative
 import Control.Monad
 import Data.Char
+import Data.List as L
 
 llvmVersions = ["3.4", "3.5"]
 config_force_version = No
@@ -37,7 +38,7 @@ llvmProgram name = (simpleProgram name) {
 main = defaultMainWithHooks simpleUserHooks {
     buildHook = myBuildHook,
     hookedPrograms = hookedPrograms simpleUserHooks ++
-        [simpleProgram "clang",
+        [simpleProgram "clang", simpleProgram "make",
          llvmProgram "llvm-link"]
     }
 
@@ -58,6 +59,26 @@ llvmLink prog verb opts outD outF srcs = do
     runProgram verb prog opts
     return outP
 
+-- call make for creating helper files
+makeHelper verb get_xfield make incs llvmlink bld_dir = do
+    case get_xfield "x-helpers-files" of
+        Nothing -> return ()
+        Just xfiles' -> do
+            let xfiles  = parseNameList xfiles'
+                xmkfile = case get_xfield "x-helpers-makefile" of
+                    Nothing -> error $ "Error: need to specify a makefile (via x-helpers-makefile) for building " ++ (show xfiles)
+                    Just x  -> x
+                xincs = case get_xfield "x-helpers-includes" of
+                    Nothing -> ""
+                    Just x  -> L.intercalate "" $ map (\x -> "-I" ++ x ++ " \\\n ") $ ((parseNameList x) ++ incs)
+                args = ["LLVM_LINK=" ++ (locationPath $ programLocation llvmlink),
+                        "BUILD_DIR=" ++ bld_dir,
+                        "CFLAGS=-O3 -Wall -Wno-unused-variable -Wno-unused-function \\\n " ++ xincs,
+                        "-f", xmkfile,
+                        L.intercalate " " $ map ((bld_dir ++ "/") ++  ) xfiles ]
+            runProgram verb make args
+            return ()
+
 -- Split list by delimiter into multiple lists
 splitBy :: Eq a => a -> [a] -> [[a]]
 splitBy delimiter = foldr f [[]]
@@ -76,6 +97,7 @@ myBuildHook pkg_descr local_bld_info user_hooks bld_flags = do
         progs = withPrograms local_bld_info
         (Just clang) = lookupProgram (simpleProgram "clang") progs
         (Just llvmlink) = lookupProgram (llvmProgram "llvm-link") progs
+        (Just make) = lookupProgram (simpleProgram "make") progs
         verb = fromFlag $ buildVerbosity bld_flags
 
     let lib = libBuildInfo <$> library pkg_descr
@@ -83,12 +105,21 @@ myBuildHook pkg_descr local_bld_info user_hooks bld_flags = do
 
     -- Iterate over BuildInfos of libraries and executables
     forM_ bis $ \bi -> do
-        let inc_dirs = includeDirs bi
-            x_fields = customFieldsBI bi
+        let x_fields = customFieldsBI bi
+            get_xfield :: String -> Maybe String
+            get_xfield xname = snd <$> (L.find ((== xname) . fst) x_fields)
+            inc_dirs = includeDirs bi
+            depIncls = concatMap IPI.includeDirs $ PI.allPackages $ installedPkgs local_bld_info
+            incs = inc_dirs ++ depIncls
             x_incs = map snd $ filter ((== "x-llvm-c-includes") . fst) x_fields
             inc_llvm = concatMap parseNameList x_incs
             x_chelp = map snd $ filter ((== "x-llvm-c-helpers") . fst) x_fields
             c_helpers = map parseNameList x_chelp
+
+        -- new method: using make
+        makeHelper verb get_xfield make incs llvmlink bld_dir
+
+        -- old method: call clang/llvm-link from here
         -- Iterate over all x-llvm-c-helpers entries
         forM_ c_helpers  $ \(out_file:c_files) -> do
             let -- TODO: This is a bit too generic, gets includes from all
