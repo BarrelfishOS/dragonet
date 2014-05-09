@@ -97,6 +97,7 @@ setIPaddr "90:e2:ba:3a:ae:9d" "10.113.4.20" "gruyere" "intel2" "switch" "24" "" 
 
 echo "for babybel"
 setDHCPIPaddr "00:1e:67:92:53:17" "10.110.4.92" "babybel"
+# FIXME: change these IPs to .92 and also, unconnected interface should be in 10.44.*.* network.
 setIPaddr "00:1e:67:9f:0c:ca" "10.113.4.82" "babybel" "intel1" "no" "no" "" ""
 setIPaddr "de:f2:f8:2f:80:f0" "10.113.4.81" "babybel" "intel2" "switch" "15" "" "cable-pat206310"
 
@@ -105,13 +106,16 @@ setDHCPIPaddr "00:1e:67:92:48:4a" "10.110.4.95" "asiago"
 setIPaddr "00:1e:67:9f:45:06" "10.22.4.95" "asiago" "intel1" "direct" "burrata-intel2" "0000:04:00.0" ""
 setIPaddr "00:1e:67:9f:45:07" "10.113.4.95" "asiago" "intel2" "switch" "21" "0000:04:00.1" "cable-pat206309"
 setIPaddr "00:0f:53:07:4d:64" "10.113.4.195" "asiago" "sf1" "switch" "22" "" "cable-red"
-setIPaddr "00:0f:53:07:4d:65" "10.23.4.195" "asiago" "sf2" "direct" "burrata-intel1" "" ""
+#setIPaddr "00:0f:53:07:4d:65" "10.23.4.195" "asiago" "sf2" "direct" "burrata-intel1" "" ""
+setIPaddr "00:0f:53:07:4d:65" "10.44.4.195" "asiago" "sf2" "no" "no" "" ""
 
 echo "for burrata"
 setDHCPIPaddr "00:1e:67:92:52:d1" "10.110.4.96" "burrata"
-setIPaddr "00:1e:67:9f:4f:de" "10.22.4.96" "burrata" "intel1" "direct" "asiago-sf2" ""
+#setIPaddr "00:1e:67:9f:4f:de" "10.22.4.96" "burrata" "intel1" "direct" "asiago-sf2" ""
+setIPaddr "00:1e:67:9f:4f:de" "10.113.4.96" "burrata" "intel1" "switch" "20" ""
 setIPaddr "00:1e:67:9f:4f:df" "10.22.4.196" "burrata" "intel2" "direct" "asiago-intel1" ""
 
+echo "for tomme1"
 setDHCPIPaddr "00:21:28:3b:3f:9e" "10.110.4.41" "tomme1"
 setIPaddr "90:e2:ba:3a:a8:40" "10.44.4.41" "tomme1" "intel1" "no" "no" "" ""
 #setIPaddr "90:e2:ba:3a:a8:40" "10.44.4.41" "tomme1" "intel1" "no" "no" "" ""
