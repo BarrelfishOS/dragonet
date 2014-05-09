@@ -14,6 +14,7 @@ import Control.Monad
 import Data.Char
 
 llvmVersions = ["3.4", "3.5"]
+config_force_version = No
 
 -- Versioned llvm program
 --   e.g. llvm-link could be named just llvm-link, or lllvm-link-3.4
@@ -22,7 +23,10 @@ llvmProgram :: String -> Program
 llvmProgram name = (simpleProgram name) {
                         programFindLocation = findFirst names }
     where
-        names = name : (map ((++) (name ++ "-")) llvmVersions)
+        vnames = (map ((++) (name ++ "-")) llvmVersions)
+        names = if config_force_version
+                then vnames
+                else name:vnames
         findFirst [] _ _ = return Nothing
         findFirst (n:ns) verb a = do
             prog <- findProgramLocation verb n
