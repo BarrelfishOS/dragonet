@@ -124,8 +124,7 @@
 #ifdef MYDEBUG
 #define mprint(x...)    printf("debug:" x)
 #else
-//#define mprint(x...)   ((void)0)
-#define mprint(...)   ((void)0)
+#define mprint(x...)   ((void)0)
 #endif // MYDEBUG
 
 #ifdef ENABLE_DRAGONET
@@ -138,6 +137,7 @@
 #ifdef DRAGONET
 #include <helpers.h>
 extern int use_dragonet_stack;
+void event_handle_loop_dn(void);
 #endif // DRAGONET
 
 /**

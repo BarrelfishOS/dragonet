@@ -3,6 +3,7 @@
 
 #include <implementation.h>
 #include <app_control.h>
+#include <packet_access.h>
 
 struct stack_handle;
 

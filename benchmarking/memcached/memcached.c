@@ -56,7 +56,19 @@
 
 
 #ifdef DRAGONET
+
 int use_dragonet_stack = 0;
+#endif // DRAGONET
+
+#ifdef DRAGONET
+static struct stack_handle *stack = NULL;
+static socket_handle_t sh;
+typedef void (*event_handler_fun_ptr)(const int fd, const short which, void *arg);
+static int register_callback_dn(event_handler_fun_ptr fun, int fd, short which,
+        void *arg);
+static void recv_cb(socket_handle_t sh, struct input *in, void *data);
+static int recvfrom_dn(uint8_t *buff, int bufsize);
+static int send_dn(uint8_t *buff, int bufsize);
 #endif // DRAGONET
 
 /*
@@ -3826,7 +3838,6 @@ static enum transmit_result transmit(conn *c) {
 
 #ifdef DRAGONET
         if ((use_dragonet_stack == 1) && (c->is_dragonet == 1)) {
-            assert(!"transmit on dragonet is not yet supported\n");
             uint8_t buff[1410];
             int bufsize = 0;
             int ii = 0;
@@ -4232,6 +4243,7 @@ static void drive_machine(conn *c) {
 
     return;
 }
+
 
 void event_handler(const int fd, const short which, void *arg) {
     conn *c;
@@ -5277,10 +5289,22 @@ int main (int argc, char **argv) {
         }
     }
 
+
 #ifdef DRAGONET
     if (use_dragonet_stack) {
+
         printf("memcached Dragonet\n");
-        stack_init("AppEcho", "Rx_to_AppEcho", "AppEcho_to_Tx");
+        if (!udp_specified) {
+            printf("Error: UDP port not specified\nAnd Dragonet currently "
+                   "only works with UDP. Please specify UDP port with -U option");
+            exit(1);
+        }
+        stack = stack_init("dragonet", "AppEcho");
+        sh = socket_create(stack, recv_cb, NULL);
+        if (!socket_bind_udp_listen(sh, 0, settings.udpport)) {
+            fprintf(stderr, "socket_bind_udp_listen failed\n");
+            return 1;
+        }
         printf("memcached Dragonet: end\n");
     } else {
 #endif // DRAGONET
@@ -5531,4 +5555,114 @@ int main (int argc, char **argv) {
 
     return retval;
 }
+
+
+
+#ifdef DRAGONET
+// FIXME: This is extremely hacky and bad way to get memcached working with Dragonet.
+//      I should clean this up and modify libevents to be integrated with dragonet
+
+
+static event_handler_fun_ptr callback_memcached_fn = NULL;
+static int callback_memcached_fd = 0;
+static short callback_memcached_which = 0;
+static void *callback_memcached_arg = NULL;
+static struct input *current_packet = NULL;
+
+
+/*
+ * Register a callback function which will be called when packet is received
+ */
+static int register_callback_dn(event_handler_fun_ptr fun, int fd, short which,
+        void *arg)
+{
+    if (callback_memcached_fn != NULL) {
+        printf("dragonet: callback already registerd\n");
+        exit(1);
+        return -1;
+    }
+    callback_memcached_fn = fun;
+    callback_memcached_fd = fd;
+    callback_memcached_which = which;
+    callback_memcached_arg = arg;
+    return 0;
+}
+
+void event_handle_loop_dn(void)
+{
+    assert(callback_memcached_fn);
+    printf("looping for incoming packets\n");
+    while (1) {
+        stack_process_event(stack);
+    }
+}
+
+// Wrapper which stores the packet received with callback tempararily
+// and calls event handler mechanism
+static void recv_cb(socket_handle_t sh1, struct input *in, void *data)
+{
+    current_packet = in;
+
+    callback_memcached_fn(callback_memcached_fd, callback_memcached_which,
+         callback_memcached_arg);
+    input_free(current_packet);
+} // end function:  recv_cb
+
+
+// FIXME: these variables are assumed to be per packet/per flow.
+//        And this will only as long as system is handling one packet at a
+//      time, and running to completion.
+static uint32_t ip4_src = 0;
+static uint32_t ip4_dst = 0;
+static uint16_t udp_sport = 0;
+static uint16_t udp_dport = 0;
+
+int recvfrom_dn(uint8_t *buff, int bufsize)
+{
+    assert(buff != NULL);
+    // printf("debug: %s:%s:%d\n", __FILE__, __FILE__, __LINE__);
+    struct input *in = current_packet;
+    int len = in->len - in->attr->offset_l5;
+
+    udp_sport = current_packet->attr->udp_sport;
+    udp_dport = current_packet->attr->udp_dport;
+    ip4_src = current_packet->attr->ip4_src;
+    ip4_dst = current_packet->attr->ip4_dst;
+    assert(len <= bufsize);
+    // printf("debug: %s:%s:%d, sport = %"PRIx16", dport=%"PRIx16", srcip = %"PRIx32" dstip = %"PRIx32" \n",
+    // __FILE__,__FILE__, __LINE__, udp_sport, udp_dport, ip4_src, ip4_dst);
+
+    memcpy(buff, (uint8_t *)in->data + in->attr->offset_l5, len);
+
+    // printf("debug: %s:%s:%d: copying data of len %d, %d, %d at location %p of size %d\n",
+    // __FILE__, __FILE__, __LINE__, len, in->len, in->attr->offset_l5,
+    // buff, bufsize);
+    return len;
+}
+
+int send_dn(uint8_t *buff, int bufsize)
+{
+
+    assert(buff != NULL);
+    assert(bufsize <= 1410);
+    struct input *in = stack_input_alloc(stack);
+    assert(in != NULL);
+    pkt_prepend(in, bufsize);
+
+    memcpy(in->data, buff, bufsize);
+
+    in->attr->udp_sport = udp_dport;
+    in->attr->udp_dport = udp_sport;
+    in->attr->ip4_dst = ip4_src;
+    in->attr->ip4_src = ip4_dst;
+
+    socket_send_udp(sh, in,
+                in->attr->ip4_src, in->attr->udp_sport,
+                in->attr->ip4_dst, in->attr->udp_dport);
+    return bufsize;
+}
+
+#endif // DRAGONET
+
+
 
