@@ -1,3 +1,4 @@
+#define EXECUTE_GRAPH
 #include <implementation.h>
 #include <stddef.h>
 #include <stdio.h>

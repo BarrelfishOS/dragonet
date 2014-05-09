@@ -65,6 +65,10 @@ struct state {
 
     // XXX: HACK
     struct tap_handler *tap_handler;
+
+    void *udp_lock;
+    void *udp_flow_ht;
+    void *udp_listen_ht;
 };
 
 struct arp_pending {
@@ -114,6 +118,7 @@ struct input_attributes {
 
     // Misc
     int32_t mux_id;
+    int32_t socket_id;
 };
 
 struct input {
@@ -169,6 +174,9 @@ void input_xchg(struct input *a, struct input *b);
 
 struct input *input_struct_alloc(void);
 void input_struct_free(struct input *in);
+
+
+bool ip_from_string(const char *ip, uint32_t *dst);
 
 //void testFun(struct state * st, struct input *in);
 

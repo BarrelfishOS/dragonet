@@ -1,7 +1,9 @@
 #ifndef TAP_H_
 #define TAP_H_
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif // _GNU_SOURCE
 #include <ctype.h> // isprint
 #include <sys/types.h>
 #include <sys/socket.h>

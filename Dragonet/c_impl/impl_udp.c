@@ -2,6 +2,8 @@
 #include <string.h>
 #include <implementation.h>
 #include <inttypes.h>
+#include <demuxstate.h>
+#include <pthread.h>
 
 #include <udpproto.h>
 #include <proto_ipv4.h>
@@ -74,8 +76,45 @@ node_out_t do_pg__RxL4UDPPortClassifyStatic(struct state *state, struct input *i
 
 node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *in)
 {
-    //
-    return 0;
+    struct udp_flow_entry *f, *f_ht;
+    struct udp_flow_entry f_key;
+    struct udp_listen_entry *l, *l_ht;
+    uint64_t socketid = -1;
+    uint64_t appid = 0;
+    node_out_t out = P_RxL4UDPPortClassifyDynamic_appEcho;
+
+    if (pthread_rwlock_rdlock(state->udp_lock) != 0) {
+        fprintf(stderr, "Could not acquire udp lock");
+        return P_RxL4UDPPortClassifyDynamic_closedPort;
+    }
+
+    f_ht = state->udp_flow_ht;
+    l_ht = state->udp_listen_ht;
+
+    f_key.s_port = udp_hdr_sport_read(in);
+    f_key.d_port = udp_hdr_dport_read(in);
+    f_key.s_ip   = ipv4_srcIP_rd(in);
+    f_key.d_ip   = ipv4_dstIP_rd(in);
+
+    HASH_FIND(hh, f_ht, &f_key.s_ip, UDP_FLOW_KEYLEN, f);
+    if (f != NULL) {
+        socketid = f->socketid;
+        appid = f->appid;
+        goto out_success;
+    }
+
+    HASH_FIND(hh, l_ht, &f_key.d_port, UDP_LISTEN_KEYLEN, l);
+    if (l != NULL) {
+        socketid = l->socketid;
+        appid = l->appid;
+        goto out_success;
+    }
+
+    out = P_RxL4UDPPortClassifyDynamic_closedPort;
+out_success:
+    in->attr->socket_id = socketid;
+    pthread_rwlock_unlock(state->udp_lock);
+    return appid;
 }
 
 node_out_t do_pg__RxL4UDPClosedPortAction(struct state *state, struct input *in)

@@ -191,21 +191,18 @@ graph lpg {
                 port true false[Valid] }
 
             and Valid {
-                port true[PortClassifyType]
+                port true[PortClassifyDynamic]
                 port false[..PacketDrop] }
 
-            node PortClassifyType {
-                port static[PortClassifyStatic]
-                port dynamic[PortClassifyDynamic]
-            }
-
-            node PortClassifyStatic {
+            /*node PortClassifyStatic {
                 port appDNS [.DnsAPP]
                 port appEcho [.EchoAPP]
                 port closedPort [ClosedPortAction]
-            }
+            }*/
 
             node PortClassifyDynamic {
+                port closedPort [ClosedPortAction]
+                /** Other ports dynamically added */
             }
 
             node ClosedPortAction {
@@ -360,19 +357,6 @@ graph lpg {
 
 
         } // end cluster: L4TCP
-
-
-        /*******************************************/
-        /* Application RX                          */
-
-    node EchoAPP {
-                port out[.TxL4UDPInitiateResponse]
-                port drop[] }
-
-    node DnsAPP {
-                port out[.TxL4UDPInitiateResponse]
-                port drop[.PacketDrop] }
-
     } // end cluster: Rx
 
 

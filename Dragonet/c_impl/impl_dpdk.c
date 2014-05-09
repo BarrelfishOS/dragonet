@@ -71,7 +71,7 @@ static void dpdk_if_init(struct state *state)
         init_dpdk_setup_and_get_default_queue(CONFIG_DPDK_IFNAME);
 }
 
-node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
+node_out_t do_pg__DPDKRxQueue(struct state *state, struct input *in)
 {
     if (state->tap_handler == NULL) {
         dpdk_if_init(state);
@@ -93,7 +93,7 @@ node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
     return P_Queue_out;
 }
 
-node_out_t do_pg__TapTxQueue(struct state *state, struct input *in)
+node_out_t do_pg__DPDKTxQueue(struct state *state, struct input *in)
 {
     int (*send_packet_wrapper)(struct dpdk_info *dinf, char *pkt_tx, size_t len);
     send_packet_wrapper = dlsym(RTLD_DEFAULT, "send_packet_wrapper");

@@ -29,6 +29,9 @@ enum out_ports {
     P_RxL4UDPPortClassifyStatic_appDNS = 0,
     P_RxL4UDPPortClassifyStatic_appEcho = 1,
     P_RxL4UDPPortClassifyStatic_closedPort = 2,
+    P_RxL4UDPPortClassifyDynamic_appDNS = 0,
+    P_RxL4UDPPortClassifyDynamic_appEcho = 1,
+    P_RxL4UDPPortClassifyDynamic_closedPort = 2,
     P_RxL4UDPClosedPortAction_out = 0,
     P_RxL4TCPPortClassifyType_static = 0,
     P_RxL4TCPPortClassifyType_dynamic = 1,
@@ -169,6 +172,7 @@ node_out_t do_pg__TxL3ARPSendRequest(struct state *state, struct input *in);
 node_out_t do_pg__TxL2EtherAllocateHeader(struct state *state, struct input *in);
 node_out_t do_pg__TxL2EtherFillHeader(struct state *state, struct input *in);
 
+#ifdef EXECUTE_GRAPH
 
 static inline void executeGraph(struct state * st, struct input *in)
 {
@@ -667,7 +671,7 @@ static inline void executeGraph(struct state * st, struct input *in)
     }
 }
 
-
+#endif
 
 #if 0
 

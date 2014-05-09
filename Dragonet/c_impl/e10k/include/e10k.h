@@ -11,6 +11,7 @@
 #define E10K_H_
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include <dev/e10k_dev.h>
 
@@ -26,10 +27,10 @@
 /* 5-Tuple filters */
 
 enum e10k_5tfilter_l4type {
-    L4_OTHER,
-    L4_UDP,
-    L4_TCP,
-    L4_SCTP
+    L4_OTHER = 0,
+    L4_UDP   = 1,
+    L4_TCP   = 2,
+    L4_SCTP  = 3
 };
 
 enum e10k_5tfilter_mask {

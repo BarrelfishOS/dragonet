@@ -138,7 +138,9 @@ main = do
     putStrLn $ generateFNProtos igraph
     putStrLn "\n"
     let graph = Unicorn.constructGraph igraph
+    putStrLn "#ifdef EXECUTE_GRAPH"
     putStrLn $ generateTestFun "executeGraph" graph
+    putStrLn "#endif // EXECUTE_GRAPH"
     putStrLn "\n"
     putStrLn "#if 0\n"
     putStrLn $ generateFNSkels igraph

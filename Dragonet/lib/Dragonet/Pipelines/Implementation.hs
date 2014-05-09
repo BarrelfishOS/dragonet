@@ -10,16 +10,24 @@ module Dragonet.Pipelines.Implementation(
     PipelineHandle(..),
     QueueHandle(..),
     InputHandle(..),
+    UDPListenHandle(..),
+    UDPFlowHandle(..),
 
     runPipelines,
     stopPipelines,
+    stackState,
 
     init_shared_state,
     pipeline_init,
     pipeline_get_state,
     pipeline_inqueue_create,
     pipeline_outqueue_bind,
-    pipeline_wait_ready
+    pipeline_wait_ready,
+
+    udpAddListen,
+    udpRemoveListen,
+    udpAddFlow,
+    udpRemoveFlow,
 ) where
 
 import Dragonet.Pipelines
@@ -55,6 +63,8 @@ newtype PipelineHandle = PipelineHandle (Ptr PipelineHandle)
 newtype QueueHandle = QueueHandle (Ptr QueueHandle)
     deriving (Storable)
 newtype InputHandle = InputHandle (Ptr InputHandle)
+newtype UDPListenHandle = UDPListenHandle (Ptr UDPListenHandle)
+newtype UDPFlowHandle = UDPFlowHandle (Ptr UDPFlowHandle)
 
 
 
@@ -78,16 +88,33 @@ runPipelines ::
     -- pipeline
     (Pipeline -> Pipeline -> (POutput,PInput)) ->
     -- Initialize pipeline
-    (PipelineImpl -> IO ()) ->
-    PLGraph -> IO StackHandle
+    (PipelineImpl -> IO a) ->
+    PLGraph -> IO (StackHandle,[a])
 runPipelines sname qconf prun plg = do
     let plis = getPLIs qconf plg
     handle <- init_shared_state sname (length $ concatMap pliInQs plis)
-    mapM_ prun plis
-    return handle
+    results <- mapM prun plis
+    return (handle,results)
 
 stopPipelines :: StackHandle -> IO ()
 stopPipelines h = c_stop_stack h
+
+stackState :: StackHandle -> IO StateHandle
+stackState = c_stack_state
+
+
+udpAddListen :: StateHandle -> Word64 -> Word64 -> Word16 -> IO UDPListenHandle
+udpAddListen = c_udp_state_add_listen
+
+udpRemoveListen :: StateHandle -> UDPListenHandle -> IO ()
+udpRemoveListen = c_udp_state_remove_listen
+
+udpAddFlow :: StateHandle -> Word64 -> Word64 -> Word32 -> Word16 -> Word32
+                    -> Word16 -> IO UDPFlowHandle
+udpAddFlow = c_udp_state_add_flow
+
+udpRemoveFlow :: StateHandle -> UDPFlowHandle -> IO ()
+udpRemoveFlow = c_udp_state_remove_flow
 
 
 -- C interface
@@ -97,6 +124,9 @@ foreign import ccall "init_shared_state"
 
 foreign import ccall "stop_stack"
     c_stop_stack :: StackHandle -> IO ()
+
+foreign import ccall "stack_state"
+    c_stack_state :: StackHandle -> IO StateHandle
 
 foreign import ccall "pl_init"
     c_pl_init :: CString -> CString -> IO PipelineHandle
@@ -113,6 +143,20 @@ foreign import ccall "pl_outqueue_bind"
 foreign import ccall "pl_wait_ready"
     c_pl_wait_ready :: PipelineHandle -> IO ()
 
+foreign import ccall "udp_state_add_listen"
+    c_udp_state_add_listen ::
+        StateHandle -> Word64 -> Word64 -> Word16 -> IO UDPListenHandle
+
+foreign import ccall "udp_state_remove_listen"
+    c_udp_state_remove_listen :: StateHandle -> UDPListenHandle -> IO ()
+
+foreign import ccall "udp_state_add_flow"
+    c_udp_state_add_flow ::
+        StateHandle -> Word64 -> Word64 -> Word32 -> Word16 -> Word32 -> Word16
+                    -> IO UDPFlowHandle
+
+foreign import ccall "udp_state_remove_flow"
+    c_udp_state_remove_flow :: StateHandle -> UDPFlowHandle -> IO ()
 
 init_shared_state :: String -> Int -> IO StackHandle
 init_shared_state n c = withCString n $ \cs ->
