@@ -61,6 +61,8 @@ DEFAULT_SETTINGS = {
     'CLIENTS_CORECOUNT': {},
     'SERVER_CORES': 1,
     'CLIENT_CORES': 1,
+    'CONCURRENCY' : 32,
+    'TCONCURRENCY' : 32,
     'SPECIAL_CLIENTS_COUNT' : 0,
     'BRUST_SIZE': 1,
     'PKT_SIZE': 1024,
@@ -372,6 +374,9 @@ parser.add_option("-Q", "--clientcores", action="store", type="int", dest="CLIEN
 parser.add_option("--spClients", action="store", type="int", dest="SPECIAL_CLIENTS_COUNT",
                   help="Number of clients to be used as 'special' clients")
 
+parser.add_option("--concurrency", action="store", type="int", dest="CONCURRENCY",
+                  help="Number concurrencies per client thread")
+
 
 parser.add_option("-e", "--onload", action="store_true", dest="SERVER_ONLOAD_ENABLED",
                   help="Solarflare openonload library will be loaded for Linux apps")
@@ -653,6 +658,9 @@ def load():
         else :
             settings.SERVER_ONLOAD_CMDLINE = ""
 
+        settings.TCONCURRENCY =  (settings.CONCURRENCY * settings.CLIENT_CORES
+                        * (len(settings.CLIENTS) - settings.SPECIAL_CLIENTS_COUNT))
+
         settings.load_test()
         results = [ResultSet(NAME=settings.NAME,
                             HOST=settings.HOST,
@@ -668,6 +676,8 @@ def load():
                             BRUST_SIZE=settings.BRUST_SIZE,
                             SERVER_CORES=settings.SERVER_CORES,
                             SPECIAL_CLIENTS_COUNT = settings.SPECIAL_CLIENTS_COUNT,
+                            CONCURRENCY = settings.CONCURRENCY,
+                            TCONCURRENCY = settings.TCONCURRENCY,
                             CLIENT_CORES=settings.CLIENT_CORES,
                             CLIENTS=settings.CLIENTS,
                             CLIENTS_IF=settings.CLIENTS_IF,
