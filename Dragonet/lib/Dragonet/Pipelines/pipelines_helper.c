@@ -156,7 +156,10 @@ void* init_shared_state(const char *name, size_t chancount)
 
     // allocate and initialize shared memory area for shared state
     fd = shm_open(name, O_CREAT | O_RDWR | O_EXCL, 0600);
-    assert(fd != -1);
+    if (fd == -1) {
+        perror(name);
+        exit(0);
+    }
     res = ftruncate(fd, SHARED_STATE_SIZE);
     assert(res == 0);
 
