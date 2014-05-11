@@ -35,12 +35,39 @@ MEMASLAP_CMD ="sudo ./runBetter.sh memaslap %s  -t%ds --cfg_cmd=../libmemcached-
 SRV_CMDS = {
     "memcached" : {
                     "client_extra_opts" : "%d" % (MEMCACHED_PORT),
-                    "init_cmd" : ["sudo killall memcached || true",
+                    "init_cmd" : [
+                        "sudo killall memcached || true",
                         "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
                         "echo 0 | sudo tee /proc/sys/net/core/busy_read",
                     ],
                     "exec_cmd" : "sudo ./runBetter.sh ../memcached/memcached -c 64000 -m 64000 -p %d  -u ubuntu -U %d" % (MEMCACHED_PORT_TCP, MEMCACHED_PORT_UDP),
                     "kill_cmd" : ["sudo killall memcached || true"],
+                    "out_cmd" : [],
+                },
+    "memcached_onload" : {
+                    "client_extra_opts" : "%d" % (MEMCACHED_PORT),
+                    "init_cmd" : [
+                        "sudo killall memcached || true",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_read",
+                                ],
+                        "exec_cmd" : "sudo ./runBetter.sh %s ../memcached/memcached -c 64000 -m 64000 -p %d  -u ubuntu -U %d" % (onload_prefix, MEMCACHED_PORT_TCP, MEMCACHED_PORT_UDP),
+                        "kill_cmd" : ["sudo killall memcached || true"],
+                        "out_cmd" : [],
+                },
+    "memcached_poll" : {
+                    "client_extra_opts" : "%d" % (MEMCACHED_PORT),
+                    "init_cmd" : [
+                        "sudo killall memcached || true",
+                        "echo 50 | sudo tee /proc/sys/net/core/busy_poll",
+                        "echo 50 | sudo tee /proc/sys/net/core/busy_read",
+                    ],
+                    "exec_cmd" : "sudo ./runBetter.sh ../memcached/memcached -c 64000 -m 64000 -p %d  -u ubuntu -U %d" % (MEMCACHED_PORT_TCP, MEMCACHED_PORT_UDP),
+                    "kill_cmd" : [
+                        "sudo killall memcached || true",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_read",
+                    ],
                     "out_cmd" : [],
                 },
 }
