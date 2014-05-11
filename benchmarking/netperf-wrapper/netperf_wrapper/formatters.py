@@ -87,7 +87,7 @@ def target_lookup (addr):
     return addr
 
 
-def plot_attr_details(trow, infod):
+def plot_attr_details(trow, sorder, infod):
     nr = len(infod[trow[0]])
     data_to_plot = []
     axis_to_plot = []
@@ -137,11 +137,35 @@ def collect_attributes(result, config, titles, values):
             values[s['label']].append(ans)
 
 
-
 def mystr(obj):
     return str(obj)[:9]
 
-def show_attr_details(trow, infod):
+def sort_attr_details(skey, trow, infod):
+    if not skey in infod.keys():
+        print "Can't sort results as given key [%s] is missing" % (key)
+        return
+
+    nr = len(infod[trow[0]])
+    ll = []
+    for i in range(0, nr):
+        #ll.append((infod[skey][i], i))
+
+        ll.append((
+                infod[trow[0]][i],
+                infod[trow[1]][i],
+                infod[trow[2]][i],
+                infod[trow[3]][i],
+                infod[trow[4]][i],
+                i))
+    print ll
+    sll = sorted(ll)
+    sorder = map (lambda x: x[-1], sll)
+    #print "sorted list = %s" % (sll)
+    #print "sorted order = %s" % (sorder)
+    return sorder
+
+
+def show_attr_details(trow, sorder, infod):
 
 #    trow = self.nresults_titles
 #    infod = self.nresults
@@ -151,7 +175,12 @@ def show_attr_details(trow, infod):
     print "|\n",
 
     nr = len(infod[trow[0]])
-    for i in range(0, nr):
+    if sorder == None or sorder == []:
+        order = range(0, nr)
+    else :
+        order = sorder
+
+    for i in order:
 #        if infod['BURST_SIZE'][i][0] != 1.0 :
 #            continue
 #        if infod['TARGET'][i] != "10.23.4.21" :
@@ -219,7 +248,7 @@ class Formatter(object):
         if results[0].dump_file is not None:
             sys.stderr.write("No output formatter selected.\nTest data is in %s (use with -i to format).\n" % results[0].dump_file)
 
-    def format2(self, results, trow=None, infod=None):
+    def format2(self, results, trow=None, sorder=None, infod=None):
         self.format(results)
 
 DefaultFormatter = Formatter
@@ -778,10 +807,19 @@ class PlotFormatter(Formatter):
                       markerfacecolor='firebrick')
         meanlineprops = dict(linestyle='--', linewidth=2.5, color='purple')
 
-        for i in range(0, nr):
+
+        if self.sorder == None or self.sorder == []:
+            order = range(0, nr)
+        else :
+            order = self.sorder
+
+        for i in order:
+            #print self.infod
             title="%s_%s" % (
-                    self.infod["ECHO_SERVER"][i],
-                    target_lookup(self.infod["TARGET"][i]),
+                    #self.infod["ECHO_SERVER"][i],
+                    self.infod["Server"][i],
+                    self.infod["USE_TCP"][i],
+                    #target_lookup(self.infod["TARGET"][i]),
                     )
             title1 = self.infod["TITLE"][i]
             title1 = title1.replace('_', ' ')
@@ -796,8 +834,11 @@ class PlotFormatter(Formatter):
             title2 = title2.replace('CImplOnload', 'CImpl Dragonet')
             title2 = title2.replace('CImpl', 'C')
 
-            axis_to_plot.append(title2)
-            ticklabels.append(title2)
+            title3 = "%d (%d)" % (self.infod['SERVER_CORES'][i],
+                    self.infod['TCONCURRENCY'][i])
+
+            axis_to_plot.append(title3)
+            ticklabels.append(title3)
             #positions = range(i,pos+group_size)
             #ticks.append(self.np.mean(positions))
 
@@ -816,7 +857,7 @@ class PlotFormatter(Formatter):
             data = []
 
             if 'label' in s:
-                for i in range(0, nr):
+                for i in order:
                     data_to_plot.append(self.infod[s['label']][i])
                     data.append(self.infod[s['label']][i])
 
@@ -836,7 +877,6 @@ class PlotFormatter(Formatter):
         #axis.set_xticks(ticks)
         axis.set_xticklabels(ticklabels, fontsize=15, rotation=90)
         #axis.set_xticklabels(ticklabels, rotation=90)
-
 
 
 
@@ -988,11 +1028,13 @@ class PlotFormatter(Formatter):
         for i,config in enumerate(self.configs):
             getattr(self, 'do_%s_plot' % config['type'])(results, config=config)
 
-    def format2(self, results, trow, infod):
+    def format2(self, results, trow, sorder, infod):
         if not trow[0]:
             return
         self.trow = trow
+        self.sorder = sorder
         self.infod = infod
+
         getattr(self, 'do_%s_plot' % self.config['type'])(results)
         skip_title = len(results) > 1
 

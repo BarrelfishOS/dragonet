@@ -466,6 +466,10 @@ plot_group.add_option("--no-annotation", action="store_false", dest="ANNOTATE",
                   help="Exclude annotation with hostnames, time and test length from plots.")
 plot_group.add_option("--use-tcp", action="store_true", dest="USE_TCP",
                   help="use TCP protocol instead of UDP for benchmarking")
+plot_group.add_option("--tcp", action="store_true", dest="USE_TCP",
+                  help="use TCP protocol instead of UDP for benchmarking")
+plot_group.add_option("--udp", action="store_false", dest="USE_TCP",
+                  help="use UDP for benchmarking (default)")
 plot_group.add_option("--no-legend", action="store_false", dest="PRINT_LEGEND",
                   help="Exclude legend from plots.")
 plot_group.add_option("--no-title", action="store_false", dest="PRINT_TITLE",

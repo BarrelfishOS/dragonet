@@ -75,11 +75,9 @@ try:
                 for r in results:
                     FORMATTER.collect_attributes(r,
                         settings.ATTRIBUTES,
-                        #settings.ATTRIBUTES['attrs']['attrlist'],
                         attributes_titles, attribute_vals)
-
-                FORMATTER.show_attr_details(attributes_titles, attribute_vals)
-                #FORMATTER.plot_attr_details(attributes_titles, attribute_vals)
+                sorder = FORMATTER.sort_attr_details('SERVER_CORES', attributes_titles, attribute_vals)
+                FORMATTER.show_attr_details(attributes_titles, sorder, attribute_vals)
             else :
                 print "No data available for processing, results = %d" % (len(results))
                 sys.exit(1)
@@ -89,7 +87,7 @@ try:
                 formatter = getattr(formatters, formatter_name)(settings)
             else:
                 raise RuntimeError("Formatter [%s] not found. Make sure this formatter is supported" % (formatter_name))
-            formatter.format2(results, attributes_titles, attribute_vals)
+            formatter.format2(results, attributes_titles, sorder, attribute_vals)
 
         except RuntimeError as e:
             sys.stderr.write("Error occurred: %s\n"% str(e))

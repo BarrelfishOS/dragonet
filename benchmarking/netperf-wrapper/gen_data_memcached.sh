@@ -8,9 +8,9 @@ result="${3}/latency_${target_t}_${ECHO_SERVER}"
 plotpath="${result}.png"
 log="${result}.log"
 tmpfile="${result}.tmp"
-title="${USE_TCP}${ECHO_SERVER}_${target_t}_SRV_${SERVERCORES}_C_${CONCURENCY}_${ONLOADTEXT}"
+title="${ECHO_SERVER}-${target_t}-${USE_PROTO}-SRV_${SERVERCORES}-C_${CONCURENCY}"
 
-   ./netperf-wrapper -I ${ITERATIONS} -l ${DURATION} -c ${ECHO_SERVER} ${USE_TCP} \
+   ./netperf-wrapper -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO} \
        -H asiago  -C ziger2 \
        --servercores ${SERVERCORES} --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} \
        --concurrency ${CONCURENCY} -t "${title}" -o "${result}" -L "${log}" | tee ${tmpfile}
@@ -52,9 +52,9 @@ run_bm_tp_rr() {
         let CBRUST=NBRUST
         let NBRUST=CBRUST+CBRUST
 
-        title="${USE_TCP}${ECHO_SERVER}_${target_t}_SRV_${SERVERCORES}_C_${CBRUST}_${ONLOADTEXT}"
+        title="${ECHO_SERVER}-${target_t}-${USE_PROTO}-SRV_${SERVERCORES}-C_${CBRUST}"
 
-        ./netperf-wrapper -I 1 -l ${DURATION} -c ${ECHO_SERVER} ${USE_TCP} \
+        ./netperf-wrapper -I 1 -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO} \
        -H asiago -C ziger2 -C sbrinz2 -C gruyere -C ziger2 -C sbrinz2 -C gruyere \
        --servercores ${SERVERCORES} --clientcores 2 -T ${target} ${UDP_TEST_NAME} \
        --concurrency ${CBRUST} -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
@@ -81,9 +81,9 @@ run_bm_tp_rr() {
     set -x
     set -e
 
-    title="${USE_TCP}${ECHO_SERVER}_${target_t}_SRV_${SERVERCORES}_C_${LBRUST}_${ONLOADTEXT}_BEST"
+    title="${ECHO_SERVER}-${target_t}-${USE_PROTO}-SRV_${SERVERCORES}-C_${LBRUST}_BEST"
 
-    ./netperf-wrapper -I ${ITERATIONS} -l ${DURATION} -c ${ECHO_SERVER} ${USE_TCP} \
+    ./netperf-wrapper -I ${ITERATIONS} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO} \
         -H asiago -C ziger2 -C sbrinz2 -C gruyere -C ziger2 -C sbrinz2 -C gruyere \
         --servercores ${SERVERCORES} --clientcores 2 -T ${target} ${UDP_TEST_NAME} \
         --concurrency ${LBRUST} -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
@@ -135,33 +135,24 @@ get_best_tp()
 }
 
 get_scalability() {
-    get_best_tp 1
-    get_best_tp 2
-    get_best_tp 4
-    get_best_tp 8
-    get_best_tp 10
-    get_best_tp 12
-    get_best_tp 14
-    get_best_tp 16
-    get_best_tp 18
+    get_best_tp "01"
+    get_best_tp "02"
+    get_best_tp "04"
+    get_best_tp "08"
+    get_best_tp "10"
+    get_best_tp "12"
+    get_best_tp "14"
+    get_best_tp "16"
+    get_best_tp "18"
 }
 
 setup_output_location() {
     OUTDIRPP="${MAIN_OUTPUT_DIR}/${SELTARGET_T}/"
 
-    OUTDIRP="${OUTDIRPP}/${ECHO_SERVER}/${UDP_TEST_NAME}/"
+    OUTDIRP="${OUTDIRPP}/${ECHO_SERVER}/${USE_PROTO}/${UDP_TEST_NAME}/"
     mkdir -p ${OUTDIRP}
     OUTDIR=${OUTDIRP}
-
-    if [ "${USE_TCP}" == "" ] ; then
-        echo "Using UDP"
-    else
-        echo "Using TCP"
-        OUTDIRP="${OUTDIRP}/${USE_TCP}/"
-    fi
-
-
-    echo "OUTPUT Location: ${OUTDIRP}"
+    echo "OUTPUT Location: ${OUTDIR}"
 }
 
 
@@ -171,7 +162,22 @@ select_intel_nic() {
     inteli=ssh asigago "cat minfo/used_if.log | grep 'asiago-intel[12]-switch' | cut -d, -f1"
     ssh asigago sudo ifconfig $sfi down
     ssh asigago sudo ifconfig $inteli up
+    rm *.minfo
+    SELTARGET=${INTEL_S_T}
+    SELTARGET_T="Intel-S"
 }
+
+select_sf_nic() {
+    # this is just for general idea, and is not fully tested yet
+    sfi=ssh asigago "cat minfo/used_if.log | grep 'asiago-sf[12]-switch' | cut -d, -f1"
+    inteli=ssh asigago "cat minfo/used_if.log | grep 'asiago-intel[12]-switch' | cut -d, -f1"
+    ssh asigago sudo ifconfig $inteli down
+    ssh asigago sudo ifconfig $sfi up
+    rm *.minfo
+    SELTARGET=${SF_S_T}
+    SELTARGET_T="SF-S"
+}
+
 
 #########################################
 ## Main starts here
@@ -194,13 +200,13 @@ UDP_TEST_NAME="memcached_rr"
 
 ECHO_SERVER="memcached"
 
-ITERATIONS=5
 ITERATIONS=1
+ITERATIONS=5
 
 DURATION=10
 
-USE_TCP="--use-tcp"
-USE_TCP=""
+USE_PROTO="tcp"
+USE_PROTO="udp"
 
 MAIN_OUTPUT_DIR="../memcachedResults/pfs/${1}/"
 ECHO_SERVER="memcached_poll"
@@ -210,46 +216,107 @@ ECHO_SERVER="memcached"
 setup_output_location
 
 #get_best_latency server_cores concurency
-get_best_latency 2 1
+#get_best_latency 2 1
+#exit 0
 
-exit 0
+############################## getting SF data ######
+select_sf_nic
 
-######################################################################
-######################################################################
+ECHO_SERVER="memcached"
 
-USE_TCP=""
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_TCP: [${USE_TCP}] "
+USE_PROTO="udp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
 setup_output_location
 get_scalability
 
-USE_TCP="--use-tcp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_TCP: [${USE_TCP}] "
+
+USE_PROTO="tcp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
+setup_output_location
+get_scalability
+
+ECHO_SERVER="memcached_onload"
+
+USE_PROTO="udp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
+setup_output_location
+get_scalability
+
+
+USE_PROTO="tcp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
+setup_output_location
+get_scalability
+
+
+############################## getting Intel data ######
+select_intel_nic
+
+ECHO_SERVER="memcached"
+
+USE_PROTO="udp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
+setup_output_location
+get_scalability
+
+
+USE_PROTO="tcp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
 setup_output_location
 get_scalability
 
 ECHO_SERVER="memcached_poll"
 
-USE_TCP=""
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_TCP: [${USE_TCP}] "
+USE_PROTO="udp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
 setup_output_location
 get_scalability
 
 
-USE_TCP="--use-tcp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_TCP: [${USE_TCP}] "
+USE_PROTO="tcp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
+setup_output_location
+get_scalability
+
+exit 0
+
+
+######################################################################
+######################################################################
+
+USE_PROTO="udp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
+setup_output_location
+get_scalability
+
+USE_PROTO="tcp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
+setup_output_location
+get_scalability
+
+ECHO_SERVER="memcached_poll"
+
+USE_PROTO="udp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
+setup_output_location
+get_scalability
+
+
+USE_PROTO="tcp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
 setup_output_location
 get_scalability
 
 exit 0
 
 ECHO_SERVER="memcached_onload"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_TCP: [${USE_TCP}] "
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
 setup_output_location
 get_scalability
 
 
 ECHO_SERVER="memcached_onload"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_TCP: [${USE_TCP}] "
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
 setup_output_location
 get_scalability
 
