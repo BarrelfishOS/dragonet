@@ -8,7 +8,7 @@ result="${3}/latency_${target_t}_${ECHO_SERVER}"
 plotpath="${result}.png"
 log="${result}.log"
 tmpfile="${result}.tmp"
-title="${ECHO_SERVER}-${target_t}-${USE_PROTO}-SRV_${SERVERCORES}-C_${CONCURENCY}"
+title="${ECHO_SERVER},${target_t},${USE_PROTO},,SRV_${SERVERCORES},C_${CONCURENCY}"
 
    ./netperf-wrapper -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO} \
        -H asiago  -C ziger2 \
@@ -52,9 +52,9 @@ run_bm_tp_rr() {
         let CBRUST=NBRUST
         let NBRUST=CBRUST+CBRUST
 
-        title="${ECHO_SERVER}-${target_t}-${USE_PROTO}-SRV_${SERVERCORES}-C_${CBRUST}"
+        title="${ECHO_SERVER},${target_t},${USE_PROTO},,SRV_${SERVERCORES},C_${CBRUST}"
 
-        ./netperf-wrapper -I 1 -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO} \
+        ./netperf-wrapper -I 1 -l 10 -c ${ECHO_SERVER} --${USE_PROTO} \
        -H asiago -C ziger2 -C sbrinz2 -C gruyere -C ziger2 -C sbrinz2 -C gruyere \
        --servercores ${SERVERCORES} --clientcores 2 -T ${target} ${UDP_TEST_NAME} \
        --concurrency ${CBRUST} -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
@@ -66,8 +66,8 @@ run_bm_tp_rr() {
 
         let CTP=NTP
 
-        NVTPS=`cat ${TMPFILE} | grep "^Valid TPS: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1`
-        NTP=`cat ${TMPFILE} | grep "^Valid TPS: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1 | cut -d'.' -f1`
+        NVTPS=`cat ${TMPFILE} | grep "^total TPS: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1`
+        NTP=`cat ${TMPFILE} | grep "^total TPS: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1 | cut -d'.' -f1`
         GETMISSES=`cat ${TMPFILE} | grep "^total get_misses: " | head -n1 |cut -d'[' -f2 | cut -d']' -f1`
         echo "TPITERATOR: ${title}, ${target}, ${SERVERCORES}, ${CBRUST}, ${GETMISSES}, ${NVTPS}, ${NTP}" >> ${SAMARRYFILE}
         echo "#################################################"
@@ -76,12 +76,13 @@ run_bm_tp_rr() {
 
         cat ${TMPFILE} >> ${FINALRESULT}
         rm -f ${TMPFILE}
+        ./cleanup.sh
     done
 
     set -x
     set -e
 
-    title="${ECHO_SERVER}-${target_t}-${USE_PROTO}-SRV_${SERVERCORES}-C_${LBRUST}_BEST"
+    title="${ECHO_SERVER},${target_t},${USE_PROTO},,SRV_${SERVERCORES},C_${LBRUST},BEST"
 
     ./netperf-wrapper -I ${ITERATIONS} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO} \
         -H asiago -C ziger2 -C sbrinz2 -C gruyere -C ziger2 -C sbrinz2 -C gruyere \
@@ -96,8 +97,7 @@ run_bm_tp_rr() {
     echo "#############################################################"
     echo "############ BEST TP for CORES:${SERVERCORES} [$NTP:$CBRUST]"
     echo "#############################################################"
-
-
+    ./cleanup.sh
     sleep 3
 }
 
@@ -134,16 +134,31 @@ get_best_tp()
     run_bm_tp_rr  ${SELTARGET} ${SELTARGET_T} ${OUTDIR}
 }
 
+get_scalability_special() {
+    get_best_tp 10
+    get_best_tp 8
+    get_best_tp 12
+    fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
+    ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
+    echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
+}
+
+
+
 get_scalability() {
-    get_best_tp "01"
-    get_best_tp "02"
-    get_best_tp "04"
-    get_best_tp "08"
-    get_best_tp "10"
-    get_best_tp "12"
-    get_best_tp "14"
-    get_best_tp "16"
-    get_best_tp "18"
+    get_best_tp 1
+    get_best_tp 2
+    get_best_tp 4
+    get_best_tp 8
+    get_best_tp 10
+    get_best_tp 12
+    get_best_tp 14
+    get_best_tp 16
+    get_best_tp 18
+
+    fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
+    ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
+    echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
 }
 
 setup_output_location() {
@@ -158,24 +173,27 @@ setup_output_location() {
 
 select_intel_nic() {
     # this is just for general idea, and is not fully tested yet
-    sfi=ssh asigago "cat minfo/used_if.log | grep 'asiago-sf[12]-switch' | cut -d, -f1"
-    inteli=ssh asigago "cat minfo/used_if.log | grep 'asiago-intel[12]-switch' | cut -d, -f1"
-    ssh asigago sudo ifconfig $sfi down
-    ssh asigago sudo ifconfig $inteli up
-    rm *.minfo
+    sfi=`ssh asiago "cat minfo/used_if.log | grep 'asiago-sf[12]-switch' | cut -d, -f1"`
+    inteli=`ssh asiago "cat minfo/used_if.log | grep 'asiago-intel[12]-switch' | cut -d, -f1"`
+    ssh asiago "sudo ifconfig $sfi down"
+    ssh asiago "sudo ifconfig $inteli up"
+    rm asiago_details.mconf
     SELTARGET=${INTEL_S_T}
-    SELTARGET_T="Intel-S"
+    SELTARGET_T="Intel_S"
 }
 
 select_sf_nic() {
     # this is just for general idea, and is not fully tested yet
-    sfi=ssh asigago "cat minfo/used_if.log | grep 'asiago-sf[12]-switch' | cut -d, -f1"
-    inteli=ssh asigago "cat minfo/used_if.log | grep 'asiago-intel[12]-switch' | cut -d, -f1"
-    ssh asigago sudo ifconfig $inteli down
-    ssh asigago sudo ifconfig $sfi up
-    rm *.minfo
+    sfi=`ssh asiago "cat minfo/used_if.log | grep 'asiago-sf[12]-switch' | cut -d, -f1"`
+    inteli=`ssh asiago "cat minfo/used_if.log | grep 'asiago-intel[12]-switch' | cut -d, -f1"`
+    ssh asiago "sudo ifconfig $inteli down"
+    ssh asiago "sudo ifconfig $sfi up"
+    rm asiago_details.mconf
+    rm *.mconf
     SELTARGET=${SF_S_T}
-    SELTARGET_T="SF-S"
+    SELTARGET_T="SF_S"
+    # pinging ziger2's 10G ip address
+    ssh asiago "sudo ping -c 10 10.113.4.57"
 }
 
 
@@ -191,29 +209,37 @@ PLOTTYPE="bbest"
 PLOTTYPE="lbest"
 
 SELTARGET=${SF_S_T}
-SELTARGET_T="SF-S"
+SELTARGET_T="SF_S"
+
+SELTARGET=${SF_S_T}
+SELTARGET_T="SF_S"
 
 SELTARGET=${INTEL_S_T}
-SELTARGET_T="Intel-S"
+SELTARGET_T="Intel_S"
 
 UDP_TEST_NAME="memcached_rr"
 
 ECHO_SERVER="memcached"
 
-ITERATIONS=1
 ITERATIONS=5
+ITERATIONS=3
 
 DURATION=10
 
 USE_PROTO="tcp"
 USE_PROTO="udp"
 
-MAIN_OUTPUT_DIR="../memcachedResults/pfs/${1}/"
-ECHO_SERVER="memcached_poll"
+MAIN_OUTPUT_DIR="../memcachedResults/sfDebug/${1}/"
 ECHO_SERVER="memcached_onload"
+ECHO_SERVER="memcached_poll"
 ECHO_SERVER="memcached"
 
+GRAPH_GEN_CMDS="${MAIN_OUTPUT_DIR}/graph_gen_cmds.sh"
+
 setup_output_location
+
+#get_scalability
+#exit 0
 
 #get_best_latency server_cores concurency
 #get_best_latency 2 1
@@ -221,14 +247,8 @@ setup_output_location
 
 ############################## getting SF data ######
 select_sf_nic
-
+starttime=`date`
 ECHO_SERVER="memcached"
-
-USE_PROTO="udp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability
-
 
 USE_PROTO="tcp"
 echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
@@ -247,6 +267,14 @@ USE_PROTO="tcp"
 echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
 setup_output_location
 get_scalability
+
+ECHO_SERVER="memcached"
+
+USE_PROTO="udp"
+echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
+setup_output_location
+get_scalability
+
 
 
 ############################## getting Intel data ######
@@ -278,6 +306,9 @@ echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
 setup_output_location
 get_scalability
 
+endtime=`date`
+echo "BM start time  ${starttime}"
+echo "BM   end time  ${endtime}"
 exit 0
 
 
