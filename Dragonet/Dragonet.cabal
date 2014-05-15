@@ -262,3 +262,13 @@ executable bench-udp-rtt
                         lib/Dragonet/Pipelines/
     CC-options:         -Wall -Wno-unused-function
 
+executable bench-udp-throughput
+    Hs-source-dirs:     apps
+    main-is:            microbenchmark/udp_throughput.c
+    other-modules:      Dummy
+    build-depends:      apps, base
+    include-dirs:       apps/lib/include,
+                        c_impl/include/,
+                        lib/Dragonet/Pipelines/
+    CC-options:         -Wall -Wno-unused-function
+
