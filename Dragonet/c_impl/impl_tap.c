@@ -22,6 +22,7 @@ node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
         state->local_mac = 0xf86954221b00ULL;
         state->local_ip = 0xc0a87b01;
         printf("Initialized\n");
+        return P_Queue_init;
     }
 
     pkt_prepend(in, in->space_before);

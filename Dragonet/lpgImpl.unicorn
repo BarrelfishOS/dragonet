@@ -2,7 +2,8 @@ graph lpg {
 //    node SoftwareRX {
     node Queue {
         port out[RxL2EtherClassified]
-        port drop[] }
+        port drop[]
+        port init[TxL3ARPSendGratuitous] }
 
     node PacketDrop { }
 
@@ -413,6 +414,9 @@ graph lpg {
         }
 
         cluster L3ARP {
+            node SendGratuitous {
+                port false true[Prepare] }
+
             node InitiateResponse {
                 port false true[Prepare]
 		port drop[] }

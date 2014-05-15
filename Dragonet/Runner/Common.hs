@@ -195,7 +195,7 @@ addSocket ais ch f = do
     sd <- appRunPolicy ais ch $ INC.policyAddSocket f
     let outQ = fromIntegral $ INC.sdQueue sd
         sockID = fromIntegral $ INC.sdID sd
-        muxID = 5 -- FIXME
+        muxID = 6 -- FIXME
     APP.sendMessage ch $ APP.MsgSocketInfo sockID outQ muxID
 
 

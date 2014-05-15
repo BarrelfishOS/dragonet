@@ -298,6 +298,9 @@ static node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
 
         e10k_queue_bump_rxtail(q->queue);
         q->populated = true;
+        if (qi == 0) {
+            return P_Queue_init;
+        }
     }
 
     if (e10k_queue_get_rxbuf(q->queue, &op, &len, &last, &flags) != 0) {

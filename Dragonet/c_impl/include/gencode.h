@@ -7,6 +7,7 @@ enum out_ports {
     P_true = 1,
     P_Queue_out = 0,
     P_Queue_drop = 1,
+    P_Queue_init = 2,
     P_RxEchoAPP_out = 0,
     P_RxEchoAPP_drop = 1,
     P_RxDnsAPP_out = 0,
@@ -67,6 +68,8 @@ enum out_ports {
     P_TxL3ICMPAllocateHeader_out = 0,
     P_TxL3IPv4AllocateHeader_out = 0,
     P_TxL3IPv4FillHeader_out = 0,
+    P_TxL3ARPSendGratuitous_false = 0,
+    P_TxL3ARPSendGratuitous_true = 1,
     P_TxL3ARPInitiateResponse_false = 0,
     P_TxL3ARPInitiateResponse_true = 1,
     P_TxL3ARPInitiateResponse_drop = 2,
@@ -163,6 +166,7 @@ node_out_t do_pg__TxL3ICMPFillHeader(struct state *state, struct input *in);
 node_out_t do_pg__TxL3IPv4AllocateHeader(struct state *state, struct input *in);
 node_out_t do_pg__TxL3IPv4FillHeader(struct state *state, struct input *in);
 node_out_t do_pg__TxL3IPv4Routing(struct state *state, struct input *in);
+node_out_t do_pg__TxL3ARPSendGratuitous(struct state *state, struct input *in);
 node_out_t do_pg__TxL3ARPInitiateResponse(struct state *state, struct input *in);
 node_out_t do_pg__TxL3ARPAllocateHeader(struct state *state, struct input *in);
 node_out_t do_pg__TxL3ARPFillHeader(struct state *state, struct input *in);

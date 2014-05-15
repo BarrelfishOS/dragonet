@@ -79,6 +79,7 @@ node_out_t do_pg__DPDKRxQueue(struct state *state, struct input *in)
         state->local_mac = CONFIG_LOCAL_MAC;
         state->local_ip = CONFIG_LOCAL_IP;
         printf("Initialized\n");
+        return P_Queue_init;
     }
 
     static uint8_t tmpbuf[2048];

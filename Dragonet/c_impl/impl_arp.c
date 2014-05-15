@@ -175,6 +175,18 @@ node_out_t do_pg__TxL3ARPLookup_(struct state *state, struct input *in)
     return P_TxL3ARPLookup__true;
 }
 
+node_out_t do_pg__TxL3ARPSendGratuitous(struct state *state, struct input *in)
+{
+    in->attr->arp_src_mac = state->local_mac;
+    in->attr->arp_dst_mac = 0;
+    in->attr->arp_src_ip = state->local_ip;
+    in->attr->arp_dst_ip = state->local_ip;
+    in->attr->arp_oper = ARP_OPER_REQUEST;
+    in->attr->eth_dst_mac = eth_broadcast_addr;
+    in->attr->eth_dst_mac = eth_broadcast_addr;
+    return P_TxL3ARPSendGratuitous_true;
+}
+
 node_out_t do_pg__TxL3ARPSendRequest(struct state *state, struct input *in)
 {
     // P_TxL3ARPSendRequest_true, P_TxL3ARPSendRequest_false, P_TxL3ARPSendRequest_drop
