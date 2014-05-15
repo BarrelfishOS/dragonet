@@ -34,6 +34,8 @@ import Data.Function (on)
 import Data.Maybe
 
 import System.IO  (hFlush,stdout)
+import System.IO.Error (catchIOError)
+import System.Posix.Signals (raiseSignal,keyboardSignal)
 
 import qualified Runner.LLVM as LLVM
 --import qualified Runner.Dynamic as Dyn
@@ -115,7 +117,10 @@ commandLineInterface :: IO ()
 commandLineInterface = do
     putStr "> "
     hFlush stdout
-    l <- getLine
+    -- Treat EOF in stdin the same way as Ctrl-C
+    l <- catchIOError getLine $ \_ -> do
+        raiseSignal keyboardSignal
+        return ""
     putStrLn ""
     done <- case l of
         "quit" -> return True
