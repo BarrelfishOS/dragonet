@@ -36,6 +36,8 @@ import Data.Maybe
 import System.IO  (hFlush,stdout)
 import System.IO.Error (catchIOError)
 import System.Posix.Signals (raiseSignal,keyboardSignal)
+import System.Environment (getArgs)
+import System.Exit (exitSuccess)
 
 import qualified Runner.LLVM as LLVM
 --import qualified Runner.Dynamic as Dyn
@@ -50,7 +52,13 @@ runStack :: Show b => (PG.PGraph -> PG.PGraph) -> INC.PolicyState a b ->
         (AppIfState a b -> b -> IO ()) -> String -> IO ()
 runStack embed pstate hwact helpers = do
     let fname = "lpgImpl.unicorn"
-    let apps = ["AppEcho"]
+    apps <- getArgs
+    if null apps
+        then do
+            putStrLn "Error: No application slots specified on commandline"
+            exitSuccess
+        else return ()
+    putStrLn $ "Running with app slots: " ++ show apps
     -- Parse graph and perform pseudo-embedding
     b <- readFile fname >>= UnicornAST.parseGraph
     let pgraph = embed $ addApps apps $ Unicorn.constructGraph b
