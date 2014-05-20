@@ -103,7 +103,7 @@ class ProcessRunner(threading.Thread):
     """Default process runner for any process."""
 
     def __init__(self, machine, name, command, wait_for,
-            init_cmd, kill_cmd, out_cmd,
+            init_cmd, kill_cmd, out_cmd, is_catastrophic,
             delay, *args, **kwargs
             ):
         threading.Thread.__init__(self)
@@ -116,6 +116,7 @@ class ProcessRunner(threading.Thread):
         self.init_cmd = init_cmd
         self.kill_cmd = kill_cmd
         self.out_cmd = out_cmd
+        self.is_catastrophic = is_catastrophic
         self.pid = None
         self.returncode = None
 #        self.deployment_host = machine.deployment_host
@@ -128,7 +129,7 @@ class ProcessRunner(threading.Thread):
         else :
             self.command = "bash -c 'cd %s ; %s'" % (self.machine_ref.tools_location, command)
 
-        #print "The runner command is [%s]" % (self.command)
+#        print "The runner %s:  [%s]" % (self.machine_ref, self.command)
         self.args = shlex.split(self.command)
 
     def fork(self):
@@ -162,7 +163,7 @@ class ProcessRunner(threading.Thread):
 
 
     def kill(self):
-        print "T4rying to kill the process"
+#        print "T4rying to kill the process"
         if self.killed:
             return
         if self.pid is not None:
@@ -199,7 +200,10 @@ class ProcessRunner(threading.Thread):
         seconds, then open the subprocess, wait for it to finish, and collect
         the last word of the output (whitespace-separated)."""
 
+
+#        print "Waiting for process id %d " % (self.pid)
         pid, sts = os.waitpid(self.pid, 0)
+#        print "process id %d died/finished with status %s" % (pid, sts)
         self._handle_exitstatus(sts)
 
         self.stdout.seek(0)
@@ -226,13 +230,15 @@ class ProcessRunner(threading.Thread):
             return
 
         if self.returncode:
-            sys.stderr.write("Warning: Program exited non-zero.\nCommand: %s\n" % self.command)
-            sys.stderr.write("Program output:\n")
-            sys.stderr.write("  " + "\n  ".join(self.err.splitlines()) + "\n")
-            sys.stderr.write("  " + "\n  ".join(self.out.splitlines()) + "\n")
-            self.result = None
-            # FIXME: should create interrupt, and then cleanup the system
-            sys.exit(1)
+            if self.is_catastrophic:
+                sys.stderr.write("Warning: Program exited non-zero.\nCommand: %s\n" % self.command)
+                sys.stderr.write("Program output:\n")
+                sys.stderr.write("  " + "\n  ".join(self.err.splitlines()) + "\n")
+                sys.stderr.write("  " + "\n  ".join(self.out.splitlines()) + "\n")
+                self.result = None
+                raise RuntimeError("Warning: Program exited non-zero.\nCommand: %s\n" % self.command)
+            sys.stderr.write("NOTE: (Noncatastrophic) Program exited non-zero.\nCommand: %s\n" % self.command)
+            #sys.exit(1) # FIXME: should I really call esit here?
         else:
             self.result = self.parse(self.out)
             if not self.result:
@@ -340,20 +346,36 @@ class MemaslapSumaryRunner(ProcessRunner):
                             v2 = parts[i+1].strip().split(" ")[0]
                             cmd_output[k2] = v2.strip()
 
+            if ("run time" in cmd_output.keys()) :
+                cmd_output['RT'] = float(cmd_output["run time"][:-1])
+
             if ("TPS" in cmd_output.keys()) :
                 result['RESULT'] = cmd_output["TPS"]
+                cmd_output['ORESULT'] = float(cmd_output["TPS"])
             else :
                 print "Run imcomplete as attribute 'TPS' is not present in output"
                 print "Existing keys: %s" % (str(cmd_output.keys()))
-            if (cmd_output['get_misses'] > 0
-                or ('packet_drop' in cmd_output.keys() and cmd_output['packet_drop'] > 0 )
+                result['RESULT'] = 0
+#            if (cmd_output['get_misses'] > (100 * cmd_output['RT']) ) :
+#                result['RESULT'] = 0
+#                cmd_output['ORESULT'] = 0
+#            elif (cmd_output['get_misses'] > 0) :
+            if (cmd_output['get_misses'] > 0) :
+                result['RESULT'] = result['RESULT'] - (cmd_output['get_misses'] / result['RT'])
+                cmd_output['ORESULT'] = 0
+
+            if (('packet_drop' in cmd_output.keys() and cmd_output['packet_drop'] > 0 )
                 or ('udp_timeout' in cmd_output.keys() and cmd_output['udp_timeout'] > 0)
                ):
                 result['RESULT'] = 0
+                cmd_output['ORESULT'] = 0
 
         finally:
             e = sys.exc_info()
             cmd_output['EXCEPTION'] = str(e)
+
+        if cmd_output['EXCEPTION'] == '(None, None, None)':
+            cmd_output['ORESULT'] = 0
 
         cmd_output['RESULT'] = float(result['RESULT'])
         result['CMD_OUTPUT'] = cmd_output

@@ -5,7 +5,7 @@
 def get_server_bw(allResults, meta, ifname1=None, takeAvg=False, rx_tx='recv'):
     """should return value series to plot from whole result"""
     res = []
-    tmp = allResults[allResults.keys()[0]]['server-1']['dstat']['dstat_outlist']
+    tmp = allResults[allResults.keys()[0]]['server-0']['dstat']['dstat_outlist']
     for k in tmp.keys():
         if "net/" in k:
             res = tmp[k][rx_tx][dstat_ignore_initial_x_vals:-1]
@@ -79,7 +79,7 @@ def get_cpu(allResults, meta, mname, coreid, takeAvg=False):
 
 
 def get_server_cpu(allResults, meta, takeAvg=False):
-    return get_cpu(allResults, meta, 'server-1', int(server_core), takeAvg)
+    return get_cpu(allResults, meta, 'server-0', int(server_core), takeAvg)
 
 def get_client_cpu(allResults, meta, takeAvg=False):
     return get_cpu(allResults, meta, 'client-0', int(client_core), takeAvg)

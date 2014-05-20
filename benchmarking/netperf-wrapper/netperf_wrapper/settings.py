@@ -55,7 +55,10 @@ DEFAULT_SETTINGS = {
     'SERVERS': [],
     'SERVERS_IF': {},
     'SERVERS_DRV': {},
+    'RUN_CONF': {},
     'SERVERS_CORECOUNT': {},
+    'SERVERS_INSTANCES': 1,
+    'SERVER_CORESHIFT' :2,
     'CLIENTS': [],
     'CLIENTS_IF': {},
     'CLIENTS_CORECOUNT': {},
@@ -64,6 +67,7 @@ DEFAULT_SETTINGS = {
     'CONCURRENCY' : 32,
     'TCONCURRENCY' : 32,
     'SPECIAL_CLIENTS_COUNT' : 0,
+    'SPECIAL_SERVERS_COUNT' : 0,
     'BRUST_SIZE': 1,
     'PKT_SIZE': 1024,
     'LOCAL_HOST': socket.gethostname(),
@@ -217,6 +221,8 @@ class TestEnvironment(object):
             exec(comp, self.env)
             return self.env
         except (IOError, SyntaxError):
+            t, value, traceback = sys.exc_info()
+            print('Error opening %s: %s: %s' % (t, value, traceback))
             raise RuntimeError("Unable to read test config file: '%s'" % filename)
 
     def include_test(self, name, env=None):
@@ -366,10 +372,16 @@ parser.add_option("-t", "--title-extra", action="store", type="string", dest="TI
 parser.add_option("-b", "--brust", action="store", type="int", dest="BRUST_SIZE",
                   help="Number of concurrent transactions")
 
+
 parser.add_option("-q", "--servercores", action="store", type="int", dest="SERVER_CORES",
                   help="Number of cores to use in server")
 parser.add_option("-Q", "--clientcores", action="store", type="int", dest="CLIENT_CORES",
                   help="Number of cores to use in client")
+
+parser.add_option("--serverInstances", action="store", type="int", dest="SERVERS_INSTANCES",
+                  help="Number of server instances")
+parser.add_option("--serverCoreShift", action="store", type="int", dest="SERVER_CORESHIFT",
+                  help="Server coreshift for NUMA effect.  Core allocation will start from this value (default 2)")
 
 parser.add_option("--spClients", action="store", type="int", dest="SPECIAL_CLIENTS_COUNT",
                   help="Number of clients to be used as 'special' clients")
@@ -558,7 +570,7 @@ class Settings(optparse.Values, object):
                     setattr(self, k, v)
 
         if not 'TOTAL_LENGTH' in s:
-            self.TOTAL_LENGTH = self.LENGTH
+            self.TOTAL_LENGTH = self.LENGTH + self.DELAY
 
     def lookup_hosts(self):
         """If no explicit IP version is set, do a hostname lookup and try to"""
@@ -662,8 +674,22 @@ def load():
         else :
             settings.SERVER_ONLOAD_CMDLINE = ""
 
+        if len(settings.SERVERS) > 1 :
+            print "ERROR: More than one server specified.  This is not supporte d yet"
+            sys.exit(1)
+
+        srvname = settings.SERVERS[0]
+        for i in range(0, settings.SERVERS_INSTANCES):
+            settings.RUN_CONF[0] = {}
+            settings.RUN_CONF[0]['SERVER'] = {}
+
+
         settings.TCONCURRENCY =  (settings.CONCURRENCY * settings.CLIENT_CORES
                         * (len(settings.CLIENTS) - settings.SPECIAL_CLIENTS_COUNT))
+
+
+
+
 
         settings.load_test()
         results = [ResultSet(NAME=settings.NAME,
@@ -680,6 +706,7 @@ def load():
                             BRUST_SIZE=settings.BRUST_SIZE,
                             SERVER_CORES=settings.SERVER_CORES,
                             SPECIAL_CLIENTS_COUNT = settings.SPECIAL_CLIENTS_COUNT,
+                            SPECIAL_SERVERS_COUNT = settings.SPECIAL_SERVERS_COUNT,
                             CONCURRENCY = settings.CONCURRENCY,
                             TCONCURRENCY = settings.TCONCURRENCY,
                             CLIENT_CORES=settings.CLIENT_CORES,
@@ -689,6 +716,8 @@ def load():
                             SERVERS_IF=settings.SERVERS_IF,
                             SERVERS_DRV=settings.SERVERS_DRV,
                             SERVERS_CORECOUNT=settings.SERVERS_CORECOUNT,
+                            SERVERS_INSTANCES=settings.SERVERS_INSTANCES,
+                            SERVER_CORESHIFT=settings.SERVER_CORESHIFT,
                             TIME=settings.TIME,
                             LOCAL_HOST=settings.LOCAL_HOST,
                             TITLE=settings.TITLE,
@@ -698,6 +727,7 @@ def load():
                             SERVER_ONLOAD_CMDLINE=settings.SERVER_ONLOAD_CMDLINE,
                             LENGTH=settings.LENGTH,
                             TOTAL_LENGTH=settings.TOTAL_LENGTH,
+                            DELAY=settings.DELAY,
                             STEP_SIZE=settings.STEP_SIZE,
                             ITERATIONS=settings.ITERATIONS,
                             ECHO_SERVER=settings.ECHO_SERVER,

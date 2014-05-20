@@ -19,7 +19,7 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import math, pprint, signal
+import math, pprint, signal, sys, time
 from datetime import datetime
 
 from . import runners, transformers
@@ -93,6 +93,15 @@ class Aggregator(object):
     def aggregate(self):
         raise NotImplementedError()
 
+
+    def forced_cleanup(self):
+        #print "Doing forced cleanup"
+        for m, mi in list(self.m_instances.items()):
+            for n,t in list(self.m_instances[m]['machine'].threads.items()):
+                if t.isAlive():
+                    t.kill()
+
+
     def collect(self):
         """Create a ProcessRunner thread for each instance and start them. Wait
         for the threads to exit, then collect the results."""
@@ -123,18 +132,23 @@ class Aggregator(object):
         try:
 
             #print "##############################"
+            print "%s: creating application instances\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+            for m, mi in list(self.m_instances.items()):
+                #print "Running tools on  machine [%s] " % (str(m))
+                for n,i in list(self.m_instances[m]['machine'].tool_instances.items()):
+                    self.m_instances[m]['machine'].threads[n] = i['runner'](self.m_instances[m]['machine'], n, **i)
+
+
             print "%s: Starting server applications\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
             for m, mi in list(self.m_instances.items()):
                 if not mi['is_server'] :
                     continue
-                #print "Running tools on  machine [%s] " % (str(m))
                 for n,i in list(self.m_instances[m]['machine'].tool_instances.items()):
-#                    print "Running tool [%s, %s] on machine %s" % (
-#                        str(n), str((i)), str(m) )
-
-                    self.m_instances[m]['machine'].threads[n] = i['runner'](self.m_instances[m]['machine'], n, **i)
                     self.m_instances[m]['machine'].threads[n].start()
 
+
+
+            #time.sleep(2)
             #print "##############################"
             #print "Starting client applications now "
             print "%s: Starting client applications\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
@@ -145,8 +159,7 @@ class Aggregator(object):
                 for n,i in list(self.m_instances[m]['machine'].tool_instances.items()):
                     #print "Running tool [%s, %s] on machine %s" % (
                     #    str(n), str((i)), str(m) )
-
-                    self.m_instances[m]['machine'].threads[n] = i['runner'](self.m_instances[m]['machine'], n, **i)
+#                    self.m_instances[m]['machine'].threads[n] = i['runner'](self.m_instances[m]['machine'], n, **i)
                     self.m_instances[m]['machine'].threads[n].start()
 
 
@@ -160,6 +173,14 @@ class Aggregator(object):
                     if t.should_wait():
                         while t.isAlive():
                             t.join(1)
+                        if not t.returncode == 0:
+                            print "WARNING: thread %s failed with return code %s\n" % (
+                                t.name,  str(t.returncode))
+                            print "WARNING: killing all processes"
+                            self.forced_cleanup()
+                            print "WARNING: exiting"
+                            sys.exit(1)
+
 
             real_bm_end_time = datetime.now()
             print "%s: Benchmark done (runtime = %f secs), killing other threads\n" % (
