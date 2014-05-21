@@ -181,7 +181,7 @@ def get_dstat_attr_cpu(allResults, meta, client, attribute, aggregator):
         ans.append(aggregator(per_run))
     return ans
 
-def get_dstat_attr_interupt(allResults, meta, client, attribute, aggregator):
+def get_dstat_attr_cpu_detailed(allResults, meta, client, attribute, attr2, aggregator):
     """should return value series to plot from whole result"""
     ans = []
     for rn, r in allResults.items():
@@ -192,8 +192,8 @@ def get_dstat_attr_interupt(allResults, meta, client, attribute, aggregator):
                     if (tn.startswith("dstat")):
                         for k in tt['dstat_outlist'].keys():
                             if k.startswith(attribute):
-                                stats = tt['dstat_outlist'][k]['idl'][dstat_ignore_initial_x_vals:-1]
-                                values = map ((lambda x: 100 - float(x)), stats)
+                                stats = tt['dstat_outlist'][k][attr2][dstat_ignore_initial_x_vals:-1]
+                                values = map ((lambda x: float(x)), stats)
                                 per_run = per_run + values
         ans.append(aggregator(per_run))
     return ans

@@ -472,6 +472,19 @@ class PlotFormatter(Formatter):
 
         self.start_position = 1
 
+    def _init_barss_plot(self, config=None, axis=None):
+        if axis is None:
+            axis = self.figure.gca()
+        if config is None:
+            config = self.config
+
+        self._init_timeseries_plot(config, axis)
+        axis.set_xlabel('')
+
+        self.start_position = 1
+
+
+
     def _init_box2_plot(self, config=None, axis=None):
         if axis is None:
             axis = self.figure.gca()
@@ -784,6 +797,128 @@ class PlotFormatter(Formatter):
         #axis.set_xlim(0,pos-1)
         #axis.set_ylim(ymin=0, ymax=10)
         axis.set_ylim(ymin=0, ymax=(ymax * 1.1))
+
+
+    def do_barss_plot(self, results, config=None, axis=None):
+        if config is None:
+            config = self.config
+        axis = config['axes'][0]
+
+        nr = len(self.infod[self.trow[0]])
+        data_to_plot = []
+        axis_to_plot = []
+
+        group_size = nr # len(results)
+        ticklabels = []
+        ticks = []
+        pos = 1
+
+        boxprops = dict(linestyle='--', linewidth=3, color='darkgoldenrod')
+        flierprops = dict(marker='o', markerfacecolor='green', markersize=12,
+                  linestyle='none')
+        medianprops = dict(linestyle='-.', linewidth=2.5, color='firebrick')
+        meanpointprops = dict(marker='D', markeredgecolor='black',
+                      markerfacecolor='firebrick')
+        meanlineprops = dict(linestyle='--', linewidth=2.5, color='purple')
+
+
+        if self.sorder == None or self.sorder == []:
+            order = range(0, nr)
+        else :
+            order = self.sorder
+
+        for i in order:
+            #print self.infod
+            title="%s_%s" % (
+                    #self.infod["ECHO_SERVER"][i],
+                    self.infod["Server"][i],
+                    self.infod["USE_TCP"][i],
+                    #target_lookup(self.infod["TARGET"][i]),
+                    )
+            title1 = self.infod["TITLE"][i]
+            title1 = title1.replace('_', ' ')
+            t3 = title1.split()
+            title2 = ""
+            for t in t3:
+                if t == "PKT":
+                    break
+                title2 = " %s %s" % (title2, t)
+            title2 = title2.replace('Dpdk', ' Dragonet')
+            title2 = title2.replace('llvmE10k', 'llvm E10k Dragonet')
+            title2 = title2.replace('CImplOnload', 'CImpl Dragonet')
+            title2 = title2.replace('CImpl', 'C')
+
+            title3 = "%d,%d (%d)" % (self.infod['SERVERS_INSTANCES'][i],
+                    self.infod['SERVER_CORES'][i],
+                    self.infod['TCONCURRENCY'][i])
+
+            axis_to_plot.append(title3)
+            ticklabels.append(title3)
+            #positions = range(i,pos+group_size)
+            #ticks.append(self.np.mean(positions))
+
+        colours = ['b', 'g', 'c', 'm', 'k']
+        while len(colours) < len(results):
+            colours = colours *2
+
+        kk = 0
+        data_sum_all = [[0 for x in range(0, len(order))]]
+
+        for ii,s in enumerate(config['series']):
+            if 'axis' in s and s['axis'] == 2:
+                a = 1
+            else:
+                a = 0
+            data = []
+            data_sum_avg_local = []
+            if 'label' in s:
+                iii = 0
+                for oi in order:
+                    data_to_plot.append(self.infod[s['label']][oi])
+                    v = self.infod[s['label']][oi]
+                    #data.append(v)
+                    avg = sum(v) / len(v)
+                    data.append(avg)
+#                    print "%d, %d, %d: %f + %f = %d" % (ii, iii, oi,
+#                            data_sum_all[ii][iii], avg,
+#                                    (data_sum_all[ii][iii] + avg))
+                    data_sum_avg_local.append(data_sum_all[ii][iii] + avg)
+                    iii = iii + 1
+            data_sum_all.append(data_sum_avg_local)
+
+            #print "%d: avg is          %s" % (ii, str(data))
+            #print "%d: using bottom as %s" % (ii, str(data_sum_all[ii]))
+            #print "%d: sum is          %s" % (ii, str(data_sum_all[ii+1]))
+            bp = config['axes'][a].bar((range(0, len(data))), data,
+                   #color=colours[ii], bottom=data_sum_previous)
+                   color=colours[ii], bottom=data_sum_all[ii])
+
+                                           #positions=positions)
+            #self.plt.setp(bp['boxes'][a], color=colours[kk])
+            #kk = kk + 1
+#                if i == 0 and group_size > 1:
+#                    bp['caps'][j*2].set_label(r.label())
+#                for k in 'caps','whiskers','fliers':
+#                    if bp[k]:
+#                        self.plt.setp(bp[k][j*2], color=colours[j])
+#                        self.plt.setp(bp[k][j*2+1], color=colours[j])
+#
+#            pos += group_size+1
+
+        #axis.set_xticks(ticks)
+        axis.set_xticklabels(ticklabels, fontsize=15, rotation=90)
+        #axis.set_xticklabels(ticklabels, rotation=90)
+
+
+
+        #axis.set_xlim(0,pos-1)
+        #axis.set_ylim(ymin=0, ymax=110)
+        axis.set_ylim(ymin=0 )
+
+
+
+
+
 
     def do_box2_plot(self, results, config=None, axis=None):
         if config is None:
