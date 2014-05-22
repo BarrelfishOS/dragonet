@@ -459,6 +459,13 @@ static struct bulk_channel_callbacks cbs = {
     .buffer_received = cb_buffer_received,
 };
 
+static void cb_create_done(void *arg, errval_t err, struct bulk_channel *chan)
+{
+    struct dragonet_queue *q = chan->user_state;
+    err_expect_ok(err);
+    q->bound = true;
+}
+
 queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name)
 {
     struct dragonet_pipeline *pl = plh;
@@ -467,7 +474,7 @@ queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name)
     errval_t err;
     struct bulk_channel_setup setup = { .direction = BULK_DIRECTION_RX,
         .role = BULK_ROLE_SLAVE, .trust = BULK_TRUST_FULL,
-        .meta_size = sizeof(struct dragonet_bulk_meta), .waitset = &pl->ws };
+        .meta_size = sizeof(struct dragonet_bulk_meta) };
     struct dragonet_queue *dq = calloc(1, sizeof(*dq));
 
     asprintf(&dq->name, "%s_%s", pl->stackname, name);
@@ -478,9 +485,14 @@ queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name)
 
     dq->pl = pl;
     dq->chan = chan;
+    dq->bound = false;
     chan->user_state = dq;
-    err = bulk_channel_create(chan, &epd->generic, &cbs, &setup);
+    err = bulk_channel_create(chan, &epd->generic, &cbs, &setup, &pl->ws,
+            MK_BULK_CONT(cb_create_done, NULL));
     err_expect_ok(err);
+    while (!dq->bound) {
+        ws_event_dispatch_nonblock(&pl->ws);
+    }
 
     __sync_fetch_and_add(&pl->shared->ch_created, 1);
     dprintf("pl_inqueue_create: pl=%s created=%d count=%d\n", pl->name, (int)
@@ -518,7 +530,7 @@ queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name)
     struct bulk_channel *chan = malloc(sizeof(*chan));
     errval_t err;
     struct bulk_channel_bind_params params = { .role = BULK_ROLE_MASTER,
-        .trust = BULK_TRUST_FULL, .waitset = &pl->ws };
+        .trust = BULK_TRUST_FULL };
     struct dragonet_queue *dq = calloc(1, sizeof(*dq));
 
 
@@ -539,7 +551,7 @@ queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name)
     dq->next = pl->outqs;
     pl->outqs = dq;
     chan->user_state = dq;
-    err = bulk_channel_bind(chan, &epd->generic, &cbs, &params,
+    err = bulk_channel_bind(chan, &epd->generic, &cbs, &params, &pl->ws,
             MK_BULK_CONT(cb_bind_done, NULL));
     err_expect_ok(err);
 

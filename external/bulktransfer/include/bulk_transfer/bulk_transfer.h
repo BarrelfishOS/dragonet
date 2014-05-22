@@ -16,57 +16,10 @@
 #define BULK_TRANSFER_H
 
 #include <bulk_transfer/bulk_internal.h>
+#include <bulk_transfer/bulk_lowlevel.h>
 
-/**
- * Specifies the direction of data flow over a channel.
- */
-enum bulk_channel_direction {
-    BULK_DIRECTION_TX,  ///< This side of the channel is the data source
-    BULK_DIRECTION_RX   ///< This side of the channel is the data sink
-};
-
-/**
- * The role of the domain with respect to the channel.
- *
- * 1) Creation: upon channel creation the role can either be given or generic
- * 2) Binding: The roles are given either Master-Slave or Slave-Master
- */
-enum bulk_channel_role {
-    BULK_ROLE_GENERIC,  ///< the role of this endpoint depends on the binding side
-    BULK_ROLE_MASTER,   ///< this endpoint is the channel master
-    BULK_ROLE_SLAVE     ///< this endpoint is the channel slave
-};
-
-/**
- * the trust levels of the channel
- */
-enum bulk_trust_level {
-    BULK_TRUST_UNINITIALIZED, ///< trust level is not initialized
-    BULK_TRUST_NONE,          ///< untrusted case, policies are enforced
-    BULK_TRUST_HALF,          ///< same as untrusted, but no revocation of caps
-    BULK_TRUST_FULL           ///< complete trust, no unmapping
-};
-
-/**
- *
- */
-enum bulk_channel_state {
-    BULK_STATE_UNINITIALIZED,  ///< channel not initialized, no endpoint assigned
-    BULK_STATE_INITIALIZED,    ///< local endpoint assigned, ready for binding
-    BULK_STATE_BINDING,        ///< binding is in progress
-    BULK_STATE_BIND_NEGOTIATE, ///< channel properties are negotiated (role, trust)
-    BULK_STATE_CONNECTED,      ///< binding is completed and ready for use
-    BULK_STATE_TEARDOWN,       ///< teardown is initiated
-    BULK_STATE_CLOSED          ///< the channel has been closed
-};
-
-/* forward declarations */
 struct bulk_channel;
-struct bulk_channel_constraints;
-struct bulk_pool;
-struct bulk_pool_list;
-struct bulk_buffer;
-
+struct bulk_cont_alloc;
 
 /**
  * continuation to make the interface asynchronous
@@ -75,6 +28,7 @@ struct bulk_continuation {
     void (*handler)(void *arg, errval_t err, struct bulk_channel *channel);
     void *arg;
 };
+
 
 #define MK_BULK_CONT(h,a) ((struct bulk_continuation) {.handler=(h), .arg=(a)})
 #define BULK_CONT_NOP     MK_BULK_CONT(NULL, NULL)
@@ -91,61 +45,12 @@ static inline void bulk_continuation_call(struct bulk_continuation *cont,
     }
 }
 
-
-/**
- * Function pointers provided by an implementation of the bulk transfer
- * mechanism over a specific backend. Functions correspond closely to the
- * public interface.
- *
- * XXX: do we want to give a pointer to the closure or the closure itself?
- *      the event_closure just has two fields, so it may be reasonable to do so.
- *      - RA
- */
-struct bulk_implementation {
-    errval_t (*channel_create)(struct bulk_channel  *channel);
-
-    errval_t (*channel_bind)(struct bulk_channel  *channel,
-                             struct bulk_continuation cont);
-
-    errval_t (*channel_destroy)(struct bulk_channel  *channel);
-
-    errval_t (*assign_pool)(struct bulk_channel *channel,
-                            struct bulk_pool    *pool,
-                            struct bulk_continuation cont);
-
-    errval_t (*remove_pool)(struct bulk_channel *channel,
-                            struct bulk_pool    *pool,
-                            struct bulk_continuation cont);
-
-    errval_t (*move)(struct bulk_channel  *channel,
-                     struct bulk_buffer   *buffer,
-                     void                 *meta,
-                     struct bulk_continuation cont);
-
-    errval_t (*copy)(struct bulk_channel  *channel,
-                     struct bulk_buffer   *buffer,
-                     void                 *meta,
-                     struct bulk_continuation cont);
-
-    errval_t (*release)(struct bulk_channel  *channel,
-                        struct bulk_buffer   *buffer,
-                        struct bulk_continuation cont);
-
-    errval_t (*pass)(struct bulk_channel  *channel,
-                     struct bulk_buffer   *buffer,
-                     void                 *meta,
-                     struct bulk_continuation cont);
+struct bulk_waitset_state {
+    struct waitset_chanstate wscs;
+    struct bulk_channel      *channel;
 };
 
-/**
- * specifies constraints on the channel. This involves limiting the supported
- * memory range or alignment requirements.
- */
-struct bulk_channel_constraints {
-    uintptr_t mem_range_min;    ///< minimum physical address supported
-    uintptr_t mem_range_max;    ///< maximum physical address supported
-    uintptr_t men_align;        ///< minimum memory alignment constraint
-};
+
 
 /** Callbacks for events */
 struct bulk_channel_callbacks {
@@ -198,155 +103,25 @@ struct bulk_channel_callbacks {
 
 /** Handle/Representation for one end of a bulk transfer channel */
 struct bulk_channel {
+    struct bulk_ll_channel         ll;
     /** callbacks for the channel events */
-    struct bulk_channel_callbacks    *callbacks;
-    /** the local endpoint for this channel */
-    struct bulk_endpoint_descriptor *ep;
-    /** the current channel state */
-    enum bulk_channel_state          state;
-    /** orderd list of assigned pools to this channel */
-    struct bulk_pool_list           *pools;
-    /** the direction of data flow */
-    enum bulk_channel_direction      direction;
-    /** role of this side of the channel */
-    enum bulk_channel_role           role;
-    /** the trust level of this channel */
-    enum bulk_trust_level            trust;
-    /** constraints of this channel */
-    struct bulk_channel_constraints  constraints;
-    /** the size of the transmitted meta information per bulk transfer */
-    size_t                           meta_size;
+    struct bulk_channel_callbacks *callbacks;
     /** the waitset for this channel */
-    struct waitset                  *waitset;
-    /** platform specific data, must be treated as opaque */
-    struct bulk_int_channel         internal;
+    struct waitset                *waitset;
+    /** state for waitset */
+    struct bulk_waitset_state      ws_state;
+    /** bulk continuation allocation cache */
+    struct bulk_cont_alloc        *cont_cache;
     /** pointer to user specific state for this channel */
-    void                            *user_state;
-    /** implementation specific data */
-    void                            *impl_data;
+    void                          *user_state;
 };
 
-/**
- * generic bulk endpoint
- *
- * This serves as an abstract representation of an endpoint. This data structure
- * must be part of the implementation specific endpoint struct.
- */
-struct bulk_endpoint_descriptor {
-    /** Pointer to backend-function pointers for this endpoint */
-    struct bulk_implementation *f;
-};
-
-
-/**
-    this struct represents the pool id which consists of the domain id of the
-    allocator and the domain local allocation counter
-    TODO: ensure system wide uniquenes also between different machines
- */
-struct bulk_pool_id {
-    uint32_t    machine;
-    uint32_t    dom;//warning: disp_get_domain_id() is core-local
-    uint32_t    local;
-};
-
-
-/**
- * represents the state of a buffer
- */
-enum bulk_buffer_state {
-    BULK_BUFFER_INVALID,    ///< the buffer is not present XXX: name?
-    BULK_BUFFER_READ_ONLY,  ///< the buffer is mapped read only
-    BULK_BUFFER_RO_OWNED,   ///< the buffer is copied first
-    BULK_BUFFER_READ_WRITE  ///< the buffer is mapped read write
-};
-
-/**
- * The bulk pool is a continuous region in (virtual) memory that consists of
- * equally sized buffers.
- */
-struct bulk_pool {
-    struct bulk_pool_id     id;
-    /** the base address of the pool */
-    void                    *base_address;
-    /** the size of a single buffer in bytes */
-    size_t                   buffer_size;
-    /**  pool trust level depending on first assignment */
-    enum bulk_trust_level    trust;
-    /** the maximum number of buffers in this pool */
-    size_t                   num_buffers;
-    /** array of the buffers for this pool (pre allocated) */
-    struct bulk_buffer     **buffers;
-    /** platform specific data, must be treated as opaque */
-    struct bulk_int_pool     internal;
-};
-
-/**
- * a list of bulk pools assigned to a channel, keep the list ordered by the id
- */
-struct bulk_pool_list {
-    struct bulk_pool_list *next;    ///< pointer to the next element
-    struct bulk_pool      *pool;    ///< the pool
-};
-
-/**
- * a bulk buffer is the base unit for bulk data transfer in the system
- */
-struct bulk_buffer {
-    /** the virtual address of the buffer */
-    void                     *address;
-    /** the physical address */
-    uintptr_t                 phys;
-    /** XXX: maybe we have to use the pool_id here */
-    struct bulk_pool         *pool;
-    /** index of this buffer within the pool's array of buffers */
-    uint32_t                  bufferid;
-    /** state of the buffer */
-    enum bulk_buffer_state    state;
-    /** local refrence counting */
-    uint32_t                  local_ref_count;
-    /** platform specific data, must be treated as opaque */
-    struct bulk_int_buffer    internal;
-    void                     *opaque;
-};
 
 
 /*
  * ---------------------------------------------------------------------------
  * Channel Management >>>
  */
-
-/**
- * setup parameters for creating a new bulk channel
- */
-struct bulk_channel_setup {
-    /** Channel direction (RX/TX) */
-    enum bulk_channel_direction       direction;
-    /** Endpoint role (master/slave) */
-    enum bulk_channel_role            role;
-    /** trust level for this channel */
-    enum bulk_trust_level             trust;
-    /** */
-    struct bulk_channel_constraints   constraints;
-    /** Size of metadata to be passed along with transfers and passed buffers. */
-    size_t                            meta_size;
-    /** Waitset on which events for this channel will be dispatched */
-    struct waitset                   *waitset;
-};
-
-/**
- * parameters used on binding ot a channel
- */
-struct bulk_channel_bind_params {
-    /** Endpoint role (master/slave) */
-    enum bulk_channel_role            role;
-    /** trust level for this channel */
-    enum bulk_trust_level             trust;
-    /** the channel constraints */
-    struct bulk_channel_constraints   constraints;
-    /** Waitset on which events for this channel will be dispatched */
-    struct waitset                   *waitset;
-};
-
 
 /**
  * Create a new channel.
@@ -359,7 +134,9 @@ struct bulk_channel_bind_params {
 errval_t bulk_channel_create(struct bulk_channel              *channel,
                              struct bulk_endpoint_descriptor  *ep_desc,
                              struct bulk_channel_callbacks    *callbacks,
-                             struct bulk_channel_setup        *setup);
+                             struct bulk_channel_setup        *setup,
+                             struct waitset                   *ws,
+                             struct bulk_continuation          cont);
 
 /**
  * Bind to an existing unbound channel.
@@ -375,7 +152,8 @@ errval_t bulk_channel_bind(struct bulk_channel              *channel,
                            struct bulk_endpoint_descriptor  *remote_ep_desc,
                            struct bulk_channel_callbacks    *callbacks,
                            struct bulk_channel_bind_params  *params,
-                           struct bulk_continuation cont);
+                           struct waitset                   *ws,
+                           struct bulk_continuation          cont);
 
 
 /**

@@ -18,14 +18,15 @@
 
 struct lsm_opstate {
     struct lsm_internal *internal;
-    void (*action) (struct lsm_opstate *ops);
+    errval_t (*action) (struct lsm_opstate   *ops,
+                        struct bulk_ll_event *event,
+                        errval_t              err);
     union {
         struct {
             struct bulk_pool *pool;
         } assign;
     } state;
-    struct bulk_continuation cont;
-    errval_t err;
+    bulk_correlation_t corr;
 
     struct lsm_opstate *next;
 };
@@ -33,22 +34,18 @@ struct lsm_opstate {
 struct lsm_internal {
     const char          *name;
     size_t               num_slots;
-    struct bulk_channel *chan;
+    struct bulk_ll_channel *chan;
     bool                 creator;
     struct lsm_opstate  *ops;
     struct lsm_opstate  *ops_free;
 
     struct shm_channel   rx;
-    struct shm_channel_wsstate rx_wss;
     void                *rx_meta;
     struct shm_channel   tx;
-    struct shm_channel_wsstate tx_wss;
     void                *tx_meta;
 
-    struct bulk_continuation bind_cont;
+    bulk_correlation_t   bind_corr;
 };
-
-static void msg_handler(struct shm_message *msg, void *opaque);
 
 
 static struct lsm_opstate *ops_alloc(struct lsm_internal *internal)
@@ -76,7 +73,7 @@ static inline uint32_t ops_id(struct lsm_opstate *ops)
 /* Helpers for channel initialization */
 
 /** Allocate and initialize internal channel state */
-static errval_t internal_init(struct bulk_channel *channel)
+static errval_t internal_init(struct bulk_ll_channel *channel)
 {
     struct lsm_internal *internal;
     struct bulk_linuxshm_endpoint_descriptor *ep =
@@ -197,7 +194,8 @@ static errval_t destroy_metas(struct lsm_internal *internal, bool tx)
 /******************************************************************************/
 /* Implementation of struct bulk_implementation */
 
-static errval_t op_channel_create(struct bulk_channel *channel)
+static errval_t op_channel_create(struct bulk_ll_channel *channel,
+                                  bulk_correlation_t      corr)
 {
     errval_t err;
     struct lsm_internal *internal;
@@ -229,8 +227,6 @@ static errval_t op_channel_create(struct bulk_channel *channel)
     if (err_is_fail(err)) {
         goto fail_rx;
     }
-    shm_chan_waitset_register(&internal->rx, &internal->rx_wss, msg_handler,
-            internal, channel->waitset);
 
     strcpy(name, internal->name);
     strcat(name, "_txc");
@@ -254,8 +250,8 @@ fail_mrx:
 }
 
 
-static errval_t op_channel_bind(struct bulk_channel     *channel,
-                                struct bulk_continuation cont)
+static errval_t op_channel_bind(struct bulk_ll_channel *channel,
+                                bulk_correlation_t      corr)
 {
     errval_t err;
     struct lsm_internal *internal;
@@ -263,7 +259,6 @@ static errval_t op_channel_bind(struct bulk_channel     *channel,
         (struct bulk_linuxshm_endpoint_descriptor *) channel->ep;
     char name[strlen(ep->name) + 5];
     struct shm_message *msg;
-    //struct lsm_opstate *ops;
 
     err = internal_init(channel);
     if (err_is_fail(err)) {
@@ -279,8 +274,6 @@ static errval_t op_channel_bind(struct bulk_channel     *channel,
     if (err_is_fail(err)) {
         goto fail_rx;
     }
-    shm_chan_waitset_register(&internal->rx, &internal->rx_wss, msg_handler,
-            internal, channel->waitset);
 
     strcpy(name, internal->name);
     strcat(name, "_rxc");
@@ -290,17 +283,7 @@ static errval_t op_channel_bind(struct bulk_channel     *channel,
     }
 
     internal->num_slots = internal->tx.size;
-
-
-
-#if 0
-    ops = ops_alloc(internal);
-    // should not fail, since we just filled the allocator
-    assert(ops != NULL);
-    ops->action = ac_bind_completed;
-    ops->cont = cont;
-#endif
-    internal->bind_cont = cont;
+    internal->bind_corr = corr;
 
     // this part really shouldn't fail unless something is seriously wrong
     err = shm_chan_alloc(&internal->tx, &msg);
@@ -308,11 +291,10 @@ static errval_t op_channel_bind(struct bulk_channel     *channel,
 
     channel->state = BULK_STATE_BINDING;
     msg->type = SHM_MSG_BIND;
-    //msg->content.bind_request.op = ops_id(ops);
     msg->content.bind_request.role = channel->role;
     shm_chan_send(&internal->tx, msg);
 
-    return SYS_ERR_OK;
+    return BULK_TRANSFER_ASYNC;
 
 fail_tx:
     shm_chan_release(&internal->rx);
@@ -338,21 +320,34 @@ static errval_t do_pool_assign(struct lsm_internal *internal,
     return SYS_ERR_OK;
 }
 
-static void ac_pool_assigned(struct lsm_opstate *ops)
+static errval_t ac_basic_cont(struct lsm_opstate   *ops,
+                                  struct bulk_ll_event *event,
+                                  errval_t              err)
+{
+    event->type = BULK_LLEV_ASYNC_DONE;
+    event->data.async_done.err = err;
+    event->data.async_done.corr = ops->corr;
+    ops_free(ops);
+    return SYS_ERR_OK;
+
+}
+
+static errval_t ac_pool_assigned(struct lsm_opstate   *ops,
+                                 struct bulk_ll_event *event,
+                                 errval_t              err)
 {
     struct lsm_internal *internal = ops->internal;
-    errval_t err = ops->err;
 
     if (err_is_ok(err)) {
         err = do_pool_assign(internal, ops->state.assign.pool);
     }
 
-    bulk_continuation_call(&ops->cont, err, internal->chan);
+    return ac_basic_cont(ops, event, err);
 }
 
-static errval_t op_assign_pool(struct bulk_channel *channel,
-                               struct bulk_pool    *pool,
-                               struct bulk_continuation cont)
+static errval_t op_assign_pool(struct bulk_ll_channel *channel,
+                               struct bulk_pool       *pool,
+                               bulk_correlation_t      corr)
 {
     errval_t err;
     struct lsm_internal *internal = channel->impl_data;
@@ -365,7 +360,7 @@ static errval_t op_assign_pool(struct bulk_channel *channel,
     }
 
     ops->action = ac_pool_assigned;
-    ops->cont = cont;
+    ops->corr = corr;
     ops->state.assign.pool = pool;
 
     err = shm_chan_alloc(&internal->tx, &msg);
@@ -379,19 +374,14 @@ static errval_t op_assign_pool(struct bulk_channel *channel,
     msg->content.assign.pool = pool->id;
 
     shm_chan_send(&internal->tx, msg);
-    return SYS_ERR_OK;
+    return BULK_TRANSFER_ASYNC;
 }
 
-static void ac_basic_cont(struct lsm_opstate *ops)
-{
-    bulk_continuation_call(&ops->cont, ops->err, ops->internal->chan);
-}
-
-static errval_t buffer_op_helper(struct bulk_channel  *channel,
-                                 struct bulk_buffer   *buffer,
-                                 void                 *meta,
-                                 struct bulk_continuation cont,
-                                 enum shm_message_type type)
+static errval_t buffer_op_helper(struct bulk_ll_channel  *channel,
+                                 struct bulk_buffer      *buffer,
+                                 void                    *meta,
+                                 bulk_correlation_t       corr,
+                                 enum shm_message_type    type)
 {
     errval_t err;
     struct lsm_internal *internal = channel->impl_data;
@@ -408,7 +398,7 @@ static errval_t buffer_op_helper(struct bulk_channel  *channel,
     oid = ops_id(ops);
 
     ops->action = ac_basic_cont;
-    ops->cont = cont;
+    ops->corr = corr;
 
     err = shm_chan_alloc(&internal->tx, &msg);
     if (err_is_fail(err)) {
@@ -433,71 +423,76 @@ static errval_t buffer_op_helper(struct bulk_channel  *channel,
 }
 
 
-static errval_t op_move(struct bulk_channel  *channel,
-                        struct bulk_buffer   *buffer,
-                        void                 *meta,
-                        struct bulk_continuation cont)
+static errval_t op_move(struct bulk_ll_channel *channel,
+                        struct bulk_buffer     *buffer,
+                        void                   *meta,
+                        bulk_correlation_t      corr)
 {
-    return buffer_op_helper(channel, buffer, meta, cont, SHM_MSG_MOVE);
+    debug_printf("op_move(ch=%p,bu=%p,me=%p,corr=%lx)\n", channel, buffer, meta,
+            corr);
+    return buffer_op_helper(channel, buffer, meta, corr, SHM_MSG_MOVE);
 }
 
-static errval_t op_pass(struct bulk_channel  *channel,
-                        struct bulk_buffer   *buffer,
-                        void                 *meta,
-                        struct bulk_continuation cont)
+static errval_t op_pass(struct bulk_ll_channel *channel,
+                        struct bulk_buffer     *buffer,
+                        void                   *meta,
+                        bulk_correlation_t      corr)
 {
-    return buffer_op_helper(channel, buffer, meta, cont, SHM_MSG_PASS);
+    debug_printf("op_pass(ch=%p,bu=%p,me=%p,corr=%lx)\n", channel, buffer, meta,
+            corr);
+    return buffer_op_helper(channel, buffer, meta, corr, SHM_MSG_PASS);
 }
 
-static errval_t op_copy(struct bulk_channel  *channel,
-                        struct bulk_buffer   *buffer,
-                        void                 *meta,
-                        struct bulk_continuation cont)
+static errval_t op_copy(struct bulk_ll_channel *channel,
+                        struct bulk_buffer     *buffer,
+                        void                   *meta,
+                        bulk_correlation_t      corr)
 {
-    return buffer_op_helper(channel, buffer, meta, cont, SHM_MSG_COPY);
+    debug_printf("op_copy(ch=%p,bu=%p,me=%p,corr=%lx)\n", channel, buffer, meta,
+            corr);
+    return buffer_op_helper(channel, buffer, meta, corr, SHM_MSG_COPY);
 }
 
-static errval_t op_release(struct bulk_channel  *channel,
-                           struct bulk_buffer   *buffer,
-                           struct bulk_continuation cont)
+static errval_t op_release(struct bulk_ll_channel *channel,
+                           struct bulk_buffer     *buffer,
+                           bulk_correlation_t      corr)
 {
-    return buffer_op_helper(channel, buffer, NULL, cont, SHM_MSG_RELEASE);
+    debug_printf("op_release(ch=%p,bu=%p,corr=%lx)\n", channel, buffer, corr);
+    return buffer_op_helper(channel, buffer, NULL, corr, SHM_MSG_RELEASE);
 }
 
-
-static struct bulk_implementation implementation = {
-    .channel_create = op_channel_create,
-    .channel_bind = op_channel_bind,
-    .assign_pool = op_assign_pool,
-    .move = op_move,
-    .pass = op_pass,
-    .copy = op_copy,
-    .release = op_release,
-};
 
 
 /*****************************************************************************/
 /* Incoming messages */
 
-static void msg_bind(struct lsm_internal *internal, struct shm_message *msg)
+static void done_status(struct lsm_internal  *internal,
+                        struct bulk_ll_event *event,
+                        errval_t              err)
 {
-    struct shm_message *out;
-    errval_t err = SYS_ERR_OK;
     errval_t e;
+    struct shm_message *out;
 
-    debug_printf("msg_bind\n");
 
-    if (msg->content.bind_request.role  == internal->chan->role) {
-        err = BULK_TRANSFER_CHAN_ROLE;
-        goto out;
-    }
+    e = shm_chan_alloc(&internal->tx, &out);
+    err_expect_ok(e); // FIXME
 
-    internal->chan->state = BULK_STATE_CONNECTED;
+    out->type = SHM_MSG_STATUS;
+    out->content.status.op = (uintptr_t) event->impl_data;
+    out->content.status.err = err;
 
-    err = internal->chan->callbacks->bind_received(internal->chan);
+    shm_chan_send(&internal->tx, out);
+}
 
-out:
-    // TODO: error handling in case the binding is not successful
+
+static void done_bind(struct lsm_internal  *internal,
+                      struct bulk_ll_event *event,
+                      errval_t              err)
+{
+    errval_t e;
+    struct shm_message *out;
+
+     // TODO: error handling in case the binding is not successful
 
     e = shm_chan_alloc(&internal->tx, &out);
     err_expect_ok(e); // FIXME
@@ -512,7 +507,32 @@ out:
     shm_chan_send(&internal->tx, out);
 }
 
-static void msg_bind_done(struct lsm_internal *internal, struct shm_message *msg)
+static errval_t msg_bind(struct lsm_internal *internal,
+                         struct shm_message *msg,
+                         struct bulk_ll_event *event)
+{
+    errval_t err = SYS_ERR_OK;
+
+    debug_printf("msg_bind\n");
+
+    if (msg->content.bind_request.role  == internal->chan->role) {
+        err = BULK_TRANSFER_CHAN_ROLE;
+        goto out_err;
+    }
+
+    internal->chan->state = BULK_STATE_CONNECTED;
+
+    event->type = BULK_LLEV_CHAN_BIND;
+    return SYS_ERR_OK;
+
+out_err:
+    done_bind(internal, NULL, err);
+    return BULK_TRANSFER_EVENTABORT;
+}
+
+static errval_t msg_bind_done(struct lsm_internal  *internal,
+                              struct shm_message   *msg,
+                              struct bulk_ll_event *event)
 {
     debug_printf("msg_bind_done\n");
     errval_t err = msg->content.bind_done.err;
@@ -530,15 +550,40 @@ static void msg_bind_done(struct lsm_internal *internal, struct shm_message *msg
         internal->chan->state = BULK_STATE_CONNECTED;
     }
 
-    bulk_continuation_call(&internal->bind_cont, err, internal->chan);
+    event->type = BULK_LLEV_ASYNC_DONE;
+    event->data.async_done.err = err;
+    event->data.async_done.corr = internal->bind_corr;
+    return SYS_ERR_OK;
 }
 
-static void msg_assign(struct lsm_internal *internal, struct shm_message *msg)
+struct assign_event {
+    struct bulk_pool *pool;
+    uint32_t op;
+};
+
+static void done_assign(struct lsm_internal  *internal,
+                        struct bulk_ll_event *event,
+                        errval_t              err)
+{
+    struct assign_event *ae = event->impl_data;
+    if (!err_is_ok(err)) {
+        bulk_pool_free(ae->pool);
+    }
+
+    event->impl_data = (void *) (uintptr_t) ae->op;
+    free(ae);
+    return done_status(internal, event, err);
+}
+
+static errval_t msg_assign(struct lsm_internal  *internal,
+                           struct shm_message   *msg,
+                           struct bulk_ll_event *event)
 {
     errval_t err = SYS_ERR_OK;
     errval_t e;
     struct bulk_pool *p;
     struct shm_message *out;
+    struct assign_event *ae;
 
     // Check if we already know the pool
     p = bulk_int_pool_byid(msg->content.assign.pool);
@@ -555,15 +600,15 @@ static void msg_assign(struct lsm_internal *internal, struct shm_message *msg)
         }
     }
 
-    err = internal->chan->callbacks->pool_assigned(internal->chan, p);
-    if (!err_is_ok(err)) {
-        goto fail_cb;
-    }
+    event->type = BULK_LLEV_POOL_ASSIGN;
+    event->data.pool.pool = p;
+    ae = malloc(sizeof(*ae));
+    ae->pool = p;
+    ae->op = msg->content.assign.op;
+    event->impl_data = ae;
 
-    goto out;
+    return SYS_ERR_OK;
 
-fail_cb:
-    bulk_pool_free(p);
 fail_map:
     free(p);
 out:
@@ -575,9 +620,12 @@ out:
     out->content.status.err = err;
 
     shm_chan_send(&internal->tx, out);
+    return BULK_TRANSFER_EVENTABORT;
 }
 
-static void msg_buffer(struct lsm_internal *internal, struct shm_message *msg)
+static errval_t msg_buffer(struct lsm_internal  *internal,
+                           struct shm_message   *msg,
+                           struct bulk_ll_event *event)
 {
     errval_t err = SYS_ERR_OK, e;
     struct bulk_pool *p;
@@ -588,7 +636,7 @@ static void msg_buffer(struct lsm_internal *internal, struct shm_message *msg)
     p = bulk_int_pool_byid(msg->content.buffer.pool);
     if (p == NULL) {
         err = BULK_TRANSFER_POOL_NOT_ASSIGNED;
-        goto out;
+        goto out_err;
     }
 
     b = p->buffers[msg->content.buffer.buffer];
@@ -606,26 +654,30 @@ static void msg_buffer(struct lsm_internal *internal, struct shm_message *msg)
 
     switch (msg->type) {
         case SHM_MSG_MOVE:
-            internal->chan->callbacks->move_received(internal->chan, b, meta);
+            event->type = BULK_LLEV_BUF_MOVE;
             break;
 
         case SHM_MSG_PASS:
-            internal->chan->callbacks->buffer_received(internal->chan, b, meta);
+            event->type = BULK_LLEV_BUF_PASS;
             break;
 
         case SHM_MSG_COPY:
-            internal->chan->callbacks->copy_received(internal->chan, b, meta);
+            event->type = BULK_LLEV_BUF_COPY;
             break;
 
         case SHM_MSG_RELEASE:
-            internal->chan->callbacks->copy_released(internal->chan, b);
+            event->type = BULK_LLEV_BUF_RELEASE;
             break;
 
         default:
             assert(!"Invalid message type");
     }
+    event->impl_data = (void *) (uintptr_t) msg->content.buffer.op;
+    event->data.buffer.buffer = b;
+    event->data.buffer.meta = meta;
 
-out:
+    return SYS_ERR_OK;
+out_err:
     e = shm_chan_alloc(&internal->tx, &out);
     err_expect_ok(e); // FIXME
 
@@ -634,55 +686,104 @@ out:
     out->content.status.err = err;
 
     shm_chan_send(&internal->tx, out);
+    return BULK_TRANSFER_EVENTABORT;
 }
 
-static void msg_status(struct lsm_internal *internal, struct shm_message *msg)
+static errval_t msg_status(struct lsm_internal  *internal,
+                           struct shm_message   *msg,
+                           struct bulk_ll_event *event)
 {
     struct lsm_opstate *ops;
     debug_printf("msg_status: op=%d err=%d\n", msg->content.status.op,
             msg->content.status.err);
 
     ops = internal->ops + msg->content.status.op;
-    ops->action(ops);
-
-    ops_free(ops);
+    return ops->action(ops, event, msg->content.status.err);
 }
 
-static void msg_handler(struct shm_message *msg, void *opaque)
+static errval_t op_event_poll(struct bulk_ll_channel *channel,
+                              struct bulk_ll_event   *event)
 {
-    struct lsm_internal *internal = opaque;
-    debug_printf("msg_handler: %d\n", msg->type);
+    struct lsm_internal *internal = channel->impl_data;
+    struct shm_message  *msg = NULL;
+    errval_t err;
+
+    err = shm_chan_poll(&internal->rx, &msg);
+    if (err == SHM_CHAN_NOMSG) {
+        return BULK_TRANSFER_NOEVENT;
+    } else if (!err_is_ok(err)) {
+        return err;
+    }
+
+    event->impl_data = NULL;
     switch (msg->type) {
         case SHM_MSG_BIND:
-            msg_bind(internal, msg);
+            err = msg_bind(internal, msg, event);
             break;
 
         case SHM_MSG_BIND_DONE:
-            msg_bind_done(internal, msg);
+            err = msg_bind_done(internal, msg, event);
             break;
 
         case SHM_MSG_ASSIGN:
-            msg_assign(internal, msg);
+            err = msg_assign(internal, msg, event);
             break;
 
         case SHM_MSG_MOVE:
         case SHM_MSG_PASS:
         case SHM_MSG_COPY:
         case SHM_MSG_RELEASE:
-            msg_buffer(internal, msg);
+            err = msg_buffer(internal, msg, event);
             break;
 
         case SHM_MSG_STATUS:
-            msg_status(internal, msg);
+            err = msg_status(internal, msg, event);
             break;
 
         default:
             debug_printf("Unhandled message type: %d\n", msg->type);
             assert(!"NYI");
     }
-
     shm_chan_free(&internal->rx, msg);
+    return err;
 }
+
+static errval_t op_event_done(struct bulk_ll_channel *channel,
+                              struct bulk_ll_event   *event,
+                              errval_t                err)
+{
+    struct lsm_internal *internal = channel->impl_data;
+    switch (event->type) {
+        case BULK_LLEV_CHAN_BIND:
+            done_bind(internal, event, err);
+            break;
+
+        case BULK_LLEV_POOL_ASSIGN:
+            done_assign(internal, event, err);
+            break;
+
+        case BULK_LLEV_BUF_MOVE:
+        case BULK_LLEV_BUF_PASS:
+        case BULK_LLEV_BUF_COPY:
+        case BULK_LLEV_BUF_RELEASE:
+            done_status(internal, event, err);
+            break;
+
+    }
+    return SYS_ERR_OK;
+}
+
+static struct bulk_implementation implementation = {
+    .channel_create = op_channel_create,
+    .channel_bind = op_channel_bind,
+    .pool_assign = op_assign_pool,
+    .buffer_move = op_move,
+    .buffer_pass = op_pass,
+    .buffer_copy = op_copy,
+    .buffer_release = op_release,
+    .event_poll = op_event_poll,
+    .event_done = op_event_done,
+};
 
 
 errval_t bulk_linuxshm_ep_create(struct bulk_linuxshm_endpoint_descriptor *ep,
@@ -695,7 +796,7 @@ errval_t bulk_linuxshm_ep_create(struct bulk_linuxshm_endpoint_descriptor *ep,
     return SYS_ERR_OK;
 }
 
-void bulk_linuxshm_emergency_cleanup(struct bulk_channel *chan)
+void bulk_linuxshm_emergency_cleanup(struct bulk_ll_channel *chan)
 {
     struct lsm_internal *internal = chan->impl_data;
     char name[strlen(internal->name) + 5];

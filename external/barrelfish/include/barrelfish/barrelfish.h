@@ -59,6 +59,9 @@ enum errvals {
     BULK_TRANSFER_SM_EXCLUSIVE_WS,
     BULK_TRANSFER_NET_MAX_QUEUES,
     BULK_TRANSFER_NET_POOL_USED,
+    BULK_TRANSFER_ASYNC,
+    BULK_TRANSFER_NOEVENT,
+    BULK_TRANSFER_EVENTABORT,
 };
 
 typedef enum errvals errval_t;
@@ -155,6 +158,12 @@ static const char *err_str(errval_t err)
             return "BULK_TRANSFER_NET_MAX_QUEUES";
         case BULK_TRANSFER_NET_POOL_USED:
             return "BULK_TRANSFER_NET_POOL_USED";
+        case BULK_TRANSFER_ASYNC:
+            return "BULK_TRANSFER_ASYNC";
+        case BULK_TRANSFER_NOEVENT:
+            return "BULK_TRANSFER_NOEVENT";
+        case BULK_TRANSFER_EVENTABORT:
+            return "BULK_TRANSFER_EVENTABORT";
         default:
             return "(unknown error value)";
     }
