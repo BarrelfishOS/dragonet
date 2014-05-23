@@ -61,7 +61,7 @@ struct dnal_net_destination {
             uint32_t ip_src;
             uint32_t ip_dst;
             uint16_t port_src;
-            uint32_t port_dst;
+            uint16_t port_dst;
         } ip4udp;
     } data;
 };
