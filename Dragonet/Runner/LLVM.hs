@@ -1283,8 +1283,8 @@ llvm_pg_op cnf nid node adj_out adj_in = do
 
 
 -- Main function for graph that just runs it in an infinite loop, starting with an empty input
-llvm_pg_main_func :: PG.Node -> String -> LLVM ()
-llvm_pg_main_func entry_node stackname = do
+llvm_pg_main_func :: [PG.Node] -> String -> LLVM ()
+llvm_pg_main_func entry_nodes stackname = do
     state_ty <- cgStateTy
     input_ty <- cgInputTy
     pli <- cgPLI
@@ -1321,9 +1321,15 @@ llvm_pg_main_func entry_node stackname = do
         bldDbgPrintf "count: %d\n" [cnt]
         cnt_next <- bldAddNamedInstruction "cnt_next" $ mkAdd cnt operandInt32_1-}
 
-        bldAddInstruction $ mkCall (getFnOp $ pg_fname entry_node) [state, input] -- call entry
-        bldAddInstruction $ mkFnCall "input_clean_attrs" [input] -- clean up input
-        bldAddInstruction $ mkFnCall "input_clean_packet" [input] -- clean up input
+        -- Call entry nodes in sequence
+        forM_ entry_nodes $ \n -> do
+            bldAddInstruction $ mkCall (getFnOp $ pg_fname n) [state, input] -- call entry
+            bldAddInstruction $ mkFnCall "input_clean_attrs" [input] -- clean up input
+            bldAddInstruction $ mkFnCall "input_clean_packet" [input] -- clean up input
+
+            -- reset o-node counters
+            forM_ on_cnt $ \cnt_name ->
+                bldAddInstruction $ mkSt (getGlobalOp cnt_name) operandInt32_0
         bldAddInstruction $ mkFnCall "pl_process_events" [plh] -- process events
 
         -- reset o-node counters
@@ -1343,8 +1349,8 @@ llvm_pg_main_func entry_node stackname = do
 
 
 -- build an llvm module for the given protocol graph
-llvm_pg :: PGraph -> Label -> LLVM ()
-llvm_pg pgraph entry = do
+llvm_pg :: PGraph -> LLVM ()
+llvm_pg pgraph = do
     state_ty <- cgStateTy
     addTy "pg_state" state_ty
     -- add declarations for printf/puts
@@ -1359,7 +1365,7 @@ llvm_pg pgraph entry = do
                           (i1Ty,  "isvolatile")]
     --}
     --
-    mapM_ llvm_pg_fn $ PG.pgFullNodes pgraph entry
+    mapM_ llvm_pg_fn $ PG.pgAllFullNodes pgraph
 
 -- build dummy implementation functions based on the given map
 llvm_pg_dummy :: PGraph -> Label -> [(String,Integer)] -> LLVM ()
@@ -1451,8 +1457,7 @@ glblOutqueue qn = "outqueue_" ++ qn -- TODO: do we need to sanitize this?
 --  - access state
 
 codegen_all pgraph stackname = do
-    let (entry_id, entry_node) = pgEntry pgraph
-    let entry_label = PG.nLabel entry_node
+    let entry_nodes = map snd $ pgEntries pgraph
 
     state_ty <- cgStateTy
     input_ty <- cgInputTy
@@ -1499,8 +1504,8 @@ codegen_all pgraph stackname = do
     forM_ (PLI.pliOutQs pli) $ \(_,(PLI.POQueue queue)) -> do
         addStaticVar qp_ty (glblOutqueue queue) (AST.C.Null qp_ty)
 
-    llvm_pg pgraph entry_label   -- Build node functions
-    llvm_pg_main_func entry_node stackname -- Build main runner function
+    llvm_pg pgraph -- Build node functions
+    llvm_pg_main_func entry_nodes stackname -- Build main runner function
 
 
 passes :: LLVM.PM.PassSetSpec

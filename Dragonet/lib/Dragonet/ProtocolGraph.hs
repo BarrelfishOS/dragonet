@@ -38,9 +38,11 @@ module Dragonet.ProtocolGraph(
     baseCNode,
 
     pgFind,
+    pgEntries,
     pgEntry,
     pgDFS,
     pgFullNodes,
+    pgAllFullNodes,
     pgGroupAdjFull
 
 ) where
@@ -228,12 +230,17 @@ opToString OpNOr = "NOR"
 pgFind :: PGraph -> Label -> Maybe PGNode
 pgFind pg label = L.find (\x -> nLabel (snd x ) == label) $ DGI.labNodes pg
 
-pgEntry :: PGraph -> PGNode
-pgEntry pg = case l of []  -> error "No entry found"
-                       [x] -> (x, fromJust $ DGI.lab pg x)
-                       _   -> error "Multiple entries found"
+-- Get nodes without incoming edges
+pgEntries :: PGraph -> [PGNode]
+pgEntries pg = map label $ L.filter f $ DGI.dfsWith' (\(_,n,_,_) -> n)  pg
     where f = \n -> (DGI.pre pg n) == [] -- entry has no predecessors
-          l = L.filter f $ DGI.dfsWith' (\(_,n,_,_) -> n)  pg
+          label x = (x, fromJust $ DGI.lab pg x)
+
+pgEntry :: PGraph -> PGNode
+pgEntry pg = case pgEntries pg of
+                       []  -> error "No entry found"
+                       [x] -> (x)
+                       _   -> error "Multiple entries found"
 
 -- depth-first search on the protocol graph, starting from node with given label
 pgDFS :: PGraph -> Label -> [PGContext]
@@ -256,6 +263,10 @@ pgFullNodes pg label = map (mkFullNode pg) $ mydfs [n0] pg
           mydfs = DGI.dfsWith $ \(_, nid, node, _) -> (nid, node)
           n0 = case pgFind pg label of Just (x, _) -> x
                                        Nothing -> error $ "Cannot find entry node: " ++ label
+
+pgAllFullNodes :: PGraph -> [(PGAdjFull, DGI.Node, Node, PGAdjFull)]
+pgAllFullNodes pg = map (mkFullNode pg) $ DGI.labNodes pg
+
 pgGroupAdjFull :: PGAdjFull -> [(Port, [(DGI.Node, Node)])]
 pgGroupAdjFull adj = [ (p, (get_edges adj p)) | p <- get_ports adj]
     where get_ports = \adj' -> L.nub $ map (\(x,_,_) -> x) adj'
