@@ -27,6 +27,8 @@ struct lsm_opstate {
         } assign;
     } state;
     bulk_correlation_t corr;
+    uint8_t op;
+
 
     struct lsm_opstate *next;
 };
@@ -327,6 +329,7 @@ static errval_t ac_basic_cont(struct lsm_opstate   *ops,
     event->type = BULK_LLEV_ASYNC_DONE;
     event->data.async_done.err = err;
     event->data.async_done.corr = ops->corr;
+    event->data.async_done.op = ops->op;
     ops_free(ops);
     return SYS_ERR_OK;
 
@@ -362,6 +365,7 @@ static errval_t op_assign_pool(struct bulk_ll_channel *channel,
     ops->action = ac_pool_assigned;
     ops->corr = corr;
     ops->state.assign.pool = pool;
+    ops->op = BULK_ASYNC_POOL_ASSIGN;
 
     err = shm_chan_alloc(&internal->tx, &msg);
     if (err_is_fail(err)) {
@@ -381,7 +385,8 @@ static errval_t buffer_op_helper(struct bulk_ll_channel  *channel,
                                  struct bulk_buffer      *buffer,
                                  void                    *meta,
                                  bulk_correlation_t       corr,
-                                 enum shm_message_type    type)
+                                 enum shm_message_type    type,
+                                 enum bulk_ll_async_op    op)
 {
     errval_t err;
     struct lsm_internal *internal = channel->impl_data;
@@ -399,6 +404,7 @@ static errval_t buffer_op_helper(struct bulk_ll_channel  *channel,
 
     ops->action = ac_basic_cont;
     ops->corr = corr;
+    ops->op = op;
 
     err = shm_chan_alloc(&internal->tx, &msg);
     if (err_is_fail(err)) {
@@ -419,7 +425,7 @@ static errval_t buffer_op_helper(struct bulk_ll_channel  *channel,
     }
 
     shm_chan_send(&internal->tx, msg);
-    return SYS_ERR_OK;
+    return BULK_TRANSFER_ASYNC;
 }
 
 
@@ -430,7 +436,8 @@ static errval_t op_move(struct bulk_ll_channel *channel,
 {
     debug_printf("op_move(ch=%p,bu=%p,me=%p,corr=%lx)\n", channel, buffer, meta,
             corr);
-    return buffer_op_helper(channel, buffer, meta, corr, SHM_MSG_MOVE);
+    return buffer_op_helper(channel, buffer, meta, corr, SHM_MSG_MOVE,
+            BULK_ASYNC_BUFFER_MOVE);
 }
 
 static errval_t op_pass(struct bulk_ll_channel *channel,
@@ -440,7 +447,8 @@ static errval_t op_pass(struct bulk_ll_channel *channel,
 {
     debug_printf("op_pass(ch=%p,bu=%p,me=%p,corr=%lx)\n", channel, buffer, meta,
             corr);
-    return buffer_op_helper(channel, buffer, meta, corr, SHM_MSG_PASS);
+    return buffer_op_helper(channel, buffer, meta, corr, SHM_MSG_PASS,
+            BULK_ASYNC_BUFFER_PASS);
 }
 
 static errval_t op_copy(struct bulk_ll_channel *channel,
@@ -450,7 +458,8 @@ static errval_t op_copy(struct bulk_ll_channel *channel,
 {
     debug_printf("op_copy(ch=%p,bu=%p,me=%p,corr=%lx)\n", channel, buffer, meta,
             corr);
-    return buffer_op_helper(channel, buffer, meta, corr, SHM_MSG_COPY);
+    return buffer_op_helper(channel, buffer, meta, corr, SHM_MSG_COPY,
+            BULK_ASYNC_BUFFER_COPY);
 }
 
 static errval_t op_release(struct bulk_ll_channel *channel,
@@ -458,7 +467,8 @@ static errval_t op_release(struct bulk_ll_channel *channel,
                            bulk_correlation_t      corr)
 {
     debug_printf("op_release(ch=%p,bu=%p,corr=%lx)\n", channel, buffer, corr);
-    return buffer_op_helper(channel, buffer, NULL, corr, SHM_MSG_RELEASE);
+    return buffer_op_helper(channel, buffer, NULL, corr, SHM_MSG_RELEASE,
+            BULK_ASYNC_BUFFER_RELEASE);
 }
 
 
@@ -551,6 +561,7 @@ static errval_t msg_bind_done(struct lsm_internal  *internal,
     }
 
     event->type = BULK_LLEV_ASYNC_DONE;
+    event->data.async_done.op = BULK_ASYNC_CHAN_BIND;
     event->data.async_done.err = err;
     event->data.async_done.corr = internal->bind_corr;
     return SYS_ERR_OK;

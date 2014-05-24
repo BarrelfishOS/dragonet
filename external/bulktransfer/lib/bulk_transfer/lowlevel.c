@@ -9,7 +9,6 @@ errval_t bulk_ll_channel_create(struct bulk_ll_channel           *channel,
                                 struct bulk_channel_setup        *setup,
                                 bulk_correlation_t                corr)
 {
-    errval_t err;
     channel->ep = ep_desc;
     channel->pools = NULL;
     channel->direction = setup->direction;
@@ -31,7 +30,6 @@ errval_t bulk_ll_channel_bind(struct bulk_ll_channel          *channel,
                               struct bulk_channel_bind_params *params,
                               bulk_correlation_t               corr)
 {
-    errval_t err;
     channel->ep = remote_ep_desc;
     channel->pools = NULL;
     channel->role = params->role;

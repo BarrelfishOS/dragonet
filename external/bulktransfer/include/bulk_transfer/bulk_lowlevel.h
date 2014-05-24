@@ -285,12 +285,25 @@ enum bulk_ll_event_type {
     BULK_LLEV_BUF_RELEASE,
 };
 
+enum bulk_ll_async_op {
+    BULK_ASYNC_CHAN_CREATE = 1,
+    BULK_ASYNC_CHAN_BIND,
+    BULK_ASYNC_CHAN_DESTROY,
+    BULK_ASYNC_POOL_ASSIGN,
+    BULK_ASYNC_POOL_REMOVE,
+    BULK_ASYNC_BUFFER_MOVE,
+    BULK_ASYNC_BUFFER_PASS,
+    BULK_ASYNC_BUFFER_COPY,
+    BULK_ASYNC_BUFFER_RELEASE,
+};
+
 struct bulk_ll_event {
     uint8_t type;
     union {
         struct {
             bulk_correlation_t corr;
             errval_t           err;
+            uint8_t            op;
         } async_done;
 
         struct { } chan_bind;
