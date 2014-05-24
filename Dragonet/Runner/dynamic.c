@@ -54,16 +54,20 @@ static struct dynamic_node *node_stack_pop(struct node_stack *ns)
 struct dynamic_graph *dyn_mkgraph(void)
 {
     struct dynamic_graph *g = malloc(sizeof(*g));
-    g->source = NULL;
+    g->sources = NULL;
+    g->num_sources = 0;
     g->num_nodes = 0;
     pthread_mutex_init(&g->lock, NULL);
     return g;
 }
 
-void dyn_set_source(struct dynamic_graph *graph,
+void dyn_add_source(struct dynamic_graph *graph,
                     struct dynamic_node  *node)
 {
-    graph->source = node;
+    graph->sources = realloc(graph->sources,
+            (graph->num_sources + 1) * sizeof(*graph->sources));
+    graph->sources[graph->num_sources] = node;
+    graph->num_sources++;
 }
 
 static node_out_t run_onode(struct dynamic_node *n,
@@ -204,13 +208,13 @@ void dyn_rungraph(struct dynamic_graph *graph,
                   pipeline_handle_t     plh)
 {
     struct node_stack ns;
-    struct dynamic_node *n;
+    struct dynamic_node *n, *source;
     struct dynamic_edge *e;
     struct state *st;
     struct input *in;
     node_out_t out;
     int version = 0;
-    size_t count;
+    size_t count, i;
 
     st = pl_get_state(plh);
 
@@ -220,49 +224,52 @@ void dyn_rungraph(struct dynamic_graph *graph,
     while (pl_get_running(plh)) {
         // Run Graph
         pthread_mutex_lock(&graph->lock);
-        node_stack_push(&ns, graph->source);
-        count = 0;
-        while ((n = node_stack_pop(&ns)) != NULL) {
-            count++;
-            //if (count > 1) printf("Execute: %s\n", n->name);
-            out = run_node(n, plh, st, in, version);
-            //if (count > 1) printf("   port=%d\n", out);
-            if (out >= 0 && n->num_ports == 0) {
-                // Terminal node
-                out = -2;
+        for (i = 0; i < graph->num_sources; i++) {
+            source = graph->sources[i];
+            node_stack_push(&ns, source);
+            count = 0;
+            while ((n = node_stack_pop(&ns)) != NULL) {
+                count++;
+                //if (count > 1) printf("Execute: %s\n", n->name);
+                out = run_node(n, plh, st, in, version);
+                //if (count > 1) printf("   port=%d\n", out);
+                if (out >= 0 && n->num_ports == 0) {
+                    // Terminal node
+                    out = -2;
+                }
+
+                // If the node failed, we can stop here
+                if (out == -2) {
+                    // Abort execution for this packet
+                    node_stack_clear(&ns);
+                    break;
+                } else if (out < 0) {
+                    continue;
+                }
+
+                n->out_value = out;
+                n->out_version = version;
+
+                // Enable successors
+                assert(out < n->num_ports);
+                e = n->ports[out];
+                while (e != NULL) {
+                    node_stack_push(&ns, e->sink);
+                    e = e->so_next;
+                }
             }
+            //if (count > 1) printf("\n");
 
-            // If the node failed, we can stop here
-            if (out == -2) {
-                // Abort execution for this packet
-                node_stack_clear(&ns);
-                break;
-            } else if (out < 0) {
-                continue;
+            version++;
+            if (version == -1) {
+                reset_versions(source);
+                version = 0;
             }
-
-            n->out_value = out;
-            n->out_version = version;
-
-            // Enable successors
-            assert(out < n->num_ports);
-            e = n->ports[out];
-            while (e != NULL) {
-                node_stack_push(&ns, e->sink);
-                e = e->so_next;
-            }
-        }
-        //if (count > 1) printf("\n");
-
-        version++;
-        if (version == -1) {
-            reset_versions(graph->source);
-            version = 0;
+            input_clean_attrs(in);
+            input_clean_packet(in);
         }
         pthread_mutex_unlock(&graph->lock);
 
-        input_clean_attrs(in);
-        input_clean_packet(in);
         pl_process_events(plh);
     }
 

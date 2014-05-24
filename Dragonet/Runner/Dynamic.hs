@@ -100,9 +100,8 @@ buildDynGraph plg pli qm nf = do
         return (n,h)
     let nm = M.fromList nlm
     -- Set source node
-    let (n,_) = PG.pgEntry pg
-        Just srcN = M.lookup n nm
-    setSource gh srcN
+    let entries = [n |(Just n) <- map ((`M.lookup` nm) . fst) $ PG.pgEntries pg]
+    mapM_ (addSource gh) entries
     -- Add edges
     forM (DGI.labEdges pg) $ \(a,b,p) -> do
         let Just al = DGI.lab pg a
@@ -215,8 +214,8 @@ runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
 mkGraph :: IO GraphHandle
 mkGraph = c_mkgraph
 
-setSource :: GraphHandle -> NodeHandle -> IO ()
-setSource = c_set_source
+addSource :: GraphHandle -> NodeHandle -> IO ()
+addSource = c_add_source
 
 runGraph :: GraphHandle -> PI.PipelineHandle -> IO ()
 runGraph gh ph = c_run_graph gh ph
@@ -251,8 +250,8 @@ addEdge so p si = c_addedge so (fromIntegral p) si
 
 foreign import ccall "dyn_mkgraph"
     c_mkgraph :: IO GraphHandle
-foreign import ccall "dyn_set_source"
-    c_set_source :: GraphHandle -> NodeHandle -> IO ()
+foreign import ccall "dyn_add_source"
+    c_add_source :: GraphHandle -> NodeHandle -> IO ()
 foreign import ccall "dyn_rungraph"
     c_run_graph ::
         GraphHandle -> PI.PipelineHandle -> IO ()

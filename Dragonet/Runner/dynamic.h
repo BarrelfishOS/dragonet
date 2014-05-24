@@ -60,17 +60,17 @@ struct dynamic_edge {
 };
 
 struct dynamic_graph {
-    struct dynamic_node *source;
-    size_t               num_nodes;
-    pthread_mutex_t      lock;
+    struct dynamic_node **sources;
+    size_t                num_sources;
+    size_t                num_nodes;
+    pthread_mutex_t       lock;
 };
 
 
 
 struct dynamic_graph *dyn_mkgraph(void);
-void dyn_set_source(struct dynamic_graph *graph,
+void dyn_add_source(struct dynamic_graph *graph,
                     struct dynamic_node  *node);
-
 void dyn_rungraph(struct dynamic_graph *graph,
                   pipeline_handle_t     plh);
 
