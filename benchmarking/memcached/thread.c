@@ -380,6 +380,7 @@ static void *worker_libevent(void *arg) {
     me->item_lock_type = ITEM_LOCK_GRANULAR;
     pthread_setspecific(item_lock_type_key, &me->item_lock_type);
 
+
     register_thread_initialized();
 
     event_base_loop(me->base, 0);
@@ -403,44 +404,51 @@ static void thread_libevent_process(int fd, short which, void *arg) {
     switch (buf[0]) {
     case 'c':
         {
-        conn *c = NULL;
-        item = cq_pop(me->new_conn_queue);
+            conn *c = NULL;
+            item = cq_pop(me->new_conn_queue);
 
-    if (NULL != item) {
-        c = conn_new(item->sfd, item->init_state, item->event_flags,
-                           item->read_buffer_size, item->transport, me->base);
-        if (c == NULL) {
-            if (IS_UDP(item->transport)) {
-                fprintf(stderr, "Can't listen for events on UDP socket\n");
-                exit(1);
-            } else {
-                if (settings.verbose > 0) {
-                    fprintf(stderr, "Can't listen for events on fd %d\n",
-                        item->sfd);
-                }
-                close(item->sfd);
-            }
-        } else {
-            c->thread = me;
-        }
-        cqi_free(item);
-    }
+            if (NULL != item) {
+                c = conn_new(item->sfd, item->init_state, item->event_flags,
+                        item->read_buffer_size, item->transport, me->base);
+                if (c == NULL) {
+                    if (IS_UDP(item->transport)) {
+                        fprintf(stderr, "Can't listen for events on UDP socket\n");
+                        exit(1);
+                    } else {
+                        if (settings.verbose > 0) {
+                            fprintf(stderr, "Can't listen for events on fd %d\n",
+                                    item->sfd);
+                        }
+                        close(item->sfd);
+                    }
+                } else {
+                    c->thread = me;
+
 
 #ifdef DRAGONET
-    if (use_dragonet_stack) {
-        // FIXME: Either I should break the libevent loop,
-        //  or I should just call dragonet event handler directly from here.
-        if (c != NULL) {
-            if (c->is_dragonet == 1) {
-                printf("Handling incomming packets on Dragonet\n");
-                event_handle_loop_dn();
-            }
-        } else {
-            printf("WARNING: Dragonet: new_conn returned empty!!!\n");
-        }
-    }
+                    if (use_dragonet_stack) {
+                        // Make sure that only UDP will go to dragonet stack
+                        if (! IS_UDP(item->transport)) {
+                            printf("Error: Dragonet: NON-UDP new_conn request on on Dragonet stack\n");
+                            exit(1);
+                            return;
+                        }
+
+                        c->is_dragonet = 1;
+
+                        // Register callback with dragonet
+                        register_callback_dn(&c->thread->dn_tstate,
+                                event_handler, c->sfd, 0, (void *)c);
+//                        fprintf(stderr, "T%d: %p: Handling incomming packets on Dragonet\n",
+//                               (int)c->thread->thread_id, c);
+                        event_handle_loop_dn(&c->thread->dn_tstate);
+                    } // end if: use_dragonet_stack
 #endif // DRAGONET
-    } // end : unnamed block
+
+                } // end else: new connection created
+                cqi_free(item);
+            } // end if: item != NULL
+        } // end : unnamed block
     break;
     /* we were told to flip the lock type and report in */
     case 'l':

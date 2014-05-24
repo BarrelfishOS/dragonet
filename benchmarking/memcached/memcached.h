@@ -127,18 +127,8 @@
 #define mprint(x...)   ((void)0)
 #endif // MYDEBUG
 
-#ifdef ENABLE_DRAGONET
-// If not enabled, enable DRAGONET
-#ifndef DRAGONET
-#define DRAGONET        1
-#endif // DRAGONET
-#endif // ENABLE_DRAGONET
+#include "dnet_interface.h"
 
-#ifdef DRAGONET
-#include <helpers.h>
-extern int use_dragonet_stack;
-void event_handle_loop_dn(void);
-#endif // DRAGONET
 
 /**
  * Callback for any function producing stats.
@@ -382,6 +372,9 @@ typedef struct {
     struct conn_queue *new_conn_queue; /* queue of new connections to handle */
     cache_t *suffix_cache;      /* suffix cache */
     uint8_t item_lock_type;     /* use fine-grained or global item lock */
+#ifdef DRAGONET
+    struct dn_thread_state dn_tstate; /* Dragonet specific thread state */
+#endif // DRAGONET
 } LIBEVENT_THREAD;
 
 typedef struct {
@@ -515,7 +508,7 @@ enum delta_result_type do_add_delta(conn *c, const char *key,
 enum store_item_type do_store_item(item *item, int comm, conn* c, const uint32_t hv);
 conn *conn_new(const int sfd, const enum conn_states init_state, const int event_flags, const int read_buffer_size, enum network_transport transport, struct event_base *base);
 extern int daemonize(int nochdir, int noclose);
-
+void event_handler(const int fd, const short which, void *arg);
 static inline int mutex_lock(pthread_mutex_t *mutex)
 {
     while (pthread_mutex_trylock(mutex));

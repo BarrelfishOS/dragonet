@@ -16,17 +16,9 @@ memcached_SOURCES = memcached.c memcached.h \
                     thread.c daemon.c \
                     stats.c stats.h \
                     util.c util.h \
-                    trace.h cache.h sasl_defs.h
-
-#		    dragonet/helpers.c \
-#		    dragonet/implementation.c \
-#		    dragonet/state.c \
-#		    dragonet/pipelinesHelpers.c \
-#		    dragonet/helpers.h \
-#		    dragonet/implementation.h \
-#		    dragonet/packet_access.h \
-#		    dragonet/pipelines.h \
-#		    dragonet/tap.h
+                    trace.h cache.h sasl_defs.h \
+		    dnet_interface.c \
+		    dnet_interface.h
 
 if BUILD_CACHE
 memcached_SOURCES += cache.c

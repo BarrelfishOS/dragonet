@@ -30,7 +30,8 @@ extern "C" {
 #define UDP_MAX_SEND_PAYLOAD_SIZE    1400                 /* mtu size is 1500 */
 #define UDP_HEADER_SIZE              8                    /* UDP header size */
 #define MAX_SENDBUF_SIZE             (256 * 1024 * 1024)  /* Maximum socket buffer size */
-#define SOCK_WAIT_TIMEOUT            30                   /* maximum waiting time of UDP, 30s */
+//#define SOCK_WAIT_TIMEOUT            30                   /* maximum waiting time of UDP, 30s */
+#define SOCK_WAIT_TIMEOUT            1                   /* maximum waiting time of UDP, 1s */
 #define MAX_UDP_PACKET               (1 << 16)            /* maximum UDP packets, 65536 */
 
 /* Initial size of the sendmsg() scatter/gather array. */
