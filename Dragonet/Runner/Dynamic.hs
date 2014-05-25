@@ -43,6 +43,7 @@ type MuxId = Word32
 buildDynNode :: PI.PipelineImpl -> GraphHandle -> M.Map String PI.QueueHandle
         -> (String -> IO NodeFun) -> PG.Node -> IO NodeHandle
 buildDynNode pli gh qm nf l
+    | isFromQ = mkFromQueueNode gh lbl fqh
     | isDemux = mkDemuxNode gh lbl
     | isMux = mkMuxNode gh lbl muxId
     | isToQ = mkToQueueNode gh lbl qh
@@ -62,7 +63,12 @@ buildDynNode pli gh qm nf l
         mbPL = getPGNAttr l "pipeline"
         isToQ = isJust mbPL
         Just pln = mbPL
-        (Just qh) = M.lookup pln qm
+        (Just qh) = M.lookup ("to_" ++ pln) qm
+
+        mbFPL = getPGNAttr l "frompipeline"
+        isFromQ = isJust mbFPL
+        Just fpln = mbFPL
+        (Just fqh) = M.lookup ("from_" ++ fpln) qm
 
         (PG.ONode op) = PG.nPersonality l
 
@@ -124,16 +130,17 @@ buildDynGraph plg pli qm nf = do
 initPipeline stackname pli pl_funs = do
     plh <- pl_init stackname $ PL.plLabel $ PI.pliPipeline pli
     -- Create input queues
-    forM (PI.pliInQs pli) $ \(_,PI.PIQueue qn) -> do
-        pl_inq plh qn
+    fqml <- forM (PI.pliInQs pli) $ \(l,PI.PIQueue qn) -> do
+        qh <- pl_inq plh qn
+        return ("from_" ++ l,qh)
 
     -- Bind output queues
     qml <- forM (PI.pliOutQs pli) $ \(l,PI.POQueue qn) -> do
         qh <- pl_outq plh qn
-        return (l,qh)
+        return ("to_" ++ l,qh)
 
     pl_wait plh
-    return (plh,M.fromList qml)
+    return (plh,M.fromList (fqml ++ qml))
     where
         (pl_init,pl_inq,pl_outq,pl_wait) = pl_funs
 
@@ -239,6 +246,9 @@ mkMuxNode gh l i = withCString l $ \cl -> c_mknode_mux gh cl i
 mkToQueueNode :: GraphHandle -> String -> PI.QueueHandle -> IO NodeHandle
 mkToQueueNode gh l qh = withCString l $ \cl -> c_mknode_toqueue gh cl qh
 
+mkFromQueueNode :: GraphHandle -> String -> PI.QueueHandle -> IO NodeHandle
+mkFromQueueNode gh l qh = withCString l $ \cl -> c_mknode_fromqueue gh cl qh
+
 addPorts :: NodeHandle -> Int -> IO Int
 addPorts nh n = fromIntegral <$> c_addports nh (fromIntegral n)
 
@@ -271,6 +281,9 @@ foreign import ccall "dyn_mknode_mux"
     c_mknode_mux :: GraphHandle -> CString -> MuxId -> IO NodeHandle
 foreign import ccall "dyn_mknode_toqueue"
     c_mknode_toqueue ::
+        GraphHandle -> CString -> PI.QueueHandle -> IO NodeHandle
+foreign import ccall "dyn_mknode_fromqueue"
+    c_mknode_fromqueue ::
         GraphHandle -> CString -> PI.QueueHandle -> IO NodeHandle
 foreign import ccall "dyn_addports"
     c_addports :: NodeHandle -> CSize -> IO CSize

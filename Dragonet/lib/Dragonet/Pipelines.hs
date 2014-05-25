@@ -15,6 +15,7 @@ import qualified Util.GraphMonad as GM
 import Data.Function
 import Data.Maybe
 import Util.Misc
+import Control.Monad
 
 
 type PLabel = String
@@ -49,6 +50,7 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
                         (\(s,d,_) -> (S.notMember s nss) && (S.member d nss)) $
                         DGI.labEdges g
         inDN = L.nub $ map snd3 $ inE
+        inPL = partListBy ((nm M.!) . fst) $ partListBy fst3 inE
         -- Edges outgoing to other pipelines
         (outE,_) = L.partition
                         (\(s,d,_) -> (S.member s nss) && (S.notMember d nss)) $
@@ -62,17 +64,29 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
 
         -- Adapt graph
         (suc,pg) = flip GM.runOn pg' (do
-            -- Demux node for incoming edges
+            -- From$Pipeline and Demux node for incoming edges
             if null inE then
                 return () -- No incoming edges from other pipelines, we're good
-            else (do
+            else do
+                -- Add Demux_ node
+                demux_N <- GM.newNode $
+                    PG.baseONode "Demux_" [] ["false", "true"] PG.OpOr Nothing
+
+                forM_ inPL $ \(pl,_) -> do
+                    let fromPLNA = "frompipeline=" ++ pl
+                        attrs = ["source","Boolean",fromPLNA]
+                    fromPLN <- GM.newNode $ PG.baseFNode ("FromPL" ++ pl) attrs
+                        ["false","true"] Nothing
+                    GM.newEdge (fromPLN, demux_N, "false")
+                    GM.newEdge (fromPLN, demux_N, "true")
+
+                -- Add Demux node
                 let demuxPs = ["_"] ++ map labN inDN
                 demuxN <- GM.newNode $
-                    PG.baseFNode "Demux" ["source"] demuxPs Nothing
+                    PG.baseFNode "Demux" [] demuxPs Nothing
+                GM.newEdge (demux_N, demuxN, "true")
                 mapM_ (\n -> GM.newEdge (demuxN, n, labN n)) inDN
 
-                -- Add edges for nodes that were originally without incoming edges
-                mapM_ (\n -> GM.newEdge (demuxN, n, "_")) sources)
 
             -- Destination nodes for outgoing queues
             if null outE then

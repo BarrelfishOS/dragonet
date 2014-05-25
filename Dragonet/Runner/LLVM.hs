@@ -14,7 +14,7 @@ import Util.GraphHelpers (findNodeByL)
 import Control.Applicative --(Applicative)
 import Control.Monad.State (State, MonadState, gets, modify, execState)
 import Control.Monad.Error (ErrorT, runErrorT)
-import Control.Monad ((>=>), liftM, mapM_, forM_, forever)
+import Control.Monad ((>=>), liftM, mapM_, forM_, foldM, forever)
 import Control.Concurrent (forkOS,yield)
 
 --import Control.Applicative
@@ -587,6 +587,13 @@ mkAdd op0 op1 = AST.I.Add {
         , AST.I.metadata = []
     }
 
+mkOr :: AST.Operand -> AST.Operand -> AST.Instruction
+mkOr op0 op1 = AST.I.Or {
+          AST.I.operand0 = op0
+        , AST.I.operand1 = op1
+        , AST.I.metadata = []
+    }
+
 mkConstInt :: Word32 -> Integer -> AST.C.Constant
 mkConstInt bits val = AST.C.Int { AST.C.integerBits = bits, AST.C.integerValue = val }
 
@@ -1037,6 +1044,10 @@ llvm_pg_fnode_terminal nid node outs = do
 --   - regular F-Node
 llvm_pg_fnode_nonterminal :: DGI.Node -> PG.Node -> [(PG.Port, [(DGI.Node, PG.Node)])] -> LLVM ()
 llvm_pg_fnode_nonterminal nid node outs = do
+    -- Generate impl function for from pipeline node
+    isFromPL <- case getPGNAttr node "frompipeline" of
+        Just pln -> do { llvm_pg_fnode_dequeue nid node pln ; return True }
+        _ -> return False
     -- Generate impl function for demultiplexing node
     isDemux <- if nLabel node == "Demux"
         then do { llvm_pg_fnode_demux nid node ; return True }
@@ -1047,16 +1058,34 @@ llvm_pg_fnode_nonterminal nid node outs = do
             llvm_pg_fnode_mux nid node aDN aDP
             return True
         _ -> return False
+    let isExternal = not (isDemux || isMux || isFromPL)
     -- Generate Fnode function
-    llvm_pg_fnode_nonterminal' nid node outs (not (isDemux || isMux))
+    llvm_pg_fnode_nonterminal' nid node outs isExternal
 
--- Generate function implementing a demux F-node
---   - Poll the queue until we get an input
---   - Enable the next node, based on the mux identifier
+-- Generate function implementing a demux F-node:
+--   Enables the next node, based on the mux identifier
 llvm_pg_fnode_demux :: DGI.Node -> PG.Node -> LLVM ()
 llvm_pg_fnode_demux nid node = do
     input_ty <- cgInputTy
     fnode_args <- cgFnodeArgs
+    fnAdd (pg_fimplname node) i32Ty fnode_args $ do
+        -- print message on entering the function
+        (AST.Name fnstr) <- gets fnName
+
+        let inp = getLocalRef "input"
+        mux_ret <- bldAddInstruction $ mkFnCall "input_muxid" [inp]
+        -- clear mux id
+        bldAddInstruction $ mkFnCall "input_set_muxid" [inp, operandInt32_0]
+
+        bldTerminate $ termRetOp mux_ret
+
+
+-- Generate function implementing a FromPipeline node (polls queue)
+llvm_pg_fnode_dequeue :: DGI.Node -> PG.Node -> String -> LLVM ()
+llvm_pg_fnode_dequeue nid node pipelineName = do
+    input_ty <- cgInputTy
+    fnode_args <- cgFnodeArgs
+    pli <- cgPLI
     fnAdd (pg_fimplname node) i32Ty fnode_args $ do
         bldNewPhi i32Ty "ret_phi"
         -- print message on entering the function
@@ -1066,22 +1095,23 @@ llvm_pg_fnode_demux nid node = do
 
         -- Basic Block for polling queue
         bldAddBB "bb_poll"
+
+        -- get queue handle
+        let Just (PLI.PIQueue queueName) = lookup pipelineName $ PLI.pliInQs pli
+        qh <- bldAddInstruction $ mkLd $ getGlobalOp $ glblInqueue queueName
+
         -- Poll queue
-        plh <- bldAddInstruction $ mkLd $ getGlobalOp glblPipeline
-        poll_ret <- bldAddInstruction $ mkFnCall "pl_poll" [plh]
+        poll_ret <- bldAddInstruction $ mkFnCall "pl_poll" [qh]
         t <- bldAddInstruction $ mkICmpEq poll_ret (mkNullPtrOp input_ty)
         bldTerminate $ termCondBr t "bb_none" "bb_success"
 
         -- We got a packet, yay!
         bldAddBB "bb_success"
-        mux_ret <- bldAddInstruction $ mkFnCall "input_muxid" [poll_ret]
-        -- clear mux id
-        bldAddInstruction $ mkFnCall "input_set_muxid" [poll_ret, operandInt32_0]
         -- exchange with current input, and free it
         let inp = getLocalRef "input"
         bldAddInstruction $ mkFnCall "input_xchg" [inp, poll_ret]
         bldAddInstruction $ mkFnCall "input_free" [poll_ret]
-        bldAddPhi "ret_phi" (mux_ret,"bb_success")
+        bldAddPhi "ret_phi" (operandInt32_1,"bb_success")
         bldTerminate $ termBr "bb_ret"
 
         -- No packet :(
@@ -1093,6 +1123,8 @@ llvm_pg_fnode_demux nid node = do
         bldAddBB "bb_ret"
         ret <- bldPhi "ret_phi"
         bldTerminate $ termRetOp ret
+
+
 
 -- Generate function transfering packet to alternative pipeline
 llvm_pg_fnode_enqueue :: DGI.Node -> PG.Node -> String -> LLVM ()
@@ -1301,7 +1333,8 @@ llvm_pg_main_func entry_nodes stackname = do
         -- Create input queues
         forM_ (PLI.pliInQs pli) $ \(_,PLI.PIQueue qn) -> do
             qnOp <- bldConstStr' qn
-            bldAddInstruction $ mkFnCall "pl_inqueue_create" [plh, qnOp]
+            qh <- bldAddInstruction $ mkFnCall "pl_inqueue_create" [plh, qnOp]
+            bldAddInstruction $ mkSt (getGlobalOp $ glblInqueue qn) qh -- global pipline handle
         -- Bind output queues
         forM_ (PLI.pliOutQs pli) $ \(_,PLI.POQueue qn) -> do
             qnOp <- bldConstStr' qn
@@ -1315,11 +1348,6 @@ llvm_pg_main_func entry_nodes stackname = do
         bldTerminate $ termBr "body"                            -- jump to loop body
 
         bldAddBB "body" -- main loop (for now, loop forever)
-        entry <- gets entryBB
-        -- setup a loop counter
-        {-cnt <- bldAddInstruction $ mkPhi i32Ty [(operandInt32_0, entry), (getLocalRef "cnt_next", "body")]
-        bldDbgPrintf "count: %d\n" [cnt]
-        cnt_next <- bldAddNamedInstruction "cnt_next" $ mkAdd cnt operandInt32_1-}
 
         -- Call entry nodes in sequence
         forM_ entry_nodes $ \n -> do
@@ -1330,12 +1358,21 @@ llvm_pg_main_func entry_nodes stackname = do
             -- reset o-node counters
             forM_ on_cnt $ \cnt_name ->
                 bldAddInstruction $ mkSt (getGlobalOp cnt_name) operandInt32_0
-        bldAddInstruction $ mkFnCall "pl_process_events" [plh] -- process events
+        bldTerminate $ termBr "poll_outevents"
 
-        -- reset o-node counters
-        forM_ on_cnt $ \cnt_name ->
-            bldAddInstruction $ mkSt (getGlobalOp cnt_name) operandInt32_0
+        bldAddBB "poll_outevents"
+        -- Poll for events from output queues (freed buffer that are returned to
+        -- us). This is prioritized over polling input queues above, to reduce
+        -- the risk for running out of buffers in the receive pipelines
+        let foldM' a b c = foldM c a b
+        ev <- foldM' operandFalse (PLI.pliOutQs pli) $ \prev poq -> do
+            let (_,PLI.POQueue qn) = poq
+            qh <- bldAddInstruction $ mkLd (getGlobalOp $ glblOutqueue qn)
+            s <- bldAddInstruction $ mkFnCall "pl_process_event" [qh]
+            bldAddInstruction $ mkOr s prev
+        bldTerminate $ termCondBr ev "poll_outevents" "mainloop_bottom"
 
+        bldAddBB "mainloop_bottom"
         -- Check if we should keep running
         running <- bldAddInstruction $ mkFnCall "pl_get_running" [plh]
         t <- bldAddInstruction $ mkICmpEq running $ mkConstIntOperand 1 1
@@ -1448,6 +1485,10 @@ glblPipeline = "pipeline_handle"
 glblOutqueue :: PL.PLabel -> String
 glblOutqueue qn = "outqueue_" ++ qn -- TODO: do we need to sanitize this?
 
+-- Name of the global in queue handle variables
+glblInqueue :: PL.PLabel -> String
+glblInqueue qn = "inqueue_" ++ qn -- TODO: do we need to sanitize this?
+
 
 -- TODO:
 --  - input from queues
@@ -1496,13 +1537,15 @@ codegen_all pgraph stackname = do
 
     -- Queue interaction
     addExternalFn voidTy "pl_enqueue" [(qp_ty, "queue"), ((mkPtrTy input_ty), "input")]
-    addExternalFn (mkPtrTy input_ty) "pl_poll" [(plp_ty, "plh")]
-    addExternalFn voidTy "pl_process_events" [(plp_ty, "plh")]
+    addExternalFn (mkPtrTy input_ty) "pl_poll" [(qp_ty, "queue")]
+    addExternalFn boolTy "pl_process_event" [(qp_ty, "queue")]
     addGlobalVarInit plp_ty glblPipeline (AST.C.Null plp_ty)
     --addGlobalVar (mkPtrTy pipelineTy) glblPipeline
     pli <- cgPLI
     forM_ (PLI.pliOutQs pli) $ \(_,(PLI.POQueue queue)) -> do
         addStaticVar qp_ty (glblOutqueue queue) (AST.C.Null qp_ty)
+    forM_ (PLI.pliInQs pli) $ \(_,(PLI.PIQueue queue)) -> do
+        addStaticVar qp_ty (glblInqueue queue) (AST.C.Null qp_ty)
 
     llvm_pg pgraph -- Build node functions
     llvm_pg_main_func entry_nodes stackname -- Build main runner function

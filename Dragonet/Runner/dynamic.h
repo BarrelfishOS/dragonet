@@ -11,6 +11,7 @@ enum dynamic_node_type {
     DYN_DEMUX,
     DYN_MUX,
     DYN_TOQUEUE,
+    DYN_FROMQUEUE,
 };
 
 enum dynamic_node_op {
@@ -45,7 +46,7 @@ struct dynamic_node {
         } mux;
         struct {
             queue_handle_t queue;
-        } toqueue;
+        } queue;
     } tdata;
 };
 
@@ -62,6 +63,8 @@ struct dynamic_edge {
 struct dynamic_graph {
     struct dynamic_node **sources;
     size_t                num_sources;
+    queue_handle_t       *outqueues;
+    size_t                num_outqs;
     size_t                num_nodes;
     pthread_mutex_t       lock;
 };
@@ -93,6 +96,9 @@ struct dynamic_node *dyn_mknode_mux(struct dynamic_graph *graph,
 struct dynamic_node *dyn_mknode_toqueue(struct dynamic_graph *graph,
                                         const char           *name,
                                         queue_handle_t        queue);
+struct dynamic_node *dyn_mknode_fromqueue(struct dynamic_graph *graph,
+                                          const char           *name,
+                                          queue_handle_t        queue);
 
 size_t dyn_addports(struct dynamic_node *node, size_t num);
 struct dynamic_edge *dyn_addedge(struct dynamic_node *source,

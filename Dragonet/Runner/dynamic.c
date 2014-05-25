@@ -56,7 +56,9 @@ struct dynamic_graph *dyn_mkgraph(void)
     struct dynamic_graph *g = malloc(sizeof(*g));
     g->sources = NULL;
     g->num_sources = 0;
+    g->num_outqs = 0;
     g->num_nodes = 0;
+    g->outqueues = NULL;
     pthread_mutex_init(&g->lock, NULL);
     return g;
 }
@@ -157,17 +159,19 @@ static node_out_t run_node(struct dynamic_node *n,
         case DYN_ONODE:
             return run_onode(n, version);;
 
-        case DYN_DEMUX:
-            din = pl_poll(plh);
+        case DYN_FROMQUEUE:
+            din = pl_poll(n->tdata.queue.queue);
             if (din != NULL) {
-                //printf("Polling succeeded\n");
-                out = input_muxid(din);
-                input_set_muxid(din, 0);
                 input_xchg(in, din);
                 input_free_plh(plh, din);
+                return 1;
             } else {
-                out = 0;
+                return 0;
             }
+
+        case DYN_DEMUX:
+            out = input_muxid(in);
+            input_set_muxid(in, 0);
             assert(out >= 0 && out < n->num_ports);
             return out;
 
@@ -176,7 +180,7 @@ static node_out_t run_node(struct dynamic_node *n,
             return 0;
 
         case DYN_TOQUEUE:
-            pl_enqueue(n->tdata.toqueue.queue, in);
+            pl_enqueue(n->tdata.queue.queue, in);
             return -2;
 
         default:
@@ -268,9 +272,13 @@ void dyn_rungraph(struct dynamic_graph *graph,
             input_clean_attrs(in);
             input_clean_packet(in);
         }
-        pthread_mutex_unlock(&graph->lock);
 
-        pl_process_events(plh);
+        // Process events on outqueues (freed buffers)
+        for (i = 0; i < graph->num_outqs; i++) {
+            while (pl_process_event(graph->outqueues[i]));
+        }
+
+        pthread_mutex_unlock(&graph->lock);
     }
 
     node_stack_free(&ns);
@@ -357,9 +365,22 @@ struct dynamic_node *dyn_mknode_toqueue(struct dynamic_graph *graph,
                                         queue_handle_t        queue)
 {
     struct dynamic_node *n = mknode(graph, name, DYN_TOQUEUE);
-    n->tdata.toqueue.queue = queue;
-    return n;
+    n->tdata.queue.queue = queue;
 
+    graph->outqueues = realloc(graph->outqueues,
+            sizeof(*graph->outqueues) * (graph->num_outqs + 1));
+    graph->outqueues[graph->num_outqs] = queue;
+    graph->num_outqs++;
+    return n;
+}
+
+struct dynamic_node *dyn_mknode_fromqueue(struct dynamic_graph *graph,
+                                          const char           *name,
+                                          queue_handle_t        queue)
+{
+    struct dynamic_node *n = mknode(graph, name, DYN_FROMQUEUE);
+    n->tdata.queue.queue = queue;
+    return n;
 }
 
 

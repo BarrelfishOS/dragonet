@@ -31,6 +31,9 @@ struct stack_handle {
     struct state *state;
     queue_handle_t *in_queue;
     queue_handle_t *out_queue;
+    size_t num_inq;
+    size_t num_outq;
+    size_t nextpoll;
     struct socket_handle *socks;
     int control_fd;
 };
@@ -106,6 +109,9 @@ struct stack_handle *stack_init(const char *stackname, const char *name)
     num_out = msg.data.welcome.num_outq;
     sh->in_queue = calloc(num_in, sizeof(*sh->in_queue));
     sh->out_queue = calloc(num_out, sizeof(*sh->out_queue));
+    sh->num_inq = num_in;
+    sh->num_outq = num_out;
+    sh->nextpoll = 0;
 
     // Initialize pipeline interface
     sh->pipeline_handle = pl_init(stackname, name);
@@ -144,15 +150,6 @@ struct state *stack_get_state(struct stack_handle *sh)
     return sh->state;
 }
 
-static struct input *stack_get_packet(struct stack_handle *sh)
-{
-    struct input *in;
-    do {
-        in = pl_poll(sh->pipeline_handle);
-    } while (in == NULL);
-    return in;
-}
-
 static void stack_send_packet(socket_handle_t handle, struct input *in)
 {
     input_set_muxid(in, handle->mux_id);
@@ -163,24 +160,50 @@ static void stack_send_packet(socket_handle_t handle, struct input *in)
                                          // in with a new one
 }
 
-void stack_process_event(struct stack_handle *stack)
+struct socket_handle *socket_by_id(struct stack_handle *stack, uint64_t id)
 {
-    struct input *in;
-    uint64_t id;
-    struct socket_handle *sh;
-
-    in = stack_get_packet(stack);
-    id = in->attr->socket_id;
-
-    sh = stack->socks;
+    struct socket_handle *sh = stack->socks;
     while (sh != NULL) {
         if (id == sh->id) {
-            sh->cb_receive(sh, in, sh->data);
-            return;
+            return sh;
         }
         sh = sh->next;
     }
-    fprintf(stderr, "Warning: dropping packet for non-existent socket\n");
+    return NULL;
+}
+
+void stack_process_event(struct stack_handle *stack)
+{
+    struct input *in;
+    struct socket_handle *sh;
+    size_t i;
+
+    // First process buffers that are returned to us
+    for (i = 0; i < stack->num_outq; i++) {
+        if (pl_process_event(stack->out_queue[i])) {
+            return;
+        }
+    }
+
+    // Now check for packets
+    i = stack->nextpoll;
+    do {
+        in = pl_poll(stack->in_queue[i]);
+        i = (i + 1) % stack->num_inq;
+    } while (in == NULL && i != stack->nextpoll);
+    stack->nextpoll = i;
+
+    if (in == NULL) {
+        return;
+    }
+
+    sh = socket_by_id(stack, in->attr->socket_id);
+    if (sh == NULL) {
+        fprintf(stderr, "Warning: dropping packet for non-existent socket\n");
+        return;
+    }
+
+    sh->cb_receive(sh, in, sh->data);
 }
 
 

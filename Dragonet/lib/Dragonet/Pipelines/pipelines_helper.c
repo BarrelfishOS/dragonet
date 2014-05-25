@@ -71,7 +71,6 @@ struct dragonet_pipeline {
     struct bulk_pool pool;
     struct bulk_allocator alloc;
 
-    struct input *queue;
     struct dragonet_termination_handler *term;
 
     struct dragonet_queue *queues;
@@ -90,6 +89,7 @@ struct dragonet_queue {
     bool is_out;
 
     struct input *pending;
+    struct input *inputs;
 
     bool bound;
     struct dragonet_queue_pool *pools;
@@ -390,12 +390,12 @@ static void move_received(struct dragonet_queue  *q,
             buffer->pool->buffer_size - (dbmeta->len + dbmeta->off);
         in->data_buffer = buffer;
 
-        // Add packet to pl->queue
+        // Add packet to q->inputs
         in->next = NULL;
-        if (pl->queue == NULL) {
-            pl->queue = in;
+        if (q->inputs == NULL) {
+            q->inputs = in;
         } else {
-            prev = pl->queue;
+            prev = q->inputs;
             while (prev->next != NULL) {
                 prev = prev->next;
             }
@@ -658,35 +658,44 @@ void pl_enqueue(queue_handle_t queue, struct input *in)
     dprintf("pl_enqueue: exit\n");
 }
 
-void pl_process_events(pipeline_handle_t plh)
+bool pl_process_event(queue_handle_t queue)
 {
-    struct dragonet_pipeline *pl = plh;
-    bool success;
-    // Note: It might be necessary to bound this loop somehow as soon as we
-    // start looking into performance
-    do {
-        success = poll_all(pl);
-    } while (success);
+    struct bulk_ll_channel *chan = queue;
+    struct dragonet_queue *q = chan->user_state;
+    struct bulk_ll_event event;
+    errval_t err;
+
+    err = bulk_ll_channel_event_poll(chan, &event);
+    if (err == SYS_ERR_OK) {
+        process_event(q, &event);
+        bulk_ll_channel_event_done(chan, &event, SYS_ERR_OK);
+        return true;
+    } else if (err == BULK_TRANSFER_EVENTABORT) {
+        return true;
+    } else {
+        assert(err == BULK_TRANSFER_NOEVENT);
+    }
+    return false;
 }
 
-struct input *pl_poll(pipeline_handle_t plh)
+struct input *pl_poll(queue_handle_t queue)
 {
-    struct dragonet_pipeline *pl = plh;
+    struct bulk_ll_channel *chan = queue;
+    struct dragonet_queue *q = chan->user_state;
     struct input *in = NULL;
-    bool success;
+    int tries;
 
-    // When queue is empty, process pending events until there is a packet in
-    // the queue or there are no more pending events.
-    if (pl->queue == NULL) {
-        do {
-            success = poll_all(pl);
-        } while (pl->queue == NULL && success);
+    // Note since we use two moves, one for the actual data buffer and one for
+    // the attributes, we should also try for two events if no input is ready
+    // yet.
+    for (tries = 0; tries < 2 && (q->inputs == NULL); tries++) {
+        if (!pl_process_event(queue)) {
+            break;
+        }
     }
-    if (pl->queue != NULL) {
-        in = pl->queue;
-        pl->queue = in->next;
-        /*puts("\n\n\n-------------------------------------------------------");
-        printf("Success polling! :-D\n");*/
+    if (q->inputs != NULL) {
+        in = q->inputs;
+        q->inputs = in->next;
     }
     return in;
 }
