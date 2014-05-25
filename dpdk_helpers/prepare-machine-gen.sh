@@ -17,17 +17,6 @@ sudo apt-get install -y libevent-dev
 }
 
 
-get_repository () {
-
-MYBASE="/home/ubuntu/"
-cd ${MYBASE}
-#git clone ssh://shindep@129.132.186.96:8006//home/shindep/git/dragonet
-git clone /cdrom/casper/mount/repository/dragonet
-cd dragonet
-git checkout pipelines-02
-
-}
-
 
 install_server_deps() {
 ## For server:  ###################
@@ -64,7 +53,7 @@ cd ${MYBASE}/dragonet/benchmarking/netperf-2.6.0
 make
 sudo make install
 
-# Creating symbolic links as this brain-dead tool wants evactly 1.13 version of both.
+# Creating symbolic links as this brain-dead tool wants exactly 1.13 version of both.
 sudo ln -s /usr/bin/aclocal /usr/bin/aclocal-1.13
 sudo ln -s /usr/bin/automake /usr/bin/automake-1.13
 
@@ -83,6 +72,14 @@ cd ../libmemcached-1.0.18/
 
 }
 
+
+setup_vim_pravin() {
+    cd ${HOME}
+    tar -xvf /cdrom/casper/mount/bin/vimconf.tar
+    mkdir -p .vimbackup/backup
+    sudo bash -c 'cd /root/ ; tar -xvf  /cdrom/casper/mount/bin/vimconf.tar'
+    sudo mkdir -p /root/.vimbackup/backup
+}
 
 install_useful_tools() {
     sudo apt-get install -y screen byobu tree vim ctags cscope vim-gnome ack-grep
@@ -106,9 +103,185 @@ install_useful_tools() {
     sudo apt-get install -y  python-numpy
 }
 
-install_base
-get_repository
-install_server_deps
-install_client_deps
-install_useful_tools
+
+old_installation() {
+    install_base
+#    get_repository
+#    install_server_deps
+#    install_client_deps
+#    setup_vim_pravin
+#    install_useful_tools
+}
+
+
+get_repository () {
+    cd ${MYBASE}
+    if [[ -d "dragonet" ]] ; then
+        echo "dragonet already exists. You may want to delete it, or run without -g option" ;
+        exit 1
+    fi
+    git clone /cdrom/casper/mount/repository/dragonet
+    cd dragonet
+}
+
+
+install_dpdk() {
+    cd ${MYBASE}/dragonet/dpdk-1.5.0r1/
+    ./doConfig.sh
+    make
+}
+
+install_openonload() {
+    cd ${MYBASE}/dragonet/openonload-201310-u2/
+    sudo ./scripts/onload_install
+    sudo onload_tool reload
+    cd ${MYBASE}
+    setIPaddress.sh
+}
+
+install_Dragonet() {
+
+    cd ${MYBASE}
+    # copy cabal installation from root if you are not root
+    if [[ "$HOME" == "/root" ]]; then
+        echo "installing as root user, so skipping cabal-install as it should be already there!"
+    else
+        echo "Copying cabal-install files from root to avoid another installation."
+        sudo cp -r /root/.cabal ${HOME}
+        sudo chown -R ubuntu.ubuntu ${HOME}/.cabal
+        export PATH="${HOME}/.cabal/bin:$PATH"
+    fi
+
+    cd ${MYBASE}/dragonet/Dragonet/
+    ./prepare_sandbox.sh
+    cabal build -j
+}
+
+install_memcached() {
+    cd ${MYBASE}/dragonet/benchmarking/memcached/
+    ./autogen.sh && ./configure && make memcached
+}
+
+install_memcached_client() {
+    cd ${MYBASE}/dragonet/benchmarking/libmemcached-1.0.18/
+    ./configure_install_dragonet.sh
+}
+
+install_others() {
+    cd ${MYBASE}/dragonet/benchmarking/netperf-2.6.0
+    ./configure_compile.sh
+    make
+    sudo make install
+    cd ${MYBASE}/dragonet/benchmarking/dstat
+    sudo make install
+}
+
+
+
+install_server_related() {
+    install_Dragonet
+    install_memcached
+}
+
+install_client_related() {
+    install_memcached_client
+    install_others
+}
+
+
+show_usage() {
+        echo "Please specify what you want to install"
+        echo "Usage: ${0} [-g -s -c -o -d -v]"
+        echo "           -g -->  clone the git repository"
+        echo "           -d -->  install dpdk"
+        echo "           -o -->  install onload"
+        echo "           -c -->  compile and install client side of dragonet"
+        echo "           -s -->  compile and install server side of dragonet"
+        echo "           -v -->  setup vim configuration (pravin's configuration)"
+        echo "Examples (installing everything): ${0} -g -d -o -c -s"
+        echo "Examples (installing minimal client):: ${0} -g -c"
+        exit 1
+}
+
+while getopts ":gcsdov" opt; do
+  case $opt in
+    g)
+        echo "-g was triggered, cloning git repo"
+        CLONE="yes"
+      ;;
+    c)
+        echo "-c was triggered, compiling client side"
+        CLIENTCOMPILE="yes"
+      ;;
+    s)
+        echo "-s was triggered, compiling server side"
+        SERVERCOMPILE="yes"
+      ;;
+    d)
+        echo "-d was triggered, setting for compilation of dpdk code"
+        DPDK="yes"
+      ;;
+    o)
+        echo "-o was triggered, setting for compilation of openonload code"
+        OPENONLOAD="yes"
+      ;;
+    v)
+        echo "-v was triggered, setting up pravin's vim configuration"
+        VIMSETUP="yes"
+      ;;
+    \?)
+        echo "Invalid option: -$OPTARG" >&2
+        show_usage
+        exit 1
+        ;;
+    :)
+        echo "Option -$OPTARG requires an argument." >&2
+        show_usage
+        exit 1
+        ;;
+  esac
+done
+
+
+MYBASE="$HOME"
+
+if [ "${CLONE}" == "yes" ] ; then
+    echo "cloning Dragonet repository"
+    get_repository
+else
+    echo "Skipping cloning of Dragonet repository"
+fi
+
+if [ "${OPENONLOAD}" == "yes" ] ; then
+    echo "Installing openonload driver"
+    install_openonload
+else
+    echo "Skipping Installing openonload driver"
+fi
+
+if [ "${DPDK}" == "yes" ] ; then
+    echo "Installing dpdk driver"
+    install_dpdk
+else
+    echo "Skipping Installing dpdk driver"
+fi
+
+if [ "${SERVERCOMPILE}" == "yes" ] ; then
+    echo "Compiling Dragonet server side"
+    install_server_related
+else
+    echo "Skipping Compiling Dragonet server side"
+fi
+
+if [ "${CLIENTCOMPILE}" == "yes" ] ; then
+    echo "Compiling Dragonet client side"
+    install_client_related
+else
+    echo "Skipping Compiling Dragonet client side"
+fi
+
+if [ "${VIMSETUP}" == "yes" ] ; then
+    echo "Copying vim setup"
+    setup_vim_pravin
+fi
 
