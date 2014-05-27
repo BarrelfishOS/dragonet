@@ -39,16 +39,5 @@ bool socket_send_udp(socket_handle_t handle, struct input *in,
                      uint32_t s_ip, uint16_t s_port,
                      uint32_t d_ip, uint16_t d_port);
 
-
-#if 0
-int register_callback_dn(event_handler_fun_ptr fun, int fd, short which,
-        void *arg);
-
-void event_handle_loop_dn(void);
-
-int recvfrom_dn(uint8_t *buff, int bufsize);
-int send_dn(uint8_t *buff, int bufsize);
-#endif // 0 // FIXME: remove this code
-
 #endif // ndef HELPERS_H_
 
