@@ -969,7 +969,7 @@ class PlotFormatter(Formatter):
             title2 = title2.replace('CImplOnload', 'CImpl Dragonet')
             title2 = title2.replace('CImpl', 'C')
 
-            title3 = "%d,%d (%d)" % (self.infod['SERVERS_INSTANCES'][i],
+            title3 = "%d,%d, (%d)" % (self.infod['SERVERS_INSTANCES'][i],
                     self.infod['SERVER_CORES'][i],
                     self.infod['TCONCURRENCY'][i])
 
@@ -1012,8 +1012,8 @@ class PlotFormatter(Formatter):
 
         #axis.set_xticks(ticks)
         axis.set_xticklabels(ticklabels, fontsize=15, rotation=90)
+        axis.set_xlabel(config['xaxis_label'][0])
         #axis.set_xticklabels(ticklabels, rotation=90)
-
 
 
         #axis.set_xlim(0,pos-1)
