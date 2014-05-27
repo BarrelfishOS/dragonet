@@ -181,14 +181,17 @@ class ResultSet(object):
 
     def _gen_filename(self):
         if 'TITLE' in self.metadata and self.metadata['TITLE']:
+            print "generating filename with title %s" % (self.metadata['TITLE'])
             return "%s-%s.%s.json.gz" % (self.metadata['NAME'],
                                          self.metadata['TIME'].isoformat().replace(":", ""),
-                                         re.sub("[^A-Za-z0-9]", "_", self.metadata['TITLE'])[:50])
+                                         re.sub("[^A-Za-z0-9]", "_", self.metadata['TITLE']))
+#                                         re.sub("[^A-Za-z0-9]", "_", self.metadata['TITLE'])[:50])
         else:
             return "%s-%s.json.gz" % (self.metadata['NAME'], self.metadata['TIME'].isoformat().replace(":", ""))
 
     def dump_dir(self, dirname):
         self._dump_file = os.path.join(dirname, self._gen_filename())
+        print "using %s as dump file" % (self._dump_file)
         try:
             fp = gzip_open(self._dump_file, "wt")
             try:

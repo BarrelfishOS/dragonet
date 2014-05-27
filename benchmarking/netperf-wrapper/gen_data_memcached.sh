@@ -74,9 +74,9 @@ run_bm_tp_rr() {
 #    set -e
     CTP=0
     NTP=1
-    LBRUST=8
-    CBRUST=8
-    NBRUST=16
+    LBRUST=1
+    CBRUST=1
+    NBRUST=1
     while [  $NTP -gt $CTP ]; do
 #        set -x
 #        set -e
@@ -115,6 +115,7 @@ run_bm_tp_rr() {
 
     sleep 5
     title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},C_${LBRUST},BEST"
+    echo "running for ${title}"
 
     retry 5 ./netperf-wrapper -I ${ITERATIONS} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
         -H ${srvName} ${cliName6} \
@@ -194,14 +195,14 @@ get_scalability_instances() {
 
 get_scalability_threads() {
     get_best_tp 1 1
-    get_best_tp 1 2
+#    get_best_tp 1 2
     get_best_tp 1 4
     get_best_tp 1 8
-    get_best_tp 1 10
+#    get_best_tp 1 10
 #    get_best_tp 1 12
 #    get_best_tp 1 14
     get_best_tp 1 16
-    get_best_tp 1 18
+#    get_best_tp 1 18
 
     fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
     ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
