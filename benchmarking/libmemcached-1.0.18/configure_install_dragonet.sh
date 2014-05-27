@@ -2,6 +2,7 @@
 set -x
 set -e
 LIBS=-lpthread ./configure --enable-memaslap || true
+aclocal
 automake-1.13 --add-missing
 make
 sudo make install
