@@ -1,6 +1,7 @@
 #ifndef HELPERS_H_
 #define HELPERS_H_
 
+#include <dragonet/app_lowlevel.h>
 #include <implementation.h>
 #include <app_control.h>
 #include <packet_access.h>
@@ -17,15 +18,9 @@ struct socket_handle;
 typedef struct socket_handle *socket_handle_t;
 struct socket_handle {
     struct stack_handle *stack;
-    uint64_t id;
-    int32_t  mux_id;
-    uint8_t  outqueue;
-    bool bound;
-    bool ready;
+    dnal_sockh_t lsh;
     void (*cb_receive)(socket_handle_t, struct input *, void *);
     void *data;
-
-    struct socket_handle *next;
 };
 
 
