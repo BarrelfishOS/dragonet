@@ -58,10 +58,10 @@ struct dnal_net_destination {
     union {
         struct {
             // 0 can be used as a wildcard
-            uint32_t ip_src;
-            uint32_t ip_dst;
-            uint16_t port_src;
-            uint16_t port_dst;
+            uint32_t ip_local;
+            uint32_t ip_remote;
+            uint16_t port_local;
+            uint16_t port_remote;
         } ip4udp;
     } data;
 };
@@ -123,12 +123,18 @@ errval_t dnal_aq_buffer_alloc(dnal_appq_t    appqueue,
                               struct input **buffer);
 
 /**
+ * Free buffer
  *
  * @param appqueue Application queue to free buffer to
  * @param buffer   Buffer to free
  */
 errval_t dnal_aq_buffer_free(dnal_appq_t   appqueue,
                              struct input *buffer);
+
+/**
+ * Get pointer to shared global dragonet state.
+ */
+struct state *dnal_aq_state(dnal_appq_t appqueue);
 
 
 /******************************************************************************/
@@ -146,6 +152,15 @@ errval_t dnal_aq_buffer_free(dnal_appq_t   appqueue,
  */
 errval_t dnal_socket_create(dnal_appq_t   appqueue,
                             dnal_sockh_t *sockethandle);
+
+/**
+ * Bind socket to network endpoint.
+ *
+ * @param sockethandle Socket handle
+ * @param destination  Network endpoint to bind to
+ */
+errval_t dnal_socket_bind(dnal_sockh_t                 sockethandle,
+                          struct dnal_net_destination *destination);
 
 /**
  * Span socket to other queue.
@@ -188,6 +203,17 @@ errval_t dnal_socket_send(dnal_sockh_t                 sockethandle,
                           struct input                *buffer,
                           struct dnal_net_destination *dest);
 
+/**
+ * Reads out the per-socket opaque value saved previously, or NULL if not
+ * initialized.
+ */
+void *dnal_socket_opaque_get(dnal_sockh_t sockethandle);
+
+/**
+ * Set the per-socket opaque value.
+ */
+void dnal_socket_opaque_set(dnal_sockh_t sockethandle,
+                            void        *opaque);
 
 #endif // ndef DRAGONET_APP_LOWLEVEL_H_
 

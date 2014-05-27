@@ -62,6 +62,13 @@ enum errvals {
     BULK_TRANSFER_ASYNC,
     BULK_TRANSFER_NOEVENT,
     BULK_TRANSFER_EVENTABORT,
+
+    DNERR_EVENT_ABORT,
+    DNERR_NOEVENT,
+    DNERR_SOCKETBOUND,
+    DNERR_SOCKETNOTBOUND,
+    DNERR_BADDEST,
+    DNERR_UNKNOWN,
 };
 
 typedef enum errvals errval_t;
@@ -164,6 +171,18 @@ static const char *err_str(errval_t err)
             return "BULK_TRANSFER_NOEVENT";
         case BULK_TRANSFER_EVENTABORT:
             return "BULK_TRANSFER_EVENTABORT";
+        case DNERR_EVENT_ABORT:
+            return "DNERR_EVENT_ABORT";
+        case DNERR_NOEVENT:
+            return "DNERR_NOEVENT";
+        case DNERR_SOCKETBOUND:
+            return "DNERR_SOCKETBOUND";
+        case DNERR_SOCKETNOTBOUND:
+            return "DNERR_SOCKETNOTBOUND";
+        case DNERR_BADDEST:
+            return "DNERR_BADDEST";
+        case DNERR_UNKNOWN:
+            return "DNERR_UNKNOWN";
         default:
             return "(unknown error value)";
     }
