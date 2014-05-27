@@ -210,7 +210,8 @@ def get_result_attr(allResults, meta, client, attribute, aggregator):
             for tn, t in m.items():
                 if (tn.startswith(client)):
                     out = t["CMD_OUTPUT"]
-                    per_run.append(float(out[attribute]))
+                    if attribute in out.keys():
+                        per_run.append(float(out[attribute]))
 
         ans.append(aggregator(per_run))
         #ans.append(myavg(per_run))

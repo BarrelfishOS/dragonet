@@ -129,7 +129,7 @@ class ProcessRunner(threading.Thread):
         else :
             self.command = "bash -c 'cd %s ; %s'" % (self.machine_ref.tools_location, command)
 
-#        print "The runner %s:  [%s]" % (self.machine_ref, self.command)
+        #print "The runner %s:  [%s]" % (self.machine_ref, self.command)
         self.args = shlex.split(self.command)
 
     def fork(self):
@@ -158,12 +158,13 @@ class ProcessRunner(threading.Thread):
         else:
             self.pid = pid
 
+
     def should_wait(self):
         return self.wait_for
 
 
     def kill(self):
-#        print "T4rying to kill the process"
+        #print "T4rying to kill the process"
         if self.killed:
             return
         if self.pid is not None:
@@ -191,7 +192,7 @@ class ProcessRunner(threading.Thread):
             raise RuntimeError("Unknown child exit status!")
 
     def start(self):
-#        print "Starting the process"
+        #print "Starting the process"
         self.fork()
         threading.Thread.start(self)
 
@@ -237,23 +238,24 @@ class ProcessRunner(threading.Thread):
                 sys.stderr.write("  " + "\n  ".join(self.out.splitlines()) + "\n")
                 self.result = None
                 raise RuntimeError("Warning: Program exited non-zero.\nCommand: %s\n" % self.command)
+                return
             sys.stderr.write("NOTE: (Noncatastrophic) Program exited non-zero.\nCommand: %s\n" % self.command)
             #sys.exit(1) # FIXME: should I really call esit here?
-        else:
-            self.result = self.parse(self.out)
-            if not self.result:
-                sys.stderr.write("Warning: Command produced no valid data.\n"
-                                 "Data series: %s\n"
-                                 "Runner: %s\n"
-                                 "Command: %s\n"
-                                 "Standard error output:\n" % (self.name, self.__class__.__name__, self.command)
-                                 )
-                sys.stderr.write("  " + "\n  ".join(self.err.splitlines()) + "\n")
+#       else:
+        self.result = self.parse(self.out)
+        if not self.result:
+            sys.stderr.write("Warning: Command produced no valid data.\n"
+                             "Data series: %s\n"
+                             "Runner: %s\n"
+                             "Command: %s\n"
+                             "Standard error output:\n" % (self.name, self.__class__.__name__, self.command)
+                             )
+            sys.stderr.write("  " + "\n  ".join(self.err.splitlines()) + "\n")
 
     def parse(self, output):
         """Default parser returns the last (whitespace-separated) word of
         output."""
-#        print "Prasing the output..."
+        #print "Prasing the output..."
         if output == None or output == [] :
             return ""
         words = output.split()
@@ -350,7 +352,7 @@ class MemaslapSumaryRunner(ProcessRunner):
                 cmd_output['RT'] = float(cmd_output["run time"][:-1])
 
             if ("TPS" in cmd_output.keys()) :
-                result['RESULT'] = cmd_output["TPS"]
+                result['RESULT'] = float(cmd_output["TPS"])
                 cmd_output['ORESULT'] = float(cmd_output["TPS"])
             else :
                 print "Run imcomplete as attribute 'TPS' is not present in output"
@@ -361,13 +363,15 @@ class MemaslapSumaryRunner(ProcessRunner):
 #                cmd_output['ORESULT'] = 0
 #            elif (cmd_output['get_misses'] > 0) :
             if (cmd_output['get_misses'] > 0) :
-                result['RESULT'] = result['RESULT'] - (cmd_output['get_misses'] / result['RT'])
+                result['RESULT'] = result['RESULT'] - (cmd_output['get_misses'] / cmd_output['RT'])
                 cmd_output['ORESULT'] = 0
 
-            if (('packet_drop' in cmd_output.keys() and cmd_output['packet_drop'] > 0 )
-                or ('udp_timeout' in cmd_output.keys() and cmd_output['udp_timeout'] > 0)
-               ):
-                result['RESULT'] = 0
+            if ('packet_drop' in cmd_output.keys() and cmd_output['packet_drop'] > 0 ):
+                result['RESULT'] = result['RESULT'] - (cmd_output['packet_drop'] / cmd_output['RT'])
+                cmd_output['ORESULT'] = 0
+
+            if ('udp_timeout' in cmd_output.keys() and cmd_output['udp_timeout'] > 0):
+                result['RESULT'] = result['RESULT'] - (cmd_output['udp_timeout'] / cmd_output['RT'])
                 cmd_output['ORESULT'] = 0
 
         finally:

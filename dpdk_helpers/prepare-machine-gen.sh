@@ -146,9 +146,8 @@ install_Dragonet() {
     if [[ "$HOME" == "/root" ]]; then
         echo "installing as root user, so skipping cabal-install as it should be already there!"
     else
-        echo "Copying cabal-install files from root to avoid another installation."
-        sudo cp -r /root/.cabal ${HOME}
-        sudo chown -R ubuntu.ubuntu ${HOME}/.cabal
+        cabal update
+        cabal install cabal-install
         export PATH="${HOME}/.cabal/bin:$PATH"
     fi
 

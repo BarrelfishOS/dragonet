@@ -74,9 +74,9 @@ run_bm_tp_rr() {
 #    set -e
     CTP=0
     NTP=1
-    LBRUST=1
-    CBRUST=1
-    NBRUST=1
+    LBRUST=8
+    CBRUST=8
+    NBRUST=16
     while [  $NTP -gt $CTP ]; do
 #        set -x
 #        set -e
@@ -146,7 +146,7 @@ get_best_latency()
     get_per_queue_packets "start"
     run_npf_w_rr ${SELTARGET} ${SELTARGET_T} ${OUTDIR}
     get_per_queue_packets "end"
-    ./cleanup.sh
+    #./cleanup.sh
     cat "${OUTDIR}/bm_ethtool_log.start" | grep rx | grep packets | grep -v ': 0$'   > "${OUTDIR}/bm_ethtool_pkts.start"
     cat "${OUTDIR}/bm_ethtool_log.end" | grep rx | grep packets | grep -v ': 0$'   > "${OUTDIR}/bm_ethtool_pkts.end"
     diff "${OUTDIR}/bm_ethtool_log.start" "${OUTDIR}/bm_ethtool_log.end" | tee  "${OUTDIR}/bm_ethtool_log.diff"
@@ -176,14 +176,15 @@ get_scalability_special() {
 
 
 get_scalability_instances() {
-    get_best_tp 1 1
-    get_best_tp 2 1
     get_best_tp 4 1
-    get_best_tp 8 1
+    #get_best_tp 1 1
+    #get_best_tp 2 1
+    #get_best_tp 8 1
+
 #    get_best_tp 10 1
 #    get_best_tp 12 1
 #    get_best_tp 14 1
-    get_best_tp 16 1
+#    get_best_tp 16 1
 #    get_best_tp 18 1
 
     fname="scalability-instances-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
@@ -197,8 +198,8 @@ get_scalability_threads() {
     get_best_tp 1 4
     get_best_tp 1 8
     get_best_tp 1 10
-    get_best_tp 1 12
-    get_best_tp 1 14
+#    get_best_tp 1 12
+#    get_best_tp 1 14
     get_best_tp 1 16
     get_best_tp 1 18
 
@@ -269,6 +270,7 @@ use_asiago_server() {
 
     cliName6="-C ziger2 -C sbrinz2 -C ziger2 -C sbrinz2"
     cliName1="-C ziger2"
+#    cliName6=${cliName1}
 }
 
 use_asiago_server_sf_switched() {
@@ -300,28 +302,34 @@ ITERATIONS=5
 ITERATIONS=3
 
 DURATION=10
-CORESHIFT=2
-SERVERINSTANCES=2
+CORESHIFT=4
+SERVERINSTANCES=1
 
 USE_PROTO="tcp"
 USE_PROTO="udp"
 
 MAIN_OUTPUT_DIR="../memcachedResults/both_proto/${1}/"
 MAIN_OUTPUT_DIR="../memcachedResults/deleteme/${1}/"
-MAIN_OUTPUT_DIR="../memcachedResults/ms/${1}/"
+MAIN_OUTPUT_DIR="../memcachedResults/deleteme_udp_instances_filters_4/${1}/"
+MAIN_OUTPUT_DIR="../memcachedResults/dn_test_run/${1}/"
 ECHO_SERVER="memcached_onload"
 ECHO_SERVER="memcached_poll"
 ECHO_SERVER="memcached"
+ECHO_SERVER="memcached_dragonet"
 GRAPH_GEN_CMDS="${MAIN_OUTPUT_DIR}/graph_gen_cmds.sh"
 
 ./cleanup.sh
 
-use_burrata_server_intel_switched
+#use_burrata_server_intel_switched
+use_asiago_server_intel_switched
 setup_output_location
 
-get_scalability_instances
+get_scalability_threads
 exit 0
+get_scalability_instances
 ##############################
+get_best_latency 1 1 1
+
 get_scalability_instances
 
 get_scalability_special
@@ -336,9 +344,6 @@ get_scalability_threads
 
 exit 0
 ##############################
-
-get_best_latency 1 1 1
-exit 0
 
 get_scalability_special
 

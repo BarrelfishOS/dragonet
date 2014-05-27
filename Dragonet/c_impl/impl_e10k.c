@@ -23,17 +23,20 @@
 
 //#define CONFIG_PCI_ADDR "0000:81:00.0"
 //#define CONFIG_LOCAL_IP 0x0a160427 // "10.22.4.39"
-//  For asigao, directly connected NIC
-#define CONFIG_PCI_ADDR "0000:04:00.0"
-#define CONFIG_LOCAL_IP  0x0a16040b //   "10.22.4.11"
 
+//  For asigao, directly connected NIC
+//#define CONFIG_PCI_ADDR "0000:04:00.0"
+//#define CONFIG_LOCAL_IP  0x0a16040b //   "10.22.4.11"
+
+//  For asigao, connected over switch
+#define CONFIG_PCI_ADDR "0000:04:00.1"
+#define CONFIG_LOCAL_IP  0x0a71045f //   "10.113.4.95"
 
 struct mem_region_alloc {
     void    *virt;
     uint64_t phys;
     size_t   left;
 };
-
 
 extern pipeline_handle_t pipeline_handle;
 

@@ -1548,7 +1548,7 @@ runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
                 modWriteFile mod $ mname ++ "-linked-cg.ll"
                 putStrLn $ "Verifying " ++ mname
                 err <- runErrorT $ LLVM.A.verify mod
-                case err of Right () -> putStrLn $ "module verified"
+                case err of Right () -> putStrLn $ "module verified\nIf it was last module then everything is done\n"
                             Left e   -> putStrLn $ "error verifying module:" ++ e
                 --modExec ctx mod "pg_main"
                 LLVM.PM.withPassManager passes $ \pm -> do

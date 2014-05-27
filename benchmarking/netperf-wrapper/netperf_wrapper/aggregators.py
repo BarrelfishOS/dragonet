@@ -132,20 +132,20 @@ class Aggregator(object):
         try:
 
             #print "##############################"
-            print "%s: creating application instances\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+            #print "%s: creating application instances\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
             for m, mi in list(self.m_instances.items()):
-                #print "Running tools on  machine [%s] " % (str(m))
+                #print "Instantiating tools on machine [%s] " % (str(m))
                 for n,i in list(self.m_instances[m]['machine'].tool_instances.items()):
+                    #print "Instantiating tool on machine [%s] " % (str(m))
                     self.m_instances[m]['machine'].threads[n] = i['runner'](self.m_instances[m]['machine'], n, **i)
-
 
             print "%s: Starting server applications\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
             for m, mi in list(self.m_instances.items()):
                 if not mi['is_server'] :
                     continue
                 for n,i in list(self.m_instances[m]['machine'].tool_instances.items()):
+                    #print "Running tool on machine [%s] " % (str(m))
                     self.m_instances[m]['machine'].threads[n].start()
-
 
 
             #time.sleep(2)
@@ -176,10 +176,11 @@ class Aggregator(object):
                         if not t.returncode == 0:
                             print "WARNING: thread %s failed with return code %s\n" % (
                                 t.name,  str(t.returncode))
-                            print "WARNING: killing all processes"
-                            self.forced_cleanup()
-                            print "WARNING: exiting"
-                            sys.exit(1)
+                            if t.is_catastrophic:
+                                print "WARNING: killing all processes"
+                                self.forced_cleanup()
+                                print "WARNING: exiting"
+                                sys.exit(1)
 
 
             real_bm_end_time = datetime.now()

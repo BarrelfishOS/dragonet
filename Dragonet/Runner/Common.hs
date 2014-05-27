@@ -23,7 +23,7 @@ import qualified Util.GraphHelpers as GH
 
 import Control.Monad
 import Control.Arrow (second)
-import Control.Concurrent (forkOS)
+import Control.Concurrent (forkOS, threadDelay)
 import qualified Control.Concurrent.STM as STM
 
 
@@ -80,7 +80,9 @@ runStack embed pstate hwact helpers = do
 
     let appPLIs = mapMaybe getAppPLI plis
     initAppInterface pstate hwact stackname h appPLIs
-    commandLineInterface
+    putStrLn "Pipelines are started, need module verification"
+    noCommandInterface
+    --commandLineInterface
 
     putStrLn "Doing cleanup..."
     PLI.stopPipelines h
@@ -120,6 +122,12 @@ plAssign (_,n)
 plConnect :: PL.Pipeline -> PL.Pipeline -> (PLI.POutput,PLI.PInput)
 plConnect i o = (PLI.POQueue n, PLI.PIQueue n)
     where n = PL.plLabel i ++ "_to_" ++ PL.plLabel o
+
+noCommandInterface :: IO ()
+noCommandInterface = do
+    threadDelay $ 1000000 * 60
+    putStrLn "1 min sleep is over, sleeping again"
+    noCommandInterface
 
 commandLineInterface :: IO ()
 commandLineInterface = do

@@ -12,31 +12,41 @@ MEMASLAP_CMD ="sudo ./runBetter.sh memaslap -t%ds --cfg_cmd=../libmemcached-1.0.
 
 SRV_CMDS = {
     "memcached" : {
-                    "client_extra_opts" : "%d" % (MEMCACHED_PORT),
                     "init_cmd" : [
                         #"sudo killall memcached || true",
                         #"echo 0 | sudo tee /proc/sys/net/core/busy_poll",
                         #"echo 0 | sudo tee /proc/sys/net/core/busy_read",
                     ],
                     "exec_cmd" : "sudo ./runBetter.sh ../memcached/memcached -c 64000 -m 64000 -u ubuntu ",
-                    #"exec_cmd" : "../memcached/memcached -d -u ubuntu ",
-                    #"exec_cmd" : "./memcached_wrapper.sh -u ubuntu ",
-                    "kill_cmd" : ["sudo killall memcached || true"],
+                    #"kill_cmd" : ["sudo killall memcached || true"],
+                    "kill_cmd" : [],
+                    "out_cmd" : [],
+                },
+    "memcached_dragonet" : {
+                    "init_cmd" : [
+                        "cd dragonet/Dragonet/ ; sudo taskset -c 0,1,2,3 ./deployDragonetE10k.sh ",
+                        #"sudo killall memcached || true",
+                        #"echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                        #"echo 0 | sudo tee /proc/sys/net/core/busy_read",
+                                ],
+                    "exec_cmd" : "sudo ./runBetter.sh ../memcached/memcached -N -c 64000 -m 64000 -u ubuntu ",
+                    "kill_cmd" : [
+                                "sudo killall memcached || true",
+                                "sudo killall llvm-cgen-e10k || true",
+                                 ],
                     "out_cmd" : [],
                 },
     "memcached_onload" : {
-                    "client_extra_opts" : "%d" % (MEMCACHED_PORT),
                     "init_cmd" : [
                         #"sudo killall memcached || true",
-                        "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
-                        "echo 0 | sudo tee /proc/sys/net/core/busy_read",
+                        #"echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                        #"echo 0 | sudo tee /proc/sys/net/core/busy_read",
                                 ],
-                        "exec_cmd" : "sudo ./runBetter.sh %s ../memcached/memcached -c 64000 -m 64000 -u ubuntu ",
+                        "exec_cmd" : "sudo ./runBetter.sh %s ../memcached/memcached -c 64000 -m 64000 -u ubuntu " % (onload_prefix),
                         "kill_cmd" : ["sudo killall memcached || true"],
                         "out_cmd" : [],
                 },
     "memcached_poll" : {
-                    "client_extra_opts" : "%d" % (MEMCACHED_PORT),
                     "init_cmd" : [
                         #"sudo killall memcached || true",
                         "echo 50 | sudo tee /proc/sys/net/core/busy_poll",
