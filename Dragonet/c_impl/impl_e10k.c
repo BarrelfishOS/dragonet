@@ -379,6 +379,16 @@ node_out_t do_pg__RxE10kQueue001(struct state *state, struct input *in)
     return rx_queue(state, in, 1);
 }
 
+node_out_t do_pg__RxE10kQueue002(struct state *state, struct input *in)
+{
+    return rx_queue(state, in, 2);
+}
+
+node_out_t do_pg__RxE10kQueue003(struct state *state, struct input *in)
+{
+    return rx_queue(state, in, 3);
+}
+
 
 node_out_t do_pg__TxE10kQueue000(struct state *state, struct input *in)
 {
@@ -390,8 +400,14 @@ node_out_t do_pg__TxE10kQueue001(struct state *state, struct input *in)
     return tx_queue(state, in, 1);
 }
 
+node_out_t do_pg__TxE10kQueue002(struct state *state, struct input *in)
+{
+    return tx_queue(state, in, 2);
+}
 
-
-
+node_out_t do_pg__TxE10kQueue003(struct state *state, struct input *in)
+{
+    return tx_queue(state, in, 3);
+}
 
 

@@ -23,7 +23,8 @@ import threading, time, shlex, subprocess, re, time, sys, math, os, tempfile, si
 
 from datetime import datetime
 
-from .settings import settings, Glob
+from .settings import settings, Glob, writeLog
+from collections import OrderedDict
 
 import json as js
 from .util import gzip_open
@@ -38,21 +39,15 @@ JSON_INDENT=4
 class MachineRunner(object):
     """Machine abstraction to capture machines involved in experiment"""
     def __init__(self, m_name, deployment_host,
-            result_location, tools_location, is_server, logfile):
-        self.tool_instances = {}
-        self.threads = {}
-        #if settings.LOG_FILE is None:
-        #    self.logfile = None
-        #else:
-        #    self.logfile = open(settings.LOG_FILE, "a")
-
+            result_location, tools_location, is_server):
+        self.tool_instances = OrderedDict()
+        self.threads = OrderedDict()
         self.is_server = is_server
         self.postprocessors = []
         self.machine_metadata = None
         self.m_name = m_name
         self.deployment_host = deployment_host
         self.result = None
-        self.logfile = logfile
         self.result_location = result_location
         self.tools_location = '${HOME}/dragonet/benchmarking/netperf-wrapper/'
         self.tools_to_run = []
@@ -129,14 +124,20 @@ class ProcessRunner(threading.Thread):
         else :
             self.command = "bash -c 'cd %s ; %s'" % (self.machine_ref.tools_location, command)
 
-        #print "The runner %s:  [%s]" % (self.machine_ref, self.command)
+        self.logMsg ("The runner %s:  [%s]" % (self.machine_ref, self.command))
         self.args = shlex.split(self.command)
+
+    def logMsg(self, msg):
+        writeLog("%s: %s\n" % (self.name, msg))
 
     def fork(self):
         # doing initial setup
         if self.init_cmd:
             for cmd in self.init_cmd:
-                self.machine_ref._exec_cmd_blocking(cmd)
+                self.logMsg ("Machine %s: Executing init command [%s]" % (
+                        self.machine_ref, cmd))
+                ans = self.machine_ref._exec_cmd_blocking(cmd)
+                self.logMsg ("the response of executing init command is \n%s\n" %(ans))
 
         # Use named temporary files to avoid errors on double-delete when
         # running on Windows/cygwin.
@@ -204,7 +205,7 @@ class ProcessRunner(threading.Thread):
 
 #        print "Waiting for process id %d " % (self.pid)
         pid, sts = os.waitpid(self.pid, 0)
-#        print "process id %d died/finished with status %s" % (pid, sts)
+        self.logMsg ("process id %d died/finished with status %s" % (pid, sts))
         self._handle_exitstatus(sts)
 
         self.stdout.seek(0)

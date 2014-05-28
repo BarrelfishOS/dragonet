@@ -9,7 +9,7 @@
 
 #include "app_control.h"
 
-#define MAX_APPS 8
+#define MAX_APPS 20
 
 void app_control_init(
     const char *stackname,

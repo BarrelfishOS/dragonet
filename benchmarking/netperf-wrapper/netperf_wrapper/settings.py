@@ -38,7 +38,13 @@ from netperf_wrapper.build_info import DATA_DIR, VERSION
 from netperf_wrapper.metadata import record_extended_metadata, record_machine_metadata
 from netperf_wrapper import util
 
-#import datetime
+
+LOGFILE_HANDLE = None
+
+def writeLog(msg):
+    #global LOGFILE_HANDLE
+    if LOGFILE_HANDLE:
+        LOGFILE_HANDLE.write("%s\n" % (msg))
 
 def timeStamped(t=None, fmt='%Y%m%d%H%M%S'):
     if t :
@@ -58,7 +64,7 @@ DEFAULT_SETTINGS = {
     'RUN_CONF': {},
     'SERVERS_CORECOUNT': {},
     'SERVERS_INSTANCES': 1,
-    'SERVER_CORESHIFT' :4,
+    'SERVER_CORESHIFT' : 4,
     'CLIENTS': [],
     'CLIENTS_IF': {},
     'CLIENTS_CORECOUNT': {},
@@ -609,7 +615,12 @@ def load_gui(settings):
     gui.run_gui(settings) # does not return
 
 def load():
+    global LOGFILE_HANDLE
     (dummy,args) = parser.parse_args(values=settings)
+
+    if settings.LOG_FILE:
+        LOGFILE_HANDLE = open(settings.LOG_FILE, "a")
+    writeLog("logfile opened")
 
     # If run with no args and no controlling TTY, launch the GUI by default
     if not sys.stdin.isatty() and not sys.stdout.isatty() and not sys.stderr.isatty() \

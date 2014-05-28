@@ -139,7 +139,12 @@ int dn_stack_init(uint16_t uport)
     pthread_mutex_init(&dn_lock, NULL);
     pthread_mutex_lock(&dn_lock);
     int ret = 1;
-    stack = stack_init("dragonet", "AppEcho");
+    int sid = uport - 7777;
+    char appName[50];
+
+    snprintf(appName, sizeof(appName), "t%d", sid);
+    printf("Using %s as name to connect with\n", appName);
+    stack = stack_init("dragonet", appName);
     sh = socket_create(stack, recv_cb, NULL);
     if (!socket_bind_udp_listen(sh, 0, uport)) {
         fprintf(stderr, "socket_bind_udp_listen failed\n");

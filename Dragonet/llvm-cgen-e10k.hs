@@ -59,7 +59,7 @@ e10kAction ais act = do
 main :: IO ()
 main = do
     let helpers = "llvm-helpers-e10k"
-        nQ = 2
+        nQ = 4
         e10kS = E10KP.e10kPStateInit 128
         pstate = INC.policyStateInit nQ e10kS E10KP.e10kPolicy
 

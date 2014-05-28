@@ -21,26 +21,20 @@
 
 import math, pprint, signal, sys, time
 from datetime import datetime
+from collections import OrderedDict
 
 from . import runners, transformers
 
 from .util import classname
 
-from .settings import settings
+from .settings import settings, writeLog
 import collections
 
 class Aggregator(object):
     """Basic aggregator. Runs all jobs and returns their result."""
 
     def __init__(self):
-        #self.instances = {}
-        self.m_instances = {}
-        #self.threads = {}
-        if settings.LOG_FILE is None:
-            self.logfile = None
-        else:
-            self.logfile = open(settings.LOG_FILE, "a")
-
+        self.m_instances = OrderedDict()
         self.postprocessors = []
 
 
@@ -56,7 +50,7 @@ class Aggregator(object):
         tools_2run = m_instance['TOOLS']
         m_is_server = m_instance['is_server']
         m_instance['machine'] = m_instance['machine'](m_name=name, deployment_host=dep_h,
-            result_location=res_loc, tools_location=tool_loc, is_server=m_is_server, logfile=None)
+            result_location=res_loc, tools_location=tool_loc, is_server=m_is_server)
 
         for ts in list(tools_2run.items()):
             #print "Adding test for %s" % (str(ts))
@@ -66,7 +60,6 @@ class Aggregator(object):
             #agg.add_machine(*ts)
 
         self.m_instances[name] = m_instance
-
 
     def add_t_instance(self, machine,  name, config):
         instance = dict(config)
@@ -110,23 +103,23 @@ class Aggregator(object):
         #print "##############################"
         #print "##############################"
 
-        if self.logfile:
-            self.logfile.write("%s:Setting up machines\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
+        writeLog("%s:Setting up machines\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
 
-        result = {}
+        #result = {}
+        result = OrderedDict()
         try:
             for m, i in list(self.m_instances.items()):
                 #print "Setting up machine [%s, %s] " % (str(m), str((i)))
                 self.m_instances[m]['machine'].setup_machine()
-                result[m] = {}
+                #result[m] = {}
+                result[m] = OrderedDict()
                 #result[m]['MACHINE_METADATA'] = self.m_instances[m]['machine'].read_machine_metadata()
                 #record_machine_metadata()
 
         except KeyboardInterrupt:
             raise
 
-        if self.logfile:
-            self.logfile.write("%s: Start run\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
+        writeLog("%s: Start run\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
 
         #print "##############################"
         try:
@@ -225,9 +218,7 @@ class Aggregator(object):
             self.kill_runners()
             raise
 
-        if self.logfile is not None:
-            self.logfile.write("Raw aggregated data:\n")
-            pprint.pprint(result, self.logfile)
+        #pprint.pprint(result, self.logfile)
         print "%s: Done with collecting data\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
         return result
 
@@ -241,14 +232,12 @@ class Aggregator(object):
         return result
 
     def _log(self, name, runner):
-        if self.logfile is None:
-            return
-        self.logfile.write("Runner: %s - %s\n" % (name, runner.__class__.__name__))
-        self.logfile.write("Command: %s\nReturncode: %d\n" % (runner.command, runner.returncode))
-        self.logfile.write("Program stdout:\n")
-        self.logfile.write("  " + "\n  ".join(runner.out.splitlines()) + "\n")
-        self.logfile.write("Program stderr:\n")
-        self.logfile.write("  " + "\n  ".join(runner.err.splitlines()) + "\n")
+        writeLog("Runner: %s - %s\n" % (name, runner.__class__.__name__))
+        writeLog("Command: %s\nReturncode: %d\n" % (runner.command, runner.returncode))
+        writeLog("Program stdout:\n")
+        writeLog("  " + "\n  ".join(runner.out.splitlines()) + "\n")
+        writeLog("Program stderr:\n")
+        writeLog("  " + "\n  ".join(runner.err.splitlines()) + "\n")
 
 class IterationAggregator(Aggregator):
     """Iteration aggregator. Runs the jobs multiple times and aggregates the
@@ -322,7 +311,8 @@ class TimeseriesAggregator(Aggregator):
             # for each step we need to find the interpolated measurement value
             # at time t by interpolating between the nearest measurements before
             # and after t
-            result = {}
+            #result = {}
+            result = OrderedDict()
             # n is the name of this measurement (from the config), r is the list
             # of measurement pairs (time,value)
             for n,r in list(measurements.items()):

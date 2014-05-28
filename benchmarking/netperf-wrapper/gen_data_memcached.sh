@@ -92,7 +92,7 @@ run_bm_tp_rr() {
         -H ${srvName} ${cliName6} \
         --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} \
-        --concurrency ${CBRUST} -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
+        --concurrency ${CBRUST} -t "${title}" -o "${ALLRESULTS}" -L "${MYTMPDIR}/${title}.log" | tee ${TMPFILE}
 
         let CTP=NTP
 
@@ -105,6 +105,7 @@ run_bm_tp_rr() {
         echo "#################################################"
 
         cat ${TMPFILE} >> ${FINALRESULT}
+        cat ${TMPFILE} >>  ${MYTMPDIR}/${title}.log
         rm -f ${TMPFILE}
         ./cleanup.sh
         sleep 3
@@ -121,11 +122,12 @@ run_bm_tp_rr() {
         -H ${srvName} ${cliName6} \
         --servercores ${SERVERCORES}  --serverInstances ${SERVERINSTANCES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} \
-        --concurrency ${LBRUST} -t "${title}" -o "${ALLRESULTS}" -L "${TMPLOG}" | tee ${TMPFILE}
+        --concurrency ${LBRUST} -t "${title}" -o "${ALLRESULTS}" -L "${MYTMPDIR}/${title}.log" | tee ${TMPFILE}
 
     set +x
     set +e
     cat ${SAMARRYFILE} >> ${FINALRESULT}
+    cat ${TMPFILE} >>  ${MYTMPDIR}/${title}.log
     rm -f ${SAMARRYFILE}
     echo "done with while [  $NTP -gt $CTP ]; do"
     echo "#############################################################"
@@ -177,11 +179,10 @@ get_scalability_special() {
 
 
 get_scalability_instances() {
+    get_best_tp 1 1
+    get_best_tp 2 1
     get_best_tp 4 1
-    #get_best_tp 1 1
-    #get_best_tp 2 1
-    #get_best_tp 8 1
-
+#    get_best_tp 8 1
 #    get_best_tp 10 1
 #    get_best_tp 12 1
 #    get_best_tp 14 1
@@ -303,20 +304,17 @@ ITERATIONS=5
 ITERATIONS=3
 
 DURATION=10
-CORESHIFT=4
+CORESHIFT=8
 SERVERINSTANCES=1
 
 USE_PROTO="tcp"
 USE_PROTO="udp"
 
-MAIN_OUTPUT_DIR="../memcachedResults/both_proto/${1}/"
-MAIN_OUTPUT_DIR="../memcachedResults/deleteme/${1}/"
-MAIN_OUTPUT_DIR="../memcachedResults/deleteme_udp_instances_filters_4/${1}/"
-MAIN_OUTPUT_DIR="../memcachedResults/dn_test_run/${1}/"
 ECHO_SERVER="memcached_onload"
 ECHO_SERVER="memcached_poll"
 ECHO_SERVER="memcached"
 ECHO_SERVER="memcached_dragonet"
+MAIN_OUTPUT_DIR="../memcachedResults/dn_test/${1}/"
 GRAPH_GEN_CMDS="${MAIN_OUTPUT_DIR}/graph_gen_cmds.sh"
 
 ./cleanup.sh
@@ -325,10 +323,10 @@ GRAPH_GEN_CMDS="${MAIN_OUTPUT_DIR}/graph_gen_cmds.sh"
 use_asiago_server_intel_switched
 setup_output_location
 
-get_scalability_threads
-exit 0
 get_scalability_instances
+exit 0
 ##############################
+get_scalability_threads
 get_best_latency 1 1 1
 
 get_scalability_instances
