@@ -241,6 +241,24 @@ errval_t dnal_socket_create(dnal_appq_t   aq,
     return SYS_ERR_OK;
 }
 
+static errval_t sockh_from_sockinfo(struct dnal_socket_handle   *sh,
+                                    struct app_control_message  *msg,
+                                    struct dnal_net_destination *dest)
+{
+    if (msg->type == APPCTRL_SOCKET_INFO) {
+        sh->bound = true;
+        sh->dest = *dest;
+        sh->id = msg->data.socket_info.id;
+        sh->mux_id = msg->data.socket_info.mux_id;
+        sh->outqueue = msg->data.socket_info.outq;
+    } else {
+        assert(msg->type == APPCTRL_STATUS);
+        // Something went wrong
+        return DNERR_UNKNOWN;
+    }
+    return SYS_ERR_OK;
+}
+
 errval_t dnal_socket_bind(dnal_sockh_t                 sh,
                           struct dnal_net_destination *dest)
 {
@@ -271,19 +289,23 @@ errval_t dnal_socket_bind(dnal_sockh_t                 sh,
 
     control_send(aq, &msg);
     control_recv(aq, &msg);
-    if (msg.type == APPCTRL_SOCKET_INFO) {
-        sh->bound = true;
-        sh->dest = *dest;
-        sh->id = msg.data.socket_info.id;
-        sh->mux_id = msg.data.socket_info.mux_id;
-        sh->outqueue = msg.data.socket_info.outq;
-    } else {
-        assert(msg.type == APPCTRL_STATUS);
-        // Something went wrong
-        return DNERR_UNKNOWN;
-    }
-    return SYS_ERR_OK;;
+    return sockh_from_sockinfo(sh, &msg, dest);
+}
 
+errval_t dnal_socket_span(dnal_sockh_t sh,
+                          dnal_appq_t  naq,
+                          dnal_sockh_t nsh)
+{
+    struct app_control_message msg;
+
+    assert(sh->bound);
+    assert(!nsh->bound);
+
+    msg.type = APPCTRL_SOCKET_SPAN;
+    msg.data.socket_span.id = sh->id;
+    control_send(naq, &msg);
+    control_recv(naq, &msg);
+    return sockh_from_sockinfo(nsh, &msg, &sh->dest);
 }
 
 errval_t dnal_socket_send(dnal_sockh_t                 sh,

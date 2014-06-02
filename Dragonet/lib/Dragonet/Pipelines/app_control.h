@@ -19,6 +19,7 @@ enum app_control_type {
     APPCTRL_REGISTER,           // App -> Dragonet
     APPCTRL_SOCKET_UDPLISTEN,   // App -> Dragonet
     APPCTRL_SOCKET_UDPFLOW,     // App -> Dragonet
+    APPCTRL_SOCKET_SPAN,        // App -> Dragonet
     APPCTRL_SOCKET_CLOSE,       // App -> Dragonet
 };
 
@@ -56,6 +57,9 @@ struct app_control_message {
         } socket_udpflow;
         struct {
             socket_id_t id;
+        } socket_span;
+        struct {
+            socket_id_t id;
         } socket_close;
     } data;
 };
@@ -67,6 +71,7 @@ void app_control_init(
     void (*stop_application)(int,bool),
     void (*socket_udplisten)(int,uint32_t,uint16_t),
     void (*socket_udpflow)(int,uint32_t,uint16_t,uint32_t,uint16_t),
+    void (*socket_span)(int,socket_id_t),
     void (*socket_close)(int,socket_id_t));
 
 void app_control_send_welcome(int fd, app_id_t id,

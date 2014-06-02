@@ -171,16 +171,13 @@ errval_t dnal_socket_bind(dnal_sockh_t                 sockethandle,
  * Note: This provides no kind of guarantees about which queue which packets
  *       will be received on.
  *
- * TODO: Should this be limited to sockets that are already bound to a
- *       particular network endpoint?
- *
- * @param orig         Handle for socket to be spanned
+ * @param orig         Handle for socket to be spanned (must be bound)
  * @param newqueue     App queue to create socket on
- * @param sockethandle Location to store new socket handle
+ * @param sockethandle Undbound socket handle (from socket_create) on newqueue
  */
-errval_t dnal_socket_span(dnal_sockh_t  orig,
-                          dnal_appq_t   newqueue,
-                          dnal_sockh_t *sockethandle);
+errval_t dnal_socket_span(dnal_sockh_t orig,
+                          dnal_appq_t  newqueue,
+                          dnal_sockh_t sockethandle);
 
 /**
  * Close particular socket handle.

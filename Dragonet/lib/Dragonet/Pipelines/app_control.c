@@ -18,6 +18,7 @@ void app_control_init(
     void (*stop_application)(int,bool),
     void (*socket_udplisten)(int,uint32_t,uint16_t),
     void (*socket_udpflow)(int,uint32_t,uint16_t,uint32_t,uint16_t),
+    void (*socket_span)(int,socket_id_t),
     void (*socket_close)(int,socket_id_t))
 {
     int appfds[MAX_APPS];
@@ -136,6 +137,10 @@ void app_control_init(
                             msg.data.socket_udpflow.d_ip,
                             msg.data.socket_udpflow.d_port);
                     break;
+                case APPCTRL_SOCKET_SPAN:
+                    printf("APPCTRL_SOCKET_SPAN\n");
+                    socket_span(appfds[i], msg.data.socket_span.id);
+                    break;
                 case APPCTRL_SOCKET_CLOSE:
                     printf("APPCTRL_SOCKET_CLOSE\n");
                     socket_close(appfds[i], msg.data.socket_close.id);
@@ -174,7 +179,7 @@ void app_control_send_status(int fd, bool success)
 
 void app_control_send_queue(int fd, bool out, const char *label)
 {
-    printf("app_control_send_status\n");
+    printf("app_control_send_queue (o=%d,l=%s)\n", out, label);
     struct app_control_message msg;
     msg.type = (out ? APPCTRL_OUTQUEUE : APPCTRL_INQUEUE);
     if (strlen(label) >= MAX_QUEUELBL) {
