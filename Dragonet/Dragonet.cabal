@@ -233,6 +233,16 @@ executable bench-echo
                         lib/Dragonet/Pipelines/
     CC-options:         -Wall -Wno-unused-function
 
+executable bench-fancyecho
+    main-is:            microbenchmark/fancyecho.c
+    Hs-source-dirs:     apps
+    other-modules:      Dummy
+    build-depends:      base, apps
+    include-dirs:       apps/lib/include,
+                        c_impl/include/,
+                        lib/Dragonet/Pipelines/
+    CC-options:         -Wall -Wno-unused-function
+
 executable bench-echo-flow
     main-is:            microbenchmark/echo-flow.c
     Hs-source-dirs:     apps
