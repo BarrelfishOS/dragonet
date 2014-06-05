@@ -415,6 +415,7 @@ graph lpg {
 
         cluster L3ARP {
             node SendGratuitous {
+                attr "noreplicateininout"
                 port false true[Prepare] }
 
             node InitiateResponse {
@@ -444,6 +445,7 @@ graph lpg {
                 port miss[SendRequest] }
 
             node SendRequest {
+                attr "noreplicateout"
                 port false true[Prepare]
                 port drop[] }
         }

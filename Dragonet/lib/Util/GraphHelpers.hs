@@ -9,6 +9,8 @@ module Util.GraphHelpers(
     filterNodesByL,
     elliminateConflicts,
     mergeGraphsBy,
+    MergeDecision(..),
+    mergeGraphsBy',
     RecContext,
     recurseNFW,
     topsortLN,
@@ -19,6 +21,7 @@ import Data.Graph.Inductive
 import qualified Data.Graph.Inductive.Query.DFS as DFS
 import qualified Data.List as L
 import qualified Control.Arrow as A
+import Data.Maybe (mapMaybe)
 
 delLEdges :: (DynGraph gr, Eq b) => [LEdge b] -> gr a b -> gr a b
 delLEdges es g = foldr delLEdge g es
@@ -61,38 +64,6 @@ reduceNodes g ns = delNodes toDelete g
     where
         toDelete = filter (`notElem` ns) $ nodes g
 
--- Integrate second graph into first graph, combining nodes according to predicate
-mergeGraphsBy :: DynGraph gr => (a -> a -> Bool) -> gr a b -> gr a b -> gr a b
-mergeGraphsBy nC a b = flip insEdges gNodes $ map convertEdge $ labEdges b
-    where
-        nb = labNodes b
-
-        -- Build tuple with node ID the second graph and
-        -- Either (Left a) (Right Node), left is for nodes not existing in the
-        -- first graph and specifies the label, while right specifies a node ID
-        -- from the first graph
-        assocN ln = (n, maybe (Left l) (Right . fst) $ findNodeByL (nC l) a)
-            where (n,l) = ln
-
-        -- Allocate node in the first graph if no match from second graph was
-        -- found. Return new graph and lists of tuples mapping from old ID to
-        -- new ID.
-        mapNode (g,l) (x,Left y) = (g',(x,Left n):l)
-            where
-                g' = insNode (n,y) g
-                n = head $ newNodes 1 g
-        mapNode (g,l) (x,Right y) = (g,(x,Right y):l)
-
-        -- gNodes = graph with new nodes (but no edges yet)
-        -- nMap = association list of old node IDs to Either Node Node. Left is
-        -- used for newly allocated nodes, while right is used for existing
-        -- nodes.
-        nMap :: [(Node,Either Node Node)]
-        (gNodes,nMap) = foldl mapNode (a,[]) $ map assocN nb
-        convertNode n = either id id e'
-            where (Just e') = lookup n nMap
-        convertEdge (nA,nB,l) = (convertNode nA, convertNode nB, l)
-
 -- Adjacency list for context
 type LAdj n e = [(e,n)]
 
@@ -129,4 +100,69 @@ updateN f n g = gmap change g
         change ctx@(i,n',l,o)
             | n' == n = (i,n',f l,o)
             | otherwise = ctx
+
+
+data MergeDecision =
+    MergeNo |  -- Don't merge nodes
+    Merge   |  -- Merge nodes, but drop all incoming and outgoing edges from b
+    MergeIn |  -- Merge nodes, but only add incoming edges from new graph
+    MergeInOut -- Merge nodes and add both incoming and outgoing edges
+
+-- Integrate second graph into first graph, combining nodes according to predicate
+mergeGraphsBy' :: DynGraph gr => (a -> a -> MergeDecision) -> gr a b -> gr a b -> gr a b
+mergeGraphsBy' nC a b = flip insEdges gNodes $ mapMaybe convertEdge $ labEdges b
+    where
+        nb = labNodes b
+        pred x y = case nC x y of
+                    MergeNo -> False
+                    _ -> True
+
+        -- Build tuple with node ID the second graph and
+        -- Either (Left a) (Right (Node,Bool)), left is for nodes not existing
+        -- in the first graph and specifies the label, while right specifies a
+        -- node ID from the first graph and the merge decision
+        assocN ln =
+            case findNodeByL (pred l) a of
+                Nothing -> (n, Left l)
+                Just (mn,ml) -> (n, Right (mn, nC l ml))
+            where (n,l) = ln
+
+        -- Allocate node in the first graph if no match from second graph was
+        -- found. Return new graph and lists of tuples mapping from old ID to
+        -- new ID.
+        mapNode (g,l) (x,Left y) = (g',(x,Left n):l)
+            where
+                g' = insNode (n,y) g
+                n = head $ newNodes 1 g
+        mapNode (g,l) (x,Right y) = (g,(x,Right y):l)
+
+        -- gNodes = graph with new nodes (but no edges yet)
+        -- nMap = association list of old node IDs to Either Node Node. Left is
+        -- used for newly allocated nodes, while right is used for existing
+        -- nodes.
+        nMap :: [(Node,Either Node (Node,MergeDecision))]
+        (gNodes,nMap) = foldl mapNode (a,[]) $ map assocN nb
+
+        -- Convert a node from an edge. Will return Nothing if this node is the
+        -- edge source, but outgoing edges should not be added, same for
+        -- incoming edeges
+        convertNode n out = either Just convRight e'
+            where
+                (Just e') = lookup n nMap
+                convRight (n',Merge) = Nothing
+                convRight (n',MergeIn) = if out then Just n' else Nothing
+                convRight (n',MergeInOut) = Just n'
+
+        -- Convert edge if it should be added
+        convertEdge (nA,nB,l) = do
+            iN <- convertNode nA False
+            oN <- convertNode nB True
+            return (iN, oN, l)
+
+-- Integrate second graph into first graph, combining nodes according to predicate
+mergeGraphsBy :: DynGraph gr => (a -> a -> Bool) -> gr a b -> gr a b -> gr a b
+mergeGraphsBy nC = mergeGraphsBy' ((fromPred .) . nC)
+    where
+        fromPred True = MergeInOut
+        fromPred False = MergeNo
 

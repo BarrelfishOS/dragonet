@@ -2,7 +2,8 @@ import qualified Data.Graph.Inductive as DGI
 
 import Dragonet.ProtocolGraph  as PG
 import qualified Dragonet.Incremental as INC
-import Util.GraphHelpers (findNodeByL,mergeGraphsBy,delLEdges,updateN)
+import Util.GraphHelpers (findNodeByL,mergeGraphsBy',delLEdges,updateN,
+                            MergeDecision(..))
 
 import qualified Data.List as L
 import Data.Maybe (fromJust)
@@ -14,6 +15,22 @@ import qualified Runner.E10KControl as E10K
 import qualified Runner.E10KPolicy as E10KP
 import Runner.Common
 
+
+-- Decides whether replicated versions of nodes should be merged
+nodesMatch a b
+    | nLabel a /= nLabel b = MergeNo
+    | otherwise =
+        case (both isNoRec a b, both isNoRecOut a b, both isNoRecInOut a b) of
+            (True,_,_) -> MergeInOut
+            (_,True,_) -> MergeIn
+            (_,_,True) -> Merge
+            _          -> MergeNo
+    where
+        both f a b = f a && f b
+        isNoRec n = elem "noreplicate" $ nAttributes n
+        isNoRecOut n = elem "noreplicateout" $ nAttributes n
+        isNoRecInOut n = elem "noreplicateininout" $ nAttributes n
+
 -- Simplistic e10k multi queue embedding
 pg4e10k :: Int -> PGraph -> PGraph
 pg4e10k nQueues pg =
@@ -23,8 +40,7 @@ pg4e10k nQueues pg =
         ql i = printf "%03d" i
         queueGraph q = tagNodes ("Queue" ++ ql q) $
             renameQueues ("RxE10kQueue" ++ ql q) ("TxE10kQueue" ++ ql q) pg
-        merge = mergeGraphsBy nodesMatch
-        nodesMatch a b =  nLabel a == "RxEchoAPP" && nLabel b == "RxEchoAPP"
+        merge = mergeGraphsBy' nodesMatch
         untagApp = DGI.nmap fixAppN
         fixAppN n
             | nLabel n == "RxEchoAPP" = n { nTag = "App" }

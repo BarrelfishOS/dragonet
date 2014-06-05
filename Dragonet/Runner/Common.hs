@@ -343,7 +343,7 @@ addApp pg app =
     where
         name = "App" ++ app
         [n] = DGI.newNodes 1 pg
-        l = baseFNode name ["application"] ["out","drop"] Nothing
+        l = baseFNode name ["application","noreplicate"] ["out","drop"] Nothing
         Just (pcN,_) = pgFind pg "RxL4UDPPortClassifyDynamic"
         Just (txN,_) = pgFind pg "TxL4UDPInitiateResponse"
         edges = [(pcN,n,name),(n,txN,"out")]
