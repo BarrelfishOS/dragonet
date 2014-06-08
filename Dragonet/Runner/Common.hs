@@ -32,6 +32,8 @@ import qualified Data.Bimap as BM
 import qualified Data.List as L
 import Data.Function (on)
 import Data.Maybe
+import Data.Word
+import Data.Int
 
 import System.IO  (hFlush,stdout)
 import System.IO.Error (catchIOError)
@@ -78,8 +80,7 @@ runStack embed pstate hwact helpers = do
         return pli
     (h,plis) <- PLI.runPipelines stackname plConnect runner plg
 
-    let appPLIs = mapMaybe getAppPLI plis
-    initAppInterface pstate hwact stackname h appPLIs
+    initAppInterface pstate hwact stackname h plis
     putStrLn "Pipelines are started, need module verification"
     noCommandInterface
     --commandLineInterface
@@ -87,10 +88,6 @@ runStack embed pstate hwact helpers = do
     putStrLn "Doing cleanup..."
     PLI.stopPipelines h
     where
-        getAppPLI pli
-            | take 3 lbl == "App" = Just (drop 3 lbl,pli)
-            | otherwise = Nothing
-            where lbl = PL.plLabel $ PLI.pliPipeline pli
 
 -- Wrapper to execute pipelines, but handle application pipelines separatly
 runPipeline :: PL.PLGraph -> String -> String -> PLI.PipelineImpl -> IO ()
@@ -155,19 +152,34 @@ data SocketDesc =
 
 data AppIfState a b = AppIfState {
     aiStackState :: PLI.StateHandle,
-    aiAppIDs     :: M.Map String APP.AppId,
-    aiPLIs       :: M.Map APP.AppId PLI.PipelineImpl,
+    aiAppIDs     :: BM.Bimap String APP.AppId,
+    aiPLIs       :: [PLI.PipelineImpl],
     aiHWAct      :: AppIfState a b -> b -> IO (),
     aiSocketMap  :: STM.TVar (M.Map (APP.ChanHandle,APP.SocketId) SocketDesc),
     aiAppChans   :: STM.TVar (BM.Bimap APP.AppId APP.ChanHandle),
     aiPState     :: STM.TVar (INC.PolicyState a b)
 }
 
+-- Get PLI by label
+aisPLIByLabel :: AppIfState a b -> String -> Maybe PLI.PipelineImpl
+aisPLIByLabel ais lbl =
+    L.find ((lbl ==) . PL.plLabel . PLI.pliPipeline) $ aiPLIs ais
+
+-- Get PLI for specified app id
+aiAppPLI :: AppIfState a b -> APP.AppId -> Maybe PLI.PipelineImpl
+aiAppPLI ais aid = do
+    an <- BM.lookupR aid $ aiAppIDs ais
+    aisPLIByLabel ais ("App" ++ an)
+
+-- Get pipeline outputs in order given to application
+appPLIOutQueues :: PLI.PipelineImpl -> [(String,PLI.POutput)]
+appPLIOutQueues p = L.sortBy (compare `on` fst) $ PLI.pliOutQs p
+
 -- Handles incoming messages from control channel
 appEvent :: Show b => AppIfState a b -> APP.ChanHandle -> APP.Event -> IO ()
 appEvent ais ch (APP.EvAppRegister n) = do
     putStrLn $ "AppRegister: " ++ n
-    maID <- case M.lookup n $ aiAppIDs ais of
+    maID <- case BM.lookup n $ aiAppIDs ais of
         Just ai -> do
             acs <- STM.atomically $ STM.readTVar $ aiAppChans ais
             case BM.lookup ai acs of
@@ -176,7 +188,7 @@ appEvent ais ch (APP.EvAppRegister n) = do
         Nothing -> return $ Left "Invalid application name!"
     case maID of
         Right ai -> do
-            let p = (aiPLIs ais) M.! ai
+            let Just p = aiAppPLI ais ai
             -- Add application to channel map
             STM.atomically $ do
                 let tv = aiAppChans ais
@@ -184,7 +196,7 @@ appEvent ais ch (APP.EvAppRegister n) = do
                 STM.writeTVar tv $ BM.insert ai ch acs
             -- Send welcome message specifying number of channels and app id
             APP.sendMessage ch $
-                APP.MsgWelcome ai (length $ inq p) (length $ outq p)
+                APP.MsgWelcome ai (length $ inq p) (length $ appPLIOutQueues p)
             -- Send channel specifications
             mapM_ (APP.sendMessage ch) $ messages p
 
@@ -193,10 +205,9 @@ appEvent ais ch (APP.EvAppRegister n) = do
             APP.sendMessage ch $ APP.MsgStatus False
     where
         inq p = PLI.pliInQs p
-        outq p = L.sortBy (compare `on` fst) $ PLI.pliOutQs p
         messages p =
             (map (\(_,PLI.PIQueue l) -> APP.MsgInQueue l) $ inq p) ++
-            (map (\(_,PLI.POQueue l) -> APP.MsgOutQueue l) $ outq p)
+            (map (\(_,PLI.POQueue l) -> APP.MsgOutQueue l) $ appPLIOutQueues p)
 
 
 appEvent ais ch (APP.EvSocketUDPListen (ip,port)) = do
@@ -217,12 +228,29 @@ addSocket ais ch f = do
     let outQ = fromIntegral $ INC.sdQueue sd
         sockID = fromIntegral $ INC.sdID sd
         muxID = 6 -- FIXME
+    muxID <- muxIDFromLabel ais ch "TxL4UDPInitiateResponse" outQ
     APP.sendMessage ch $ APP.MsgSocketInfo sockID outQ muxID
+
+-- Multiplex identifier for node in output queue
+muxIDFromLabel ::
+    AppIfState a b -> APP.ChanHandle -> String -> Word8 -> IO Int32
+muxIDFromLabel ais ch nl qid = do
+    acs <- STM.atomically $ STM.readTVar $ aiAppChans ais
+    let Just aid = BM.lookupR ch acs -- AppID from channel handle
+        Just apli = aiAppPLI ais aid -- App PLI
+        qid' = fromIntegral qid
+        dstPLL = (map fst $ appPLIOutQueues apli) !! qid' -- Label for dst PL
+        Just dpli = aisPLIByLabel ais dstPLL -- Dest PLI
+        dpg = PL.plGraph $ PLI.pliPipeline dpli -- Dest PG
+        Just (_,dxn) = GH.findNodeByL (("Demux" ==) . PG.nLabel) dpg -- Demux N
+        firstIdx p l = fmap snd $ L.find (p . fst) $ zip l [0..]
+        Just pnum = firstIdx (nl ==) $ PG.nPorts dxn -- Port number
+    return pnum
 
 
 initAppInterface :: Show b =>
         INC.PolicyState a b -> (AppIfState a b -> b -> IO ()) ->
-            String -> PLI.StackHandle -> [(String,PLI.PipelineImpl)] -> IO ()
+            String -> PLI.StackHandle -> [PLI.PipelineImpl] -> IO ()
 initAppInterface pstate hwact stackname sh plis = do
     st <- PLI.stackState sh
     sm <- STM.newTVarIO M.empty
@@ -234,15 +262,18 @@ initAppInterface pstate hwact stackname sh plis = do
             aiPState = psTV,
             aiHWAct = hwact,
             aiAppIDs = appIDs,
-            aiPLIs = pliMap,
+            aiPLIs = plis,
             aiAppChans = acs }
     tid <- forkOS $ APP.interfaceThread stackname (appEvent ais)
     return ()
     where
-        apps = map fst plis
-        appIDs = M.fromList $ zip apps [1..]
-        mapPLI (l,p) = (appIDs M.! l,p)
-        pliMap = M.fromList $ map mapPLI plis
+        apps = map fst $ mapMaybe getAppPLI plis
+        appIDs = BM.fromList $ zip apps [1..]
+        mapPLI (l,p) = (appIDs BM.! l,p)
+        getAppPLI pli
+            | take 3 lbl == "App" = Just (drop 3 lbl,pli)
+            | otherwise = Nothing
+            where lbl = PL.plLabel $ PLI.pliPipeline pli
 
 
 --------------------------------------------------------------------------------
