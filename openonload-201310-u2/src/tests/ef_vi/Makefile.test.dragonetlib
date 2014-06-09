@@ -1,0 +1,39 @@
+SHELL = /bin/sh
+CC    = gcc
+INCLUDE	     = ../../include/
+FLAGS        = #-std=gnu99 -I$(INCLUDE)
+CFLAGS       = -fPIC -g -I$(INCLUDE) -lpthread -lciul #-pedantic -Wall -Wextra -march=native -ggdb3 -std=gnu99
+DEBUGFLAGS   = -O2
+RELEASEFLAGS = -O2 -D NDEBUG -combine -fwhole-program
+LDFLAGS		= -shared
+
+CLANG           = clang
+LLVM_LINK       = llvm-link
+
+#CFLAGS          = -Wall -O2 -flto
+#LDFLAGS         = -O2 -flto
+
+
+TARGET  = libexample.so
+#SOURCES = $(shell echo *.c)
+#HEADERS = $(shell echo *.h)
+SOURCES = efdragonet.c  efvi_sfw.c
+OBJECTS = $(SOURCES:.c=.o)
+BCOBJECTS = $(SOURCES:.c=.bc)
+SF_CFLAGS       = -fPIC -g -I$(INCLUDE)
+
+all: $(TARGET)
+
+$(TARGET): $(OBJECTS)
+	$(CC) $(FLAGS) $(CFLAGS) $(DEBUGFLAGS) -o $(TARGET) $(OBJECTS) -shared
+
+
+%.bc : %.c
+	$(CLANG) $(SF_CFLAGS) -c -emit-llvm $^ -o $@
+
+llvmVer:  $(BCOBJECTS)
+	echo "hi there"
+clean:
+	rm -f $(OBJECTS) $(TARGET) $(BCOBJECTS)
+
+

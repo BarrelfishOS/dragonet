@@ -11,8 +11,6 @@ do
 done
 
 cat /proc/meminfo | grep HugePages_Free
-pwd
-file ./dist/build/llvm-cgen-e10k/llvm-cgen-e10k
 nohup sudo ./dist/build/llvm-cgen-e10k/llvm-cgen-e10k $@ > some.log 2>&1 < /dev/null  &
 sleep 5
 echo "Done with lunching Dragonet network stack"

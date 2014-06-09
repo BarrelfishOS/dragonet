@@ -120,15 +120,7 @@
 #define APPEND_NUM_STAT(num, name, fmt, val) \
     APPEND_NUM_FMT_STAT("%d:%s", num, name, fmt, val)
 
-//#define MYDEBUG     1
-#ifdef MYDEBUG
-#define mprint(x...)    printf("debug:" x)
-#else
-#define mprint(x...)   ((void)0)
-#endif // MYDEBUG
-
 #include "dnet_interface.h"
-
 
 /**
  * Callback for any function producing stats.

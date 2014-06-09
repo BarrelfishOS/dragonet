@@ -188,8 +188,9 @@ runPipeline :: PL.PLGraph -> String -> String -> PI.PipelineImpl -> IO ()
 runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
     putStrLn $ "Initializing pipeline " ++ mname
     withHelpers llvm_helpers $ \hf -> do
-        putStrLn "Helpers ready"
+        putStrLn "Helpers ready...."
         pl_funs <- pl_get_funs hf
+        putStrLn "functions ready"
         (plh,qm) <- initPipeline stackname pli pl_funs
         putStrLn "Pipeline Queues initialized"
         splh <- hf "set_pipeline_handle"

@@ -43,6 +43,7 @@ import System.Exit (exitSuccess)
 
 import qualified Runner.LLVM as LLVM
 --import qualified Runner.Dynamic as Dyn
+--import qualified Runner.Dynamic as LLVM
 
 
 

@@ -29,7 +29,8 @@
 #define BULK_BUFFERNUM 1024
 
 //#define dprintf printf
-#define dprintf printf_dummy
+#define dprintf dprint
+//#define dprintf printf_dummy
 static inline void printf_dummy(const char *fmt, ...) { }
 
 struct dragonet_bulk_meta {

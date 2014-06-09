@@ -53,8 +53,15 @@ void stack_process_event(struct stack_handle *stack)
     struct dnal_aq_event ev;
     errval_t err;
 
+//    dprint("debug(%s:%s:%d): called\n",
+//                __FILE__, __FUNCTION__, __LINE__);
+
     err = dnal_aq_poll(stack->aq, &ev);
     if (err == DNERR_NOEVENT || err == DNERR_EVENT_ABORT) {
+        dprint("ERROR (%s:%s:%d): no event or event abort %d(%s)\n",
+                __FILE__, __FUNCTION__, __LINE__, (int)err,
+                ((err == DNERR_NOEVENT)? "NOEVENT":"ABORT"));
+        // FIXME: we need a way to return what exactly happened
         return;
     } else {
         err_expect_ok(err);

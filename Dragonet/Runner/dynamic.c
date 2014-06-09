@@ -234,9 +234,9 @@ void dyn_rungraph(struct dynamic_graph *graph,
             count = 0;
             while ((n = node_stack_pop(&ns)) != NULL) {
                 count++;
-                //if (count > 1) printf("Execute: %s\n", n->name);
+//                if (count > 1) printf("Execute: %s\n", n->name);
                 out = run_node(n, plh, st, in, version);
-                //if (count > 1) printf("   port=%d\n", out);
+//                if (count > 1) printf("   port=%d\n", out);
                 if (out >= 0 && n->num_ports == 0) {
                     // Terminal node
                     out = -2;
@@ -262,7 +262,7 @@ void dyn_rungraph(struct dynamic_graph *graph,
                     e = e->so_next;
                 }
             }
-            //if (count > 1) printf("\n");
+//            if (count > 1) printf("\n");
 
             version++;
             if (version == -1) {

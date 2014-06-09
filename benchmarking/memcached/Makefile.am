@@ -34,6 +34,7 @@ memcached_SOURCES += sasl_defs.c
 endif
 
 BULKTRANSPORT_INCLUDES = "-I../../external/bulktransfer/include/"
+BARRELFISH_INCLUDES = "-I../../external/barrelfish/include/"
 BULKTRANSPORTLIB = $(shell find ../../external/bulktransfer/dist/ -name "libHSbulktransfer*" -exec dirname {} \;)
 
 BARRELFISHLIB = $(shell find ../../external/barrelfish/dist/ -name "libHSbarrelfish*" -exec dirname {} \;)
@@ -46,7 +47,7 @@ DRAGONETAPP_INCLUDES = -I../../Dragonet/c_impl/include/ \
 DRAGONETAPPLIB = $(shell find ../../Dragonet/apps/dist/ -name "libHSapps*" -exec dirname {} \;)
 
 memcached_debug_SOURCES = $(memcached_SOURCES)
-memcached_CPPFLAGS = -DNDEBUG -DENABLE_DRAGONET $(BULKTRANSPORT_INCLUDES) $(DRAGONETAPP_INCLUDES)
+memcached_CPPFLAGS = -DNDEBUG -DENABLE_DRAGONET $(BULKTRANSPORT_INCLUDES) $(BARRELFISH_INCLUDES) $(DRAGONETAPP_INCLUDES)
 memcached_debug_LDADD = @PROFILER_LDFLAGS@
 memcached_debug_CFLAGS = @PROFILER_FLAGS@
 

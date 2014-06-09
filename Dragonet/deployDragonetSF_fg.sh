@@ -1,8 +1,5 @@
 #!/bin/bash
 set -x
-set -e
-
-sudo killall llvm-cgen || true
 sudo killall llvm-cgen-e10k || true
 sudo killall llvm-cgen-sf || true
 sudo rm -rf /dev/shm/dragonet*
@@ -12,9 +9,8 @@ do
 	sudo ipcrm -m $i ;
 done
 
-cat  /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-cat /proc/meminfo | grep HugePages
 cat /proc/meminfo | grep HugePages_Free
-#sudo dist/build/llvm-cgen/llvm-cgen lpgImpl.unicorn
-sudo dist/build/llvm-cgen/llvm-cgen $1
+#sudo LD_PRELOAD=/lib/libciul.so.1.1.1 gdb ./dist/build/llvm-cgen-sf/llvm-cgen-sf $1
+sudo LD_PRELOAD=/lib/libciul.so.1.1.1 ./dist/build/llvm-cgen-sf/llvm-cgen-sf $@
+
 

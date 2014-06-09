@@ -1,4 +1,5 @@
 #include "dnet_interface.h"
+#include <inttypes.h>
 
 #ifdef DRAGONET
 
@@ -15,6 +16,7 @@ static pthread_mutex_t dn_lock = PTHREAD_MUTEX_INITIALIZER; // dragonet lock
 // and calls event handler mechanism
 static void recv_cb(socket_handle_t sh1, struct input *in, void *data)
 {
+    mprint("debug: %s:%s:%d: callback arrived\n", __FILE__, __FUNCTION__, __LINE__);
     struct dn_thread_state *current_thread_st_copy;
     // we need to have one current packet for each thread.
     current_thread_st_copy = current_thread_st;
@@ -32,7 +34,8 @@ static void recv_cb(socket_handle_t sh1, struct input *in, void *data)
     // Does input_free needs to be guarded with Dragonet lock?
     pthread_mutex_lock(&dn_lock);
     input_free(current_thread_st_copy->current_packet);
-    pthread_mutex_unlock(&dn_lock);
+    // Not unlocking as event handler will unlock this.
+    //pthread_mutex_unlock(&dn_lock);
 } // end function:  recv_cb
 
 
@@ -70,11 +73,13 @@ void event_handle_loop_dn(void *dn_state)
     // Each thread will call this.  All other threads should wait for their turn
     // use grab the dragonet lock here
     assert(dnt_state->callback_memcached_fn);
-//    printf("looping for incoming packets\n");
+    mprint("looping for incoming packets\n");
     while (1) {
         pthread_mutex_lock(&dn_lock);
         current_thread_st = dnt_state;
+        //mprint("waiting for next event\n");
         stack_process_event(dnt_state->stack);
+        pthread_mutex_unlock(&dn_lock);
     }
 }
 
@@ -85,7 +90,7 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
     assert(dn_state != NULL);
     struct dn_thread_state *dnt_state = (struct dn_thread_state *)dn_state;
 
-    // printf("debug: %s:%s:%d\n", __FILE__, __FILE__, __LINE__);
+    mprint("debug: %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
     struct input *in = dnt_state->current_packet;
 
     int len = in->len - in->attr->offset_l5;
@@ -94,14 +99,14 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
     dnt_state->ip4_src = in->attr->ip4_src;
     dnt_state->ip4_dst = in->attr->ip4_dst;
     assert(len <= bufsize);
-    // printf("debug: %s:%s:%d, sport = %"PRIx16", dport=%"PRIx16", srcip = %"PRIx32" dstip = %"PRIx32" \n",
-    // __FILE__,__FILE__, __LINE__, udp_sport, udp_dport, ip4_src, ip4_dst);
+    mprint("debug: %s:%s:%d, sport = %"PRIx16", dport=%"PRIx16", srcip = %"PRIx32" dstip = %"PRIx32" \n",
+     __FILE__,__FILE__, __LINE__, in->attr->udp_sport, in->attr->udp_dport, in->attr->ip4_src, in->attr->ip4_dst);
 
     memcpy(buff, (uint8_t *)in->data + in->attr->offset_l5, len);
 
-    // printf("debug: %s:%s:%d: copying data of len %d, %d, %d at location %p of size %d\n",
-    // __FILE__, __FILE__, __LINE__, len, in->len, in->attr->offset_l5,
-    // buff, bufsize);
+    mprint("debug: %s:%s:%d: copying data of len %d, %d, %d at location %p of size %d\n",
+     __FILE__, __FILE__, __LINE__, len, in->len, in->attr->offset_l5,
+     buff, bufsize);
     return len;
 }
 

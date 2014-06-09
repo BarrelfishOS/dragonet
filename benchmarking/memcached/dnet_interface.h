@@ -9,6 +9,14 @@
 #endif // ENABLE_DRAGONET
 
 
+//#define MYDEBUG     1
+#ifdef MYDEBUG
+#define mprint(x...)    printf("debug:" x)
+#else
+#define mprint(x...)   ((void)0)
+#endif // MYDEBUG
+
+
 #ifdef DRAGONET
 #include <pthread.h>  // for using pthread_mutex_locks
 #include <assert.h>

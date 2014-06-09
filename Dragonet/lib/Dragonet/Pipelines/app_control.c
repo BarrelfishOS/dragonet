@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "app_control.h"
 
@@ -55,6 +56,9 @@ void app_control_init(
         reads = reads_orig;
         errs = reads_orig;
         if ((cnt = select(maxfd + 1, &reads, NULL, &errs, NULL)) < 0) {
+//            if (cnt == EINTR)  {
+//                continue;
+//            }
             perror("app_control_init: select failed");
             abort();
         }

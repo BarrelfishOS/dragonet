@@ -16,10 +16,23 @@
 #include <pipelines.h>
 #include <dragonet_e10k.h>
 
+//#define USE_LOT_OF_MEM  1
+#ifdef USE_LOT_OF_MEM
+//#define NUM_RXDESCS 5121
+//#define NUM_TXDESCS 5121
+//#define E10K_BUFSZ 2048
+//#define NUM_RXBUFS 2561
+#define NUM_RXDESCS 1024
+#define NUM_TXDESCS 1024
+#define E10K_BUFSZ 2048
+#define NUM_RXBUFS 512
+#else
 #define NUM_RXDESCS 512
 #define NUM_TXDESCS 512
 #define E10K_BUFSZ 2048
 #define NUM_RXBUFS 256
+#endif // USE_LOT_OF_MEM
+
 
 //#define CONFIG_PCI_ADDR "0000:81:00.0"
 //#define CONFIG_LOCAL_IP 0x0a160427 // "10.22.4.39"

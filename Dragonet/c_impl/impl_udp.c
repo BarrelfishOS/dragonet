@@ -10,6 +10,8 @@
 
 node_out_t do_pg__RxL4UDPValidHeaderLength(struct state *state, struct input *in)
 {
+    dprint("### %s:%s:%d: UDP packet %"PRIu16"\n",
+            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     in->attr->offset_l5 = udp_payload_offset(in);
     in->attr->udp_dport = udp_hdr_dport_read(in);
     in->attr->udp_sport = udp_hdr_sport_read(in);
@@ -20,6 +22,8 @@ node_out_t do_pg__RxL4UDPValidHeaderLength(struct state *state, struct input *in
 
 node_out_t do_pg__RxL4UDPValidLength(struct state *state, struct input *in)
 {
+    dprint("### %s:%s:%d: UDP packet %"PRIu16"\n",
+            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     return PORT_BOOL((in->len) >=
             ((udp_header_offset(in)) + udp_hdr_pkt_length_read(in)));
 }
@@ -27,6 +31,8 @@ node_out_t do_pg__RxL4UDPValidLength(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL4UDPValidChecksum(struct state *state, struct input *in)
 {
+    dprint("### %s:%s:%d: UDP packet %"PRIu16"\n",
+            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     pktoff_t off = udp_header_offset(in);
     pktoff_t len = in->len;
     uint16_t checksum = udp_hdr_checksum_read(in);
@@ -58,12 +64,16 @@ node_out_t do_pg__RxL4UDPValidChecksum(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL4UDPPortClassifyType(struct state *state, struct input *in)
 {
+    dprint("### %s:%s:%d: UDP packet %"PRIu16"\n",
+            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     // P_RxL4UDPPortClassifyType_static, P_RxL4UDPPortClassifyType_dynamic
     return P_RxL4UDPPortClassifyType_static;
 }
 
 node_out_t do_pg__RxL4UDPPortClassifyStatic(struct state *state, struct input *in)
 {
+    dprint("### %s:%s:%d: UDP packet %"PRIu16"\n",
+            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     portno_t dport = udp_hdr_dport_read(in);
     switch(dport) {
         case 51098: return P_RxL4UDPPortClassifyStatic_appDNS;
@@ -76,6 +86,8 @@ node_out_t do_pg__RxL4UDPPortClassifyStatic(struct state *state, struct input *i
 
 node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *in)
 {
+    dprint("### %s:%s:%d: UDP packet %"PRIu16"\n",
+            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     struct udp_flow_entry *f, *f_ht;
     struct udp_flow_entry f_key;
     struct udp_listen_entry *l, *l_ht;
@@ -88,6 +100,8 @@ node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *
         return P_RxL4UDPPortClassifyDynamic_closedPort;
     }
 
+    dprint("### %s:%s:%d: UDP packet %"PRIu16": global state lock grabbed\n",
+            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     f_ht = state->udp_flow_ht;
     l_ht = state->udp_listen_ht;
 
@@ -110,8 +124,13 @@ node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *
         goto out_success;
     }
 
+    dprint("### %s:%s:%d: UDP packet %"PRIu16": closed port, returning zero\n",
+            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     out = P_RxL4UDPPortClassifyDynamic_closedPort;
 out_success:
+
+    dprint("### %s:%s:%d: UDP packet %"PRIu16": open port, going to socket\n",
+            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     in->attr->socket_id = socketid;
     pthread_rwlock_unlock(state->udp_lock);
     return appid;
@@ -119,6 +138,8 @@ out_success:
 
 node_out_t do_pg__RxL4UDPClosedPortAction(struct state *state, struct input *in)
 {
+    dprint("### %s:%s:%d: UDP packet %"PRIu16"\n",
+            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     dprint("#### UDP packet on closed port %"PRIu16"\n",
             udp_hdr_dport_read(in));
     return P_RxL4UDPClosedPortAction_out;
@@ -126,6 +147,8 @@ node_out_t do_pg__RxL4UDPClosedPortAction(struct state *state, struct input *in)
 
 node_out_t do_pg__RxEchoAPP(struct state *state, struct input *in)
 {
+    dprint("### %s:%s:%d: UDP packet %"PRIu16"\n",
+            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     uint8_t contents[DEFAULT_BUFFER_SIZE];
     int ret = udp_copy_payload(in, contents, sizeof(contents));
     // get packet fields to be sent out.

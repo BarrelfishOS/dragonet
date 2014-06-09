@@ -21,6 +21,11 @@ Memcached with Dragonet support can be compiled with following command ::
 
     ./autogen.sh && ./configure && make memcached -j1
 
+Note: In case there are any modifications in application interface of Dragonet
+then it is important to run ``./prepare_sandbox.sh`` as it will compile the
+``LibHSApps`` needed by memcached.
+
+
 Deployment
 --------------
 
