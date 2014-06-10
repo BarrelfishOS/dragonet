@@ -29,20 +29,36 @@ import Control.Monad
 
 [unicorn|
 graph prg {
+
+    node HWDrop { }
+
     cluster L2Ether {
+
         boolean Classified {
             attr "source"
-            port true[ValidCRC_]
+            port true[configCRCValidation]
             port false[]
         }
 
-        boolean ValidCRC_ {
-            port true false[FilterLookup]
+        config configCRCValidation {
+            port true[ValidCRC]
+            port false[configLengthValidation]
         }
 
         boolean ValidCRC {
-            attr "software"
-            port true false[]
+            port true[configLengthValidation]
+            port false[.HWDrop]
+        }
+
+        config configLengthValidation {
+            port true[ValidLength]
+            port false[FilterLookup .ToOffload]
+        }
+
+       // FIXME: Add a config node around this
+        boolean ValidLength {
+            port true[FilterLookup .ToOffload]
+            port false[.HWDrop]
         }
 
         node FilterLookup {
@@ -78,7 +94,7 @@ graph prg {
     cluster L3IPv4 {
 
         node Checksum_ {
-            port out[ValidChecksum FilterLookup]
+            port out[ValidChecksum]
         }
 
         boolean ValidChecksum {
@@ -150,6 +166,48 @@ graph prg {
 
     } // end cluster: L3IPv4
 
+
+    cluster L4 {
+
+        node Classify {
+            port udp[UDPchecksum_]
+            port tcp[TCPchecksum_]
+            port iscsi[iSCSIdigest_]
+        }
+
+        node UDPchecksum_ {
+            port out[UDPchecksum]
+        }
+
+        boolean UDPchecksum {
+            attr "software"
+            port true false[]
+        }
+
+        node TCPchecksum_ {
+            port out[TCPchecksum]
+        }
+
+        boolean TCPchecksum {
+            attr "software"
+            port true false[]
+        }
+
+        node iSCSIdigest_ {
+            port out[iSCSIdigest]
+        }
+
+        boolean iSCSIdigest {
+            attr "software"
+            port true false[]
+        }
+
+    } // end cluster: L4
+
+    node ToOffload {
+        port out[L3IPv4Checksum_ L4Classify]
+    }
+
 //    config isFilterRSSEnabled {
 //        port true[ApplyRSS]
 //        port false[]
@@ -192,6 +250,7 @@ graph prg {
         attr "sink"
         port out[]
     }
+
 } // end PRG: SF
 |]
 
