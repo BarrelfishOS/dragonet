@@ -224,27 +224,86 @@ graph prg {
     }
 
     or Q0Valid {
-        port true[Queue0]
+        port true[Queue0 BuffMNGGetDesc]
         port false[]
     }
+
+    or Q1Valid {
+        port true[Queue1 BuffMNGGetDesc]
+        port false[]
+    }
+    or Q2Valid {
+        port true[Queue2 BuffMNGGetDesc]
+        port false[]
+    }
+
+    cluster BuffMNG {
+        node GetDesc {
+            port out[configIsBufferMode]
+        }
+
+        config configIsBufferMode {
+            port true[ValidateBufferOwnership]
+            port false[PacketDMA]
+        }
+
+        boolean ValidateBufferOwnership {
+            port true[PacketDMA]
+            port false[.HWDrop]
+        }
+
+        node PacketDMA {
+            port queueID[.EventQ0 .Queue0 .EventQ1 .Queue1 .EventQ2 .Queue2]
+        }
+    } // end cluster: BuffMNG
+
+cluster  Event {
+        node Q0 {
+            port out[QHandle0]
+        }
+
+        node QHandle0 {
+            attr "software"
+            attr "sink"
+            port out[]
+        }
+
+        node Q1 {
+            port out[QHandle1]
+        }
+
+        node QHandle1 {
+            attr "software"
+            attr "sink"
+            port out[]
+        }
+
+        node Q2 {
+            port out[QHandle2]
+        }
+
+        node QHandle2 {
+            attr "software"
+            attr "sink"
+            port out[]
+        }
+
+    } // end cluster: Event
+
+
     node Queue0 {
         attr "software"
         attr "sink"
         port out[]
     }
-    or Q1Valid {
-        port true[Queue1]
-        port false[]
-    }
+
     node Queue1 {
         attr "software"
         attr "sink"
         port out[]
     }
-    or Q2Valid {
-        port true[Queue2]
-        port false[]
-    }
+
+
     node Queue2 {
         attr "software"
         attr "sink"
