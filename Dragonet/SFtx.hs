@@ -1,5 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
---module SF (
+--module SFtx (
 --    prg,
 --    prgClusters,
 --
@@ -30,212 +30,30 @@ import Control.Monad
 [unicorn|
 graph prg {
 
-    node HWDrop { }
-
-    cluster L2Ether {
-
-        boolean Classified {
-            attr "source"
-            port true[configCRCValidation]
-            port false[]
-        }
-
-        config configCRCValidation {
-            port true[ValidCRC]
-            port false[configLengthValidation]
-        }
-
-        boolean ValidCRC {
-            port true[configLengthValidation]
-            port false[.HWDrop]
-        }
-
-        config configLengthValidation {
-            port true[ValidLength]
-            port false[FilterLookup .ToOffload]
-        }
-
-       // FIXME: Add a config node around this
-        boolean ValidLength {
-            port true[FilterLookup .ToOffload]
-            port false[.HWDrop]
-        }
-
-        node FilterLookup {
-            // FIXME: This will give out a result and not just true/false
-            // Assuming that it is altering some global state to mark
-            // which queue was matched
-            port filterID[configMatchedIPOverride]
-            port notFound[.L3IPv4FilterLookup]
-        }
-
-        config configMatchedIPOverride {
-            //function configEtherFilter
-            port true[IsFullFilterMatched]
-            port false[.L3IPv4FilterLookup]
-        }
-
-        boolean IsFullFilterMatched {
-            port true[selectMatchedFullFilter]
-            port false[selectMatchedWildcardFilter]
-        }
-
-        config selectMatchedFullFilter {
-            port queueID[.Q0Valid .Q1Valid .Q2Valid]
-        }
-
-        config selectMatchedWildcardFilter {
-            port queueID[.Q0Valid .Q1Valid .Q2Valid]
-        }
-
-    } // end cluster: L2Ether
-
-
-    cluster L3IPv4 {
-
-        node Checksum_ {
-            port out[ValidChecksum]
-        }
-
-        boolean ValidChecksum {
-            attr "software"
-            port true false[]
-        }
-
-        node FilterLookup {
-            // FIXME: This will give out a result and not just true/false
-            // Assuming that it is altering some global state to mark
-            // which queue was matched
-            port filterID[isMulticastMatched]
-            port notFound[isMulticastUnmatched]
-            constraint true "IPv4"
-            constraint false "!IPv4"
-        }
-
-        boolean isMulticastMatched {
-            port true[confMcastUnmatchedIPOverride]
-            port false[confUcastUnmatchedIPOverride]
-        }
-
-        config confMcastUnmatchedIPOverride {
-            port true[IsMulticastNomatchRSSEnabled]
-            port false[IsFullFilterMatched]
-        }
-
-        config confUcastUnmatchedIPOverride {
-            port true[IsUnicastNomatchRSSEnabled]
-            port false[IsFullFilterMatched]
-        }
-
-        boolean isMulticastUnmatched {
-            port true[IsMulticastNomatchRSSEnabled]
-            port false[IsUnicastNomatchRSSEnabled]
-        }
-
-        config IsUnicastNomatchRSSEnabled {
-            port true [.ApplyRSS]
-            port false[selectDefaultUnicastQ]
-        }
-
-        config IsMulticastNomatchRSSEnabled {
-            port true [.ApplyRSS]
-            port false[selectDefaultMulticastQ]
-        }
-
-        config selectDefaultMulticastQ {
-            port queueID[.Q0Valid .Q1Valid .Q2Valid]
-        }
-
-        config selectDefaultUnicastQ {
-            port queueID[.Q0Valid .Q1Valid .Q2Valid]
-        }
-
-        boolean IsFullFilterMatched {
-            port true[selectMatchedFullFilter]
-            port false[selectMatchedWildcardFilter]
-        }
-
-        config selectMatchedFullFilter {
-            port queueID[.Q0Valid .Q1Valid .Q2Valid]
-        }
-
-        config selectMatchedWildcardFilter {
-            port queueID[.Q0Valid .Q1Valid .Q2Valid]
-            //port filterID[.isFilterRSSEnabled]
-        }
-
-    } // end cluster: L3IPv4
-
-
-    cluster L4 {
-
-        node Classify {
-            port udp[UDPchecksum_]
-            port tcp[TCPchecksum_]
-            port iscsi[iSCSIdigest_]
-        }
-
-        node UDPchecksum_ {
-            port out[UDPchecksum]
-        }
-
-        boolean UDPchecksum {
-            attr "software"
-            port true false[]
-        }
-
-        node TCPchecksum_ {
-            port out[TCPchecksum]
-        }
-
-        boolean TCPchecksum {
-            attr "software"
-            port true false[]
-        }
-
-        node iSCSIdigest_ {
-            port out[iSCSIdigest]
-        }
-
-        boolean iSCSIdigest {
-            attr "software"
-            port true false[]
-        }
-
-    } // end cluster: L4
-
-    node ToOffload {
-        port out[L3IPv4Checksum_ L4Classify]
+    node HWDrop {}
+    node ToMacBlock {
+        attr "sink"
     }
 
-//    config isFilterRSSEnabled {
-//        port true[ApplyRSS]
-//        port false[]
-//    }
-
-
-    node ApplyRSS {
-        // modifies queueid based on packet hash
-        port out[selectSpecifiedQueue]
+    node TXQueue0 {
+        attr "software"
+        attr "source"
+        port out[BuffMNGGetDesc]
     }
 
-    node selectSpecifiedQueue {
-        port queueID[Q0Valid Q1Valid Q2Valid]
+    node TXQueue1 {
+        attr "software"
+        attr "source"
+        port out[BuffMNGGetDesc]
     }
 
-    or Q0Valid {
-        port true[Queue0 BuffMNGGetDesc]
-        port false[]
+
+    node TXQueue2 {
+        attr "software"
+        attr "source"
+        port out[BuffMNGGetDesc]
     }
 
-    or Q1Valid {
-        port true[Queue1 BuffMNGGetDesc]
-        port false[]
-    }
-    or Q2Valid {
-        port true[Queue2 BuffMNGGetDesc]
-        port false[]
-    }
 
     cluster BuffMNG {
         node GetDesc {
@@ -270,64 +88,165 @@ graph prg {
         }
 
         node PacketDMA {
-            port queueID[.EventQ0 .Queue0 .EventQ1 .Queue1 .EventQ2 .Queue2]
+            port queueID[.TXPacerAddQueue]
         }
     } // end cluster: BuffMNG
 
-cluster  Event {
-        node Q0 {
-            port out[QHandle0]
+
+    cluster TXPacer {
+
+        node AddQueue {
+            port queueID[ConfigBinSelector]
         }
 
-        node QHandle0 {
-            attr "software"
-            attr "sink"
+        config ConfigBinSelector {
+            port toWorkBin[WorkBin]
+            port toFastBin[FastBin]
+            port toSlowBin[SlowBin]
+        }
+
+        config WorkBin {
+            port forward[ProcessQueue]
+            port wait[]
+        }
+
+        config FastBin {
+            port forward[ProcessQueue]
+            port wait[]
+        }
+
+        config SlowBin {
+            port forward[ProcessQueue]
+            port wait[]
+        }
+
+        or ProcessQueue {
+            port true[.FilterValidatePacket]
+            port false[]
+        }
+
+    } // end cluster: TXPacer
+
+    // This cluster can be also called as Validation
+    cluster Filter {
+        node ValidatePacket {
+            port queueID[IsQueueETHFilter]
+        }
+
+        config IsQueueETHFilter {
+            port true[ApplyETHFilter]
+            port false[ClassifyL3]
+        }
+
+        node ApplyETHFilter {
+            port out[IsIETHWildcardFilterMatch]
+        }
+
+        config IsIETHWildcardFilterMatch {
+            port true[.OffloadEngine]
+            port false[IsETHFullFilterMatch]
+        }
+
+        config IsETHFullFilterMatch {
+            port true[.OffloadEngine]
+            port false[ClassifyL3]
+        }
+
+        node ClassifyL3 {
+            port ipv4[IsQueueIPv4Filter]
+            //port ipv6[IsQueueNonIPv4Allowed]
+            port ipv6[IsQueueNonIPv4DropDisabled]
+            port other[.HWDrop]
+        }
+
+        config IsQueueIPv4Filter {
+            port true[ApplyIPv4Filter]
+            port false[.HWDrop]
+        }
+
+        node ApplyIPv4Filter {
+            port out[IsIPv4WildcardFilterMatch]
+        }
+
+        config IsIPv4WildcardFilterMatch {
+            port true[.OffloadEngine]
+            port false[IsIPv4FullFilterMatch]
+        }
+
+        config IsIPv4FullFilterMatch {
+            port true[.OffloadEngine]
+            port false[.HWDrop]
+        }
+
+        // config IsQueueNonIPv4Allowed {
+        config IsQueueNonIPv4DropDisabled {
+            port true[.OffloadEngine] // send to offload engine
+            port false[ClassifyL4]
+        }
+
+        node ClassifyL4 {
+            port tcp[.HWDrop]
+            port udp[.HWDrop]
+            port other[.OffloadEngine]
+        }
+
+    } // end cluster: Filter
+
+    cluster Offload {
+        node Engine {
             port out[]
         }
 
-        node Q1 {
-            port out[QHandle1]
+        node ClassifyL3 {
+            port ipv4[IsQueueIPv4ChecksumDisabled]
+            port ipv6[ClassifyL4]
         }
 
-        node QHandle1 {
-            attr "software"
-            attr "sink"
-            port out[]
+        config IsQueueIPv4ChecksumDisabled {
+            port true[ClassifyL4]
+            port false[CalculateIPv4Checksum]
         }
 
-        node Q2 {
-            port out[QHandle2]
+        node CalculateIPv4Checksum {
+            port out[ClassifyL4]
         }
 
-        node QHandle2 {
-            attr "software"
-            attr "sink"
-            port out[]
+        node ClassifyL4 {
+            port TcpUdp[IsQueueTcpUdpChecksumDisabled]
+            port iscsi[IsQueueISCSIDigestEnabled]
+            port other[.ToMacBlock]
         }
 
-    } // end cluster: Event
+        config IsQueueISCSIDigestEnabled {
+            port true[CalculateISCSIDigest]
+            port false[.ToMacBlock]
+        }
 
+        node CalculateISCSIDigest {
+            port out[.ToMacBlock]
+        }
 
-    node Queue0 {
-        attr "software"
-        attr "sink"
-        port out[]
-    }
+        config IsQueueTcpUdpChecksumDisabled {
+            port true[.ToMacBlock]
+            port false[ClassifyTcpUdp]
+        }
 
-    node Queue1 {
-        attr "software"
-        attr "sink"
-        port out[]
-    }
+        node ClassifyTcpUdp {
+            port tcp[CalculateTCPChecksum]
+            port udp[CalculateUDPChecksum]
+        }
 
+        node CalculateTCPChecksum {
+            port out[.ToMacBlock]
+        }
 
-    node Queue2 {
-        attr "software"
-        attr "sink"
-        port out[]
-    }
+        node CalculateUDPChecksum {
+            port out[.ToMacBlock]
+        }
 
-} // end PRG: SF
+    } // end cluster: Offload
+
+} // end PRG: SFtx
 |]
 
 type QueueID = Int
@@ -574,12 +493,11 @@ myWriteFile fnamefile contents = do
 main :: IO ()
 main = do
     putStrLn "Generating .dot files..."
-    myWriteFile "prgSF.dot" $ DOT.toDot prg
-    myWriteFile "prgSFClustered.dot" $ DOT.toDotClustered prg prgClusters
---    myWriteFile "prgSFConf.dot" $ DOT.toDot prgTConf
+    myWriteFile "prgSFtx.dot" $ DOT.toDot prg
+    myWriteFile "prgSFtxClustered.dot" $ DOT.toDotClustered prg prgClusters
+--    myWriteFile "prgSFtxConf.dot" $ DOT.toDot prgTConf
     where
         prgTConf = PG.pgSetType PG.GTPrg prgConfigured
         prgConfigured = CONF.applyConfig config prg
         config = []
-
 
