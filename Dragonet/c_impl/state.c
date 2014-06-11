@@ -8,10 +8,6 @@
 #include <demuxstate.h>
 #include "config.h"
 
-#define STRUCT_POOL_MAX 16
-
-static struct input *s_pool = NULL;
-static size_t s_count;
 
 void pg_state_init(struct state *st)
 {
@@ -29,56 +25,10 @@ void pg_state_init(struct state *st)
     assert(r == 0);
 }
 
-struct input *input_struct_alloc(void)
-{
-    struct input *in = s_pool;
-    if (in != NULL) {
-        s_count--;
-        s_pool = in->next;
-        return in;
-    }
-
-    return malloc(sizeof(*in));
-}
-
-void input_struct_free(struct input *in)
-{
-    if (s_count < STRUCT_POOL_MAX) {
-        in->next = s_pool;
-        s_pool = in;
-        s_count++;
-    } else {
-        free(in);
-    }
-}
-
 /** Allocate/initialize a new input structure including a buffer */
 struct input *input_alloc_plh(pipeline_handle_t plh)
 {
-    struct input *in;
-    void *data;
-    uint64_t phys;
-    size_t len;
-    buffer_handle_t buf_data, buf_attr;
-
-    in = input_struct_alloc();
-
-    buf_data = pl_buffer_alloc(plh, &data, &phys, &len);
-    assert(buf_data != NULL);
-    in->data = (void *) ((uintptr_t) data + len);
-    in->phys = phys + len;
-    in->space_before = len;
-    in->space_after = 0;
-    in->len = 0;
-    in->data_buffer = buf_data;
-
-    buf_attr = pl_buffer_alloc(plh, &data, &phys, &len);
-    assert(buf_attr != NULL);
-    in->attr = data;
-    in->attr_buffer = buf_attr;
-    memset(in->attr, 0, sizeof(*in->attr));
-
-    return in;
+    return pl_input_alloc(plh);
 }
 
 void input_copy_packet(struct input *in, unsigned char *buff, size_t len)
@@ -90,10 +40,7 @@ void input_copy_packet(struct input *in, unsigned char *buff, size_t len)
 
 void input_free_plh(pipeline_handle_t plh, struct input *in)
 {
-    pl_buffer_free(plh, in->data_buffer);
-    pl_buffer_free(plh, in->attr_buffer);
-    input_struct_free(in);
-    return;
+    pl_input_free(plh, in);
 }
 
 void input_clean_attrs(struct input *in)

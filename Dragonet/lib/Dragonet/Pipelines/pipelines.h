@@ -32,6 +32,8 @@ void pl_panic(pipeline_handle_t plh, const char *fmt, ...)
 buffer_handle_t pl_buffer_alloc(pipeline_handle_t plh, void **buf,
                                 uint64_t *phys, size_t *len);
 void pl_buffer_free(pipeline_handle_t plh, buffer_handle_t buf);
+struct input *pl_input_alloc(pipeline_handle_t plh);
+void pl_input_free(pipeline_handle_t plh, struct input *);
 
 #endif
 

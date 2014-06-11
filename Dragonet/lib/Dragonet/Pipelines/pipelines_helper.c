@@ -28,6 +28,11 @@
 #define BULK_BUFFERSZ 2048
 #define BULK_BUFFERNUM 1024
 
+// Size of full input and input struct allocation caches
+#define IN_FULL_POOL_MAX 16
+#define IN_STRUCT_POOL_MAX 16
+
+
 //#define dprintf printf
 #define dprintf dprint
 //#define dprintf printf_dummy
@@ -76,6 +81,11 @@ struct dragonet_pipeline {
 
     struct dragonet_queue *queues;
     struct dragonet_queue *poll_next;
+
+    size_t input_cnt;
+    struct input *input_cache;
+    size_t input_struct_cnt;
+    struct input *input_struct_cache;
 };
 
 struct dragonet_queue_pool {
@@ -102,6 +112,8 @@ struct dragonet_queue {
 static struct dragonet_shared_state *sig_dss = NULL;
 
 void pg_state_init(struct state *st);
+static void input_fill_alloc(struct dragonet_pipeline *pl, struct input *in);
+static struct input *input_struct_alloc(struct dragonet_pipeline *pl);
 
 static void signal_abort(int sig)
 {
@@ -375,7 +387,7 @@ static void move_received(struct dragonet_queue  *q,
     dprintf("cb_move_received: %s %"PRIx32" len=%d off=%d\n", pl->name,
             buffer->bufferid, dbmeta->len, dbmeta->off);
     if (q->pending == NULL) {
-        in = input_struct_alloc();
+        in = input_struct_alloc(pl);
         in->attr = buffer->address;
         in->attr_buffer = buffer;
         q->pending = in;
@@ -621,41 +633,18 @@ void pl_enqueue(queue_handle_t queue, struct input *in)
     struct bulk_ll_channel *chan = queue;
     struct dragonet_queue *q = chan->user_state;
     struct dragonet_pipeline *pl = q->pl;
-    struct bulk_buffer *data_buf = in->data_buffer;
-    struct bulk_buffer *attr_buf = in->attr_buffer;
     struct dragonet_bulk_meta meta = {
         .len = in->len, .off = in->space_before, };
-    uint32_t len;
     errval_t err;
 
-    err = bulk_ll_channel_move(chan, attr_buf, &meta, 0);
+    err = bulk_ll_channel_move(chan, in->attr_buffer, &meta, 0);
     assert(err_is_ok(err) || err == BULK_TRANSFER_ASYNC);
 
-    err = bulk_ll_channel_move(chan, data_buf, &meta, 0);
+    err = bulk_ll_channel_move(chan, in->data_buffer, &meta, 0);
     assert(err_is_ok(err) || err == BULK_TRANSFER_ASYNC);
 
     // We need to replace these buffers in the current input, and make it empty
-    attr_buf = bulk_alloc_new_buffer(&pl->alloc);
-    if (attr_buf == NULL) {
-        printf("ERROR: pl_enqueue: no more space left pl=%s q=%s\n", q->name, pl->name);
-        exit(1);
-    }
-    assert(attr_buf != NULL);
-    attr_buf->opaque = NULL;
-
-    data_buf = bulk_alloc_new_buffer(&pl->alloc);
-    assert(data_buf != NULL);
-    data_buf->opaque = NULL;
-
-    in->len = 0;
-    in->space_after = 0;
-    len = data_buf->pool->buffer_size;
-    in->space_before = len;
-    in->data = (void *) ((uintptr_t) data_buf->address + len);
-    in->phys = data_buf->phys + len;
-    in->attr = attr_buf->address;
-    in->data_buffer = data_buf;
-    in->attr_buffer = attr_buf;
+    input_fill_alloc(pl, in);
     dprintf("pl_enqueue: exit\n");
 }
 
@@ -712,35 +701,103 @@ void pl_panic(pipeline_handle_t plh, const char *fmt, ...)
     abort();
 }
 
-buffer_handle_t pl_buffer_alloc(pipeline_handle_t plh, void **buf,
-                                uint64_t *phys, size_t *len)
+static struct input *input_struct_alloc(struct dragonet_pipeline *pl)
+{
+    struct input *in;
+    in = pl->input_struct_cache;
+    if (in != NULL) {
+        // Yay, found an input in the cache
+        pl->input_struct_cache = in->next;
+        pl->input_struct_cnt--;
+        return in;
+    }
+
+    in = malloc(sizeof(*in));
+    return in;
+}
+
+static void input_struct_free(struct dragonet_pipeline *pl, struct input *in)
+{
+    if (pl->input_struct_cnt < IN_STRUCT_POOL_MAX) {
+        // Cache the struct
+        pl->input_struct_cnt++;
+        in->next = pl->input_struct_cache;
+        pl->input_struct_cache = in;
+    } else {
+        free(in);
+    }
+}
+
+static void input_fill_alloc(struct dragonet_pipeline *pl, struct input *in)
+{
+    struct bulk_buffer *data_buf;
+    struct bulk_buffer *attr_buf;
+    uint32_t len;
+
+    attr_buf = bulk_alloc_new_buffer(&pl->alloc);
+    if (attr_buf == NULL) {
+        printf("ERROR: input_fill_alloc: no more space left pl=%sn", pl->name);
+        abort();
+    }
+    attr_buf->opaque = NULL;
+
+    data_buf = bulk_alloc_new_buffer(&pl->alloc);
+    if (data_buf == NULL) {
+        printf("ERROR: input_fill_alloc: no more space left pl=%s\n", pl->name);
+        abort();
+    }
+    data_buf->opaque = NULL;
+
+
+    in->len = 0;
+    in->space_after = 0;
+    len = data_buf->pool->buffer_size;
+    in->space_before = len;
+    in->data = (void *) ((uintptr_t) data_buf->address + len);
+    in->phys = data_buf->phys + len;
+    in->attr = attr_buf->address;
+
+    in->data_buffer = data_buf;
+    in->attr_buffer = attr_buf;
+
+    memset(in->attr, 0, sizeof(*in->attr));
+}
+
+struct input *pl_input_alloc(pipeline_handle_t plh)
 {
     struct dragonet_pipeline *pl = plh;
-    struct bulk_buffer *buffer;
-    dprintf("pl_buffer_alloc: enter\n");
+    struct input *in;
 
-    buffer = bulk_alloc_new_buffer(&pl->alloc);
-    assert(buffer != NULL);
-    buffer->opaque = NULL;
+    in = pl->input_cache;
+    if (in != NULL) {
+        // Yay there is an input in the cache
+        pl->input_cache = in->next;
+        pl->input_cnt--;
+        return in;
+    }
 
-    if (buf != NULL) {
-        *buf = buffer->address;
-    }
-    if (phys != NULL) {
-        *phys = buffer->phys;
-    }
-    if (len != NULL) {
-        *len = buffer->pool->buffer_size;
-    }
-    dprintf("pl_buffer_alloc: exit\n");
-    return buffer;
+    in = input_struct_alloc(pl);
+    input_fill_alloc(pl, in);
+    return in;
 }
 
-void pl_buffer_free(pipeline_handle_t plh, buffer_handle_t bufh)
+void pl_input_free(pipeline_handle_t plh, struct input *in)
 {
-    dprintf("pl_buffer_free: enter\n");
-    free_bulk_buffer((struct dragonet_pipeline *) plh,
-                     (struct bulk_buffer *) bufh);
-    dprintf("pl_buffer_free: exit\n");
+    struct dragonet_pipeline *pl = plh;
+
+    if (pl->input_cnt < IN_FULL_POOL_MAX) {
+        // Cache the input
+        input_clean_attrs(in);
+        input_clean_packet(in);
+
+        pl->input_cnt++;
+        in->next = pl->input_cache;
+        pl->input_cache = in;
+    } else {
+        free_bulk_buffer(pl, in->data_buffer);
+        free_bulk_buffer(pl, in->attr_buffer);
+        input_struct_free(pl, in);
+    }
 }
+
 
