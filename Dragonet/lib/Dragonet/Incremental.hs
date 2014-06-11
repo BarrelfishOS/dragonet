@@ -180,7 +180,7 @@ policyAddSocket :: Flow -> PolicyM a b SocketDesc
 policyAddSocket f = do
     s <- get
     let sm = psSockets s
-    let sid = if M.null sm then 0 else ((fst $ M.findMax sm) + 1)
+    let sid = if M.null sm then 1 else ((fst $ M.findMax sm) + 1)
     let sd = SocketDesc { sdID = sid, sdFlow = f, sdNodes = [], sdQueue = -1 }
     let (qmin,_) = L.minimumBy (compare `on` snd) $ M.toList $ psQueues s
     q <- (pPRGAddSocket $ psPolicy s) sd qmin
