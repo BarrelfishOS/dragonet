@@ -244,8 +244,6 @@ errval_t dnal_socket_create(dnal_appq_t   aq,
     sh->aq = aq;
     sh->id = -1ULL;
     sh->ready = sh->bound = false;
-    sh->next = aq->socks;
-    aq->socks = sh;
     sh->opaque = NULL;
 
     *sockethandle = sh;
@@ -256,12 +254,15 @@ static errval_t sockh_from_sockinfo(struct dnal_socket_handle   *sh,
                                     struct app_control_message  *msg,
                                     struct dnal_net_destination *dest)
 {
+    struct dnal_app_queue *aq = sh->aq;
     if (msg->type == APPCTRL_SOCKET_INFO) {
         sh->bound = true;
         sh->dest = *dest;
         sh->id = msg->data.socket_info.id;
         sh->mux_id = msg->data.socket_info.mux_id;
         sh->outqueue = msg->data.socket_info.outq;
+        sh->next = aq->socks;
+        aq->socks = sh;
     } else {
         assert(msg->type == APPCTRL_STATUS);
         // Something went wrong
