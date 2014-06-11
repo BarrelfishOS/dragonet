@@ -92,12 +92,9 @@ graph lpg {
                 port true false[ValidPendingResponse] }
 
             and ValidPendingResponse {
-                port true[ProcessPendingResponse]
+                port true[..TxL3ARPProcessPendingResponse]
                 port false[] }
 
-            node ProcessPendingResponse {
-                port false []
-                port true [..TxL3ARPLookupRequestIn] }
         }
 
 
@@ -417,6 +414,10 @@ graph lpg {
             node SendGratuitous {
                 attr "noreplicateininout"
                 port false true[Prepare] }
+
+            node ProcessPendingResponse {
+                port false []
+                port true [LookupRequestIn] }
 
             node InitiateResponse {
                 port false true[Prepare]

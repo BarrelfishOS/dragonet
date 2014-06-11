@@ -94,9 +94,9 @@ node_out_t do_pg__RxL3ARPIsPending(struct state *state, struct input *in)
     return PORT_BOOL(pending != NULL);
 }
 
-node_out_t do_pg__RxL3ARPProcessPendingResponse(struct state *state, struct input *in)
+node_out_t do_pg__TxL3ARPProcessPendingResponse(struct state *state, struct input *in)
 {
-    // P_RxL3ARPProcessPendingResponse_true, P_RxL3ARPProcessPendingResponse_false, P_RxL3ARPProcessPendingResponse_drop
+    // P_TxL3ARPProcessPendingResponse_true, P_TxL3ARPProcessPendingResponse_false, P_TxL3ARPProcessPendingResponse_drop
     struct arp_pending *pending = arp_get_pending(state, arp_spa_ipv4_rd(in));
     struct arp_cache   *cache;
     arp_remove_pending(state, pending);
@@ -112,7 +112,7 @@ node_out_t do_pg__RxL3ARPProcessPendingResponse(struct state *state, struct inpu
     input_free(pending->input);
     free(pending);
 
-    return P_RxL3ARPProcessPendingResponse_true;
+    return P_TxL3ARPProcessPendingResponse_true;
 }
 
 node_out_t do_pg__TxL3ARPInitiateResponse(struct state *state, struct input *in)
