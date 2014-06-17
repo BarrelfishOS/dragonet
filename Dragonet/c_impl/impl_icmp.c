@@ -5,6 +5,7 @@
 
 node_out_t do_pg__RxL3ICMPValidHeaderLength(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
 
     pktoff_t len = in->len;
     pktoff_t off = icmp_header_offset(in);
@@ -13,6 +14,7 @@ node_out_t do_pg__RxL3ICMPValidHeaderLength(struct state *state, struct input *i
 
 node_out_t do_pg__RxL3ICMPValidChecksum(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // calculate the checksum without copying out the packet
     pktoff_t off = icmp_header_offset(in);
     pktoff_t len = in->len;
@@ -22,6 +24,7 @@ node_out_t do_pg__RxL3ICMPValidChecksum(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL3ICMPIsTypeRequest(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     uint8_t icmp_type = icmp_hdr_type_read(in);
     uint8_t icmp_code = icmp_hdr_code_read(in);
     if ((icmp_type == icmpTypeEchoRequest) && (icmp_code == 0x0)) {
@@ -34,6 +37,7 @@ node_out_t do_pg__RxL3ICMPIsTypeRequest(struct state *state, struct input *in)
 
 node_out_t do_pg__TxL3ICMPInitiateResponse(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // get packet fields to be sent out.
     uint32_t id = icmp_hdr_misc_read(in);
     uint32_t srcIP = ipv4_srcIP_rd(in);
@@ -66,6 +70,7 @@ node_out_t do_pg__TxL3ICMPInitiateResponse(struct state *state, struct input *in
 
 node_out_t do_pg__TxL3ICMPAllocateHeader(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     pktoff_t len = icmp_header_len;
     pkt_prepend(in, len);
     in->attr->offset_l5 = 0;
@@ -74,6 +79,7 @@ node_out_t do_pg__TxL3ICMPAllocateHeader(struct state *state, struct input *in)
 
 node_out_t do_pg__TxL3ICMPFillHeader(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
 
     icmp_hdr_type_write(in, icmpTypeEchoReply);
     icmp_hdr_code_write(in, 0);

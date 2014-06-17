@@ -6,18 +6,35 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <inttypes.h>
+#include <pthread.h>
 
 #include <pipelines.h>
 #include "../../lib/Util/tap.h"
 
+//uint64_t get_tsc(void);
+
+__inline__ uint64_t
+get_tsc(void) {
+    uint32_t lo, hi;
+    __asm__ __volatile__ ( /* serialize */
+            "xorl %%eax,%%eax \n cpuid"
+            ::: "%rax", "%rbx", "%rcx", "%rdx");
+    /* We cannot use "=A", since this would use %rax on x86_64 and
+     * return only the lower 32bits of the TSC
+     */
+    __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+    return (uint64_t)hi << 32 | lo;
+}
+
 //#define MYDEBUG     1
 #ifdef MYDEBUG
-#define dprint(x...)    printf("debug:" x)
+#define dprint(x...)    do { printf("TID:%d:Cycle:%"PRIu64":", (int)pthread_self(), get_tsc()); printf(":debug:" x); } while(0)
 #else
 #define dprint(x...)   ((void)0)
 #endif // MYDEBUG
 
-//#define MYDEBUGV     1
+#define MYDEBUGV     1
 #ifdef MYDEBUGV
 #define ddprint(x...)    dprint(x)
 #else

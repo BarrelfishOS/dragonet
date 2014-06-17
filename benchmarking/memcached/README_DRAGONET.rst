@@ -41,3 +41,6 @@ Command to deploy memcached with dragonet ::
     sudo ./memcached -N -p 0 -U 7 -t 1 -l 192.168.123.1 -u pravin
 
 
+Command to deploy memcached on real hardware with dragonet ::
+    sudo ./memcached -N -p 0 -U 7777 -t 1 -l 10.113.4.71 -u ubuntu
+

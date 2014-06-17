@@ -1,11 +1,15 @@
 #include <stdio.h>
 #include <helpers.h>
+#include <inttypes.h>
+#include <stdint.h>
 
 #include <udpproto.h>
 #include <proto_ipv4.h>
 
 static void recv_cb(socket_handle_t sh, struct input *in, void *data)
 {
+//    printf("Packet received from %"PRIx32": %"PRIx16" with data %s\n",
+//            ipv4_dstIP_rd(in), udp_hdr_dport_read(in), (char *)data);
     socket_send_udp(sh, in, ipv4_dstIP_rd(in), udp_hdr_dport_read(in),
             ipv4_srcIP_rd(in), udp_hdr_sport_read(in));
 }

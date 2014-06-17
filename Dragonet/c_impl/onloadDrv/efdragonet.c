@@ -64,6 +64,9 @@
 #include <errno.h>
 #include <string.h>
 
+#include <implementation.h>
+#include <packet_access.h>
+
 
 #define LOGE(x)  do{ x; }while(0)
 #define LOGW(x)  do{ x; }while(0)
@@ -130,7 +133,6 @@ static void complete_tx(struct thread* thread, int vi_i, int pkt_buf_i)
   pkt_buf_release(pkt_buf);
 }
 
-
 static void thread_main_loop(struct thread* thread)
 {
   ef_request_id ids[EF_VI_TRANSMIT_BATCH];
@@ -142,8 +144,8 @@ static void thread_main_loop(struct thread* thread)
     vi = thread->vis[vi_i];
     vi_i = (vi_i + 1) % thread->vis_n;
 
-    //n_ev = ef_eventq_poll(&vi->vi, evs, sizeof(evs) / sizeof(evs[0]));
-    n_ev = ef_eventq_poll(&vi->vi, evs, 1);
+    n_ev = ef_eventq_poll(&vi->vi, evs, sizeof(evs) / sizeof(evs[0]));
+    //n_ev = ef_eventq_poll(&vi->vi, evs, 1);
     if( n_ev <= 0 )
       continue;
 
@@ -405,7 +407,13 @@ static void buf_details(struct pkt_buf* pkt_buf, char *buff, int l)
 }
 
 
+#define EF_VI_TRANSMIT_BATCH    64
 static int refill_counter_local = 0;
+static int tx_event_count = 0;
+static int tx_discard_event_count = 0;
+static int rx_event_count = 0;
+static int no_event_count = 0;
+static int event_count = 0;
 size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
 {
     if (vif == NULL) {
@@ -417,12 +425,16 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
      if (vif != vis_local) {
         dprint("%s:%s:%d:WARNING: vif (%p) != vis_local(%p)\n",
                 __FILE__, __func__, __LINE__, vif, vis_local);
+        // FIXME : This should work!!!!
+//        assert(vif == vis_local);
     }
-    vif = vis_local;
+    // FIXME : This should not be needed !!!!!
+//    vif = vis_local;
 
-    //ef_request_id ids[EF_VI_TRANSMIT_BATCH];
-    ef_request_id ids[1];
-    ef_event evs[1];
+    ef_request_id ids[EF_VI_TRANSMIT_BATCH];
+    //ef_request_id ids[1];
+    ef_event evs[16];
+    //ef_event evs[1];
 
     struct vi* viff;
     int i, j, n, n_ev = 0;
@@ -432,23 +444,50 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
     int pkt_received = 0;
     struct pkt_buf* pkt_buf;
     char printbuf[PRINTBUFSIZE] = {'\0'};
+    int pkt_received_count = 0;
 
     while( 1 ) {
         viff = vif;
 
 //        dprint("%s:%d: %p: polling event queue\n", __func__, __LINE__, viff);
-        //n_ev = ef_eventq_poll(&viff->vi, evs, sizeof(evs) / sizeof(evs[0]));
-        n_ev = ef_eventq_poll(&viff->vi, evs, 1);
+        n_ev = ef_eventq_poll(&viff->vi, evs, sizeof(evs) / sizeof(evs[0]));
+        //n_ev = ef_eventq_poll(&viff->vi, evs, 1);
+        ++event_count;
+//        if (event_count % 10 == 0) {
+//            printf("status: %s:%s:%d: %d, no events: %d, TX:%d, RX=%d, DROP=%d\n",
+//                    __FILE__, __FUNCTION__, __LINE__,
+//                    event_count, no_event_count, tx_event_count, rx_event_count,
+//                    tx_discard_event_count);
+//        }
+
 //        dprint("%s:%d: polling event queue returned\n", __func__, __LINE__);
 
-        if( n_ev <= 0 )
+        if( n_ev <= 0 ) {
+            ++no_event_count;
+//            if (no_event_count % 10 == 0) {
+//                printf("status: %s:%s:%d: %d, no events: %d, TX:%d, RX=%d, DROP=%d\n",
+//                        __FILE__, __FUNCTION__, __LINE__,
+//                        event_count, no_event_count, tx_event_count, rx_event_count,
+//                        tx_discard_event_count);
+//            }
             continue;
+        }
 
-        assert(n_ev == 1);
+        //assert(n_ev == 1);
+        if (n_ev > 1) {
+            printf("WARNING: no. of events received = %d\n", n_ev);
+        }
 
         for( i = 0; i < n_ev; ++i ) {
             switch( EF_EVENT_TYPE(evs[i]) ) {
                 case EF_EVENT_TYPE_RX:
+                    ++rx_event_count;
+                    //if (rx_event_count % 10 == 0) {
+                        dprint("status: %s:%s:%d: %d, no events: %d, TX:%d, RX=%d, DROP=%d\n",
+                            __FILE__, __FUNCTION__, __LINE__,
+                            event_count, no_event_count, tx_event_count, rx_event_count,
+                            tx_discard_event_count);
+                    //}
                     dprint("%s:%d: RX event arrived\n", __func__, __LINE__);
                     /* This code does not handle jumbos. */
                     assert(EF_EVENT_RX_SOP(evs[i]) != 0);
@@ -467,35 +506,44 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
                     dprint("RX event: trying to copy %d bytes at location %p\n",
                             copylen, pkt_out);
 
-                    buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                    dprint("%s:%s:%d: reveived %s\n", __FILE__, __func__, __LINE__, printbuf);
+                    //buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                    //dprint("%s:%s:%d: reveived %s\n", __FILE__, __func__, __LINE__, printbuf);
 
                     //int myoffset = RX_PKT_OFF(viff);
                     //memcpy(pkt_out, pkt_buf->addr[viff->net_if->id] + myoffset, copylen);
                     //hexdump(RX_PKT_PTR(pkt_buf), len);
                     memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
+                    ++pkt_received_count;
                     pkt_buf_release(pkt_buf);
                     if (pkt_buf->n_refs != 0) {
                         dprint("%s:%s:%d: ################### BUF LEAK ####\n", __FILE__, __func__, __LINE__);
-                        buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                        dprint("%s:%s:%d: RX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                        //buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                        //dprint("%s:%s:%d: RX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
                     }
                     //assert(pkt_buf->n_refs == 0);
 
                     pkt_received = copylen;
                     ++refill_counter_local;
-                    //if (refill_counter_local >= 16 ) {
+                    if (refill_counter_local >= 16 ) {
                         vi_refill_rx_ring(viff);
-                    //    refill_counter_local = 0;
-                    //}
+                        refill_counter_local = 0;
+                    }
 
                     // NOTE: I am assuming that we are reading only one event
                     //      in each iteration
-                    return pkt_received;
+//                    return pkt_received;
                     break;
 
                 case EF_EVENT_TYPE_TX:
+                    ++tx_event_count;
+                    //if (tx_event_count % 10 == 0) {
+                        dprint("status: %s:%s:%d: %d, no events: %d, TX:%d, RX=%d, DROP=%d\n",
+                            __FILE__, __FUNCTION__, __LINE__,
+                            event_count, no_event_count, tx_event_count, rx_event_count,
+                            tx_discard_event_count);
+                    //}
                     dprint("TX event arrived\n");
+                    //break;
                     n = ef_vi_transmit_unbundle(&viff->vi, &evs[i], ids);
                     for( j = 0; j < n; ++j ) {
                         //complete_tx(thread, TX_RQ_ID_VI(ids[j]), TX_RQ_ID_PB(ids[j]));
@@ -513,6 +561,13 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
                     break;
 
                 case EF_EVENT_TYPE_RX_DISCARD:
+                    ++tx_discard_event_count;
+                    if (tx_discard_event_count % 10 == 0) {
+                        dprint("status: %s:%s:%d: %d, no events: %d, TX:%d, RX=%d, DROP=%d\n",
+                            __FILE__, __FUNCTION__, __LINE__,
+                            event_count, no_event_count, tx_event_count, rx_event_count,
+                            tx_discard_event_count);
+                    }
                     dprint("RX_discard event arrived\n");
                     //handle_rx_discard(thread, viff, EF_EVENT_RX_DISCARD_RQ_ID(evs[i]),
                     //        EF_EVENT_RX_DISCARD_TYPE(evs[i]));
@@ -532,9 +587,16 @@ size_t get_packet(struct vi *vif, char *pkt_out, size_t buf_len)
             } // end switch
         } // end for : i
         //vi_refill_rx_ring(viff);
-    }
 
-    dprint("%s:%s:%d: NYI\n", __FILE__, __func__, __LINE__);
+        if (pkt_received_count == 1) {
+            dprint("Exactly one packet received, returning it\n");
+            return pkt_received;
+        } else if (pkt_received_count > 1) {
+            printf("Warning: %d packets received, returning first out of it\n",
+                   pkt_received_count);
+            return pkt_received;
+        }
+    }
     return 0;
 } // end function: get_packet
 
@@ -547,16 +609,21 @@ void send_packet(struct vi *vif, char *pkt_tx, size_t len)
     int offset = 0;
     int ii;
 
+    dprint("%s:%s:%d: ###### packet %p, len %zu, using vif %p \n",
+            __FILE__, __func__, __LINE__,
+            pkt_tx, len, vif);
     if (vif == NULL) {
         dprint("%s:%s:%d:ERROR: vif == NULL\n", __FILE__, __func__, __LINE__);
         return;
     }
-    assert(vis_local != NULL);
+
+    //assert(vis_local != NULL);
      if (vif != vis_local) {
         dprint("%s:%s:%d:WARNING: vif (%p) != vis_local(%p)\n",
                 __FILE__, __func__, __LINE__, vif, vis_local);
+//        assert(vif == vis_local);
     }
-    vif = vis_local;
+//    vif = vis_local;
 
     pkt_buf = vi_get_free_pkt_buf(vif);
     if (pkt_buf == NULL) {
@@ -566,7 +633,7 @@ void send_packet(struct vi *vif, char *pkt_tx, size_t len)
 
     // print details of buffer which is being sent
     char printbuf[PRINTBUFSIZE] = {'\0'};
-    buf_details(pkt_buf, printbuf, sizeof(printbuf));
+    //buf_details(pkt_buf, printbuf, sizeof(printbuf));
     dprint("%s:%s:%d: ###### 1 %s\n", __FILE__, __func__, __LINE__, printbuf);
 
     offset = RX_PKT_OFF(vif);
@@ -577,22 +644,22 @@ void send_packet(struct vi *vif, char *pkt_tx, size_t len)
 //#define RX_PKT_PTR(pb)   ((char*) (pb) + RX_PKT_OFF((pb)->vi_owner))
 //                    memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
     void * buf_addr = RX_PKT_PTR(pkt_buf);
-    buf_details(pkt_buf, printbuf, sizeof(printbuf));
+    //buf_details(pkt_buf, printbuf, sizeof(printbuf));
     dprint("%s:%s:%d: ###### 2 %s\n", __FILE__, __func__, __LINE__, printbuf);
 
 //    void * buf_addr = (void *)(pkt_buf->addr[pkt_buf->vi_owner->net_if->id] + offset);
-    dprint("%s:%s:%d: calling memcpy\n", __FILE__, __func__, __LINE__);
-    volatile char aa = 0;
-    for (ii = 0; ii < len; ++ii) {
-       aa = aa + ((char *) pkt_tx)[ii];
-    }
-    dprint("%s:%s:%d: verified pkt_tx %c\n", __FILE__, __func__, __LINE__, aa);
-
-    for (ii = 0; ii < len; ++ii) {
-       aa = aa + ((char *) buf_addr)[ii];
-    }
-    dprint("%s:%s:%d: verified pkt_tx %c\n", __FILE__, __func__, __LINE__, aa);
-
+//    dprint("%s:%s:%d: calling memcpy\n", __FILE__, __func__, __LINE__);
+//    volatile char aa = 0;
+//    for (ii = 0; ii < len; ++ii) {
+//       aa = aa + ((char *) pkt_tx)[ii];
+//    }
+//    dprint("%s:%s:%d: verified pkt_tx %c\n", __FILE__, __func__, __LINE__, aa);
+//
+//    for (ii = 0; ii < len; ++ii) {
+//       aa = aa + ((char *) buf_addr)[ii];
+//    }
+//    dprint("%s:%s:%d: verified pkt_tx %c\n", __FILE__, __func__, __LINE__, aa);
+//
 
     // FIXME: make sure that len is smaller than buffer length
     memcpy(buf_addr, pkt_tx, len);
@@ -614,9 +681,8 @@ void send_packet(struct vi *vif, char *pkt_tx, size_t len)
     //assert(pkt_buf->n_refs == 1);
 
     dprint("%s:%s:%d: vi_send done\n", __FILE__, __func__, __LINE__);
-    buf_details(pkt_buf, printbuf, sizeof(printbuf));
+//    buf_details(pkt_buf, printbuf, sizeof(printbuf));
     dprint("%s:%s:%d: ###### 3 %s\n", __FILE__, __func__, __LINE__, printbuf);
-
 
 
     // FIXME: Wait for send ACK
@@ -624,14 +690,205 @@ void send_packet(struct vi *vif, char *pkt_tx, size_t len)
     //assert(!"send_packet: NYI");
 } // end function: send_packet
 
-struct vi *init_and_alloc_default_queue(char *name)
+void *init_and_alloc_default_queue(char *name)
 {
     struct net_if *myif = init_openonload_setup(name);
-    struct vi* vis =  alloc_queue(myif);
+    struct vi* vis =  NULL;
+    vis = alloc_queue(myif);
     alloc_filter_default(vis);
     vis_local = vis;
-    return vis;
+    dprint("%s:%s:%d: void * == %d\n", __FILE__, __func__, __LINE__, sizeof(void *));
+    dprint("%s:%s:%d: struct vi* == %d\n", __FILE__, __func__, __LINE__, sizeof(struct vi *));
+    dprint("%s:%s:%d: if = %p, (vis [%p] == [%p] vis_local)\n",
+            __FILE__, __func__, __LINE__, myif, vis, vis_local);
+    return (void *)vis;
 }
 
+void *
+init_onload_wrapper2(char *arg)
+{
+    //struct vi *ret;
+    void *ret;
+    ret = init_and_alloc_default_queue(arg);
+    dprint("%s:%s:%d: void * == %d\n", __FILE__, __func__, __LINE__, sizeof(void *));
+    dprint("%s:%s:%d: dev =  %p\n",
+            __FILE__, __func__, __LINE__, ret);
+    return (ret);
+}
+
+
 // ######################  ###########################
+
+
+
+// this one is connected via switch on appenzeller
+#define IFNAME              "p6p2"
+#define CONFIG_LOCAL_MAC_sf  0x495107530f00ULL  // "00:0f:53:07:51:49"
+#define CONFIG_LOCAL_IP_sf   0x0a710447         // "10.113.4.71"
+
+
+struct vi;
+
+static
+uint64_t sf_mac_read(device_t ttd) {
+    return (CONFIG_LOCAL_MAC_sf);
+}
+
+static
+uint32_t sf_ip_read(device_t ttd) {
+    return (CONFIG_LOCAL_IP_sf);
+}
+
+static
+//struct vi *
+void *
+init_onload_wrapper(char *arg)
+{
+    //struct vi *ret;
+    void *ret;
+    //ret = init_and_alloc_default_queue(IFNAME);
+    ret = init_onload_wrapper2(IFNAME);
+    dprint("%s:%s:%d: void * == %d\n", __FILE__, __func__, __LINE__, sizeof(void *));
+    dprint("%s:%s:%d: dev =  %p\n",
+            __FILE__, __func__, __LINE__, ret);
+    return (ret);
+}
+
+static
+pktoff_t onload_rx_wrapper(device_t dev, uint8_t *data, pktoff_t len)
+{
+    struct vi *onload = (struct vi *)dev;
+    return ((pktoff_t)get_packet(onload, (char *)data, len));
+}
+
+static
+int onload_tx_wrapper(device_t dev, uint8_t *data, pktoff_t len)
+{
+    struct vi *onload = (struct vi *)dev;
+    dprint("calling onload_tx_wrapper...................\n");
+    send_packet(onload, (char *)data, len);
+    return len;
+}
+
+static struct driver onload_driver = {
+    .drv_handle = NULL,
+//    .drv_init = init_onload_wrapper,
+    .drv_rx = onload_rx_wrapper,
+    .drv_tx = onload_tx_wrapper,
+    .drv_mac_read = sf_mac_read,
+    .drv_ip_read = sf_ip_read,
+};
+
+static
+struct driver *get_sf_driver(void)
+{
+    return &onload_driver;
+}
+
+#if 0
+int main(int argc, char *argv[])
+{
+    struct driver *drv = NULL;
+    drv = get_sf_driver();
+    return main_loop(drv);
+}
+#endif // 0
+
+static void tap_init(struct state *state)
+{
+    if (state->tap_handler != NULL) {
+        printf("SF driver Already intialized\n");
+        return;
+    }
+
+    //struct vi *onload_dev = init_onload_wrapper(NULL);
+    void *onload_dev = init_onload_wrapper(NULL);
+    state->tap_handler = onload_dev;
+    onload_driver.drv_handle = onload_dev;
+    dprint("%s:%s:%d: %p == %p == %p ##########\n",
+              __FILE__,  __func__, __LINE__,
+              onload_dev, state->tap_handler, onload_driver.drv_handle);
+}
+
+
+static int rx_pkts = 0;
+static int tx_pkts = 0;
+node_out_t do_pg__SFRxQueue(struct state *state, struct input *in)
+{
+    int p_id = ++rx_pkts;
+    pktoff_t maxlen;
+    if (state->tap_handler == NULL) {
+        tap_init(state);
+
+        state->local_mac = CONFIG_LOCAL_MAC_sf;
+        state->local_ip = CONFIG_LOCAL_IP_sf;
+        dprint("%s:%s:%d: [pktid:%d]: ############## initialized queue\n",
+              __FILE__,  __func__, __LINE__, p_id);
+        printf("Initialized\n");
+        return P_Queue_init;
+    }
+
+    pkt_prepend(in, in->space_before);
+
+//    struct driver *onload_ptr = (struct driver *)state->tap_handler;
+    struct vi *onload_dev = (struct vi *) state->tap_handler;
+    dprint("%s:%s:%d: [pktid:%d]: [drv: %p, %p], ############## Trying to receive packet\n",
+           __FILE__,  __func__, __LINE__, p_id, onload_dev, state->tap_handler);
+    ssize_t len = onload_rx_wrapper(
+            //onload_driver.drv_handle,
+            //onload_ptr->drv_handle,
+            onload_dev,
+            (char *)in->data, in->len);
+    if (len == 0) {
+        dprint("%s:%d: [pktid:%d]: pkt with zero len\n", __func__, __LINE__, p_id);
+        pkt_prepend(in, -in->len);
+        return P_Queue_drop;
+    }
+
+    pkt_append(in, -(in->len - len));
+    dprint("%s:%d: [pktid:%d]: ############## pkt received, data: %p, len:%"PRIu32"\n",
+            __func__, __LINE__, p_id, in->data, len);
+    return P_Queue_out;
+}
+
+node_out_t do_pg__SFTxQueue(struct state *state, struct input *in)
+{
+    int p_id = ++tx_pkts;
+    dprint("%s:%s:%d: [pktid:%d]: ############## Trying to send packet, data: %p, len:%"PRIu32"\n",
+            __FILE__, __func__, __LINE__, p_id, in->data, in->len);
+    struct vi *onload_dev = (struct vi *) state->tap_handler;
+    //struct driver *onload_ptr = (struct driver *)state->tap_handler;
+    onload_tx_wrapper(
+            //onload_driver.drv_handle,
+            //onload_ptr->drv_handle,
+            onload_dev,
+            in->data, in->len);
+    dprint("%s:%s:%d: [pktid:%d]: ##############  packet sent\n",
+            __FILE__, __func__, __LINE__, p_id);
+    return 0;
+}
+
+
+node_out_t do_pg__TapTxQueue(struct state *state, struct input *in) {
+    return  do_pg__SFTxQueue(state, in);
+}
+
+
+node_out_t do_pg__TapRxQueue(struct state *state, struct input *in) {
+    return  do_pg__SFRxQueue(state, in);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

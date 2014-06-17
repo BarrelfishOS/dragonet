@@ -202,7 +202,9 @@ vi_get_free_pkt_buf(struct vi* vi);
 
 //#define MYDEBUG     1
 #ifdef MYDEBUG
-#define dprint(x...)    printf("sfdebug1111:" x)
+#ifndef dprint
+#define dprint(x...)    printf("sfdebug:" x)
+#endif // dprint
 #else
 #define dprint(x...)   ((void)0)
 #endif // MYDEBUG

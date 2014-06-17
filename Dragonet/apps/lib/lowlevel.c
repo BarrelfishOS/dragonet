@@ -165,19 +165,21 @@ errval_t dnal_aq_poll(dnal_appq_t           aq,
     struct dnal_socket_handle *sh;
     size_t i;
 
-    dprint("debug:%s:%s:%d:checking queus %d\n",
-            __FILE__, __FUNCTION__, __LINE__, (int)aq->num_outq);
+//    dprint("debug:%s:%s:%d:checking queus %d\n",
+//            __FILE__, __FUNCTION__, __LINE__, (int)aq->num_outq);
     // First process buffers that are returned to us
     for (i = 0; i < aq->num_outq; i++) {
-        if (pl_process_event(aq->out_queue[i])) {
-            dprint("debug:%s:%s:%d:aborting event %d\n",
-            __FILE__, __FUNCTION__, __LINE__, (int)i);
-            return DNERR_EVENT_ABORT;
+        bool ret = pl_process_event(aq->out_queue[i]);
+        if (ret) {
+            // FIXME: The return values of this function don't make sense
+//            dprint("debug:%s:%s:%d:aborting event %d\n",
+//            __FILE__, __FUNCTION__, __LINE__, (int)i);
+//            return DNERR_EVENT_ABORT;
         }
     }
 
-    dprint("debug:%s:%s:%d: checking for packet start %d\n",
-            __FILE__, __FUNCTION__, __LINE__, (int)aq->nextpoll);
+//    dprint("debug:%s:%s:%d: checking for packet start %d\n",
+//            __FILE__, __FUNCTION__, __LINE__, (int)aq->nextpoll);
     // Now check for packets
     i = aq->nextpoll;
     do {
@@ -186,10 +188,10 @@ errval_t dnal_aq_poll(dnal_appq_t           aq,
     } while (in == NULL && i != aq->nextpoll);
     aq->nextpoll = i;
 
-    dprint("debug:%s:%s:%d: checking for packet done %d\n",
-            __FILE__, __FUNCTION__, __LINE__, (int)i);
+//    dprint("debug:%s:%s:%d: checking for packet done %d\n",
+//            __FILE__, __FUNCTION__, __LINE__, (int)i);
     if (in == NULL) {
-    dprint("debug:%s:%s:%d: null \n", __FILE__, __FUNCTION__, __LINE__);
+//    dprint("debug:%s:%s:%d: null \n", __FILE__, __FUNCTION__, __LINE__);
         return DNERR_NOEVENT;
     }
 

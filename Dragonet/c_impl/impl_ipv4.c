@@ -8,6 +8,7 @@ struct arp_cache *arp_cache_lookup(struct state *st, uint32_t ip);
 
 node_out_t do_pg__RxL3IPv4ValidHeaderLength(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // P_true, P_false
     pktoff_t iplen = in->len - ipv4_hdroff(in);
     if (iplen < IPV4_HDRLEN_MIN)
@@ -17,6 +18,7 @@ node_out_t do_pg__RxL3IPv4ValidHeaderLength(struct state *state, struct input *i
 
 node_out_t do_pg__RxL3IPv4ValidReassembly(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // P_true, P_false
     return PORT_BOOL((ipv4_flags_rd(in) & IPV4_FLAGS_MF) == 0 &&
                      ipv4_fragment_rd(in) == 0);
@@ -24,12 +26,14 @@ node_out_t do_pg__RxL3IPv4ValidReassembly(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL3IPv4ValidVersion(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // P_true, P_false
     return PORT_BOOL(ipv4_version_rd(in) == 4);
 }
 
 node_out_t do_pg__RxL3IPv4ValidLength(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // P_true, P_false
     pktoff_t iplen = in->len - ipv4_hdroff(in);
     return PORT_BOOL(iplen >= ipv4_hdrlen(in) + ipv4_payload_len(in));
@@ -37,18 +41,21 @@ node_out_t do_pg__RxL3IPv4ValidLength(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL3IPv4ValidTTL(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // P_true, P_false
     return P_true;
 }
 
 node_out_t do_pg__RxL3IPv4ValidChecksum(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // P_true, P_false
     return PORT_BOOL(ipv4_checksum(in, ipv4_hdroff(in), ipv4_hdrlen(in)) == 0);
 }
 
 node_out_t do_pg__RxL3IPv4ValidLocalIP(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
 //    dprint("%s: srcIP = %"PRIx32", dstIP = %"PRIx32"\n", __func__,
 //            ipv4_srcIP_rd(in), ipv4_dstIP_rd(in));
 
@@ -67,6 +74,7 @@ node_out_t do_pg__RxL3IPv4ValidLocalIP(struct state *state, struct input *in)
 
 node_out_t do_pg__RxL3IPv4Classify(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // P_RxL3IPv4Classify_udp, P_RxL3IPv4Classify_icmp, P_RxL3IPv4Classify_drop
     in->attr->offset_l4 = ipv4_payload_off(in);
     switch (ipv4_protocol_rd(in)) {
@@ -78,6 +86,7 @@ node_out_t do_pg__RxL3IPv4Classify(struct state *state, struct input *in)
 
 node_out_t do_pg__TxL3IPv4AllocateHeader(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // P_TxL3IPv4AllocateHeader_out
     pktoff_t hlen = IPV4_HDRLEN_MIN;
     pkt_prepend(in, hlen);
@@ -92,6 +101,7 @@ node_out_t do_pg__TxL3IPv4AllocateHeader(struct state *state, struct input *in)
 
 node_out_t do_pg__TxL3IPv4FillHeader(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // P_TxL3IPv4FillHeader_out
     pktoff_t hoff = ipv4_hdroff(in);
     ipv4_version_wr(in, 4);
@@ -113,6 +123,7 @@ node_out_t do_pg__TxL3IPv4FillHeader(struct state *state, struct input *in)
 
 node_out_t do_pg__TxL3IPv4Routing(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // P_true, P_false
     in->attr->eth_src_mac = state->local_mac;
     return P_true;

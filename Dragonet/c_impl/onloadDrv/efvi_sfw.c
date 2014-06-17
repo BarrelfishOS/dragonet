@@ -96,8 +96,8 @@ static void pkt_buf_init(struct vi* vi, int pkt_buf_i)
 
 void vi_refill_rx_ring(struct vi* vi)
 {
-//#define REFILL_BATCH_SIZE  16
-#define REFILL_BATCH_SIZE  1
+#define REFILL_BATCH_SIZE  16
+//#define REFILL_BATCH_SIZE  1
   struct pkt_buf* pkt_buf;
   int i;
   int freespace_hw = ef_vi_receive_space(&vi->vi);

@@ -201,6 +201,7 @@ node_out_t do_pg__RxDnsAPP(struct state *state, struct input *in)
 
 node_out_t do_pg__TxL4UDPInitiateResponse(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
 
 #if DO_EXPLICIT_COPY
     pktoff_t payload_len = udp_payload_length(in);
@@ -224,6 +225,7 @@ node_out_t do_pg__TxL4UDPInitiateResponse(struct state *state, struct input *in)
 
 node_out_t do_pg__TxL4UDPAllocateHeader(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     pktoff_t len = udp_header_len;
     pkt_prepend(in, len);
     in->attr->offset_l5 = udp_header_len;
@@ -236,6 +238,7 @@ node_out_t do_pg__TxL4UDPAllocateHeader(struct state *state, struct input *in)
 
 node_out_t do_pg__TxL4UDPFillHeader(struct state *state, struct input *in)
 {
+    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
 
     udp_hdr_sport_write(in, in->attr->udp_sport);
     udp_hdr_dport_write(in, in->attr->udp_dport);

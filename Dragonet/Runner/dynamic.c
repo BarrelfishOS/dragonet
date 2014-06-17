@@ -181,7 +181,7 @@ static node_out_t run_node(struct dynamic_node *n,
 
         case DYN_TOQUEUE:
             pl_enqueue(n->tdata.queue.queue, in);
-            return -2;
+            return -2; // FIXME: why there is return value of -2?
 
         default:
             fprintf(stderr, "Invalid node type: %d\n", n->type);

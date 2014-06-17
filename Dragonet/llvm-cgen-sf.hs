@@ -5,7 +5,8 @@ import Runner.Common
 
 -- Simulates a basic embedding (replace rx and tx queue by tap specific node)
 pg4tap :: PGraph -> PGraph
-pg4tap pg = tagNodes "" $ renameQueues "SFRxQueue" "SFTxQueue" pg
+pg4tap pg = tagNodes "" $ renameQueues "TapRxQueue" "TapTxQueue" pg
+--pg4tap pg = tagNodes "" $ renameQueues "SFRxQueue" "SFTxQueue" pg
 
 main :: IO ()
 main = do

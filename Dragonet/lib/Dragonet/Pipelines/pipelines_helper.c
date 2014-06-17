@@ -403,6 +403,8 @@ static void move_received(struct dragonet_queue  *q,
             buffer->pool->buffer_size - (dbmeta->len + dbmeta->off);
         in->data_buffer = buffer;
 
+        dprintf("cb_move_received:2: %s %"PRIx32" len=%d off=%d, data=%p \n",
+                pl->name, buffer->bufferid, dbmeta->len, dbmeta->off, in->data);
         // Add packet to q->inputs
         in->next = NULL;
         if (q->inputs == NULL) {
@@ -415,7 +417,6 @@ static void move_received(struct dragonet_queue  *q,
             prev->next = in;
         }
     }
-
 }
 
 static void bind_done(struct dragonet_queue *q)
@@ -444,7 +445,7 @@ static void bind_done(struct dragonet_queue *q)
 static void process_event(struct dragonet_queue *q,
                           struct bulk_ll_event  *event)
 {
-    dprintf("process_event: enter\n");
+//    dprintf("process_event: enter\n");
     struct dragonet_queue *oq;
     struct dragonet_pipeline *pl = q->pl;
 
@@ -462,6 +463,7 @@ static void process_event(struct dragonet_queue *q,
                     break;
 
                 case BULK_ASYNC_BUFFER_MOVE:
+                    dprintf("status: BULK_ASYNC_BUFFER_MOVE done: %s\n", pl->name);
                     err_expect_ok(event->data.async_done.err);
                     break;
 
@@ -505,7 +507,7 @@ static void process_event(struct dragonet_queue *q,
             abort();
     }
 
-    dprintf("process_event: exit\n");
+//    dprintf("process_event: exit\n");
 }
 
 static bool poll_all(struct dragonet_pipeline *pl)
@@ -633,6 +635,11 @@ void pl_enqueue(queue_handle_t queue, struct input *in)
     struct bulk_ll_channel *chan = queue;
     struct dragonet_queue *q = chan->user_state;
     struct dragonet_pipeline *pl = q->pl;
+
+    dprintf("pl_enqueue: q-name:%s, pl name: %s, stack: %s, id: %"PRIu32", len  %"PRIu64"\n",
+            q->name, pl->name, pl->stackname, pl->id, in->len);
+
+
     struct dragonet_bulk_meta meta = {
         .len = in->len, .off = in->space_before, };
     errval_t err;
@@ -648,6 +655,8 @@ void pl_enqueue(queue_handle_t queue, struct input *in)
     dprintf("pl_enqueue: exit\n");
 }
 
+// FIXME: The return values of this function don't make sense
+// It returns true on both Abort and EventHandle case
 bool pl_process_event(queue_handle_t queue)
 {
     struct bulk_ll_channel *chan = queue;
@@ -661,6 +670,8 @@ bool pl_process_event(queue_handle_t queue)
         bulk_ll_channel_event_done(chan, &event, SYS_ERR_OK);
         return true;
     } else if (err == BULK_TRANSFER_EVENTABORT) {
+        printf("ERROR:%s:%s:%d: bulk_ll_channel_event_poll returned BULK_TRANSFER_EVENTABORT\n");
+        abort();
         return true;
     } else {
         assert(err == BULK_TRANSFER_NOEVENT);

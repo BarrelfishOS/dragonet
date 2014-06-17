@@ -56,15 +56,21 @@ void stack_process_event(struct stack_handle *stack)
 //    dprint("debug(%s:%s:%d): called\n",
 //                __FILE__, __FUNCTION__, __LINE__);
 
-    err = dnal_aq_poll(stack->aq, &ev);
-    if (err == DNERR_NOEVENT || err == DNERR_EVENT_ABORT) {
-        dprint("ERROR (%s:%s:%d): no event or event abort %d(%s)\n",
-                __FILE__, __FUNCTION__, __LINE__, (int)err,
-                ((err == DNERR_NOEVENT)? "NOEVENT":"ABORT"));
+    while(1) {
+        err = dnal_aq_poll(stack->aq, &ev);
+        if (err == DNERR_NOEVENT) {
+//        dprint("ERROR (%s:%s:%d): no event\n",
+//                __FILE__, __FUNCTION__, __LINE__);
         // FIXME: we need a way to return what exactly happened
-        return;
-    } else {
-        err_expect_ok(err);
+        //return;
+            continue;
+        } else if (err == DNERR_EVENT_ABORT) {
+            dprint("ERROR (%s:%s:%d): EVENT_ABORT\n",
+                __FILE__, __FUNCTION__, __LINE__);
+            return;
+        }
+        // This is normal event
+        break;
     }
 
     assert(ev.type == DNAL_AQET_INPACKET);
