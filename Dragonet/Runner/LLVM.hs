@@ -487,7 +487,8 @@ bldAddBB_  bbname = modify $ \st ->
         cnt_new = 1 + (blockCnt st)
         bb_new = bbInit cnt_new
     in case M.lookup bbname bbs_map of
-    Just _ -> error $ "basic block already exists: " ++ show bbname
+    --Just _ ->  putStrLn $ "basic block already exists: " ++ show bbname
+    Just _ -> error $ "basic block already exists: " ++ show bbname ++ ", bbs_map: " ++ (show bbs_map)
     Nothing -> st {
           currentBB = bbname
         , bbsMap = M.insert bbname bb_new bbs_map
@@ -935,7 +936,7 @@ bldPrintf str args = do
 
 bldDbgPrintf :: String -> [AST.Operand] -> FnBuilder ()
 bldDbgPrintf str args = do
-    --bldPrintf str args
+--    bldPrintf str args
     return ()
 
 -- call a remote node
