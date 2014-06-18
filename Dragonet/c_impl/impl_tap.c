@@ -45,7 +45,7 @@ node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
     }
     pkt_append(in, -(in->len - len));
 
-    dprint("%s:%d: [pktid:%d]: ############## pkt received, data: %p, len:%"PRIu32"\n",
+    dprint("%s:%d: [pktid:%d]: ############## pkt received, data: %p, len:%zu\n",
             __func__, __LINE__, p_id, in->data, len);
     return P_Queue_out;
 }

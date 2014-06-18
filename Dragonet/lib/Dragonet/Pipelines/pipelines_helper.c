@@ -556,7 +556,8 @@ queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name)
         .meta_size = sizeof(struct dragonet_bulk_meta) };
     struct dragonet_queue *dq = calloc(1, sizeof(*dq));
 
-    asprintf(&dq->name, "%s_%s", pl->stackname, name);
+    int ret = asprintf(&dq->name, "%s_%s", pl->stackname, name);
+    assert(ret > 0);
     dprintf("pl_inqueue_create: pl=%s q=%s\n", pl->name, dq->name);
 
     err = bulk_linuxshm_ep_create(epd, dq->name, QUEUE_SLOTS);
@@ -597,7 +598,8 @@ queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name)
         poll_all(pl);
     }
 
-    asprintf(&dq->name, "%s_%s", pl->stackname, name);
+    int ret = asprintf(&dq->name, "%s_%s", pl->stackname, name);
+    assert(ret > 0);
     dprintf("pl_inqueue_bind: pl=%s q=%s\n", pl->name, dq->name);
 
     err = bulk_linuxshm_ep_create(epd, dq->name, QUEUE_SLOTS);
@@ -636,8 +638,8 @@ void pl_enqueue(queue_handle_t queue, struct input *in)
     struct dragonet_queue *q = chan->user_state;
     struct dragonet_pipeline *pl = q->pl;
 
-    dprintf("pl_enqueue: q-name:%s, pl name: %s, stack: %s, id: %"PRIu32", len  %"PRIu64"\n",
-            q->name, pl->name, pl->stackname, pl->id, in->len);
+    dprintf("pl_enqueue: q-name:%s, pl name: %s, stack: %s, id: %"PRIu32", len  %d\n",
+            q->name, pl->name, pl->stackname, pl->id, (int)in->len);
 
 
     struct dragonet_bulk_meta meta = {
@@ -670,7 +672,8 @@ bool pl_process_event(queue_handle_t queue)
         bulk_ll_channel_event_done(chan, &event, SYS_ERR_OK);
         return true;
     } else if (err == BULK_TRANSFER_EVENTABORT) {
-        printf("ERROR:%s:%s:%d: bulk_ll_channel_event_poll returned BULK_TRANSFER_EVENTABORT\n");
+        printf("ERROR:%s:%s:%d: bulk_ll_channel_event_poll returned BULK_TRANSFER_EVENTABORT\n",
+                __FILE__, __FUNCTION__, __LINE__);
         abort();
         return true;
     } else {

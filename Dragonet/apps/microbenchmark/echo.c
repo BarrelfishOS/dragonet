@@ -33,6 +33,7 @@ int main(int argc, char *argv[])
     }
 
     stack = stack_init("dragonet", name);
+    printf("###################### stack init done!!!!!!\n");
 
     sh = socket_create(stack, recv_cb, NULL);
     if (!socket_bind_udp_listen(sh, 0, port)) {

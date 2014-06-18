@@ -12,9 +12,10 @@
 #include <pipelines.h>
 #include "../../lib/Util/tap.h"
 
-//uint64_t get_tsc(void);
 
-__inline__ uint64_t
+#if 0
+//uint64_t get_tsc(void);
+__inline__ static uint64_t
 get_tsc(void) {
     uint32_t lo, hi;
     __asm__ __volatile__ ( /* serialize */
@@ -26,10 +27,13 @@ get_tsc(void) {
     __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
     return (uint64_t)hi << 32 | lo;
 }
+#endif // 0
 
-//#define MYDEBUG     1
+
+#define MYDEBUG     1
 #ifdef MYDEBUG
-#define dprint(x...)    do { printf("TID:%d:Cycle:%"PRIu64":", (int)pthread_self(), get_tsc()); printf(":debug:" x); } while(0)
+//#define dprint(x...)    do { printf("TID:%d:Cycle:%"PRIu64":", (int)pthread_self(), get_tsc()); printf(":debug:" x); } while(0)
+#define dprint(x...)    do { printf("TID:%d:", (int)pthread_self()); printf(":debug:" x); } while(0)
 #else
 #define dprint(x...)   ((void)0)
 #endif // MYDEBUG

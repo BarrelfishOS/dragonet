@@ -177,7 +177,7 @@ static void vi_init_layout(struct vi* vi, enum ef_vi_flags flags)
             "Didn't find minor ticks offset in ef_vi_receive_query_layout.\n");
     exit(1);
   }
-  if( (found_frame_offset == 0) ) {
+  if(found_frame_offset == 0) {
     fprintf(stderr,
             "Didn't find frame offset in ef_vi_receive_query_layout.\n");
     exit(1);
