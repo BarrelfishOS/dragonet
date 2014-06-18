@@ -474,10 +474,6 @@ conn *conn_new(const int sfd, enum conn_states init_state,
             exit(1);
         }
         c->is_dragonet = 1;
-        // Register callback with dragonet
-        // Callback is event_handler(sfd, ??,  (void *)c);
-        //register_callback_dn(&c->thread->dn_tstate, event_handler,
-        //        sfd, 0, (void *)c);
 
     } else {
 #endif // DRAGONET
@@ -3887,10 +3883,10 @@ static enum transmit_result transmit(conn *c) {
             conn_set_state(c, conn_read);
         else
             conn_set_state(c, conn_closing);
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+        mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
         return TRANSMIT_HARD_ERROR;
     } else {
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+        mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
         return TRANSMIT_COMPLETE;
     }
 }
@@ -4176,20 +4172,23 @@ static void drive_machine(conn *c) {
             conn_set_state(c, conn_closing);
             break;
           }
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+          mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
             switch (transmit(c)) {
             case TRANSMIT_COMPLETE:
+
+                mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
                 if (c->state == conn_mwrite) {
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+                    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
                     conn_release_items(c);
                     /* XXX:  I don't know why this wasn't the general case */
                     if(c->protocol == binary_prot) {
                         conn_set_state(c, c->write_and_go);
                     } else {
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+                        mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
                         conn_set_state(c, conn_new_cmd);
                     }
                 } else if (c->state == conn_write) {
+                    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
                     if (c->write_and_free) {
                         free(c->write_and_free);
                         c->write_and_free = 0;
@@ -4226,6 +4225,7 @@ static void drive_machine(conn *c) {
         }
     }
 
+    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
     return;
 }
 
@@ -4248,6 +4248,7 @@ void event_handler(const int fd, const short which, void *arg) {
     }
     drive_machine(c);
 
+    mprint("%s:%s:%d: event_handler done \n", __FILE__, __func__, __LINE__);
     /* wait for next event */
     return;
 }

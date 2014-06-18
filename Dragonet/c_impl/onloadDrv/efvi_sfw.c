@@ -101,14 +101,15 @@ void vi_refill_rx_ring(struct vi* vi)
   struct pkt_buf* pkt_buf;
   int i;
   int freespace_hw = ef_vi_receive_space(&vi->vi);
-  if( ef_vi_receive_space(&vi->vi) >= REFILL_BATCH_SIZE &&
+  if( freespace_hw >= REFILL_BATCH_SIZE &&
       vi->free_pkt_bufs_n >= REFILL_BATCH_SIZE ) {
-    printf("%s:%d: freespace HW = %d, freebufs = %d \n",
-         __func__, __LINE__,
-          freespace_hw, vi->free_pkt_bufs_n);
-        printf("%s:%d:Refilling the RX queue\n", __func__, __LINE__);
+//    printf("%s:%d: freespace HW = %d, freebufs = %d \n",
+//         __func__, __LINE__,
+//          freespace_hw, vi->free_pkt_bufs_n);
+//        printf("%s:%d:Refilling the RX queue\n", __func__, __LINE__);
     for( i = 0; i < REFILL_BATCH_SIZE; ++i ) {
       pkt_buf = vi->free_pkt_bufs;
+      assert(pkt_buf != NULL);
       vi->free_pkt_bufs = vi->free_pkt_bufs->next;
       --vi->free_pkt_bufs_n;
       assert(pkt_buf->n_refs == 0);

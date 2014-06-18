@@ -76,6 +76,7 @@ void stack_process_event(struct stack_handle *stack)
     assert(ev.type == DNAL_AQET_INPACKET);
     sh = dnal_socket_opaque_get(ev.data.inpacket.socket);
     sh->cb_receive(sh, ev.data.inpacket.buffer, sh->data);
+    dprint("%s:%s:%d: callback done\n", __FILE__, __FUNCTION__, __LINE__);
 }
 
 

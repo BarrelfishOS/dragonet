@@ -40,6 +40,8 @@ void input_copy_packet(struct input *in, unsigned char *buff, size_t len)
 
 void input_free_plh(pipeline_handle_t plh, struct input *in)
 {
+    assert(plh != NULL);
+    assert(in != NULL);
     pl_input_free(plh, in);
 }
 

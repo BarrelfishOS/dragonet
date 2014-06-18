@@ -16,6 +16,7 @@ static pthread_mutex_t dn_lock = PTHREAD_MUTEX_INITIALIZER; // dragonet lock
 // and calls event handler mechanism
 static void recv_cb(socket_handle_t sh1, struct input *in, void *data)
 {
+
     mprint("debug: %s:%s:%d: callback arrived\n", __FILE__, __FUNCTION__, __LINE__);
     struct dn_thread_state *current_thread_st_copy;
     // we need to have one current packet for each thread.
@@ -33,7 +34,11 @@ static void recv_cb(socket_handle_t sh1, struct input *in, void *data)
 
     // Does input_free needs to be guarded with Dragonet lock?
     pthread_mutex_lock(&dn_lock);
-    input_free(current_thread_st_copy->current_packet);
+    assert(current_thread_st_copy != NULL);
+    assert(current_thread_st_copy->current_packet != NULL);
+    stack_input_free(current_thread_st_copy->stack,
+            current_thread_st_copy->current_packet);
+
     // Not unlocking as event handler will unlock this.
     //pthread_mutex_unlock(&dn_lock);
 } // end function:  recv_cb
@@ -77,8 +82,10 @@ void event_handle_loop_dn(void *dn_state)
     while (1) {
         pthread_mutex_lock(&dn_lock);
         current_thread_st = dnt_state;
-        //mprint("waiting for next event\n");
+        mprint("waiting for next event\n");
         stack_process_event(dnt_state->stack);
+        mprint("%s:%s:%d: stack_process_event done! looping back\n",
+                __FILE__, __func__, __LINE__);
         pthread_mutex_unlock(&dn_lock);
     }
 }

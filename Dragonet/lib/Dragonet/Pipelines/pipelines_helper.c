@@ -798,6 +798,8 @@ struct input *pl_input_alloc(pipeline_handle_t plh)
 void pl_input_free(pipeline_handle_t plh, struct input *in)
 {
     struct dragonet_pipeline *pl = plh;
+    assert(pl != NULL);
+    assert(in != NULL);
 
     if (pl->input_cnt < IN_FULL_POOL_MAX) {
         // Cache the input

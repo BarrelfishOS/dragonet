@@ -30,7 +30,7 @@ get_tsc(void) {
 #endif // 0
 
 
-#define MYDEBUG     1
+//#define MYDEBUG     1
 #ifdef MYDEBUG
 //#define dprint(x...)    do { printf("TID:%d:Cycle:%"PRIu64":", (int)pthread_self(), get_tsc()); printf(":debug:" x); } while(0)
 #define dprint(x...)    do { printf("TID:%d:", (int)pthread_self()); printf(":debug:" x); } while(0)
@@ -38,7 +38,7 @@ get_tsc(void) {
 #define dprint(x...)   ((void)0)
 #endif // MYDEBUG
 
-#define MYDEBUGV     1
+//#define MYDEBUGV     1
 #ifdef MYDEBUGV
 #define ddprint(x...)    dprint(x)
 #else
