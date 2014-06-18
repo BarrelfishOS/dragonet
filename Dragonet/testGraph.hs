@@ -338,7 +338,7 @@ main = do
 
         prgConfigured = applyConfig config prg
 --        config = [("CSynFilter", "true"), ("CSynOutput","Q2")]
-        config = [("RxCSynFilter", "true"), ("RxCSynOutput","Q2")]
+        config = [("RxCSynFilter", CVEnum 0), ("RxCSynOutput",CVEnum 2)]
 
         lpgTImpl = pgSetType GTLpg LPG2.lpg
         embedded = fullEmbedding prgTConf lpgTImpl

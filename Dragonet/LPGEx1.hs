@@ -9,14 +9,10 @@ module LPGEx1 (
 import Dragonet.Unicorn
 import LPGImpl
 
-import qualified Dragonet.ProtocolGraph as PG
+import Dragonet.ProtocolGraph
 import qualified Dragonet.Implementation as Impl
 
-lpgClusters :: [(Int, [String])]
-lpgNodes :: [(Int, PG.Node)]
-lpgEdges :: [PG.PGEdge]
-lpg :: PG.PGraph
 
 -- The protocol graph
-[unicornImpl_f|lpgImpl.unicorn|]
+[unicorn_f|lpgImpl.unicorn|]
 

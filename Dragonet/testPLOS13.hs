@@ -285,7 +285,7 @@ main = do
         prgTConf = pgSetType GTPrg prgConfigured
 
         prgConfigured = applyConfig config prg
-        config = [("CSynFilter", "true"), ("CSynOutput","Q2")]
+        config = [("CSynFilter", CVEnum 0), ("CSynOutput", CVEnum 2)]
 
         embedded = fullEmbedding prgTConf lpgT
 

@@ -85,7 +85,7 @@ combineN (pr,(_,n),_) = map port $ PG.nPorts n
         port p = (p,case PG.nPersonality n of
             PG.ONode op -> opPort op (findIn "true") (findIn "false") p
             PG.FNode -> maybe fInExp (cAnd fInExp) (fExp p)
-            PG.CNode _ -> error "Encountered CNode")
+            PG.CNode _ _ -> error "Encountered CNode")
 
         opPort PG.OpAnd ts _ "true" = cAndL ts
         opPort PG.OpOr ts _ "true" = cOrL ts

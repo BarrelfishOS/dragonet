@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Dragonet.Unicorn(
     unicorn,
     unicorn_f,
@@ -12,6 +13,7 @@ module Dragonet.Unicorn(
     unicornNOrNode,
     unicornGraph,
     constructGraph,
+    PG.ConfType(..),
 ) where
 
 import Dragonet.Unicorn.Parser
@@ -81,6 +83,9 @@ node_to_pgnode (Or name pt pf attrs)      = PG.baseONode name attrs pnames PG.Op
     where pnames = map pName [pt, pf]
 node_to_pgnode (NOr name pt pf attrs)     = PG.baseONode name attrs pnames PG.OpNOr Nothing
     where pnames = map pName [pt, pf]
+node_to_pgnode  (Config name ports attrs _ t) =
+    PG.baseCNode name attrs pnames t unicornSimpleConfig Nothing
+    where pnames = map pName ports
 
 constructGraph :: Graph -> PG.PGraph
 constructGraph (Graph gname cluster) =
@@ -205,6 +210,39 @@ unicornOrNode l a p     = PG.baseONode l a p PG.OpOr
 unicornNOrNode l a p    = PG.baseONode l a p PG.OpNOr
 unicornGraph nodes edges = DGI.mkGraph nodes edges
 
+
+intE :: Integer -> TH.Exp
+intE i = TH.LitE $ TH.IntegerL i
+
+stringE :: String -> TH.Exp
+stringE s = TH.LitE $ TH.StringL s
+
+boolE :: Bool -> TH.Exp
+boolE True = conE "True" []
+boolE False = conE "False" []
+
+conE :: String -> [TH.Exp] -> TH.Exp
+conE name = callE (TH.ConE $ TH.mkName name)
+
+maybeE :: (a -> TH.Exp) -> Maybe a -> TH.Exp
+maybeE _ Nothing = conE "Nothing" []
+maybeE mf (Just a) = conE "Just" [mf a]
+
+
+confTypeToTH :: PG.ConfType -> TH.Exp
+confTypeToTH (PG.CTInteger a b) = conE "CTInteger" [intE a, intE b]
+confTypeToTH PG.CTBool = conE "CTBool" []
+confTypeToTH (PG.CTMaybe t) = conE "CTMaybe" [confTypeToTH t]
+confTypeToTH (PG.CTList e o mi ma) =
+    conE "CTList" [confTypeToTH e, boolE o, maybeE intE mi, maybeE intE ma]
+confTypeToTH (PG.CTTuple es) = conE "CTTuple" [TH.ListE $ map el es]
+    where el (lbl,t) = TH.TupE [stringE lbl, confTypeToTH t]
+confTypeToTH (PG.CTEnum es) = conE "CTEnum" [TH.ListE $ map stringE es]
+confTypeToTH (PG.CTSum es) = conE "CTSum" [TH.ListE $ map el es]
+    where el (lbl,t) = TH.TupE [stringE lbl, confTypeToTH t]
+
+
+
 nodeExp :: String -> Node -> Bool -> TH.Exp
 nodeExp gn n impl =
     callE (TH.VarE $ TH.mkName ntFun) ([labelE, attrE, portsE] ++ ntE ++ [i])
@@ -212,7 +250,9 @@ nodeExp gn n impl =
         (ntFun,ntE,isfnode) =
             case n of
                 (Node _ _ _) -> ("unicornNode", [],True)
-                (Config _ _ _ c) -> ("unicornConfNode", [confFE c],False)
+                (Config _ _ _ c t) -> ("unicornConfNode",
+                                        [confTE t, confFE c],
+                                        False)
                 (Boolean _ _ _ _) -> ("unicornNode", [],True)
                 (And _ _ _ _) -> ("unicornAndNode", [],False)
                 (NAnd _ _ _ _) -> ("unicornNAndNode", [],False)
@@ -223,6 +263,7 @@ nodeExp gn n impl =
         attrE = TH.ListE $ map (TH.LitE . TH.StringL) $ fixAttrs $ nAttrs n
         portsE = TH.ListE $ map (TH.LitE . TH.StringL . pName) $ nPorts n
         confFE f = TH.VarE $ TH.mkName $ fromMaybe "unicornSimpleConfig" f
+        confTE t = confTypeToTH t
 
         fixAttrs a =
             case n of
@@ -239,16 +280,16 @@ nodeExp gn n impl =
 -----------------------------------------------------------------------------
 -- Helper functions
 
-
 unicornSimpleConfig :: PG.ConfFunction
-unicornSimpleConfig _ inE outE cfg =
+unicornSimpleConfig n inE outE cval =
     return $ concatMap edge inE
     where
+        -- Port name to use
+        cfg = PG.nConfType n `PG.cvEnumName` cval
         -- Only the out-endpoints that match the configuration
         outN = map fst $ filter ((== cfg) . snd) outE
         -- Remove labels from node in edge
         unlab ((a,_),(b,_),c) = (a,b,c)
         -- Create edge from (n,p) to all out-endpoints
         edge (n,p) = map unlab $ map (\x -> (n,x,p)) $ outN
-
 

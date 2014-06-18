@@ -6,7 +6,10 @@ module Dragonet.ProtocolGraph(
 
     ConfFunction,
     ConfMonad,
-    ConfSpace,
+    ConfType(..),
+    ConfValue(..),
+
+    cvEnumName,
 
     Operator(..),
     Personality(..),
@@ -18,7 +21,7 @@ module Dragonet.ProtocolGraph(
 
     nIsCNode,
     nConfFun,
-
+    nConfType,
     nIsSoftware,
 
     opToString,
@@ -67,18 +70,18 @@ data Operator = OpAnd | OpOr | OpNAnd | OpNOr
     deriving (Show, Eq)
 
 data Personality =
-    CNode ConfFunction |
+    CNode ConfType ConfFunction |
     ONode Operator |
     FNode
 
 instance Eq Personality where
-    CNode _ == CNode _ = True
+    CNode ta _ == CNode tb _ = ta == tb
     ONode oa == ONode ob = oa == ob
     FNode == FNode = True
     _ == _ = False
 
 instance Show Personality where
-    show (CNode _) = "CNode"
+    show (CNode t _) = "CNode " ++ show t
     show (ONode op) = "ONode " ++ show op
     show (FNode) = "FNode"
 
@@ -122,21 +125,65 @@ type PGAdjFull = [(Port, DGI.Node, Node)]
 
 -------------------------------------------------------------------------------
 -- Configuration
-type ConfSpace = String
 type ConfMonad a = ST.State (Int,[PGNode]) a 
 type ConfFunction =
     Node ->
-    [(DGI.LNode (Node), Port)] ->
-    [(DGI.LNode (Node), Port)] ->
-    ConfSpace ->
+    [(PGNode, Port)] ->
+    [(PGNode, Port)] ->
+    ConfValue ->
     ConfMonad [DGI.LEdge Port]
+
+data ConfType =
+    CTInteger {
+        ctMin :: Integer,
+        ctMax :: Integer
+      } |
+    CTBool {
+      } |
+    CTMaybe {
+        ctElement :: ConfType
+      } |
+    CTList {
+        ctElement :: ConfType,
+        ctOrdered :: Bool,
+        ctLenMin  :: Maybe Integer,
+        ctLenMax  :: Maybe Integer
+      } |
+    CTTuple {
+        ctElements :: [(String, ConfType)]
+      } |
+    CTEnum {
+        ctEnumerators :: [String]
+      } |
+    CTSum {
+        ctElements :: [(String, ConfType)]
+      }
+    deriving (Show, Eq, Ord)
+
+data ConfValue =
+    CVInt Integer |
+    CVBool Bool |
+    CVMaybe (Maybe ConfValue) |
+    CVList [ConfValue] |
+    CVTuple [ConfValue] |
+    CVEnum Int |
+    CVTag Int ConfValue
+    deriving (Show, Eq, Ord)
+
+-- Get enumerator name from conf value and its type
+cvEnumName :: ConfType -> ConfValue -> String
+cvEnumName (CTEnum enums) (CVEnum v) = enums !! v
 
 
 -- Get configuration function from node (assumes node is CNode)
 nConfFun :: Node -> ConfFunction
 nConfFun n = fun
-    where (CNode fun) = nPersonality n
+    where (CNode _ fun) = nPersonality n
 
+-- Get configuration type from node (assumes node is CNode)
+nConfType :: Node -> ConfType
+nConfType n = ctype
+    where (CNode ctype _) = nPersonality n
 
 
 -------------------------------------------------------------------------------
@@ -162,12 +209,12 @@ baseONode label attr ports op impl = Node {
         nPorts = ports,
         nImplementation = impl }
 
-baseCNode :: Label -> [Attribute] -> [Port] -> ConfFunction -> Maybe Implementation
-                -> Node
-baseCNode label attr ports cnf impl = Node {
+baseCNode :: Label -> [Attribute] -> [Port] -> ConfType -> ConfFunction
+                -> Maybe Implementation -> Node
+baseCNode label attr ports ctype cnf impl = Node {
         nLabel = label,
         nTag = "",
-        nPersonality = CNode cnf,
+        nPersonality = CNode ctype cnf,
         nGraphType = GTUnknown,
         nAttributes = attr,
         nPorts = ports,
@@ -205,7 +252,7 @@ pgSetType t = DGI.nmap (\n -> n { nGraphType = t })
 
 
 persIsCNode :: Personality -> Bool
-persIsCNode (CNode _) = True
+persIsCNode (CNode _ _) = True
 persIsCNode _ = False
 
 persIsONode :: Personality -> Bool

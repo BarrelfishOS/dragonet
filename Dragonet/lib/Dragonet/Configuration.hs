@@ -1,6 +1,7 @@
 module Dragonet.Configuration(
     applyConfig,
     confMNewNode,
+    replaceConfFunctions
 ) where
 
 import Dragonet.ProtocolGraph
@@ -36,7 +37,7 @@ confMRun g m = addEdges $ addNodes g
 
 
 -- Apply configuration for a single CNode
-applyCNode :: [(String,String)] -> PGraph -> PGContext -> PGraph
+applyCNode :: [(String,ConfValue)] -> PGraph -> PGContext -> PGraph
 applyCNode config g ctx = confMRun g' newEM
     where
         node = DGI.lab' ctx
@@ -57,10 +58,21 @@ applyCNode config g ctx = confMRun g' newEM
 
 
 -- Apply specified configuration to graph
-applyConfig :: [(String,String)] -> PGraph -> PGraph
+applyConfig :: [(String,ConfValue)] -> PGraph -> PGraph
 applyConfig cfg g =
     foldl (applyCNode cfg) g configNodes
     where
         isConfigNode ctx = nIsCNode $ DGI.lab' ctx
         configNodes = GH.filterCtx isConfigNode g
+
+-- Add/replace config functions in graph. Calls passed function to get a config
+-- function for each CNode.
+replaceConfFunctions :: (Node -> ConfFunction) -> PGraph -> PGraph
+replaceConfFunctions m = DGI.nmap fixNode
+    where
+        fixNode n
+            | nIsCNode n = n { nPersonality = CNode ct (m n) }
+            | otherwise = n
+            where
+                CNode ct _ = nPersonality n
 

@@ -870,7 +870,7 @@ llvm_pg_fn (edges_in, nid, node, edges_out) = case PG.nPersonality node of
     PG.ONode PG.OpOr   -> llvm_pg_op   or_cnf nid node edges_out edges_in
     PG.ONode PG.OpNAnd -> llvm_pg_op nand_cnf nid node edges_out edges_in
     PG.ONode PG.OpNOr  -> llvm_pg_op  nor_cnf nid node edges_out edges_in
-    PG.CNode _         -> error "What is a CNode doing here?!"
+    PG.CNode _ _       -> error "What is a CNode doing here?!"
     where or_cnf   = LlvmPgOpConf {shortCircuitIn = True,  shortCircuitOut = True}
           and_cnf  = LlvmPgOpConf {shortCircuitIn = False, shortCircuitOut = False}
           nand_cnf = LlvmPgOpConf {shortCircuitIn = True, shortCircuitOut  = False}
@@ -881,7 +881,7 @@ llvm_pg_fn (edges_in, nid, node, edges_out) = case PG.nPersonality node of
 llvm_pg_dummy_impl :: M.Map String Integer ->  (PGAdjFull, DGI.Node, PG.Node, PGAdjFull) -> LLVM ()
 llvm_pg_dummy_impl def_map (edges_in, nid, node, edges_out) = case PG.nPersonality node of
     PG.FNode           -> llvm_dummy_impl def_val nid node edges_out
-    PG.CNode _         -> error "What is a CNode doing here?!"
+    PG.CNode _ _       -> error "What is a CNode doing here?!"
     _                  -> return ()
     where def_val = M.findWithDefault 0 nlbl def_map
           nlbl  = nLabel node
@@ -949,7 +949,7 @@ bldCallNode node port = do
         (PG.ONode _, "true")  -> operandTrue:args
         (PG.ONode _, "false") -> operandFalse:args
         (PG.ONode _, _)       -> error $ "No idea how to call port " ++ port ++ " of operator node " ++ (show node)
-        (PG.CNode _, _)       -> error $ "What is a CNode doing here?!"
+        (PG.CNode _ _, _)     -> error $ "What is a CNode doing here?!"
 
 -- call a set of remote nodes of a given port
 -- associative list

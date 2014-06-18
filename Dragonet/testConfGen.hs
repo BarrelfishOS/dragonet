@@ -28,6 +28,8 @@ import qualified Data.GraphViz.Attributes.Complete as GA
 
 import qualified Debug.Trace as T
 
+import E10k
+
 
 type IPv4Address = Word32
 type UDPPort = Word16
@@ -70,87 +72,10 @@ data StackState = StackState {
     ss5Tuples :: Int,
     ssNextSock :: SocketID,
     ssSockets :: [SocketDesc],
-    ssConfig :: [(String,String)]
+    ssConfig :: [(String,ConfValue)]
 }
 
 
-
-
-
-[unicorn|
-graph prg {
-    node HWDrop { }
-
-    cluster L2Ether {
-        boolean Classified {
-            attr "source"
-            port true[ValidCRC]
-            port false[] }
-
-        boolean ValidCRC {
-            port true[ClassifyL3_]
-            port false[.HWDrop] }
-
-        node ClassifyL3_ {
-            port ipv4[.L3IPv4Classified .L3IPv4Checksum_]
-            port other[.C5TupleFilter] }
-
-    }
-    
-    cluster L3IPv4 {
-
-        boolean Classified {
-            attr "software"
-            port true false[]
-            constraint true "IPv4"
-            constraint false "!IPv4" }
-    
-        node Checksum_ {
-            port out[ValidChecksum .C5TupleFilter] }
-
-        boolean ValidChecksum {
-            attr "software"
-            port true false[] }
-    }
-
-    config C5TupleFilter {
-        function config5tuple
-        port queues[Q0Valid Q1Valid Q2Valid]
-        port default[CFDirFilter] }
-
-    config CFDirFilter {
-        function configFDir
-        port queues[Q0Valid Q1Valid Q2Valid]
-        port default[ToDefaultQueue] }
-
-    boolean ToDefaultQueue {
-        port true false[Q0Valid] }
-
-    or Q0Valid {
-        port true[Queue0]
-        port false[] }
-    node Queue0 {
-        attr "software"
-        attr "sink"
-        port out[] }
-
-    or Q1Valid {
-        port true[Queue1]
-        port false[] }
-    node Queue1 {
-        attr "software"
-        attr "sink"
-        port out[] }
-
-    or Q2Valid {
-        port true[Queue2]
-        port false[] }
-    node Queue2 {
-        attr "software"
-        attr "sink"
-        port out[] }
-}
-|]
 
 
 
@@ -258,199 +183,6 @@ graph lpg {
         port true false[] }
 }
 |]
-
-
--------------------------------------------------------------------------------
--- Implementation of configuration of 5-tuple filters
-
-data C5TL3Proto = C5TPL3IPv4 | C5TPL3IPv6
-instance Show C5TL3Proto where
-    show C5TPL3IPv4 = "IPv4"
-    show C5TPL3IPv6 = "IPv6"
-
-data C5TL4Proto = C5TPL4TCP | C5TPL4UDP
-instance Show C5TL4Proto where
-    show C5TPL4TCP = "TCP"
-    show C5TPL4UDP = "UDP"
-
-data C5Tuple = C5Tuple {
-    c5tPriority :: Int,
-    c5tQueue    :: Int,
-    c5tL3Proto  :: Maybe C5TL3Proto,
-    c5tL4Proto  :: Maybe C5TL4Proto,
-    c5tL3Src    :: Maybe String,
-    c5tL3Dst    :: Maybe String,
-    c5tL4Src    :: Maybe UDPPort,
-    c5tL4Dst    :: Maybe UDPPort
-}
-
-c5tString :: C5Tuple -> String
-c5tString c = "5T("++l3p++"/"++l4p++","++l3s++","++l3d++","++l4s++","++l4d++")"
-    where
-        l3p = fromMaybe "*" $ liftM show $ c5tL3Proto c
-        l4p = fromMaybe "*" $ liftM show $ c5tL4Proto c
-        showIP s = IP4.ipToString $ read s
-        l3s = maybe "*" showIP $ c5tL3Src c
-        l3d = maybe "*" showIP $ c5tL3Dst c
-        l4s = fromMaybe "*" $ liftM show $ c5tL4Src c
-        l4d = fromMaybe "*" $ liftM show $ c5tL4Dst c
-
-c5tAttr :: C5Tuple -> [String]
-c5tAttr c =
-    if null constr then [] else [aTrue, aFalse]
-    where
-        constr = catMaybes $ [
-                do {p <- c5tL3Proto c; return (show p)},
-                do {p <- c5tL4Proto c; return (show p)},
-                do {s <- c5tL3Src c; return ("SourceIP=" ++ s)},
-                do {d <- c5tL3Dst c; return ("DestIP=" ++ d)},
-                do {s <- c5tL4Src c; return ("SourcePort=" ++ show s)},
-                do {d <- c5tL4Dst c; return ("DestPort=" ++ show d)} ]
-        cT = foldl1 (\a b -> a ++ "&" ++ b) constr
-        aTrue = "C.true:" ++ cT
-        aFalse = "C.false:!(" ++ cT ++ ")"
-            
-
-parse5tCFG :: String -> [C5Tuple]
-parse5tCFG [] = []
-parse5tCFG s = map parseTuple $ UM.splitBy '#' s
-    where
-        parseTuple s' = C5Tuple {
-            c5tPriority = read (parts !! 0),
-            c5tQueue    = read (parts !! 1),
-            c5tL3Proto  = if (parts !! 2) == "IPv4" then Just C5TPL3IPv4 else
-                          if (parts !! 2) == "IPv6" then Just C5TPL3IPv6 else
-                          Nothing,
-            c5tL4Proto  = if (parts !! 3) == "TCP" then Just C5TPL4TCP else
-                          if (parts !! 3) == "UDP" then Just C5TPL4UDP else
-                          Nothing,
-            c5tL3Src    = if null (parts !! 4) then Nothing else
-                          Just (parts !! 4),
-            c5tL3Dst    = if null (parts !! 5) then Nothing else
-                          Just (parts !! 5),
-            c5tL4Src    = if null (parts !! 6) then Nothing else
-                          Just (read (parts !! 6)),
-            c5tL4Dst    = if null (parts !! 7) then Nothing else
-                          Just (read (parts !! 7))
-        }
-            where
-            parts = UM.splitBy ',' s'
-
-
-config5tuple :: ConfFunction
-config5tuple _ inE outE cfg = do
-    ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
-    let lastEdge = (endN,defaultN,endP)
-    return (edges ++ [lastEdge])
-    where
-        -- Node and Port for the incoming edge for the first node
-        start = (fst $ fst $ head inE, snd $ head inE)
-        -- Node for default queue
-        (Just ((defaultN,_),_)) = L.find ((== "default") . snd) outE
-        -- Lookup node id for specified queue
-        queue i = queueN
-            where
-                (Just ((queueN,_),_)) =
-                    L.find (\((_,n),_) -> nLabel n == "Q" ++ show i ++ "Valid") outE
-        
-        -- Get filter configurations ordered by priority
-        cmpPrio a b = compare (c5tPriority a) (c5tPriority b)
-        cfgs = L.sortBy cmpPrio $ parse5tCFG cfg
-
-        -- Generate node and edges for one filter
-        bports = ["true","false"]
-        nodeL c = baseFNode (c5tString c) (c5tAttr c) bports Nothing
-        addFilter ((iN,iE),es) c = do
-            (n,_) <- confMNewNode $ nodeL c
-            let inEdge = (iN,n,iE)
-            let tEdge = (n,queue $ c5tQueue c,"true")
-            let fEdge = (n,queue $ c5tQueue c,"false")
-            return ((n,"false"), es ++ [inEdge,tEdge,fEdge])
-
-
--------------------------------------------------------------------------------
--- Implementation of configuration of the flow director filters
-
-data CFDirTuple = CFDirTuple {
-    cfdtQueue    :: Int,
-    cfdtL3Proto  :: C5TL3Proto,
-    cfdtL4Proto  :: C5TL4Proto,
-    cfdtL3Src    :: String,
-    cfdtL3Dst    :: String,
-    cfdtL4Src    :: UDPPort,
-    cfdtL4Dst    :: UDPPort
-}
-
-cFDtString :: CFDirTuple -> String
-cFDtString c = "FDir("++l3p++"/"++l4p++","++l3s++","++l3d++","++l4s++","++l4d++")"
-    where
-        l3p = show $ cfdtL3Proto c
-        l4p = show $ cfdtL4Proto c
-        l3s = IP4.ipToString $ read $ cfdtL3Src c
-        l3d = IP4.ipToString $ read $ cfdtL3Dst c
-        l4s = show $ cfdtL4Src c
-        l4d = show $ cfdtL4Dst c
-
-cFDtAttr :: CFDirTuple -> [String]
-cFDtAttr c =
-    [aTrue, aFalse]
-    where
-        constr :: [String]
-        constr = [show $ cfdtL3Proto c, show $ cfdtL4Proto c,
-                  ("SourceIP=" ++ cfdtL3Src c), ("DestIP=" ++ cfdtL3Dst c),
-                  ("SourcePort=" ++ (show $ cfdtL4Src c)),
-                  ("DestPort=" ++ (show $ cfdtL4Dst c)) ]
-        cT = constr `UM.joinBy` "&"
-        aTrue = "C.true:" ++ cT
-        aFalse = "C.false:!(" ++ cT ++ ")"
-
-parseFDirCFG :: String -> [CFDirTuple]
-parseFDirCFG [] = []
-parseFDirCFG s = map parseTuple $ UM.splitBy '#' s
-    where
-        parseTuple s' = CFDirTuple {
-            cfdtQueue   = read (parts !! 0),
-            cfdtL3Proto = if (parts !! 1) == "IPv4" then C5TPL3IPv4 else
-                           if (parts !! 1) == "IPv6" then C5TPL3IPv6 else
-                               error "Invalid L3 protocol",
-            cfdtL4Proto = if (parts !! 2) == "TCP" then C5TPL4TCP else
-                           if (parts !! 2) == "UDP" then C5TPL4UDP else
-                               error "Invalid L4 protocol",
-            cfdtL3Src   = parts !! 3,
-            cfdtL3Dst   = parts !! 4,
-            cfdtL4Src   = read (parts !! 5),
-            cfdtL4Dst   = read (parts !! 6) }
-            where
-            parts = UM.splitBy ',' s'
-
-configFDir :: ConfFunction
-configFDir _ inE outE cfg = do
-    ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
-    let lastEdge = (endN,defaultN,endP)
-    return (edges ++ [lastEdge])
-    where
-        -- Node and Port for the incoming edge for the first node
-        start = (fst $ fst $ head inE, snd $ head inE)
-        -- Node for default queue
-        (Just ((defaultN,_),_)) = L.find ((== "default") . snd) outE
-        -- Lookup node id for specified queue
-        queue i = queueN
-            where
-                (Just ((queueN,_),_)) =
-                    L.find (\((_,n),_) -> nLabel n == "Q" ++ show i ++ "Valid") outE
-
-        -- Get filter configurations
-        cfgs = parseFDirCFG cfg
-
-        -- Generate node and edges for one filter
-        bports = ["true","false"]
-        nodeL c = baseFNode (cFDtString c) (cFDtAttr c) bports Nothing
-        addFilter ((iN,iE),es) c = do
-            (n,_) <- confMNewNode $ nodeL c
-            let inEdge = (iN,n,iE)
-            let tEdge = (n,queue $ cfdtQueue c,"true")
-            let fEdge = (n,queue $ cfdtQueue c,"false")
-            return ((n,"false"), es ++ [inEdge,tEdge,fEdge])
 
 
 
@@ -569,7 +301,7 @@ ssLPG ss = snd $ GM.runOn (do
 -- State of the whole network stack
 
 
-emptyStackState :: Int -> Int -> [(String,String)] -> StackState
+emptyStackState :: Int -> Int -> [(String,ConfValue)] -> StackState
 emptyStackState queues n5tuples cfg = StackState {
     ssQueues = queues,
     ss5Tuples = n5tuples,
@@ -597,35 +329,55 @@ ssDelSocket ss sock =
     ss { ssSockets = filter (\s -> sdID s /= sock) $ ssSockets ss }
 
 -- Generate a 5-tuple filter configuration for the specified socket list
-generate5TConfig :: StackState -> [SocketDesc] -> String
+generate5TConfig :: StackState -> [SocketDesc] -> ConfValue
 generate5TConfig ss sockets =
-    map genTuple sockets `UM.joinBy` "#"
+    CVList $ map genTuple sockets
     where
-        genTuple sd = genParts sd `UM.joinBy` ","
-        genParts (SocketDesc _ (UDPIPv4Listen 0 port) _ q) =
-            [ "2", show q, "IPv4", "UDP", "", "", "", show port ]
-        genParts (SocketDesc _ (UDPIPv4Listen ip port) _ q) =
-            [ "1", show q, "IPv4", "UDP", "", show ip, "", show port ]
-        genParts (SocketDesc _ (UDPIPv4Flow sAddr dAddr sPort dPort) _ q) =
-            [ "0", show q, "IPv4", "UDP", show sAddr, show dAddr, show sPort,
-              show dPort ]
+        genTuple (SocketDesc _ (UDPIPv4Listen 0 port) _ q) =
+            CVTuple [CVMaybe Nothing,
+                     CVMaybe Nothing,
+                     CVMaybe $ Just $ CVEnum 1,
+                     CVMaybe Nothing,
+                     CVMaybe $ Just $ CVInt $ fromIntegral port,
+                     CVInt 3,
+                     CVInt $ fromIntegral q]
+        genTuple (SocketDesc _ (UDPIPv4Listen ip port) _ q) =
+            CVTuple [CVMaybe Nothing,
+                     CVMaybe $ Just $ CVInt $ fromIntegral ip,
+                     CVMaybe $ Just $ CVEnum 1,
+                     CVMaybe Nothing,
+                     CVMaybe $ Just $ CVInt $ fromIntegral port,
+                     CVInt 2,
+                     CVInt $ fromIntegral q]
+        genTuple (SocketDesc _ (UDPIPv4Flow sAddr dAddr sPort dPort) _ q) =
+            CVTuple [CVMaybe $ Just $ CVInt $ fromIntegral sAddr,
+                     CVMaybe $ Just $ CVInt $ fromIntegral dAddr,
+                     CVMaybe $ Just $ CVEnum 1,
+                     CVMaybe $ Just $ CVInt $ fromIntegral sPort,
+                     CVMaybe $ Just $ CVInt $ fromIntegral dPort,
+                     CVInt 1,
+                     CVInt $ fromIntegral q]
 
 -- Generate a FlowDir filter configuration for the specified socket list
-generateFDirConfig :: StackState -> [SocketDesc] -> String
+generateFDirConfig :: StackState -> [SocketDesc] -> ConfValue
 generateFDirConfig ss sockets =
-    map genTuple sockets `UM.joinBy` "#"
+    CVList $ map genTuple sockets
     where
-        genTuple sd = genParts sd `UM.joinBy` ","
-        genParts (SocketDesc _ (UDPIPv4Listen _ _) _ _) =
+        genTuple (SocketDesc _ (UDPIPv4Listen _ _) _ _) =
             error "Listening sockets not supported in FlowDir filters"
-        genParts (SocketDesc _ (UDPIPv4Flow sAddr dAddr sPort dPort) _ q) =
-            [ show q, "IPv4", "UDP", show sAddr, show dAddr, show sPort,
-              show dPort ]
+        genTuple (SocketDesc _ (UDPIPv4Flow sAddr dAddr sPort dPort) _ q) =
+            CVTuple [
+                CVInt $ fromIntegral sAddr,
+                CVInt $ fromIntegral dAddr,
+                CVEnum 1,
+                CVInt $ fromIntegral sPort,
+                CVInt $ fromIntegral dPort,
+                CVInt $ fromIntegral q]
 
 
 -- Generate configuration for PRG
-ssPRGConfig :: StackState -> [(String,String)]
-ssPRGConfig ss = 
+ssPRGConfig :: StackState -> [(String,ConfValue)]
+ssPRGConfig ss =
         ssConfig ss ++ [("C5TupleFilter",config5T),("CFDirFilter",configFD)]
     where
         -- Divide sockets up into listening and flows
@@ -741,7 +493,7 @@ cgmGraphs' pref title = do
     ss <- get
     cgmIO $ ssGraphs ss pref title
 
-cgmRun :: Int -> Int -> [(String,String)] -> ConfigGenM () -> IO ()
+cgmRun :: Int -> Int -> [(String,ConfValue)] -> ConfigGenM () -> IO ()
 cgmRun queues n5tuples config c = do
     let ss = emptyStackState queues n5tuples config
     TS.evalStateT c ss
@@ -847,5 +599,5 @@ main = do
     cgmRun queues n5tuples config rndS
 
     where
-        config = [("CSynFilter", "false"), ("CSynOutput","drop")]
+        config = []
 
