@@ -361,6 +361,14 @@ static void setup_thread(LIBEVENT_THREAD *me) {
         fprintf(stderr, "Failed to create suffix cache\n");
         exit(EXIT_FAILURE);
     }
+
+    // Dragonet specific initialization
+#ifdef DRAGONET
+    // Initializing the thread level lock for dragonet data-structures
+//    me->dn_tstate.dn_lock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_init(&me->dn_tstate.dn_lock, NULL);
+
+#endif // DRAGONET
 }
 
 /*
@@ -380,6 +388,7 @@ static void *worker_libevent(void *arg) {
     me->item_lock_type = ITEM_LOCK_GRANULAR;
     pthread_setspecific(item_lock_type_key, &me->item_lock_type);
 
+    // FIXME: maybe I should move the dragonet initialization here
 
     register_thread_initialized();
 
@@ -423,10 +432,11 @@ static void thread_libevent_process(int fd, short which, void *arg) {
                     }
                 } else {
                     c->thread = me;
-
+                    // new connection
 
 #ifdef DRAGONET
                     if (use_dragonet_stack) {
+
                         // Make sure that only UDP will go to dragonet stack
                         if (! IS_UDP(item->transport)) {
                             printf("Error: Dragonet: NON-UDP new_conn request on on Dragonet stack\n");
@@ -436,12 +446,27 @@ static void thread_libevent_process(int fd, short which, void *arg) {
 
                         c->is_dragonet = 1;
 
+
+                        // FIXME: create connection with dragonet here
+                        int ret = 0;
+                        // FIXME: set application slot name to be used
+
+                        // FIXME: set the port number to be used
+                        c->thread->dn_tstate.listen_port_udp = settings.udpport;
+                        //  NOTE: currently these two are directly set into stack init code
+                        ret = lowlevel_dn_stack_init(&c->thread->dn_tstate);
+                        if (ret != SYS_ERR_OK) {
+                            printf("Error: Dragonet: stack init failed\n");
+                            exit(1);
+                            return;
+                        }
+
                         // Register callback with dragonet
                         register_callback_dn(&c->thread->dn_tstate,
                                 event_handler, c->sfd, 0, (void *)c);
-//                        fprintf(stderr, "T%d: %p: Handling incomming packets on Dragonet\n",
-//                               (int)c->thread->thread_id, c);
+                        // infinite loop handling events
                         event_handle_loop_dn(&c->thread->dn_tstate);
+                        printf("ERROR: This is unreachable statement!\n");
                     } // end if: use_dragonet_stack
 #endif // DRAGONET
 

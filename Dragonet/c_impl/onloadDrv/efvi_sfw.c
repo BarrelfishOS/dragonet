@@ -108,10 +108,15 @@ void vi_refill_rx_ring(struct vi* vi)
 //          freespace_hw, vi->free_pkt_bufs_n);
 //        printf("%s:%d:Refilling the RX queue\n", __func__, __LINE__);
     for( i = 0; i < REFILL_BATCH_SIZE; ++i ) {
+      assert(vi->free_pkt_bufs_n > 0);
       pkt_buf = vi->free_pkt_bufs;
       assert(pkt_buf != NULL);
       vi->free_pkt_bufs = vi->free_pkt_bufs->next;
       --vi->free_pkt_bufs_n;
+      if (pkt_buf->n_refs != 0) {
+          printf("%s:%s:%d: dragonet buffer leak: existing refs in new buff = %d\n",
+                  __FILE__, __FUNCTION__, __LINE__, pkt_buf->n_refs);
+      }
       assert(pkt_buf->n_refs == 0);
       pkt_buf->n_refs = 1;
       ef_vi_receive_init(&vi->vi, pkt_buf->addr[vi->net_if->id] + RX_DMA_OFF,
@@ -125,9 +130,22 @@ void vi_refill_rx_ring(struct vi* vi)
 struct pkt_buf* vi_get_free_pkt_buf(struct vi* vi)
 {
     struct pkt_buf* pkt_buf;
+    if (vi->free_pkt_bufs_n <= 0) {
+        printf("%s:%s:%d: dragonet out of packet buffers\n",
+                __FILE__, __FUNCTION__, __LINE__);
+
+        assert(vi->free_pkt_bufs_n > 0);
+        abort();
+
+        return NULL;
+    }
     pkt_buf = vi->free_pkt_bufs;
     vi->free_pkt_bufs = vi->free_pkt_bufs->next;
     --vi->free_pkt_bufs_n;
+    if (pkt_buf->n_refs != 0) {
+        printf("%s:%s:%d: dragonet buffer leak: existing refs in new buff = %d\n",
+                __FILE__, __FUNCTION__, __LINE__, pkt_buf->n_refs);
+    }
     assert(pkt_buf->n_refs == 0);
     pkt_buf->n_refs = 1;
     return pkt_buf;

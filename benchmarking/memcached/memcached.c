@@ -5282,6 +5282,8 @@ int main (int argc, char **argv) {
                    "only works with UDP. Please specify UDP port with -U option");
             exit(1);
         }
+
+#if 0
         // call init dragonet interface
         int ret = dn_stack_init(settings.udpport);
         if (ret < 0) {
@@ -5290,6 +5292,8 @@ int main (int argc, char **argv) {
             exit(1);
         }
         printf("memcached Dragonet: end\n");
+#endif // 0
+
     } else {
         printf("memcached with Dragonet disabled with option -N\n");
     }

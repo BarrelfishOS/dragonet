@@ -97,6 +97,7 @@ main :: IO ()
 main = do
     let helpers = "llvm-helpers-sf"
         nQ = 2
+        --nQ = 1
         sfS = SFP.sfPStateInit 128
         pstate = INC.policyStateInit nQ sfS SFP.sfPolicy
 

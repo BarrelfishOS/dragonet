@@ -39,14 +39,15 @@ static void arp_remove_pending(struct state *st, struct arp_pending *p)
 
 struct arp_cache *arp_cache_lookup(struct state *st, uint32_t ip)
 {
-    dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     struct arp_cache *cache = st->arp_cache;
     while (cache != NULL) {
         if (cache->ip == ip) {
+            dprint("%s:%s:%d ARP cache hit\n", __FILE__, __func__, __LINE__);
             return cache;
         }
         cache = cache->next;
     }
+    dprint("%s:%s:%d ARP cache miss\n", __FILE__, __func__, __LINE__);
     return NULL;
 }
 

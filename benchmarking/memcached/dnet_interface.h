@@ -26,9 +26,20 @@
 typedef void (*event_handler_fun_ptr)(const int fd, const short which, void *arg);
 
 struct dn_thread_state {
-    struct stack_handle *stack;
-    socket_handle_t sh;
-    event_handler_fun_ptr callback_memcached_fn;
+    pthread_mutex_t dn_lock;  // lock around dragonet related state of thread
+    int tindex;               // id of the thread
+//    struct stack_handle *stack;
+//    socket_handle_t sh;
+
+    dnal_appq_t daq;    // application queue handle with network stack
+    dnal_sockh_t dsh;   // Socket handle
+    struct dnal_net_destination dnd;    // listen address for binding
+    struct dnal_net_destination dest;   // destination for currently processing packet
+    struct dnal_aq_event event;     // event handle to be used in polling
+    event_handler_fun_ptr callback_memcached_fn;  // callback function ptr
+    char app_slot[255];     // Name of application slot for this thread
+
+    uint16_t listen_port_udp;
     int callback_memcached_fd;
     short callback_memcached_which;
     void *callback_memcached_arg;
@@ -42,7 +53,11 @@ struct dn_thread_state {
 extern int use_dragonet_stack;
 
 
-int dn_stack_init(uint16_t uport);
+//int dn_stack_init_specific(char *slot_name, uint16_t uport);
+//int dn_stack_init(uint16_t uport);
+
+int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate);
+
 int register_callback_dn(void *dn_state, event_handler_fun_ptr fun, int fd,
         short which, void *arg);
 int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize);

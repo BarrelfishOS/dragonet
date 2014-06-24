@@ -82,6 +82,7 @@ struct vi* vis_local = NULL;
 #define QUEUE_INDEX(q) ((q) - (q)->sf->queues)
 
 #define EF_VI_TRANSMIT_BATCH    64
+#define EF_VI_RX_BATCH          16
 
 typedef void * sf_queue_t;
 
@@ -103,7 +104,12 @@ struct dragonet_sf_queue {
     int rx_pkts;
     int tx_pkts;
     ef_request_id ids[EF_VI_TRANSMIT_BATCH];
-    ef_event evs[16];
+    ef_event evs[EF_VI_RX_BATCH];
+
+    // buffered RX packets (as we process one packet at time)
+    int evs_rx_buffered_indexes[EF_VI_RX_BATCH];
+    int evs_bufferd_rx_total;       // total buffered RX packet
+    int evs_bufferd_rx_last;     // last packet that was reported to userspace
 };
 
 struct dragonet_sf {
@@ -250,16 +256,6 @@ static void buf_details(struct pkt_buf* pkt_buf, char *buff, int l)
 }
 
 
-// FIXME: remove these state variables as now they are part of the struct
-/*
-static int refill_counter_local = 0;
-static int tx_event_count = 0;
-static int tx_discard_event_count = 0;
-static int rx_event_count = 0;
-static int no_event_count = 0;
-static int event_count = 0;
-*/
-
 size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
         size_t buf_len)
 {
@@ -273,93 +269,121 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
 
     struct vi* viff;
     int i, j, n, n_ev = 0;
+    int idx = 0;
     int pkt_buf_i = 0;
     int len = 0;
     int copylen = 0;
     int pkt_received = 0;
     struct pkt_buf* pkt_buf;
-    char printbuf[PRINTBUFSIZE] = {'\0'};
+//    char printbuf[PRINTBUFSIZE]; // = {'\0'};
     int pkt_received_count = 0;
 
     while( 1 ) {
         viff = vif;
 
+        // If there are already received packet,
+        // then pop one of them out and return.
+
+        if ( (sfq->evs_bufferd_rx_total - sfq->evs_bufferd_rx_last) > 0) {
+//            printf("Warning: returning already buffered packet: "
+//                    "%d from total %d packets\n",
+//                    sfq->evs_bufferd_rx_last, sfq->evs_bufferd_rx_total);
+
+            idx = sfq->evs_rx_buffered_indexes[sfq->evs_bufferd_rx_last];
+            ++sfq->evs_bufferd_rx_last;
+
+
+            /* This code does not handle jumbos. */
+            assert(EF_EVENT_RX_SOP(sfq->evs[idx]) != 0);
+            assert(EF_EVENT_RX_CONT(sfq->evs[idx]) == 0);
+
+            pkt_buf_i = EF_EVENT_RX_RQ_ID(sfq->evs[idx]);
+            pkt_buf = pkt_buf_from_id(viff, pkt_buf_i);
+            len = EF_EVENT_RX_BYTES(sfq->evs[idx]) - viff->frame_off;
+
+            copylen = len;
+            if (len > buf_len) {
+                copylen = buf_len;
+                dprint("buffer too small to copy full packet."
+                        "Ignoring  %d byte data\n", (len - copylen));
+            }
+            dprint("RX event: trying to copy %d bytes at location %p\n",
+                    copylen, pkt_out);
+
+            memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
+            ++pkt_received_count;
+            pkt_buf_release(pkt_buf);
+
+            if (pkt_buf->n_refs != 0) {
+                dprint("%s:%s:%d: ################### BUF LEAK ####\n", __FILE__, __func__, __LINE__);
+            }
+            assert(pkt_buf->n_refs == 0);
+
+            pkt_received = copylen;
+            ++sfq->refill_counter_local;
+            if (sfq->refill_counter_local >= 16 ) {
+                vi_refill_rx_ring(viff);
+                sfq->refill_counter_local = 0;
+            }
+
+            return pkt_received;
+        } // end if: buffered packets
+
+        // OK, there are no bufferd packets, lets buffer some packets!
+        // starting new buffer cycle
+        sfq->evs_bufferd_rx_total = 0;
+        sfq->evs_bufferd_rx_last = 0;
+
         n_ev = ef_eventq_poll(&viff->vi, sfq->evs, sizeof(sfq->evs) / sizeof(sfq->evs[0]));
-        ++sfq->event_count;
+        //n_ev = ef_eventq_poll(&viff->vi, sfq->evs, 1);
+        //++sfq->event_count;
         if( n_ev <= 0 ) {
-            ++sfq->no_event_count;
+            //++sfq->no_event_count;
             continue;
         }
 
-        if (n_ev > 1) {
-            printf("WARNING: no. of events received = %d\n", n_ev);
-        }
+        //if (n_ev > 1) {
+        //    printf("WARNING: no. of events received = %d\n", n_ev);
+        //}
 
         for( i = 0; i < n_ev; ++i ) {
             switch( EF_EVENT_TYPE(sfq->evs[i]) ) {
                 case EF_EVENT_TYPE_RX:
+                    sfq->evs_rx_buffered_indexes[sfq->evs_bufferd_rx_total] = i;
+                    ++sfq->evs_bufferd_rx_total;
+                    assert(sfq->evs_bufferd_rx_total < EF_VI_RX_BATCH);
+
                     ++sfq->rx_event_count;
-                        dprint("status: %s:%s:%d: %d, no events: %d, TX:%d, RX=%d, DROP=%d\n",
+
+                    dprint("status: %s:%s:%d: %d,RX event arrived, "
+                            "no events: %d, TX:%d, RX=%d, DROP=%d\n",
                             __FILE__, __FUNCTION__, __LINE__,
-                            sfq->event_count, sfq->no_event_count, sfq->tx_event_count, sfq->rx_event_count,
+                            sfq->event_count, sfq->no_event_count,
+                            sfq->tx_event_count, sfq->rx_event_count,
                             sfq->tx_discard_event_count);
-                    dprint("%s:%d: RX event arrived\n", __func__, __LINE__);
-                    /* This code does not handle jumbos. */
-                    assert(EF_EVENT_RX_SOP(sfq->evs[i]) != 0);
-                    assert(EF_EVENT_RX_CONT(sfq->evs[i]) == 0);
-
-                    pkt_buf_i = EF_EVENT_RX_RQ_ID(sfq->evs[i]);
-                    pkt_buf = pkt_buf_from_id(viff, pkt_buf_i);
-                    len = EF_EVENT_RX_BYTES(sfq->evs[i]) - viff->frame_off;
-
-                    copylen = len;
-                    if (len > buf_len) {
-                        copylen = buf_len;
-                        dprint("buffer too small to copy full packet."
-                                "Ignoring  %d byte data\n", (len - copylen));
-                    }
-                    dprint("RX event: trying to copy %d bytes at location %p\n",
-                            copylen, pkt_out);
-
-                    memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
-                    ++pkt_received_count;
-                    pkt_buf_release(pkt_buf);
-                    if (pkt_buf->n_refs != 0) {
-                        dprint("%s:%s:%d: ################### BUF LEAK ####\n", __FILE__, __func__, __LINE__);
-                    }
-                    //assert(pkt_buf->n_refs == 0);
-
-                    pkt_received = copylen;
-                    ++sfq->refill_counter_local;
-                    if (sfq->refill_counter_local >= 16 ) {
-                        vi_refill_rx_ring(viff);
-                        sfq->refill_counter_local = 0;
-                    }
-
-                    // NOTE: I am assuming that we are reading only one event
-                    //      in each iteration
-//                    return pkt_received;
                     break;
 
                 case EF_EVENT_TYPE_TX:
                     ++sfq->tx_event_count;
-                    dprint("status: %s:%s:%d: %d, no events: %d, TX:%d, RX=%d, DROP=%d\n",
+                    dprint("status: %s:%s:%d: %d, no events: %d, TX:%d, "
+                            "RX=%d, DROP=%d\n",
                             __FILE__, __FUNCTION__, __LINE__,
-                            sfq->event_count, sfq->no_event_count, sfq->tx_event_count, sfq->rx_event_count,
+                            sfq->event_count, sfq->no_event_count,
+                            sfq->tx_event_count, sfq->rx_event_count,
                             sfq->tx_discard_event_count);
                     dprint("TX event arrived\n");
                     n = ef_vi_transmit_unbundle(&viff->vi, &sfq->evs[i], sfq->ids);
                     for( j = 0; j < n; ++j ) {
                         pkt_buf = pkt_buf_from_id(viff, TX_RQ_ID_PB(sfq->ids[j]));
-                        buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                        dprint("%s:%s:%d: TX, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                        //buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                        //dprint("%s:%s:%d: TX, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
                         pkt_buf_release(pkt_buf);
                         if (pkt_buf->n_refs != 0) {
                             dprint("%s:%s:%d: ################### BUF LEAK %d ####\n", __FILE__, __func__, __LINE__,j);
-                            buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                            dprint("%s:%s:%d: TX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                            //buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                            //dprint("%s:%s:%d: TX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
                         }
-                        //assert(pkt_buf->n_refs == 0);
+                        assert(pkt_buf->n_refs == 0);
                     } // end for:
                     break;
 
@@ -371,14 +395,15 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
                             sfq->event_count, sfq->no_event_count, sfq->tx_event_count, sfq->rx_event_count,
                             sfq->tx_discard_event_count);
                     }
-                    dprint("RX_discard event arrived\n");
+                    printf("RX_discard event arrived\n");
                         pkt_buf = pkt_buf_from_id(viff,
                                     EF_EVENT_RX_DISCARD_RQ_ID(sfq->evs[i]));
-                        buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                        dprint("%s:%s:%d: RX_DISCARD, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                        //buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                        //dprint("%s:%s:%d: RX_DISCARD, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
                         pkt_buf_release(pkt_buf);
-                        buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                        dprint("%s:%s:%d: RX_DISCARD, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                        assert(pkt_buf->n_refs == 0);
+                        //buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                        //dprint("%s:%s:%d: RX_DISCARD, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
                     break;
 
                 default:
@@ -387,17 +412,8 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
                     break;
             } // end switch
         } // end for : i
-        //vi_refill_rx_ring(viff);
 
-        if (pkt_received_count == 1) {
-            dprint("Exactly one packet received, returning it\n");
-            return pkt_received;
-        } else if (pkt_received_count > 1) {
-            printf("Warning: %d packets received, returning first out of it\n",
-                   pkt_received_count);
-            return pkt_received;
-        }
-    }
+    } // end while: infinite
     return 0;
 } // end function: get_packet
 
@@ -426,9 +442,9 @@ void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len)
     }
 
     // print details of buffer which is being sent
-    char printbuf[PRINTBUFSIZE] = {'\0'};
+//    char printbuf[PRINTBUFSIZE]; // = {'\0'};
     //buf_details(pkt_buf, printbuf, sizeof(printbuf));
-    dprint("%s:%s:%d: ###### 1 %s\n", __FILE__, __func__, __LINE__, printbuf);
+    //dprint("%s:%s:%d: ###### 1 %s\n", __FILE__, __func__, __LINE__, printbuf);
 
     offset = RX_PKT_OFF(vif);
     assert(pkt_buf != NULL);
@@ -437,7 +453,7 @@ void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len)
 
     void * buf_addr = RX_PKT_PTR(pkt_buf);
     //buf_details(pkt_buf, printbuf, sizeof(printbuf));
-    dprint("%s:%s:%d: ###### 2 %s\n", __FILE__, __func__, __LINE__, printbuf);
+    //dprint("%s:%s:%d: ###### 2 %s\n", __FILE__, __func__, __LINE__, printbuf);
 
     // FIXME: make sure that len is smaller than buffer length
     memcpy(buf_addr, pkt_tx, len);
@@ -460,7 +476,7 @@ void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len)
 
     dprint("%s:%s:%d: vi_send done\n", __FILE__, __func__, __LINE__);
 //    buf_details(pkt_buf, printbuf, sizeof(printbuf));
-    dprint("%s:%s:%d: ###### 3 %s\n", __FILE__, __func__, __LINE__, printbuf);
+    //dprint("%s:%s:%d: ###### 3 %s\n", __FILE__, __func__, __LINE__, printbuf);
 
     // FIXME: Wait for send ACK
     dprint("%s:%s:%d: buf[] send done\n", __FILE__, __func__, __LINE__);
@@ -500,10 +516,13 @@ void *init_and_alloc_default_queue(char *name)
         iq[k].populated = false;
         iq[k].queue_handle = alloc_queue(sf_nic->sfif);
         iq[k].qid = k;
+        iq[k].evs_bufferd_rx_total = 0;
+        iq[k].evs_bufferd_rx_last = 0;
         iq[k].queue =  (void *) iq[k].queue_handle;
     }
     alloc_filter_default(&sf_nic->queues[0]);
     vis_local = sf_nic->queues[0].queue_handle;
+
     dprint("%s:%s:%d: dragonet_nic = %p,  sf_if = %p, (q0 [%p], q1 [%p], q2[%p])\n",
             __FILE__, __func__, __LINE__,
             sf_nic, sf_nic->sfif,
@@ -515,12 +534,15 @@ void *init_and_alloc_default_queue(char *name)
 
 // ######################  ###########################
 
-
+// this one is connected via switch on asiago
+#define IFNAME              "p801p1"
+#define CONFIG_LOCAL_MAC_sf  0x644d07530f00ULL  // "00:0f:53:07:4d:64"
+#define CONFIG_LOCAL_IP_sf   0x0a7104c3         // "10.113.4.195"
 
 // this one is connected via switch on appenzeller
-#define IFNAME              "p6p2"
-#define CONFIG_LOCAL_MAC_sf  0x495107530f00ULL  // "00:0f:53:07:51:49"
-#define CONFIG_LOCAL_IP_sf   0x0a710447         // "10.113.4.71"
+//#define IFNAME              "p6p2"
+//#define CONFIG_LOCAL_MAC_sf  0x495107530f00ULL  // "00:0f:53:07:51:49"
+//#define CONFIG_LOCAL_IP_sf   0x0a710447         // "10.113.4.71"
 
 
 struct vi;
@@ -570,8 +592,8 @@ static void tap_init(struct state *state, char *dev_name)
 
     void *onload_dev = init_onload_wrapper(dev_name);
     state->tap_handler = onload_dev;
-    dprint("%s:%s:%d: %p == %p ##########\n",
-              __FILE__,  __func__, __LINE__, onload_dev, state->tap_handler);
+//    dprint("%s:%s:%d: %p == %p ##########\n",
+//              __FILE__,  __func__, __LINE__, onload_dev, state->tap_handler);
 }
 
 
@@ -585,6 +607,14 @@ node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
 
     //pktoff_t maxlen;
     if (sf_driver == NULL) {
+        if (qi != 0) {
+
+            // We'll do the intialization on queue 0
+            dprint("%s:%s:%d: [QID:%"PRIu8"],  WARNING: ############## "
+                "initialization will be done on queue-0, returning\n",
+              __FILE__,  __func__, __LINE__, qi);
+            return P_Queue_drop;
+        }
         tap_init(state, IFNAME);
         state->local_mac = CONFIG_LOCAL_MAC_sf;
         state->local_ip = CONFIG_LOCAL_IP_sf;
