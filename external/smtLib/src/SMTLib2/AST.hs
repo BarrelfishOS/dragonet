@@ -91,6 +91,7 @@ data Command
   | CmdCheckSat
   | CmdGetAssertions
   | CmdGetValue [Expr]
+  | CmdGetAssignment
   | CmdGetProof
   | CmdGetUnsatCore
   | CmdGetInfo InfoFlag

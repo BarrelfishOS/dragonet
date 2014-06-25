@@ -152,6 +152,7 @@ instance PP Command where
       CmdCheckSat       -> one "check-sat"
       CmdGetAssertions  -> one "get-assertions"
       CmdGetValue es    -> mk  "get-value" (parens (fsep (map pp es)))
+      CmdGetAssignment  -> one "get-assignment"
       CmdGetProof       -> one "get-proof"
       CmdGetUnsatCore   -> one "get-unsat-core"
       CmdGetInfo i      -> std "get-info" i
