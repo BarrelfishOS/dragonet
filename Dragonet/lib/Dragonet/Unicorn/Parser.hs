@@ -6,10 +6,7 @@ module Dragonet.Unicorn.Parser(
     Port(..),
     Node(..),
 
-    pName, pOuts,
-    nName,
-    nAttrs,
-    nPorts,
+    nAllPorts,
 
     parseGraph,
 ) where
@@ -27,59 +24,74 @@ import Dragonet.ProtocolGraph (ConfType(..))
 -----------------------------------------------------------------------------
 -- Representing parsed code
 
-data Graph = Graph String Cluster
+data Graph = Graph {
+        gName        :: String,
+        gRootCluster :: Cluster }
     deriving Show
 
-data Cluster = Cluster String [Cluster] [Node]
+data Cluster = Cluster {
+        cName     :: String,
+        cChildren :: [Cluster],
+        cNodes    :: [Node] }
     deriving Show
 
--- String is port name, [String] is out edges
-data Port = Port String [String]
+data Port = Port {
+        pName     :: String,
+        pOuts     :: [String] }
     deriving Show
 
 data Node =
-    Node String [Port] [String] |
-    Config String [Port] [String] (Maybe String) ConfType |
-    Boolean String Port Port [String] |
-    And String Port Port [String] |
-    NAnd String Port Port [String] |
-    Or String Port Port [String] |
-    NOr String Port Port [String]
+    Node {
+        nName     :: String,
+        nPorts    :: [Port],
+        nAttrs    :: [String] } |
+
+    Config {
+        nName     :: String,
+        nPorts    :: [Port],
+        nAttrs    :: [String],
+        nConfFun  :: Maybe String,
+        nConfType :: ConfType } |
+
+    Boolean {
+        nName     :: String,
+        nPortT    :: Port,
+        nPortF    :: Port,
+        nAttrs    :: [String] } |
+
+    And {
+        nName     :: String,
+        nPortT    :: Port,
+        nPortF    :: Port,
+        nAttrs    :: [String] } |
+
+    NAnd {
+        nName     :: String,
+        nPortT    :: Port,
+        nPortF    :: Port,
+        nAttrs    :: [String] } |
+
+    Or {
+        nName     :: String,
+        nPortT    :: Port,
+        nPortF    :: Port,
+        nAttrs    :: [String] } |
+
+    NOr {
+        nName     :: String,
+        nPortT    :: Port,
+        nPortF    :: Port,
+        nAttrs    :: [String] }
     deriving Show
 
 
-pName :: Port -> String
-pName (Port n _) = n
-
-pOuts :: Port -> [String]
-pOuts (Port _ outs) = outs
-
-nName :: Node -> String
-nName (Node n _ _) = n
-nName (Config n _ _ _ _) = n
-nName (Boolean n _ _ _) = n
-nName (And n _ _ _) = n
-nName (NAnd n _ _ _) = n
-nName (Or n _ _ _) = n
-nName (NOr n _ _ _) = n
-
-nAttrs :: Node -> [String]
-nAttrs (Node _ _ as) = as
-nAttrs (Config _ _ as _ _) = as
-nAttrs (Boolean _ _ _ as) = as
-nAttrs (And _ _ _ as) = as
-nAttrs (NAnd _ _ _ as) = as
-nAttrs (Or _ _ _ as) = as
-nAttrs (NOr _ _ _ as) = as
-
-nPorts :: Node -> [Port]
-nPorts (Node _ ps _) = ps
-nPorts (Config _ ps _ _ _) = ps
-nPorts (Boolean _ a b _) = [a, b]
-nPorts (And _ a b _) = [a, b]
-nPorts (NAnd _ a b _) = [a, b]
-nPorts (Or _ a b _) = [a, b]
-nPorts (NOr _ a b _) = [a, b]
+nAllPorts :: Node -> [Port]
+nAllPorts Boolean { nPortT = t, nPortF = f } = [t, f]
+nAllPorts And { nPortT = t, nPortF = f } = [t, f]
+nAllPorts NAnd { nPortT = t, nPortF = f } = [t, f]
+nAllPorts Or { nPortT = t, nPortF = f } = [t, f]
+nAllPorts NOr { nPortT = t, nPortF = f } = [t, f]
+nAllPorts n = nPorts n
 
 
 -----------------------------------------------------------------------------
@@ -163,7 +175,10 @@ genNaryNode p name = do
 
 node p = do
     (name,ports,attr) <- genNaryNode p "node"
-    return (Right (Node name ports attr))
+    return $ Right $ Node {
+            nName  = name,
+            nPorts = ports,
+            nAttrs = attr }
 
 configFun = do
     reserved "function"
@@ -185,7 +200,12 @@ config p = do
         ps' <- concat <$> many (port p)
         let ctt' = defaultType ps' `fromMaybe` mbCtt
         return (ps',as',iF',ctt')
-    return (Right (Config n ps as iF ctt))
+    return $ Right $ Config {
+            nName     = n,
+            nPorts    = ps,
+            nAttrs    = as,
+            nConfFun  = iF,
+            nConfType = ctt }
     where
         defaultType ps = CTEnum { ctEnumerators = map pName ps }
 
@@ -210,36 +230,62 @@ genBoolean p name hasConstraints = do
                 return ()
     return (n, (head ps), (head (tail ps)),as)
     where
-        isPort n (Port m _) = (n == m)
+        isPort n p = n == pName p
         findPort n ps = L.find (isPort n) ps
         truePort = findPort "true"
         falsePort = findPort "false"
 
 boolean p = do
     (n, t, f, a) <- genBoolean p "boolean" True
-    return (Right (Boolean n t f a))
+    return $ Right $ Boolean {
+            nName  = n,
+            nPortT = t,
+            nPortF = f,
+            nAttrs = a }
+
 
 orN p = do
     (n, t, f, a) <- genBoolean p "or" False
-    return (Right (Or n t f a))
+    return $ Right $ Or {
+            nName  = n,
+            nPortT = t,
+            nPortF = f,
+            nAttrs = a }
+
 
 norN p = do
     (n, t, f, a) <- genBoolean p "nor" False
-    return (Right (NOr n t f a))
+    return $ Right $ NOr {
+            nName  = n,
+            nPortT = t,
+            nPortF = f,
+            nAttrs = a }
+
 
 andN p = do
     (n, t, f, a) <- genBoolean p "and" False
-    return (Right (And n t f a))
+    return $ Right $ And {
+            nName  = n,
+            nPortT = t,
+            nPortF = f,
+            nAttrs = a }
 
 nandN p = do
     (n, t, f, a) <- genBoolean p "nand" False
-    return (Right (NAnd n t f a))
+    return $ Right $ NAnd {
+            nName  = n,
+            nPortT = t,
+            nPortF = f,
+            nAttrs = a }
 
 cluster p = do
     reserved "cluster"
     n <- identifier
     ns <- braces $ clusteredNodes (n:p)
-    return (Left (Cluster ((concat $ reverse p) ++ n) (lefts ns) (rights ns)))
+    return $ Left $ Cluster {
+            cName     = (concat $ reverse p) ++ n,
+            cChildren = lefts ns,
+            cNodes    = rights ns }
 
 clusteredNodes p = do
     ns <- many (node p <|> config p <|> boolean p <|> orN p <|> norN p <|>
@@ -252,7 +298,14 @@ graph = do
     gn <- identifier
     ns <- braces $ clusteredNodes []
     eof
-    return (Graph gn (Cluster "" (lefts ns) (rights ns)))
+    return $
+        Graph {
+            gName        = gn,
+            gRootCluster =
+                Cluster {
+                    cName     = "",
+                    cChildren = lefts ns,
+                    cNodes    = rights ns } }
 
 parseGraph s = case runParser graph () "" s of
       Left err  -> fail $ show err

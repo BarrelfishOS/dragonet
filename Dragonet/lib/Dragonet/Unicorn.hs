@@ -65,35 +65,72 @@ quoteMyDecImpl s = do
     return (declare gr True)
 
 declare :: Graph -> Bool -> [TH.Dec]
-declare (Graph name cl) impl = declareClusters name cl impl
+declare (Graph { gName = name, gRootCluster = cl }) impl =
+    declareClusters name cl impl
 
 -- empty implementation for now
 node_to_pgnode :: Node -> PG.Node
-node_to_pgnode (Node name ports attrs)    = PG.baseFNode name attrs pnames Nothing
+node_to_pgnode Node {
+                nName = name,
+                nPorts = ports,
+                nAttrs = attrs } =
+    PG.baseFNode name attrs pnames Nothing
     where pnames = map pName ports
-node_to_pgnode (Boolean name pt pf attrs) = PG.baseFNode name a pnames Nothing
+node_to_pgnode Boolean {
+                nName  = name,
+                nPortT = pt,
+                nPortF = pf,
+                nAttrs = attrs } =
+    PG.baseFNode name a pnames Nothing
     where
         pnames = map pName [pt, pf]
         a = "Boolean":attrs
-node_to_pgnode (And name pt pf attrs)     = PG.baseONode name attrs pnames PG.OpAnd Nothing
+node_to_pgnode And {
+                nName  = name,
+                nPortT = pt,
+                nPortF = pf,
+                nAttrs = attrs } =
+    PG.baseONode name attrs pnames PG.OpAnd Nothing
     where pnames = map pName [pt, pf]
-node_to_pgnode (NAnd name pt pf attrs)    = PG.baseONode name attrs pnames PG.OpNAnd Nothing
+node_to_pgnode NAnd {
+                nName  = name,
+                nPortT = pt,
+                nPortF = pf,
+                nAttrs = attrs } =
+    PG.baseONode name attrs pnames PG.OpNAnd Nothing
     where pnames = map pName [pt, pf]
-node_to_pgnode (Or name pt pf attrs)      = PG.baseONode name attrs pnames PG.OpOr Nothing
+node_to_pgnode Or {
+                nName  = name,
+                nPortT = pt,
+                nPortF = pf,
+                nAttrs = attrs } =
+    PG.baseONode name attrs pnames PG.OpOr Nothing
     where pnames = map pName [pt, pf]
-node_to_pgnode (NOr name pt pf attrs)     = PG.baseONode name attrs pnames PG.OpNOr Nothing
+node_to_pgnode NOr {
+                nName  = name,
+                nPortT = pt,
+                nPortF = pf,
+                nAttrs = attrs } =
+    PG.baseONode name attrs pnames PG.OpNOr Nothing
     where pnames = map pName [pt, pf]
-node_to_pgnode  (Config name ports attrs _ t) =
+node_to_pgnode Config {
+                nName     = name,
+                nPorts    = ports,
+                nAttrs    = attrs,
+                nConfType = t } =
     PG.baseCNode name attrs pnames t unicornSimpleConfig Nothing
     where pnames = map pName ports
 
 constructGraph :: Graph -> PG.PGraph
-constructGraph (Graph gname cluster) =
+constructGraph (Graph { gName = gname, gRootCluster = cluster }) =
         DGI.mkGraph pg_nodes pg_edges
     where
         -- produce a flatten list of nodes from a (hiearchical) cluster
         cl_flat_nodes :: Cluster -> [Node]
-        cl_flat_nodes (Cluster cl_name cl_clusters cl_nodes) =
+        cl_flat_nodes Cluster {
+                        cName     = cl_name,
+                        cChildren = cl_clusters,
+                        cNodes    = cl_nodes } =
             [ n | n <- cl_nodes ] ++ (concatMap cl_flat_nodes cl_clusters)
 
         nodes_ids :: [(Int, Node)]
@@ -115,17 +152,23 @@ constructGraph (Graph gname cluster) =
 
         get_edges_node :: (Int, Node) -> [PG.PGEdge]
         get_edges_node (nid, node) = concatMap get_edges_port x
-            where x = [ (nid, port) | port <- nPorts node ]
+            where x = [ (nid, port) | port <- nAllPorts node ]
 
         pg_edges :: [PG.PGEdge]
         pg_edges = concatMap get_edges_node nodes_ids
 
 nodeClusterMap :: Cluster -> [(String, Node)]
-nodeClusterMap (Cluster cn cs ns) =
+nodeClusterMap Cluster {
+                cName     = cn,
+                cChildren = cs,
+                cNodes    = ns } =
     (map (\n -> (cn, n)) ns) ++ (concatMap nodeClusterMap cs)
 
 clusterMap :: Cluster -> [String] -> [(Node,[String])]
-clusterMap (Cluster cn cs ns) l =
+clusterMap Cluster {
+                cName     = cn,
+                cChildren = cs,
+                cNodes    = ns } l =
     map (\n -> (n,l')) ns ++ concatMap (\c -> clusterMap c l') cs
     where l' = if null cn then l else (l ++ [cn])
 
@@ -184,8 +227,11 @@ declareClusters gn cl impl =
         eDef = fdec edgesName eExps
         eDecl (s,n,e) = TH.TupE $ map TH.LitE [TH.IntegerL s, TH.IntegerL e,
                                                TH.StringL n]
-        pDecl i (Port n ds) = map (\d -> eDecl (i,n,lookupNode d)) ds
-        eDecls (i,(_,n)) = concatMap (pDecl i) $ nPorts n
+        pDecl i
+              (Port {
+                pName = n,
+                pOuts = ds }) = map (\d -> eDecl (i,n,lookupNode d)) ds
+        eDecls (i,(_,n)) = concatMap (pDecl i) $ nAllPorts n
         eExps = TH.ListE $ concatMap eDecls nodeIdMap
 
         -- "g", the full graph
@@ -249,25 +295,25 @@ nodeExp gn n impl =
     where
         (ntFun,ntE,isfnode) =
             case n of
-                (Node _ _ _) -> ("unicornNode", [],True)
-                (Config _ _ _ c t) -> ("unicornConfNode",
-                                        [confTE t, confFE c],
-                                        False)
-                (Boolean _ _ _ _) -> ("unicornNode", [],True)
-                (And _ _ _ _) -> ("unicornAndNode", [],False)
-                (NAnd _ _ _ _) -> ("unicornNAndNode", [],False)
-                (Or _ _ _ _) -> ("unicornOrNode", [],False)
-                (NOr _ _ _ _) -> ("unicornNOrNode", [],False)
+                Node {} -> ("unicornNode", [],True)
+                Config { nConfFun  = c,
+                         nConfType = t } ->
+                    ("unicornConfNode", [confTE t, confFE c], False)
+                Boolean {} -> ("unicornNode", [],True)
+                And {} -> ("unicornAndNode", [],False)
+                NAnd {} -> ("unicornNAndNode", [],False)
+                Or {} -> ("unicornOrNode", [],False)
+                NOr {} -> ("unicornNOrNode", [],False)
 
         labelE = TH.LitE $ TH.StringL $ nName n
         attrE = TH.ListE $ map (TH.LitE . TH.StringL) $ fixAttrs $ nAttrs n
-        portsE = TH.ListE $ map (TH.LitE . TH.StringL . pName) $ nPorts n
+        portsE = TH.ListE $ map (TH.LitE . TH.StringL . pName) $ nAllPorts n
         confFE f = TH.VarE $ TH.mkName $ fromMaybe "unicornSimpleConfig" f
         confTE t = confTypeToTH t
 
         fixAttrs a =
             case n of
-                (Boolean _ _ _ _) -> "Boolean":a
+                Boolean {} -> "Boolean":a
                 otherwise -> a
 
         i = if impl && isfnode then
