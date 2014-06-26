@@ -67,9 +67,13 @@ void pkt_buf_free(struct pkt_buf* pkt_buf)
 {
   struct vi* vi = pkt_buf->vi_owner;
   assert(pkt_buf->n_refs == 0);
+
+  pthread_mutex_lock(&vi->vi_lock);
   pkt_buf->next = vi->free_pkt_bufs;
   vi->free_pkt_bufs = pkt_buf;
   ++vi->free_pkt_bufs_n;
+  pthread_mutex_unlock(&vi->vi_lock);
+
 }
 
 
@@ -100,6 +104,11 @@ void vi_refill_rx_ring(struct vi* vi)
 //#define REFILL_BATCH_SIZE  1
   struct pkt_buf* pkt_buf;
   int i;
+
+
+  // FIXME: I should use fine-grained locking here.  We just need to protect
+  //        free_pkt_bufs and free_pkt_bufs_n, and not the whole vi struct
+  pthread_mutex_lock(&vi->vi_lock);
   int freespace_hw = ef_vi_receive_space(&vi->vi);
   if( freespace_hw >= REFILL_BATCH_SIZE &&
       vi->free_pkt_bufs_n >= REFILL_BATCH_SIZE ) {
@@ -114,8 +123,10 @@ void vi_refill_rx_ring(struct vi* vi)
       vi->free_pkt_bufs = vi->free_pkt_bufs->next;
       --vi->free_pkt_bufs_n;
       if (pkt_buf->n_refs != 0) {
-          printf("%s:%s:%d: dragonet buffer leak: existing refs in new buff = %d\n",
+          printf("%s:%s:%d: ERROR: dragonet buffer leak: existing refs in new buff = %d\n",
                   __FILE__, __FUNCTION__, __LINE__, pkt_buf->n_refs);
+          //printf("dragonet buffer leak: existing refs in new buff = %d\n",
+
       }
       assert(pkt_buf->n_refs == 0);
       pkt_buf->n_refs = 1;
@@ -124,24 +135,31 @@ void vi_refill_rx_ring(struct vi* vi)
     }
     ef_vi_receive_push(&vi->vi);
   }
+  pthread_mutex_unlock(&vi->vi_lock);
+
 }
 
 
 struct pkt_buf* vi_get_free_pkt_buf(struct vi* vi)
 {
     struct pkt_buf* pkt_buf;
-    if (vi->free_pkt_bufs_n <= 0) {
+    pthread_mutex_lock(&vi->vi_lock);
+
+    int free_pkt_bufs_n_copy = vi->free_pkt_bufs_n;
+    if (free_pkt_bufs_n_copy <= 0) {
+        pthread_mutex_unlock(&vi->vi_lock);
         printf("%s:%s:%d: dragonet out of packet buffers\n",
                 __FILE__, __FUNCTION__, __LINE__);
-
-        assert(vi->free_pkt_bufs_n > 0);
+        assert(free_pkt_bufs_n_copy > 0);
         abort();
-
         return NULL;
     }
+
     pkt_buf = vi->free_pkt_bufs;
     vi->free_pkt_bufs = vi->free_pkt_bufs->next;
     --vi->free_pkt_bufs_n;
+    pthread_mutex_unlock(&vi->vi_lock);
+
     if (pkt_buf->n_refs != 0) {
         printf("%s:%s:%d: dragonet buffer leak: existing refs in new buff = %d\n",
                 __FILE__, __FUNCTION__, __LINE__, pkt_buf->n_refs);
@@ -214,6 +232,10 @@ static struct vi* __vi_alloc(int vi_id, struct net_if* net_if,
   vi->id = vi_id;
   vi->net_if = net_if;
 
+  //vi->vi_lock = PTHREAD_MUTEX_INITIALIZER;
+  pthread_mutex_init(&vi->vi_lock, NULL);
+//  pthread_mutex_lock(&vi->vi_lock);
+
   TRY(ef_driver_open(&vi->dh));
   if( vi_set_instance < 0 ) {
     TRY(ef_vi_alloc_from_pd(&vi->vi, vi->dh, &net_if->pd, net_if->dh,
@@ -227,8 +249,9 @@ static struct vi* __vi_alloc(int vi_id, struct net_if* net_if,
   }
   vi_init_pktbufs(vi);
   vi_init_layout(vi, flags);
-  vi_refill_rx_ring(vi);
+//  pthread_mutex_unlock(&vi->vi_lock);
 
+  vi_refill_rx_ring(vi);
   return vi;
 }
 

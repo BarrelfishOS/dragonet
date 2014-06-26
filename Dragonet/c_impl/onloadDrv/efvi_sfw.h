@@ -49,7 +49,7 @@
 #include <etherfabric/vi.h>
 #include <etherfabric/pd.h>
 #include <etherfabric/memreg.h>
-
+#include <pthread.h>
 
 #define ROUND_UP(p, align)   (((p)+(align)-1u) & ~((align)-1u))
 
@@ -104,6 +104,9 @@ struct vi {
   /* Pool of free packet buffers (LIFO to minimise working set). */
   struct pkt_buf*  free_pkt_bufs;
   int              free_pkt_bufs_n;
+  /* Introducing locks around free_pkt_bufs as we are using it in
+   * multi-thread setup */
+  pthread_mutex_t      vi_lock;
 };
 
 

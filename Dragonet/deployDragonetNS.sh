@@ -16,5 +16,5 @@ cat  /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
 cat /proc/meminfo | grep HugePages
 cat /proc/meminfo | grep HugePages_Free
 #sudo dist/build/llvm-cgen/llvm-cgen lpgImpl.unicorn
-sudo dist/build/llvm-cgen/llvm-cgen $1
+sudo dist/build/llvm-cgen/llvm-cgen $@
 

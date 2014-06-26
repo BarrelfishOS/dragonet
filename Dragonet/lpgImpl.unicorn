@@ -84,7 +84,7 @@ graph lpg {
 
             and NeedsResponse {
                 port true[..TxL3ARPInitiateResponse]
-                port false[] }
+                port false[..PacketDrop] }
 
             boolean ValidResponse {
                 port true false[ValidPendingResponse IsPending] }
@@ -94,7 +94,7 @@ graph lpg {
 
             and ValidPendingResponse {
                 port true[..TxL3ARPProcessPendingResponse]
-                port false[] }
+                port false[..PacketDrop] }
 
         }
 
@@ -159,7 +159,7 @@ graph lpg {
         cluster L3ICMP {
             boolean ValidHeaderLength {
                 port true[ValidChecksum IsTypeRequest]
-		port false[] }
+                port false[..PacketDrop] }
 
             boolean ValidChecksum {
                 port true false[Valid] }
@@ -172,7 +172,7 @@ graph lpg {
 
             and NeedsResponse {
                 port true[..TxL3ICMPInitiateResponse]
-                port false[] }
+                port false[..PacketDrop] }
         }
 
         /*******************************************/

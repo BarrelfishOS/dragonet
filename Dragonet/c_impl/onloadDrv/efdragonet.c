@@ -314,10 +314,15 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
             ++pkt_received_count;
             pkt_buf_release(pkt_buf);
 
+            // FIXME: Does having a reference to pkt_buf implies buffer leak?
             if (pkt_buf->n_refs != 0) {
-                dprint("%s:%s:%d: ################### BUF LEAK ####\n", __FILE__, __func__, __LINE__);
+                //dprint
+                printf
+                    ("%s:%s:%d: ##### possible BUF LEAK: ref: %d ###\n",
+                        __FILE__, __func__, __LINE__, (int)pkt_buf->n_refs);
             }
-            assert(pkt_buf->n_refs == 0);
+
+            //assert(pkt_buf->n_refs == 0);
 
             pkt_received = copylen;
             ++sfq->refill_counter_local;
@@ -334,8 +339,8 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
         sfq->evs_bufferd_rx_total = 0;
         sfq->evs_bufferd_rx_last = 0;
 
-        n_ev = ef_eventq_poll(&viff->vi, sfq->evs, sizeof(sfq->evs) / sizeof(sfq->evs[0]));
-        //n_ev = ef_eventq_poll(&viff->vi, sfq->evs, 1);
+        //n_ev = ef_eventq_poll(&viff->vi, sfq->evs, sizeof(sfq->evs) / sizeof(sfq->evs[0]));
+        n_ev = ef_eventq_poll(&viff->vi, sfq->evs, 1);
         //++sfq->event_count;
         if( n_ev <= 0 ) {
             //++sfq->no_event_count;
@@ -378,12 +383,16 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
                         //buf_details(pkt_buf, printbuf, sizeof(printbuf));
                         //dprint("%s:%s:%d: TX, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
                         pkt_buf_release(pkt_buf);
+                        // FIXME: Does ref > 0 after this release indicate buffer curruption?
                         if (pkt_buf->n_refs != 0) {
-                            dprint("%s:%s:%d: ################### BUF LEAK %d ####\n", __FILE__, __func__, __LINE__,j);
+                            //dprint
+                            printf
+                                ("%s:%s:%d: ################### BUF LEAK %d ####\n",
+                                 __FILE__, __func__, __LINE__, (int) pkt_buf->n_refs);
                             //buf_details(pkt_buf, printbuf, sizeof(printbuf));
                             //dprint("%s:%s:%d: TX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
                         }
-                        assert(pkt_buf->n_refs == 0);
+                        //assert(pkt_buf->n_refs == 0);
                     } // end for:
                     break;
 
@@ -401,7 +410,8 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
                         //buf_details(pkt_buf, printbuf, sizeof(printbuf));
                         //dprint("%s:%s:%d: RX_DISCARD, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
                         pkt_buf_release(pkt_buf);
-                        assert(pkt_buf->n_refs == 0);
+                        // FIXME: Does ref > 0 after this release indicate buffer curruption?
+                        //assert(pkt_buf->n_refs == 0);
                         //buf_details(pkt_buf, printbuf, sizeof(printbuf));
                         //dprint("%s:%s:%d: RX_DISCARD, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
                     break;

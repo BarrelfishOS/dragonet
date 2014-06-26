@@ -44,3 +44,4 @@ Command to deploy memcached with dragonet ::
 Command to deploy memcached on real hardware with dragonet ::
     sudo ./memcached -N -p 0 -U 7777 -t 1 -l 10.113.4.71 -u ubuntu
 
+sudo ./memcached -c 64000 -m 64000 -N -p 0 -U 7777 -t 1 -l 10.113.4.95 -u root

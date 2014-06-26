@@ -1301,7 +1301,7 @@ llvm_pg_op cnf nid node adj_out adj_in = do
                 Nothing       -> do
                     --error $ "Cannot find port " ++ lbl ++ " in operator node with id: " ++ (show nid) ++ " (" ++ (show $ nLabel node) ++ ")"
                     bldAddBB $ "bb_"++ lbl ++ "0"
-                    bldPrintf (" -> NO " ++ lbl ++ " PORT DEFINED!") []
+                    bldPrintf (" -> NO " ++ fnstr ++ " " ++ lbl ++ " PORT DEFINED!\n") []
                     bldTerminate $ termBr "bb_err"
 
         forM_ [("bb_cont", pgContOp), ("bb_done", pgDoneOp), ("bb_err", pgErrOp)] $ \(bb,retval) -> do
