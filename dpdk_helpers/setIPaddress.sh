@@ -86,7 +86,8 @@ setIPaddr "00:1b:21:8f:1b:20" "10.113.4.67" "gottardo" "intel1" "switch" "9" "" 
 setIPaddr "00:1b:21:8f:1b:21" "10.44.4.67" "gottardo" "intel2" "no" "no" "" ""
 
 echo "for appenzeller"
-setDHCPIPaddr "00:25:64:fc:61:dd" "10.110.4.64" "appenzeller"
+#setDHCPIPaddr "00:1b:21:4c:ed:a2" "10.110.4.64" "appenzeller"
+setDHCPIPaddr "00:25:64:fc:61:dd" "10.110.4.66" "appenzeller-e1000"
 setIPaddr "00:0f:53:07:51:48" "10.22.4.64" "appenzeller" "sf1" "direct" "ziger1-intel1" "" "cable-144"
 setIPaddr "00:0f:53:07:51:49" "10.113.4.71" "appenzeller" "sf2" "switch" "8" "" "cable-6"
 

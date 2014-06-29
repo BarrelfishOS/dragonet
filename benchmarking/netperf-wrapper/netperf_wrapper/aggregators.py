@@ -252,8 +252,11 @@ class IterationAggregator(Aggregator):
     def aggregate(self, results):
 
         results.x_values = list(range(1, self.iterations+1))
+
         for i in range(self.iterations):
             results.add_result(i+1, self.collect())
+            if self.iterations > 1:
+                time.sleep(5)
         return results
 
 

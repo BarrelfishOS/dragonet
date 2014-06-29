@@ -43,7 +43,7 @@ log="${result}.log"
 tmpfile="${result}.tmp"
 title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},,SRV_${SERVERCORES},C_${CONCURENCY}"
 
-   retry 1 ./netperf-wrapper -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
+   retry 1 ./netperf-wrapper -d ${DELAY} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
        -H ${srvName}  ${cliName6} --serverInstances ${SERVERINSTANCES} \
        --servercores ${SERVERCORES} --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} \
        --concurrency ${CONCURENCY} -t "${title}" -o "${result}" -L "${log}"
@@ -88,7 +88,7 @@ run_bm_tp_rr() {
         echo "#################################################"
         echo "running for ${title}"
 
-        retry 5 ./netperf-wrapper -I 1 -l 10 -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
+        retry 5 ./netperf-wrapper -d ${DELAY} -I 1 -l 10 -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
         -H ${srvName} ${cliName6} \
         --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} \
@@ -118,7 +118,7 @@ run_bm_tp_rr() {
     title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},C_${LBRUST},BEST"
     echo "running for ${title}"
 
-    retry 5 ./netperf-wrapper -I ${ITERATIONS} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
+    retry 5 ./netperf-wrapper -d ${DELAY} -I ${ITERATIONS} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
         -H ${srvName} ${cliName6} \
         --servercores ${SERVERCORES}  --serverInstances ${SERVERINSTANCES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} \
@@ -182,11 +182,11 @@ get_scalability_instances() {
     get_best_tp 1 1
     get_best_tp 2 1
     get_best_tp 4 1
-#    get_best_tp 8 1
+    get_best_tp 8 1
 #    get_best_tp 10 1
 #    get_best_tp 12 1
 #    get_best_tp 14 1
-#    get_best_tp 16 1
+    get_best_tp 16 1
 #    get_best_tp 18 1
 
     fname="scalability-instances-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
@@ -202,7 +202,7 @@ get_scalability_threads() {
 #    get_best_tp 1 10
 #    get_best_tp 1 12
 #    get_best_tp 1 14
-    get_best_tp 1 16
+#    get_best_tp 1 16
 #    get_best_tp 1 18
 
     fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
@@ -272,7 +272,7 @@ use_asiago_server() {
 
     cliName6="-C ziger2 -C sbrinz2 -C ziger2 -C sbrinz2"
     cliName1="-C ziger2"
-#    cliName6=${cliName1}
+    #cliName6=${cliName1}
 }
 
 use_asiago_server_sf_switched() {
@@ -304,30 +304,39 @@ ITERATIONS=5
 ITERATIONS=3
 
 DURATION=10
-CORESHIFT=8
+CORESHIFT=2
 SERVERINSTANCES=1
 
+DELAY=5
+DELAY=1
 USE_PROTO="tcp"
 USE_PROTO="udp"
 
-ECHO_SERVER="memcached_onload"
 ECHO_SERVER="memcached_poll"
-ECHO_SERVER="memcached"
 ECHO_SERVER="memcached_dragonet"
-MAIN_OUTPUT_DIR="../memcachedResults/dn_test/${1}/"
+ECHO_SERVER="memcached_onload"
+ECHO_SERVER="memcached"
+MAIN_OUTPUT_DIR="../memcachedResults/sf_scale_test/${1}/"
 GRAPH_GEN_CMDS="${MAIN_OUTPUT_DIR}/graph_gen_cmds.sh"
 
 ./cleanup.sh
 
 #use_burrata_server_intel_switched
-use_asiago_server_intel_switched
-setup_output_location
+#use_asiago_server_intel_switched
+use_asiago_server_sf_switched
 
+ECHO_SERVER="memcached_onload"
+setup_output_location
+get_scalability_instances
+
+ECHO_SERVER="memcached"
+setup_output_location
 get_scalability_instances
 exit 0
 ##############################
 get_scalability_threads
 get_best_latency 1 1 1
+
 
 get_scalability_instances
 

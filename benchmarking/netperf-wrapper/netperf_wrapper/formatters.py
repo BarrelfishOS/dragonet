@@ -141,9 +141,9 @@ def mystr(obj):
     return str(obj)[:9]
 
 def sort_attr_details(skey, trow, infod):
-    if not skey in infod.keys():
-        print "Can't sort results as given key [%s] is missing" % (key)
-        return
+    #if not skey in infod.keys():
+    #    print "Can't sort results as given key [%s] is missing" % (skey)
+    #    return
 
     nr = len(infod[trow[0]])
     ll = []

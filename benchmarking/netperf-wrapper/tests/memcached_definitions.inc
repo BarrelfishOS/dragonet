@@ -35,6 +35,12 @@ SRV_CMDS = {
                     "out_cmd" : [],
                 },
     "memcached_dragonet" : {
+                    "init_cmd_3" : [
+                        "cd dragonet/Dragonet/ ; sudo ./deployDragonetE10k.sh %s" % (
+                                toCoreList2(range(0, APPS), separator=" ", prefix="t"),
+                            ),
+                                ],
+
                     "init_cmd_1" : [
                         "cd dragonet/Dragonet/ ; sudo taskset -c %s ./deployDragonetE10k.sh %s" % (
                                 toCoreList2(range(0, (QUEUES * 2))),
@@ -42,6 +48,15 @@ SRV_CMDS = {
                             ),
                                 ],
                     "init_cmd_2" : [],
+                    "exec_cmd" : "sudo ./runBetter.sh ../memcached/memcached -N -c 64000 -m 64000 -u ubuntu ",
+                    "kill_cmd" : [
+                                "sudo killall memcached || true",
+                                "sudo killall llvm-cgen-e10k || true",
+                                 ],
+                    "out_cmd" : [],
+                },
+    "memcached_dn" : {
+                    "init_cmd" : [],
                     "exec_cmd" : "sudo ./runBetter.sh ../memcached/memcached -N -c 64000 -m 64000 -u ubuntu ",
                     "kill_cmd" : [
                                 "sudo killall memcached || true",
@@ -57,6 +72,7 @@ SRV_CMDS = {
                                 ],
                         "exec_cmd" : "sudo ./runBetter.sh %s ../memcached/memcached -c 64000 -m 64000 -u ubuntu " % (onload_prefix),
                         "kill_cmd" : ["sudo killall memcached || true"],
+                        "kill_cmd" : [],
                         "out_cmd" : [],
                 },
     "memcached_poll" : {

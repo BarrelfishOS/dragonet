@@ -22,8 +22,8 @@ SRV_CMDS = {
                     "client_extra_opts" : "-N",
                     "init_cmd" : [
                         "sudo killall socat || true",
-                        "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
-                        "echo 0 | sudo tee  /proc/sys/net/core/busy_read",
+                        #"echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                        #"echo 0 | sudo tee  /proc/sys/net/core/busy_read",
                                 ],
                     "exec_cmd" : "socat -b 64000 PIPE UDP-LISTEN:7,fork ",
                     "kill_cmd" : ["sudo killall socat || true"],
@@ -115,7 +115,7 @@ SRV_CMDS = {
     "CImplOnload" : {
                     "client_extra_opts" : "-N",
                     "init_cmd" : [],
-                    "exec_cmd" : "echo ",  # "/home/ubuntu/dragonet/Dragonet/c_impl ; make sfOnload_run"  # "sudo taskset -c 3"
+                    "exec_cmd" : "echo 'Assuming server is deployed'",  # "/home/ubuntu/dragonet/Dragonet/c_impl ; make sfOnload_run"  # "sudo taskset -c 3"
                     "kill_cmd" : [],  # sudo killall sfOnload
                     "out_cmd" : [],
                 },
