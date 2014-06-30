@@ -15,6 +15,9 @@ import qualified Runner.E10KControl as E10K
 import qualified Runner.E10KPolicy as E10KP
 import Runner.Common
 
+--import System.Environment (getArgs, getProgName)
+--import System.Exit (exitSuccess)
+
 
 -- Decides whether replicated versions of nodes should be merged
 nodesMatch a b
@@ -71,13 +74,15 @@ e10kAction ais (E10KP.E10kPAct5TSet idx ft) = do
 e10kAction ais act = do
     putStrLn $ "Unimplemented e10k policy action: " ++ show act
 
-
 main :: IO ()
 main = do
+    (nQ, apps) <- parseDNArgs
+    putStrLn $ "Running hardware queues: " ++ show nQ
+    putStrLn $ "Running with app slots: " ++ show apps
     let helpers = "llvm-helpers-e10k"
-        nQ = 2
+        --nQ = 1
         e10kS = E10KP.e10kPStateInit 128
         pstate = INC.policyStateInit nQ e10kS E10KP.e10kPolicy
 
-    runStack (pg4e10k nQ) pstate e10kAction helpers
+    runStackParsed apps (pg4e10k nQ) pstate e10kAction helpers
 

@@ -339,8 +339,8 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
         sfq->evs_bufferd_rx_total = 0;
         sfq->evs_bufferd_rx_last = 0;
 
-        //n_ev = ef_eventq_poll(&viff->vi, sfq->evs, sizeof(sfq->evs) / sizeof(sfq->evs[0]));
-        n_ev = ef_eventq_poll(&viff->vi, sfq->evs, 1);
+        n_ev = ef_eventq_poll(&viff->vi, sfq->evs, sizeof(sfq->evs) / sizeof(sfq->evs[0]));
+        //n_ev = ef_eventq_poll(&viff->vi, sfq->evs, 1);
         //++sfq->event_count;
         if( n_ev <= 0 ) {
             //++sfq->no_event_count;

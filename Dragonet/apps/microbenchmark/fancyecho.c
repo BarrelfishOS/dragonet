@@ -57,6 +57,11 @@ static void print_usage(void)
 {
     fprintf(stderr, "fancyecho [-a label [-p port | -f lip:lport/rip:rport]+]+ "
             "[-t [-q label]+]+\n");
+
+    // For one thread listening on one socket
+    //  sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0 -p 7 -t -q t0
+    // For two threads listening on same socket
+    //  sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0 -p 7 -a t1 -p 7 -t -q t0 -t -q t1
 }
 
 static void parse_flow(struct cfg_udpep *udp, char *str)

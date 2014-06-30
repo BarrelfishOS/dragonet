@@ -95,11 +95,11 @@ sfAction ais act = do
 
 main :: IO ()
 main = do
+    (nQ, apps) <- parseDNArgs
+    putStrLn $ "Running hardware queues: " ++ show nQ
+    putStrLn $ "Running with app slots: " ++ show apps
     let helpers = "llvm-helpers-sf"
-        --nQ = 2
-        nQ = 1
         sfS = SFP.sfPStateInit 128
         pstate = INC.policyStateInit nQ sfS SFP.sfPolicy
-
-    runStack (pg4sf nQ) pstate sfAction helpers
+    runStackParsed apps (pg4sf nQ) pstate sfAction helpers
 

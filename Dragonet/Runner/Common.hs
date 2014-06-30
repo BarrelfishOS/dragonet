@@ -1,6 +1,8 @@
 module Runner.Common (
     AppIfState(..),
     runStack,
+    runStackParsed,
+    parseDNArgs,
 
     dummyHwAction,
     dummyHwPolicy,
@@ -38,12 +40,53 @@ import Data.Int
 import System.IO  (hFlush,stdout)
 import System.IO.Error (catchIOError)
 import System.Posix.Signals (raiseSignal,keyboardSignal)
-import System.Environment (getArgs)
+import System.Environment (getArgs, getProgName)
 import System.Exit (exitSuccess)
 
 import qualified Runner.LLVM as LLVM
 --import qualified Runner.Dynamic as Dyn
 --import qualified Runner.Dynamic as LLVM
+
+
+-------------------------------------------------------------------------------
+-- commandline parsing
+
+
+
+usage :: String -> IO ()
+usage errMsg = do
+    name <- getProgName
+    putStrLn $ "Error: " ++ (show errMsg)
+    putStrLn $ "USAGE: " ++ name ++  " <no. of HW queues> <appSlotName-0> "
+                ++  "[<appSlotName-1> <appSlotName-2>]"
+    putStrLn $ "Example: " ++ name ++  " 2 t0 t1 t2 t3"
+    exitSuccess
+
+parseDNArgs :: IO (Int,[String])
+parseDNArgs = do
+    args <- getArgs
+    if null args
+        then do
+            usage "No commandline agruments given!"
+        else return ()
+    let
+        nQcount:apps = args
+        parsed = reads nQcount :: [(Int, String)]
+    if null parsed
+    then do
+            usage "No. of HW queues not specified"
+        else return ()
+    let
+        (nQ,err):moreChars = parsed
+    if null apps
+        then do
+            usage "No application slots specified on commandline"
+        else return ()
+    if (not $ null err) || (not $ null moreChars)
+        then do
+            usage "No application slots specified on commandline"
+        else return ()
+    return(nQ, apps)
 
 
 
@@ -54,7 +97,6 @@ import qualified Runner.LLVM as LLVM
 runStack :: Show b => (PG.PGraph -> PG.PGraph) -> INC.PolicyState a b ->
         (AppIfState a b -> b -> IO ()) -> String -> IO ()
 runStack embed pstate hwact helpers = do
-    let fname = "lpgImpl.unicorn"
     apps <- getArgs
     if null apps
         then do
@@ -62,6 +104,13 @@ runStack embed pstate hwact helpers = do
             exitSuccess
         else return ()
     putStrLn $ "Running with app slots: " ++ show apps
+    runStackParsed apps embed pstate hwact helpers
+
+runStackParsed :: Show b => [String] -> (PG.PGraph -> PG.PGraph) -> INC.PolicyState a b ->
+        (AppIfState a b -> b -> IO ()) -> String -> IO ()
+runStackParsed apps embed pstate hwact helpers = do
+
+    let fname = "lpgImpl.unicorn"
     -- Parse graph and perform pseudo-embedding
     b <- readFile fname >>= UnicornAST.parseGraph
     let pgraph = embed $ addApps apps $ Unicorn.constructGraph b
@@ -88,7 +137,7 @@ runStack embed pstate hwact helpers = do
 
     putStrLn "Doing cleanup..."
     PLI.stopPipelines h
-    where
+
 
 -- Wrapper to execute pipelines, but handle application pipelines separatly
 runPipeline :: PL.PLGraph -> String -> String -> PLI.PipelineImpl -> IO ()
