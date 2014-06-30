@@ -98,8 +98,8 @@ run_bm_tp_rr() {
 
         NVTPS=`cat ${TMPFILE} | grep "^total TPS: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1`
         NTP=`cat ${TMPFILE} | grep "^total TPS: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1 | cut -d'.' -f1`
-        GETMISSES=`cat ${TMPFILE} | grep "^total get_misses: " | head -n1 |cut -d'[' -f2 | cut -d']' -f1`
-        echo "TPITERATOR: ${title}, ${target}, ${SERVERCORES}, ${CBRUST}, ${GETMISSES}, ${NVTPS}, ${NTP}" >> ${SAMARRYFILE}
+        #GETMISSES=`cat ${TMPFILE} | grep "^total get_misses: " | head -n1 |cut -d'[' -f2 | cut -d']' -f1`
+        echo "TPITERATOR: ${title}, ${target}, ${SERVERCORES}, ${CBRUST}, ${NVTPS}, ${NTP}" >> ${SAMARRYFILE}
         echo "#################################################"
         echo "################### TP of [$NTP:$CBRUST]"
         echo "#################################################"
@@ -163,7 +163,8 @@ get_best_tp()
 {
     SERVERINSTANCES=$1
     SERVERCORES=$2
-    CLIENTCORES="2"
+    #CLIENTCORES="2"
+    CLIENTCORES="1"
     OUTDIR="${OUTDIRP}/TP_MAX/S_${SERVERCORES}/"
     mkdir -p ${OUTDIR}
     # for increasing TP on transaction based benchmark
@@ -272,6 +273,7 @@ use_asiago_server() {
 
     cliName6="-C ziger2 -C sbrinz2 -C ziger2 -C sbrinz2"
     cliName1="-C ziger2"
+    cliName1="-C sbrinz2 -C sbrinz2"
     #cliName6=${cliName1}
 }
 
@@ -317,17 +319,23 @@ ECHO_SERVER="memcached_dragonet"
 ECHO_SERVER="memcached_onload"
 ECHO_SERVER="memcached"
 MAIN_OUTPUT_DIR="../memcachedResults/sf_scale_test/${1}/"
+MAIN_OUTPUT_DIR="../netperfScaleResults/sf_scale_test/${1}/"
 GRAPH_GEN_CMDS="${MAIN_OUTPUT_DIR}/graph_gen_cmds.sh"
 
 ./cleanup.sh
 
 #use_burrata_server_intel_switched
 #use_asiago_server_intel_switched
-use_asiago_server_sf_switched
+#use_asiago_server_sf_switched
+use_asiago_server_intel_switched
 
-ECHO_SERVER="memcached_onload"
+UDP_TEST_NAME="udp_rr"
+#ECHO_SERVER="netserver"
+ECHO_SERVER="llvmE10k"
 setup_output_location
-get_scalability_instances
+get_scalability_special
+exit 0
+##############################
 
 ECHO_SERVER="memcached"
 setup_output_location

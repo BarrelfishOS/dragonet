@@ -1,17 +1,62 @@
 ## -*- mode: python; coding: utf-8 -*-
 
 AGGREGATOR="timeseries"
-TOTAL_LENGTH=LENGTH+2*DELAY
-NETPERF_CMD="../netperf-2.6.0/src/netperf -fg "
+TOTAL_LENGTH=LENGTH + 2
+
 onload_prefix="onload --profile=latency --preload=/usr/lib64/libonload.so"
+
+SERVER_INITIAL_PORT =  7
+NETPERF_CMD="../netperf-2.6.0/src/netperf -fg -4"
+
+
+QUEUES = 4
+
+APPS = SERVERS_INSTANCES * SERVER_CORES
+def toCoreList2(clist, separator=",", prefix=""):
+    ret = ""
+    for c in clist:
+        if ret == "" :
+            ret = "%s%d" % (prefix, c)
+        else :
+            ret = "%s%s%s%d" % (ret, separator, prefix, c)
+    print "toCoreList2 %s" % (ret)
+    return ret
 
 
 SRV_CMDS = {
+    "llvmE10k" : {
+                    "client_extra_opts" : "-N",
+                    "init_cmd" : [],
+                    "exec_cmd" : "echo 'test'", # "/home/ubuntu/dragonet/Dragonet/ ; sudo  ./dist/build/llvm-cgen-e10k/llvm-cgen-e10k ./lpgImpl.unicorn "
+                    "kill_cmd" : [],
+                    "out_cmd" : [],
+                },
+    "noServer" : {
+                    "client_extra_opts" : "-N",
+                    "init_cmd" : [],
+                    "exec_cmd" : "echo 'test output'",
+                    "kill_cmd" : [],
+                    "out_cmd" : [],
+                },
+    "HImplOnload" : {
+                    "client_extra_opts" : "-N",
+                    "init_cmd" : [],
+                    "exec_cmd" : "echo 'test output'",
+                    "kill_cmd" : [],
+                    "out_cmd" : [],
+                },
+    "CImplOnload" : {
+                    "client_extra_opts" : "-N",
+                    "init_cmd" : [],
+                    "exec_cmd" : "echo 'Assuming server is deployed'",
+                    "kill_cmd" : [],  # sudo killall sfOnload
+                    "out_cmd" : [],
+                },
     "netserver" : {
                     "client_extra_opts" : "",
                     "init_cmd" : ["sudo killall netserver || true",
-                        "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
-                        "echo 0 | sudo tee /proc/sys/net/core/busy_read",
+                        #"echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                        #"echo 0 | sudo tee /proc/sys/net/core/busy_read",
                     ],
                     "exec_cmd" : "../netperf-2.6.0/src/netserver -D ",
                     "kill_cmd" : ["sudo killall netserver || true"],
@@ -105,20 +150,6 @@ SRV_CMDS = {
                         ],
                     "out_cmd" : [],
                 },
-    "HImplOnload" : {
-                    "client_extra_opts" : "-N",
-                    "init_cmd" : [],
-                    "exec_cmd" : "echo ",
-                    "kill_cmd" : [],
-                    "out_cmd" : [],
-                },
-    "CImplOnload" : {
-                    "client_extra_opts" : "-N",
-                    "init_cmd" : [],
-                    "exec_cmd" : "echo 'Assuming server is deployed'",  # "/home/ubuntu/dragonet/Dragonet/c_impl ; make sfOnload_run"  # "sudo taskset -c 3"
-                    "kill_cmd" : [],  # sudo killall sfOnload
-                    "out_cmd" : [],
-                },
     "HImplDpdk" : {
                     "client_extra_opts" : "-N",
                     "init_cmd" : [],
@@ -140,21 +171,6 @@ SRV_CMDS = {
                     "kill_cmd" : [],
                     "out_cmd" : [],
                 },
-    "llvmE10k" : {
-                    "client_extra_opts" : "-N",
-                    "init_cmd" : [],
-                    "exec_cmd" : "echo ", # "/home/ubuntu/dragonet/Dragonet/ ; sudo  ./dist/build/llvm-cgen-e10k/llvm-cgen-e10k ./lpgImpl.unicorn "
-                    "kill_cmd" : [],
-                    "out_cmd" : [],
-                },
-}
 
-PING4="ping"
-PING6="ping6"
-PING="ping"
-if IP_VERSION == 4:
-    NETPERF_CMD += " -4"
-elif IP_VERSION == 6:
-    NETPERF_CMD += " -6"
-    PING="ping6"
+}
 

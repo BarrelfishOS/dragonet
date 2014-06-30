@@ -10,6 +10,7 @@ MEMASLAP_CMD ="sudo ./runBetter.sh memaslap -t%ds --cfg_cmd=../libmemcached-1.0.
         TOTAL_LENGTH, TOTAL_LENGTH
         )
 QUEUES = 4
+
 APPS = SERVERS_INSTANCES * SERVER_CORES
 def toCoreList2(clist, separator=",", prefix=""):
     ret = ""

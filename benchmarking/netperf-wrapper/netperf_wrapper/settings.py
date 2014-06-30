@@ -70,11 +70,11 @@ DEFAULT_SETTINGS = {
     'CLIENTS_CORECOUNT': {},
     'SERVER_CORES': 1,
     'CLIENT_CORES': 1,
-    'CONCURRENCY' : 32,
-    'TCONCURRENCY' : 32,
+    'BRUST_SIZE': 1,
+    'CONCURRENCY' : 1,
+    'TCONCURRENCY' : 1,
     'SPECIAL_CLIENTS_COUNT' : 0,
     'SPECIAL_SERVERS_COUNT' : 0,
-    'BRUST_SIZE': 1,
     'PKT_SIZE': 1024,
     'LOCAL_HOST': socket.gethostname(),
     'STEP_SIZE': 0.2,
@@ -375,8 +375,8 @@ parser.add_option("-p", "--plot", action="store", type="string", dest="PLOT",
                   "Use the --list-plots option to see available plots.")
 parser.add_option("-t", "--title-extra", action="store", type="string", dest="TITLE",
                   help="Text to add to plot title and data file name.")
-parser.add_option("-b", "--brust", action="store", type="int", dest="BRUST_SIZE",
-                  help="Number of concurrent transactions")
+#parser.add_option("-b", "--brust", action="store", type="int", dest="BRUST_SIZE",
+#                  help="Number of concurrent transactions")
 
 
 parser.add_option("-q", "--servercores", action="store", type="int", dest="SERVER_CORES",
@@ -694,12 +694,9 @@ def load():
             settings.RUN_CONF[0] = {}
             settings.RUN_CONF[0]['SERVER'] = {}
 
-
+        settings.BRUST_SIZE = settings.CONCURRENCY
         settings.TCONCURRENCY =  (settings.CONCURRENCY * settings.CLIENT_CORES
                         * (len(settings.CLIENTS) - settings.SPECIAL_CLIENTS_COUNT))
-
-
-
 
 
         settings.load_test()
@@ -714,10 +711,10 @@ def load():
                             PKT_SIZE=settings.PKT_SIZE,
                             TARGET=settings.TARGET,
                             USE_TCP=settings.USE_TCP,
-                            BRUST_SIZE=settings.BRUST_SIZE,
                             SERVER_CORES=settings.SERVER_CORES,
                             SPECIAL_CLIENTS_COUNT = settings.SPECIAL_CLIENTS_COUNT,
                             SPECIAL_SERVERS_COUNT = settings.SPECIAL_SERVERS_COUNT,
+                            BRUST_SIZE=settings.BRUST_SIZE,
                             CONCURRENCY = settings.CONCURRENCY,
                             TCONCURRENCY = settings.TCONCURRENCY,
                             CLIENT_CORES=settings.CLIENT_CORES,
