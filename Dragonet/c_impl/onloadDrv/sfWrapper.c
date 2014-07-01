@@ -127,6 +127,8 @@ node_out_t do_pg__SFRxQueue(struct state *state, struct input *in)
         state->local_ip = CONFIG_LOCAL_IP_sf;
         dprint("%s:%s:%d: [pktid:%d]: ############## initialized queue\n",
               __FILE__,  __func__, __LINE__, p_id);
+
+        declare_dragonet_initialized(DN_READY_FNAME, "sf driver started!\n");
         printf("Initialized\n");
         return P_Queue_init;
     }

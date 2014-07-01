@@ -1597,8 +1597,12 @@ runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
                 modWriteFile mod $ mname ++ "-linked-cg.ll"
                 putStrLn $ "Verifying " ++ mname
                 err <- runErrorT $ LLVM.A.verify mod
-                case err of Right () -> putStrLn $ "module verified\nIf it was last module then everything is done\n"
-                            Left e   -> putStrLn $ "error verifying module:" ++ e
+                case err of Right () -> do
+                                putStrLn $ "module verified\nIf it was last module then everything is done\n"
+                                writeFile ("pipeline-" ++ mname ++ ".ready") $ "Pipeline "  ++ mname ++ " is ready!!\n"
+                            Left e   -> do
+                                putStrLn $ "error verifying module: "  ++ mname ++ ", ERROR: " ++ e
+                                writeFile ("pipeline-" ++ mname ++ ".failed") $ "Pipeline "  ++ mname ++ " failed!\n" ++  e ++ "\n"
                 --modExec ctx mod "pg_main"
                 LLVM.PM.withPassManager passes $ \pm -> do
                     LLVM.PM.runPassManager pm mod

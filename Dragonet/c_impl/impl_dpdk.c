@@ -78,6 +78,7 @@ node_out_t do_pg__DPDKRxQueue(struct state *state, struct input *in)
 
         state->local_mac = CONFIG_LOCAL_MAC;
         state->local_ip = CONFIG_LOCAL_IP;
+        declare_dragonet_initialized(DN_READY_FNAME, "dpdk driver started!\n");
         printf("Initialized\n");
         return P_Queue_init;
     }

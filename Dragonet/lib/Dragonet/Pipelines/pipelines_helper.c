@@ -112,7 +112,7 @@ struct dragonet_queue {
 static struct dragonet_shared_state *sig_dss = NULL;
 
 void pg_state_init(struct state *st);
-static void input_fill_alloc(struct dragonet_pipeline *pl, struct input *in);
+static int input_fill_alloc(struct dragonet_pipeline *pl, struct input *in);
 static struct input *input_struct_alloc(struct dragonet_pipeline *pl);
 
 static void signal_abort(int sig)
@@ -371,6 +371,10 @@ static void free_bulk_buffer(struct dragonet_pipeline *pl,
         // We received it over this channel
         //
         err = bulk_ll_channel_pass(chan, buf, NULL, 0);
+        if (!(err_is_ok(err) || err == BULK_TRANSFER_ASYNC)) {
+            printf("\n%s:%s:%d:ERROR: bulk_ll_channel_pass failed, %d\n\n",
+               __FILE__, __FUNCTION__, __LINE__, (int)err);
+        }
         assert(err_is_ok(err) || err == BULK_TRANSFER_ASYNC);
     }
 }
@@ -631,7 +635,7 @@ void pl_wait_ready(pipeline_handle_t plh)
     dprintf("pl_wait_ready: end pl=%s\n", pl->name);
 }
 
-void pl_enqueue(queue_handle_t queue, struct input *in)
+int pl_enqueue(queue_handle_t queue, struct input *in)
 {
     dprintf("pl_enqueue: enter\n");
     struct bulk_ll_channel *chan = queue;
@@ -640,7 +644,6 @@ void pl_enqueue(queue_handle_t queue, struct input *in)
 
     dprintf("pl_enqueue: q-name:%s, pl name: %s, stack: %s, id: %"PRIu32", len  %d\n",
             q->name, pl->name, pl->stackname, pl->id, (int)in->len);
-
 
     struct dragonet_bulk_meta meta = {
         .len = in->len, .off = in->space_before, };
@@ -653,8 +656,13 @@ void pl_enqueue(queue_handle_t queue, struct input *in)
     assert(err_is_ok(err) || err == BULK_TRANSFER_ASYNC);
 
     // We need to replace these buffers in the current input, and make it empty
-    input_fill_alloc(pl, in);
-    dprintf("pl_enqueue: exit\n");
+    int ret = input_fill_alloc(pl, in);
+    if (ret < 0) {
+        printf("\n%s:%s:%d:Warning: pl_enqueue failed, %d\n\n",
+               __FILE__, __FUNCTION__, __LINE__, ret);
+    }
+    dprintf("pl_enqueue: %d : exit\n", ret);
+    return ret;
 }
 
 // FIXME: The return values of this function don't make sense
@@ -742,7 +750,7 @@ static void input_struct_free(struct dragonet_pipeline *pl, struct input *in)
     }
 }
 
-static void input_fill_alloc(struct dragonet_pipeline *pl, struct input *in)
+static int input_fill_alloc(struct dragonet_pipeline *pl, struct input *in)
 {
     struct bulk_buffer *data_buf;
     struct bulk_buffer *attr_buf;
@@ -750,15 +758,18 @@ static void input_fill_alloc(struct dragonet_pipeline *pl, struct input *in)
 
     attr_buf = bulk_alloc_new_buffer(&pl->alloc);
     if (attr_buf == NULL) {
-        printf("ERROR: input_fill_alloc: no more space left pl=%sn", pl->name);
+        printf("Warning: input_fill_alloc: no more space left for attr_buf  pl=%sn", pl->name);
         abort();
+        return -1;
     }
     attr_buf->opaque = NULL;
 
     data_buf = bulk_alloc_new_buffer(&pl->alloc);
     if (data_buf == NULL) {
-        printf("ERROR: input_fill_alloc: no more space left pl=%s\n", pl->name);
+        printf("Warning: input_fill_alloc: no more space left for data_buf pl=%s\n", pl->name);
+        bulk_alloc_return_buffer(&pl->alloc, attr_buf);
         abort();
+        return -2;
     }
     data_buf->opaque = NULL;
 
@@ -775,12 +786,14 @@ static void input_fill_alloc(struct dragonet_pipeline *pl, struct input *in)
     in->attr_buffer = attr_buf;
 
     memset(in->attr, 0, sizeof(*in->attr));
+    return 0;
 }
 
 struct input *pl_input_alloc(pipeline_handle_t plh)
 {
     struct dragonet_pipeline *pl = plh;
     struct input *in;
+    int ret = 0;
 
     in = pl->input_cache;
     if (in != NULL) {
@@ -791,7 +804,13 @@ struct input *pl_input_alloc(pipeline_handle_t plh)
     }
 
     in = input_struct_alloc(pl);
-    input_fill_alloc(pl, in);
+    ret = input_fill_alloc(pl, in);
+    if (ret < 0) {
+        printf("%s:%s:%d:Warning: input_fill_alloc failed, %d\n",
+               __FILE__, __FUNCTION__, __LINE__, ret);
+        input_struct_free(pl, in);
+        return NULL;
+    }
     return in;
 }
 

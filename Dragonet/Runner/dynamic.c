@@ -152,6 +152,7 @@ static node_out_t run_node(struct dynamic_node *n,
 {
     node_out_t out;
     struct input *din;
+    int ret;
     switch (n->type) {
         case DYN_FNODE:
             return n->tdata.fnode.nodefun(st, in);
@@ -180,7 +181,11 @@ static node_out_t run_node(struct dynamic_node *n,
             return 0;
 
         case DYN_TOQUEUE:
-            pl_enqueue(n->tdata.queue.queue, in);
+            ret = pl_enqueue(n->tdata.queue.queue, in);
+            if (ret < 0) {
+                printf("%s:%s:%d:Warning: packet/event is lost as, pl_enqueue failed, %d\n",
+                        __FILE__, __FUNCTION__, __LINE__, ret);
+            }
             return -2; // FIXME: why there is return value of -2?
 
         default:
@@ -223,6 +228,7 @@ void dyn_rungraph(struct dynamic_graph *graph,
     st = pl_get_state(plh);
 
     in = input_alloc_plh(plh);
+    assert(in != NULL);
     node_stack_init(&ns);
 
     while (pl_get_running(plh)) {

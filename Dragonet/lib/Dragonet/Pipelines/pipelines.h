@@ -19,7 +19,7 @@ struct state *pl_get_state(pipeline_handle_t plh);
 queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name);
 queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name);
 void pl_wait_ready(pipeline_handle_t plh);
-void pl_enqueue(queue_handle_t queue, struct input *in);
+int pl_enqueue(queue_handle_t queue, struct input *in);
 bool pl_process_event(queue_handle_t queue);
 struct input *pl_poll(queue_handle_t queue);
 bool pl_get_running(pipeline_handle_t plh);

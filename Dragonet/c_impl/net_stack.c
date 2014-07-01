@@ -73,6 +73,7 @@ static void show_hex_dump(void *data, size_t len)
 static void run_packet(struct state *st, void *buffer, size_t len)
 {
     struct input *in = input_alloc();
+    assert(in != NULL);
     input_copy_packet(in, buffer, len);
     executeGraph(st, in);
     input_free(in);

@@ -26,6 +26,7 @@ node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
 
         state->local_mac = 0xf86954221b00ULL;
         state->local_ip = 0xc0a87b01;
+        declare_dragonet_initialized(DN_READY_FNAME, "tap driver started!\n");
         printf("Initialized\n");
         dprint("%s:%s:%d: [pktid:%d]: ############## initialized queue\n",
               __FILE__,  __func__, __LINE__, p_id);

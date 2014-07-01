@@ -116,6 +116,8 @@ errval_t dnal_aq_create(const char  *stackname,
     // Get welcome message
     control_recv(aq, &msg);
     assert(msg.type == APPCTRL_WELCOME);
+    uint64_t appid_copy = msg.data.welcome.id;
+
     printf("App ID=%"PRId64"\n", msg.data.welcome.id);
     num_in = msg.data.welcome.num_inq;
     num_out = msg.data.welcome.num_outq;
@@ -152,8 +154,13 @@ errval_t dnal_aq_create(const char  *stackname,
     while (aq->state->tap_handler == NULL) {
         sched_yield();
     }
-    printf("Data path ready\n");
 
+    char fname[250];
+    snprintf(fname, sizeof(fname), "APP%"PRIu64"%s", appid_copy, APP_READY_FNAME);
+
+    // FIXME: create a file with appid_copy  and "appReady"
+    declare_dragonet_initialized(fname, "App ready!\n");
+    printf("Data path ready\n");
     *appqueue = aq;
     return SYS_ERR_OK;
 }
@@ -219,7 +226,10 @@ errval_t dnal_aq_buffer_alloc(dnal_appq_t    aq,
                               struct input **buffer)
 {
     *buffer = input_alloc_plh(aq->pipeline_handle);
-    assert(buffer != NULL);
+    if (buffer == NULL) {
+        return DNERR_UNKNOWN;
+    }
+    //assert(buffer != NULL);
     return SYS_ERR_OK;
 }
 
@@ -328,6 +338,7 @@ errval_t dnal_socket_send(dnal_sockh_t                 sh,
 {
     uint16_t src_port, dst_port;
     uint32_t src_ip, dst_ip;
+    int ret;
 
     if (!sh->bound) {
         return DNERR_SOCKETNOTBOUND;
@@ -378,7 +389,12 @@ errval_t dnal_socket_send(dnal_sockh_t                 sh,
 
     // Send out packet
     input_set_muxid(buf, sh->mux_id);
-    pl_enqueue(sh->aq->out_queue[sh->outqueue], buf);
+    ret = pl_enqueue(sh->aq->out_queue[sh->outqueue], buf);
+    if (ret < 0) {
+        printf("\n\n%s:%s:%d:Warning:TX: send_packet failed as pl_enqueue failed, %d\n\n",
+               __FILE__, __FUNCTION__, __LINE__, ret);
+        return DNERR_UNKNOWN;
+    }
 
     // Weird, but necessary since pl_enqueue replaces the buffer in buf with a
     // new one

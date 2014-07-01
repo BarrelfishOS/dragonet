@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include <implementation.h>
 #include <proto_arp.h>
 #include <ethernetproto.h>
@@ -217,6 +218,7 @@ node_out_t do_pg__TxL3ARPSendRequest(struct state *state, struct input *in)
 
     // Allocate new input for pending, and exchange it with current in
     pending->input = input_alloc();
+    assert(pending->input != NULL);
     memcpy(&i, pending->input, sizeof(i));
     memcpy(pending->input, in, sizeof(*in));
     memcpy(in, &i, sizeof(*in));

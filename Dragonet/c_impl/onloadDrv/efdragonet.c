@@ -630,6 +630,9 @@ node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
         state->local_ip = CONFIG_LOCAL_IP_sf;
         dprint("%s:%s:%d: ############## Initializing driver %p done\n",
               __FILE__,  __func__, __LINE__, state->tap_handler);
+
+        // FIXME: enable following line.  I don't know why it generates compiliation error
+        //declare_dragonet_initialized(DN_READY_FNAME, "SF driver started!\n");
         printf("Initialized\n");
         return P_Queue_init;
     }

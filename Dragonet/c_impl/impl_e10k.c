@@ -296,6 +296,7 @@ static node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
 
         state->local_mac = e10k->card.macaddr;
         state->local_ip = CONFIG_LOCAL_IP;
+        declare_dragonet_initialized(DN_READY_FNAME, "e10k driver started!\n");
         printf("Initialized\n");
     }
     q = e10k->queues + qi;
@@ -366,6 +367,7 @@ static node_out_t tx_queue(struct state *state, struct input *in, uint8_t qi)
 
     // Replacement input
     qin = input_alloc();
+    assert(qin != NULL);
     input_xchg(qin, in);
 
     e10k_queue_add_txbuf(q->queue, qin->phys, qin->len, qin, 1, 1, qin->len);

@@ -201,6 +201,12 @@ bool ip_from_string(const char *ip, uint32_t *dst);
 // does the continuous packet processing by fetching packets from driver
 int main_loop(struct driver *drv);
 
+
+// This is a way to declare the dragonet stack is initialied
+#define DN_READY_FNAME       "stack.dnready"
+#define APP_READY_FNAME       ".appready"
+void declare_dragonet_initialized(char *fname, char *msg);
+
 #include "gencode.h"
 
 #define PORT_BOOL(b) ((b) ? P_true : P_false)
