@@ -98,12 +98,26 @@ void input_xchg(struct input *a, struct input *b)
 void *udp_state_add_listen(struct state *st, uint64_t appid, uint64_t socketid,
                            uint16_t port)
 {
-    struct udp_listen_entry *l, *ht;
 
-    l = calloc(1, sizeof(*l));
-    l->socketid = socketid;
-    l->port = port;
-    l->appid = appid;
+    struct udp_listen_entry *lf,  // listen-found
+                            *l_ht;
+    struct udp_flow_entry f_key;
+    f_key.s_port = 0;
+    f_key.d_port = port;
+    f_key.s_ip   = 0;
+    f_key.d_ip   = 0;
+
+    struct udp_listen_entry *ln,  // listen-new
+                            *ht;
+
+    struct udp_listen_entry *lr;  // listen-return
+
+    ln = calloc(1, sizeof(*ln));
+    ln->lsocketid[ln->rss_entries] = socketid;
+    ln->lappid[ln->rss_entries] = appid;
+    ++ln->rss_entries;
+
+    ln->port = port;
 
 
     if (pthread_rwlock_wrlock(st->udp_lock) != 0) {
@@ -111,13 +125,31 @@ void *udp_state_add_listen(struct state *st, uint64_t appid, uint64_t socketid,
         abort();
     }
 
-    ht = st->udp_listen_ht;
-    HASH_ADD(hh, ht, port, UDP_LISTEN_KEYLEN, l);
-    st->udp_listen_ht = ht;
+    l_ht = st->udp_listen_ht;
+
+    // Look for existing entry for same hash key
+    HASH_FIND(hh, l_ht, &f_key.d_port, UDP_LISTEN_KEYLEN, lf);
+    if (lf == NULL) {
+        // No existing listen entry, so using newly created listen-entry
+        ht = st->udp_listen_ht;
+        HASH_ADD(hh, ht, port, UDP_LISTEN_KEYLEN, ln);
+        st->udp_listen_ht = ht;
+        lr = ln;
+    } else {
+        // There is existing listen entry.  Either report error
+        //      or use this entry as spanned entry.
+        assert(lf->rss_entries > 0 && lf->rss_entries < RSS_TABLE_MAX);
+        printf("Warning: Listen on already inserted filter by appid %"PRIu64", "
+                " treating as span for appid %"PRIu64", %d\n",
+               lf->lappid[0], appid, (int)lf->rss_entries);
+        lf->lsocketid[lf->rss_entries] = socketid;
+        lf->lappid[lf->rss_entries] = appid;
+        ++lf->rss_entries;
+        lr = lf;
+    } // end else:
 
     pthread_rwlock_unlock(st->udp_lock);
-
-    return l;
+    return lr;
 }
 
 void udp_state_remove_listen(struct state *st, void *listen)
@@ -144,12 +176,14 @@ void *udp_state_add_flow(struct state *st, uint64_t appid, uint64_t socketid,
     struct udp_flow_entry *f, *ht;
 
     f = calloc(1, sizeof(*f));
-    f->socketid = socketid;
+    f->lsocketid[f->rss_entries] = socketid;
+    f->lappid[f->rss_entries] = appid;
+    ++f->rss_entries;
+
     f->s_ip = s_ip;
     f->d_ip = d_ip;
     f->s_port = s_port;
     f->d_port = d_port;
-    f->appid = appid;
 
     if (pthread_rwlock_wrlock(st->udp_lock) != 0) {
         fprintf(stderr, "udp_state_add_listen: wrlock failed\n");

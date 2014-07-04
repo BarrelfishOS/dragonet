@@ -269,6 +269,16 @@ appEvent ais ch (APP.EvSocketUDPFlow (sIP,sPort) (dIP,dPort)) = do
         " d=" ++ show (dIP,dPort)
     addSocket ais ch $ INC.UDPIPv4Flow sIP dIP sPort dPort
 
+
+appEvent ais ch (APP.EvSocketSpan sockId) = do
+    putStrLn $ "appEvent span: " ++ show ch ++ ", socket " ++ show sockId
+    -- Get the details about the flow going to that socket
+    -- check if it is already spanned to some other socket
+    -- If supported, add hardware RSS configuration so that new socket will
+    --      also receive some of the load
+    --  If not, then mimic RSS in software by adding a node which will send
+    --      traffic to two possible applications instead of just one.
+
 appEvent _ ch ev = do
     putStrLn $ "appEvent " ++ show ch ++ " " ++ show ev
 

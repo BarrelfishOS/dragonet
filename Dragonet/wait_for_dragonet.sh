@@ -24,6 +24,7 @@ do
     #failedCount=`ls -l *.failed | wc -l`
     if [ "${failedCount}" != "0"  ] ; then
         echo "One of the pipeline failed! FailedCount=${failedCount}"
+        cat some.log
         ls *.failed
         exit
     fi
@@ -31,6 +32,7 @@ do
     if [ "${readyCount}" == "${pipelineCount}"  ] ; then
         echo "All ${readyCount} pipelines are ready!"
         ls *.ready
+        cat some.log
         exit 0
     fi
     echo "Pipelines ready=${readyCount}, Pipelines failed=${failedCount}"
@@ -38,5 +40,6 @@ do
 done
 
 echo "Failed for some unknown reason!"
+cat some.log
 exit 1
 

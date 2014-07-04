@@ -30,7 +30,7 @@ do
     echo "Apps ready=${readyCount}"
     evCount=`expr 1 + ${evCount}`
 
-    if [ "${evCount}" == "15"  ] ; then
+    if [ "${evCount}" == "35"  ] ; then
         echo "ERROR: Event-count ${evCount} reached!, giving up on waiting"
         exit 1
     fi

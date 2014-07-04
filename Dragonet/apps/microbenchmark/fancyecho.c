@@ -41,11 +41,13 @@ struct cfg_appq {
 };
 
 struct cfg_thread {
-    struct cfg_appq  **aqs;
-    size_t             num_aqs;
-    pthread_t          thread;
+    struct cfg_appq     **aqs;
+    size_t              num_aqs;
+    pthread_t           thread;
+    int                 localtid;
+    uint64_t            packetCount;
 
-    struct cfg_thread *next;
+    struct cfg_thread   *next;
 };
 
 static struct cfg_endpoint *ceps = NULL;
@@ -291,7 +293,7 @@ static void parse_params(int argc, char *argv[])
 
 }
 
-static void handle_event(struct dnal_aq_event *event)
+static void handle_event(struct dnal_aq_event *event, struct cfg_thread *th)
 {
     struct input *in;
     struct dnal_net_destination dest;
@@ -305,6 +307,19 @@ static void handle_event(struct dnal_aq_event *event)
     dest.data.ip4udp.port_local = udp_hdr_dport_read(in);
     dest.data.ip4udp.port_remote = udp_hdr_sport_read(in);
 
+    // Print the stats after every 1K packets.
+    if ((th->packetCount % 1000) == 0) {
+        //printf("TID:%d:%d: Echo-back to dest: %"PRIu64"\n",
+        //    th->localtid, (int)pthread_self(), th->packetCount);
+    }
+    ++th->packetCount;
+
+/*
+    printf("TID:%d:%d: Echo-back to dest: %"PRIu16": %"PRIu16", length: %d\n",
+            th->localtid, (int)pthread_self(), dest.data.ip4udp.ip_remote,
+            dest.data.ip4udp.port_remote,
+            (int)in->len);
+*/
     dnal_socket_send(event->data.inpacket.socket, in, &dest);
 }
 
@@ -334,7 +349,7 @@ static void *run_thread(void *arg)
             while (cs != NULL) {
                 err_expect_ok(dnal_socket_create(daq, &dsh));
                 pthread_mutex_lock(&cs->ep->mutex);
-                if (cs->ep->opaque == NULL) {
+                //if (cs->ep->opaque == NULL) {
                     dnd.type = DNAL_NETDSTT_IP4UDP;
                     dnd.data.ip4udp.ip_local = cs->ep->ep.l_ip;
                     dnd.data.ip4udp.ip_remote = cs->ep->ep.r_ip;
@@ -342,9 +357,9 @@ static void *run_thread(void *arg)
                     dnd.data.ip4udp.port_remote = cs->ep->ep.r_port;
                     err_expect_ok(dnal_socket_bind(dsh, &dnd));
                     cs->ep->opaque = dsh;
-                } else {
-                    err_expect_ok(dnal_socket_span(cs->ep->opaque, daq, dsh));
-                }
+//                } else {
+//                    err_expect_ok(dnal_socket_span(cs->ep->opaque, daq, dsh));
+//                }
                 pthread_mutex_unlock(&cs->ep->mutex);
                 cs->opaque = dsh;
                 cs = cs->next;
@@ -367,7 +382,7 @@ static void *run_thread(void *arg)
             if (err == SYS_ERR_OK) {
                 // This needs to be inside the critical section, since we'll
                 // send out data through the AQ
-                handle_event(&event);
+                handle_event(&event, th);
             }
 
             if (locked) {
@@ -381,9 +396,11 @@ static void *run_thread(void *arg)
 
 static void start_threads(void)
 {
+    int count = 0;
     struct cfg_thread *th = cthreads;
     int res;
     while (th != NULL) {
+        th->localtid = count++;
         res = pthread_create(&th->thread, NULL, run_thread, th);
         if (res != 0) {
             fprintf(stderr, "pthread_create failed: %s\n", strerror(res));

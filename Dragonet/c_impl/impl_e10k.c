@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include <signal.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include <linux_pci_uio.h>
 #include <linux_hugepage.h>
@@ -271,9 +272,11 @@ out_err:
     return false;
 }
 
-
+#define MAX_QUEUES          16
+static uint64_t qstat[MAX_QUEUES] = {0, 0};
 static node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
 {
+    assert(qi < MAX_QUEUES);
     struct dragonet_e10k *e10k = (struct dragonet_e10k *) state->tap_handler;
     struct dragonet_e10k_queue *q;
     void *op;
@@ -294,6 +297,9 @@ static node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
         }
         e10k = (struct dragonet_e10k *) state->tap_handler;
 
+        // clear up the stats array
+        memset(qstat, 0, sizeof(qstat));
+        // set the local IP and mac
         state->local_mac = e10k->card.macaddr;
         state->local_ip = CONFIG_LOCAL_IP;
         declare_dragonet_initialized(DN_READY_FNAME, "e10k driver started!\n");
@@ -337,6 +343,13 @@ static node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
         goto add_buf;
     }
     //printf("e10k: Yay, we got a full packet!\n");
+    if (qstat[qi] % 1000 == 0) {
+        //printf
+        dprint
+            ("QueueID:%"PRIu8":[TID:%d]: has handled %"PRIu64" packets\n",
+               qi, (int)pthread_self(), qstat[qi]);
+    }
+    ++qstat[qi];
 
     // Set packet boundaries
     pkt_append(qin, -(qin->len - len));
