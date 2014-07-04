@@ -67,9 +67,14 @@ class MachineRunner(object):
             return ""
         if self.deployment_host and self.deployment_host != 'localhost':
             cmd = "ssh %s '%s'" % (self.deployment_host, cmd)
-        res = subprocess.check_output(cmd, universal_newlines=True, shell=True,
+            #cmd = "ssh -t %s '%s'" % (self.deployment_host, cmd)
+
+        try:
+            res = subprocess.check_output(cmd, universal_newlines=True, shell=True,
                     stderr=subprocess.STDOUT)
-        return res.strip()
+            return res.strip()
+        except:
+            raise
 
 
     def _create_work_location(self):
@@ -134,10 +139,10 @@ class ProcessRunner(threading.Thread):
         # doing initial setup
         if self.init_cmd:
             for cmd in self.init_cmd:
-                self.logMsg ("Machine %s: Executing init command [%s]" % (
+                self.logMsg ("INIT: Machine %s: Executing init command [%s]" % (
                         self.machine_ref, cmd))
                 ans = self.machine_ref._exec_cmd_blocking(cmd)
-                self.logMsg ("the response of executing init command is \n%s\n" %(ans))
+                self.logMsg ("INIT: Machine %s: the response of executing init command is \n%s\n" %( self.machine_ref, ans))
 
         # Use named temporary files to avoid errors on double-delete when
         # running on Windows/cygwin.
@@ -289,14 +294,16 @@ class NetperfSumaryRunner(ProcessRunner):
             if (len(parts) == 2):
                 cmd_output[parts[0]] = parts[1]
             else :
-                print "Could not parse line [%s] == [%s]" % (line, str(parts))
+                self.logMsg("Could not parse line [%s] == [%s]" %
+                        (line, str(parts)))
             #result.append(parts[0], parts[1])
         # FIXME: Verify that the numbers are proper and there are no errors
         bytes_sent = int(cmd_output["LOCAL_BYTES_XFERD"])
         bytes_recvd = int(cmd_output['REMOTE_BYTES_RECVD'])
         missing_bytes = bytes_sent - bytes_recvd
         if (missing_bytes != 0) :
-            print ("Bytes lost = %d\n", missing_bytes)
+        #    print ("Bytes lost = %d\n", missing_bytes)
+            self.logMsg ("Bytes lost = %d\n" % missing_bytes)
         assert(cmd_output['THROUGHPUT_UNITS'] == "10^9bits/s")
         result['RESULT'] = cmd_output['REMOTE_RECV_THROUGHPUT']
         result['CMD_OUTPUT'] = cmd_output

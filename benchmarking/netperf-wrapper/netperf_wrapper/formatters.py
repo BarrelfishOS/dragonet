@@ -969,7 +969,9 @@ class PlotFormatter(Formatter):
             title2 = title2.replace('CImplOnload', 'CImpl Dragonet')
             title2 = title2.replace('CImpl', 'C')
 
-            title3 = "%d,%d, (%d)" % (self.infod['SERVERS_INSTANCES'][i],
+            title3 = "%d,%d,%d, (%d)" % (
+                    self.infod['HWQUEUES'][i],
+                    self.infod['SERVERS_INSTANCES'][i],
                     self.infod['SERVER_CORES'][i],
                     self.infod['TCONCURRENCY'][i])
 

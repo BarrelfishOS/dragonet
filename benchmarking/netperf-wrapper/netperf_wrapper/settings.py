@@ -70,6 +70,7 @@ DEFAULT_SETTINGS = {
     'CLIENTS_CORECOUNT': {},
     'SERVER_CORES': 1,
     'CLIENT_CORES': 1,
+    'HWQUEUES': 1,
     'BRUST_SIZE': 1,
     'CONCURRENCY' : 1,
     'TCONCURRENCY' : 1,
@@ -381,6 +382,9 @@ parser.add_option("-t", "--title-extra", action="store", type="string", dest="TI
 
 parser.add_option("-q", "--servercores", action="store", type="int", dest="SERVER_CORES",
                   help="Number of cores to use in server")
+parser.add_option("--hwqueues", action="store", type="int", dest="HWQUEUES",
+                  help="Number of hardware queues to be used (for Dragonet stack)")
+
 parser.add_option("-Q", "--clientcores", action="store", type="int", dest="CLIENT_CORES",
                   help="Number of cores to use in client")
 
@@ -712,6 +716,7 @@ def load():
                             TARGET=settings.TARGET,
                             USE_TCP=settings.USE_TCP,
                             SERVER_CORES=settings.SERVER_CORES,
+                            HWQUEUES=settings.HWQUEUES,
                             SPECIAL_CLIENTS_COUNT = settings.SPECIAL_CLIENTS_COUNT,
                             SPECIAL_SERVERS_COUNT = settings.SPECIAL_SERVERS_COUNT,
                             BRUST_SIZE=settings.BRUST_SIZE,

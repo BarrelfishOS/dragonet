@@ -19,7 +19,7 @@ retry() {
             return 1
         else
             echo "Attempt $attempt_num failed! Trying again in $attempt_num seconds..."
-            ./cleanup.sh
+            ./cleanup.sh 2> /dev/null
             sleep 5
             sleep $(( attempt_num++ ))
         fi
@@ -44,8 +44,8 @@ tmpfile="${result}.tmp"
 title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},,SRV_${SERVERCORES},C_${CONCURENCY}"
 
    retry 1 ./netperf-wrapper -d ${DELAY} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
-       -H ${srvName}  ${cliName6} --serverInstances ${SERVERINSTANCES} \
-       --servercores ${SERVERCORES} --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} \
+        --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
+       --servercores ${SERVERCORES} --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
        --concurrency ${CONCURENCY} -t "${title}" -o "${result}" -L "${log}"
 
 #outfile=`cat ${tmpfile} | grep  'Test data is in ' | cut -d'[' -f2 | cut -d']' -f1`
@@ -77,21 +77,21 @@ run_bm_tp_rr() {
     LBRUST=1
     CBRUST=1
     NBRUST=1
-    while [  $NTP -gt $CTP ]; do
+    while [  "$NTP" -gt "$CTP" ]; do
 #        set -x
 #        set -e
         let LBRUST=CBRUST
         let CBRUST=NBRUST
         let NBRUST=CBRUST+CBRUST
 
-        title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},C_${CBRUST}"
+        title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},Q_${HWQUEUES},P_${PACKET_SIZE},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},C_${CBRUST}"
         echo "#################################################"
         echo "running for ${title}"
 
-        retry 5 ./netperf-wrapper -d ${DELAY} -I 1 -l 10 -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
+        retry 2 ./netperf-wrapper -d ${DELAY} -I 1 -l 10 -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
         -H ${srvName} ${cliName6} \
-        --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} \
-        --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} \
+        --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
+        --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
         --concurrency ${CBRUST} -t "${title}" -o "${ALLRESULTS}" -L "${MYTMPDIR}/${title}.log" | tee ${TMPFILE}
 
         let CTP=NTP
@@ -107,7 +107,7 @@ run_bm_tp_rr() {
         cat ${TMPFILE} >> ${FINALRESULT}
         cat ${TMPFILE} >>  ${MYTMPDIR}/${title}.log
         rm -f ${TMPFILE}
-        ./cleanup.sh
+        ./cleanup.sh 2> /dev/null
         sleep 3
     done
 
@@ -115,13 +115,13 @@ run_bm_tp_rr() {
     set -e
 
     sleep 5
-    title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},C_${LBRUST},BEST"
+    title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},Q_${HWQUEUES},P_${PACKET_SIZE},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},C_${LBRUST},BEST"
     echo "running for ${title}"
 
-    retry 5 ./netperf-wrapper -d ${DELAY} -I ${ITERATIONS} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
+    retry 2 ./netperf-wrapper -d ${DELAY} -I ${ITERATIONS} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
         -H ${srvName} ${cliName6} \
-        --servercores ${SERVERCORES}  --serverInstances ${SERVERINSTANCES} \
-        --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} \
+        --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
+        --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
         --concurrency ${LBRUST} -t "${title}" -o "${ALLRESULTS}" -L "${MYTMPDIR}/${title}.log" | tee ${TMPFILE}
 
     set +x
@@ -133,14 +133,14 @@ run_bm_tp_rr() {
     echo "#############################################################"
     echo "############ BEST TP for instances:${SERVERINSTANCES} CORES:${SERVERCORES} [$NTP:$CBRUST]"
     echo "#############################################################"
-    ./cleanup.sh
+    ./cleanup.sh 2> /dev/null
     sleep 3
 }
 
 get_best_latency()
 {
-    SERVERCORES=$1
-    SERVERINSTANCES=$2
+    SERVERINSTANCES=$1
+    SERVERCORES=$2
     CONCURENCY=$3
     CLIENTCORES="1"
     OUTDIR="${OUTDIRP}/LATENCY/"
@@ -171,8 +171,35 @@ get_best_tp()
     run_bm_tp_rr  ${SELTARGET} ${SELTARGET_T} ${OUTDIR}
 }
 
+get_scalability_special22() {
+
+    HWQUEUES=1
+    setup_output_location
+    get_best_tp 2 1
+    get_best_tp 1 2
+#    get_best_tp 4 1
+#    get_best_tp 1 1
+#    get_best_tp 1 4
+    HWQUEUES=2
+    setup_output_location
+#    get_best_tp 2 1
+#    get_best_tp 4 1
+#    get_best_tp 1 2
+#    get_best_tp 1 4
+#    HWQUEUES=4
+#    setup_output_location
+#    get_best_tp 1 4
+#    get_best_tp 4 1
+
+    fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
+    ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
+    echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
+}
+
+
+
 get_scalability_special() {
-    get_best_tp 1 1
+    get_best_tp 4 1
     fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
     ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
     echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
@@ -214,7 +241,7 @@ get_scalability_threads() {
 setup_output_location() {
     OUTDIRPP="${MAIN_OUTPUT_DIR}/${SELTARGET_T}/"
 
-    OUTDIRP="${OUTDIRPP}/${ECHO_SERVER}/${USE_PROTO}/${CORESHIFT}/${UDP_TEST_NAME}/"
+    OUTDIRP="${OUTDIRPP}/${ECHO_SERVER}/${USE_PROTO}/${PACKET_SIZE}${CORESHIFT}/${UDP_TEST_NAME}/"
     mkdir -p ${OUTDIRP}
     OUTDIR=${OUTDIRP}
     echo "OUTPUT Location: ${OUTDIR}"
@@ -271,7 +298,8 @@ use_asiago_server() {
     SF_T="10.23.4.195"
     SF_S_T="10.113.4.195"
 
-    cliName6="-C ziger2 -C sbrinz2 -C ziger2 -C sbrinz2"
+    cliName6="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere  -C burrata"
+    cliName6="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
     cliName1="-C ziger2"
     cliName1="-C sbrinz2 -C sbrinz2"
     #cliName6=${cliName1}
@@ -310,19 +338,22 @@ CORESHIFT=2
 SERVERINSTANCES=1
 
 DELAY=5
-DELAY=1
+DELAY=2
+HWQUEUES=1
+HWQUEUES=4
 USE_PROTO="tcp"
 USE_PROTO="udp"
+PACKET_SIZE=1024
 
 ECHO_SERVER="memcached_poll"
 ECHO_SERVER="memcached_dragonet"
 ECHO_SERVER="memcached_onload"
 ECHO_SERVER="memcached"
 MAIN_OUTPUT_DIR="../memcachedResults/sf_scale_test/${1}/"
-MAIN_OUTPUT_DIR="../netperfScaleResults/sf_scale_test/${1}/"
+MAIN_OUTPUT_DIR="../netperfScaleResults/intelTest/${1}/"
 GRAPH_GEN_CMDS="${MAIN_OUTPUT_DIR}/graph_gen_cmds.sh"
 
-./cleanup.sh
+./cleanup.sh 2> /dev/null
 
 #use_burrata_server_intel_switched
 #use_asiago_server_intel_switched
@@ -332,9 +363,11 @@ use_asiago_server_intel_switched
 UDP_TEST_NAME="udp_rr"
 #ECHO_SERVER="netserver"
 ECHO_SERVER="llvmE10k"
+PACKET_SIZE=1024
 setup_output_location
-get_scalability_special
+get_scalability_special22
 exit 0
+get_scalability_special
 ##############################
 
 ECHO_SERVER="memcached"
@@ -351,7 +384,7 @@ get_scalability_instances
 get_scalability_special
 
 get_scalability_threads
-./cleanup.sh
+./cleanup.sh 2> /dev/null
 sleep 10
 
 CORESHIFT=6
@@ -369,7 +402,7 @@ get_best_tp 1
 
 #exit 0
 
-#get_best_latency server-cores server-instances concurency
+#get_best_latency server-instances server-cores concurency
 #get_best_latency 2 1 1
 #exit 0
 
