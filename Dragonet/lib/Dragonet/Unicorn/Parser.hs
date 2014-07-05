@@ -21,12 +21,16 @@ import Text.ParserCombinators.Parsec as Parsec
 import qualified Text.ParserCombinators.Parsec.Token as P
 import Dragonet.ProtocolGraph (ConfType(..))
 
+import qualified Util.SMTLibParser as SMTP
+import qualified SMTLib2 as SMT
+
 -----------------------------------------------------------------------------
 -- Representing parsed code
 
 data Graph = Graph {
         gName        :: String,
-        gRootCluster :: Cluster }
+        gRootCluster :: Cluster,
+        gSemHelpers  :: SMT.Script }
     deriving Show
 
 data Cluster = Cluster {
@@ -44,7 +48,8 @@ data Node =
     Node {
         nName     :: String,
         nPorts    :: [Port],
-        nAttrs    :: [String] } |
+        nAttrs    :: [String],
+        nPortSems :: [(String, SMT.Expr)] } |
 
     Config {
         nName     :: String,
@@ -57,7 +62,8 @@ data Node =
         nName     :: String,
         nPortT    :: Port,
         nPortF    :: Port,
-        nAttrs    :: [String] } |
+        nAttrs    :: [String],
+        nPortSems :: [(String, SMT.Expr)] } |
 
     And {
         nName     :: String,
@@ -109,7 +115,8 @@ lexer = P.makeTokenParser P.LanguageDef {
     P.opStart = Parsec.oneOf "",
     P.opLetter = Parsec.oneOf "",
     P.reservedNames = ["graph", "cluster", "node", "config", "boolean", "and",
-                       "nand", "or", "nor", "gconfig", "port", "attr", "type"],
+                       "nand", "or", "nor", "gconfig", "port", "attr", "type",
+                       "semantics", "helpers"],
     P.reservedOpNames = [],
     P.caseSensitive = True }
 
@@ -161,24 +168,32 @@ constraint = do
 constraintAttrs :: [(String,String)] -> [String]
 constraintAttrs = map (\(p,e) -> "C." ++ p ++ ":" ++ e)
 
+semantics = do
+    reserved "semantics"
+    ps <- many1 identifier
+    sem <- braces $ SMTP.termParser
+    return $ map (\p -> (p,sem)) ps
+
 genNaryNode p name = do
     reserved name
     n <- cIdentifier p
-    (ps,as) <- braces $ do
+    (ps,as,sems) <- braces $ do
         as' <- many attributes
         ps' <- concat <$> many (port p)
         cs <- many constraint
         let attrs = as' ++ constraintAttrs cs
-        return (ps',attrs)
-    return (n,ps,as)
+        sems <- concat <$> many semantics
+        return (ps',attrs,sems)
+    return (n,ps,as,sems)
 
 
 node p = do
-    (name,ports,attr) <- genNaryNode p "node"
+    (name,ports,attr,sems) <- genNaryNode p "node"
     return $ Right $ Node {
-            nName  = name,
-            nPorts = ports,
-            nAttrs = attr }
+            nName     = name,
+            nPorts    = ports,
+            nAttrs    = attr,
+            nPortSems = sems }
 
 configFun = do
     reserved "function"
@@ -212,12 +227,15 @@ config p = do
 genBoolean p name hasConstraints = do
     reserved name
     n <- cIdentifier p
-    (ps,as) <- braces $ do
+    (ps,as,sems) <- braces $ do
         as' <- many attributes
         ps' <- concat <$> many (port p)
         cs <- if hasConstraints then many constraint else return []
+        sems <- if hasConstraints
+                then concat <$> many semantics
+                else return []
         let attrs = as' ++ constraintAttrs cs
-        return (ps',attrs)
+        return (ps',attrs,sems)
     if (length ps) /= 2 then
         unexpected "Unexpected number of ports in boolean node, expect exactly 2"
     else
@@ -228,7 +246,7 @@ genBoolean p name hasConstraints = do
                 unexpected "false port not found in boolean node"
             else
                 return ()
-    return (n, (head ps), (head (tail ps)),as)
+    return (n, (head ps), (head (tail ps)),as, sems)
     where
         isPort n p = n == pName p
         findPort n ps = L.find (isPort n) ps
@@ -236,16 +254,17 @@ genBoolean p name hasConstraints = do
         falsePort = findPort "false"
 
 boolean p = do
-    (n, t, f, a) <- genBoolean p "boolean" True
+    (n, t, f, a, s) <- genBoolean p "boolean" True
     return $ Right $ Boolean {
-            nName  = n,
-            nPortT = t,
-            nPortF = f,
-            nAttrs = a }
+            nName     = n,
+            nPortT    = t,
+            nPortF    = f,
+            nAttrs    = a,
+            nPortSems = s }
 
 
 orN p = do
-    (n, t, f, a) <- genBoolean p "or" False
+    (n, t, f, a, _) <- genBoolean p "or" False
     return $ Right $ Or {
             nName  = n,
             nPortT = t,
@@ -254,7 +273,7 @@ orN p = do
 
 
 norN p = do
-    (n, t, f, a) <- genBoolean p "nor" False
+    (n, t, f, a, _) <- genBoolean p "nor" False
     return $ Right $ NOr {
             nName  = n,
             nPortT = t,
@@ -263,7 +282,7 @@ norN p = do
 
 
 andN p = do
-    (n, t, f, a) <- genBoolean p "and" False
+    (n, t, f, a, _) <- genBoolean p "and" False
     return $ Right $ And {
             nName  = n,
             nPortT = t,
@@ -271,7 +290,7 @@ andN p = do
             nAttrs = a }
 
 nandN p = do
-    (n, t, f, a) <- genBoolean p "nand" False
+    (n, t, f, a, _) <- genBoolean p "nand" False
     return $ Right $ NAnd {
             nName  = n,
             nPortT = t,
@@ -292,11 +311,18 @@ clusteredNodes p = do
                 andN p <|> nandN p <|> cluster p)
     return $ ns
 
+helpers = do
+    reserved "helpers"
+    braces $ SMTP.scriptParser
+
 graph = do
     whitespace
     reserved "graph"
     gn <- identifier
-    ns <- braces $ clusteredNodes []
+    (ns,helpers) <- braces $ do
+        hs <- option (SMT.Script []) helpers
+        ns <- clusteredNodes []
+        return (ns, hs)
     eof
     return $
         Graph {
@@ -305,7 +331,8 @@ graph = do
                 Cluster {
                     cName     = "",
                     cChildren = lefts ns,
-                    cNodes    = rights ns } }
+                    cNodes    = rights ns },
+            gSemHelpers  = helpers }
 
 parseGraph s = case runParser graph () "" s of
       Left err  -> fail $ show err

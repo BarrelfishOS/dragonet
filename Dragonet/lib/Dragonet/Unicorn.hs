@@ -13,6 +13,7 @@ module Dragonet.Unicorn(
     unicornNOrNode,
     unicornGraph,
     constructGraph,
+    constructGraph',
     PG.ConfType(..),
 ) where
 
@@ -24,6 +25,7 @@ import Data.Maybe
 import qualified Data.List as L
 
 import qualified Dragonet.ProtocolGraph as PG
+import qualified Dragonet.Semantics as Sem
 import qualified Data.Graph.Inductive as DGI
 
 import qualified Text.Show.Pretty as Pr
@@ -73,18 +75,23 @@ node_to_pgnode :: Node -> PG.Node
 node_to_pgnode Node {
                 nName = name,
                 nPorts = ports,
-                nAttrs = attrs } =
-    PG.baseFNode name attrs pnames Nothing
-    where pnames = map pName ports
+                nAttrs = attrs,
+                nPortSems = sems } =
+    node { PG.nSemantics = sems }
+    where
+        pnames = map pName ports
+        node = PG.baseFNode name attrs pnames Nothing
 node_to_pgnode Boolean {
                 nName  = name,
                 nPortT = pt,
                 nPortF = pf,
-                nAttrs = attrs } =
-    PG.baseFNode name a pnames Nothing
+                nAttrs = attrs,
+                nPortSems = sems } =
+    node { PG.nSemantics = sems }
     where
         pnames = map pName [pt, pf]
         a = "Boolean":attrs
+        node = PG.baseFNode name a pnames Nothing
 node_to_pgnode And {
                 nName  = name,
                 nPortT = pt,
@@ -156,6 +163,9 @@ constructGraph (Graph { gName = gname, gRootCluster = cluster }) =
 
         pg_edges :: [PG.PGEdge]
         pg_edges = concatMap get_edges_node nodes_ids
+
+constructGraph' :: Graph -> (PG.PGraph, Sem.Helpers)
+constructGraph' g = (constructGraph g, gSemHelpers g)
 
 nodeClusterMap :: Cluster -> [(String, Node)]
 nodeClusterMap Cluster {

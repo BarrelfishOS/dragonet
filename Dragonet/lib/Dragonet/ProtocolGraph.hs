@@ -60,6 +60,7 @@ import Data.Maybe (fromJust)
 import qualified Data.List as L
 
 import Dragonet.Implementation (Implementation)
+import Dragonet.Semantics (PortSemantics)
 
 type Label = String
 type Tag = String
@@ -95,7 +96,8 @@ data Node = Node {
     nGraphType      :: GraphType,
     nAttributes     :: [Attribute],
     nPorts          :: [Port],
-    nImplementation :: Maybe Implementation
+    nImplementation :: Maybe Implementation,
+    nSemantics      :: [(Port,PortSemantics)]
 }-- deriving (Show)
 
 instance Show (Node) where
@@ -197,7 +199,8 @@ baseFNode label attr ports impl = Node {
         nGraphType = GTUnknown,
         nAttributes = attr,
         nPorts = ports,
-        nImplementation = impl }
+        nImplementation = impl,
+        nSemantics = [] }
 
 baseONode :: Label -> [Attribute] -> [Port] -> Operator -> Maybe Implementation -> Node
 baseONode label attr ports op impl = Node {
@@ -207,7 +210,8 @@ baseONode label attr ports op impl = Node {
         nGraphType = GTUnknown,
         nAttributes = attr,
         nPorts = ports,
-        nImplementation = impl }
+        nImplementation = impl,
+        nSemantics = [] }
 
 baseCNode :: Label -> [Attribute] -> [Port] -> ConfType -> ConfFunction
                 -> Maybe Implementation -> Node
@@ -218,7 +222,8 @@ baseCNode label attr ports ctype cnf impl = Node {
         nGraphType = GTUnknown,
         nAttributes = attr,
         nPorts = ports,
-        nImplementation = impl }
+        nImplementation = impl,
+        nSemantics = [] }
 
 
 nIsCNode :: Node -> Bool
