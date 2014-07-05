@@ -1,0 +1,45 @@
+graph testSMT {
+    helpers {
+        (define-fun ETH.src ((p Packet)) (_ BitVec 8)
+            (pget p #x0006))
+        (define-fun ETH.type ((p Packet)) (_ BitVec 8)
+            (pget p #x0007))
+    }
+    boolean Foo {
+        port false[Baz]
+        port true[Baz]
+        semantics false {(not (= (ETH.type pkt) #x08))}
+        semantics true {(= (ETH.type pkt) #x08)}
+    }
+
+    boolean Bar {
+        port false[Baz]
+        port true[Baz]
+        semantics false {(not (= (ETH.src pkt) #xff))}
+        semantics true {(= (ETH.src pkt) #xff)}
+    }
+
+    and Baz {
+        port false[A]
+        port true[B]
+    }
+
+    node A {
+        port out[C]
+        semantics out {(not (= (ETH.type pkt) #x08))}
+    }
+
+    node B {
+        port out[D]
+        semantics out {(not (= (ETH.type pkt) #x08))}
+    }
+
+    node C {
+        port out[]
+    }
+
+    node D {
+        port out[]
+    }
+
+}
