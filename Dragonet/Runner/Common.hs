@@ -267,8 +267,9 @@ appEvent ais ch (APP.EvSocketUDPListen (ip,port)) = do
 appEvent ais ch (APP.EvSocketUDPFlow (sIP,sPort) (dIP,dPort)) = do
     putStrLn $ "SocketUDPFlow s=" ++ show (sIP,sPort) ++
         " d=" ++ show (dIP,dPort)
-    addSocket ais ch $ INC.UDPIPv4Flow sIP dIP sPort dPort
-
+    let ff = INC.UDPIPv4Flow sIP dIP sPort dPort
+    putStrLn $ "SocketUDPFlow flow = " ++ show (ff)
+    addSocket ais ch ff
 
 appEvent ais ch (APP.EvSocketSpan sockId) = do
     putStrLn $ "appEvent span: " ++ show ch ++ ", socket " ++ show sockId
@@ -289,6 +290,8 @@ addSocket ais ch f = do
         sockID = fromIntegral $ INC.sdID sd
         muxID = 6 -- FIXME
     muxID <- muxIDFromLabel ais ch "TxL4UDPInitiateResponse" outQ
+    putStrLn $ "addSocket: outQ: " ++ (show outQ) ++ ", sockID:" ++ (show sockID)
+        ++ ", flow: " ++ (show f)
     APP.sendMessage ch $ APP.MsgSocketInfo sockID outQ muxID
 
 -- Multiplex identifier for node in output queue

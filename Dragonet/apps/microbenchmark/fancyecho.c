@@ -104,6 +104,8 @@ static void parse_flow(struct cfg_udpep *udp, char *str)
         goto parse_err;
     }
 
+    printf("lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+            udp->l_ip, udp->l_port, udp->r_ip, udp->r_port);
     return;
 parse_err:
     fprintf(stderr, "Parse error for flow specification (expect "
@@ -308,10 +310,11 @@ static void handle_event(struct dnal_aq_event *event, struct cfg_thread *th)
     dest.data.ip4udp.port_remote = udp_hdr_sport_read(in);
 
     // Print the stats after every 1K packets.
-    if ((th->packetCount % 1000) == 0) {
-        //printf("TID:%d:%d: Echo-back to dest: %"PRIu64"\n",
-        //    th->localtid, (int)pthread_self(), th->packetCount);
+/*    if ((th->packetCount % 1000) == 0) {
+        printf("HWQ:%d, TID:%d:%d: Echo-back to dest: %"PRIu64"\n",
+           in->qid, th->localtid, (int)pthread_self(), th->packetCount);
     }
+*/
     ++th->packetCount;
 
 /*
@@ -355,6 +358,13 @@ static void *run_thread(void *arg)
                     dnd.data.ip4udp.ip_remote = cs->ep->ep.r_ip;
                     dnd.data.ip4udp.port_local = cs->ep->ep.l_port;
                     dnd.data.ip4udp.port_remote = cs->ep->ep.r_port;
+                    printf("before bind: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+                            dnd.data.ip4udp.ip_local,
+                            dnd.data.ip4udp.port_local,
+                            dnd.data.ip4udp.ip_remote,
+                            dnd.data.ip4udp.port_remote
+                          );
+
                     err_expect_ok(dnal_socket_bind(dsh, &dnd));
                     cs->ep->opaque = dsh;
 //                } else {

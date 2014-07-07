@@ -351,6 +351,7 @@ static node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
     }
     ++qstat[qi];
 
+    qin->qid = qi;
     // Set packet boundaries
     pkt_append(qin, -(qin->len - len));
 

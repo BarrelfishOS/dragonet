@@ -88,8 +88,8 @@ node_out_t do_pg__RxL4UDPPortClassifyStatic(struct state *state, struct input *i
 static uint64_t app_selector_dummy = 0;
 node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *in)
 {
-    dprint("### %s:%s:%d: UDP packet %"PRIu16"\n",
-            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
+    dprint("### %s:%s:%d:HWQ:%d, UDP packet %"PRIu16"\n",
+            __FILE__, __FUNCTION__, __LINE__, in->qid, udp_hdr_dport_read(in));
     struct udp_flow_entry *f, *f_ht;
     struct udp_flow_entry f_key;
     struct udp_listen_entry *l, *l_ht;
@@ -121,6 +121,28 @@ node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *
         ++app_selector_dummy;
         socketid = f->lsocketid[selected_appid];
         appid = f->lappid[selected_appid];
+        dprint
+        //printf
+            ("HWQ:%d, Full flow match: selected appid index = %d, selected appid = %"PRIu64", socket-ID: %"PRIu64"\n",
+                in->qid, selected_appid, appid, socketid);
+        goto out_success;
+    }
+
+    // Masking the source port and destination ip for scalability filters
+    // FIXME: I am not covering all the possibilities of masking
+    f_key.s_port = 0;
+    f_key.d_ip = 0;
+    HASH_FIND(hh, f_ht, &f_key.s_ip, UDP_FLOW_KEYLEN, f);
+    if (f != NULL) {
+        assert(f->rss_entries == 1);
+        selected_appid = app_selector_dummy % f->rss_entries;
+        ++app_selector_dummy;
+        socketid = f->lsocketid[selected_appid];
+        appid = f->lappid[selected_appid];
+        dprint
+        //printf
+            ("HWQ:%d, Partial flow match: selected appid index = %d, selected appid = %"PRIu64", socket-ID: %"PRIu64"\n",
+              in->qid,  selected_appid, appid, socketid);
         goto out_success;
     }
 
@@ -132,8 +154,10 @@ node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *
         ++app_selector_dummy;
         socketid = l->lsocketid[selected_appid];
         appid = l->lappid[selected_appid];
-        dprint("selected appid index = %d, selected appid = %"PRIu64"\n",
-                selected_appid, appid);
+        dprint
+        //printf
+            ("HWQ:%d, Listen match: selected appid index = %d, selected appid = %"PRIu64", socket-ID: %"PRIu64"\n",
+               in->qid, selected_appid, appid, socketid);
         goto out_success;
     }
 
@@ -143,13 +167,16 @@ node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *
     //        - Use rounded value to choose application id.
     //      choose one of the queues specified by
 
-    dprint("### %s:%s:%d: UDP packet %"PRIu16": closed port, returning zero\n",
+    dprint
+    //printf
+        ("### %s:%s:%d: UDP packet %"PRIu16": closed port, returning zero\n",
             __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     out = P_RxL4UDPPortClassifyDynamic_closedPort;
+    appid = P_RxL4UDPPortClassifyDynamic_closedPort;
 out_success:
 
-    dprint("### %s:%s:%d: UDP packet %"PRIu16": open port, going to socket\n",
-            __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
+    //dprint("### %s:%s:%d: UDP packet %"PRIu16": open port, going to socket\n",
+    //        __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     in->attr->socket_id = socketid;
     pthread_rwlock_unlock(state->udp_lock);
     return appid;

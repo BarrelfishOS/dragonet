@@ -147,6 +147,7 @@ struct input {
     void  *data;
     struct input_attributes *attr;
     uint64_t phys;
+    int      qid;
     pktoff_t len;
     pktoff_t space_before;
     pktoff_t space_after;

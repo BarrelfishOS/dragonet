@@ -306,6 +306,16 @@ errval_t dnal_socket_bind(dnal_sockh_t                 sh,
             msg.data.socket_udpflow.d_ip = dest->data.ip4udp.ip_local;
             msg.data.socket_udpflow.s_port = dest->data.ip4udp.port_remote;
             msg.data.socket_udpflow.d_port = dest->data.ip4udp.port_local;
+
+            printf("This is flow binding\n");
+                    printf("before bind: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+                           msg.data.socket_udpflow.d_ip,
+                           msg.data.socket_udpflow.d_port,
+                           msg.data.socket_udpflow.s_ip,
+                           msg.data.socket_udpflow.s_port
+                          );
+
+
         }
     } else {
         return DNERR_BADDEST;

@@ -53,6 +53,19 @@ bool e10k_ctrl_5tuple_set(struct state *state,
     f.dst_port = dst_port;
     f.mask     = mask;
     f.l4_type  = l4_type;
+    printf("### %s:%s:%d:"
+            "Priority: %"PRIu8", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
+            "srcIP: %"PRIu32", srcPort: %"PRIu16",  dstIP: %"PRIu32", dstPort: %"PRIu16"\n",
+            __FILE__, __FUNCTION__, __LINE__,
+            f.priority,
+            f.queue,
+            f.mask,
+            f.l4_type,
+            f.src_ip,
+            f.src_port,
+            f.dst_ip,
+            f.dst_port
+            );
     return e10k_5tfilter_setup(&e10k->card, index, &f);
 }
 

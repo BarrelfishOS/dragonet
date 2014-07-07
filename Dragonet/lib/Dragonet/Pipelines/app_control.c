@@ -5,6 +5,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 #include <errno.h>
 
@@ -134,7 +136,11 @@ void app_control_init(
                             msg.data.socket_udplisten.port);
                     break;
                 case APPCTRL_SOCKET_UDPFLOW:
-                    printf("APPCTRL_SOCKET_UDPFLOW\n");
+                    printf("APPCTRL_SOCKET_UDPFLOW: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+                            msg.data.socket_udpflow.s_ip,
+                            msg.data.socket_udpflow.s_port,
+                            msg.data.socket_udpflow.d_ip,
+                            msg.data.socket_udpflow.d_port);
                     socket_udpflow(appfds[i],
                             msg.data.socket_udpflow.s_ip,
                             msg.data.socket_udpflow.s_port,
