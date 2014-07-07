@@ -7,6 +7,8 @@ onload_prefix="onload --profile=latency --preload=/usr/lib64/libonload.so"
 
 #SERVER_INITIAL_PORT =  7
 SERVER_INITIAL_PORT =  888
+CLIENT_INITIAL_PORT =  9000
+UNIQUE_CLIENTS = list(set(CLIENTS))
 NETPERF_CMD="../netperf-2.6.0/src/netperf -fg -4"
 
 def toCoreList2(clist, separator=",", prefix=""):
@@ -19,15 +21,37 @@ def toCoreList2(clist, separator=",", prefix=""):
     print "toCoreList2 %s" % (ret)
     return ret
 
-
 def genFancyEchoParameters(noPorts, threadsPerPort):
     ret = ""
     # socket info per slot
     appID = 0
+    unique_clients = list(set(CLIENTS))
+    instances_per_client = (len(CLIENTS)/len(UNIQUE_CLIENTS))
+    if not (len(CLIENTS) % len(UNIQUE_CLIENTS)) == 0:
+        print "Not enough not all clients are repeated same times.  All clients: %d, unique clients: %d  " % (
+                len(CLIENTS),  len(UNIQUE_CLIENTS))
+        sys.exit(1)
+
+    # Make sure that number of unique clients is more than threadsPerPort
+    if len(unique_clients) < threadsPerPort :
+        print "Not enough unique clients (%d) for load balancing per threads %d" % (
+            len(unique_clients),  threadsPerPort)
+        sys.exit(1)
+
+
     for p in range(0, noPorts):
         portNo = SERVER_INITIAL_PORT + p
         for c in range(0, threadsPerPort):
-            ret = ret + (" -a t%d -p %d " % (appID, portNo))
+            if c == 0 :
+                ret = ret + (" -a t%d -p %d " % (appID, portNo))
+            else :
+                ret = ret + (" -a t%d " % (appID))
+                for ff in range(0, instances_per_client):
+                    ret = ret + (" -f %s:%d/%s:%d " % (
+                        TARGET, portNo,
+                        MINFO_CLIENT[unique_clients[c]]["EGRESS_INFO"]["src"],
+                        (CLIENT_INITIAL_PORT + ff)
+                    ))
             appID = appID + 1
 
     # thread info per slot

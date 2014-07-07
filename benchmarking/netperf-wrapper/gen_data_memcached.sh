@@ -163,6 +163,12 @@ get_best_tp()
 {
     SERVERINSTANCES=$1
     SERVERCORES=$2
+
+    if [  "$SERVERINSTANCES" -gt "1" ]; then
+        cliName6=${cliName6Short}
+    else
+        cliName6=${cliName6Long}
+    fi
     #CLIENTCORES="2"
     CLIENTCORES="1"
     OUTDIR="${OUTDIRP}/TP_MAX/S_${SERVERCORES}/"
@@ -175,21 +181,21 @@ get_scalability_special22() {
 
     HWQUEUES=1
     setup_output_location
-    get_best_tp 2 1
+    get_best_tp 1 1
     get_best_tp 1 2
-#    get_best_tp 4 1
-#    get_best_tp 1 1
-#    get_best_tp 1 4
+    get_best_tp 1 4
+    get_best_tp 2 1
+    get_best_tp 4 1
     HWQUEUES=2
     setup_output_location
-#    get_best_tp 2 1
-#    get_best_tp 4 1
-#    get_best_tp 1 2
-#    get_best_tp 1 4
-#    HWQUEUES=4
-#    setup_output_location
-#    get_best_tp 1 4
-#    get_best_tp 4 1
+    get_best_tp 2 1
+    get_best_tp 4 1
+    get_best_tp 1 2
+    get_best_tp 1 4
+    HWQUEUES=4
+    setup_output_location
+    get_best_tp 1 4
+    get_best_tp 4 1
 
     fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
     ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
@@ -200,6 +206,7 @@ get_scalability_special22() {
 
 get_scalability_special() {
     get_best_tp 4 1
+    #get_best_tp 1 4
     fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
     ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
     echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
@@ -241,7 +248,7 @@ get_scalability_threads() {
 setup_output_location() {
     OUTDIRPP="${MAIN_OUTPUT_DIR}/${SELTARGET_T}/"
 
-    OUTDIRP="${OUTDIRPP}/${ECHO_SERVER}/${USE_PROTO}/${PACKET_SIZE}${CORESHIFT}/${UDP_TEST_NAME}/"
+    OUTDIRP="${OUTDIRPP}/${ECHO_SERVER}/${USE_PROTO}/P_${PACKET_SIZE}/HWQ_${HWQUEUES}/${CORESHIFT}/${UDP_TEST_NAME}/"
     mkdir -p ${OUTDIRP}
     OUTDIR=${OUTDIRP}
     echo "OUTPUT Location: ${OUTDIR}"
@@ -298,11 +305,13 @@ use_asiago_server() {
     SF_T="10.23.4.195"
     SF_S_T="10.113.4.195"
 
-    cliName6="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere  -C burrata"
+    cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere  -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata"
+    cliName6Short="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
+#    cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata"
     cliName6="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
     cliName1="-C ziger2"
     cliName1="-C sbrinz2 -C sbrinz2"
-    #cliName6=${cliName1}
+    cliName6=${cliName6Long}
 }
 
 use_asiago_server_sf_switched() {
@@ -330,6 +339,7 @@ UDP_TEST_NAME="memcached_rr"
 
 ECHO_SERVER="memcached"
 
+ITERATIONS=1
 ITERATIONS=5
 ITERATIONS=3
 
@@ -351,6 +361,8 @@ ECHO_SERVER="memcached_onload"
 ECHO_SERVER="memcached"
 MAIN_OUTPUT_DIR="../memcachedResults/sf_scale_test/${1}/"
 MAIN_OUTPUT_DIR="../netperfScaleResults/intelTest/${1}/"
+MAIN_OUTPUT_DIR="../netperfScaleResults/deleteme_smartOracle/${1}/"
+MAIN_OUTPUT_DIR="../netperfScaleResults/smartOracle/r1/${1}/"
 GRAPH_GEN_CMDS="${MAIN_OUTPUT_DIR}/graph_gen_cmds.sh"
 
 ./cleanup.sh 2> /dev/null
@@ -364,9 +376,26 @@ UDP_TEST_NAME="udp_rr"
 #ECHO_SERVER="netserver"
 ECHO_SERVER="llvmE10k"
 PACKET_SIZE=1024
+MAIN_OUTPUT_DIR="../netperfScaleResults/smartOracle/r1/${1}/"
+setup_output_location
+get_scalability_special
+
+##############################
+MAIN_OUTPUT_DIR="../netperfScaleResults/smartOracle/rAll/${1}/"
+PACKET_SIZE=1024
+setup_output_location
+get_scalability_special22
+PACKET_SIZE=64
+setup_output_location
+get_scalability_special22
+PACKET_SIZE=512
+setup_output_location
+get_scalability_special22
+PACKET_SIZE=128
 setup_output_location
 get_scalability_special22
 exit 0
+
 get_scalability_special
 ##############################
 

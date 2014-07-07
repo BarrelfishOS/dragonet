@@ -113,8 +113,14 @@ old_installation() {
 #    install_useful_tools
 }
 
+install_new_tools() {
+    sudo apt-get update
+    sudo apt-get install -y htop
+}
+
 
 get_repository () {
+    install_new_tools
     cd ${MYBASE}
     if [[ -d "dragonet" ]] ; then
         echo "dragonet already exists. You may want to delete it, or run without -g option" ;
@@ -135,11 +141,16 @@ install_openonload() {
     cd ${MYBASE}/dragonet/openonload-201310-u2/
     sudo ./scripts/onload_install
     sudo onload_tool reload
+    sudo cp build/gnu_x86_64/lib/ciul/libciul.so.1.1.1 /lib/
     cd ${MYBASE}
     setIPaddress.sh
 }
 
 install_Dragonet() {
+
+sudo apt-get install -y clang-3.4 clang-3.4-doc libclang-common-3.4-dev libclang-3.4-dev libclang1-3.4 libclang1-3.4-dbg libllvm-3.4-ocaml-dev libllvm3.4 libllvm3.4-dbg lldb-3.4 llvm-3.4 llvm-3.4-dev llvm-3.4-doc llvm-3.4-examples llvm-3.4-runtime clang-modernize-3.4 clang-format-3.4 python-clang-3.4 lldb-3.4-dev
+
+sudo apt-get install -y ghc cabal-install zlib1g-dev g++-4.6 happy
 
     cd ${MYBASE}
     # copy cabal installation from root if you are not root
@@ -153,7 +164,7 @@ install_Dragonet() {
 
     cd ${MYBASE}/dragonet/Dragonet/
     ./prepare_sandbox.sh
-    cabal build -j
+    cabal build llvm-cgen llvm-cgen-e10k bench-echo llvm-cgen-sf
 }
 
 install_memcached() {
