@@ -168,6 +168,14 @@ class ProcessRunner(threading.Thread):
     def should_wait(self):
         return self.wait_for
 
+    def kill_explicit(self):
+        if self.kill_cmd:
+            try:
+                for cmd in self.kill_cmd:
+                    self.machine_ref._exec_cmd_blocking(cmd)
+            except OSError:
+                pass
+
 
     def kill(self):
         #print "T4rying to kill the process"
@@ -175,9 +183,7 @@ class ProcessRunner(threading.Thread):
             return
         if self.pid is not None:
             try:
-                if self.kill_cmd:
-                    for cmd in self.kill_cmd:
-                        self.machine_ref._exec_cmd_blocking(cmd)
+                self.kill_explicit()
                 os.kill(self.pid, signal.SIGINT)
             except OSError:
                 pass
@@ -290,6 +296,8 @@ class NetperfSumaryRunner(ProcessRunner):
         cmd_output = {}
         lines = output.split("\n")
         for line in lines:
+            if (len(line.strip()) == 0):
+                continue
             parts = line.split("=")
             if (len(parts) == 2):
                 cmd_output[parts[0]] = parts[1]

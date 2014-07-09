@@ -9,6 +9,7 @@ clean_machine() {
     commands_to_kill="${commands_to_kill} memcached"
     commands_to_kill="${commands_to_kill} bench-fancyecho"
     commands_to_kill="${commands_to_kill} llvm-cgen-e10k"
+    commands_to_kill="${commands_to_kill} fancyEchoLinux"
     echo "ssh ${mname} sudo killall ${commands_to_kill}"
     ssh ${mname} "sudo killall ${commands_to_kill}"
     ssh ${mname} "sudo rm -rf tempResult*"

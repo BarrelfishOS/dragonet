@@ -218,6 +218,17 @@ class Aggregator(object):
             self.kill_runners()
             raise
 
+
+        # Cleanup servers
+        print "%s: cleaning up server applications\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+        for m, mi in list(self.m_instances.items()):
+            if not mi['is_server'] :
+                continue
+            for n,i in list(self.m_instances[m]['machine'].tool_instances.items()):
+                #print "Running tool on machine [%s] " % (str(m))
+                self.m_instances[m]['machine'].threads[n].kill_explicit()
+
+
         #pprint.pprint(result, self.logfile)
         print "%s: Done with collecting data\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
         return result

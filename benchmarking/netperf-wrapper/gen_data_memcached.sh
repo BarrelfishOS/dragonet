@@ -169,12 +169,51 @@ get_best_tp()
     else
         cliName6=${cliName6Long}
     fi
+    echo "using client list ${cliName6}"
     #CLIENTCORES="2"
     CLIENTCORES="1"
     OUTDIR="${OUTDIRP}/TP_MAX/S_${SERVERCORES}/"
     mkdir -p ${OUTDIR}
     # for increasing TP on transaction based benchmark
     run_bm_tp_rr  ${SELTARGET} ${SELTARGET_T} ${OUTDIR}
+}
+
+get_scalability_linux() {
+
+    HWQUEUES=1
+
+    setup_output_location
+    get_best_tp 2 1
+    get_best_tp 4 1
+    get_best_tp 4 1
+    get_best_tp 6 1
+    get_best_tp 8 1
+
+    get_best_tp 1 1
+    get_best_tp 1 2
+    get_best_tp 1 4
+    get_best_tp 1 6
+    get_best_tp 1 8
+    get_best_tp 1 10
+    get_best_tp 1 12
+    get_best_tp 1 14
+    get_best_tp 1 16
+    get_best_tp 1 18
+    fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
+    ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
+    echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
+}
+
+gen_graph() {
+    pdir=${1}
+    fname="scalability-TPS-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
+    fnameNet="scalability-BW-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
+    graphGenFile="${pdir}/graphGen.sh"
+    ./netperf-wrapper -p bbox -o ${pdir}/${fname} -i `find ${pdir} -name '*BEST.json*' | sort`
+    ./netperf-wrapper -p bboxNet -o ${pdir}/${fnameNet} -i `find ${pdir} -name '*BEST.json*' | sort`
+
+    echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" > ${graphGenFile}
+    echo "./netperf-wrapper -p bboxNet -o ${OUTDIRP}/TP_MAX/${fnameNet} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${graphGenFile}
 }
 
 get_scalability_special22() {
@@ -311,7 +350,7 @@ use_asiago_server() {
     cliName6="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
     cliName1="-C ziger2"
     cliName1="-C sbrinz2 -C sbrinz2"
-    cliName6=${cliName6Long}
+    cliName6=${cliName6Short}
 }
 
 use_asiago_server_sf_switched() {
@@ -370,15 +409,20 @@ GRAPH_GEN_CMDS="${MAIN_OUTPUT_DIR}/graph_gen_cmds.sh"
 #use_burrata_server_intel_switched
 #use_asiago_server_intel_switched
 #use_asiago_server_sf_switched
-use_asiago_server_intel_switched
+#use_asiago_server_intel_switched
+use_asiago_server_sf_switched
 
 UDP_TEST_NAME="udp_rr"
 #ECHO_SERVER="netserver"
 ECHO_SERVER="llvmE10k"
+ECHO_SERVER="fancyEchoOnload"
 PACKET_SIZE=1024
-MAIN_OUTPUT_DIR="../netperfScaleResults/smartOracle/r1/${1}/"
+MAIN_OUTPUT_DIR="../netperfScaleResults/Linux/${1}/"
 setup_output_location
-get_scalability_special
+get_scalability_linux
+gen_graph ${MAIN_OUTPUT_DIR}
+./graphGen.sh ${MAIN_OUTPUT_DIR}
+exit 0
 
 ##############################
 MAIN_OUTPUT_DIR="../netperfScaleResults/smartOracle/rAll/${1}/"
