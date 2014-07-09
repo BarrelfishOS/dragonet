@@ -63,12 +63,13 @@ int buf_details(struct pkt_buf* pkt_buf, char *buff, int l)
     assert(buff != NULL);
 
     int ret = snprintf(buff, l,
-           "BUF[id=%d,owner=%d,ref=%d,if_id=%d,addr=%p]\n",
+           "BUF[id=%d,owner=%d,ref=%d,if_id=%d,addr=%p,is_tx=%d\n",
                     pkt_buf->id,
                     pkt_buf->vi_owner->id,
                     pkt_buf->n_refs,
                     pkt_buf->vi_owner->net_if->id,
-                    RX_PKT_PTR(pkt_buf)
+                    RX_PKT_PTR(pkt_buf),
+                    pkt_buf->is_tx
                     );
 
     return ret;
@@ -90,9 +91,15 @@ pkt_buf_free(struct pkt_buf* pkt_buf)
   assert(pkt_buf->n_refs == 0);
 
   pthread_mutex_lock(&vi->vi_lock);
-  pkt_buf->next = vi->free_pkt_bufs;
-  vi->free_pkt_bufs = pkt_buf;
-  ++vi->free_pkt_bufs_n;
+  if (pkt_buf->is_tx == 1) {
+      pkt_buf->next = vi->tx_free_pkt_bufs;
+      vi->tx_free_pkt_bufs = pkt_buf;
+      ++vi->tx_free_pkt_bufs_n;
+  } else {
+      pkt_buf->next = vi->free_pkt_bufs;
+      vi->free_pkt_bufs = pkt_buf;
+      ++vi->free_pkt_bufs_n;
+  }
   assert(pkt_buf->n_refs == 0);
   pthread_mutex_unlock(&vi->vi_lock);
 //  return pkt_buf;
@@ -120,6 +127,7 @@ static void pkt_buf_init(struct vi* vi, int pkt_buf_i)
     ef_memreg_dma_addr(&vi->memreg, pkt_buf_i * PKT_BUF_SIZE);
   pkt_buf->id = pkt_buf_i;
   pkt_buf->n_refs = 0;
+  pkt_buf->is_tx = 0;
   pkt_buf_free(pkt_buf);
 }
 
@@ -130,8 +138,6 @@ void vi_refill_rx_ring(struct vi* vi, int no_bufs)
   struct pkt_buf* pkt_buf;
   int i;
 
-  // FIXME: I should use fine-grained locking here.  We just need to protect
-  //        free_pkt_bufs and free_pkt_bufs_n, and not the whole vi struct
   pthread_mutex_lock(&vi->vi_lock);
   int freespace_hw = ef_vi_receive_space(&vi->vi);
   if( freespace_hw >= no_bufs &&
@@ -194,10 +200,46 @@ struct pkt_buf* vi_get_free_pkt_buf(struct vi* vi)
         printf("%s:%s:%d: dragonet buffer leak: existing refs in new buff = %d\n",
                 __FILE__, __FUNCTION__, __LINE__, pkt_buf->n_refs);
     }
+    assert(pkt_buf->is_tx == 0);
     assert(pkt_buf->n_refs == 0);
     pkt_buf->n_refs = 1;
     return pkt_buf;
 }
+
+
+// Note: gives pbuf with ref_count exactly equals 1
+//      Used from send_packet
+struct pkt_buf* vi_get_free_pkt_buf_tx(struct vi* vi)
+{
+    struct pkt_buf* pkt_buf;
+    pthread_mutex_lock(&vi->vi_lock);
+
+    int free_pkt_bufs_n_copy = vi->tx_free_pkt_bufs_n;
+    if (free_pkt_bufs_n_copy <= 0) {
+        pthread_mutex_unlock(&vi->vi_lock);
+        printf("%s:%s:%d: dragonet out of packet buffers for TX\n",
+                __FILE__, __FUNCTION__, __LINE__);
+        assert(free_pkt_bufs_n_copy > 0);
+        abort();
+        return NULL;
+    }
+
+    pkt_buf = vi->tx_free_pkt_bufs;
+    vi->tx_free_pkt_bufs =  pkt_buf->next;
+    --vi->tx_free_pkt_bufs_n;
+    pthread_mutex_unlock(&vi->vi_lock);
+
+    if (pkt_buf->n_refs != 0) {
+        printf("%s:%s:%d: dragonet buffer leak: existing refs in new tx buff = %d\n",
+                __FILE__, __FUNCTION__, __LINE__, pkt_buf->n_refs);
+    }
+    assert(pkt_buf->n_refs == 0);
+    assert(pkt_buf->is_tx == 1);
+    pkt_buf->n_refs = 1;
+    return pkt_buf;
+}
+
+
 
 static void vi_init_pktbufs(struct vi* vi)
 {
@@ -257,14 +299,16 @@ static struct vi* __vi_alloc(int vi_id, struct net_if* net_if,
                              int vi_set_instance, enum ef_vi_flags flags)
 {
   struct vi* vi;
+  struct pkt_buf *tx_pbuf = NULL;
+  int i;
 
   vi = malloc(sizeof(*vi));
   vi->id = vi_id;
   vi->net_if = net_if;
 
-  //vi->vi_lock = PTHREAD_MUTEX_INITIALIZER;
+//  //vi->vi_lock = PTHREAD_MUTEX_INITIALIZER;
   pthread_mutex_init(&vi->vi_lock, NULL);
-//  pthread_mutex_lock(&vi->vi_lock);
+// //  pthread_mutex_lock(&vi->vi_lock);
 
   TRY(ef_driver_open(&vi->dh));
   if( vi_set_instance < 0 ) {
@@ -277,17 +321,35 @@ static struct vi* __vi_alloc(int vi_id, struct net_if* net_if,
     TRY(ef_vi_alloc_from_set(&vi->vi, vi->dh, &net_if->vi_set, net_if->dh,
                              vi_set_instance, -1, -1, -1, NULL, -1, flags));
   }
+
+
   vi_init_pktbufs(vi);
   vi_init_layout(vi, flags);
-//  pthread_mutex_unlock(&vi->vi_lock);
+// //  pthread_mutex_unlock(&vi->vi_lock);
+
+    // Allocate buffers for TX side
+  vi->tx_free_pkt_bufs = NULL;
+  vi->tx_free_pkt_bufs_n = 0;
+
+
+  for (i = 0; i < MAX_TX_BUFFERS; ++i) {
+    tx_pbuf = vi_get_free_pkt_buf(vi);
+    tx_pbuf->is_tx = 1;
+    tx_pbuf->n_refs = 0;
+    tx_pbuf->next = vi->tx_free_pkt_bufs;
+    vi->tx_free_pkt_bufs = tx_pbuf;
+    ++vi->tx_free_pkt_bufs_n;
+  }
+
 
   int freespace_hw = ef_vi_receive_space(&vi->vi);
   int slots_filled = (freespace_hw - 64);
   vi_refill_rx_ring(vi, slots_filled);
   freespace_hw = ef_vi_receive_space(&vi->vi);
-  printf("VI init(vi_id: %d, net_if: %p, vi_set_instance: %d, flags: %d): HW-slots(populated[%d] + empty[%d]), free bufs[%d]\n",
+  printf("VI init(vi_id: %d, net_if: %p, vi_set_instance: %d, flags: %d): HW-slots(populated[%d] + empty[%d]), free bufs[%d], free TX bufs[%d]\n",
             vi_id, net_if, vi_set_instance, (int)flags,
-            slots_filled, freespace_hw, vi->free_pkt_bufs_n);
+            slots_filled, freespace_hw,
+            vi->free_pkt_bufs_n, vi->tx_free_pkt_bufs_n);
 
   return vi;
 }

@@ -74,6 +74,10 @@
 
 #define EF_VI_TRANSMIT_BATCH      64
 
+// No. of buffers reserved for TX operation
+//   This is an upper limit on how many outstanding TX operations can there be.
+#define MAX_TX_BUFFERS            128
+
 struct pkt_buf;
 
 
@@ -111,6 +115,13 @@ struct vi {
   /* Pool of free packet buffers (LIFO to minimise working set). */
   struct pkt_buf*  free_pkt_bufs;
   int              free_pkt_bufs_n;
+
+  /* Pool of free packet buffers for TX operation (LIFO to minimise working set). */
+  /* Currently they are just few buffers (MAX_TX_BUFFERS) from RX queue which are taken
+   *        out and kept in separate list */
+
+  struct pkt_buf*  tx_free_pkt_bufs;
+  int              tx_free_pkt_bufs_n;
   /* Introducing locks around free_pkt_bufs as we are using it in
    * multi-thread setup */
   pthread_mutex_t      vi_lock;
@@ -129,6 +140,8 @@ struct pkt_buf {
    * are only used in a single thread.
    */
   int              n_refs;
+  /* If this buffer is reserved for TX part */
+  int              is_tx;
 };
 
 
@@ -209,6 +222,9 @@ vi_send(struct vi* vi, struct pkt_buf* pkt_buf, int off, int len);
 
 extern struct pkt_buf*
 vi_get_free_pkt_buf(struct vi* vi);
+
+struct pkt_buf*
+vi_get_free_pkt_buf_tx(struct vi* vi);
 
 
 #define PRINTBUFSIZE    (1023)

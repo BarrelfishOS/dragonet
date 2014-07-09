@@ -279,6 +279,7 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
             pkt_buf = pkt_buf_from_id(viff, pkt_buf_i);
             // Every incoming packet should have n_refs set to 1.
             assert(pkt_buf->n_refs == 1);
+            assert(pkt_buf->is_tx == 0);
             len = EF_EVENT_RX_BYTES(sfq->evs[idx]) - viff->frame_off;
 
             copylen = len;
@@ -350,6 +351,7 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
                     for( j = 0; j < n; ++j ) {
                         pkt_buf = pkt_buf_from_id(viff, TX_RQ_ID_PB(sfq->ids[j]));
                         assert(pkt_buf->n_refs == 1);
+                        assert(pkt_buf->is_tx == 1);
                         pkt_buf_release(pkt_buf);
                     } // end for:
                     break;
@@ -403,9 +405,10 @@ void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len)
         return;
     }
 
-    pkt_buf = vi_get_free_pkt_buf(vif);
+    pkt_buf = vi_get_free_pkt_buf_tx(vif);
     if (pkt_buf == NULL) {
-        dprint("%s:%s:%d: No free pkt buffers\n", __FILE__, __func__, __LINE__);
+        dprint("%s:%s:%d: No free tx_pkt buffers\n",
+                __FILE__, __func__, __LINE__);
         return;
     }
 
@@ -419,6 +422,7 @@ void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len)
     assert(pkt_buf->vi_owner != NULL);
     assert(pkt_buf->vi_owner->net_if != NULL);
     assert(pkt_buf->n_refs == 1);
+    assert(pkt_buf->is_tx);
 
     void * buf_addr = RX_PKT_PTR(pkt_buf);
     //buf_details(pkt_buf, printbuf, sizeof(printbuf));
