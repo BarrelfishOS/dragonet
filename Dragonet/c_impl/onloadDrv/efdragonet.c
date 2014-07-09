@@ -77,12 +77,9 @@ struct vi* vis_local = NULL;
 
 
 // ############################ from e10kControl #########################
+static int QUEUES = 4;  // This value should be set based on the parameter to llvm-cgen-sf
 
-#define QUEUES 4
 #define QUEUE_INDEX(q) ((q) - (q)->sf->queues)
-
-#define EF_VI_TRANSMIT_BATCH    64
-#define EF_VI_RX_BATCH          16
 
 typedef void * sf_queue_t;
 
@@ -116,7 +113,8 @@ struct dragonet_sf {
 //    struct usp_pci_desc dev;
 //    struct sf_card card;
     struct net_if *sfif;
-    struct dragonet_sf_queue queues[QUEUES];
+    //struct dragonet_sf_queue queues[QUEUES];
+    struct dragonet_sf_queue *queues;
 };
 
 
@@ -235,26 +233,6 @@ int alloc_filter_full_ipv4(struct dragonet_sf_queue *sfq, int protocol,
 
 
 
-#define PRINTBUFSIZE    (1023)
-static void buf_details(struct pkt_buf* pkt_buf, char *buff, int l)
-{
-    assert(pkt_buf != NULL);
-    assert(pkt_buf->vi_owner != NULL);
-    assert(pkt_buf->vi_owner->net_if != NULL);
-    assert(buff != NULL);
-
-    //snprintf(buff, l,
-    dprint(
-           "BUF[id=%d,owner=%d,ref=%d,if_id=%d,addr=%p]\n",
-                    pkt_buf->id,
-                    pkt_buf->vi_owner->id,
-                    pkt_buf->n_refs,
-                    pkt_buf->vi_owner->net_if->id,
-                    RX_PKT_PTR(pkt_buf)
-                    );
-
-}
-
 
 size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
         size_t buf_len)
@@ -299,6 +277,8 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
 
             pkt_buf_i = EF_EVENT_RX_RQ_ID(sfq->evs[idx]);
             pkt_buf = pkt_buf_from_id(viff, pkt_buf_i);
+            // Every incoming packet should have n_refs set to 1.
+            assert(pkt_buf->n_refs == 1);
             len = EF_EVENT_RX_BYTES(sfq->evs[idx]) - viff->frame_off;
 
             copylen = len;
@@ -309,25 +289,14 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
             }
             dprint("RX event: trying to copy %d bytes at location %p\n",
                     copylen, pkt_out);
-
             memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
             ++pkt_received_count;
             pkt_buf_release(pkt_buf);
 
-            // FIXME: Does having a reference to pkt_buf implies buffer leak?
-            if (pkt_buf->n_refs != 0) {
-                //dprint
-                printf
-                    ("%s:%s:%d: ##### possible BUF LEAK: ref: %d ###\n",
-                        __FILE__, __func__, __LINE__, (int)pkt_buf->n_refs);
-            }
-
-            //assert(pkt_buf->n_refs == 0);
-
             pkt_received = copylen;
             ++sfq->refill_counter_local;
-            if (sfq->refill_counter_local >= 16 ) {
-                vi_refill_rx_ring(viff);
+            if (sfq->refill_counter_local >=  REFILL_BATCH_SIZE) {
+                vi_refill_rx_ring(viff, REFILL_BATCH_SIZE);
                 sfq->refill_counter_local = 0;
             }
 
@@ -339,8 +308,8 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
         sfq->evs_bufferd_rx_total = 0;
         sfq->evs_bufferd_rx_last = 0;
 
-        n_ev = ef_eventq_poll(&viff->vi, sfq->evs, sizeof(sfq->evs) / sizeof(sfq->evs[0]));
-        //n_ev = ef_eventq_poll(&viff->vi, sfq->evs, 1);
+        //n_ev = ef_eventq_poll(&viff->vi, sfq->evs, sizeof(sfq->evs) / sizeof(sfq->evs[0]));
+        n_ev = ef_eventq_poll(&viff->vi, sfq->evs, EF_VI_RX_BATCH);
         //++sfq->event_count;
         if( n_ev <= 0 ) {
             //++sfq->no_event_count;
@@ -356,7 +325,7 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
                 case EF_EVENT_TYPE_RX:
                     sfq->evs_rx_buffered_indexes[sfq->evs_bufferd_rx_total] = i;
                     ++sfq->evs_bufferd_rx_total;
-                    assert(sfq->evs_bufferd_rx_total < EF_VI_RX_BATCH);
+                    assert(sfq->evs_bufferd_rx_total <= EF_VI_RX_BATCH);
 
                     ++sfq->rx_event_count;
 
@@ -380,19 +349,8 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
                     n = ef_vi_transmit_unbundle(&viff->vi, &sfq->evs[i], sfq->ids);
                     for( j = 0; j < n; ++j ) {
                         pkt_buf = pkt_buf_from_id(viff, TX_RQ_ID_PB(sfq->ids[j]));
-                        //buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                        //dprint("%s:%s:%d: TX, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                        assert(pkt_buf->n_refs == 1);
                         pkt_buf_release(pkt_buf);
-                        // FIXME: Does ref > 0 after this release indicate buffer curruption?
-                        if (pkt_buf->n_refs != 0) {
-                            //dprint
-                            printf
-                                ("%s:%s:%d: ################### BUF LEAK %d ####\n",
-                                 __FILE__, __func__, __LINE__, (int) pkt_buf->n_refs);
-                            //buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                            //dprint("%s:%s:%d: TX, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
-                        }
-                        //assert(pkt_buf->n_refs == 0);
                     } // end for:
                     break;
 
@@ -404,19 +362,19 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
                             sfq->event_count, sfq->no_event_count, sfq->tx_event_count, sfq->rx_event_count,
                             sfq->tx_discard_event_count);
                     }
-                    printf("RX_discard event arrived\n");
-                        pkt_buf = pkt_buf_from_id(viff,
+                    pkt_buf = pkt_buf_from_id(viff,
                                     EF_EVENT_RX_DISCARD_RQ_ID(sfq->evs[i]));
                         //buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                        //dprint("%s:%s:%d: RX_DISCARD, before released %s\n", __FILE__, __func__, __LINE__, printbuf);
-                        pkt_buf_release(pkt_buf);
-                        // FIXME: Does ref > 0 after this release indicate buffer curruption?
-                        //assert(pkt_buf->n_refs == 0);
-                        //buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                        //dprint("%s:%s:%d: RX_DISCARD, after released %s\n", __FILE__, __func__, __LINE__, printbuf);
+                    printf("%s:%s:%d: RX_DISCARD, before released, ref = %d\n",
+                                __FILE__, __func__, __LINE__, pkt_buf->n_refs);
+
+                    assert(pkt_buf->n_refs == 1);
+                    pkt_buf_release(pkt_buf);
                     break;
 
                 default:
+                    printf("ERROR: unexpected event type=%d\n",
+                            (int) EF_EVENT_TYPE(sfq->evs[i]));
                     LOGE(fprintf(stderr, "ERROR: unexpected event type=%d\n",
                                 (int) EF_EVENT_TYPE(sfq->evs[i])));
                     break;
@@ -460,6 +418,7 @@ void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len)
     assert(pkt_buf != NULL);
     assert(pkt_buf->vi_owner != NULL);
     assert(pkt_buf->vi_owner->net_if != NULL);
+    assert(pkt_buf->n_refs == 1);
 
     void * buf_addr = RX_PKT_PTR(pkt_buf);
     //buf_details(pkt_buf, printbuf, sizeof(printbuf));
@@ -480,9 +439,10 @@ void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len)
                     vif->net_if->name));
     }
 
+    assert(pkt_buf->n_refs == 2);
+
     // marking that sending is partially done.  The ref counter should still be 1
     pkt_buf_release(pkt_buf);
-    //assert(pkt_buf->n_refs == 1);
 
     dprint("%s:%s:%d: vi_send done\n", __FILE__, __func__, __LINE__);
 //    buf_details(pkt_buf, printbuf, sizeof(printbuf));
@@ -508,6 +468,11 @@ void *init_and_alloc_default_queue(char *name)
     assert(sf_nic != NULL);
     memset(sf_nic, 0, sizeof(struct dragonet_sf));
 
+    // Allocate memory to hold the actual queue elements
+    sf_nic->queues = (struct dragonet_sf_queue *)
+                calloc(QUEUES, sizeof(struct dragonet_sf_queue));
+    assert(sf_nic->queues != NULL);
+
     // connecting to device with given name using openonalod library and storing the handle
     sf_nic->sfif = net_if_alloc(0, name, 0);
 
@@ -519,8 +484,8 @@ void *init_and_alloc_default_queue(char *name)
         exit(1);
     }
 
+    // Initialize the queues
     struct dragonet_sf_queue *iq = sf_nic->queues;
-
     for (k = 0; k < QUEUES; k++) {
         iq[k].sf = sf_nic;
         iq[k].populated = false;
@@ -530,6 +495,8 @@ void *init_and_alloc_default_queue(char *name)
         iq[k].evs_bufferd_rx_last = 0;
         iq[k].queue =  (void *) iq[k].queue_handle;
     }
+
+    // Create a default filter to make sure that all traffic ends up in queue-0 by default.
     alloc_filter_default(&sf_nic->queues[0]);
     vis_local = sf_nic->queues[0].queue_handle;
 
@@ -620,7 +587,7 @@ node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
         if (qi != 0) {
 
             // We'll do the intialization on queue 0
-            dprint("%s:%s:%d: [QID:%"PRIu8"],  WARNING: ############## "
+            dprint("%s:%s:%d: [QID:%"PRIu8"], "
                 "initialization will be done on queue-0, returning\n",
               __FILE__,  __func__, __LINE__, qi);
             return P_Queue_drop;
@@ -643,11 +610,11 @@ node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
     assert(sf_driver != NULL);
     q = sf_driver->queues + qi;
     assert(q->queue_handle != NULL);
-    int p_id = ++q->rx_pkts;
+    ++q->rx_pkts;
     dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
             "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
             "######## Trying to RX packet\n",
-            __FILE__,  __func__, __LINE__, qi, p_id,
+            __FILE__,  __func__, __LINE__, qi, q->rx_pkts,
             state->tap_handler, sf_driver->sfif,
             &sf_driver->queues[0], sf_driver->queues[0].queue_handle,
             qi, q, q->queue_handle);
@@ -658,14 +625,14 @@ node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
     ssize_t len = onload_rx_wrapper(q, (uint8_t *)in->data, in->len);
     if (len == 0) {
         dprint("%s:%d: [QID: %"PRIu8"], [pktid:%d], pkt with zero len\n",
-            __func__, __LINE__, qi, p_id);
+            __func__, __LINE__, qi, q->rx_pkts);
         pkt_prepend(in, -in->len);
         return P_Queue_drop;
     }
 
     pkt_append(in, -(in->len - len));
     dprint("%s:%d: [QID:%"PRIu8"], [pktid:%d]: ############## pkt received, data: %p, len:%zu\n",
-            __func__, __LINE__, qi, p_id, in->data, len);
+            __func__, __LINE__, qi, q->rx_pkts, in->data, len);
     return P_Queue_out;
 }
 
@@ -681,11 +648,11 @@ node_out_t tx_queue(struct state *state, struct input *in, uint8_t qi)
     q = sf_driver->queues + qi;
     assert(q->queue_handle != NULL);
 
-    int p_id = ++q->tx_pkts;
+    ++q->tx_pkts;
     dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
             "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
             "######## Trying to send packet, data: %p, len:%"PRIu32"\n",
-            __FILE__,  __func__, __LINE__, qi, p_id,
+            __FILE__,  __func__, __LINE__, qi, q->tx_pkts,
             state->tap_handler, sf_driver->sfif,
             &sf_driver->queues[0], sf_driver->queues[0].queue_handle,
             qi, q, q->queue_handle, in->data, in->len);
@@ -694,7 +661,7 @@ node_out_t tx_queue(struct state *state, struct input *in, uint8_t qi)
 
     dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d]:"
             "##############  packet sent, data: %p, len:%"PRIu32"\n",
-            __FILE__, __func__, __LINE__, qi, p_id, in->data, in->len);
+            __FILE__, __func__, __LINE__, qi, q->tx_pkts, in->data, in->len);
     return 0;
 }
 

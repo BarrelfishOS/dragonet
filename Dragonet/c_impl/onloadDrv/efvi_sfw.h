@@ -66,6 +66,13 @@
  */
 #define PKT_BUF_SIZE         2048
 
+//#define REFILL_BATCH_SIZE       1
+//#define EF_VI_RX_BATCH          1
+
+#define REFILL_BATCH_SIZE         16
+#define EF_VI_RX_BATCH            16
+
+#define EF_VI_TRANSMIT_BATCH      64
 
 struct pkt_buf;
 
@@ -178,14 +185,14 @@ net_if_map_vi_pool(struct net_if*, struct vi*);
 extern struct pkt_buf*
 pkt_buf_from_id(struct vi* vi, int pkt_buf_i);
 
-extern void
-pkt_buf_free(struct pkt_buf* pkt_buf);
+//extern void
+//pkt_buf_free(struct pkt_buf* pkt_buf);
 
 extern void
 pkt_buf_release(struct pkt_buf* pkt_buf);
 
 extern void
-vi_refill_rx_ring(struct vi* vi);
+vi_refill_rx_ring(struct vi* vi, int no_bufs);
 
 extern int
 filter_parse(ef_filter_spec* fs, const char* s_in);
@@ -202,6 +209,10 @@ vi_send(struct vi* vi, struct pkt_buf* pkt_buf, int off, int len);
 
 extern struct pkt_buf*
 vi_get_free_pkt_buf(struct vi* vi);
+
+
+#define PRINTBUFSIZE    (1023)
+int buf_details(struct pkt_buf* pkt_buf, char *buff, int l);
 
 //#define MYDEBUG     1
 #ifdef MYDEBUG

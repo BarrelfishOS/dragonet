@@ -55,6 +55,25 @@
 #include <errno.h>
 #include <netdb.h>
 
+int buf_details(struct pkt_buf* pkt_buf, char *buff, int l)
+{
+    assert(pkt_buf != NULL);
+    assert(pkt_buf->vi_owner != NULL);
+    assert(pkt_buf->vi_owner->net_if != NULL);
+    assert(buff != NULL);
+
+    int ret = snprintf(buff, l,
+           "BUF[id=%d,owner=%d,ref=%d,if_id=%d,addr=%p]\n",
+                    pkt_buf->id,
+                    pkt_buf->vi_owner->id,
+                    pkt_buf->n_refs,
+                    pkt_buf->vi_owner->net_if->id,
+                    RX_PKT_PTR(pkt_buf)
+                    );
+
+    return ret;
+}
+
 
 struct pkt_buf* pkt_buf_from_id(struct vi* vi, int pkt_buf_i)
 {
@@ -63,7 +82,9 @@ struct pkt_buf* pkt_buf_from_id(struct vi* vi, int pkt_buf_i)
 }
 
 
-void pkt_buf_free(struct pkt_buf* pkt_buf)
+//struct pkt_buf *
+void
+pkt_buf_free(struct pkt_buf* pkt_buf)
 {
   struct vi* vi = pkt_buf->vi_owner;
   assert(pkt_buf->n_refs == 0);
@@ -72,16 +93,21 @@ void pkt_buf_free(struct pkt_buf* pkt_buf)
   pkt_buf->next = vi->free_pkt_bufs;
   vi->free_pkt_bufs = pkt_buf;
   ++vi->free_pkt_bufs_n;
+  assert(pkt_buf->n_refs == 0);
   pthread_mutex_unlock(&vi->vi_lock);
-
+//  return pkt_buf;
 }
 
 
 void pkt_buf_release(struct pkt_buf* pkt_buf)
 {
-  assert(pkt_buf->n_refs > 0);
-  if( --pkt_buf->n_refs == 0 )
+
+    assert(pkt_buf->n_refs > 0);
+    --pkt_buf->n_refs;
+
+  if( pkt_buf->n_refs == 0 ) {
     pkt_buf_free(pkt_buf);
+  }
 }
 
 
@@ -98,25 +124,23 @@ static void pkt_buf_init(struct vi* vi, int pkt_buf_i)
 }
 
 
-void vi_refill_rx_ring(struct vi* vi)
+// Inserts buffers in RX queue.  All of them will have n_refs == 1.
+void vi_refill_rx_ring(struct vi* vi, int no_bufs)
 {
-#define REFILL_BATCH_SIZE  16
-//#define REFILL_BATCH_SIZE  1
   struct pkt_buf* pkt_buf;
   int i;
-
 
   // FIXME: I should use fine-grained locking here.  We just need to protect
   //        free_pkt_bufs and free_pkt_bufs_n, and not the whole vi struct
   pthread_mutex_lock(&vi->vi_lock);
   int freespace_hw = ef_vi_receive_space(&vi->vi);
-  if( freespace_hw >= REFILL_BATCH_SIZE &&
-      vi->free_pkt_bufs_n >= REFILL_BATCH_SIZE ) {
+  if( freespace_hw >= no_bufs &&
+      vi->free_pkt_bufs_n >= no_bufs) {
 //    printf("%s:%d: freespace HW = %d, freebufs = %d \n",
 //         __func__, __LINE__,
 //          freespace_hw, vi->free_pkt_bufs_n);
 //        printf("%s:%d:Refilling the RX queue\n", __func__, __LINE__);
-    for( i = 0; i < REFILL_BATCH_SIZE; ++i ) {
+    for( i = 0; i < no_bufs; ++i ) {
       assert(vi->free_pkt_bufs_n > 0);
       pkt_buf = vi->free_pkt_bufs;
       assert(pkt_buf != NULL);
@@ -132,14 +156,20 @@ void vi_refill_rx_ring(struct vi* vi)
       pkt_buf->n_refs = 1;
       ef_vi_receive_init(&vi->vi, pkt_buf->addr[vi->net_if->id] + RX_DMA_OFF,
                          pkt_buf->id);
+      assert(pkt_buf->n_refs == 1);
     }
     ef_vi_receive_push(&vi->vi);
+  } else {
+    printf("%s:%s:%d: not enough bufs.  HW free space = %d, free bufs = %d, requested refill = %d\n",
+            __FILE__, __FUNCTION__, __LINE__,
+            freespace_hw, vi->free_pkt_bufs_n,  no_bufs);
   }
   pthread_mutex_unlock(&vi->vi_lock);
-
 }
 
 
+// Note: gives pbuf with ref_count exactly equals 1
+//      Used from send_packet
 struct pkt_buf* vi_get_free_pkt_buf(struct vi* vi)
 {
     struct pkt_buf* pkt_buf;
@@ -251,7 +281,14 @@ static struct vi* __vi_alloc(int vi_id, struct net_if* net_if,
   vi_init_layout(vi, flags);
 //  pthread_mutex_unlock(&vi->vi_lock);
 
-  vi_refill_rx_ring(vi);
+  int freespace_hw = ef_vi_receive_space(&vi->vi);
+  int slots_filled = (freespace_hw - 64);
+  vi_refill_rx_ring(vi, slots_filled);
+  freespace_hw = ef_vi_receive_space(&vi->vi);
+  printf("VI init(vi_id: %d, net_if: %p, vi_set_instance: %d, flags: %d): HW-slots(populated[%d] + empty[%d]), free bufs[%d]\n",
+            vi_id, net_if, vi_set_instance, (int)flags,
+            slots_filled, freespace_hw, vi->free_pkt_bufs_n);
+
   return vi;
 }
 
@@ -280,9 +317,11 @@ int vi_send_v2(struct vi* vi, struct pkt_buf* pkt_buf, int off, int len)
 }
 
 
-
+// Sends packet and increases the n_refs by 1.
+// It should be 2 here.
 int vi_send(struct vi* vi, struct pkt_buf* pkt_buf, int off, int len)
 {
+  assert(pkt_buf->n_refs == 1);
   int rc;
   rc = ef_vi_transmit_init(&vi->vi, pkt_buf->addr[vi->net_if->id] + off, len,
                       MK_TX_RQ_ID(pkt_buf->vi_owner->id, pkt_buf->id));
@@ -290,8 +329,10 @@ int vi_send(struct vi* vi, struct pkt_buf* pkt_buf, int off, int len)
     printf("%s:%d: ERROR: pkt DMA failed %d\n", __func__, __LINE__, rc);
   }
 
+  assert(pkt_buf->n_refs == 1);
   ef_vi_transmit_push(&vi->vi);
   ++pkt_buf->n_refs;
+  assert(pkt_buf->n_refs == 2);
   return rc;
 }
 
