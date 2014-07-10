@@ -107,8 +107,11 @@ queueEmbedding prg' lpg = embeddingStep DGI.empty lpgNodes
 
 -- Get list of queue nodes in graph
 queues ::  PG.PGraph -> [PG.PGNode]
-queues g = filter (L.isPrefixOf "Queue" . PG.nLabel . snd) $ DGI.labNodes g
-
+queues g = filter isQueue $ DGI.labNodes g
+    where
+        isQueue (_,PG.Node { PG.nLabel = l }) =
+            "Queue" `L.isPrefixOf` l ||
+                "RxQueue" `L.isPrefixOf` l
 -- Find SW-Entry node for specified queue
 findSWE :: String -> PG.PGraph -> Maybe (DGI.Node,PG.Port)
 findSWE q g = do
@@ -164,7 +167,8 @@ lpgQ q = DGI.nmap (lpgQNode q)
 
 -- Relabel node to q if its label is "Queue", and tag the node with q
 lpgQNode :: PG.PGNode -> PG.Node -> PG.Node
-lpgQNode (_,qn) n = if lbl == "Queue" then n' { PG.nLabel = ql } else n'
+lpgQNode (_,qn) n =
+    if lbl == "Queue" || lbl == "RxQueue" then n' { PG.nLabel = ql } else n'
     where
         ql = PG.nLabel qn
         n' = n { PG.nTag = ql }

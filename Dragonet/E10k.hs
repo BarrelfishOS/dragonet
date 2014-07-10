@@ -133,6 +133,11 @@ graph prg {
 type QueueID = Int
 
 
+isRxQValidN :: Int -> PGNode -> Bool
+isRxQValidN i (_,n) =
+    (nLabel n == "Q" ++ show i ++ "Valid") ||
+        (nLabel n == "RxQ" ++ show i ++ "Valid")
+
 -------------------------------------------------------------------------------
 -- Implementation of configuration of 5-tuple filters
 
@@ -251,9 +256,7 @@ config5tuple _ inE outE cfg = do
         (Just ((defaultN,_),_)) = L.find ((== "default") . snd) outE
         -- Lookup node id for specified queue
         queue i = queueN
-            where
-                (Just ((queueN,_),_)) =
-                    L.find (\((_,n),_) -> nLabel n == "Q" ++ show i ++ "Valid") outE
+            where (Just ((queueN,_),_)) = L.find (isRxQValidN i . fst) outE
 
         -- Get filter configurations ordered by priority
         cmpPrio = compare `on` c5tPriority
@@ -344,9 +347,7 @@ configFDir _ inE outE cfg = do
         (Just ((defaultN,_),_)) = L.find ((== "default") . snd) outE
         -- Lookup node id for specified queue
         queue i = queueN
-            where
-                (Just ((queueN,_),_)) =
-                    L.find (\((_,n),_) -> nLabel n == "Q" ++ show i ++ "Valid") outE
+            where (Just ((queueN,_),_)) = L.find (isRxQValidN i . fst) outE
 
         -- Get filter configurations
         cfgs = parseFDirCFG cfg
