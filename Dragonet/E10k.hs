@@ -1,4 +1,4 @@
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
 module E10k (
     prg,
     prgClusters,
@@ -8,6 +8,9 @@ module E10k (
     C5TPort,
     C5Tuple(..),
     CFDirTuple(..),
+
+    configFDir,
+    config5tuple
 ) where
 
 import Dragonet.ProtocolGraph
@@ -22,6 +25,11 @@ import qualified Util.Misc as UM
 import Control.Monad
 import Data.Function (on)
 import Data.Functor ((<$>))
+import Data.String (fromString)
+
+import qualified SMTLib2 as SMT
+import qualified SMTLib2.Core as SMTC
+import qualified SMTLib2.BitVector as SMTBV
 
 
 
@@ -211,6 +219,25 @@ parse5t (CVTuple
 
 
 
+nodeL5Tuple c = addSems $ baseFNode (c5tString c) (c5tAttr c) bports Nothing
+    where
+        bports = ["true","false"]
+        addSems n = n { nSemantics = [("true",tSems),("false",fSems)] }
+        tSems = foldl1 SMTC.and $ catMaybes [
+                ipSems "src" <$> c5tL3Src c,
+                ipSems "dst" <$> c5tL3Dst c,
+                portSems "src" <$> c5tL4Src c,
+                portSems "dst" <$> c5tL4Dst c
+                ]
+        fSems = SMTC.not tSems
+        ipSems n i = SMTBV.bv (fromIntegral i) 32 SMTC.===
+            SMT.app
+                (fromString $ "IP4." ++ n)
+                [SMT.app "pkt" []]
+        portSems n i = SMTBV.bv (fromIntegral i) 16 SMTC.===
+                    SMT.app
+                        (fromString $ "UDP." ++ n)
+                        [SMT.app "pkt" []]
 
 config5tuple :: ConfFunction
 config5tuple _ inE outE cfg = do
@@ -233,10 +260,8 @@ config5tuple _ inE outE cfg = do
         cfgs = L.sortBy cmpPrio $ parse5tCFG cfg
 
         -- Generate node and edges for one filter
-        bports = ["true","false"]
-        nodeL c = baseFNode (c5tString c) (c5tAttr c) bports Nothing
         addFilter ((iN,iE),es) c = do
-            (n,_) <- confMNewNode $ nodeL c
+            (n,_) <- confMNewNode $ nodeL5Tuple c
             let inEdge = (iN,n,iE)
             let tEdge = (n,queue $ c5tQueue c,"true")
             let fEdge = (n,queue $ c5tQueue c,"false")
