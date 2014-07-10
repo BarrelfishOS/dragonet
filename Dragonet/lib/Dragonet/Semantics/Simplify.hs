@@ -10,8 +10,9 @@ import qualified Util.GraphHelpers as GH
 
 import Control.Monad (foldM)
 import qualified Data.List as L
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Data.Maybe
+import Data.Functor ((<$>))
 import qualified Data.Graph.Inductive as DGI
 import qualified SMTLib2 as SMT
 import qualified SMTLib2.Core as SMTC
@@ -20,20 +21,46 @@ import qualified Hsmtlib as H
 import qualified Hsmtlib.Solver as HS
 import qualified Hsmtlib.Parsers.Syntax as HPS
 
+import qualified Control.Concurrent.STM.TVar as TV
+import qualified Control.Monad.STM as STM
+
 addIn :: Ord k => k -> a -> M.Map k [a] -> M.Map k [a]
 addIn k v = M.insertWith (++) k [v]
 
 lookupAll :: Eq a => a -> [(a,b)] -> [(a,b)]
 lookupAll a as = filter ((== a) . fst) as
 
-checkSat :: HS.Solver -> Sem.PortSemantics -> IO HPS.CheckSatResponse
-checkSat sol ps = do
-    HS.CGR HPS.Success <- HS.push sol 1
-    HS.CGR HPS.Success <- HS.assert sol ps
-    HS.CCS res <- HS.checkSat sol
-    HS.CGR HPS.Success <- HS.pop sol 1
-    --putStrLn $ "checkSat (" ++ (show $ SMT.pp ps) ++ ") -> " ++ show res
-    return res
+sAnd a b
+    | a == b = a
+    | a == SMTC.true = b
+    | b == SMTC.true = a
+    | a == SMTC.false || b == SMTC.false = SMTC.false
+    | otherwise = a `SMTC.and` b
+
+sOr a b
+    | a == b = a
+    | a == SMTC.false = b
+    | b == SMTC.false = a
+    | a == SMTC.true || b == SMTC.true = SMTC.true
+    | otherwise = a `SMTC.or` b
+
+type MySolver = (HS.Solver,
+                 TV.TVar (M.Map Sem.PortSemantics HPS.CheckSatResponse))
+
+checkSat :: MySolver -> Sem.PortSemantics -> IO HPS.CheckSatResponse
+checkSat (sol,cache) ps = do
+    c <- M.lookup ps <$> (STM.atomically $ TV.readTVar cache)
+    case c of
+        Nothing -> do
+            HS.CGR HPS.Success <- HS.push sol 1
+            HS.CGR HPS.Success <- HS.assert sol ps
+            HS.CCS res <- HS.checkSat sol
+            HS.CGR HPS.Success <- HS.pop sol 1
+            --putStrLn $ "checkSat (" ++ (show $ SMT.pp ps) ++ ") -> " ++ show res
+            STM.atomically $ TV.modifyTVar' cache (M.insert ps res)
+            return res
+
+        Just r -> return r
 
 type EMap = M.Map DGI.Node [(String,Sem.PortSemantics)]
 
@@ -41,7 +68,7 @@ processPort :: PG.PGNode -> [(String, Sem.PortSemantics)] -> String
                 -> Sem.PortSemantics
 processPort (_,l) ins p =
     case lookup p $ PG.nSemantics l of
-        Just e  -> inEx `SMTC.and` e
+        Just e  -> inEx `sAnd` e
         Nothing -> inEx
     where
         inEx = case PG.nPersonality l of
@@ -53,7 +80,7 @@ processPort (_,l) ins p =
         fInEx =
             case ins of
                 [] -> SMTC.true
-                es -> combinePExps SMTC.or es
+                es -> combinePExps sOr es
 
         oInEx' p op =
             case lookupAll p $ ins of
@@ -62,21 +89,21 @@ processPort (_,l) ins p =
         PG.ONode op = PG.nPersonality l
         oInEx =
             case (op,p) of
-                (PG.OpAnd,"true") -> oInEx' "true" SMTC.and
-                (PG.OpAnd,"false") -> oInEx' "false" SMTC.or
+                (PG.OpAnd,"true") -> oInEx' "true" sAnd
+                (PG.OpAnd,"false") -> oInEx' "false" sOr
 
-                (PG.OpNAnd,"true") -> oInEx' "false" SMTC.or
-                (PG.OpNAnd,"false") -> oInEx' "true" SMTC.and
+                (PG.OpNAnd,"true") -> oInEx' "false" sOr
+                (PG.OpNAnd,"false") -> oInEx' "true" sAnd
 
-                (PG.OpOr,"true") -> oInEx' "true" SMTC.or
-                (PG.OpOr,"false") -> oInEx' "false" SMTC.and
+                (PG.OpOr,"true") -> oInEx' "true" sOr
+                (PG.OpOr,"false") -> oInEx' "false" sAnd
 
-                (PG.OpNOr,"true") -> oInEx' "false" SMTC.and
-                (PG.OpNOr,"false") -> oInEx' "true" SMTC.or
+                (PG.OpNOr,"true") -> oInEx' "false" sAnd
+                (PG.OpNOr,"false") -> oInEx' "true" sOr
 
         combinePExps o es = snd $ foldl1 (\(_,a) (ip,b) -> (ip,a `o` b)) es
 
-processNode :: HS.Solver -> (PG.PGraph,EMap) -> PG.PGNode -> IO (PG.PGraph,EMap)
+processNode :: MySolver -> (PG.PGraph,EMap) -> PG.PGNode -> IO (PG.PGraph,EMap)
 processNode solver (g,eM) fn@(n,nL) = do
     -- Get incoming constraints
     let ins = fromMaybe [] $ M.lookup n eM
@@ -122,7 +149,12 @@ builtins = [
     SMT.CmdDeclareFun  "pget"
                         [SMT.TApp "Packet" [], SMTB.tBitVec 16]
                         (SMTB.tBitVec 8),
-    SMT.CmdDeclareFun  "pkt" [] (SMT.TApp "Packet" [])]
+    SMT.CmdDeclareFun  "pkt" [] (SMT.TApp "Packet" []),
+    SMT.CmdDeclareFun  "IP4.src" [SMT.TApp "Packet" []] (SMTB.tBitVec 32),
+    SMT.CmdDeclareFun  "IP4.dst" [SMT.TApp "Packet" []] (SMTB.tBitVec 32),
+    SMT.CmdDeclareFun  "UDP.src" [SMT.TApp "Packet" []] (SMTB.tBitVec 16),
+    SMT.CmdDeclareFun  "UDP.dst" [SMT.TApp "Packet" []] (SMTB.tBitVec 16)
+    ]
     where
 
 reducePG :: PG.PGraph -> Sem.Helpers -> IO PG.PGraph
@@ -132,11 +164,12 @@ reducePG graph helpers = do
     mapM_ (expectSuccess . runCmd sol) (builtins ++ cmds)
     -- Get topologically sorted list of nodes
     let nodes = GH.topsortLN graph
+    -- Prepare cached solver
+    cache <- STM.atomically $ TV.newTVar $ M.empty
+    let sol' = (sol,cache)
     -- Iterate over nodes, keeping a map of Expr for each edge that was
     -- processed
-    (graph',_) <- foldM (processNode sol) (graph,M.empty) nodes
+    (graph',_) <- foldM (processNode sol') (graph,M.empty) nodes
     HS.exit sol
-    putStrLn $ show graph
-    putStrLn $ show graph'
     return graph'
 
