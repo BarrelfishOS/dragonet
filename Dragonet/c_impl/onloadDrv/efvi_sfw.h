@@ -76,7 +76,8 @@
 
 // No. of buffers reserved for TX operation
 //   This is an upper limit on how many outstanding TX operations can there be.
-#define MAX_TX_BUFFERS            128
+//#define MAX_TX_BUFFERS            128
+#define MAX_TX_BUFFERS              256
 
 struct pkt_buf;
 

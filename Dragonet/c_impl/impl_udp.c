@@ -104,6 +104,7 @@ node_out_t do_pg__RxL4UDPPortClassifyDynamic(struct state *state, struct input *
     }
 
     dprint
+    //printf
         ("### %s:%s:%d: UDP packet %"PRIu16": global state lock grabbed\n",
             __FILE__, __FUNCTION__, __LINE__, udp_hdr_dport_read(in));
     f_ht = state->udp_flow_ht;

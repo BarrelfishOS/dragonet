@@ -74,6 +74,16 @@
 
 struct vi* vis_local = NULL;
 
+// this one is connected via switch on asiago
+#define IFNAME              "p801p1"
+#define CONFIG_LOCAL_MAC_sf  0x644d07530f00ULL  // "00:0f:53:07:4d:64"
+#define CONFIG_LOCAL_IP_sf   0x0a7104c3         // "10.113.4.195"
+
+// this one is connected via switch on appenzeller
+//#define IFNAME              "p6p2"
+//#define CONFIG_LOCAL_MAC_sf  0x495107530f00ULL  // "00:0f:53:07:51:49"
+//#define CONFIG_LOCAL_IP_sf   0x0a710447         // "10.113.4.71"
+
 
 
 // ############################ from e10kControl #########################
@@ -169,7 +179,9 @@ int alloc_filter_default(struct dragonet_sf_queue *sfq)
     ef_filter_spec_init(&filter_spec, EF_FILTER_FLAG_NONE);
     TRY(ef_filter_spec_set_unicast_all(&filter_spec));
     TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
-    dprint("%s:%s:%d: [vq:%p], [qid:%"PRIu8"], done\n",
+    //dprint
+    printf
+        ("%s:%s:%d: [vq:%p], [qid:%"PRIu8"], done\n",
             __FILE__, __func__, __LINE__, sfq, sfq->qid);
     return 1;
 } // end function: alloc_filter_default
@@ -181,6 +193,24 @@ int alloc_filter_default(struct dragonet_sf_queue *sfq)
 #define IPROTO_TCP      6
 #define IPROTO_UDP      17
 
+
+static int convert_u32_ip4_to_string(uint32_t ipAddress, char *addr, int len)
+{
+    uint8_t  octet[4] = {0,0,0,0};
+    int i, ret;
+    assert(len >= 16);
+    for (i = 0; i < 4; i++)
+    {
+        octet[i] = ( ipAddress >> (i*8) ) & 0xFF;
+    }
+    ret = snprintf(addr, len, "%d.%d.%d.%d", octet[3], octet[2],
+            octet[1], octet[0]);
+    printf("IP address %"PRIu32" is converted to %s\n", ipAddress, addr);
+    return ret;
+}
+
+
+
 int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
             uint32_t localip1,
             uint16_t localport1)
@@ -189,44 +219,92 @@ int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
     struct vi *vis = sfq->queue_handle;
     assert(vis != NULL);
 
-    uint16_t localport = htons(localport1);
-    uint32_t localip = htonl(localip1);
-    ef_filter_spec filter_spec;
-    ef_filter_spec_init(&filter_spec, EF_FILTER_FLAG_NONE);
-    dprint("%s:%s:%d: [vq:%p], [qid:%"PRIu8"], inserting listen filter proto [%d], "
-            "localip [%"PRIx32"] localport[%"PRIx16"]\n",
-            __FILE__, __func__, __LINE__, sfq, sfq->qid,
-            protocol, localip, localport);
+    char localIPStr[16];
+    char filterStr[1024];
 
-    TRY(ef_filter_spec_set_ip4_local(&filter_spec, protocol, localip,
-                localport));
+    if (localip1 == 0) {
+        localip1 = CONFIG_LOCAL_IP_sf;
+    }
+
+    convert_u32_ip4_to_string(localip1, localIPStr, sizeof(localIPStr));
+
+
+ //{udp|tcp}:[vid=<vlan>,]<local-host>:<local-port>"
+// "[,<remote-host>:<remote-port>]");
+    snprintf(filterStr, sizeof(filterStr), "%s:%s:%d",
+            "udp", localIPStr, localport1);
+    printf("The created Listen filter is [%s]\n", filterStr);
+
+    ef_filter_spec filter_spec;
+    if(filter_parse(&filter_spec, filterStr) != 0) {
+        printf("Error in filter parsing: %s\n", filterStr);
+        abort();
+        return 0;
+    }
+
+    //dprint
+    printf
+        ("%s:%s:%d: [vq:%p, vis:%p], [qid:%"PRIu8"], inserting listen filter proto [%d], "
+            "localip [%"PRIx32"] localport[%"PRIx16"]\n",
+            __FILE__, __func__, __LINE__, sfq, vis, sfq->qid,
+            protocol, localip1, localport1);
+
+//    TRY(ef_filter_spec_set_ip4_local(&filter_spec, protocol, localip,
+//                localport));
     TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
-    dprint("%s:%s:%d: [vq:%p], [qid:%"PRIu8"] done\n",
+    //dprint
+    printf
+        ("%s:%s:%d: [vq:%p], [qid:%"PRIu8"] done\n",
             __FILE__, __func__, __LINE__, sfq, sfq->qid);
     return 1;
 } // end function: alloc_filter_listen_ipv4
 
 
 int alloc_filter_full_ipv4(struct dragonet_sf_queue *sfq, int protocol,
-            uint32_t localip, uint16_t localport,
-            uint32_t remoteip, uint16_t remoteport
+            uint32_t localip1, uint16_t localport1,
+            uint32_t remoteip1, uint16_t remoteport1
             )
 {
     assert(sfq != NULL);
     struct vi *vis = sfq->queue_handle;
     assert(vis != NULL);
 
-    ef_filter_spec filter_spec;
-    ef_filter_spec_init(&filter_spec, EF_FILTER_FLAG_NONE);
-    dprint("%s:%s:%d: [vq:%p], [qid:%"PRIu8"] inserting listen filter proto [%d], "
-            "localip [%"PRIx32"] localport[%"PRIx16"]\n",
-            __FILE__, __func__, __LINE__, sfq, sfq->qid,
-            protocol, localip, localport);
+    char localIPStr[16];
+    char remoteIPStr[16];
+    char filterStr[1024];
 
-    TRY(ef_filter_spec_set_ip4_full(&filter_spec, protocol,
-                localip, localport, remoteip, remoteport));
+    convert_u32_ip4_to_string(localip1, localIPStr, sizeof(localIPStr));
+    convert_u32_ip4_to_string(remoteip1, remoteIPStr, sizeof(remoteIPStr));
+
+ //{udp|tcp}:[vid=<vlan>,]<local-host>:<local-port>"
+// "[,<remote-host>:<remote-port>]");
+    snprintf(filterStr, sizeof(filterStr), "%s:%s:%d,%s:%d",
+            "udp", localIPStr, localport1, remoteIPStr, remoteport1);
+    printf("The created filter is [%s]\n", filterStr);
+
+    ef_filter_spec filter_spec;
+    if(filter_parse(&filter_spec, filterStr) != 0) {
+        printf("Error in filter parsing: %s\n", filterStr);
+        abort();
+        return 0;
+    }
+
+    //dprint
+    printf
+        ("%s:%s:%d: [vq:%p, vis:%p], [qid:%"PRIu8"] inserting full filter proto [%d], "
+            "localip [%"PRIx32"] localport[%"PRIx16"], "
+            "RemoteIP [%"PRIx32"] RemotePort[%"PRIx16"], error = %d\n",
+            __FILE__, __func__, __LINE__, sfq, vis, sfq->qid,
+            protocol, localip1, localport1,
+            remoteip1, remoteport1, EINVAL);
+
+//    TRY(ef_filter_spec_set_ip4_full(&filter_spec, protocol,
+//                localip, localport, remoteip, remoteport));
+
     TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
-    dprint("%s:%s:%d: [vq:%p], [qid:%"PRIu8"] done\n",
+    //dprint
+    printf
+        ("%s:%s:%d: [vq:%p], [qid:%"PRIu8"] done\n",
             __FILE__, __func__, __LINE__, sfq, sfq->qid);
     return 1;
 } // end function: alloc_filter_full_ipv4
@@ -301,6 +379,11 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
                 sfq->refill_counter_local = 0;
             }
 
+            // FIXME: print the size of packet and qid
+            dprint
+                ("%s:%s:%d: [vq:%p], [qid:%"PRIu8"], packet received %d\n",
+                    __FILE__, __func__, __LINE__, sfq, sfq->qid,
+                    pkt_received);
             return pkt_received;
         } // end if: buffered packets
 
@@ -515,16 +598,6 @@ void *init_and_alloc_default_queue(char *name)
 
 // ######################  ###########################
 
-// this one is connected via switch on asiago
-#define IFNAME              "p801p1"
-#define CONFIG_LOCAL_MAC_sf  0x644d07530f00ULL  // "00:0f:53:07:4d:64"
-#define CONFIG_LOCAL_IP_sf   0x0a7104c3         // "10.113.4.195"
-
-// this one is connected via switch on appenzeller
-//#define IFNAME              "p6p2"
-//#define CONFIG_LOCAL_MAC_sf  0x495107530f00ULL  // "00:0f:53:07:51:49"
-//#define CONFIG_LOCAL_IP_sf   0x0a710447         // "10.113.4.71"
-
 
 struct vi;
 
@@ -578,11 +651,14 @@ static void tap_init(struct state *state, char *dev_name)
 }
 
 
+#define MAX_QUEUES          16
+static uint64_t qstat[MAX_QUEUES] = {0, 0};
 //node_out_t do_pg__SFRxQueue(struct state *state, struct input *in)
 static
 node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
 {
 
+    assert(qi < MAX_QUEUES);
     struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
     struct dragonet_sf_queue *q;
 
@@ -597,6 +673,10 @@ node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
             return P_Queue_drop;
         }
         tap_init(state, IFNAME);
+
+        // clear up the stats array
+        memset(qstat, 0, sizeof(qstat));
+
         state->local_mac = CONFIG_LOCAL_MAC_sf;
         state->local_ip = CONFIG_LOCAL_IP_sf;
         dprint("%s:%s:%d: ############## Initializing driver %p done\n",
@@ -615,7 +695,9 @@ node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
     q = sf_driver->queues + qi;
     assert(q->queue_handle != NULL);
     ++q->rx_pkts;
-    dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
+    dprint
+    //printf
+        ("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
             "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
             "######## Trying to RX packet\n",
             __FILE__,  __func__, __LINE__, qi, q->rx_pkts,
@@ -634,8 +716,19 @@ node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
         return P_Queue_drop;
     }
 
+    if (qstat[qi] % 1000 == 0) {
+        //printf
+        dprint
+            ("QueueID:%"PRIu8":[TID:%d]: has handled %"PRIu64" packets\n",
+               qi, (int)pthread_self(), qstat[qi]);
+    }
+    ++qstat[qi];
+
+    in->qid = qi;
     pkt_append(in, -(in->len - len));
-    dprint("%s:%d: [QID:%"PRIu8"], [pktid:%d]: ############## pkt received, data: %p, len:%zu\n",
+    dprint
+    //printf
+        ("%s:%d: [QID:%"PRIu8"], [pktid:%d]: ############## pkt received, data: %p, len:%zu\n",
             __func__, __LINE__, qi, q->rx_pkts, in->data, len);
     return P_Queue_out;
 }
@@ -724,6 +817,7 @@ bool sf_ctrl_5tuple_set(struct state *state,
 {
     struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
     struct dragonet_sf_queue *q;
+    int ret;
     uint8_t qi = queue;
     assert(qi < QUEUES);
     assert(sf_driver != NULL);
@@ -737,9 +831,12 @@ bool sf_ctrl_5tuple_set(struct state *state,
             sf_driver->queues[0].queue_handle,
             qi, q, q->queue_handle);
 
-    //int ret = alloc_filter_listen_ipv4(l4_type, dst_ip, dst_port);
-    int ret = alloc_filter_full_ipv4(q, l4_type, dst_ip, dst_port,
+    if (src_ip == 0 && src_port == 0) {
+        ret = alloc_filter_listen_ipv4(q, l4_type, dst_ip, dst_port);
+    } else {
+        ret = alloc_filter_full_ipv4(q, l4_type, dst_ip, dst_port,
             src_ip, src_port);
+    }
     assert(ret == 1);
     return true;
 }

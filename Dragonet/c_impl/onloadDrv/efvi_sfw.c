@@ -251,6 +251,7 @@ static void vi_init_pktbufs(struct vi* vi)
   int _2meg = (1 << 21);
   int i, pbuf_size = ef_vi_receive_capacity(&vi->vi) * PKT_BUF_SIZE;
   pbuf_size = ROUND_UP(pbuf_size, _2meg);
+  pbuf_size *= 2;  // PS: Doubling the size so that there is more for TX side as well.
   TEST(posix_memalign(&vi->pkt_bufs, _2meg, pbuf_size) == 0);
   vi->pkt_bufs_n = pbuf_size / PKT_BUF_SIZE;
 
@@ -332,7 +333,8 @@ static struct vi* __vi_alloc(int vi_id, struct net_if* net_if,
   vi->tx_free_pkt_bufs_n = 0;
 
 
-  for (i = 0; i < MAX_TX_BUFFERS; ++i) {
+  // Assigning half of free packet buffers for TX path
+  for (i = 0; i < (vi->free_pkt_bufs_n / 2); ++i) {
     tx_pbuf = vi_get_free_pkt_buf(vi);
     tx_pbuf->is_tx = 1;
     tx_pbuf->n_refs = 0;
@@ -439,6 +441,11 @@ static int hostport_parse(struct sockaddr_in* sin, const char* s_in)
   return rc;
 }
 
+/*
+ *
+ {udp|tcp}:[vid=<vlan>,]<local-host>:<local-port>"
+ "[,<remote-host>:<remote-port>]\n");
+ */
 
 int filter_parse(ef_filter_spec* fs, const char* s_in)
 {
