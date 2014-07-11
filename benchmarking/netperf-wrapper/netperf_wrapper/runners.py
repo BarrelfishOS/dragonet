@@ -172,7 +172,8 @@ class ProcessRunner(threading.Thread):
         if self.kill_cmd:
             try:
                 for cmd in self.kill_cmd:
-                    self.machine_ref._exec_cmd_blocking(cmd)
+                    ans = self.machine_ref._exec_cmd_blocking(cmd)
+                    self.logMsg ("KILL_EXPLICIT: Machine %s: the response of executing kill command[%s] is \n%s\n" %( self.machine_ref, cmd, ans))
             except OSError:
                 pass
 

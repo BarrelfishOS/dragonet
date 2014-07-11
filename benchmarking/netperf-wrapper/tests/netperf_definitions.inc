@@ -69,6 +69,7 @@ def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
 
 
 def SRV_CMDS(name):
+
     if name == "llvmE10k" :
         return {
                     "client_extra_opts" : "-N",
@@ -101,10 +102,57 @@ def SRV_CMDS(name):
                     "exec_cmd" : "echo 'Server should already be running'" ,
                     "exec_cmd_complex" : "./runBetterCD.sh ../../Dragonet/ ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
                             genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
-                    "kill_cmd" : [
-                                "sudo killall llvm-cgen-e10k || true",
+                    "kill_cmd_special" : [
+                                "tail dragonet/Dragonet/some.log",
+                                "tail dragonet/Dragonet/fancyecho-out.log",
                                 "sudo killall bench-fancyecho || true",
+                                "sudo killall llvm-cgen-e10k",
                                  ],
+                    "kill_cmd" : [],
+                    "out_cmd" : [],
+                }
+
+
+    if name == "llvmSF" :
+        return {
+                    "client_extra_opts" : "-N",
+                    "init_cmd_special_min" : [
+                      "cd dragonet/Dragonet/ ; sudo ./deployDragonetSF.sh %d %s" % (
+                          HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
+                            ),
+                                    ],
+
+                    "init_cmd_special" : [
+                      "cd dragonet/Dragonet/ ; sudo ./deployDragonetSF.sh %d %s" % (
+                          HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
+                            ),
+                      "cd dragonet/Dragonet/ ; sudo ./runBetterBg.sh 0 ./ ./fancyecho-out.log  ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
+                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
+
+                      "cd dragonet/Dragonet/ ; ./wait_for_dn_app.sh %d %d " % (HWQUEUES, SERVERS_INSTANCES * SERVER_CORES),
+                                    ],
+
+                    "init_cmd_special2" : [
+                        "cd dragonet/Dragonet/ ; sudo taskset -c %s ./deployDragonetSF.sh %d %s" % (
+                                toCoreList2(range(0, (HWQUEUES* 2))), HWQUEUES,
+                                toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
+                            ),
+                      "cd dragonet/Dragonet/ ; ./runBetterBg.sh 2 ./ ./fancyecho-out.log  ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
+                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
+                                ],
+
+                    "init_cmd" : [],
+                    "exec_cmd" : "echo 'Server should already be running'" ,
+                    "exec_cmd_complex" : "./runBetterCD.sh ../../Dragonet/ ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
+                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
+                    "kill_cmd_special" : [
+                                "tail dragonet/Dragonet/some.log",
+                                "tail dragonet/Dragonet/fancyecho-out.log",
+                                "sudo killall bench-fancyecho || true",
+                                "sudo killall llvm-cgen-sf",
+                                 ],
+                    "kill_cmd" : [],
+
                     "out_cmd" : [],
                 }
 
