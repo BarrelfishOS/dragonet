@@ -221,7 +221,7 @@ evalGraph helpers prg lpg pref cfg = do
     write "prg_c.dot" $ toDot prgC
 
     -- Dot for embedded graph...
-    let emb = Emb.fullEmbedding prgC lpg
+    let emb = Emb.embeddingRxTx prgC lpg
     write "embed.dot" $ toDot emb
 
     -- Dot for reduced graph...

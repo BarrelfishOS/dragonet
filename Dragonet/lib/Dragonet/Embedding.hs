@@ -1,5 +1,6 @@
 module Dragonet.Embedding(
     fullEmbedding,
+    embeddingRxTx
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG
@@ -203,4 +204,45 @@ fullEmbedding prg lpg = serialized
 
         merged = foldl1 (GH.mergeGraphsBy (==)) embeddings
         serialized = serialize merged
+
+
+--------------------------------------------------------------------------------
+-- Embedding for both RX and TX path
+
+rxPref = "RxQueue"
+txPref = "TxQueue"
+
+qTag pref = "Q" ++ pref
+
+tagNodes :: String -> PG.PGraph -> PG.PGraph
+tagNodes tag = DGI.nmap tagN
+    where tagN n = n { PG.nTag = tag }
+
+tagPrgQueues :: PG.PGraph -> PG.PGraph
+tagPrgQueues = DGI.nmap tagQueue
+    where
+        isQueueNode PG.Node { PG.nLabel = l } =
+            rxPref `L.isPrefixOf` l || txPref `L.isPrefixOf` l
+        tagQueue n
+            | isQueueNode n = n {
+                    PG.nTag = qTag $ drop (length rxPref) $ PG.nLabel n }
+            | otherwise = n
+
+embeddingRxTx :: PG.PGraph -> PG.PGraph -> PG.PGraph
+embeddingRxTx prg lpg = withLPGs
+    where
+        prg' = tagPrgQueues prg
+        -- List of queue identifiers
+        rxQs = [ drop (length rxPref) l |
+                    (_, PG.Node { PG.nLabel = l })<- DGI.labNodes prg,
+                    rxPref `L.isPrefixOf` l ]
+        -- PRG with full LPG added for each queue
+        withLPGs = foldl addLPG prg' rxQs
+        mergeP pr PG.Node { PG.nLabel = lA } PG.Node { PG.nLabel = lB }
+            | lB == rxPref ++ pr && lA == rxPref = True
+            | lB == txPref ++ pr && lA == txPref = True
+            | otherwise = False
+        addLPG g pref = GH.mergeGraphsBy (mergeP pref) g $
+                            tagNodes (qTag pref) lpg
+
 
