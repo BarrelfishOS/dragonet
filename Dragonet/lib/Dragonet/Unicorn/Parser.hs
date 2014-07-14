@@ -19,7 +19,8 @@ import Data.Functor ((<$>))
 
 import Text.ParserCombinators.Parsec as Parsec
 import qualified Text.ParserCombinators.Parsec.Token as P
-import Dragonet.ProtocolGraph (ConfType(..))
+import Dragonet.Configuration (ConfType(..))
+import Dragonet.ProtocolGraph (NAttribute(..))
 
 import qualified Util.SMTLibParser as SMTP
 import qualified SMTLib2 as SMT
@@ -48,13 +49,13 @@ data Node =
     Node {
         nName     :: String,
         nPorts    :: [Port],
-        nAttrs    :: [String],
+        nAttrs    :: [NAttribute],
         nPortSems :: [(String, SMT.Expr)] } |
 
     Config {
         nName     :: String,
         nPorts    :: [Port],
-        nAttrs    :: [String],
+        nAttrs    :: [NAttribute],
         nConfFun  :: Maybe String,
         nConfType :: ConfType } |
 
@@ -62,32 +63,32 @@ data Node =
         nName     :: String,
         nPortT    :: Port,
         nPortF    :: Port,
-        nAttrs    :: [String],
+        nAttrs    :: [NAttribute],
         nPortSems :: [(String, SMT.Expr)] } |
 
     And {
         nName     :: String,
         nPortT    :: Port,
         nPortF    :: Port,
-        nAttrs    :: [String] } |
+        nAttrs    :: [NAttribute] } |
 
     NAnd {
         nName     :: String,
         nPortT    :: Port,
         nPortF    :: Port,
-        nAttrs    :: [String] } |
+        nAttrs    :: [NAttribute] } |
 
     Or {
         nName     :: String,
         nPortT    :: Port,
         nPortF    :: Port,
-        nAttrs    :: [String] } |
+        nAttrs    :: [NAttribute] } |
 
     NOr {
         nName     :: String,
         nPortT    :: Port,
         nPortF    :: Port,
-        nAttrs    :: [String] }
+        nAttrs    :: [NAttribute] }
     deriving Show
 
 
@@ -157,7 +158,7 @@ port p = do
 
 attributes = do
     reserved "attr"
-    stringLiteral
+    NAttrCustom <$> stringLiteral
 
 constraint = do
     reserved "constraint"
@@ -165,8 +166,8 @@ constraint = do
     e <- stringLiteral
     return (p,e)
 
-constraintAttrs :: [(String,String)] -> [String]
-constraintAttrs = map (\(p,e) -> "C." ++ p ++ ":" ++ e)
+constraintAttrs :: [(String,String)] -> [NAttribute]
+constraintAttrs = map (\(p,e) -> NAttrCustom $ "C." ++ p ++ ":" ++ e)
 
 semantics = do
     reserved "semantics"

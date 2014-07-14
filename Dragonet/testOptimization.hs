@@ -26,12 +26,10 @@ import Data.String (fromString)
 import Debug.Trace (trace)
 
 -- Parse graph from unicorn file
-parseGraph :: PG.GraphType -> FilePath -> IO (PG.PGraph,Sem.Helpers)
-parseGraph gt path = do
+parseGraph :: FilePath -> IO (PG.PGraph,Sem.Helpers)
+parseGraph path = do
     b <- readFile path >>= UnicornAST.parseGraph
-    let (pg,hs) = Unicorn.constructGraph' b
-        pg' = PG.pgSetType gt pg
-    return (pg',hs)
+    return $ Unicorn.constructGraph' b
 
 --------------------------------------------------------------------------------
 -- Graph transformations
@@ -43,7 +41,7 @@ cleanupGraph g
     | null badNodes = g
     | otherwise = cleanupGraph g'
     where
-        hasAttr a n = elem a $ PG.nAttributes n
+        hasAttr a n = elem (PG.NAttrCustom a) $ PG.nAttributes n
         srcs = filter (null . DGI.pre g . fst) $ DGI.labNodes g
         snks = filter (null . DGI.suc g . fst) $ DGI.labNodes g
         badSrcs = filter (not . hasAttr "source" . snd) srcs
@@ -72,7 +70,7 @@ configLPGUDPSockets :: PG.ConfFunction
 configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
     where
         PG.CVList tuples = cfg
-        hasL l PG.Node { PG.nLabel = nl } = l == nl
+        hasL l n = l == PG.nLabel n
         findN ps l = (fst . fst) <$> L.find (hasL l . snd . fst) ps
         Just vN = findN inE "RxL4UDPValid"
         Just vhN = findN inE "RxL4UDPValidHeaderLength"
@@ -84,15 +82,15 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
                     PG.CVMaybe msPort,
                     PG.CVMaybe mdIP,
                     PG.CVMaybe mdPort]) = do
-            (dxN,_) <- C.confMNewNode $ addFSemantics $ PG.baseFNode filterS []
-                        bports Nothing
-            (fsN,_) <- C.confMNewNode $ PG.baseFNode ("FromSocket" ++ show sid)
-                        [] ["out"] Nothing
-            (tsN,_) <- C.confMNewNode $ PG.baseFNode ("ToSocket" ++ show sid)
-                        ["sink"] ["out","drop"] Nothing
+            (dxN,_) <- C.confMNewNode $ addFSemantics $
+                        PG.baseFNode filterS bports
+            (fsN,_) <- C.confMNewNode $
+                        PG.baseFNode ("FromSocket" ++ show sid) ["out"]
+            (tsN,_) <- C.confMNewNode $ PG.nAttrAdd (PG.NAttrCustom "sink") $
+                        PG.baseFNode ("ToSocket" ++ show sid) ["out","drop"]
             (vsN,_) <- C.confMNewNode $ PG.baseONode ("ValidSocket" ++ show sid)
-                        [] bports PG.OpAnd Nothing
-            return [
+                        bports PG.NOpAnd
+            return $ map (\(a,b,p) -> (a,b,PG.Edge p)) [
                 (vhN,dxN,"true"),  -- RxL4UDPValidHeaderLength -> Filter
                 (dxN,vsN,"false"), -- Filter -> ValidSocket
                 (dxN,vsN,"true"),  -- Filter -> ValidSocket
@@ -130,9 +128,10 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
                     PG.nSemantics = [("true",tSems),("false",fSems) ] }
                 bports = ["false","true"]
 
-addLpgCfgFun PG.Node { PG.nLabel = l }
+addLpgCfgFun n
     | l == "RxL4UDPCUDPSockets" = configLPGUDPSockets
     | otherwise = error $ "Unknown LPG CNode: '" ++ l ++ "'"
+    where l = PG.nLabel n
 
 lpgCfg = [
     ("RxL4UDPCUDPSockets", PG.CVList [
@@ -166,10 +165,11 @@ lpgCfg = [
 --------------------------------------------------------------------------------
 -- PRG
 
-addPrgCfgFun PG.Node { PG.nLabel = l }
+addPrgCfgFun n
     | l == "RxC5TupleFilter" = E10k.config5tuple
     | l == "RxCFDirFilter"   = E10k.configFDir
     | otherwise = error $ "Unknown LPG CNode: '" ++ l ++ "'"
+    where l = PG.nLabel n
 
 prgCfgEmpty = [
     ("RxC5TupleFilter", PG.CVList []),
@@ -216,7 +216,7 @@ nodeCost _ = 1
 
 evalGraph helpers prg lpg pref cfg = do
     let write f s = writeFile (pref ++ f) s
-    let prgC  = PG.pgSetType PG.GTPrg $ C.applyConfig cfg prg
+    let prgC  = C.applyConfig cfg prg
     -- Dot for configured graphs...
     write "prg_c.dot" $ toDot prgC
 
@@ -247,8 +247,8 @@ main = do
     let pref = ""
     let write f s = writeFile (pref ++ f) s
 
-    (prgU,prgH) <- parseGraph PG.GTPrg "prgE10kImpl.unicorn"
-    (lpgU,lpgH) <- parseGraph PG.GTLpg "lpgConfImpl.unicorn"
+    (prgU,prgH) <- parseGraph "prgE10kImpl.unicorn"
+    (lpgU,lpgH) <- parseGraph "lpgConfImpl.unicorn"
     let helpers = prgH `Sem.mergeHelpers` lpgH
 
     -- Dot for unconfigured graphs...
@@ -259,7 +259,7 @@ main = do
     let lpgU' = C.replaceConfFunctions addLpgCfgFun lpgU
         prgU' = C.replaceConfFunctions addPrgCfgFun prgU
     -- Configure LPG
-    let lpgC  = PG.pgSetType PG.GTLpg $ C.applyConfig lpgCfg lpgU'
+    let lpgC  = C.applyConfig lpgCfg lpgU'
     writeFile "lpg_c.dot" $ toDot lpgC
 
 

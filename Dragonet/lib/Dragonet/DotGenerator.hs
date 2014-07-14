@@ -25,17 +25,19 @@ t = T.pack
 data ELabel = SingleEdge String | DoubleEdge
 
 -- Mark edges in adjacency list as double edges (if the case)
-fixAdj :: [(String,DGI.Node)] -> [(ELabel,DGI.Node)]
+fixAdj :: [(PG.Edge,DGI.Node)] -> [(ELabel,DGI.Node)]
 fixAdj l = singleEdges ++ doubleEdges
     where
         n = L.nub $ map snd l
         -- Endpoints for double edges
-        dblN = filter (\x -> elem ("true",x) l && elem ("false",x) l) n
+        dblN = filter (\x -> elem (PG.Edge "true",x) l &&
+                             elem (PG.Edge "false",x) l) n
         doubleEdges = map (\m -> (DoubleEdge,m)) dblN
         -- Original edges with double edges removed
         lSingle = filter (\(p,m) -> notElem m dblN ||
-                                    (p /= "true" && p /= "false")) l
-        singleEdges = map (A.first SingleEdge) lSingle
+                                    (p /= PG.Edge "true" &&
+                                     p /= PG.Edge "false")) l
+        singleEdges = map (A.first (SingleEdge . PG.ePort)) lSingle
 
 -- Mark double edges in the graph
 getELs :: PG.PGraph -> DGI.Gr PG.Node ELabel
@@ -60,19 +62,23 @@ formatEdge (_,_,DoubleEdge) = [tailP,headP,double]
                            GA.WC (GA.X11Color GC.White) Nothing,
                            GA.WC (GA.X11Color GC.Black) Nothing]
 
-                         
-        
+opStr :: PG.NOperator -> String
+opStr PG.NOpAnd  = "AND"
+opStr PG.NOpOr   = "OR"
+opStr PG.NOpNAnd = "NAND"
+opStr PG.NOpNOr  = "NOR"
+
 -- Get string label for a node
 nodeLabel :: PG.Node -> String
-nodeLabel n
-    | PG.nIsONode n = PG.opToString op ++ ":" ++ lbl
-    | otherwise = lbl
+nodeLabel n =
+    case n of
+        PG.ONode { PG.nOperator = o } -> opStr o ++ ":" ++ lbl
+        _ -> lbl
     where
-        (PG.ONode op) = PG.nPersonality n
-        pf = case PG.nGraphType n of
+        pf = "" {-case PG.nGraphType n of
             PG.GTPrg -> "P:"
             PG.GTLpg -> "L:"
-            _ -> ""
+            _ -> ""-}
         lbl = pf ++ PG.nLabel n
 
 -- Build record label for node
@@ -87,18 +93,15 @@ nodeRecord nlf plf n = GA.RecordLabel [GA.FlipFields
 
 -- Build style attributes for node depending on node personality
 nodeStyle :: PG.Node -> GA.Attributes
-nodeStyle n
-    | PG.nIsFNode n =
-        [GA.Style [GA.SItem GA.Dotted []] | isSW]
-    | PG.nIsONode n =
-        [GA.Style [GA.SItem GA.Filled [], GA.SItem GA.Rounded []],
+nodeStyle n@PG.FNode {} = [GA.Style [GA.SItem GA.Dotted []] | isSW]
+    where
+        isSW = PG.nAttrElem (PG.NAttrCustom "software") n
+nodeStyle n@PG.ONode {} =
+    [GA.Style [GA.SItem GA.Filled [], GA.SItem GA.Rounded []],
          GA.FillColor [GA.WC (GA.X11Color GC.Gray) Nothing]]
-    | PG.nIsCNode n =
+nodeStyle n@PG.CNode {} =
         [GA.Style [GA.SItem GA.Filled [], GA.SItem GA.Diagonals []],
          GA.FillColor [GA.WC (GA.X11Color GC.PaleTurquoise) Nothing]]
-    | otherwise = undefined
-    where
-        isSW = elem "software" $ PG.nAttributes n
 
 -- Generate node attributes
 formatNode :: (String -> String) -> (String -> String) -> (n,PG.Node)

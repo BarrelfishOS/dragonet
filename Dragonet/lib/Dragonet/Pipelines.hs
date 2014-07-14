@@ -70,22 +70,21 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
             else do
                 -- Add Demux_ node
                 demux_N <- GM.newNode $
-                    PG.baseONode "Demux_" [] ["false", "true"] PG.OpOr Nothing
+                    PG.baseONode "Demux_" ["false", "true"] PG.NOpOr
 
                 forM_ inPL $ \(pl,_) -> do
                     let fromPLNA = "frompipeline=" ++ pl
-                        attrs = ["source","Boolean",fromPLNA]
-                    fromPLN <- GM.newNode $ PG.baseFNode ("FromPL" ++ pl) attrs
-                        ["false","true"] Nothing
-                    GM.newEdge (fromPLN, demux_N, "false")
-                    GM.newEdge (fromPLN, demux_N, "true")
+                        attrs = map PG.NAttrCustom ["source","Boolean",fromPLNA]
+                    fromPLN <- GM.newNode $ PG.nAttrsAdd attrs $
+                        PG.baseFNode ("FromPL" ++ pl) ["false","true"]
+                    GM.newEdge (fromPLN, demux_N, PG.Edge "false")
+                    GM.newEdge (fromPLN, demux_N, PG.Edge "true")
 
                 -- Add Demux node
                 let demuxPs = ["_"] ++ map labN inDN
-                demuxN <- GM.newNode $
-                    PG.baseFNode "Demux" [] demuxPs Nothing
-                GM.newEdge (demux_N, demuxN, "true")
-                mapM_ (\n -> GM.newEdge (demuxN, n, labN n)) inDN
+                demuxN <- GM.newNode $ PG.baseFNode "Demux" demuxPs
+                GM.newEdge (demux_N, demuxN, PG.Edge "true")
+                mapM_ (\n -> GM.newEdge (demuxN, n, PG.Edge $ labN n)) inDN
 
 
             -- Destination nodes for outgoing queues
@@ -95,17 +94,17 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
                 mapM_ (\(pl,ns') -> do
                     -- Create "To$Pipeline" node
                     let toPLNA = "pipeline=" ++ pl
-                    toPLN <- GM.newNode $ PG.baseFNode ("ToPL" ++ pl)
-                        ["sink", toPLNA] ["out"] Nothing
+                        as = map PG.NAttrCustom ["sink", toPLNA]
+                    toPLN <- GM.newNode $ PG.nAttrsAdd as $
+                        PG.baseFNode ("ToPL" ++ pl) ["out"]
                     mapM_ (\(n,es) -> do
                         -- Create "To$Node" node
-                        let muxNA = "multiplex=" ++ labN n
-                        let muxPL = "muxPL=" ++ pl
-                        toNN <- GM.newNode $
-                            PG.baseFNode ("ToPL" ++ pl ++ "_" ++ labN n)
-                                [muxNA, muxPL] ["out"] Nothing
+                        let as' = map PG.NAttrCustom ["multiplex=" ++ labN n,
+                                                      "muxPL=" ++ pl]
+                        toNN <- GM.newNode $ PG.nAttrsAdd as' $
+                            PG.baseFNode ("ToPL" ++ pl ++ "_" ++ labN n) ["out"]
                         -- Add edge to "To$Pipeline" node
-                        GM.newEdge (toNN,toPLN,"out")
+                        GM.newEdge (toNN,toPLN,PG.Edge "out")
                         -- Add edges
                         mapM_ (\(s,_,p) -> GM.newEdge (s,toNN,p)) es
                         ) ns'

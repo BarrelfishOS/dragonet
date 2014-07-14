@@ -67,16 +67,19 @@ type EMap = M.Map DGI.Node [(String,Sem.PortSemantics)]
 processPort :: PG.PGNode -> [(String, Sem.PortSemantics)] -> String
                 -> Sem.PortSemantics
 processPort (_,l) ins p =
-    case lookup p $ PG.nSemantics l of
-        Just e  -> inEx `sAnd` e
-        Nothing -> inEx
+    case l of
+        PG.FNode { PG.nSemantics = sems }->
+            case lookup p sems of
+                Just e  -> inEx `sAnd` e
+                Nothing -> inEx
+        _ -> inEx
     where
-        inEx = case PG.nPersonality l of
-                    PG.FNode   -> fInEx
-                    PG.ONode _ -> oInEx
-                    PG.CNode _ _  -> SMTC.true -- We know absolutely nothing
-                                               -- here, since there could be a
-                                               -- source node generated
+        inEx = case l of
+                    PG.FNode {} -> fInEx
+                    PG.ONode {PG.nOperator = op} -> oInEx op
+                    PG.CNode {} -> SMTC.true -- We know absolutely nothing
+                                             -- here, since there could be a
+                                             -- source node generated
         fInEx =
             case ins of
                 [] -> SMTC.true
@@ -86,20 +89,19 @@ processPort (_,l) ins p =
             case lookupAll p $ ins of
                 [] -> SMTC.false -- Not reachable
                 es -> combinePExps op es
-        PG.ONode op = PG.nPersonality l
-        oInEx =
+        oInEx op =
             case (op,p) of
-                (PG.OpAnd,"true") -> oInEx' "true" sAnd
-                (PG.OpAnd,"false") -> oInEx' "false" sOr
+                (PG.NOpAnd,"true") -> oInEx' "true" sAnd
+                (PG.NOpAnd,"false") -> oInEx' "false" sOr
 
-                (PG.OpNAnd,"true") -> oInEx' "false" sOr
-                (PG.OpNAnd,"false") -> oInEx' "true" sAnd
+                (PG.NOpNAnd,"true") -> oInEx' "false" sOr
+                (PG.NOpNAnd,"false") -> oInEx' "true" sAnd
 
-                (PG.OpOr,"true") -> oInEx' "true" sOr
-                (PG.OpOr,"false") -> oInEx' "false" sAnd
+                (PG.NOpOr,"true") -> oInEx' "true" sOr
+                (PG.NOpOr,"false") -> oInEx' "false" sAnd
 
-                (PG.OpNOr,"true") -> oInEx' "false" sAnd
-                (PG.OpNOr,"false") -> oInEx' "true" sOr
+                (PG.NOpNOr,"true") -> oInEx' "false" sAnd
+                (PG.NOpNOr,"false") -> oInEx' "true" sOr
 
         combinePExps o es = snd $ foldl1 (\(_,a) (ip,b) -> (ip,a `o` b)) es
 
@@ -111,11 +113,11 @@ processNode solver (g,eM) fn@(n,nL) = do
     let ps = map (\p -> (p,processPort fn ins p)) $ PG.nPorts nL
     let lsucs = DGI.lsuc g n
     -- Check satisfiability of ports
-    let portSat :: (PG.PGraph,EMap) -> (PG.Port,Sem.PortSemantics)
+    let portSat :: (PG.PGraph,EMap) -> (PG.NPort,Sem.PortSemantics)
                         -> IO (PG.PGraph,EMap)
         portSat (g',eM') (p,e) = do
             us <- checkSat solver e
-            let edges = [((n,eN,eP),e) | (eN,eP) <- lsucs, eP == p]
+            let edges = [((n,eN,eP),e) | (eN,eP) <- lsucs, PG.ePort eP == p]
             let updateEM e' =
                     M.delete n $
                         foldl (\m ((_,n',_),_) -> addIn n' (p,e') m) eM' edges

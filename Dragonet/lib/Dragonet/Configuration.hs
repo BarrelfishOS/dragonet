@@ -1,4 +1,11 @@
 module Dragonet.Configuration(
+    ConfType(..),
+    ConfValue(..),
+    ConfFunction,
+    ConfMonad,
+
+    cvEnumName,
+
     applyConfig,
     confMNewNode,
     replaceConfFunctions
@@ -10,6 +17,9 @@ import qualified Util.GraphHelpers as GH
 import qualified Control.Monad.State as ST
 import Data.Maybe
 
+-- Get enumerator name from conf value and its type
+cvEnumName :: ConfType -> ConfValue -> String
+cvEnumName (CTEnum enums) (CVEnum v) = enums !! v
 
 -- Create new node
 confMNewNode :: Node -> ConfMonad PGNode
@@ -41,7 +51,7 @@ applyCNode :: [(String,ConfValue)] -> PGraph -> PGContext -> PGraph
 applyCNode config g ctx = confMRun g' newEM
     where
         node = DGI.lab' ctx
-        fun = nConfFun node
+        fun = nConfFunction node
         conf = fromJust $ lookup (nLabel node) config
 
         -- Remove configuration node
@@ -62,7 +72,8 @@ applyConfig :: [(String,ConfValue)] -> PGraph -> PGraph
 applyConfig cfg g =
     foldl (applyCNode cfg) g configNodes
     where
-        isConfigNode ctx = nIsCNode $ DGI.lab' ctx
+        isConfigNode (_,_,CNode {},_) = True
+        isConfigNode _ = False
         configNodes = GH.filterCtx isConfigNode g
 
 -- Add/replace config functions in graph. Calls passed function to get a config
@@ -70,9 +81,6 @@ applyConfig cfg g =
 replaceConfFunctions :: (Node -> ConfFunction) -> PGraph -> PGraph
 replaceConfFunctions m = DGI.nmap fixNode
     where
-        fixNode n
-            | nIsCNode n = n { nPersonality = CNode ct (m n) }
-            | otherwise = n
-            where
-                CNode ct _ = nPersonality n
+        fixNode n@CNode {} = n { nConfFunction = m n }
+        fixNode n = n
 

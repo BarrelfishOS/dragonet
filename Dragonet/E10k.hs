@@ -1,8 +1,5 @@
 {-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
 module E10k (
-    prg,
-    prgClusters,
-
     C5TL3Proto(..),
     C5TL4Proto(..),
     C5TPort,
@@ -32,103 +29,6 @@ import qualified SMTLib2.Core as SMTC
 import qualified SMTLib2.BitVector as SMTBV
 
 
-
-
-[unicorn|
-graph prg {
-    node HWDrop { }
-
-    cluster L2Ether {
-        boolean Classified {
-            attr "source"
-            port true[ValidCRC]
-            port false[] }
-
-        boolean ValidCRC {
-            port true[ClassifyL3_]
-            port false[.HWDrop] }
-
-        node ClassifyL3_ {
-            port ipv4[.L3IPv4Classified .L3IPv4Checksum_]
-            port other[.C5TupleFilter] }
-
-    }
-
-    cluster L3IPv4 {
-
-        boolean Classified {
-            attr "software"
-            port true false[]
-            constraint true "IPv4"
-            constraint false "!IPv4" }
-
-        node Checksum_ {
-            port out[ValidChecksum .C5TupleFilter] }
-
-        boolean ValidChecksum {
-            attr "software"
-            port true false[] }
-    }
-
-    config C5TupleFilter {
-        type { (sip:   <UInt 32>,
-                dip:   <UInt 32>,
-                proto: <Enum (TCP,UDP,SCP,OTHER)>,
-                sport: <UInt 16>,
-                dport: <UInt 16>,
-                prio:  Int 1 7,
-                queue: UInt 2) } <,128>
-        function config5tuple
-        port queues[Q0Valid Q1Valid Q2Valid Q3Valid]
-        port default[CFDirFilter] }
-
-    config CFDirFilter {
-        type { (sip:   UInt 32,
-                dip:   UInt 32,
-                proto: Enum (TCP,UDP,SCP,OTHER),
-                sport: UInt 16,
-                dport: UInt 16,
-                queue: UInt 2) }
-        function configFDir
-        port queues[Q0Valid Q1Valid Q2Valid Q3Valid]
-        port default[ToDefaultQueue] }
-
-    boolean ToDefaultQueue {
-        port true false[Q0Valid] }
-
-    or Q0Valid {
-        port true[Queue0]
-        port false[] }
-    node Queue0 {
-        attr "software"
-        attr "sink"
-        port out[] }
-
-    or Q1Valid {
-        port true[Queue1]
-        port false[] }
-    node Queue1 {
-        attr "software"
-        attr "sink"
-        port out[] }
-
-    or Q2Valid {
-        port true[Queue2]
-        port false[] }
-    node Queue2 {
-        attr "software"
-        attr "sink"
-        port out[] }
-
-    or Q3Valid {
-        port true[Queue3]
-        port false[] }
-    node Queue3 {
-        attr "software"
-        attr "sink"
-        port out[] }
-}
-|]
 
 type QueueID = Int
 
@@ -179,7 +79,7 @@ c5tString c = "5T("++l4p++","++l3s++","++l3d++","++l4s++","++l4d++")"
         l4s = fromMaybe "*" $ liftM show $ c5tL4Src c
         l4d = fromMaybe "*" $ liftM show $ c5tL4Dst c
 
-c5tAttr :: C5Tuple -> [String]
+c5tAttr :: C5Tuple -> [NAttribute]
 c5tAttr c =
     if null constr then [] else [aTrue, aFalse]
     where
@@ -190,8 +90,8 @@ c5tAttr c =
                 do {s <- c5tL4Src c; return ("SourcePort=" ++ show s)},
                 do {d <- c5tL4Dst c; return ("DestPort=" ++ show d)} ]
         cT = foldl1 (\a b -> a ++ "&" ++ b) constr
-        aTrue = "C.true:" ++ cT
-        aFalse = "C.false:!(" ++ cT ++ ")"
+        aTrue = NAttrCustom $ "C.true:" ++ cT
+        aFalse = NAttrCustom $ "C.false:!(" ++ cT ++ ")"
         showIP = IP4.ipToString
 
 parse5tCFG :: ConfValue -> [C5Tuple]
@@ -224,10 +124,12 @@ parse5t (CVTuple
 
 
 
-nodeL5Tuple c = addSems $ baseFNode (c5tString c) (c5tAttr c) bports Nothing
+nodeL5Tuple c = (baseFNode (c5tString c) bports) {
+                    nAttributes = c5tAttr c,
+                    nSemantics = [("true",tSems),("false",fSems)]
+                    }
     where
         bports = ["true","false"]
-        addSems n = n { nSemantics = [("true",tSems),("false",fSems)] }
         tSems = foldl1 SMTC.and $ catMaybes [
                 ipSems "src" <$> c5tL3Src c,
                 ipSems "dst" <$> c5tL3Dst c,
@@ -253,7 +155,7 @@ config5tuple _ inE outE cfg = do
         -- Node and Port for the incoming edge for the first node
         start = (fst $ fst $ head inE, snd $ head inE)
         -- Node for default queue
-        (Just ((defaultN,_),_)) = L.find ((== "default") . snd) outE
+        (Just ((defaultN,_),_)) = L.find ((== "default") . ePort . snd) outE
         -- Lookup node id for specified queue
         queue i = queueN
             where (Just ((queueN,_),_)) = L.find (isRxQValidN i . fst) outE
@@ -266,9 +168,9 @@ config5tuple _ inE outE cfg = do
         addFilter ((iN,iE),es) c = do
             (n,_) <- confMNewNode $ nodeL5Tuple c
             let inEdge = (iN,n,iE)
-            let tEdge = (n,queue $ c5tQueue c,"true")
-            let fEdge = (n,queue $ c5tQueue c,"false")
-            return ((n,"false"), es ++ [inEdge,tEdge,fEdge])
+            let tEdge = (n,queue $ c5tQueue c,Edge "true")
+            let fEdge = (n,queue $ c5tQueue c,Edge "false")
+            return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
 
 
 
@@ -294,7 +196,7 @@ cFDtString c = "FDir("++l4p++","++l3s++","++l3d++","++l4s++","++l4d++")"
         l4s = show $ cfdtL4Src c
         l4d = show $ cfdtL4Dst c
 
-cFDtAttr :: CFDirTuple -> [String]
+cFDtAttr :: CFDirTuple -> [NAttribute]
 cFDtAttr c =
     [aTrue, aFalse]
     where
@@ -305,8 +207,8 @@ cFDtAttr c =
                   ("SourcePort=" ++ (show $ cfdtL4Src c)),
                   ("DestPort=" ++ (show $ cfdtL4Dst c)) ]
         cT = constr `UM.joinBy` "&"
-        aTrue = "C.true:" ++ cT
-        aFalse = "C.false:!(" ++ cT ++ ")"
+        aTrue = NAttrCustom $ "C.true:" ++ cT
+        aFalse = NAttrCustom $ "C.false:!(" ++ cT ++ ")"
 
 parseFDirCFG :: ConfValue -> [CFDirTuple]
 parseFDirCFG (CVList l) = map parseFDT l
@@ -344,7 +246,7 @@ configFDir _ inE outE cfg = do
         -- Node and Port for the incoming edge for the first node
         start = (fst $ fst $ head inE, snd $ head inE)
         -- Node for default queue
-        (Just ((defaultN,_),_)) = L.find ((== "default") . snd) outE
+        (Just ((defaultN,_),_)) = L.find ((== "default") . ePort . snd) outE
         -- Lookup node id for specified queue
         queue i = queueN
             where (Just ((queueN,_),_)) = L.find (isRxQValidN i . fst) outE
@@ -354,13 +256,15 @@ configFDir _ inE outE cfg = do
 
         -- Generate node and edges for one filter
         bports = ["true","false"]
-        nodeL c = baseFNode (cFDtString c) (cFDtAttr c) bports Nothing
+        nodeL c = (baseFNode (cFDtString c) bports) {
+                    nAttributes = cFDtAttr c
+                    }
         addFilter ((iN,iE),es) c = do
             (n,_) <- confMNewNode $ nodeL c
             let inEdge = (iN,n,iE)
-            let tEdge = (n,queue $ cfdtQueue c,"true")
-            let fEdge = (n,queue $ cfdtQueue c,"false")
-            return ((n,"false"), es ++ [inEdge,tEdge,fEdge])
+            let tEdge = (n,queue $ cfdtQueue c,Edge "true")
+            let fEdge = (n,queue $ cfdtQueue c,Edge "false")
+            return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
 
 
 
