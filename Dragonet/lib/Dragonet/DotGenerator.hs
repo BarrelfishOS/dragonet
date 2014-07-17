@@ -22,7 +22,7 @@ t :: String -> T.Text
 t = T.pack
 
 -- Edge labels, mainly used to create double edges
-data ELabel = SingleEdge String | DoubleEdge
+data ELabel = SingleEdge String | DoubleEdge | SpawnEdge String
 
 -- Mark edges in adjacency list as double edges (if the case)
 fixAdj :: [(PG.Edge,DGI.Node)] -> [(ELabel,DGI.Node)]
@@ -37,7 +37,10 @@ fixAdj l = singleEdges ++ doubleEdges
         lSingle = filter (\(p,m) -> notElem m dblN ||
                                     (p /= PG.Edge "true" &&
                                      p /= PG.Edge "false")) l
-        singleEdges = map (A.first (SingleEdge . PG.ePort)) lSingle
+        -- Replace label by internal label
+        relblEdge PG.Edge { PG.ePort = p } = SingleEdge p
+        relblEdge PG.ESpawn { PG.eIdentifier = i } = SpawnEdge i
+        singleEdges = map (A.first relblEdge) lSingle
 
 -- Mark double edges in the graph
 getELs :: PG.PGraph -> DGI.Gr PG.Node ELabel
@@ -50,6 +53,11 @@ getELs = DGI.gmap conv
 
 -- Generate attributes for Edges
 formatEdge :: (n,n,ELabel) -> GA.Attributes
+formatEdge (_,_,SpawnEdge _) = [tailP,headP,style]
+    where
+        tailP = GA.TailPort $ GA.CompassPoint GA.North
+        headP = GA.HeadPort $ GA.CompassPoint GA.West
+        style = GA.Style [ GA.SItem GA.Dashed [] ]
 formatEdge (_,_,SingleEdge p) = [tailP,headP]
     where
         tailP = GA.TailPort $ GA.LabelledPort (GA.PN $ t p) (Just GA.East)
