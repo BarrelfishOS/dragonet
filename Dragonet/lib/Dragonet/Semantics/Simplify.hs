@@ -151,17 +151,40 @@ expectSuccess run = do
 builtins = [
     SMT.CmdDeclareType "Packet" 0,
     SMT.CmdDefineType  "POffset" [] (SMTB.tBitVec 16),
-    SMT.CmdDeclareFun  "plen" [SMT.TApp "Packet" []] (SMTB.tBitVec 16),
-    SMT.CmdDeclareFun  "pget"
-                        [SMT.TApp "Packet" [], SMTB.tBitVec 16]
-                        (SMTB.tBitVec 8),
-    SMT.CmdDeclareFun  "pkt" [] (SMT.TApp "Packet" []),
-    SMT.CmdDeclareFun  "IP4.src" [SMT.TApp "Packet" []] (SMTB.tBitVec 32),
-    SMT.CmdDeclareFun  "IP4.dst" [SMT.TApp "Packet" []] (SMTB.tBitVec 32),
-    SMT.CmdDeclareFun  "UDP.src" [SMT.TApp "Packet" []] (SMTB.tBitVec 16),
-    SMT.CmdDeclareFun  "UDP.dst" [SMT.TApp "Packet" []] (SMTB.tBitVec 16)
+    --
+    SMT.CmdDeclareType "L2Proto" 0,
+    SMT.CmdDeclareFun "L2P.Ethernet" [] (t "L2Proto"),
+    --
+    SMT.CmdDeclareType "L3Proto" 0,
+    SMT.CmdDeclareFun "L3P.IP4" [] (t "L3Proto"),
+    SMT.CmdDeclareFun "L3P.IP6" [] (t "L3Proto"),
+    SMT.CmdDeclareFun "L3P.ARP" [] (t "L3Proto"),
+    SMT.CmdAssert $ v "L3P.IP4" SMTC.=/= v "L3P.IP6",
+    SMT.CmdAssert $ v "L3P.IP4" SMTC.=/= v "L3P.ARP",
+    SMT.CmdAssert $ v "L3P.IP6" SMTC.=/= v "L3P.ARP",
+    --
+    SMT.CmdDeclareType "L4Proto" 0,
+    SMT.CmdDeclareFun "L4P.UDP" [] (t "L4Proto"),
+    SMT.CmdDeclareFun "L4P.TCP" [] (t "L4Proto"),
+    SMT.CmdDeclareFun "L4P.ICMP" [] (t "L4Proto"),
+    SMT.CmdAssert $ v "L4P.UDP" SMTC.=/= v "L4P.TCP",
+    SMT.CmdAssert $ v "L4P.UDP" SMTC.=/= v "L4P.ICMP",
+    SMT.CmdAssert $ v "L4P.TCP" SMTC.=/= v "L4P.ICMP",
+    --
+    SMT.CmdDeclareFun  "plen" [t "Packet"] (SMTB.tBitVec 16),
+    SMT.CmdDeclareFun  "pget" [t "Packet", SMTB.tBitVec 16] (SMTB.tBitVec 8),
+    SMT.CmdDeclareFun  "pkt" [] (t "Packet"),
+    SMT.CmdDeclareFun  "L2.Proto" [t "Packet"] (t "L2Proto"),
+    SMT.CmdDeclareFun  "L3.Proto" [t "Packet"] (t "L3Proto"),
+    SMT.CmdDeclareFun  "L4.Proto" [t "Packet"] (t "L4Proto"),
+    SMT.CmdDeclareFun  "IP4.src" [t "Packet"] (SMTB.tBitVec 32),
+    SMT.CmdDeclareFun  "IP4.dst" [t "Packet"] (SMTB.tBitVec 32),
+    SMT.CmdDeclareFun  "UDP.src" [t "Packet"] (SMTB.tBitVec 16),
+    SMT.CmdDeclareFun  "UDP.dst" [t "Packet"] (SMTB.tBitVec 16)
     ]
     where
+        t n = SMT.TApp n []
+        v n = SMT.app n []
 
 reducePG :: PG.PGraph -> Sem.Helpers -> IO PG.PGraph
 reducePG graph helpers = do

@@ -17,7 +17,8 @@ graph lpg {
         cluster L2Ether {
             boolean Classified {
                 port true[ValidLength]
-                port false[] }
+                port false[]
+                semantics true { (= L2P.Ethernet (L2.Proto pkt)) }}
 
             boolean ValidLength {
                 port true[ValidUnicast ValidMulticast ValidBroadcast
@@ -55,7 +56,10 @@ graph lpg {
                 port ipv4[.L3IPv4ValidHeaderLength]
                 port ipv6[]
                 port arp[.L3ARPValidHeaderLength]
-                port drop[] }
+                port drop[]
+                semantics ipv4 { (= L3P.IP4 (L3.Proto pkt)) }
+                semantics ipv6 { (= L3P.IP6 (L3.Proto pkt)) }
+                semantics arp { (= L3P.ARP (L3.Proto pkt)) } }
         }
 
 
@@ -126,7 +130,10 @@ graph lpg {
                 port tcp[.L4TCPValidHeaderLength]
                 port udp[.L4UDPValidHeaderLength]
                 port icmp[.L3ICMPValidHeaderLength]
-                port drop[] }
+                port drop[]
+                semantics tcp { (= L4P.TCP (L4.Proto pkt)) }
+                semantics udp { (= L4P.UDP (L4.Proto pkt)) }
+                semantics icmp { (= L4P.ICMP (L4.Proto pkt)) } }
 
             and Valid {
                 port true false[.L3IPValid] }

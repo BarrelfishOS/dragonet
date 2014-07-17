@@ -130,21 +130,22 @@ nodeL5Tuple c = (baseFNode (c5tString c) bports) {
                     }
     where
         bports = ["true","false"]
-        tSems = foldl1 SMTC.and $ catMaybes [
+        tSems = foldl1 SMTC.and $ (catMaybes  [
                 ipSems "src" <$> c5tL3Src c,
                 ipSems "dst" <$> c5tL3Dst c,
                 portSems "src" <$> c5tL4Src c,
                 portSems "dst" <$> c5tL4Dst c
-                ]
+                ]) ++ protoSems
         fSems = SMTC.not tSems
+        pkt = SMT.app "pkt" []
         ipSems n i = SMTBV.bv (fromIntegral i) 32 SMTC.===
-            SMT.app
-                (fromString $ "IP4." ++ n)
-                [SMT.app "pkt" []]
+            SMT.app (fromString $ "IP4." ++ n) [pkt]
         portSems n i = SMTBV.bv (fromIntegral i) 16 SMTC.===
-                    SMT.app
-                        (fromString $ "UDP." ++ n)
-                        [SMT.app "pkt" []]
+                    SMT.app (fromString $ "UDP." ++ n) [pkt]
+        protoSems = [
+            SMT.app "L3.Proto" [pkt] SMTC.=== SMT.app "L3P.IP4" [],
+            SMT.app "L4.Proto" [pkt] SMTC.=== SMT.app "L4P.UDP" []
+            ]
 
 config5tuple :: ConfFunction
 config5tuple _ inE outE cfg = do
