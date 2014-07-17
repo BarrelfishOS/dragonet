@@ -1,4 +1,12 @@
 graph e10kPRG {
+    node E10kInit {
+        attr "init"
+        attr "software"
+        spawn q0 RxQueue0
+        spawn q1 RxQueue1
+        spawn q2 RxQueue2
+        spawn q3 RxQueue3 }
+
     cluster Rx {
         cluster L2Ether {
             boolean Classified {
@@ -67,6 +75,7 @@ graph e10kPRG {
         node Queue0 {
             attr "software"
             attr "source"
+            spawn poll Queue0
             port out[]
             port drop[]
             port init[] }
@@ -77,6 +86,7 @@ graph e10kPRG {
         node Queue1 {
             attr "software"
             attr "source"
+            spawn poll Queue1
             port out[]
             port drop[]
             port init[] }
@@ -87,6 +97,7 @@ graph e10kPRG {
         node Queue2 {
             attr "software"
             attr "source"
+            spawn poll Queue2
             port out[]
             port drop[]
             port init[] }
@@ -97,6 +108,7 @@ graph e10kPRG {
         node Queue3 {
             attr "software"
             attr "source"
+            spawn poll Queue3
             port out[]
             port drop[]
             port init[] }

@@ -421,8 +421,8 @@ graph lpg {
                 port false true[Prepare] }
 
             node ProcessPendingResponse {
-                port false []
-                port true [LookupRequestIn] }
+                spawn restart LookupRequestIn
+                port out [] }
 
             node InitiateResponse {
                 port false true[Prepare]
@@ -447,8 +447,9 @@ graph lpg {
                 port false[] }
 
             node Lookup_ {
+                spawn miss SendRequest
                 port false true[.L2EtherPrepare]
-                port miss[SendRequest] }
+                port miss[] }
 
             node SendRequest {
                 attr "noreplicateout"
