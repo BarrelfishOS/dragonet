@@ -4,12 +4,14 @@ module Dragonet.Semantics.Simplify (
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG
+import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Dragonet.Semantics as Sem
 
 import qualified Util.GraphHelpers as GH
 
 import Control.Monad (foldM)
 import qualified Data.List as L
+import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Functor ((<$>))
@@ -66,7 +68,7 @@ type EMap = M.Map DGI.Node [(String,Sem.PortSemantics)]
 
 processPort :: PG.PGNode -> [(String, Sem.PortSemantics)] -> String
                 -> Sem.PortSemantics
-processPort (_,l) ins p =
+processPort (n,l) ins p =
     case l of
         PG.FNode { PG.nSemantics = sems }->
             case lookup p sems of
@@ -117,7 +119,9 @@ processNode solver (g,eM) fn@(n,nL) = do
                         -> IO (PG.PGraph,EMap)
         portSat (g',eM') (p,e) = do
             us <- checkSat solver e
-            let edges = [((n,eN,eP),e) | (eN,eP) <- lsucs, PG.ePort eP == p]
+            let pMatch p' PG.Edge { PG.ePort = p } = p' == p
+                pMatch _ _ = False
+                edges = [((n,eN,eP),e) | (eN,eP) <- lsucs, pMatch p eP]
             let updateEM e' =
                     M.delete n $
                         foldl (\m ((_,n',_),_) -> addIn n' (p,e') m) eM' edges
@@ -165,13 +169,14 @@ reducePG graph helpers = do
     let SMT.Script cmds = helpers
     mapM_ (expectSuccess . runCmd sol) (builtins ++ cmds)
     -- Get topologically sorted list of nodes
-    let nodes = GH.topsortLN graph
+    let graph' = PGU.dropSpawnEdges graph
+        nodes = GH.topsortLN graph'
     -- Prepare cached solver
     cache <- STM.atomically $ TV.newTVar $ M.empty
     let sol' = (sol,cache)
     -- Iterate over nodes, keeping a map of Expr for each edge that was
     -- processed
-    (graph',_) <- foldM (processNode sol') (graph,M.empty) nodes
+    (graph'',_) <- foldM (processNode sol') (graph,M.empty) nodes
     HS.exit sol
-    return graph'
+    return graph''
 
