@@ -32,37 +32,49 @@ addIn k v = M.insertWith (++) k [v]
 lookupAll :: Eq a => a -> [(a,b)] -> [(a,b)]
 lookupAll a as = filter ((== a) . fst) as
 
+fList :: SMT.Ident -> SMT.Expr -> S.Set SMT.Expr
+fList f e@(SMT.App af Nothing es)
+    | f == af = S.unions $ map (fList f) es
+    | otherwise = S.singleton e
+fList _ e = S.singleton e
+
 sAnd a b
-    | a == b = a
-    | a == SMTC.true = b
-    | b == SMTC.true = a
-    | a == SMTC.false || b == SMTC.false = SMTC.false
-    | otherwise = a `SMTC.and` b
+    | SMTC.false `S.member` parts = SMTC.false
+    | S.null cleaned = SMTC.true
+    | otherwise = foldl1 SMTC.and $ S.toList cleaned
+    where
+        parts = fList "and" a `S.union` fList "and" b
+        cleaned = parts S.\\ S.singleton SMTC.true
 
 sOr a b
-    | a == b = a
-    | a == SMTC.false = b
-    | b == SMTC.false = a
-    | a == SMTC.true || b == SMTC.true = SMTC.true
-    | otherwise = a `SMTC.or` b
+    | SMTC.true `S.member` parts = SMTC.true
+    | S.null cleaned = SMTC.false
+    | otherwise = foldl1 SMTC.or $ S.toList cleaned
+    where
+        parts = fList "or" a `S.union` fList "or" b
+        cleaned = parts S.\\ S.singleton SMTC.false
+
 
 type MySolver = (HS.Solver,
                  TV.TVar (M.Map Sem.PortSemantics HPS.CheckSatResponse))
 
-checkSat :: MySolver -> Sem.PortSemantics -> IO HPS.CheckSatResponse
-checkSat (sol,cache) ps = do
+checkSat :: MySolver -> (PG.Node,String) -> Sem.PortSemantics
+                -> IO HPS.CheckSatResponse
+checkSat (sol,cache) (n,p) ps = do
     c <- M.lookup ps <$> (STM.atomically $ TV.readTVar cache)
-    case c of
+    r <- case c of
         Nothing -> do
             HS.CGR HPS.Success <- HS.push sol 1
             HS.CGR HPS.Success <- HS.assert sol ps
             HS.CCS res <- HS.checkSat sol
             HS.CGR HPS.Success <- HS.pop sol 1
-            --putStrLn $ "checkSat (" ++ (show $ SMT.pp ps) ++ ") -> " ++ show res
             STM.atomically $ TV.modifyTVar' cache (M.insert ps res)
             return res
 
         Just r -> return r
+    --let s = PG.nTag n ++ "." ++ PG.nLabel n ++ "." ++ p ++ ":  "
+    --putStrLn $ s ++ "checkSat (" ++ (show $ SMT.pp ps) ++ ")  -> " ++ show r
+    return r
 
 type EMap = M.Map DGI.Node [(String,Sem.PortSemantics)]
 
@@ -118,7 +130,7 @@ processNode solver (g,eM) fn@(n,nL) = do
     let portSat :: (PG.PGraph,EMap) -> (PG.NPort,Sem.PortSemantics)
                         -> IO (PG.PGraph,EMap)
         portSat (g',eM') (p,e) = do
-            us <- checkSat solver e
+            us <- checkSat solver (nL,p) e
             let pMatch p' PG.Edge { PG.ePort = p } = p' == p
                 pMatch _ _ = False
                 edges = [((n,eN,eP),e) | (eN,eP) <- lsucs, pMatch p eP]
