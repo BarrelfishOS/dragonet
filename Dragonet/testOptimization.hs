@@ -233,7 +233,7 @@ evalGraph helpers prg lpg pref cfg = do
     write "cleanup.dot" $ toDot cleanedUp
 
     -- Dots for pipeline graph...
-    let linkMap pl = "pl_" ++ PL.plLabel pl ++ ".svg"
+    let linkMap pl = pref ++ "pl_" ++ PL.plLabel pl ++ ".svg"
     let plg = pipelineGraph cleanedUp
     write "pipelines.dot" $ pipelinesDot (Just linkMap) plg
     mapM_ (\(_,pl) ->
