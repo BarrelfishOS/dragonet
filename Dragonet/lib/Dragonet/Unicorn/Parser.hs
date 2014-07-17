@@ -4,6 +4,7 @@ module Dragonet.Unicorn.Parser(
     Graph(..),
     Cluster(..),
     Port(..),
+    Spawn(..),
     Node(..),
 
     nAllPorts,
@@ -45,16 +46,24 @@ data Port = Port {
         pOuts     :: [String] }
     deriving Show
 
+data Spawn = Spawn {
+        sName     :: String,
+        sNode     :: String }
+    deriving Show
+
+
 data Node =
     Node {
         nName     :: String,
         nPorts    :: [Port],
+        nSpawns   :: [Spawn],
         nAttrs    :: [NAttribute],
         nPortSems :: [(String, SMT.Expr)] } |
 
     Config {
         nName     :: String,
         nPorts    :: [Port],
+        nSpawns   :: [Spawn],
         nAttrs    :: [NAttribute],
         nConfFun  :: Maybe String,
         nConfType :: ConfType } |
@@ -63,6 +72,7 @@ data Node =
         nName     :: String,
         nPortT    :: Port,
         nPortF    :: Port,
+        nSpawns   :: [Spawn],
         nAttrs    :: [NAttribute],
         nPortSems :: [(String, SMT.Expr)] } |
 
@@ -117,7 +127,7 @@ lexer = P.makeTokenParser P.LanguageDef {
     P.opLetter = Parsec.oneOf "",
     P.reservedNames = ["graph", "cluster", "node", "config", "boolean", "and",
                        "nand", "or", "nor", "gconfig", "port", "attr", "type",
-                       "semantics", "helpers"],
+                       "semantics", "helpers", "spawn"],
     P.reservedOpNames = [],
     P.caseSensitive = True }
 
@@ -156,6 +166,12 @@ port p = do
     where
         ports ns ds = map (flip Port ds) ns
 
+spawn p = do
+    reserved "spawn"
+    n <- identifier
+    d <- cIdentifier p
+    return $ Spawn n d
+
 attributes = do
     reserved "attr"
     NAttrCustom <$> stringLiteral
@@ -178,21 +194,23 @@ semantics = do
 genNaryNode p name = do
     reserved name
     n <- cIdentifier p
-    (ps,as,sems) <- braces $ do
+    (ps,as,sems,spawns) <- braces $ do
         as' <- many attributes
+        ss <- many (spawn p)
         ps' <- concat <$> many (port p)
         cs <- many constraint
         let attrs = as' ++ constraintAttrs cs
         sems <- concat <$> many semantics
-        return (ps',attrs,sems)
-    return (n,ps,as,sems)
+        return (ps',attrs,sems,ss)
+    return (n,ps,as,sems,spawns)
 
 
 node p = do
-    (name,ports,attr,sems) <- genNaryNode p "node"
+    (name,ports,attr,sems,spawns) <- genNaryNode p "node"
     return $ Right $ Node {
             nName     = name,
             nPorts    = ports,
+            nSpawns   = spawns,
             nAttrs    = attr,
             nPortSems = sems }
 
@@ -209,16 +227,18 @@ configType = do
 config p = do
     reserved "config"
     n <- cIdentifier p
-    (ps,as,iF,ctt) <- braces $ do
+    (ps,as,iF,ctt,ss) <- braces $ do
         mbCtt <- optionMaybe configType
         iF' <- optionMaybe configFun
         as' <- many attributes
+        ss <- many (spawn p)
         ps' <- concat <$> many (port p)
         let ctt' = defaultType ps' `fromMaybe` mbCtt
-        return (ps',as',iF',ctt')
+        return (ps',as',iF',ctt',ss)
     return $ Right $ Config {
             nName     = n,
             nPorts    = ps,
+            nSpawns   = ss,
             nAttrs    = as,
             nConfFun  = iF,
             nConfType = ctt }
@@ -228,15 +248,18 @@ config p = do
 genBoolean p name hasConstraints = do
     reserved name
     n <- cIdentifier p
-    (ps,as,sems) <- braces $ do
+    (ps,as,sems,spawns) <- braces $ do
         as' <- many attributes
+        spawns <- if hasConstraints
+                    then many (spawn p)
+                    else return []
         ps' <- concat <$> many (port p)
         cs <- if hasConstraints then many constraint else return []
         sems <- if hasConstraints
                 then concat <$> many semantics
                 else return []
         let attrs = as' ++ constraintAttrs cs
-        return (ps',attrs,sems)
+        return (ps',attrs,sems,spawns)
     if (length ps) /= 2 then
         unexpected "Unexpected number of ports in boolean node, expect exactly 2"
     else
@@ -247,7 +270,7 @@ genBoolean p name hasConstraints = do
                 unexpected "false port not found in boolean node"
             else
                 return ()
-    return (n, (head ps), (head (tail ps)),as, sems)
+    return (n, (head ps), (head (tail ps)),as, sems, spawns)
     where
         isPort n p = n == pName p
         findPort n ps = L.find (isPort n) ps
@@ -255,17 +278,18 @@ genBoolean p name hasConstraints = do
         falsePort = findPort "false"
 
 boolean p = do
-    (n, t, f, a, s) <- genBoolean p "boolean" True
+    (n, t, f, a, s, ss) <- genBoolean p "boolean" True
     return $ Right $ Boolean {
             nName     = n,
             nPortT    = t,
             nPortF    = f,
+            nSpawns   = ss,
             nAttrs    = a,
             nPortSems = s }
 
 
 orN p = do
-    (n, t, f, a, _) <- genBoolean p "or" False
+    (n, t, f, a, _, _) <- genBoolean p "or" False
     return $ Right $ Or {
             nName  = n,
             nPortT = t,
@@ -274,7 +298,7 @@ orN p = do
 
 
 norN p = do
-    (n, t, f, a, _) <- genBoolean p "nor" False
+    (n, t, f, a, _, _) <- genBoolean p "nor" False
     return $ Right $ NOr {
             nName  = n,
             nPortT = t,
@@ -283,7 +307,7 @@ norN p = do
 
 
 andN p = do
-    (n, t, f, a, _) <- genBoolean p "and" False
+    (n, t, f, a, _, _) <- genBoolean p "and" False
     return $ Right $ And {
             nName  = n,
             nPortT = t,
@@ -291,7 +315,7 @@ andN p = do
             nAttrs = a }
 
 nandN p = do
-    (n, t, f, a, _) <- genBoolean p "nand" False
+    (n, t, f, a, _, _) <- genBoolean p "nand" False
     return $ Right $ NAnd {
             nName  = n,
             nPortT = t,

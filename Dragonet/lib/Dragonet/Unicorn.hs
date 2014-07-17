@@ -105,8 +105,18 @@ constructGraph (Graph { gName = gname, gRootCluster = cluster }) =
                                       out <- pOuts port]
             where pname = pName port
 
+        get_edges_spawn :: (Int, Node) -> [PG.PGEdge]
+        get_edges_spawn (nid, node) =
+            [(nid,  node_id $ sNode s, PG.ESpawn $ sName s) |
+                s <- case node of
+                    Node { nSpawns = ss' } -> ss'
+                    Config { nSpawns = ss' } -> ss'
+                    Boolean { nSpawns = ss' } -> ss'
+                    _ -> [] ]
+
         get_edges_node :: (Int, Node) -> [PG.PGEdge]
-        get_edges_node (nid, node) = concatMap get_edges_port x
+        get_edges_node n@(nid, node) =
+            concatMap get_edges_port x ++ get_edges_spawn n
             where x = [ (nid, port) | port <- nAllPorts node ]
 
         pg_edges :: [PG.PGEdge]
@@ -140,8 +150,11 @@ unicornSimpleConfig n inE outE cval =
     where
         -- Port name to use
         cfg = PG.nConfType n `CFG.cvEnumName` cval
+        -- Pick edges that match config, drop spawn edges
+        matchingEdge PG.Edge { PG.ePort = p } = p == cfg
+        matchingEdge _ = False
         -- Only the out-endpoints that match the configuration
-        outN = map fst $ filter ((== cfg) . PG.ePort . snd) outE
+        outN = map fst $ filter (matchingEdge . snd) outE
         -- Remove labels from node in edge
         unlab ((a,_),(b,_),c) = (a,b,c)
         -- Create edge from (n,p) to all out-endpoints
