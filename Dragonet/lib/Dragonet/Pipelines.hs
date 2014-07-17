@@ -79,6 +79,7 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
                         PG.baseFNode ("FromPL" ++ pl) ["false","true"]
                     GM.newEdge (fromPLN, demux_N, PG.Edge "false")
                     GM.newEdge (fromPLN, demux_N, PG.Edge "true")
+                    GM.newEdge (fromPLN, fromPLN, PG.ESpawn "poll")
 
                 -- Add Demux node
                 let demuxPs = ["_"] ++ map labN inDN
@@ -91,13 +92,13 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
             if null outE then
                 return ()
             else
-                mapM_ (\(pl,ns') -> do
+                forM_ outPL $ \(pl,ns') -> do
                     -- Create "To$Pipeline" node
                     let toPLNA = "pipeline=" ++ pl
                         as = map PG.NAttrCustom ["sink", toPLNA]
                     toPLN <- GM.newNode $ PG.nAttrsAdd as $
                         PG.baseFNode ("ToPL" ++ pl) ["out"]
-                    mapM_ (\(n,es) -> do
+                    forM_ ns' $ \(n,es) -> do
                         -- Create "To$Node" node
                         let as' = map PG.NAttrCustom ["multiplex=" ++ labN n,
                                                       "muxPL=" ++ pl]
@@ -107,8 +108,6 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
                         GM.newEdge (toNN,toPLN,PG.Edge "out")
                         -- Add edges
                         mapM_ (\(s,_,p) -> GM.newEdge (s,toNN,p)) es
-                        ) ns'
-                    ) outPL
             return $ map fst outPL)
 
 
