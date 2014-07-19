@@ -1,5 +1,5 @@
 module Util.Misc (
-    splitBy, joinBy, minusL, partListBy,
+    splitBy, splitByFirst, joinBy, minusL, partListBy,
     fst3, snd3, thd3,
 ) where
 
@@ -13,6 +13,16 @@ splitBy delimiter = foldr f [[]]
     where f c l@(x:xs) | c == delimiter = []:l
                        | otherwise = (c:x):xs
           f _ _ = undefined
+
+-- Split list at first occurrence of delimiter, otherwise second list will be
+-- empty
+splitByFirst :: Eq a => a -> [a] -> ([a],[a])
+splitByFirst delim as = snd $ foldl f (False,([],[])) as
+    where
+        f (True,(as,bs)) a = (True,(as,bs ++ [a]))
+        f (False,(as,bs)) a
+            | a == delim = (True,(as,bs))
+            | otherwise = (False,(as ++ [a],bs))
 
 -- Concatenate lists with delimiter
 joinBy :: [[a]] -> [a] -> [a]

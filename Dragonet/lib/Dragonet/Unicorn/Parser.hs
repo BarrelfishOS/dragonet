@@ -58,7 +58,8 @@ data Node =
         nPorts    :: [Port],
         nSpawns   :: [Spawn],
         nAttrs    :: [NAttribute],
-        nPortSems :: [(String, SMT.Expr)] } |
+        nPortSems :: [(String, SMT.Expr)],
+        nImplFun  :: Maybe String } |
 
     Config {
         nName     :: String,
@@ -74,7 +75,8 @@ data Node =
         nPortF    :: Port,
         nSpawns   :: [Spawn],
         nAttrs    :: [NAttribute],
-        nPortSems :: [(String, SMT.Expr)] } |
+        nPortSems :: [(String, SMT.Expr)],
+        nImplFun  :: Maybe String } |
 
     And {
         nName     :: String,
@@ -191,28 +193,32 @@ semantics = do
     sem <- braces $ SMTP.termParser
     return $ map (\p -> (p,sem)) ps
 
+implFun = do { reserved "implementation" ; identifier }
+
 genNaryNode p name = do
     reserved name
     n <- cIdentifier p
-    (ps,as,sems,spawns) <- braces $ do
+    (ps,as,sems,spawns,mi) <- braces $ do
+        mi <- optionMaybe implFun
         as' <- many attributes
         ss <- many (spawn p)
         ps' <- concat <$> many (port p)
         cs <- many constraint
         let attrs = as' ++ constraintAttrs cs
         sems <- concat <$> many semantics
-        return (ps',attrs,sems,ss)
-    return (n,ps,as,sems,spawns)
+        return (ps',attrs,sems,ss,mi)
+    return (n,ps,as,sems,spawns,mi)
 
 
 node p = do
-    (name,ports,attr,sems,spawns) <- genNaryNode p "node"
+    (name,ports,attr,sems,spawns,impl) <- genNaryNode p "node"
     return $ Right $ Node {
             nName     = name,
             nPorts    = ports,
             nSpawns   = spawns,
             nAttrs    = attr,
-            nPortSems = sems }
+            nPortSems = sems,
+            nImplFun  = impl }
 
 configFun = do
     reserved "function"
@@ -248,7 +254,8 @@ config p = do
 genBoolean p name hasConstraints = do
     reserved name
     n <- cIdentifier p
-    (ps,as,sems,spawns) <- braces $ do
+    (ps,as,sems,spawns,mi) <- braces $ do
+        mi <- if hasConstraints then optionMaybe implFun else return Nothing
         as' <- many attributes
         spawns <- if hasConstraints
                     then many (spawn p)
@@ -259,7 +266,7 @@ genBoolean p name hasConstraints = do
                 then concat <$> many semantics
                 else return []
         let attrs = as' ++ constraintAttrs cs
-        return (ps',attrs,sems,spawns)
+        return (ps',attrs,sems,spawns,mi)
     if (length ps) /= 2 then
         unexpected "Unexpected number of ports in boolean node, expect exactly 2"
     else
@@ -270,7 +277,7 @@ genBoolean p name hasConstraints = do
                 unexpected "false port not found in boolean node"
             else
                 return ()
-    return (n, (head ps), (head (tail ps)),as, sems, spawns)
+    return (n, (head ps), (head (tail ps)),as, sems, spawns, mi)
     where
         isPort n p = n == pName p
         findPort n ps = L.find (isPort n) ps
@@ -278,18 +285,19 @@ genBoolean p name hasConstraints = do
         falsePort = findPort "false"
 
 boolean p = do
-    (n, t, f, a, s, ss) <- genBoolean p "boolean" True
+    (n, t, f, a, s, ss, mi) <- genBoolean p "boolean" True
     return $ Right $ Boolean {
             nName     = n,
             nPortT    = t,
             nPortF    = f,
             nSpawns   = ss,
             nAttrs    = a,
-            nPortSems = s }
+            nPortSems = s,
+            nImplFun  = mi }
 
 
 orN p = do
-    (n, t, f, a, _, _) <- genBoolean p "or" False
+    (n, t, f, a, _, _, _) <- genBoolean p "or" False
     return $ Right $ Or {
             nName  = n,
             nPortT = t,
@@ -298,7 +306,7 @@ orN p = do
 
 
 norN p = do
-    (n, t, f, a, _, _) <- genBoolean p "nor" False
+    (n, t, f, a, _, _, _) <- genBoolean p "nor" False
     return $ Right $ NOr {
             nName  = n,
             nPortT = t,
@@ -307,7 +315,7 @@ norN p = do
 
 
 andN p = do
-    (n, t, f, a, _, _) <- genBoolean p "and" False
+    (n, t, f, a, _, _, _) <- genBoolean p "and" False
     return $ Right $ And {
             nName  = n,
             nPortT = t,
@@ -315,7 +323,7 @@ andN p = do
             nAttrs = a }
 
 nandN p = do
-    (n, t, f, a, _, _) <- genBoolean p "nand" False
+    (n, t, f, a, _, _, _) <- genBoolean p "nand" False
     return $ Right $ NAnd {
             nName  = n,
             nPortT = t,

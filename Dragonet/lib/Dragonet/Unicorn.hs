@@ -17,29 +17,35 @@ import qualified Data.Graph.Inductive as DGI
 import qualified Text.Show.Pretty as Pr
 
 
+addImplFun :: Maybe String -> PG.Node -> PG.Node
+addImplFun Nothing n = n
+addImplFun (Just l) n = n { PG.nImplementation = PG.NImplFunction l }
+
 -- empty implementation for now
 node_to_pgnode :: Node -> PG.Node
 node_to_pgnode Node {
                 nName = name,
                 nPorts = ports,
                 nAttrs = attrs,
-                nPortSems = sems } =
+                nPortSems = sems,
+                nImplFun = mi } =
     node { PG.nSemantics = sems }
     where
         pnames = map pName ports
-        node = PG.nAttrsAdd attrs $ PG.baseFNode name pnames
+        node = addImplFun mi $ PG.nAttrsAdd attrs $ PG.baseFNode name pnames
 node_to_pgnode Boolean {
                 nName  = name,
                 nPortT = pt,
                 nPortF = pf,
                 nAttrs = attrs,
-                nPortSems = sems } =
+                nPortSems = sems,
+                nImplFun = mi } =
     node { PG.nSemantics = sems,
            PG.nAttributes = a }
     where
         pnames = map pName [pt, pf]
         a = PG.NAttrCustom "Boolean":attrs
-        node = PG.baseFNode name pnames
+        node = addImplFun mi $ PG.baseFNode name pnames
 node_to_pgnode And {
                 nName  = name,
                 nPortT = pt,
