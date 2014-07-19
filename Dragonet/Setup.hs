@@ -74,8 +74,8 @@ makeHelper verb get_xfield make incs llvmlink bld_dir = do
                 args = ["LLVM_LINK=" ++ (locationPath $ programLocation llvmlink),
                         "BUILD_DIR=" ++ bld_dir,
                         "CFLAGS=-O3 -Wall -Wno-unused-variable -Wno-unused-function \\\n " ++ xincs,
-                        "-f", xmkfile,
-                        L.intercalate " " $ map ((bld_dir ++ "/") ++  ) xfiles ]
+                        "-f", xmkfile] ++
+                        map ((bld_dir ++ "/") ++  ) xfiles
             runProgram verb make args
             return ()
 
