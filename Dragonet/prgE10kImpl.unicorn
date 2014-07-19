@@ -30,6 +30,7 @@ graph e10kPRG {
         cluster L3IPv4 {
 
             boolean Classified {
+                implementation E10kL3IPv4Classified
                 attr "software"
                 port true false[]
                 constraint true "IPv4"
@@ -39,6 +40,7 @@ graph e10kPRG {
                 port out[ValidChecksum .C5TupleFilter] }
 
             boolean ValidChecksum {
+                implementation E10kL3IPv4ValidChecksum
                 attr "software"
                 port true false[] }
         }
@@ -73,6 +75,7 @@ graph e10kPRG {
             port true[Queue0]
             port false[] }
         node Queue0 {
+            implementation E10kRxQueue0
             attr "software"
             attr "source"
             spawn poll Queue0
@@ -84,6 +87,7 @@ graph e10kPRG {
             port true[Queue1]
             port false[] }
         node Queue1 {
+            implementation E10kRxQueue1
             attr "software"
             attr "source"
             spawn poll Queue1
@@ -95,6 +99,7 @@ graph e10kPRG {
             port true[Queue2]
             port false[] }
         node Queue2 {
+            implementation E10kRxQueue2
             attr "software"
             attr "source"
             spawn poll Queue2
@@ -106,6 +111,7 @@ graph e10kPRG {
             port true[Queue3]
             port false[] }
         node Queue3 {
+            implementation E10kRxQueue3
             attr "software"
             attr "source"
             spawn poll Queue3
@@ -116,15 +122,19 @@ graph e10kPRG {
 
     cluster Tx {
         node Queue0 {
+            implementation E10kTxQueue0
             attr "sink"
             attr "software" }
         node Queue1 {
+            implementation E10kTxQueue1
             attr "sink"
             attr "software" }
         node Queue2 {
+            implementation E10kTxQueue2
             attr "sink"
             attr "software" }
         node Queue3 {
+            implementation E10kTxQueue3
             attr "sink"
             attr "software" }
     }

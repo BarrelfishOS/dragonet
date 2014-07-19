@@ -165,6 +165,10 @@ enum attr_mux_id {
     ATTR_MUX_TCPIR,
 };
 
+struct ctx_generic {
+    void *implementation;
+};
+
 //#define panic(x...) do { printf(#__FILE__":"#__LINE__": "x); abort(); } while (0)
 #define panic(x...) panic_(__FILE__,__LINE__,x);
 

@@ -17,7 +17,8 @@ static void tap_init(struct state *state)
     tap_up(state->tap_handler);
 }
 
-node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
+node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context,
+        struct state *state, struct input **in)
 {
     int p_id = ++rx_pkts;
     pktoff_t maxlen;
@@ -30,33 +31,34 @@ node_out_t do_pg__TapRxQueue(struct state *state, struct input *in)
         printf("Initialized\n");
         dprint("%s:%s:%d: [pktid:%d]: ############## initialized queue\n",
               __FILE__,  __func__, __LINE__, p_id);
-        return P_Queue_init;
+        return P_RxQueue_init;
     }
 
 
     dprint("%s:%s:%d: [pktid:%d]: ############## Trying to receive packet\n",
            __FILE__,  __func__, __LINE__, p_id);
 
-    pkt_prepend(in, in->space_before);
-    ssize_t len = tap_read(state->tap_handler, (char *) in->data, in->len, 500);
+    pkt_prepend(*in, (*in)->space_before);
+    ssize_t len = tap_read(state->tap_handler, (char *) (*in)->data, (*in)->len, 500);
     if (len == 0) {
         dprint("%s:%d: [pktid:%d]: pkt with zero len\n", __func__, __LINE__, p_id);
-        pkt_prepend(in, -in->len);
-        return P_Queue_drop;
+        pkt_prepend(*in, -(*in)->len);
+        return P_RxQueue_drop;
     }
-    pkt_append(in, -(in->len - len));
+    pkt_append(*in, -((*in)->len - len));
 
     dprint("%s:%d: [pktid:%d]: ############## pkt received, data: %p, len:%zu\n",
-            __func__, __LINE__, p_id, in->data, len);
-    return P_Queue_out;
+            __func__, __LINE__, p_id, (*in)->data, len);
+    return P_RxQueue_out;
 }
 
-node_out_t do_pg__TapTxQueue(struct state *state, struct input *in)
+node_out_t do_pg__TapTxQueue(struct ctx_TapTxQueue *context,
+        struct state *state, struct input **in)
 {
     int p_id = ++tx_pkts;
     dprint("%s:%s:%d: [pktid:%d]: ############## Trying to send packet, data: %p, len:%"PRIu32"\n",
-            __FILE__, __func__, __LINE__, p_id, in->data, in->len);
-    tap_write(state->tap_handler, in->data, in->len);
+            __FILE__, __func__, __LINE__, p_id, (*in)->data, (*in)->len);
+    tap_write(state->tap_handler, (*in)->data, (*in)->len);
     dprint("%s:%s:%d: [pktid:%d]: ##############  packet sent\n",
             __FILE__, __func__, __LINE__, p_id);
     return 0;

@@ -274,7 +274,7 @@ out_err:
 
 #define MAX_QUEUES          16
 static uint64_t qstat[MAX_QUEUES] = {0, 0};
-static node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
+static node_out_t rx_queue(struct state *state, struct input **in, uint8_t qi)
 {
     assert(qi < MAX_QUEUES);
     struct dragonet_e10k *e10k = (struct dragonet_e10k *) state->tap_handler;
@@ -289,7 +289,7 @@ static node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
     if (e10k == NULL) {
         if (qi != 0) {
             // We'll do the intialization on queue 0
-            return P_Queue_drop;
+            return P_E10kRxQueue0_drop;
         }
 
         if (!e10k_if_init(state, CONFIG_PCI_ADDR)) {
@@ -310,24 +310,24 @@ static node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
     if (!q->populated) {
         int j;
         for (j = 0; j < NUM_RXBUFS; j++) {
-            struct input *in = input_alloc();
-            if (in == NULL) {
+            struct input *i = input_alloc();
+            if (i == NULL) {
                 fprintf(stderr, "Allocating receive buffer %d failed\n", j);
                 break;
             }
 
-            queue_add_rxbuf(q->queue, in);
+            queue_add_rxbuf(q->queue, i);
         }
 
         e10k_queue_bump_rxtail(q->queue);
         q->populated = true;
         if (qi == 0) {
-            return P_Queue_init;
+            return P_E10kRxQueue0_init;
         }
     }
 
     if (e10k_queue_get_rxbuf(q->queue, &op, &len, &last, &flags) != 0) {
-        return P_Queue_drop;
+        return P_E10kRxQueue0_drop;
     }
     qin = op;
 
@@ -339,7 +339,7 @@ static node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
         } else if (last) {
             q->chained = false;
         }
-        port = P_Queue_drop;
+        port = P_E10kRxQueue0_drop;
         goto add_buf;
     }
     //printf("e10k: Yay, we got a full packet!\n");
@@ -356,8 +356,8 @@ static node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
     pkt_append(qin, -(qin->len - len));
 
     // Add current in as replacement buffer
-    input_xchg(qin, in);
-    port = P_Queue_out;
+    input_xchg(qin, *in);
+    port = P_E10kRxQueue0_out;
 
 add_buf:
     queue_add_rxbuf(q->queue, qin);
@@ -366,7 +366,7 @@ add_buf:
 
 }
 
-static node_out_t tx_queue(struct state *state, struct input *in, uint8_t qi)
+static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
 {
     struct dragonet_e10k *e10k;
     struct dragonet_e10k_queue *q;
@@ -382,7 +382,7 @@ static node_out_t tx_queue(struct state *state, struct input *in, uint8_t qi)
     // Replacement input
     qin = input_alloc();
     assert(qin != NULL);
-    input_xchg(qin, in);
+    input_xchg(qin, *in);
 
     e10k_queue_add_txbuf(q->queue, qin->phys, qin->len, qin, 1, 1, qin->len);
     e10k_queue_bump_txtail(q->queue);
@@ -398,43 +398,51 @@ static node_out_t tx_queue(struct state *state, struct input *in, uint8_t qi)
     return 0;
 }
 
-node_out_t do_pg__RxE10kQueue000(struct state *state, struct input *in)
+node_out_t do_pg__E10kRxQueue0(struct ctx_E10kRxQueue0 *context,
+        struct state *state, struct input **in)
 {
     return rx_queue(state, in, 0);
 }
 
-node_out_t do_pg__RxE10kQueue001(struct state *state, struct input *in)
+node_out_t do_pg__E10kRxQueue1(struct ctx_E10kRxQueue1 *context,
+        struct state *state, struct input **in)
 {
     return rx_queue(state, in, 1);
 }
 
-node_out_t do_pg__RxE10kQueue002(struct state *state, struct input *in)
+node_out_t do_pg__E10kRxQueue2(struct ctx_E10kRxQueue2 *context,
+        struct state *state, struct input **in)
 {
     return rx_queue(state, in, 2);
 }
 
-node_out_t do_pg__RxE10kQueue003(struct state *state, struct input *in)
+node_out_t do_pg__E10kRxQueue3(struct ctx_E10kRxQueue3 *context,
+        struct state *state, struct input **in)
 {
     return rx_queue(state, in, 3);
 }
 
 
-node_out_t do_pg__TxE10kQueue000(struct state *state, struct input *in)
+node_out_t do_pg__E10kTxQueue0(struct ctx_E10kTxQueue0 *context,
+        struct state *state, struct input **in)
 {
     return tx_queue(state, in, 0);
 }
 
-node_out_t do_pg__TxE10kQueue001(struct state *state, struct input *in)
+node_out_t do_pg__E10kTxQueue1(struct ctx_E10kTxQueue1 *context,
+        struct state *state, struct input **in)
 {
     return tx_queue(state, in, 1);
 }
 
-node_out_t do_pg__TxE10kQueue002(struct state *state, struct input *in)
+node_out_t do_pg__E10kTxQueue2(struct ctx_E10kTxQueue2 *context,
+        struct state *state, struct input **in)
 {
     return tx_queue(state, in, 2);
 }
 
-node_out_t do_pg__TxE10kQueue003(struct state *state, struct input *in)
+node_out_t do_pg__E10kTxQueue3(struct ctx_E10kTxQueue3 *context,
+        struct state *state, struct input **in)
 {
     return tx_queue(state, in, 3);
 }
