@@ -38,6 +38,7 @@ library
                         Dragonet.Implementation.IPv4,
                         Dragonet.Implementation.TCP,
                         Dragonet.Implementation.UDP,
+                        Dragonet.Optimization,
                         Dragonet.Pipelines,
                         Dragonet.ProtocolGraph,
                         Dragonet.ProtocolGraph.Utils,
@@ -53,13 +54,13 @@ library
     build-depends:      base, containers, template-haskell, fgl, parsec,
                         bytestring, pretty-show, stm, mtl, graphviz>=2999.16,
                         text, process, temporary, smtLib, Hsmtlib, transformers,
-                        bulktransfer, shmchan, barrelfish
+                        bulktransfer, shmchan, barrelfish, filepath, directory
     default-language:   Haskell2010
     extensions:         RankNTypes
 
 executable opt-test
     main-is:            testOptimization.hs
-    build-depends:      Dragonet, base, smtLib, fgl
+    build-depends:      Dragonet, base, smtLib, fgl, directory
     default-language:   Haskell2010
 
 executable generateCSkeleton

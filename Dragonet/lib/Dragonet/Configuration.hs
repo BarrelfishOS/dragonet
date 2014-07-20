@@ -1,4 +1,5 @@
 module Dragonet.Configuration(
+    Configuration,
     ConfType(..),
     ConfValue(..),
     ConfFunction,
@@ -16,6 +17,8 @@ import qualified Data.Graph.Inductive as DGI
 import qualified Util.GraphHelpers as GH
 import qualified Control.Monad.State as ST
 import Data.Maybe
+
+type Configuration = [(String,ConfValue)]
 
 -- Get enumerator name from conf value and its type
 cvEnumName :: ConfType -> ConfValue -> String
@@ -47,7 +50,7 @@ confMRun g m = addEdges $ addNodes g
 
 
 -- Apply configuration for a single CNode
-applyCNode :: [(String,ConfValue)] -> PGraph -> PGContext -> PGraph
+applyCNode :: Configuration -> PGraph -> PGContext -> PGraph
 applyCNode config g ctx = confMRun g' newEM
     where
         node = DGI.lab' ctx
@@ -68,7 +71,7 @@ applyCNode config g ctx = confMRun g' newEM
 
 
 -- Apply specified configuration to graph
-applyConfig :: [(String,ConfValue)] -> PGraph -> PGraph
+applyConfig :: Configuration -> PGraph -> PGraph
 applyConfig cfg g =
     foldl (applyCNode cfg) g configNodes
     where

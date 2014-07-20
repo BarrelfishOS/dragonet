@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 import qualified Dragonet.Semantics as Sem
-import qualified Dragonet.Semantics.Simplify as SS
 import qualified Dragonet.Unicorn.Parser as UnicornAST
 import qualified Dragonet.Unicorn  as Unicorn
 import Dragonet.DotGenerator (toDot, pipelinesDot)
@@ -9,6 +8,7 @@ import qualified Dragonet.Embedding as Emb
 import Dragonet.Implementation.IPv4 as IP4
 import qualified Dragonet.Configuration as C
 import qualified Dragonet.Pipelines as PL
+import qualified Dragonet.Optimization as O
 
 import qualified Graphs.E10k as E10k
 import qualified Graphs.LPG as LPG
@@ -21,47 +21,17 @@ import qualified Data.List as L
 import Data.Functor ((<$>))
 import Data.String (fromString)
 
-import Debug.Trace (trace)
-
-import qualified Runner.Dynamic as DYN
+import qualified System.Directory as Dir
 
 
--- Parse graph from unicorn file
-parseGraph :: FilePath -> IO (PG.PGraph,Sem.Helpers)
-parseGraph path = do
-    b <- readFile path >>= UnicornAST.parseGraph
-    return $ Unicorn.constructGraph' b
 
---------------------------------------------------------------------------------
--- Graph transformations
-
--- Remove sources without "source" attribute and sinks without "sink" attribute
--- can also be used to remove hardware parts of the embeded graph
-cleanupGraph :: PG.PGraph -> PG.PGraph
-cleanupGraph g
-    | null badNodes = g
-    | otherwise = cleanupGraph g'
+plAssign _ (_,n)
+    | take 3 lbl == "App" = lbl
+    | take 2 lbl == "Tx" = "Tx" ++ tag
+    | otherwise = "Rx" ++ tag
     where
-        hasAttr a n = elem (PG.NAttrCustom a) $ PG.nAttributes n
-        srcs = filter (null . DGI.pre g . fst) $ DGI.labNodes g
-        snks = filter (null . DGI.suc g . fst) $ DGI.labNodes g
-        badSrcs = filter (not . hasAttr "source" . snd) srcs
-        badSnks = filter (not . hasAttr "sink" . snd) snks
-        badNodes = L.nub $ map fst $ badSrcs ++ badSnks
-        g' = DGI.delNodes badNodes g
-
-
-
-pipelineGraph :: PG.PGraph -> PL.PLGraph
-pipelineGraph g = PL.generatePLG plAssign g
-    where
-        plAssign (_,n)
-            | take 3 lbl == "App" = lbl
-            | take 2 lbl == "Tx" = "Tx" ++ tag
-            | otherwise = "Rx" ++ tag
-            where
-                lbl = PG.nLabel n
-                tag = PG.nTag n
+        lbl = PG.nLabel n
+        tag = PG.nTag n
 
 
 --------------------------------------------------------------------------------
@@ -141,56 +111,30 @@ nodeCost _ = 1
 -- Main
 
 
-evalGraph helpers prg lpg pref cfg = do
-    let write f s = writeFile (pref ++ f) s
-    let prgC  = C.applyConfig cfg prg
-    -- Dot for configured graphs...
-    write "prg_c.dot" $ toDot prgC
-
-    -- Dot for embedded graph...
-    let emb = Emb.embeddingRxTx prgC lpg
-    write "embed.dot" $ toDot emb
-
-    -- Dot for reduced graph...
-    reduced <- SS.reducePG emb helpers
-    write "reduced.dot" $ toDot reduced
-
-    -- Dot for cleaned-up graph...
-    let cleanedUp = cleanupGraph reduced
-    write "cleanup.dot" $ toDot cleanedUp
-
-    -- Dots for pipeline graph...
-    let linkMap pl = pref ++ "pl_" ++ PL.plLabel pl ++ ".svg"
-    let plg = pipelineGraph cleanedUp
-    write "pipelines.dot" $ pipelinesDot (Just linkMap) plg
-    mapM_ (\(_,pl) ->
-        write ("pl_" ++ PL.plLabel pl ++ ".dot") $ toDot $ PL.plGraph pl
-        ) $ DGI.labNodes plg
-
-    return (costFunction plg, plg)
-
-
 main = do
     let pref = ""
     let write f s = writeFile (pref ++ f) s
 
+    Dir.createDirectoryIfMissing True "opt-graphs"
     (prgU,prgH) <- E10k.graphH
     (lpgU,lpgH) <- LPG.graphH
     let helpers = prgH `Sem.mergeHelpers` lpgH
 
     -- Dot for unconfigured graphs...
-    writeFile "prg_u.dot" $ toDot prgU
-    writeFile "lpg_u.dot" $ toDot lpgU
+    writeFile "opt-graphs/prg_u.dot" $ toDot prgU
+    writeFile "opt-graphs/lpg_u.dot" $ toDot lpgU
 
     -- Configure LPG
     let lpgC  = C.applyConfig lpgCfg lpgU
-    writeFile "lpg_c.dot" $ toDot lpgC
+    writeFile "opt-graphs/lpg_c.dot" $ toDot lpgC
 
 
     -- Evaluate configurations
     let configs = [("cfg_empty_",prgCfgEmpty), ("cfg_test_", prgCfg)]
 
     -- Evaluate graph
-    results <- mapM (uncurry $ evalGraph helpers prgU lpgC) configs
-    putStrLn $ show $ zip (map fst configs) (map fst results)
+    plg <- O.optimize helpers prgU lpgC plAssign (O.dbgDotfiles "opt-graphs")
+            costFunction configs
+    return ()
+
 
