@@ -1,18 +1,19 @@
 {-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
-module E10k (
+module Graphs.E10k (
     C5TL3Proto(..),
     C5TL4Proto(..),
     C5TPort,
     C5Tuple(..),
     CFDirTuple(..),
 
-    addCfgFun
+    graphH
 ) where
 
 import Dragonet.ProtocolGraph
 import Dragonet.Unicorn
 import Dragonet.Configuration
 import Dragonet.Implementation.IPv4 as IP4
+import qualified Dragonet.Semantics as SEM
 
 import Data.Word
 import Data.Maybe
@@ -26,6 +27,8 @@ import Data.String (fromString)
 import qualified SMTLib2 as SMT
 import qualified SMTLib2.Core as SMTC
 import qualified SMTLib2.BitVector as SMTBV
+
+import Graphs.Helpers
 
 
 
@@ -275,4 +278,9 @@ configFDir _ inE outE cfg = do
             return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
 
 
+graphH :: IO (PGraph,SEM.Helpers)
+graphH = do
+    (pg,helpers) <- parseGraph "Graphs/E10k/prgE10kImpl.unicorn"
+    let pg' = replaceConfFunctions addCfgFun pg
+    return (pg',helpers)
 

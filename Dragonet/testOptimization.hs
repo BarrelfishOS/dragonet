@@ -10,8 +10,8 @@ import Dragonet.Implementation.IPv4 as IP4
 import qualified Dragonet.Configuration as C
 import qualified Dragonet.Pipelines as PL
 
-import qualified E10k
-import qualified LPGConf as LPG
+import qualified Graphs.E10k as E10k
+import qualified Graphs.LPG as LPG
 
 
 import qualified Data.Graph.Inductive.Graph as DGI
@@ -174,19 +174,16 @@ main = do
     let pref = ""
     let write f s = writeFile (pref ++ f) s
 
-    (prgU,prgH) <- parseGraph "prgE10kImpl.unicorn"
-    (lpgU,lpgH) <- parseGraph "lpgConfImpl.unicorn"
+    (prgU,prgH) <- E10k.graphH
+    (lpgU,lpgH) <- LPG.graphH
     let helpers = prgH `Sem.mergeHelpers` lpgH
 
     -- Dot for unconfigured graphs...
     writeFile "prg_u.dot" $ toDot prgU
     writeFile "lpg_u.dot" $ toDot lpgU
 
-    -- Add config functions
-    let lpgU' = C.replaceConfFunctions LPG.addCfgFun lpgU
-        prgU' = C.replaceConfFunctions E10k.addCfgFun prgU
     -- Configure LPG
-    let lpgC  = C.applyConfig lpgCfg lpgU'
+    let lpgC  = C.applyConfig lpgCfg lpgU
     writeFile "lpg_c.dot" $ toDot lpgC
 
 
@@ -194,6 +191,6 @@ main = do
     let configs = [("cfg_empty_",prgCfgEmpty), ("cfg_test_", prgCfg)]
 
     -- Evaluate graph
-    results <- mapM (uncurry $ evalGraph helpers prgU' lpgC) configs
+    results <- mapM (uncurry $ evalGraph helpers prgU lpgC) configs
     putStrLn $ show $ zip (map fst configs) (map fst results)
 

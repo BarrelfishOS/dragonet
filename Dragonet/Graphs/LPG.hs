@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
-module LPGConf (
-    addCfgFun
+module Graphs.LPG (
+    graphH
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.Configuration as C
+import qualified Dragonet.Semantics as SEM
 
 import qualified SMTLib2 as SMT
 import qualified SMTLib2.Core as SMTC
@@ -15,6 +16,8 @@ import qualified Data.List as L
 import Data.Maybe
 import Dragonet.Implementation.IPv4 as IP4
 import Data.String (fromString)
+
+import Graphs.Helpers
 
 configLPGUDPSockets :: PG.ConfFunction
 configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
@@ -82,3 +85,11 @@ addCfgFun n
     | l == "RxL4UDPCUDPSockets" = configLPGUDPSockets
     | otherwise = error $ "Unknown LPG CNode: '" ++ l ++ "'"
     where l = PG.nLabel n
+
+
+graphH :: IO (PG.PGraph,SEM.Helpers)
+graphH = do
+    (pg,helpers) <- parseGraph "Graphs/LPG/lpgConfImpl.unicorn"
+    let pg' = C.replaceConfFunctions addCfgFun pg
+    return (pg',helpers)
+
