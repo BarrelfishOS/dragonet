@@ -6,8 +6,7 @@ module E10k (
     C5Tuple(..),
     CFDirTuple(..),
 
-    configFDir,
-    config5tuple
+    addCfgFun
 ) where
 
 import Dragonet.ProtocolGraph
@@ -37,6 +36,14 @@ isRxQValidN :: Int -> PGNode -> Bool
 isRxQValidN i (_,n) =
     (nLabel n == "Q" ++ show i ++ "Valid") ||
         (nLabel n == "RxQ" ++ show i ++ "Valid")
+
+addCfgFun :: Node -> ConfFunction
+addCfgFun n
+    | l == "RxC5TupleFilter" = config5tuple
+    | l == "RxCFDirFilter"   = configFDir
+    | otherwise = error $ "Unknown LPG CNode: '" ++ l ++ "'"
+    where l = nLabel n
+
 
 -------------------------------------------------------------------------------
 -- Implementation of configuration of 5-tuple filters
