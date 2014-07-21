@@ -74,7 +74,8 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
 
                 forM_ inPL $ \(pl,_) -> do
                     let fromPLNA = "frompipeline=" ++ pl
-                        attrs = map PG.NAttrCustom ["source","Boolean",fromPLNA]
+                        attrs = map PG.NAttrCustom
+                                    ["source","Boolean",fromPLNA,"init"]
                     fromPLN <- GM.newNode $ PG.nAttrsAdd attrs $
                         PG.baseFNode ("FromPL" ++ pl) ["false","true"]
                     GM.newEdge (fromPLN, demux_N, PG.Edge "false")

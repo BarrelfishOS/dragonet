@@ -117,22 +117,28 @@ node_out_t do_pg__TxL3ARPProcessPendingResponse(
         struct input **in)
 {
     dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
-    // P_TxL3ARPProcessPendingResponse_true, P_TxL3ARPProcessPendingResponse_false, P_TxL3ARPProcessPendingResponse_drop
-    struct arp_pending *pending = arp_get_pending(state, arp_spa_ipv4_rd(*in));
+    struct arp_pending *pending;
     struct arp_cache   *cache;
-    arp_remove_pending(state, pending);
+    uint32_t ip;
+    uint64_t mac;
+
+    ip = arp_spa_ipv4_rd(*in);
+    mac = arp_sha_eth_rd(*in);
 
     cache = malloc(sizeof(*cache));
-    cache->ip = pending->ip;
-    cache->mac = arp_sha_eth_rd(*in);
+    cache->ip = ip;
+    cache->mac = mac;
     cache->next = state->arp_cache;
     state->arp_cache = cache;
 
-    // TODO: Can we avoid this?
-    input_xchg(*in, pending->input);
-    input_free(pending->input);
-    free(pending);
+    while ((pending = arp_get_pending(state, ip)) != NULL) {
+        spawn(context, pending->input, S_TxL3ARPProcessPendingResponse_restart,
+                SPAWNPRIO_HIGH);
+        arp_remove_pending(state, pending);
+        free(pending);
+    }
 
+    // P_TxL3ARPProcessPendingResponse_true, P_TxL3ARPProcessPendingResponse_false, P_TxL3ARPProcessPendingResponse_drop
     return P_TxL3ARPProcessPendingResponse_out;
 }
 
@@ -199,7 +205,21 @@ node_out_t do_pg__TxL3ARPLookup_(struct ctx_TxL3ARPLookup_ *context,
     dprint("%s: arp lookup for : %"PRIx32"\n", __func__, (*in)->attr->ip4_dst);
     // P_TxL3ARPLookup__true, P_TxL3ARPLookup__false, P_TxL3ARPLookup__miss
     struct arp_cache *cache = arp_cache_lookup(state, (*in)->attr->ip4_dst);
+    struct arp_pending *pending;
+    struct input *nin;
+
     if (cache == NULL) {
+        pending = malloc(sizeof(*pending));
+        pending->next = state->arp_pending;
+        pending->ip = (*in)->attr->ip4_dst;
+        pending->input = *in;
+        state->arp_pending = pending;
+
+        nin = input_alloc();
+        nin->attr->ip4_dst = (*in)->attr->ip4_dst;
+        spawn(context, nin, S_TxL3ARPLookup__miss, SPAWNPRIO_HIGH);
+
+        *in = NULL;
         return P_TxL3ARPLookup__miss;
     }
 
@@ -227,26 +247,14 @@ node_out_t do_pg__TxL3ARPSendRequest(struct ctx_TxL3ARPSendRequest *context,
 {
     dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // P_TxL3ARPSendRequest_true, P_TxL3ARPSendRequest_false, P_TxL3ARPSendRequest_drop
-    struct arp_pending *pending;
     struct input i;
 
     dprint("%s: %"PRIx32"\n", __func__, state->local_ip);
-    pending = malloc(sizeof(*pending));
-    pending->next = state->arp_pending;
-    state->arp_pending = pending;
-    pending->ip = (*in)->attr->ip4_dst;
-
-    // Allocate new input for pending, and exchange it with current in
-    pending->input = input_alloc();
-    assert(pending->input != NULL);
-    memcpy(&i, pending->input, sizeof(i));
-    memcpy(pending->input, *in, sizeof(i));
-    memcpy(*in, &i, sizeof(i));
 
     (*in)->attr->arp_src_mac = state->local_mac;
     (*in)->attr->arp_dst_mac = 0;
-    (*in)->attr->arp_src_ip = pending->input->attr->ip4_src;
-    (*in)->attr->arp_dst_ip = pending->input->attr->ip4_dst;
+    (*in)->attr->arp_src_ip = state->local_ip;
+    (*in)->attr->arp_dst_ip = (*in)->attr->ip4_dst;
     (*in)->attr->arp_oper = ARP_OPER_REQUEST;
     (*in)->attr->eth_dst_mac = eth_broadcast_addr;
     return P_TxL3ARPSendRequest_true;

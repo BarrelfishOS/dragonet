@@ -1,11 +1,14 @@
 module Dragonet.ProtocolGraph.Utils (
     dropSpawnEdges,
-    entryNodes
+    entryNodes,
+    orderedSpawns
 ) where
 
 import Dragonet.ProtocolGraph
 
+import Data.Function
 import Data.Maybe
+import Data.List (sortBy)
 import qualified Data.Set as S
 import qualified Data.Graph.Inductive as DGI
 
@@ -23,4 +26,10 @@ entryNodes g = S.fromList $ mapMaybe getN $ DGI.labEdges g
         -- The if is a very ugly hack
         getN (_,d,ESpawn {}) = Just d
         getN _ = Nothing
+
+-- | Ordered list of spawn-handles (order is used to generate implementation
+--   IDs)
+orderedSpawns :: PGraph -> DGI.Node -> [(NSpawnHandle,DGI.Node)]
+orderedSpawns pg n = sortBy (compare `on` fst)
+        [(sh,n) | (n,ESpawn { eIdentifier = sh }) <- DGI.lsuc pg n]
 

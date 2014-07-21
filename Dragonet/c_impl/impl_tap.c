@@ -22,6 +22,10 @@ node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context,
 {
     int p_id = ++rx_pkts;
     pktoff_t maxlen;
+
+    // Respawn this node
+    spawn(context, NULL, S_TapRxQueue_poll, SPAWNPRIO_LOW);
+
     if (state->tap_handler == NULL) {
         tap_init(state);
 
@@ -31,6 +35,7 @@ node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context,
         printf("Initialized\n");
         dprint("%s:%s:%d: [pktid:%d]: ############## initialized queue\n",
               __FILE__,  __func__, __LINE__, p_id);
+        *in = input_alloc();
         return P_RxQueue_init;
     }
 
@@ -38,11 +43,11 @@ node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context,
     dprint("%s:%s:%d: [pktid:%d]: ############## Trying to receive packet\n",
            __FILE__,  __func__, __LINE__, p_id);
 
+    *in = input_alloc();
     pkt_prepend(*in, (*in)->space_before);
     ssize_t len = tap_read(state->tap_handler, (char *) (*in)->data, (*in)->len, 500);
     if (len == 0) {
         dprint("%s:%d: [pktid:%d]: pkt with zero len\n", __func__, __LINE__, p_id);
-        pkt_prepend(*in, -(*in)->len);
         return P_RxQueue_drop;
     }
     pkt_append(*in, -((*in)->len - len));

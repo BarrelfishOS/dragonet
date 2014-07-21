@@ -5,6 +5,8 @@
 #include <implementation.h>
 #include <pipelines.h>
 
+#include "rt_queue.h"
+
 enum dynamic_node_type {
     DYN_FNODE,
     DYN_ONODE,
@@ -21,22 +23,29 @@ enum dynamic_node_op {
     DYN_OP_NOR,
 };
 
-typedef node_out_t (*nodefun_t)(struct state *state,
-                                struct input *in);
+typedef node_out_t (*nodefun_t)(struct ctx_generic *ctx, // I don't think we can
+                                                         // do better here.
+                                struct state *state,
+                                struct input **in);
 
 struct dynamic_edge;
 struct dynamic_node {
     struct dynamic_graph  *graph;
     const char            *name;
     enum dynamic_node_type type;
+
     node_out_t             out_value;
     int                    out_version;
+
     struct dynamic_edge   *preds;
     size_t                 num_ports;
     struct dynamic_edge  **ports;
+    size_t                 num_spawns;
+    struct dynamic_node  **spawns;
     union {
         struct {
-            nodefun_t nodefun;
+            nodefun_t           nodefun;
+            struct ctx_generic *ctx;
         } fnode;
         struct {
             enum dynamic_node_op op;
@@ -48,6 +57,10 @@ struct dynamic_node {
             queue_handle_t queue;
         } queue;
     } tdata;
+
+    /** Linked list of nodes in graph */
+    struct dynamic_node   *next;
+    struct dynamic_node   *prev;
 };
 
 struct dynamic_edge {
@@ -61,19 +74,19 @@ struct dynamic_edge {
 };
 
 struct dynamic_graph {
-    struct dynamic_node **sources;
-    size_t                num_sources;
     queue_handle_t       *outqueues;
     size_t                num_outqs;
     size_t                num_nodes;
     pthread_mutex_t       lock;
+    struct task_queue     tqueue;
+    struct dynamic_node  *nodes;
 };
 
 
 
 struct dynamic_graph *dyn_mkgraph(void);
-void dyn_add_source(struct dynamic_graph *graph,
-                    struct dynamic_node  *node);
+void dyn_add_init(struct dynamic_graph *graph,
+                  struct dynamic_node  *node);
 void dyn_rungraph(struct dynamic_graph *graph,
                   pipeline_handle_t     plh);
 
@@ -104,6 +117,8 @@ size_t dyn_addports(struct dynamic_node *node, size_t num);
 struct dynamic_edge *dyn_addedge(struct dynamic_node *source,
                                  size_t port,
                                  struct dynamic_node *sink);
+
+void dyn_addspawn(struct dynamic_node *node, struct dynamic_node *dst);
 
 #endif // ndef DYNAMIC_H_
 

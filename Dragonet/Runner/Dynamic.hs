@@ -4,6 +4,7 @@ module Runner.Dynamic (
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG
+import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Dragonet.Pipelines as PL
 import qualified Dragonet.Pipelines.Implementation as PI
 import qualified Data.Graph.Inductive as DGI
@@ -26,6 +27,7 @@ import Data.Word
 import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.List as L
+import qualified Data.Set as S
 
 import Control.Monad
 import Control.Applicative
@@ -41,20 +43,22 @@ type MuxId = Word32
 
 -- Build node
 buildDynNode :: PI.PipelineImpl -> GraphHandle -> M.Map String PI.QueueHandle
-        -> (String -> IO NodeFun) -> PG.Node -> IO NodeHandle
+        -> (PG.Node -> IO NodeFun) -> PG.Node -> IO NodeHandle
 buildDynNode pli gh qm nf l
     | isFromQ = mkFromQueueNode gh lbl fqh
     | isDemux = mkDemuxNode gh lbl
     | isMux = mkMuxNode gh lbl muxId
     | isToQ = mkToQueueNode gh lbl qh
-    | PG.nIsFNode l = do
-        fp <- nf lbl
+    | PG.FNode {} <- l = do
+        fp <- nf l
         mkFNode gh lbl fp
-    | PG.nIsONode l = mkONode gh lbl op
+    | PG.ONode { PG.nOperator = op } <- l = mkONode gh lbl op
     | otherwise = error "Unsupported node type"
     where
         lbl = PG.nLabel l
-        isDemux = PG.nIsFNode l && PG.nLabel l == "Demux"
+        isDemux
+            | PG.FNode { PG.nLabel = "Demux" } <- l = True
+            | otherwise = False
 
         mbMuxId = getPGNAttr l "muxid"
         isMux = isJust mbMuxId
@@ -70,15 +74,13 @@ buildDynNode pli gh qm nf l
         Just fpln = mbFPL
         (Just fqh) = M.lookup ("from_" ++ fpln) qm
 
-        (PG.ONode op) = PG.nPersonality l
-
 
 addMuxIds :: PL.PLGraph -> PG.PGraph -> PG.PGraph
 addMuxIds plg pg = flip DGI.nmap pg $ \node ->
     case (getPGNAttr node "multiplex",getPGNAttr node "muxPL") of
         (Just aDN,Just aDP) ->
             node { PG.nAttributes = PG.nAttributes node ++
-                    ["muxid=" ++ (show $ muxId plg aDN aDP)] }
+                    [PG.NAttrCustom $ "muxid=" ++ (show $ muxId plg aDN aDP)] }
         _ -> node
 
 muxId :: PL.PLGraph -> String -> String -> MuxId
@@ -96,7 +98,7 @@ muxId plg dNodeL dPL = i
 
 -- Build graph for pipeline
 buildDynGraph :: PL.PLGraph -> PI.PipelineImpl -> M.Map String PI.QueueHandle
-        -> (String -> IO NodeFun) -> IO GraphHandle
+        -> (PG.Node -> IO NodeFun) -> IO GraphHandle
 buildDynGraph plg pli qm nf = do
     gh <- mkGraph
     -- Create nodes
@@ -105,16 +107,27 @@ buildDynGraph plg pli qm nf = do
         addPorts h $ length $ PG.nPorts l
         return (n,h)
     let nm = M.fromList nlm
-    -- Set source node
-    let entries = [n |(Just n) <- map ((`M.lookup` nm) . fst) $ PG.pgEntries pg]
-    mapM_ (addSource gh) entries
+    -- Set init nodes
+    let entries = [n | n' <- S.toList $ PGU.entryNodes pg,
+                       let Just l = DGI.lab pg n',
+                       PG.nAttrElem (PG.NAttrCustom "init") l,
+                       let Just n = n' `M.lookup` nm]
+    mapM_ (addInit gh) entries
     -- Add edges
-    forM (DGI.labEdges pg) $ \(a,b,p) -> do
-        let Just al = DGI.lab pg a
-            Just pi = lookup p $ flip zip [0..] $ fixBoolP $ PG.nPorts al
-            Just src = M.lookup a nm
-            Just dst = M.lookup b nm
-        addEdge src pi dst
+    let aEdge (a,b,PG.Edge { PG.ePort = p }) = const () <$> addEdge src pi dst
+            where
+                Just al = DGI.lab pg a
+                Just pi = lookup p $ flip zip [0..] $ fixBoolP $ PG.nPorts al
+                Just src = M.lookup a nm
+                Just dst = M.lookup b nm
+        aEdge _ = return ()
+    mapM aEdge $ DGI.labEdges pg
+    -- Add spawns
+    forM (DGI.labNodes pg) $ \(n,_) ->
+        forM (PGU.orderedSpawns pg n) $ \(_,m) -> do
+            let Just nh = M.lookup n nm
+                Just mh = M.lookup m nm
+            addSpawn nh mh
     return gh
     where
         pg = addMuxIds plg $ PL.plGraph $ PI.pliPipeline pli
@@ -144,20 +157,26 @@ initPipeline stackname pli pl_funs = do
     where
         (pl_init,pl_inq,pl_outq,pl_wait) = pl_funs
 
-withHelpers :: String -> ((String -> IO (FunPtr b)) -> IO a) -> IO a
-withHelpers llvm_helpers run = do
+withHelpers :: String -> String -> ((String -> IO (FunPtr b)) -> IO a) -> IO a
+withHelpers llvm_helpers dyn_helpers run = do
     LLVMCtx.withContext $ \ctx ->
         liftError $ LLVMMod.withModuleFromBitcode ctx file $ \mod -> do
-            LLVMPM.withPassManager passes $ \pm -> do
-                LLVMPM.runPassManager pm mod
-                withJitEE ctx $ \ee -> do
-                    LLVMEE.withModuleInEngine ee mod $ \emod -> do
-                        run (pgf emod)
+            liftError $ LLVMMod.withModuleFromBitcode ctx file' $ \dyn_mod -> do
+                liftError $ LLVMMod.linkModules False mod dyn_mod
+                LLVMPM.withPassManager passes $ \pm -> do
+                    LLVMPM.runPassManager pm mod
+                    withJitEE ctx $ \ee -> do
+                        LLVMEE.withModuleInEngine ee mod $ \emod -> do
+                            run (pgf emod)
 
     where
         file = LLVMMod.File llvm_helpers
+        file' = LLVMMod.File dyn_helpers
         pgf emod n = do
-            Just f <- LLVMEE.getFunction emod (AST.Name n)
+            mf <- LLVMEE.getFunction emod (AST.Name n)
+            let f = case mf of
+                    Just f -> f
+                    Nothing -> error $ "getFunction " ++ n
             return $ castFunPtr f
 
 
@@ -187,7 +206,7 @@ pl_qprep_wrapper fp ph qN = withCString qN $ \cqN -> c_pl_queue_prepare fp ph cq
 runPipeline :: PL.PLGraph -> String -> String -> PI.PipelineImpl -> IO ()
 runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
     putStrLn $ "Initializing pipeline " ++ mname
-    withHelpers llvm_helpers $ \hf -> do
+    withHelpers llvm_helpers dyn_helpers $ \hf -> do
         putStrLn "Helpers ready...."
         pl_funs <- pl_get_funs hf
         putStrLn "functions ready"
@@ -195,8 +214,9 @@ runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
         putStrLn "Pipeline Queues initialized"
         splh <- hf "set_pipeline_handle"
         splhFun splh plh
-        let nodeFun l = castFunPtr <$> (hf $ "do_pg__" ++ l)
-        gh <- buildDynGraph plg pli qm (nodeFun :: String -> IO NodeFun)
+        let ifName (PG.NImplFunction f) = "do_pg__" ++ f
+            nodeFun l = castFunPtr <$> (hf $ ifName $ PG.nImplementation l)
+        gh <- buildDynGraph plg pli qm (nodeFun :: PG.Node -> IO NodeFun)
         putStrLn "Running Graph"
         runGraph gh plh
         putStrLn "Graph initialized"
@@ -206,6 +226,7 @@ runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
         mname = PL.plLabel pl
         -- LLVM file with helper utilities
         llvm_helpers = "dist/build/" ++ helpers ++ ".bc"
+        dyn_helpers = "dist/build/llvm-dyn-helpers.bc"
         pl_get_funs hf = do
             pl_init <- castFunPtr <$> hf "pl_init"
             pl_inq <- castFunPtr <$> hf "pl_inqueue_create"
@@ -222,8 +243,8 @@ runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
 mkGraph :: IO GraphHandle
 mkGraph = c_mkgraph
 
-addSource :: GraphHandle -> NodeHandle -> IO ()
-addSource = c_add_source
+addInit :: GraphHandle -> NodeHandle -> IO ()
+addInit = c_add_init
 
 runGraph :: GraphHandle -> PI.PipelineHandle -> IO ()
 runGraph gh ph = c_run_graph gh ph
@@ -231,12 +252,12 @@ runGraph gh ph = c_run_graph gh ph
 mkFNode :: GraphHandle -> String -> NodeFun -> IO NodeHandle
 mkFNode gh l f = withCString l $ \cl -> c_mkfnode gh cl f
 
-mkONode :: GraphHandle -> String -> PG.Operator -> IO NodeHandle
+mkONode :: GraphHandle -> String -> PG.NOperator -> IO NodeHandle
 mkONode gh l o = withCString l $ \cl -> case o of
-    PG.OpAnd -> c_mkonode_and gh cl
-    PG.OpOr -> c_mkonode_or gh cl
-    PG.OpNAnd -> c_mkonode_nand gh cl
-    PG.OpNOr -> c_mkonode_nor gh cl
+    PG.NOpAnd -> c_mkonode_and gh cl
+    PG.NOpOr -> c_mkonode_or gh cl
+    PG.NOpNAnd -> c_mkonode_nand gh cl
+    PG.NOpNOr -> c_mkonode_nor gh cl
 
 mkDemuxNode :: GraphHandle -> String -> IO NodeHandle
 mkDemuxNode gh l = withCString l $ \cl -> c_mknode_demux gh cl
@@ -256,13 +277,16 @@ addPorts nh n = fromIntegral <$> c_addports nh (fromIntegral n)
 addEdge :: NodeHandle -> Int -> NodeHandle -> IO EdgeHandle
 addEdge so p si = c_addedge so (fromIntegral p) si
 
+addSpawn :: NodeHandle -> NodeHandle -> IO ()
+addSpawn = c_addspawn
+
 -------------------------------------------------------------------------------
 -- C Declarations
 
 foreign import ccall "dyn_mkgraph"
     c_mkgraph :: IO GraphHandle
-foreign import ccall "dyn_add_source"
-    c_add_source :: GraphHandle -> NodeHandle -> IO ()
+foreign import ccall "dyn_add_init"
+    c_add_init :: GraphHandle -> NodeHandle -> IO ()
 foreign import ccall "dyn_rungraph"
     c_run_graph ::
         GraphHandle -> PI.PipelineHandle -> IO ()
@@ -290,6 +314,8 @@ foreign import ccall "dyn_addports"
     c_addports :: NodeHandle -> CSize -> IO CSize
 foreign import ccall "dyn_addedge"
     c_addedge :: NodeHandle -> CSize -> NodeHandle -> IO EdgeHandle
+foreign import ccall "dyn_addspawn"
+    c_addspawn :: NodeHandle -> NodeHandle -> IO ()
 
 -------------------------------------------------------------------------------
 -- Generic Helpers
@@ -305,9 +331,11 @@ listAsArray l f = allocaBytesAligned sz al $ \a -> do
         sz = n * (sizeOf $ head l)
 
 getPGNAttr :: PG.Node -> String -> Maybe String
-getPGNAttr node n =
-    drop (length n + 1) <$>
-        (L.find (L.isPrefixOf (n ++ "=")) $ PG.nAttributes node)
+getPGNAttr node n = getVal <$> (L.find matches $ PG.nAttributes node)
+    where
+        matches (PG.NAttrCustom s) = (n ++ "=") `L.isPrefixOf` s
+        matches _ = False
+        getVal (PG.NAttrCustom s) = drop (length n + 1) s
 
 
 

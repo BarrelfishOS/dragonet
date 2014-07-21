@@ -216,4 +216,16 @@ void declare_dragonet_initialized(char *fname, char *msg);
 
 #define PORT_BOOL(b) ((b) ? P_true : P_false)
 
+
+
+
+enum spawn_priority {
+    SPAWNPRIO_HIGH,
+    SPAWNPRIO_LOW,
+};
+
+bool spawn_impl(struct ctx_generic *ctx, struct input *in, enum out_spawns s,
+        enum spawn_priority p);
+#define spawn(nctx,in,sid,prio) spawn_impl(&(nctx)->generic, in, sid, prio)
+
 #endif // IMPLEMENTATION_H_

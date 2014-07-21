@@ -122,6 +122,23 @@ $(BUILD_DIR)/llvm-helpers-sf.bc: $(BUILD_DIR)/llvm-c_impl-sf.bc $(helpers_common
 	$(LLVM_LINK) $^ -o $@ # -L ../../openonload-201310-u2/build/gnu_x86_64/lib/ciul/ -Wl,-no-as-needed -lciul
 
 
+# dyn helpers
+
+cfiles_dyn_helpers=Runner/dyn_helpers.c \
+		   Runner/rt_queue.c
+
+bcfiles_dyn_helpers = $(addprefix $(BUILD_DIR)/, $(addsuffix .bc,$(basename $(cfiles_dyn_helpers))))
+
+$(BUILD_DIR)/Runner/%.bc : Runner/%.c
+	# build dirs for output as needed
+	@xdir=$$(dirname $@); [ -d $$xdir ] || echo "===> $$xdir does not exist, creating..." & mkdir -p $$xdir
+	$(CLANG) $(CFLAGS) -c -emit-llvm $^ -o $@
+
+$(BUILD_DIR)/llvm-dyn-helpers.bc:  $(bcfiles_dyn_helpers)
+	$(LLVM_LINK) $^ -o $@
+
+
+
 #
 #clean:
 #	rm -f llvm-heelpers.bc
