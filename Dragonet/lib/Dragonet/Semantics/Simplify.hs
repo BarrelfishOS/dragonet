@@ -12,7 +12,7 @@ import qualified Util.GraphHelpers as GH
 import Control.Monad (foldM)
 import qualified Data.List as L
 import qualified Data.Set as S
-import qualified Data.Map.Strict as M
+import qualified Data.Map as M
 import Data.Maybe
 import Data.Functor ((<$>))
 import qualified Data.Graph.Inductive as DGI
