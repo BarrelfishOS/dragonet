@@ -34,6 +34,10 @@ import Dragonet.Semantics (PortSemantics)
 import qualified Data.Graph.Inductive as DGI
 import qualified Control.Monad.State as ST
 
+import Text.Show.Functions -- show instance for functions, so that ConfFunction
+                           -- gets Show and we can derive Show for Node
+
+
 -------------------------------------------------------------------------------
 -- Basic Types
 
@@ -62,6 +66,7 @@ data Node =
         nConfType       :: ConfType,
         nConfFunction   :: ConfFunction
         }
+    deriving (Show)
 
 -- Graph edge label
 data Edge =
