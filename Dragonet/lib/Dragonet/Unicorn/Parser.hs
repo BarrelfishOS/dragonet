@@ -10,6 +10,7 @@ module Dragonet.Unicorn.Parser(
     nAllPorts,
 
     parseGraph,
+    parseGraph_,
 ) where
 
 import Data.Maybe
@@ -371,7 +372,11 @@ parseGraph s = case runParser graph () "" s of
       Left err  -> fail $ show err
       Right e   -> return e
 
-
+-- non-monadic version
+parseGraph_ :: String -> Graph
+parseGraph_ s = case parse graph "" s of
+    Left err -> error $ show err
+    Right e  -> e
 
 --------------------------------------------------------------------------------
 -- Parser for configuration input type

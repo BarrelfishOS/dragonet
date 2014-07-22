@@ -2,6 +2,7 @@
 module Dragonet.Unicorn(
     constructGraph,
     constructGraph',
+    strToGraph,
 ) where
 
 import Dragonet.Unicorn.Parser
@@ -127,6 +128,10 @@ constructGraph (Graph { gName = gname, gRootCluster = cluster }) =
 
         pg_edges :: [PG.PGEdge]
         pg_edges = concatMap get_edges_node nodes_ids
+
+-- get a graph from a Unicorn string
+strToGraph :: String -> PG.PGraph
+strToGraph = constructGraph . parseGraph_
 
 constructGraph' :: Graph -> (PG.PGraph, Sem.Helpers)
 constructGraph' g = (constructGraph g, gSemHelpers g)
