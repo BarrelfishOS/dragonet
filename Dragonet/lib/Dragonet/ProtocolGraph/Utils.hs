@@ -5,16 +5,18 @@ module Dragonet.ProtocolGraph.Utils (
     getPGNodeByName,
     getFNodeByName,
     getFNodeByName',
+    getPGNAttr
 ) where
 
 import Dragonet.ProtocolGraph
 
 import Data.Function
 import Data.Maybe
-import Data.List (sortBy)
+import Data.List (sortBy, find, isPrefixOf)
 import qualified Data.Set as S
 import qualified Data.Graph.Inductive as DGI
 import qualified Util.GraphHelpers as GH
+import Data.Functor ((<$>))
 
 -- Remove all spawn edges from the graph
 dropSpawnEdges :: PGraph -> PGraph
@@ -55,4 +57,12 @@ getFNodeByName graph name = case GH.findNodeByL fn graph of
     Nothing -> error $ "Unable to find f-node with name: " ++ name
     where fn (FNode label _ _ _ _ _) = (label == name)
           fn _ = False
+
+-- Get key=value attribute with key == n
+getPGNAttr :: Node -> String -> Maybe String
+getPGNAttr node n = getVal <$> (find matches $ nAttributes node)
+    where
+        matches (NAttrCustom s) = (n ++ "=") `isPrefixOf` s
+        matches _ = False
+        getVal (NAttrCustom s) = drop (length n + 1) s
 

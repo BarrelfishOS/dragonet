@@ -40,6 +40,7 @@ library
                         Dragonet.Implementation.UDP,
                         Dragonet.Optimization,
                         Dragonet.Pipelines,
+                        Dragonet.Pipelines.Dynamic,
                         Dragonet.Pipelines.Implementation,
                         Dragonet.ProtocolGraph,
                         Dragonet.ProtocolGraph.Utils,
@@ -67,7 +68,7 @@ executable opt-test
 executable stack-tap
     main-is:            stackTap.hs
     build-depends:      Dragonet, base, smtLib, fgl, containers, mtl, directory,
-                        llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, transformers
+                        llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm
     ghc-options:        -threaded
     C-sources:          Runner/dynamic.c,
                         Runner/rt_queue.c

@@ -14,6 +14,7 @@ module Dragonet.Pipelines.Implementation(
     UDPFlowHandle(..),
 
     runPipelines,
+    runPipelines',
     stopPipelines,
     stackState,
 
@@ -67,7 +68,6 @@ newtype UDPListenHandle = UDPListenHandle (Ptr UDPListenHandle)
 newtype UDPFlowHandle = UDPFlowHandle (Ptr UDPFlowHandle)
 
 
-
 getPLIs :: (Pipeline -> Pipeline -> (POutput,PInput)) -> PLGraph
         -> [PipelineImpl]
 getPLIs qconf g = map n2pi $ DGI.labNodes g
@@ -81,6 +81,20 @@ getPLIs qconf g = map n2pi $ DGI.labNodes g
             pliInQs = map (inConf p) $ DGI.pre g n,
             pliOutQs = map (outConf p) $ DGI.suc g n }
 
+runPipelines' ::
+    -- Should give queue implementation for queue between first and second
+    -- pipeline
+    (Pipeline -> Pipeline -> (POutput,PInput)) ->
+    -- Initialize pipeline
+    (PipelineImpl -> IO a) ->
+    PLGraph -> IO [a]
+runPipelines' qconf prun plg = do
+    let plis = getPLIs qconf plg
+    results <- mapM prun plis
+    return results
+
+
+
 runPipelines ::
     -- Stack name
     String ->
@@ -91,10 +105,10 @@ runPipelines ::
     (PipelineImpl -> IO a) ->
     PLGraph -> IO (StackHandle,[a])
 runPipelines sname qconf prun plg = do
-    let plis = getPLIs qconf plg
-    handle <- init_shared_state sname (length $ concatMap pliInQs plis)
-    results <- mapM prun plis
-    return (handle,results)
+    handle <- init_shared_state sname $ length $ concatMap pliInQs
+                $ getPLIs qconf plg
+    res <- runPipelines' qconf prun plg
+    return (handle,res)
 
 stopPipelines :: StackHandle -> IO ()
 stopPipelines h = c_stop_stack h
