@@ -9,6 +9,7 @@ errval_t bulk_ll_channel_create(struct bulk_ll_channel           *channel,
                                 struct bulk_channel_setup        *setup,
                                 bulk_correlation_t                corr)
 {
+    errval_t err;
     channel->ep = ep_desc;
     channel->pools = NULL;
     channel->direction = setup->direction;
@@ -18,11 +19,14 @@ errval_t bulk_ll_channel_create(struct bulk_ll_channel           *channel,
     channel->meta_size = setup->meta_size;
     channel->internal.creator = true;
 
-    channel->internal.next = bulk_channels;
-    bulk_channels = channel;
 
-    return ep_desc->f->channel_create(channel, corr);
+    err = ep_desc->f->channel_create(channel, corr);
 
+    if (err_is_ok(err) || err == BULK_TRANSFER_ASYNC) {
+        channel->internal.next = bulk_channels;
+        bulk_channels = channel;
+    }
+    return err;
 }
 
 errval_t bulk_ll_channel_bind(struct bulk_ll_channel          *channel,
@@ -30,6 +34,8 @@ errval_t bulk_ll_channel_bind(struct bulk_ll_channel          *channel,
                               struct bulk_channel_bind_params *params,
                               bulk_correlation_t               corr)
 {
+    errval_t err;
+
     channel->ep = remote_ep_desc;
     channel->pools = NULL;
     channel->role = params->role;
@@ -37,11 +43,15 @@ errval_t bulk_ll_channel_bind(struct bulk_ll_channel          *channel,
     channel->constraints = params->constraints;
     channel->internal.creator = false;
 
-    channel->internal.next = bulk_channels;
-    bulk_channels = channel;
 
     // To be set when binding: channel->{direction,meta_size}
-    return remote_ep_desc->f->channel_bind(channel, corr);
+    err = remote_ep_desc->f->channel_bind(channel, corr);
+
+    if (err_is_ok(err) || err == BULK_TRANSFER_ASYNC) {
+        channel->internal.next = bulk_channels;
+        bulk_channels = channel;
+    }
+    return err;
 }
 
 errval_t bulk_ll_channel_destroy(struct bulk_ll_channel *channel,

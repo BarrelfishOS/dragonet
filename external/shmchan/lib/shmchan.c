@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include <shmchan.h>
 
@@ -47,6 +48,9 @@ errval_t shmchan_bind_(struct shm_channel *chan, const char *name,
     struct shm_chan_meta *meta;
 
     fd = shm_open(name, O_RDWR, 0600);
+    if (fd == -1 && errno == ENOENT) {
+        return SHM_CHAN_NOTCREATED;
+    }
     assert_fix(fd != -1);
 
     // Map meta-data and data area

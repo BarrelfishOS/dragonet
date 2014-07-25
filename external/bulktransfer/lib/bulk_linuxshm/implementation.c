@@ -136,17 +136,20 @@ static errval_t map_metas(struct lsm_internal *internal, bool create, bool tx)
     }
     get_metas_name(internal, tx, name);
 
+    debug_printf("shm_open(%s)\n", name);
     if (create) {
         fd = shm_open(name, O_CREAT | O_RDWR | O_EXCL, 0600);
         assert_fix(fd != -1);
         res = ftruncate(fd, size);
         assert_fix(res == 0);
-        close(fd);
+    } else {
+        fd = shm_open(name, O_RDWR, 0600);
+        if (fd == -1 && errno == ENOENT) {
+            return BULK_TRANSFER_CHAN_NOTCREATED;
+        } else {
+            assert_fix(fd != -1);
+        }
     }
-
-    debug_printf("shm_open(%s)\n", name);
-    fd = shm_open(name, O_RDWR, 0600);
-    assert_fix(fd != -1);
 
     mapped = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     debug_printf("error: %s\n", strerror(errno));
@@ -273,7 +276,10 @@ static errval_t op_channel_bind(struct bulk_ll_channel *channel,
     strcpy(name, internal->name);
     strcat(name, "_txc");
     err = shm_chan_bind(&internal->rx, name, false);
-    if (err_is_fail(err)) {
+    if (err == SHM_CHAN_NOTCREATED) {
+        err = BULK_TRANSFER_CHAN_NOTCREATED;
+        goto fail_rx;
+    } else if (err_is_fail(err)) {
         goto fail_rx;
     }
 
