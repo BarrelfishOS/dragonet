@@ -56,7 +56,6 @@ struct dragonet_shared_state {
     char name[64];
     volatile bool running;
     size_t count;
-    volatile size_t ch_created;
     volatile size_t ch_bound;
     volatile size_t num_running;
     volatile uint32_t pl_id_alloc;
@@ -98,13 +97,17 @@ struct dragonet_queue_pool {
 struct dragonet_queue {
     struct dragonet_pipeline *pl;
     struct bulk_ll_channel *chan;
+    struct bulk_linuxshm_endpoint_descriptor *epd;
     char *name;
     bool is_out;
 
     struct input *pending;
     struct input *inputs;
 
+    bool bind_started;
     bool bound;
+    bool assign_done;
+
     struct dragonet_queue_pool *pools;
 
     struct dragonet_queue *next;
@@ -250,8 +253,8 @@ pipeline_handle_t pl_init(const char *stackname, const char *plname)
     dprintf("pl_init(%s,%s)\n", stackname, plname);
 
     pl = calloc(1, sizeof(*pl));
-    pl->name = plname;
-    pl->stackname = stackname;
+    pl->name = strdup(plname);
+    pl->stackname = strdup(stackname);
 
 
     // Map shared state
@@ -329,7 +332,7 @@ static void assign_done(struct dragonet_queue *q, bulk_correlation_t corr)
     struct dragonet_pipeline *pl = q->pl;
     struct bulk_pool *pool       = (struct bulk_pool *) corr;
     if (pool == &pl->pool) {
-        __sync_fetch_and_add(&pl->shared->ch_bound, 1);
+        q->assign_done = true;
     }
     dprintf("cb_assign_done: pl=%s bound=%d count=%d\n", pl->name, (int)
             pl->shared->ch_bound, (int) pl->shared->count);
@@ -532,15 +535,17 @@ static bool poll_all(struct dragonet_pipeline *pl)
            }
        }
 
-       err = bulk_ll_channel_event_poll(q->chan, &event);
-       if (err == SYS_ERR_OK) {
-           process_event(q, &event);
-           bulk_ll_channel_event_done(q->chan, &event, SYS_ERR_OK);
-           found = true;
-       } else if (err == BULK_TRANSFER_EVENTABORT) {
-           found = true;
+       // only poll output queues after the bind was initiated
+       if (!q->is_out || q->bind_started) {
+           err = bulk_ll_channel_event_poll(q->chan, &event);
+           if (err == SYS_ERR_OK) {
+               process_event(q, &event);
+               bulk_ll_channel_event_done(q->chan, &event, SYS_ERR_OK);
+               found = true;
+           } else if (err == BULK_TRANSFER_EVENTABORT) {
+               found = true;
+           }
        }
-
        q = q->next;
     } while (!found && q != pl->poll_next);
 
@@ -554,7 +559,6 @@ queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name)
 {
     dprintf("pl_inqueue_create: enter\n");
     struct dragonet_pipeline *pl = plh;
-    struct bulk_linuxshm_endpoint_descriptor *epd = malloc(sizeof(*epd));
     struct bulk_ll_channel *chan = malloc(sizeof(*chan));
     errval_t err;
     struct bulk_channel_setup setup = { .direction = BULK_DIRECTION_RX,
@@ -566,7 +570,8 @@ queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name)
     assert(ret > 0);
     dprintf("pl_inqueue_create: pl=%s q=%s\n", pl->name, dq->name);
 
-    err = bulk_linuxshm_ep_create(epd, dq->name, QUEUE_SLOTS);
+    dq->epd = malloc(sizeof(*dq->epd));
+    err = bulk_linuxshm_ep_create(dq->epd, dq->name, QUEUE_SLOTS);
     err_expect_ok(err);
 
     dq->pl = pl;
@@ -575,12 +580,8 @@ queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name)
     dq->next = pl->queues;
     pl->queues = dq;
     chan->user_state = dq;
-    err = bulk_ll_channel_create(chan, &epd->generic, &setup, 0);
+    err = bulk_ll_channel_create(chan, &dq->epd->generic, &setup, 0);
     err_expect_ok(err);
-
-    __sync_fetch_and_add(&pl->shared->ch_created, 1);
-    dprintf("pl_inqueue_create: pl=%s created=%d count=%d\n", pl->name, (int)
-            pl->shared->ch_created, (int) pl->shared->count);
 
     dprintf("pl_inqueue_create: exit\n");
     return chan;
@@ -590,25 +591,16 @@ queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name)
 {
     dprintf("pl_outqueue_bind: enter\n");
     struct dragonet_pipeline *pl = plh;
-    struct bulk_linuxshm_endpoint_descriptor *epd = malloc(sizeof(*epd));
     struct bulk_ll_channel *chan = malloc(sizeof(*chan));
     errval_t err;
-    struct bulk_channel_bind_params params = { .role = BULK_ROLE_MASTER,
-        .trust = BULK_TRUST_FULL };
     struct dragonet_queue *dq = calloc(1, sizeof(*dq));
-
-
-    // Wait until all channels are created
-    // TODO: can we avoid the busy wait here?
-    while (pl->shared->ch_created != pl->shared->count) {
-        poll_all(pl);
-    }
 
     int ret = asprintf(&dq->name, "%s_%s", pl->stackname, name);
     assert(ret > 0);
     dprintf("pl_inqueue_bind: pl=%s q=%s\n", pl->name, dq->name);
 
-    err = bulk_linuxshm_ep_create(epd, dq->name, QUEUE_SLOTS);
+    dq->epd = malloc(sizeof(*dq->epd));
+    err = bulk_linuxshm_ep_create(dq->epd, dq->name, QUEUE_SLOTS);
     err_expect_ok(err);
 
     dq->pl = pl;
@@ -618,8 +610,6 @@ queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name)
     pl->queues = dq;
     chan->user_state = dq;
     dprintf("before_bind\n");
-    err = bulk_ll_channel_bind(chan, &epd->generic, &params, 0);
-    assert(err == BULK_TRANSFER_ASYNC);
     dprintf("pl_outqueue_bind: exit\n");
 
     return chan;
@@ -628,12 +618,37 @@ queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name)
 void pl_wait_ready(pipeline_handle_t plh)
 {
     struct dragonet_pipeline *pl = plh;
-    dprintf("pl_wait_ready: pl=%s bound=%"PRId64" count=%"PRId64"\n",
+    struct dragonet_queue *dq;
+    bool all_bound;
+    errval_t err;
+    struct bulk_channel_bind_params params = { .role = BULK_ROLE_MASTER,
+        .trust = BULK_TRUST_FULL };
+
+    printf("pl_wait_ready: pl=%s bound=%"PRId64" count=%"PRId64"\n",
             pl->name, pl->shared->ch_bound, pl->shared->count);
+
     // TODO: busy wait?
-    while (pl->shared->ch_bound != pl->shared->count) {
+    do {
+        all_bound = true;
+        dq = pl->queues;
+        while (dq != NULL) {
+            if (dq->is_out) {
+                if (!dq->bind_started) {
+                    err = bulk_ll_channel_bind(dq->chan, &dq->epd->generic,
+                            &params, 0);
+                    if (err == BULK_TRANSFER_CHAN_NOTCREATED) {
+                        // Just wait with this one
+                    } else {
+                        assert(err == BULK_TRANSFER_ASYNC);
+                        dq->bind_started = true;
+                    }
+                }
+                all_bound = all_bound && dq->assign_done;
+            }
+            dq = dq->next;
+        }
         poll_all(pl);
-    }
+    } while (!all_bound);
     dprintf("pl_wait_ready: end pl=%s\n", pl->name);
 }
 
