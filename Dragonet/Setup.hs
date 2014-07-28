@@ -15,7 +15,7 @@ import Data.Char
 import Data.List as L
 
 llvmVersions = ["3.4", "3.5"]
-config_force_version = True
+config_force_version = False
 
 -- Versioned llvm program
 --   e.g. llvm-link could be named just llvm-link, or lllvm-link-3.4
