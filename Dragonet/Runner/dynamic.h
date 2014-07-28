@@ -28,6 +28,9 @@ typedef node_out_t (*nodefun_t)(struct ctx_generic *ctx, // I don't think we can
                                 struct state *state,
                                 struct input **in);
 
+typedef nodefun_t (*fn_resolver_t)(const char *name,
+                                   void *data);
+
 struct dynamic_edge;
 struct dynamic_node {
     struct dynamic_graph  *graph;
@@ -73,8 +76,16 @@ struct dynamic_edge {
     node_out_t           port;
 };
 
+// Only here for allocation
+struct dyn_node_stack {
+    struct dynamic_node **stack;
+    size_t top;
+    size_t capacity;
+};
+
 struct dynamic_graph {
     pipeline_handle_t     plh;
+    struct dyn_node_stack nodestack;
     queue_handle_t       *outqueues;
     size_t                num_outqs;
     size_t                num_nodes;
@@ -82,6 +93,9 @@ struct dynamic_graph {
     struct task_queue     tqueue;
     struct dynamic_node  *nodes;
     struct dynamic_spawn *spawns;
+    fn_resolver_t         resolver;
+    void                 *resolver_data;
+    int                   version;
     volatile bool         stop;
 };
 
@@ -93,7 +107,9 @@ struct dynamic_spawn {
 
 
 
-struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh);
+struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh,
+                                  fn_resolver_t resolver,
+                                  void *resolver_data);
 void dyn_add_init(struct dynamic_graph *graph,
                   struct dynamic_spawn *spawn);
 void dyn_rungraph(struct dynamic_graph *graph);
@@ -102,7 +118,10 @@ void dyn_cleargraph(struct dynamic_graph *graph);
 
 struct dynamic_node *dyn_mkfnode(struct dynamic_graph *graph,
                                  const char *name,
-                                 nodefun_t   nodefun);
+                                 const char *nodefun);
+struct dynamic_node *dyn_mkonode(struct dynamic_graph *graph,
+                                 const char *name,
+                                 enum dynamic_node_op op);
 struct dynamic_node *dyn_mkonode_and(struct dynamic_graph *graph,
                                      const char *name);
 struct dynamic_node *dyn_mkonode_or(struct dynamic_graph *graph,

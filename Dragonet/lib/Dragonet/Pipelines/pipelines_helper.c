@@ -624,7 +624,7 @@ void pl_wait_ready(pipeline_handle_t plh)
     struct bulk_channel_bind_params params = { .role = BULK_ROLE_MASTER,
         .trust = BULK_TRUST_FULL };
 
-    printf("pl_wait_ready: pl=%s bound=%"PRId64" count=%"PRId64"\n",
+    dprintf("pl_wait_ready: pl=%s bound=%"PRId64" count=%"PRId64"\n",
             pl->name, pl->shared->ch_bound, pl->shared->count);
 
     // TODO: busy wait?

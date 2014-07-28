@@ -36,30 +36,38 @@ import Control.Monad.Error
 import Control.Concurrent (forkOS,yield)
 import qualified Control.Concurrent.STM as STM
 import Debug.Trace (trace)
+import qualified Control.Monad.Trans.State.Strict as ST
+
 
 newtype GraphHandle = GraphHandle (Ptr GraphHandle)
-newtype NodeHandle = NodeHandle (Ptr NodeHandle)
-newtype EdgeHandle = EdgeHandle (Ptr EdgeHandle)
-newtype SpawnHandle = SpawnHandle (Ptr SpawnHandle)
+newtype NodeHandle = NodeHandle Word64
+newtype EdgeHandle = EdgeHandle Word64
+newtype SpawnHandle = SpawnHandle Word64
+newtype QueueHandle = QueueHandle Word64
 type NodeFun = FunPtr (PI.StateHandle -> PI.InputHandle -> IO Word32)
 type MuxId = Word32
 
+
+type DynM a = ST.StateT DynState IO a
+
 -- Build node
-buildDynNode :: DynState -> PG.Node -> IO NodeHandle
-buildDynNode ds l
-    | isFromQ = mkFromQueueNode gh lbl fqh
-    | isDemux = mkDemuxNode gh lbl
-    | isMux = mkMuxNode gh lbl muxId
-    | isToQ = mkToQueueNode gh lbl qh
-    | PG.FNode {} <- l = do
-        fp <- nf l
-        mkFNode gh lbl fp
-    | PG.ONode { PG.nOperator = op } <- l = mkONode gh lbl op
+buildDynNode :: PG.Node -> DynM NodeHandle
+buildDynNode n = do
+    ds <- dmDS
+    buildDynNode' ds n
+
+buildDynNode' :: DynState -> PG.Node -> DynM NodeHandle
+buildDynNode' ds l
+    | isFromQ = mkFromQueueNode lbl fqh
+    | isDemux = mkDemuxNode lbl
+    | isMux = mkMuxNode lbl muxId
+    | isToQ = mkToQueueNode lbl qh
+    | PG.FNode {} <- l = mkFNode lbl ifun
+    | PG.ONode { PG.nOperator = op } <- l = mkONode lbl op
     | otherwise = error "Unsupported node type"
     where
-        gh = dsGraph ds
-        nf = plhNodeFun $ dsHelpers ds
         lbl = PG.nLabel l
+        PG.NImplFunction ifun = PG.nImplementation l
         isDemux
             | PG.FNode { PG.nLabel = "Demux" } <- l = True
             | otherwise = False
@@ -80,12 +88,11 @@ buildDynNode ds l
 
 
 
-buildGraph :: DynState -> PG.PGraph -> IO DynState
-buildGraph ds pg = do
-    let gh = dsGraph ds
+buildGraph :: PG.PGraph -> DynM ()
+buildGraph pg = do
     -- Create nodes
     nlm <- forM (DGI.labNodes pg) $ \(n,l) -> do
-        h <- buildDynNode ds l
+        h <- buildDynNode l
         addPorts h $ length $ PG.nPorts l
         return (n,h)
     let nm = M.fromList nlm
@@ -98,50 +105,186 @@ buildGraph ds pg = do
                 Just dst = M.lookup b nm
         aEdge _ = return ()
     mapM aEdge $ DGI.labEdges pg
-    -- Add spawns to nodes
-    let st = (ds, S.fromList $ map (\(a,b,_) -> (a,b)) $ dsSpawns ds)
-        dsSpawn d n = L.find (\(l,t,_) -> l == PG.nLabel n &&
-                                          t == PG.nTag n) $ dsSpawns d
-        procSpawn n (ds',s) (_,m) = do
+    -- Add spawns to nodes, and track unnused spawns
+    spawns <- dmDSGets dsSpawns
+    let st = S.fromList $ map (\(a,b,_) -> (a,b)) spawns
+        dsSpawn n ds = L.find (\(l,t,_) -> l == PG.nLabel n &&
+                                           t == PG.nTag n) $ dsSpawns ds
+        procSpawn n s (_,m) = do
             let Just nh = M.lookup n nm
                 Just mh = M.lookup m nm
                 Just mm = DGI.lab pg m
                 (mL,mT) = (PG.nLabel mm, PG.nTag mm)
-                ms = dsSpawn ds' mm
+            ms <- dmDSGets (dsSpawn mm)
             (ret,sh) <- case ms of
+                -- Spawn already exists
                 Just (_,_,sh) -> if (mL,mT) `S.member` s
                     then do
                         updateSpawn sh mh
-                        return ((ds', (mL,mT) `S.delete` s), sh)
-                    else return ((ds', s), sh)
+                        return ((mL,mT) `S.delete` s, sh)
+                    else return (s, sh)
+                -- Create new spawn
                 Nothing -> do
-                    sh <- mkSpawn gh mh
-                    let ds'' = ds' { dsSpawns = dsSpawns ds' ++ [(mL,mT,sh)] }
-                    return ((ds'',s),sh)
+                    sh <- mkSpawn mh
+                    dmDSModify $ \ds ->
+                        ds { dsSpawns = dsSpawns ds ++ [(mL,mT,sh)] }
+                    return (s,sh)
+            -- Add spawn to node
             addSpawn nh sh
             return ret
-    (ds',unused) <- foldM (\ret (n,_) ->
+    unused <- foldM (\ret (n,_) ->
         foldM (procSpawn n) ret $ PGU.orderedSpawns pg n) st $ DGI.labNodes pg
     -- Remove old unused spawns
+    spawns' <- dmDSGets dsSpawns
     let (old,remaining) =
-            L.partition (\(a,b,_) -> (a,b) `S.member` unused) $ dsSpawns ds'
-        ds'' = ds' { dsSpawns = remaining }
-    forM old $ \(_,_,sh) -> rmSpawn gh sh
+            L.partition (\(a,b,_) -> (a,b) `S.member` unused) spawns'
+    dmDSModify $ \ds -> ds { dsSpawns = remaining }
+    forM old $ \(_,_,sh) -> rmSpawn sh
     -- Spawn init nodes
-    let inits = [sh | n' <- S.toList $ PGU.entryNodes pg,
+    spawns'' <- dmDSGets dsSpawns
+    let initNodes = [l | n' <- S.toList $ PGU.entryNodes pg,
                        let Just l = DGI.lab pg n',
-                       PG.nAttrElem (PG.NAttrCustom "init") l,
-                       let Just (_,_,sh) = dsSpawn ds'' l]
-    mapM_ (addInit gh) inits
-
-
-    return ds''
+                       PG.nAttrElem (PG.NAttrCustom "init") l]
+    forM_ initNodes $ \n -> do
+        Just (_,_,sh) <- dmDSGets (dsSpawn n)
+        addInit sh
     where
         fixBoolP l
             | "true" `elem` l && "false" `elem` l && length l == 2 =
                 ["false", "true"]
             | otherwise = l
 
+
+
+
+type TDynState = STM.TVar DynState
+
+runDynMWithTDS :: TDynState -> DynM a -> IO a
+runDynMWithTDS tds act = do
+    ds <- STM.atomically $ STM.readTVar tds
+    (a,ds') <- ST.runStateT act ds
+    STM.atomically $ STM.writeTVar tds ds'
+    return a
+
+hStart :: TDynState -> IO ()
+hStart tds = runDynMWithTDS tds $ do
+    dmDebugPrint "hStart"
+    startGraph
+
+hStop :: TDynState -> IO ()
+hStop tds = runDynMWithTDS tds $ do
+    dmDebugPrint "hStop"
+    stopGraph
+
+hInQAdd :: TDynState -> PL.PLabel -> PI.PInput -> IO ()
+hInQAdd tds pl (PI.PIQueue iq) = do
+    runDynMWithTDS tds $ do
+        dmDebugPrint "hInQAdd"
+        addInQueue pl iq
+    return ()
+
+hInQRemove :: TDynState -> PL.PLabel -> IO ()
+hInQRemove tds pl = runDynMWithTDS tds $ do
+    dmDebugPrint "hInQRemove"
+    Just qh <- dmDSGets $ M.lookup pl . dsOutQs
+    rmInQueue pl qh
+
+hOutQAdd :: TDynState -> PL.PLabel -> PI.POutput -> IO ()
+hOutQAdd tds pl (PI.POQueue oq) = do
+    runDynMWithTDS tds $ do
+        dmDebugPrint "hOutQAdd"
+        addOutQueue pl oq
+    return ()
+
+hOutQRemove :: TDynState -> PL.PLabel -> IO ()
+hOutQRemove tds pl = runDynMWithTDS tds $ do
+    dmDebugPrint "hOutQRemove"
+    Just qh <- dmDSGets $ M.lookup pl . dsInQs
+    rmOutQueue pl qh
+
+hSetGraph :: TDynState -> PG.PGraph -> IO ()
+hSetGraph tds pg = runDynMWithTDS tds $ do
+    dmDebugPrint "hSetGraph"
+    clearGraph
+    buildGraph pg
+
+hDestroy :: TDynState -> IO ()
+hDestroy q = do
+    putStrLn "TODO: hDestroy"
+
+
+mkDPL :: PL.PLabel -> TDynState -> PD.DynPipeline
+mkDPL l tds =
+    PD.DynPipeline {
+        PD.dplLabel = l,
+        PD.dplStart = hStart tds,
+        PD.dplStop = hStop tds,
+        PD.dplInQAdd = hInQAdd tds,
+        PD.dplInQRemove = hInQRemove tds,
+        PD.dplOutQAdd = hOutQAdd tds,
+        PD.dplOutQRemove = hOutQRemove tds,
+        PD.dplSetGraph = hSetGraph tds,
+        PD.dplDestroy = hDestroy tds
+    }
+
+
+data DynState = DynState {
+    dsLabel   :: String,
+    dsGraph   :: GraphHandle,
+    dsSpawns  :: [(String,String,SpawnHandle)],
+    dsInQs    :: M.Map String QueueHandle,
+    dsOutQs   :: M.Map String QueueHandle,
+    -- Allocator helpers for node, edge, spawn, and queue handles
+    dsNextNH  :: Word64,
+    dsNextEH  :: Word64,
+    dsNextSH  :: Word64,
+    dsNextQH  :: Word64
+}
+
+
+createPipeline :: PL.PLGraph -> String -> String -> PL.PLabel
+                    -> IO PD.DynPipeline
+createPipeline plg stackname helpers mname = do
+    cmdq <- STM.newTQueueIO
+    mv <- STM.newEmptyTMVarIO
+    -- Spawn off execution thread
+    forkOS $ withHelpers llvm_helpers dyn_helpers $ \hf -> do
+        -- Prepare helper functions
+        (dl_init, dl_client, dl_run) <- pl_get_funs hf
+        -- Initialize
+        dl <- dl_init
+        gh <- dl_client dl
+
+        tds <- STM.atomically $ STM.newTVar $
+            DynState {
+                dsLabel = mname,
+                dsGraph = gh,
+                dsSpawns = [],
+                dsInQs = M.empty,
+                dsOutQs = M.empty,
+                dsNextNH = 0,
+                dsNextEH = 0,
+                dsNextSH = 0,
+                dsNextQH = 0 }
+        -- Return DynPipeline to main thread
+        STM.atomically $ STM.putTMVar mv $ mkDPL mname tds
+        putStrLn $ mname ++ ": Starting event loop"
+        dl_run dl
+
+    -- Wait for message from execution thread
+    STM.atomically $ STM.takeTMVar mv
+    where
+        -- LLVM file with helper utilities
+        llvm_helpers = "dist/build/" ++ helpers ++ ".bc"
+        dyn_helpers = "dist/build/llvm-dyn-helpers.bc"
+        pl_get_funs hf = do
+            hInit <- castFunPtr <$> hf "dyn_local_init"
+            hGraph <- castFunPtr <$> hf "dyn_local_client"
+            hRun <- castFunPtr <$> hf "dyn_local_run"
+            let nodeFun l = castFunPtr <$> (hf $ "do_pg__" ++ l)
+            return (localInitWrap hInit stackname mname nodeFun,
+                    localGraphFH hGraph,
+                    localRunFH hRun)
 
 
 withHelpers :: String -> String -> ((String -> IO (FunPtr b)) -> IO a) -> IO a
@@ -155,7 +298,6 @@ withHelpers llvm_helpers dyn_helpers run = do
                     withJitEE ctx $ \ee -> do
                         LLVMEE.withModuleInEngine ee mod $ \emod -> do
                             run (pgf emod)
-
     where
         file = LLVMMod.File llvm_helpers
         file' = LLVMMod.File dyn_helpers
@@ -167,290 +309,266 @@ withHelpers llvm_helpers dyn_helpers run = do
             return $ castFunPtr f
 
 
+-------------------------------------------------------------------------------
+-- Local Pipeline specific stuff
+
+type LocalResFNode = CString -> Ptr () -> IO NodeFun
+newtype LocalHandle = LocalHandle (Ptr LocalHandle)
+
 foreign import ccall "dynamic"
-    splhFun :: FunPtr (PI.PipelineHandle -> IO ()) -> PI.PipelineHandle -> IO ()
-
--- Don't ask... ;-)
+    localInitFH ::
+        FunPtr (CString -> CString -> FunPtr LocalResFNode -> IO LocalHandle)
+            -> CString -> CString -> FunPtr LocalResFNode -> IO LocalHandle
 foreign import ccall "dynamic"
-    c_pl_init :: FunPtr (CString -> CString -> IO PI.PipelineHandle)
-        -> CString -> CString -> IO PI.PipelineHandle
+    localGraphFH ::
+        FunPtr (LocalHandle -> IO GraphHandle) -> LocalHandle -> IO GraphHandle
 foreign import ccall "dynamic"
-    c_pl_queue_prepare ::
-        FunPtr (PI.PipelineHandle -> CString -> IO PI.QueueHandle)
-            -> PI.PipelineHandle -> CString -> IO PI.QueueHandle
-foreign import ccall "dynamic"
-    c_pl_wait_ready :: FunPtr (PI.PipelineHandle -> IO ())
-        -> PI.PipelineHandle -> IO ()
+    localRunFH ::
+        FunPtr (LocalHandle -> IO ()) -> LocalHandle -> IO ()
 
-pl_init_wrapper :: FunPtr (CString -> CString -> IO PI.PipelineHandle)
-        -> String -> String -> IO PI.PipelineHandle
-pl_init_wrapper fp sN pN = withCString sN $ \csN -> withCString pN $ \cpN ->
-    c_pl_init fp csN cpN
-pl_qprep_wrapper :: FunPtr (PI.PipelineHandle -> CString -> IO PI.QueueHandle)
-        -> PI.PipelineHandle -> String -> IO PI.QueueHandle
-pl_qprep_wrapper fp ph qN = withCString qN $ \cqN -> c_pl_queue_prepare fp ph cqN
+foreign import ccall "wrapper"
+    wrapResFN :: LocalResFNode -> IO (FunPtr LocalResFNode)
 
-type CmdQ = STM.TQueue DynCommand
-
-data DynCommand =
-    DCStart |
-    DCInQAdd PL.PLabel PI.PInput |
-    DCInQRemove PL.PLabel |
-    DCOutQAdd PL.PLabel PI.POutput |
-    DCOutQRemove PL.PLabel |
-    DCSetGraph PG.PGraph |
-    DCDestroy
-    deriving Show
-
-hStart :: CmdQ -> IO ()
-hStart q = STM.atomically $ STM.writeTQueue q DCStart
-
-hStop :: CmdQ -> IO () -> IO ()
-hStop _ stop = stop
-
-hInQAdd :: CmdQ -> PL.PLabel -> PI.PInput -> IO ()
-hInQAdd q pl pi = STM.atomically $ STM.writeTQueue q $ DCInQAdd pl pi
-
-hInQRemove :: CmdQ -> PL.PLabel -> IO ()
-hInQRemove q pl = STM.atomically $ STM.writeTQueue q $ DCInQRemove pl
-
-hOutQAdd :: CmdQ -> PL.PLabel -> PI.POutput -> IO ()
-hOutQAdd q pl po = STM.atomically $ STM.writeTQueue q $ DCOutQAdd pl po
-
-hOutQRemove :: CmdQ -> PL.PLabel -> IO ()
-hOutQRemove q pl = STM.atomically $ STM.writeTQueue q $ DCOutQRemove pl
-
-hSetGraph :: CmdQ -> PG.PGraph -> IO ()
-hSetGraph q pg = STM.atomically $ STM.writeTQueue q $ DCSetGraph pg
-
-hDestroy :: CmdQ -> IO ()
-hDestroy q = STM.atomically $ STM.writeTQueue q DCDestroy
-
-
-mkDPL :: PL.PLabel -> CmdQ -> IO () -> PD.DynPipeline
-mkDPL l q stop =
-    PD.DynPipeline {
-        PD.dplLabel = l,
-        PD.dplStart = hStart q,
-        PD.dplStop = hStop q stop,
-        PD.dplInQAdd = hInQAdd q,
-        PD.dplInQRemove = hInQRemove q,
-        PD.dplOutQAdd = hOutQAdd q,
-        PD.dplOutQRemove = hOutQRemove q,
-        PD.dplSetGraph = hSetGraph q,
-        PD.dplDestroy = hDestroy q
-    }
-
-data PLHelpers = PLHelpers {
-    plhInQCreate :: PI.PipelineHandle -> String -> IO PI.QueueHandle,
-    plhOutQBind  :: PI.PipelineHandle -> String -> IO PI.QueueHandle,
-    plhWaitReady :: PI.PipelineHandle -> IO (),
-    plhNodeFun :: PG.Node -> IO NodeFun
-}
-
-data DynState = DynState {
-    dsGraph   :: GraphHandle,
-    dsPLH     :: PI.PipelineHandle,
-    dsSpawns  :: [(String,String,SpawnHandle)],
-    dsInQs    :: M.Map String PI.QueueHandle,
-    dsOutQs   :: M.Map String PI.QueueHandle,
-    dsHelpers :: PLHelpers
-}
-
-eventHandler :: DynState -> DynCommand -> IO (Maybe DynState)
-eventHandler ds DCStart = do
-    plhWaitReady (dsHelpers ds) $ dsPLH ds
-    runGraph $ dsGraph ds
-    return $ Just ds
-
-eventHandler ds (DCInQAdd l pi) = do
-    let hlp = dsHelpers ds
-        plh = dsPLH ds
-        PI.PIQueue n = pi
-    qh <- plhInQCreate hlp plh n
-    return $ Just $ ds { dsInQs = M.insert l qh $ dsInQs ds }
-
-eventHandler ds (DCOutQAdd l po) = do
-    let hlp = dsHelpers ds
-        plh = dsPLH ds
-        PI.POQueue n = po
-    qh <- plhOutQBind hlp plh n
-    return $ Just $ ds { dsOutQs = M.insert l qh $ dsOutQs ds }
-
-eventHandler ds (DCInQRemove l) = do
-    putStrLn "Warning: NDI DCInQRemove"
-    return $ Just ds
-
-eventHandler ds (DCOutQRemove l) = do
-    putStrLn "Warning: NDI DCInQRemove"
-    return $ Just ds
-
-eventHandler ds (DCSetGraph pg) = do
-    clearGraph $ dsGraph ds
-    fmap Just $ buildGraph ds pg
-
-
-
-createPipeline :: PL.PLGraph -> String -> String -> PL.PLabel
-                    -> IO PD.DynPipeline
-createPipeline plg stackname helpers mname = do
-    cmdq <- STM.newTQueueIO
-    mv <- STM.newEmptyTMVarIO
-    -- Spawn off execution thread
-    forkOS $ withHelpers llvm_helpers dyn_helpers $ \hf -> do
-        -- Prepare helper functions
-        (pl_init,pl_helpers) <- pl_get_funs hf
-        -- Initialize pipeline
-        plh <- pl_init stackname mname
-        splh <- hf "set_pipeline_handle"
-        splhFun splh plh
-        -- Initialize empty dynamic graph
-        gh <- mkGraph plh
-        -- Return DynPipeline to main thread
-        STM.atomically $ STM.putTMVar mv $ mkDPL mname cmdq $ stopGraph gh
-        -- Start processing events from the queue
-        let eventLoop st = do
-                ev <- STM.atomically $ STM.readTQueue cmdq
-                --putStrLn $ mname ++ ": Got event: " ++ show ev
-                res <- eventHandler st ev
-                --putStrLn $ mname ++ ": Done event"
-                case res of
-                    Nothing -> return ()
-                    Just st' -> eventLoop st'
-        putStrLn $ mname ++ ": Starting event loop"
-        eventLoop $
-            DynState {
-                dsGraph = gh,
-                dsPLH = plh,
-                dsSpawns = [],
-                dsInQs = M.empty,
-                dsOutQs = M.empty,
-                dsHelpers = pl_helpers }
-
-    -- Wait for message from execution thread
-    STM.atomically $ STM.takeTMVar mv
-    where
-        -- LLVM file with helper utilities
-        llvm_helpers = "dist/build/" ++ helpers ++ ".bc"
-        dyn_helpers = "dist/build/llvm-dyn-helpers.bc"
-        pl_get_funs hf = do
-            pl_init <- castFunPtr <$> hf "pl_init"
-            pl_inq <- castFunPtr <$> hf "pl_inqueue_create"
-            pl_outq <- castFunPtr <$> hf "pl_outqueue_bind"
-            pl_wait <- castFunPtr <$> hf "pl_wait_ready"
-            let ifName (PG.NImplFunction f) = "do_pg__" ++ f
-                nodeFun l = castFunPtr <$> (hf $ ifName $ PG.nImplementation l)
-            return (pl_init_wrapper pl_init,
-                    PLHelpers {
-                        plhInQCreate = pl_qprep_wrapper pl_inq,
-                        plhOutQBind = pl_qprep_wrapper pl_outq,
-                        plhWaitReady = c_pl_wait_ready pl_wait,
-                        plhNodeFun = nodeFun })
+localInitWrap ::
+        FunPtr (CString -> CString -> FunPtr LocalResFNode -> IO LocalHandle)
+            -> String -> String -> (String -> IO NodeFun) -> IO LocalHandle
+localInitWrap cfun sn pl res = do
+    let cfun' = localInitFH cfun
+    fp <- wrapResFN (\n _ -> peekCString n >>= res)
+    withCString sn $ \csn ->
+        withCString pl $ \cpl ->
+            cfun' csn cpl fp
 
 
 -------------------------------------------------------------------------------
--- Convenient functions :)
+-- DynM helpers
 
-mkGraph :: PI.PipelineHandle -> IO GraphHandle
-mkGraph = c_mkgraph
+dmDS :: DynM DynState
+dmDS = ST.get
 
-addInit :: GraphHandle -> SpawnHandle -> IO ()
-addInit = c_add_init
+dmDSGets :: (DynState -> a) -> DynM a
+dmDSGets = ST.gets
 
-runGraph :: GraphHandle -> IO ()
-runGraph = c_run_graph
+dmDSPut :: DynState -> DynM ()
+dmDSPut = ST.put
 
-stopGraph :: GraphHandle -> IO ()
-stopGraph = c_stop_graph
+dmDSModify :: (DynState -> DynState) -> DynM ()
+dmDSModify = ST.modify
 
-clearGraph :: GraphHandle -> IO ()
-clearGraph = c_clear_graph
+dmGH :: DynM GraphHandle
+dmGH = ST.gets dsGraph
 
-mkFNode :: GraphHandle -> String -> NodeFun -> IO NodeHandle
-mkFNode gh l f = withCString l $ \cl -> c_mkfnode gh cl f
+dmWithGH :: (GraphHandle -> DynM a) -> DynM a
+dmWithGH f = do { gh <- dmGH ; f gh }
 
-mkONode :: GraphHandle -> String -> PG.NOperator -> IO NodeHandle
-mkONode gh l o = withCString l $ \cl -> case o of
-    PG.NOpAnd -> c_mkonode_and gh cl
-    PG.NOpOr -> c_mkonode_or gh cl
-    PG.NOpNAnd -> c_mkonode_nand gh cl
-    PG.NOpNOr -> c_mkonode_nor gh cl
+dmWithGHIO :: (GraphHandle -> IO a) -> DynM a
+dmWithGHIO f = dmWithGH (liftIO . f)
 
-mkDemuxNode :: GraphHandle -> String -> IO NodeHandle
-mkDemuxNode gh l = withCString l $ \cl -> c_mknode_demux gh cl
+dmNewNodeHandle :: DynM NodeHandle
+dmNewNodeHandle = do
+    ds@DynState { dsNextNH = nx } <- ST.get
+    ST.put $ ds { dsNextNH = nx + 1 }
+    return $ NodeHandle nx
 
-mkMuxNode :: GraphHandle -> String -> MuxId -> IO NodeHandle
-mkMuxNode gh l i = withCString l $ \cl -> c_mknode_mux gh cl i
+dmNewEdgeHandle :: DynM EdgeHandle
+dmNewEdgeHandle = do
+    ds@DynState { dsNextEH = nx } <- ST.get
+    ST.put $ ds { dsNextEH = nx + 1 }
+    return $ EdgeHandle nx
 
-mkToQueueNode :: GraphHandle -> String -> PI.QueueHandle -> IO NodeHandle
-mkToQueueNode gh l qh = withCString l $ \cl -> c_mknode_toqueue gh cl qh
+dmNewSpawnHandle :: DynM SpawnHandle
+dmNewSpawnHandle = do
+    ds@DynState { dsNextSH = nx } <- ST.get
+    ST.put $ ds { dsNextSH = nx + 1 }
+    return $ SpawnHandle nx
 
-mkFromQueueNode :: GraphHandle -> String -> PI.QueueHandle -> IO NodeHandle
-mkFromQueueNode gh l qh = withCString l $ \cl -> c_mknode_fromqueue gh cl qh
+dmNewQueueHandle :: DynM QueueHandle
+dmNewQueueHandle = do
+    ds@DynState { dsNextQH = nx } <- ST.get
+    ST.put $ ds { dsNextQH = nx + 1 }
+    return $ QueueHandle nx
 
-mkSpawn :: GraphHandle -> NodeHandle -> IO SpawnHandle
-mkSpawn = c_mkspawn
-
-updateSpawn :: SpawnHandle -> NodeHandle -> IO ()
-updateSpawn = c_updatespawn
-
-rmSpawn :: GraphHandle -> SpawnHandle -> IO ()
-rmSpawn = c_rmspawn
-
-addPorts :: NodeHandle -> Int -> IO Int
-addPorts nh n = fromIntegral <$> c_addports nh (fromIntegral n)
-
-addEdge :: NodeHandle -> Int -> NodeHandle -> IO EdgeHandle
-addEdge so p si = c_addedge so (fromIntegral p) si
-
-addSpawn :: NodeHandle -> SpawnHandle -> IO ()
-addSpawn = c_addspawn
+dmDebugPrint :: String -> DynM ()
+dmDebugPrint s = do
+    dsl <- dmDSGets dsLabel
+    --liftIO $ putStrLn $ dsl ++ ": " ++ s
+    return ()
 
 -------------------------------------------------------------------------------
--- C Declarations
+-- Convenient interface for pipeline interaction
 
-foreign import ccall "dyn_mkgraph"
-    c_mkgraph :: PI.PipelineHandle -> IO GraphHandle
-foreign import ccall "dyn_add_init"
-    c_add_init :: GraphHandle -> SpawnHandle -> IO ()
-foreign import ccall "dyn_rungraph"
-    c_run_graph :: GraphHandle -> IO ()
-foreign import ccall "dyn_stopgraph"
-    c_stop_graph :: GraphHandle -> IO ()
-foreign import ccall "dyn_cleargraph"
-    c_clear_graph :: GraphHandle -> IO ()
-foreign import ccall "dyn_mkfnode"
-    c_mkfnode :: GraphHandle -> CString -> NodeFun -> IO NodeHandle
-foreign import ccall "dyn_mkonode_and"
-    c_mkonode_and :: GraphHandle -> CString -> IO NodeHandle
-foreign import ccall "dyn_mkonode_or"
-    c_mkonode_or :: GraphHandle -> CString -> IO NodeHandle
-foreign import ccall "dyn_mkonode_nand"
-    c_mkonode_nand :: GraphHandle -> CString -> IO NodeHandle
-foreign import ccall "dyn_mkonode_nor"
-    c_mkonode_nor :: GraphHandle -> CString -> IO NodeHandle
-foreign import ccall "dyn_mknode_demux"
-    c_mknode_demux :: GraphHandle -> CString -> IO NodeHandle
-foreign import ccall "dyn_mknode_mux"
-    c_mknode_mux :: GraphHandle -> CString -> MuxId -> IO NodeHandle
-foreign import ccall "dyn_mknode_toqueue"
+stopGraph :: DynM ()
+stopGraph = dmWithGHIO c_stopgraph
+
+startGraph :: DynM ()
+startGraph = dmWithGHIO c_startgraph
+
+clearGraph :: DynM ()
+clearGraph = dmWithGHIO c_cleargraph
+
+
+mkFNode :: String -> String -> DynM NodeHandle
+mkFNode l i = do
+    nh <- dmNewNodeHandle
+    dmWithGHIO $ \gh ->
+        withCString l $ \cl ->
+            withCString i $ \ci -> c_mkfnode gh nh cl ci
+    return nh
+
+mkONode :: String -> PG.NOperator -> DynM NodeHandle
+mkONode l o = do
+    let opF = case o of
+                PG.NOpAnd -> c_mkonode_and
+                PG.NOpOr -> c_mkonode_or
+                PG.NOpNAnd -> c_mkonode_nand
+                PG.NOpNOr -> c_mkonode_nor
+    nh <- dmNewNodeHandle
+    dmWithGHIO $ \gh ->
+        withCString l $ \cl -> opF gh nh cl
+    return nh
+
+mkDemuxNode :: String -> DynM NodeHandle
+mkDemuxNode l = do
+    nh <- dmNewNodeHandle
+    dmWithGHIO $ \gh ->
+        withCString l $ \cl -> c_mknode_demux gh nh cl
+    return nh
+
+mkMuxNode :: String -> MuxId -> DynM NodeHandle
+mkMuxNode l i = do
+    nh <- dmNewNodeHandle
+    dmWithGHIO $ \gh ->
+        withCString l $ \cl -> c_mknode_mux gh nh cl i
+    return nh
+
+mkToQueueNode :: String -> QueueHandle -> DynM NodeHandle
+mkToQueueNode l qh = do
+    nh <- dmNewNodeHandle
+    dmWithGHIO $ \gh ->
+        withCString l $ \cl -> c_mknode_toqueue gh nh cl qh
+    return nh
+
+mkFromQueueNode :: String -> QueueHandle -> DynM NodeHandle
+mkFromQueueNode l qh = do
+    nh <- dmNewNodeHandle
+    dmWithGHIO $ \gh ->
+        withCString l $ \cl -> c_mknode_fromqueue gh nh cl qh
+    return nh
+
+
+mkSpawn :: NodeHandle -> DynM SpawnHandle
+mkSpawn nh = do
+    sh <- dmNewSpawnHandle
+    dmWithGHIO $ \gh -> c_mkspawn gh sh nh
+    return sh
+
+updateSpawn :: SpawnHandle -> NodeHandle -> DynM ()
+updateSpawn sh nh = dmWithGHIO $ \gh -> c_updatespawn gh sh nh
+
+rmSpawn :: SpawnHandle -> DynM ()
+rmSpawn sh = dmWithGHIO $ \gh -> c_rmspawn gh sh
+
+addPorts :: NodeHandle -> Int -> DynM ()
+addPorts nh n = dmWithGHIO $ \gh -> c_addports gh nh (fromIntegral n)
+
+addEdge :: NodeHandle -> Int -> NodeHandle -> DynM EdgeHandle
+addEdge so p si = do
+    eh <- dmNewEdgeHandle
+    dmWithGHIO $ \gh -> c_addedge gh eh so (fromIntegral p) si
+    return eh
+
+addSpawn :: NodeHandle -> SpawnHandle -> DynM ()
+addSpawn nh sh = dmWithGHIO $ \gh -> c_addspawn gh nh sh
+
+addInit :: SpawnHandle -> DynM ()
+addInit sh = dmWithGHIO $ \gh -> c_add_init gh sh
+
+
+addInQueue :: String -> String -> DynM QueueHandle
+addInQueue pl ep = do
+    qh <- dmNewQueueHandle
+    dmDSModify $ \ds -> ds { dsInQs = M.insert pl qh $ dsInQs ds }
+    dmWithGHIO $ \gh ->
+        withCString ep $ \cep -> c_addinqueue gh qh cep
+    return qh
+
+rmInQueue :: String -> QueueHandle -> DynM ()
+rmInQueue pl qh = do
+    dmWithGHIO $ \gh -> c_rminqueue gh qh
+    dmDSModify $ \ds -> ds { dsInQs = M.delete pl $ dsInQs ds }
+
+addOutQueue :: String -> String -> DynM QueueHandle
+addOutQueue pl ep = do
+    qh <- dmNewQueueHandle
+    dmDSModify $ \ds -> ds { dsOutQs = M.insert pl qh $ dsOutQs ds }
+    dmWithGHIO $ \gh ->
+        withCString ep $ \cep -> c_addoutqueue gh qh cep
+    return qh
+
+rmOutQueue :: String -> QueueHandle -> DynM ()
+rmOutQueue pl qh = do
+    dmWithGHIO $ \gh -> c_rmoutqueue gh qh
+    dmDSModify $ \ds -> ds { dsOutQs = M.delete pl $ dsOutQs ds }
+
+
+
+-------------------------------------------------------------------------------
+-- C Declarations for pipeline interface channel
+
+foreign import ccall "dynrc_startgraph"
+    c_startgraph :: GraphHandle -> IO ()
+foreign import ccall "dynrc_stopgraph"
+    c_stopgraph  :: GraphHandle -> IO ()
+foreign import ccall "dynrc_cleargraph"
+    c_cleargraph  :: GraphHandle -> IO ()
+
+
+foreign import ccall "dynrc_mkfnode"
+    c_mkfnode :: GraphHandle -> NodeHandle -> CString -> CString -> IO ()
+foreign import ccall "dynrc_mkonode_and"
+    c_mkonode_and :: GraphHandle -> NodeHandle -> CString -> IO ()
+foreign import ccall "dynrc_mkonode_or"
+    c_mkonode_or :: GraphHandle -> NodeHandle -> CString -> IO ()
+foreign import ccall "dynrc_mkonode_nand"
+    c_mkonode_nand :: GraphHandle -> NodeHandle -> CString -> IO ()
+foreign import ccall "dynrc_mkonode_nor"
+    c_mkonode_nor :: GraphHandle -> NodeHandle -> CString -> IO ()
+foreign import ccall "dynrc_mknode_demux"
+    c_mknode_demux :: GraphHandle -> NodeHandle -> CString -> IO ()
+foreign import ccall "dynrc_mknode_mux"
+    c_mknode_mux :: GraphHandle -> NodeHandle -> CString -> MuxId -> IO ()
+foreign import ccall "dynrc_mknode_toqueue"
     c_mknode_toqueue ::
-        GraphHandle -> CString -> PI.QueueHandle -> IO NodeHandle
-foreign import ccall "dyn_mknode_fromqueue"
+        GraphHandle -> NodeHandle -> CString -> QueueHandle -> IO ()
+foreign import ccall "dynrc_mknode_fromqueue"
     c_mknode_fromqueue ::
-        GraphHandle -> CString -> PI.QueueHandle -> IO NodeHandle
-foreign import ccall "dyn_mkspawn"
-    c_mkspawn :: GraphHandle -> NodeHandle -> IO SpawnHandle
-foreign import ccall "dyn_updatespawn"
-    c_updatespawn :: SpawnHandle -> NodeHandle -> IO ()
-foreign import ccall "dyn_rmspawn"
+        GraphHandle -> NodeHandle -> CString -> QueueHandle -> IO ()
+
+
+foreign import ccall "dynrc_mkspawn"
+    c_mkspawn :: GraphHandle -> SpawnHandle -> NodeHandle -> IO ()
+foreign import ccall "dynrc_updatespawn"
+    c_updatespawn :: GraphHandle -> SpawnHandle -> NodeHandle -> IO ()
+foreign import ccall "dynrc_rmspawn"
     c_rmspawn :: GraphHandle -> SpawnHandle -> IO ()
-foreign import ccall "dyn_addports"
-    c_addports :: NodeHandle -> CSize -> IO CSize
-foreign import ccall "dyn_addedge"
-    c_addedge :: NodeHandle -> CSize -> NodeHandle -> IO EdgeHandle
-foreign import ccall "dyn_addspawn"
-    c_addspawn :: NodeHandle -> SpawnHandle -> IO ()
+foreign import ccall "dynrc_addports"
+    c_addports :: GraphHandle -> NodeHandle -> CSize -> IO ()
+foreign import ccall "dynrc_addedge"
+    c_addedge ::
+        GraphHandle -> EdgeHandle -> NodeHandle -> CSize -> NodeHandle -> IO ()
+foreign import ccall "dynrc_addspawn"
+    c_addspawn :: GraphHandle -> NodeHandle -> SpawnHandle -> IO ()
+foreign import ccall "dynrc_add_init"
+    c_add_init :: GraphHandle -> SpawnHandle -> IO ()
+
+foreign import ccall "dynrc_addinqueue"
+    c_addinqueue :: GraphHandle -> QueueHandle -> CString -> IO ()
+foreign import ccall "dynrc_rminqueue"
+    c_rminqueue :: GraphHandle -> QueueHandle -> IO ()
+foreign import ccall "dynrc_addoutqueue"
+    c_addoutqueue :: GraphHandle -> QueueHandle -> CString -> IO ()
+foreign import ccall "dynrc_rmoutqueue"
+    c_rmoutqueue :: GraphHandle -> QueueHandle -> IO ()
 
 -------------------------------------------------------------------------------
 -- Generic Helpers

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "dynamic.h"
 
@@ -11,13 +12,8 @@
 #define dprintf(x...) do { } while (0)
 //#define dprintf printf
 
-struct node_stack {
-    struct dynamic_node **stack;
-    size_t top;
-    size_t capacity;
-};
 
-static void node_stack_init(struct node_stack *ns)
+static void node_stack_init(struct dyn_node_stack *ns)
 {
     size_t cap = 32;
     ns->capacity = cap;
@@ -25,17 +21,17 @@ static void node_stack_init(struct node_stack *ns)
     ns->stack = malloc(sizeof(*ns->stack) * cap);
 }
 
-static void node_stack_free(struct node_stack *ns)
+static void node_stack_free(struct dyn_node_stack *ns)
 {
     free(ns->stack);
 }
 
-static void node_stack_clear(struct node_stack *ns)
+static void node_stack_clear(struct dyn_node_stack *ns)
 {
     ns->top = 0;
 }
 
-static void node_stack_push(struct node_stack *ns, struct dynamic_node *n)
+static void node_stack_push(struct dyn_node_stack *ns, struct dynamic_node *n)
 {
     if (ns->top == ns->capacity) {
         ns->capacity *= 2;
@@ -45,7 +41,7 @@ static void node_stack_push(struct node_stack *ns, struct dynamic_node *n)
     ns->stack[ns->top++] = n;
 }
 
-static struct dynamic_node *node_stack_pop(struct node_stack *ns)
+static struct dynamic_node *node_stack_pop(struct dyn_node_stack *ns)
 {
     if (ns->top == 0) {
         return NULL;
@@ -54,7 +50,9 @@ static struct dynamic_node *node_stack_pop(struct node_stack *ns)
 }
 
 
-struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh)
+struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh,
+                                  fn_resolver_t     resolver,
+                                  void             *resolver_data)
 {
     dprintf("dyn_mkgraph\n");
     struct dynamic_graph *g = malloc(sizeof(*g));
@@ -65,6 +63,10 @@ struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh)
     g->spawns = NULL;
     g->plh = plh;
     g->stop = false;
+    g->resolver = resolver;
+    g->resolver_data = resolver_data;
+    g->version = 1;
+    node_stack_init(&g->nodestack);
     task_queue_init(&g->tqueue);
     pthread_mutex_init(&g->lock, NULL);
     return g;
@@ -73,7 +75,8 @@ struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh)
 void dyn_add_init(struct dynamic_graph *graph,
                   struct dynamic_spawn *spawn)
 {
-    dprintf("dyn_add_init\n");
+    dprintf("dyn_add_init %s\n",
+            (spawn->node != NULL ? spawn->node->name : NULL));
     if (!task_queue_put(&graph->tqueue, spawn, NULL, SPAWNPRIO_HIGH)) {
         fprintf(stderr, "dyn_add_source: task_queue_put failed\n");
         abort();
@@ -123,7 +126,7 @@ static node_out_t run_onode(struct dynamic_node *n,
     }
     while (e != NULL) {
         m = e->source;
-        //printf("m=%s ver=%d val=%d\n", m->name, m->out_version, m->out_value);
+        //printf("  m=%s ver=%d val=%d\n", m->name, m->out_version, m->out_value);
         if (m->out_version != version ||
                 (m->out_value != P_true && m->out_value != P_false))
         {
@@ -193,7 +196,7 @@ static node_out_t run_node(struct dynamic_node *n,
         case DYN_TOQUEUE:
             ret = pl_enqueue(n->tdata.queue.queue, *in);
             if (ret < 0) {
-                printf("%s:%s:%d:Warning: packet/event is lost as, pl_enqueue failed, %d\n",
+                dprintf("%s:%s:%d:Warning: packet/event is lost as, pl_enqueue failed, %d\n",
                         __FILE__, __FUNCTION__, __LINE__, ret);
             }
             *in = NULL;
@@ -227,89 +230,87 @@ static void reset_versions(struct dynamic_node *n)
 void dyn_rungraph(struct dynamic_graph *graph)
 {
     dprintf("dyn_rungraph\n");
-    struct node_stack ns;
+    struct dyn_node_stack *ns = &graph->nodestack;
     struct dynamic_node *n, *source;
     struct dynamic_spawn *spawn;
     struct dynamic_edge *e;
     struct state *st;
     struct input *in;
     node_out_t out;
-    int version = 0;
+    int version;
     size_t count, i;
     enum spawn_priority prio;
     pipeline_handle_t plh = graph->plh;
 
     st = pl_get_state(plh);
+    version = graph->version;
 
-    node_stack_init(&ns);
-
-    while (!graph->stop) {
-        if (!task_queue_get(&graph->tqueue, (void **) &spawn, &in, &prio)) {
-            fprintf(stderr, "PANIC: task queue empty\n");
-            abort();
-        }
-        if (spawn->node == NULL) {
-            fprintf(stderr, "Warning: Task starting at no longer existing "
-                            "node, dropping task...\n");
-            input_free_plh(plh, in);
-            continue;
-        }
-        source = spawn->node;
-
-        // Run Graph
-        node_stack_push(&ns, source);
-        count = 0;
-        while ((n = node_stack_pop(&ns)) != NULL) {
-            count++;
-            dprintf("Execute: n=%p n->n=%p\n", n, n->name);
-            dprintf("Execute: %s\n", n->name);
-            out = run_node(n, plh, st, &in, version);
-            dprintf("   port=%d\n", out);
-            if (out >= 0 && n->num_ports == 0) {
-                // Terminal node
-                out = -2;
-            }
-
-            // If the node failed, we can stop here
-            if (out == -2) {
-                // Abort execution for this packet
-                node_stack_clear(&ns);
-                break;
-            } else if (out < 0) {
-                continue;
-            }
-
-            n->out_value = out;
-            n->out_version = version;
-
-            // Enable successors
-            assert(out < n->num_ports);
-            e = n->ports[out];
-            while (e != NULL) {
-                node_stack_push(&ns, e->sink);
-                e = e->so_next;
-            }
-        }
-        dprintf("Execution done\n");
+    node_stack_clear(ns);
+    if (!task_queue_get(&graph->tqueue, (void **) &spawn, &in, &prio)) {
+        fprintf(stderr, "PANIC: task queue empty\n");
+        abort();
+    }
+    if (spawn->node == NULL) {
+        fprintf(stderr, "Warning: Task starting at no longer existing "
+                        "node, dropping task...\n");
         if (in != NULL) {
             input_free_plh(plh, in);
-            in = NULL;
+        }
+        return;
+    }
+    source = spawn->node;
+
+    // Run Graph
+    node_stack_push(ns, source);
+    count = 0;
+    while ((n = node_stack_pop(ns)) != NULL) {
+        count++;
+        dprintf("Execute: n=%p n->n=%p\n", n, n->name);
+        dprintf("Execute: %s\n", n->name);
+        out = run_node(n, plh, st, &in, version);
+        dprintf("   port=%d\n", out);
+        if (out >= 0 && n->num_ports == 0) {
+            // Terminal node
+            out = -2;
         }
 
-        version++;
-        if (version == -1) {
-            reset_versions(source);
-            version = 0;
+        // If the node failed, we can stop here
+        if (out == -2) {
+            // Abort execution for this packet
+            break;
+        } else if (out < 0) {
+            continue;
         }
 
-        // Process events on outqueues (freed buffers)
-        for (i = 0; i < graph->num_outqs; i++) {
-            while (pl_process_event(graph->outqueues[i]));
+        n->out_value = out;
+        n->out_version = version;
+
+        // Enable successors
+        assert(out < n->num_ports);
+        e = n->ports[out];
+        while (e != NULL) {
+            node_stack_push(ns, e->sink);
+            e = e->so_next;
         }
     }
-    graph->stop = false;
+    dprintf("Execution done\n");
+    if (in != NULL) {
+        input_free_plh(plh, in);
+        in = NULL;
+    }
 
-    node_stack_free(&ns);
+    version++;
+    if (version == -1) {
+        reset_versions(source);
+        version = 0;
+    }
+    graph->version = version;
+
+    // Process events on outqueues (freed buffers)
+    for (i = 0; i < graph->num_outqs; i++) {
+        while (pl_process_event(graph->outqueues[i]));
+    }
+
     dprintf("dyn_rungraph done\n");
 }
 
@@ -365,6 +366,7 @@ void dyn_cleargraph(struct dynamic_graph *graph)
     graph->num_outqs = 0;
     graph->num_nodes = 0;
     graph->nodes = NULL;
+    graph->version = 1;
 }
 
 
@@ -396,48 +398,24 @@ static struct dynamic_node *mknode(struct dynamic_graph *graph,
 
 struct dynamic_node *dyn_mkfnode(struct dynamic_graph *graph,
                                  const char *name,
-                                 nodefun_t   nodefun)
+                                 const char *impl)
 {
     dprintf("dyn_mkfnode\n");
     struct dynamic_node *n = mknode(graph, name, DYN_FNODE);
-    n->tdata.fnode.nodefun = nodefun;
+    n->tdata.fnode.nodefun = graph->resolver(impl, graph->resolver_data);
     n->tdata.fnode.ctx = malloc(sizeof(n->tdata.fnode.ctx));
     n->tdata.fnode.ctx->implementation = n;
     return n;
 }
 
-static struct dynamic_node *mkonode(struct dynamic_graph *graph,
-                                    const char *name,
-                                    enum dynamic_node_op op)
+struct dynamic_node *dyn_mkonode(struct dynamic_graph *graph,
+                                 const char *name,
+                                 enum dynamic_node_op op)
 {
-    dprintf("dyn_mkonode\n");
+    dprintf("dyn_mkonode: %s %d\n", name, op);
     struct dynamic_node *n = mknode(graph, name, DYN_ONODE);
     n->tdata.onode.op = op;
     return n;
-}
-
-struct dynamic_node *dyn_mkonode_and(struct dynamic_graph *graph,
-                                     const char *name)
-{
-    return mkonode(graph, name, DYN_OP_AND);
-}
-
-struct dynamic_node *dyn_mkonode_or(struct dynamic_graph *graph,
-                                    const char *name)
-{
-    return mkonode(graph, name, DYN_OP_OR);
-}
-
-struct dynamic_node *dyn_mkonode_nand(struct dynamic_graph *graph,
-                                      const char *name)
-{
-    return mkonode(graph, name, DYN_OP_NAND);
-}
-
-struct dynamic_node *dyn_mkonode_nor(struct dynamic_graph *graph,
-                                     const char *name)
-{
-    return mkonode(graph, name, DYN_OP_NOR);
 }
 
 struct dynamic_node *dyn_mknode_demux(struct dynamic_graph *graph,
@@ -543,7 +521,7 @@ struct dynamic_edge *dyn_addedge(struct dynamic_node *source,
                                  size_t port,
                                  struct dynamic_node *sink)
 {
-    dprintf("dyn_addedge\n");
+    dprintf("dyn_addedge: %s:%"PRId64" -> %s\n", source->name, port, sink->name);
     struct dynamic_edge *e = malloc(sizeof(*e));
     e->source = source;
     e->sink = sink;

@@ -68,10 +68,10 @@ executable opt-test
 executable stack-tap
     main-is:            stackTap.hs
     build-depends:      Dragonet, base, smtLib, fgl, containers, mtl, directory,
-                        llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm
+                        llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
+                        transformers
     ghc-options:        -threaded
-    C-sources:          Runner/dynamic.c,
-                        Runner/rt_queue.c
+    C-sources:          Runner/dyn_remote_client.c
     Include-dirs:       c_impl/include,
                         c_impl/e10k/include
     CC-options:         -Wall -Wno-unused-function
