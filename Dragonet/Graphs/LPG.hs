@@ -43,17 +43,18 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
                         PG.baseFNode ("ToSocket" ++ show sid) ["out","drop"]
             (vsN,_) <- C.confMNewNode $ PG.baseONode ("ValidSocket" ++ show sid)
                         bports PG.NOpAnd
-            return $ map (\(a,b,p) -> (a,b,PG.Edge p)) [
-                (vhN,dxN,"true"),  -- RxL4UDPValidHeaderLength -> Filter
-                (dxN,vsN,"false"), -- Filter -> ValidSocket
-                (dxN,vsN,"true"),  -- Filter -> ValidSocket
-                (dxN,cN,"false"),  -- Filter -> Collect
-                (dxN,cN,"true"),   -- Filter -> Collect
-                (vN, vsN,"false"), -- RxL4UDPValid -> ValidSocket
-                (vN, vsN,"true"),  -- RxL4UDPValid -> ValidSocket
-                (vsN,tsN,"true"),  -- ValidSocket -> ToSocket
-                (fsN,irN,"out"),   -- FromSocket -> TxL4UDPInitiateResponse
-                (tsN,fsN,"out")]   -- FromSocket -> ToSocket
+            let dfEdges = map (\(a,b,p) -> (a,b,PG.Edge p)) [
+                    (vhN,dxN,"true"),  -- RxL4UDPValidHeaderLength -> Filter
+                    (dxN,vsN,"false"), -- Filter -> ValidSocket
+                    (dxN,vsN,"true"),  -- Filter -> ValidSocket
+                    (dxN,cN,"false"),  -- Filter -> Collect
+                    (dxN,cN,"true"),   -- Filter -> Collect
+                    (vN, vsN,"false"), -- RxL4UDPValid -> ValidSocket
+                    (vN, vsN,"true"),  -- RxL4UDPValid -> ValidSocket
+                    (vsN,tsN,"true"),  -- ValidSocket -> ToSocket
+                    (fsN,irN,"out")]   -- FromSocket -> TxL4UDPInitiateResponse
+                spawnEdges = [(fsN,fsN,PG.ESpawn "send")]
+            return $ dfEdges ++ spawnEdges
             where
                 tuple@(_,msIP',msP,mdIP',mdP) =
                     (sid, uncvi <$> msIP, uncvi <$> msPort,
