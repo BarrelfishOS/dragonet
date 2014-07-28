@@ -1,0 +1,119 @@
+
+graph lpg {
+
+cluster Tx {
+
+    //node _sock1  { port o[UdpL4Len] }
+    //node _sock2  { port o[TcpL4Len] }
+
+    node Entry {
+        port udp[UdpL4Len]
+        port tcp[TcpL4Len]
+        port arp[ArpL3Len]
+    }
+
+    cluster Udp {
+        node L4Len {
+            port o[.IPv4L3Len_ Checksum HdrFill]
+        }
+
+        node Checksum {
+            port o[Done]
+        }
+        node HdrFill {
+            port o[Done]
+        }
+        and Done {
+            port true[.L4Done]
+            port false[]
+        }
+    }
+
+    cluster Tcp {
+        node L4Len {
+            port o[.IPv4L3Len_ Checksum HdrFill]
+        }
+        node Checksum {
+            port o[Done]
+        }
+        node HdrFill {
+            port o[Done]
+        }
+
+        and Done {
+            port true[.L4Done]
+            port false[]
+        }
+    }
+
+    cluster IPv4 {
+        or L3Len_ {
+            port true[L3Len]
+            port false[]
+        }
+
+        node L3Len {
+            port o[.EthernetL2Len_ Checksum HdrFill]
+        }
+        node Checksum {
+            port o[Done]
+        }
+        node HdrFill {
+            port o[Done]
+        }
+
+        and Done {
+            port true[.L3Done]
+            port false[]
+        }
+    }
+
+    cluster Arp {
+        node L3Len {
+            port o[.EthernetL2Len_ HdrFill]
+        }
+        node HdrFill {
+            port o[.L3Done .L4Done]
+        }
+    }
+
+    cluster Ethernet {
+        or L2Len_ {
+            port true[L2Len]
+            port false[]
+        }
+
+        node L2Len {
+            port o[HdrFill]
+        }
+
+        node HdrFill {
+            port o[.L2Done]
+        }
+    }
+
+    or L2Done {
+        port true[Done]
+        port false[]
+    }
+
+    or L3Done {
+        port true[Done]
+        port false[]
+    }
+
+    or L4Done {
+        port true[Done]
+        port false[]
+    }
+
+
+    and Done {
+        port true[Out]
+        port false[]
+    }
+
+    node Out {}
+}
+
+}

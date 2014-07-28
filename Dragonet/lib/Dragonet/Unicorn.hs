@@ -3,6 +3,7 @@ module Dragonet.Unicorn(
     constructGraph,
     constructGraph',
     strToGraph,
+    fileToGraph,
 ) where
 
 import Dragonet.Unicorn.Parser
@@ -132,6 +133,10 @@ constructGraph (Graph { gName = gname, gRootCluster = cluster }) =
 -- get a graph from a Unicorn string
 strToGraph :: String -> PG.PGraph
 strToGraph = constructGraph . parseGraph_
+
+-- load a graph from a file
+fileToGraph :: FilePath -> IO (PG.PGraph)
+fileToGraph fname = fmap strToGraph $ readFile fname
 
 constructGraph' :: Graph -> (PG.PGraph, Sem.Helpers)
 constructGraph' g = (constructGraph g, gSemHelpers g)

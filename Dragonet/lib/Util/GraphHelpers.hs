@@ -14,14 +14,16 @@ module Util.GraphHelpers(
     RecContext,
     recurseNFW,
     topsortLN,
-    updateN
+    updateN,
+    labPre, labLPre,
+    rdfsStop,
 ) where
 
 import Data.Graph.Inductive
 import qualified Data.Graph.Inductive.Query.DFS as DFS
 import qualified Data.List as L
 import qualified Control.Arrow as A
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe,fromJust)
 
 delLEdges :: (DynGraph gr, Eq b) => [LEdge b] -> gr a b -> gr a b
 delLEdges es g = foldr delLEdge g es
@@ -166,3 +168,36 @@ mergeGraphsBy nC = mergeGraphsBy' ((fromPred .) . nC)
         fromPred True = MergeInOut
         fromPred False = MergeNo
 
+-- silly helper
+nodeToLNode :: Graph gr => gr a b -> Node -> LNode a
+nodeToLNode g n = (n, fromJust $ lab g n)
+
+-- labeled node predecessors on a graph
+labPre :: Graph gr => gr a b -> LNode a -> [LNode a]
+labPre g n = map (nodeToLNode g) $ pre g (fst n)
+
+-- same as above, but includes edge labels
+labLPre :: Graph gr => gr a b -> LNode a -> [(LNode a, LEdge b)]
+labLPre graph node = map mapfn $ inn graph (fst node)
+    where mapfn edge@(src, _, _) = (nodeToLNode graph src, edge)
+
+-- similar to xdfsWith, but the search is stopped when a particular node is
+-- found. The node is included in the results
+xdfsWithStop ::
+    Graph gr =>
+    DFS.CFun a b [Node] ->  -- function to get a list of nodes out of a context
+                            -- (e.g,. pre', suc')
+    DFS.CFun a b c ->       -- function to get a return item from a context
+                            -- (e.g., node')
+    (LNode a -> Bool) ->    -- function for deciding when to stop
+    [LNode a] ->            -- starting points for search
+    gr a b ->               -- graph
+    [c]                     -- return items
+xdfsWithStop getNodes getResult stopSearch nodes graph =
+    DFS.xdfsWith getNodes' getResult nodes' graph
+        where getNodes' ctx@(_, node, lnode, _) | stopSearch (node, lnode) = []
+                                                | otherwise = getNodes ctx
+              nodes' = map fst nodes
+
+rdfsStop :: Graph gr => (LNode a -> Bool) -> [LNode a] -> gr a b -> [LNode a]
+rdfsStop = xdfsWithStop pre' labNode'

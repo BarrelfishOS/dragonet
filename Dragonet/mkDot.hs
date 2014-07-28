@@ -20,7 +20,7 @@ main = do
         else forM_ xargs $ \fname -> do
 
             let outname = fname ++ ".dot"
-            putStrLn $ "Generating dot file for: " ++ fname
+            putStrLn $ "Generating dot file for " ++ fname
 
             txt   <- readFile fname
             graph <- UnicornAST.parseGraph txt

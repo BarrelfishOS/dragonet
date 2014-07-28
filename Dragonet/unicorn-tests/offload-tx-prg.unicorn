@@ -1,0 +1,24 @@
+graph prg_tx {
+
+cluster Tx {
+
+    node Entry {
+        port udp[UdpChecksum]
+        port other[Done]
+    }
+
+    cluster Udp {
+        node Checksum {
+            port o[.Done]
+        }
+    }
+
+    or Done {
+        port true[Out]
+        port false[]
+    }
+
+    node Out {}
+}
+
+}

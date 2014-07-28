@@ -205,4 +205,3 @@ nAttrsAdd a n = n { nAttributes = nAttributes n ++ a }
 nAttrElem :: NAttribute -> Node -> Bool
 nAttrElem a n = elem a $ nAttributes n
 
-
