@@ -62,11 +62,7 @@ cfiles_cimpl      = $(CIMPL_DIR)/impl_arp.c \
                     $(CIMPL_DIR)/implementation.c \
                     $(CIMPL_DIR)/state.c \
                     $(CIMPL_DIR)/support/Ethernet.c \
-                    $(CIMPL_DIR)/support/Icmp.c \
-                    stack/Runner/dyn_remote_server.c \
-                    stack/Runner/dyn_remote_client.c \
-                    stack/Runner/dyn_local.c \
-                    stack/Runner/dynamic.c
+                    $(CIMPL_DIR)/support/Icmp.c
  
 
 cfiles_cimpl_tap  = $(CIMPL_DIR)/impl_tap.c
@@ -131,7 +127,11 @@ $(BUILD_DIR)/llvm-helpers-sf.bc: $(BUILD_DIR)/llvm-c_impl-sf.bc $(helpers_common
 # dyn helpers
 
 cfiles_dyn_helpers=stack/Runner/dyn_helpers.c \
-		   stack/Runner/rt_queue.c
+		   stack/Runner/rt_queue.c \
+                    stack/Runner/dyn_remote_server.c \
+                    stack/Runner/dyn_remote_client.c \
+                    stack/Runner/dyn_local.c \
+                    stack/Runner/dynamic.c
 
 bcfiles_dyn_helpers = $(addprefix $(BUILD_DIR)/, $(addsuffix .bc,$(basename $(cfiles_dyn_helpers))))
 

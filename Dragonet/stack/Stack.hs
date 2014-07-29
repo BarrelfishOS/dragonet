@@ -1,3 +1,12 @@
+module Stack (
+    instantiate,
+
+    StackState(..),
+    EndpointDesc(..),
+    SocketDesc(..),
+    AppDesc(..)
+) where
+
 import qualified Dragonet.Configuration as C
 import qualified Dragonet.Optimization as O
 import qualified Dragonet.Pipelines as PL
@@ -20,8 +29,6 @@ import Runner.Dynamic (createPipeline, createPipelineClient)
 import qualified Control.Concurrent.STM as STM
 import Control.Concurrent (threadDelay)
 import qualified Data.Map as M
-
-lpgCfg = [("RxL4UDPCUDPSockets", PG.CVList [])]
 
 data AppDesc = AppDesc {
     adLabel :: String,
@@ -52,13 +59,14 @@ data StackState = StackState {
 }
 
 
-plAssign ss (_,n)
-    | ('R':'x':_) <- PG.nLabel n = "Rx"
+-- Force socket nodes in their respective pipeline, for the rest use the
+-- function f
+plAssign f ss cfg m@(_,n)
     | Just ssid <- PGU.getPGNAttr n "fromsocket" =
             "App" ++ (show $ appId $ read ssid)
     | Just ssid <- PGU.getPGNAttr n "tosocket" =
             "App" ++ (show $ appId $ read ssid)
-    | otherwise = "Tx"
+    | otherwise = f ss cfg m
     where
         appId sid = sdAppId socket
             where Just socket = M.lookup sid $ ssSockets ss
@@ -170,14 +178,20 @@ lpgConfig ss = [("RxL4UDPCUDPSockets", PG.CVList $ cUdpSockets)]
                 mdIP = PG.CVInt <$> fromIntegral <$> edIP4Dst ed
                 msPort = PG.CVInt <$> fromIntegral <$> edUDPSrc ed
                 mdPort = PG.CVInt <$> fromIntegral <$> edUDPDst ed
-main = do
+
+instantiate :: (Ord a, Show a) =>
+           (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
+        -> String                                      -- | Name of llvm-helpers
+        -> (StackState -> O.CostFunction a)            -- | Cost Function
+        -> (PG.PGraph -> StackState -> [(String,C.Configuration)]) -- | Oracle
+        -> (C.Configuration -> IO ())                  -- | Implement PRG config
+        -> (StackState -> String -> PG.PGNode -> String) -- | Assign nodes to PL
+        -> IO ()
+instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
     -- Prepare graphs and so on
-    (prgU,prgHelp) <- Tap.graphH
     (lpgU,lpgHelp) <- LPG.graphH
     let helpers = prgHelp `Sem.mergeHelpers` lpgHelp
-    let dbg = O.dbgDotfiles $ "graphs-tap" :: O.DbgFunction ()
-    let stackname = "dragonet"
-        llvmHelpers = "llvm-helpers"
+        stackname = "dragonet"
     ctx <- PLD.initialContext stackname
 
     -- Function to adapt graph to current stack state
@@ -188,12 +202,16 @@ main = do
                 let ss' = ss { ssVersion = ssVersion ss + 1 }
                 STM.writeTVar sstv ss'
                 return ss'
-            -- Configure LPG
             let lpgCfg = lpgConfig ss
+                -- Configure LPG
                 lpgC = C.applyConfig lpgCfg lpgU
+                dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
+                -- Generate PRG configurations
+                pCfgs = cfgOracle lpgC ss
             putStrLn $ "LPG config: " ++ show lpgCfg
-            plg <- O.makeGraph helpers prgU lpgC (plAssign ss)
-                (dbg $ show $ ssVersion ss) []
+            (plg,(_,pCfg)) <- O.optimize helpers prgU lpgC (plAssign cfgPLA ss)
+                    dbg (costFun ss) pCfgs
+            cfgImpl pCfg
             let createPL pl@('A':'p':'p':aids) = do
                     putStrLn $ "Creating App pipeline: " ++ pl
                     createPipelineClient agh pl
@@ -203,7 +221,7 @@ main = do
                         agh = adGraphHandle app
                 createPL pl = do
                     putStrLn $ "Creating local pipeline: " ++ pl
-                    createPipeline plg stackname llvmHelpers pl
+                    createPipeline plg stackname llvmH pl
             PLD.run ctx plConnect createPL $ addMuxIds plg
             putStrLn "updateGraph exit"
 

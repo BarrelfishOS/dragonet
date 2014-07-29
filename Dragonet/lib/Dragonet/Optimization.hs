@@ -71,15 +71,16 @@ optimize :: Ord a =>
     -> DbgFunction a                   -- | Debugging function
     -> CostFunction a                  -- | Cost function
     -> [(String,C.Configuration)]      -- | Configurations to evaluate
-    -> IO PL.PLGraph
+    -> IO (PL.PLGraph, (String,C.Configuration))
 optimize hs prg lpg pla dbg cf cfgs = do
     evald <- forM cfgs $ \(lbl,cfg) -> do
         plg <- makeGraph hs prg lpg (pla lbl) (dbg lbl) cfg
         let cost = cf plg
         dbg lbl lbl $ DbgEvaluated plg cost
-        return (cost, plg)
-    let (_,minPlg) = L.minimumBy (compare `on` fst) evald
-    return minPlg
+        return (cost, plg, (lbl,cfg))
+    let fst3 (a,_,_) = a
+        (_,minPlg,lcfg) = L.minimumBy (compare `on` fst3) evald
+    return (minPlg, lcfg)
 
 
 
