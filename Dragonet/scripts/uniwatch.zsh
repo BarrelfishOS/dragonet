@@ -1,5 +1,7 @@
 #!/usr/bin/env zsh
-# script watch for changes in unicorn files.
+
+# Watch for changes in unicorn files and dot files.
+# When a file is updated, create the corresponding pdf
 
 if [ -z "$*" ]; then
 	echo "Usage: $0 <dir>"
@@ -10,25 +12,29 @@ idir=$1
 inotifywait --format "%f %e" -e modify -e close_write -e moved_to -m $idir  | (while read fname event
 do
 	echo "Got: $fname ($event)"
-	# if file does not have a unicorn extension, do nothing
-	if [ ! "${fname:e}" = "unicorn" ]; then
+	infile="$idir/$fname" # file that changed
+	fext="${fname:e}"     # file name extension
+	if [ "$fext" = "unicorn" ]; then
+		docmd="./scripts/uni2pdf.zsh $infile"
+	elif [ "$fext" = "dot" ]; then
+		docmd="./scripts/dot2pdf.zsh $infile"
+	else
 		continue
 	fi
 
-	unifile="$idir/$fname"
-	pdffile="$unifile.pdf"
+	outfile="$unifile.pdf"
 	# if output file exists and is newer that $fname, do nothing
 	if [ -e "$pdffile" ]; then
 		t_pdf=$(stat -c "%Y" $pdffile)
-		t_uni=$(stat -c "%Y" $unifile)
+		t_uni=$(stat -c "%Y" $infile)
 		if [ $t_pdf -gt $t_uni ]; then
-            echo "***** out file older, not compiling"
+			echo "***** out file older, not compiling"
 			continue
 		fi
 	fi
 
-    sleep .4 # wait until dust settles
-	echo "Compiling $unifle:"
-	./scripts/uni2pdf.zsh $unifile
+	sleep .4 # wait until dust settles
+	echo "Compiling $unifle via $docmd"
+	eval $docmd
 	echo
 done)
