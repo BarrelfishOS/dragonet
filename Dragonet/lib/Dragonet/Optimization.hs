@@ -118,10 +118,13 @@ cleanupGraph g
     | otherwise = cleanupGraph g'
     where
         hasAttr a n = elem (PG.NAttrCustom a) $ PG.nAttributes n
-        srcs = filter (null . DGI.pre g . fst) $ DGI.labNodes g
-        snks = filter (null . DGI.suc g . fst) $ DGI.labNodes g
+        srcs = filter (onlySpawnEs . DGI.lpre g . fst) $ DGI.labNodes g
+        snks = filter (onlySpawnEs . DGI.lsuc g . fst) $ DGI.labNodes g
         badSrcs = filter (not . hasAttr "source" . snd) srcs
         badSnks = filter (not . hasAttr "sink" . snd) snks
         badNodes = L.nub $ map fst $ badSrcs ++ badSnks
         g' = DGI.delNodes badNodes g
+        onlySpawnEs = all isSpawnE
+            where isSpawnE (_,PG.ESpawn {}) = True
+                  isSpawnE _ = False
 
