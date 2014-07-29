@@ -3,9 +3,10 @@
 #set -e
 
 convertDir() {
+    dir=$(pwd)
     cd $1
-    flist=`ls *.dot`
-    for f in ${flist} ; do
+    for f in *.dot ; do
+        [ -f $f ] || continue
         justFile=`echo ${f} | sed -e "s/.dot//"`
         pdfFile="${justFile}.pdf"
         svgFile="${justFile}.svg"
@@ -14,7 +15,7 @@ convertDir() {
         #pdfcrop ${pdfFile}
         echo converted "$1/${f} to $1/{${pdfFile} ${svgFile}}"
     done
-    cd ..
+    cd $dir
 
     for d in $1/*/ ; do
         if [ -d $d ] ; then
