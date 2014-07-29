@@ -80,7 +80,7 @@ generatePipeline g nm pll ns = (Pipeline pll pg, suc)
                         PG.baseFNode ("FromPL" ++ pl) ["false","true"]
                     GM.newEdge (fromPLN, demux_N, PG.Edge "false")
                     GM.newEdge (fromPLN, demux_N, PG.Edge "true")
-                    GM.newEdge (fromPLN, fromPLN, PG.ESpawn "poll")
+                    GM.newEdge (fromPLN, fromPLN, PG.ESpawn "poll" [])
 
                 -- Add Demux node
                 let demuxPs = ["_"] ++ map labN inDN

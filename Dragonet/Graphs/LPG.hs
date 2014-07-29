@@ -1,9 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Graphs.LPG (
-    graphH
+    graphH, graphH_
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG
+import Dragonet.ProtocolGraph.Utils (getPGNodeByName)
 import qualified Dragonet.Configuration as C
 import qualified Dragonet.Semantics as SEM
 
@@ -27,7 +28,10 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
         findN ps l = (fst . fst) <$> L.find (hasL l . snd . fst) ps
         Just vN = findN inE "RxL4UDPValid"
         Just vhN = findN inE "RxL4UDPValidHeaderLength"
-        Just irN = findN outE "TxL4UDPInitiateResponse"
+        -- ugly hack to support both lpg versions
+        irN = case findN outE "TxL4UDPStart" of
+            Just x  -> x
+            Nothing -> fromJust $ findN outE "TxL4UDPInitiateResponse"
         Just cN  = findN outE "RxL4UDPUnusedPort"
         addSocket (PG.CVTuple [
                     PG.CVInt sid,
@@ -58,7 +62,7 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
                     (vN, vsN,"true"),  -- RxL4UDPValid -> ValidSocket
                     (vsN,tsN,"true"),  -- ValidSocket -> ToSocket
                     (fsN,irN,"out")]   -- FromSocket -> TxL4UDPInitiateResponse
-                spawnEdges = [(fsN,fsN,PG.ESpawn "send")]
+                spawnEdges = [(fsN,fsN,PG.ESpawn "send" [])]
             return $ dfEdges ++ spawnEdges
             where
                 tuple@(_,msIP',msP,mdIP',mdP) =
@@ -100,10 +104,11 @@ addCfgFun n
     | otherwise = error $ "Unknown LPG CNode: '" ++ l ++ "'"
     where l = PG.nLabel n
 
-
-graphH :: IO (PG.PGraph,SEM.Helpers)
-graphH = do
-    (pg,helpers) <- parseGraph "Graphs/LPG/lpgConfImpl.unicorn"
+graphH_ :: FilePath -> IO (PG.PGraph, SEM.Helpers)
+graphH_ fname = do
+    (pg,helpers) <- parseGraph fname
     let pg' = C.replaceConfFunctions addCfgFun pg
     return (pg',helpers)
 
+graphH :: IO (PG.PGraph,SEM.Helpers)
+graphH = graphH_ "Graphs/LPG/lpgConfImpl.unicorn"

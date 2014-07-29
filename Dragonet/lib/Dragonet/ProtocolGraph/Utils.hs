@@ -65,4 +65,3 @@ getPGNAttr node n = getVal <$> (find matches $ nAttributes node)
         matches (NAttrCustom s) = (n ++ "=") `isPrefixOf` s
         matches _ = False
         getVal (NAttrCustom s) = drop (length n + 1) s
-

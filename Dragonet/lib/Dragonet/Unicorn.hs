@@ -115,7 +115,7 @@ constructGraph (Graph { gName = gname, gRootCluster = cluster }) =
 
         get_edges_spawn :: (Int, Node) -> [PG.PGEdge]
         get_edges_spawn (nid, node) =
-            [(nid,  node_id $ sNode s, PG.ESpawn $ sName s) |
+            [(nid,  node_id $ sNode s, PG.ESpawn (sName s) (sAttrs s)) |
                 s <- case node of
                     Node { nSpawns = ss' } -> ss'
                     Config { nSpawns = ss' } -> ss'

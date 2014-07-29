@@ -2,13 +2,15 @@
 
 --import qualified Data.Graph.Inductive as DGI
 
-import Dragonet.ProtocolGraph (PGraph, PGNode, PGEdge, Node(..), NPort, Edge(..), NOperator(..))
+import Dragonet.Predicate
+import Dragonet.ProtocolGraph (PGraph, PGNode, PGEdge, Node(..), NPort, Edge(..), NOperator(..), ESAttribute(..))
 import Dragonet.ProtocolGraph.Utils (getFNodeByName, getFNodeByName')
 import Dragonet.DotGenerator (toDot)
 import qualified Dragonet.Unicorn as U
 import qualified Util.GraphHelpers as GH
 
 import Control.Monad.State (State, MonadState, gets, modify, runState)
+import Control.Monad (Monad)
 import Control.Applicative ((<$>))
 import Data.Maybe
 import Data.List (intercalate)
@@ -17,8 +19,16 @@ import Text.Show.Pretty (ppShow)
 import Debug.Trace (trace)
 import Text.RawString.QQ (r)
 
+import qualified Graphs.LPG as L
+import qualified Dragonet.Configuration as C
+
+import TestOptimization (lpgCfg)
+
 ------------------------------------------------
 -- helpers (to be eventually moved to other files)
+
+traceMessages = True
+xtrace = if traceMessages then \a b -> b else trace
 
 -- node type tests
 isONode :: PGNode -> Bool
@@ -33,70 +43,6 @@ isCNode :: PGNode -> Bool
 isCNode (_, CNode {}) = True
 isCNode _ = False
 
--- helper to easily define equality for PredicateExpr
-data PTerm = PTerm PGNode NPort
-instance Eq PTerm where
-    (PTerm (_, n1) p1) == (PTerm (_, n2) p2) = (nLabel n1 == nLabel n2) && (p1 == p2)
-
-data PredicateExpr = PredicateTerm PTerm |
-                     PredicateOr  [PredicateExpr] |
-                     PredicateAnd [PredicateExpr] |
-                     PredicateNot PredicateExpr |
-                     PredicateTrue | PredicateFalse |
-                     PredicateUndef
-    deriving (Eq)
-
-instance Show PredicateExpr where
-    show (PredicateTerm (PTerm (_, node) nport)) = "(" ++ (nLabel node) ++ "," ++ nport ++ ")"
-    show (PredicateOr l)  = "( " ++ (intercalate " OR " $ map show l) ++ " ) "
-    show (PredicateAnd l) = "( " ++ (intercalate " AND " $ map show l) ++ " ) "
-    show (PredicateNot e) = "(NOT " ++ (show e) ++ ")"
-    show PredicateTrue    = "True"
-    show PredicateFalse   = "False"
-    show PredicateUndef   = "UNDEFINED"
-
--- create an AND predicate, and do folding when possible
-predicateAND :: [PredicateExpr] -> PredicateExpr
-predicateAND [] = error "Empty predicate list"
-predicateAND x  = let tr = if True then \a b -> b else trace
-                      x'   = tr ("AND args: " ++ (show x)) x
-                      ret  = doAND PredicateUndef x'
-                      ret' = tr ("RESULT: " ++ (show ret)) ret
-                   in ret'
-    where doAND :: PredicateExpr -> [PredicateExpr] -> PredicateExpr
-          doAND result           []                  = result
-          doAND _                (PredicateFalse:xs) = PredicateFalse
-          doAND PredicateUndef   (PredicateTrue:xs)  = doAND PredicateTrue xs
-          doAND result           (PredicateTrue:xs)  = doAND result xs
-          doAND PredicateUndef   (x:xs)              = doAND (PredicateAnd [x])   xs
-          doAND PredicateTrue    (x:xs)              = doAND x  xs
-          doAND (PredicateAnd r) (x:xs)              = doAND (PredicateAnd (x:r)) xs
-          doAND r                l                   = error $ "This should not happen (AND)" ++ "result: --" ++ (show r) ++ "-- rest: --" ++ (show l) ++ "--"
-
--- create an OR predicate, and do folding when possible
-predicateOR :: [PredicateExpr] -> PredicateExpr
-predicateOR [] = error "Empty predicate list"
-predicateOR x  = let tr = if True then \a b -> b else trace
-                     x'   = tr ("OR args: " ++ (show x)) x
-                     ret  = doOR PredicateUndef x'
-                     ret' = tr ("RESULT: " ++ (show ret)) ret
-                  in ret'
-    where doOR :: PredicateExpr -> [PredicateExpr] -> PredicateExpr
-          doOR result           []                  = result
-          doOR _               (PredicateTrue:xs)   = PredicateTrue
-          doOR PredicateUndef  (PredicateFalse:xs)  = doOR PredicateFalse xs
-          doOR result          (PredicateFalse:xs)  = doOR result xs
-          doOR PredicateUndef  (x:xs)               = doOR (PredicateOr [x]) xs
-          doOR PredicateFalse  (x:xs)               = doOR x xs
-          doOR (PredicateOr r) (x:xs)               = doOR (PredicateOr (x:r)) xs
-          doOR r               l                    = error $ "This should not happen (OR)" ++ "result: --" ++ (show r) ++ "-- rest: --" ++ (show l) ++ "--"
-
--- potentially replace them with the versions above that do folding
-predAnd = predicateAND
-predOr  = predicateOR
---predAnd = PredicateAnd
---predOr  = PredicateOr
-
 -- simple equality for now
 predEquiv :: PredicateExpr -> PredicateExpr -> Bool
 predEquiv a b =  a == b
@@ -104,7 +50,6 @@ predEquiv a b =  a == b
 -- state for computing predicate expression:
 data PredCompSt = PredCompSt {
       predGraph  :: PGraph
-    , predSrc    :: PGNode
     , predDst    :: PGNode
     , predInPort :: Maybe NPort
 } deriving (Show)
@@ -112,48 +57,89 @@ data PredCompSt = PredCompSt {
 -- initialize state
 initPredCompSt_ = PredCompSt {
       predGraph  = undefined
-    , predSrc    = undefined
     , predDst    = undefined
     , predInPort = Nothing
 }
 
-initPredCompSt :: PGraph -> String -> String -> PredCompSt
-initPredCompSt gr src dst = initPredCompSt_ {
+initPredCompSt :: PGraph -> String -> PredCompSt
+initPredCompSt gr node = initPredCompSt_ {
       predGraph = gr
-    , predSrc   = getFNodeByName gr src
-    , predDst   = getFNodeByName gr dst
+    , predDst   = getFNodeByName gr node
 }
 
 pgEdgePort :: PGEdge -> NPort
 pgEdgePort pedge = case pedge of
-    (_, _, ESpawn _) -> error "cannot deal with spawn edges just yet"
-    (_, _, Edge p)   -> p
+    (_, _, ESpawn _ _) -> error "spawn edges do not have ports"
+    (_, _, Edge p)     -> p
+
+-- is this a normal (not spawn) edge?
+pgIsNormalEdge :: PGEdge -> Bool
+pgIsNormalEdge e = case e of
+    (_, _, ESpawn _ _) -> False
+    (_, _, Edge _)     -> True
+
+pgIsSpawnEdge = not . pgIsNormalEdge
+
+-- normal incomming edges (label of connected node, edge)
+pgInEdges :: PGraph -> PGNode -> [(PGNode, PGEdge)]
+pgInEdges gr dst = filter (pgIsNormalEdge . snd) $ GH.labLPre gr dst
+
+-- normal incomming edges (label of connected node, edge)
+pgInSpawnEdges :: PGraph -> PGNode -> [(PGNode, PGEdge)]
+pgInSpawnEdges gr dst = filter (pgIsSpawnEdge . snd) $ GH.labLPre gr dst
+
+-- is the node a traget spawn edges
+pgIsSpawnTarget :: PGraph -> PGNode -> Bool
+pgIsSpawnTarget g n = not $ null $ pgInSpawnEdges g n
+
+pgSpawnEdgePred :: PGEdge -> PredicateExpr
+pgSpawnEdgePred (_, _, ESpawn _ attrs) = expr
+    where isPredAttr ::  ESAttribute -> Bool
+          isPredAttr (ESAttrPredicate _) = True -- only this one for now
+
+          parse :: ESAttribute -> PredicateExpr
+          parse (ESAttrPredicate x) = parseStr $ xtrace ("parsing: " ++ x) x
+
+          predicates = filter isPredAttr attrs
+          predicates' = xtrace ("predicates are: " ++ (show predicates)) predicates
+          exprs = map parse predicates'
+          expr = case length exprs of
+                      0 -> PredicateTrue
+                      1 -> exprs !! 0
+                      otherwise -> PredicateAnd exprs
+
+--predicates from incomming spawn edges (combine them with and)
+pgSpawnPreds :: PGraph -> PGNode -> PredicateExpr
+pgSpawnPreds pg n = predAnd $ map (pgSpawnEdgePred . snd) $ pgInSpawnEdges pg n
 
 
 -- Compute a predicate expression for flows (packets, whatever) that start from
 --  predSrc and reach predDst, in predGraph
+--  (assumes no circles exist)
 computePred :: PredCompSt -> PredicateExpr
 -- compute predicate of src->dst, where dst is an FNode:
 --  predicate of pre(dst) AND predicate of src->pre(dst)
 computePred st@(PredCompSt { predDst = (_, FNode {}) } )
-    -- we reached src: end recursion
-    | same_node          = PredicateTrue
-    -- we reched another (i.e., not src) entry node
-    | npredecessors == 0 = error "Not sure what should happen now..." --PredicateFalse
+    -- we reached an entry node
+    | npredecessors == 0 = pgSpawnPreds gr dst
     | npredecessors > 1  = error "F-nodes have at most one predecessor"
+    -- npredecessors == 1
+    | spawn_target       = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat is an OR?)
     -- recurse
     | otherwise          = expr
-    where (src, dst, gr) = (predSrc st, predDst st, predGraph st)
-          -- equality by DGI.Node (we assume nodes are in the same graph)
-          same_node      = fst src == fst dst
+    where (dst', gr) = (predDst st, predGraph st)
+          dst = trace ("Visiting node: " ++ (nLabel $ snd dst')) dst'
           -- predecessors of destintation (going backwards)
-          predecessors   = GH.labLPre gr dst
+          -- (only consider normal edges)
+          spawn_target   = pgIsSpawnTarget gr dst
+          predecessors   = pgInEdges gr dst
           npredecessors  = length predecessors
           (pnode, pedge) = predecessors !! 0
           port           = pgEdgePort pedge
+          nlabel         = nLabel (snd pnode)
           newst          = st { predDst = pnode, predInPort = Just port}
           expr'          = computePred newst
-          term           = PredicateTerm (PTerm pnode port)
+          term           = PredicateTerm nlabel port
           expr           = case pnode of
                              (_, ONode {})            -> expr'
                              (_, FNode {nPorts = np}) -> if length np == 1
@@ -183,8 +169,8 @@ computePred st@(PredCompSt { predDst = (_, ONode { nOperator = op })} ) = expr
                   (_, _)            -> error $ "Expecting true/false, not:" ++ inport
 
 -- silly hellper
-pathPredicate :: PGraph -> String -> String -> PredicateExpr
-pathPredicate g s d = computePred $ initPredCompSt g s d
+pathPredicate :: PGraph -> String -> PredicateExpr
+pathPredicate g n = computePred $ initPredCompSt g n
 
 ------------------------------------------------
 -- Embedding
@@ -193,10 +179,8 @@ pathPredicate g s d = computePred $ initPredCompSt g s d
 data EmbedSt = EmbedSt {
       lpg           :: PGraph
     , prg           :: PGraph
-    , lpgEntry      :: String   -- LPG node to connect PRG to
     , lpgSink       :: String
     , prgEntry      :: String
-    , prgSink       :: String
     , embCandidates :: [PGNode] -- nodes that are candidates for embedding
 } deriving (Show)
 
@@ -204,10 +188,8 @@ data EmbedSt = EmbedSt {
 initEmbedSt = EmbedSt {
       lpg           = undefined
     , prg           = undefined
-    , lpgEntry      = "TxEntry"
     , lpgSink       = "TxOut"
     , prgEntry      = "TxEntry"
-    , prgSink       = "TxOut"
     , embCandidates = []
 }
 
@@ -271,18 +253,16 @@ tryEmbedNode lpg_node = do
 tryEmbedMatchedNode :: PGNode -> PGNode -> EmbedExec ()
 tryEmbedMatchedNode lpg_node prg_node = do
     (lpg, prg) <- gets $ \s -> (lpg s, prg s)
-    prg_entry  <- getFNodeByName prg <$> gets prgEntry
-    lpg_entry  <- getFNodeByName lpg <$> gets lpgEntry
 
-    let pred_prg = computePred $ initPredCompSt_ { predGraph = prg, predSrc = prg_entry, predDst = prg_node }
-        pred_lpg = computePred $ initPredCompSt_ { predGraph = lpg, predSrc = lpg_entry, predDst = lpg_node }
+    let pred_prg = computePred $ initPredCompSt_ { predGraph = prg, predDst = prg_node }
+        pred_lpg = computePred $ initPredCompSt_ { predGraph = lpg, predDst = lpg_node }
 
     case predEquiv pred_prg pred_lpg of
         False -> return () -- cannot embed
-        True  -> doEmbedNode
+        True  -> doEmbedNode lpg_node
 
-doEmbedNode :: PGnode -> EmbedExec ()
-doEmbedNode = do
+doEmbedNode :: PGNode -> EmbedExec ()
+doEmbedNode lpg_node = do
     -- remove from LPG
     -- add candidates
     return ()
@@ -299,19 +279,26 @@ embedNodes = do
 
 
 -- print a path predicate
-prPathPredicate :: PGraph -> String -> String -> IO (PredicateExpr)
-prPathPredicate g s d = do
-    let x =pathPredicate g s d
-    putStrLn $ s ++ "->" ++ d ++ " has a path predicate: " ++ (show x)
+prPathPredicate :: PGraph -> String -> IO (PredicateExpr)
+prPathPredicate g node = do
+    let x = pathPredicate g node
+    putStrLn $"path to " ++ node  ++ " has a path predicate: " ++ (show x)
     return x
 
 main = do
-    lpg <- U.fileToGraph "unicorn-tests/offload-tx-lpg.unicorn"
-    prg <- U.fileToGraph "unicorn-tests/offload-tx-prg.unicorn"
+    --(lpgU,_) <- L.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
+    --let lpgC  = C.applyConfig lpgCfg lpgU
+    --writeFile "unicorn-tests/lpg.dot"  $ toDot lpgC
+
+    writeFile "unicorn-tests/g2.dot"  $ toDot g2
+    prPathPredicate g2 "X"
+
+    --lpg <- U.fileToGraph "unicorn-tests/offload-tx-lpg.unicorn"
+    --prg <- U.fileToGraph "unicorn-tests/offload-tx-prg.unicorn"
     --let (emb, st) = runEmbeddingTx initEmbedSt { lpg = lpg, prg = prg }
     --putStrLn (ppShow $ map (\(_,x) -> nLabel x) (embCandidates st))
-    prPathPredicate lpg "TxEntry" "TxUdpChecksum"
-    prPathPredicate prg "TxEntry" "TxUdpChecksum"
+    --prPathPredicate lpg "TxEntry" "TxUdpChecksum"
+    --prPathPredicate prg "TxEntry" "TxUdpChecksum"
     --prPathPredicate lpg "TxEthernetHdrFill" "TxOut"
     --prPathPredicate lpg "TxUdpChecksum" "TxOut"
     return ()
@@ -353,6 +340,24 @@ main = do
 --  CTX1: IPv4 header/UDP checksum offload
 -- We need to use CTX1 for packets that match the context configuration and CTX0
 -- for everything else.
+
+-- another test graph
+g2 :: PGraph
+g2 = U.strToGraph [r|
+graph g2 {
+
+    node X  { }
+    or   X_ { port true[X]
+              port false[] }
+    node A  { port o[X_] }
+    node B  { port o[X_] }
+
+    node S1 {
+        spawn start A [predicate "and(pred(n1,p1),pred(n2,p2))"]
+        spawn start B [predicate "and(pred(n1,p1),pred(n2,p2))"]
+    }
+}
+|]
 
 -- a test graph
 g1 :: PGraph

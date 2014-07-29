@@ -22,7 +22,7 @@ import Data.Functor ((<$>))
 import Text.ParserCombinators.Parsec as Parsec
 import qualified Text.ParserCombinators.Parsec.Token as P
 import Dragonet.Configuration (ConfType(..))
-import Dragonet.ProtocolGraph (NAttribute(..))
+import Dragonet.ProtocolGraph (NAttribute(..),ESAttribute(..))
 
 import qualified Util.SMTLibParser as SMTP
 import qualified SMTLib2 as SMT
@@ -49,9 +49,9 @@ data Port = Port {
 
 data Spawn = Spawn {
         sName     :: String,
-        sNode     :: String }
+        sNode     :: String,
+        sAttrs    :: [ESAttribute]}
     deriving Show
-
 
 data Node =
     Node {
@@ -130,7 +130,7 @@ lexer = P.makeTokenParser P.LanguageDef {
     P.opLetter = Parsec.oneOf "",
     P.reservedNames = ["graph", "cluster", "node", "config", "boolean", "and",
                        "nand", "or", "nor", "gconfig", "port", "attr", "type",
-                       "semantics", "helpers", "spawn"],
+                       "semantics", "helpers", "spawn", "predicate"],
     P.reservedOpNames = [],
     P.caseSensitive = True }
 
@@ -173,7 +173,9 @@ spawn p = do
     reserved "spawn"
     n <- identifier
     d <- cIdentifier p
-    return $ Spawn n d
+    as <- optionMaybe $ many $ brackets $ (reserved "predicate" >> (ESAttrPredicate <$> stringLiteral))
+    let as' = case as of { Just x -> x; Nothing -> [] }
+    return $ Spawn n d as'
 
 attributes = do
     reserved "attr"

@@ -15,6 +15,8 @@ module Dragonet.ProtocolGraph (
     NOperator(..),
     NSpawnHandle,
 
+    ESAttribute(..),
+
     ConfMonad,
     ConfFunction,
     ConfType(..),
@@ -74,9 +76,20 @@ data Edge =
         ePort :: NPort
         } |
     ESpawn {
-        eIdentifier :: NSpawnHandle
+        eIdentifier :: NSpawnHandle,
+        eAttributes :: [ESAttribute]
         }
-    deriving (Eq, Ord, Show)
+    deriving (Show)
+
+instance Ord Edge where
+    (Edge p1) `compare` (Edge p2)         = p1 `compare` p2
+    (ESpawn x1 _) `compare` (ESpawn x2 _) = x1 `compare` x2
+
+instance Eq Edge where
+    (Edge p1) == (Edge p2)         = p1 == p2
+    (ESpawn x1 _) == (ESpawn x2 _) = x1 == x2
+    (ESpawn _ _)  == (Edge _)      = False
+    (Edge _)      == (ESpawn _ _)  = False
 
 -- Graph representation
 type PGraph = DGI.Gr Node Edge
@@ -96,6 +109,12 @@ data NAttribute =
     NAttrSoftware |
     NAttrCustom String
     deriving (Eq,Ord,Show)
+
+-- spawn edge attribute
+data ESAttribute =
+    ESAttrPredicate String -- predicate for incoming edge
+    deriving (Show)
+
 
 data NImplementation =
     NImplFunction String
