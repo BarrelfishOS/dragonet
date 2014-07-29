@@ -115,26 +115,26 @@ main = do
     let pref = ""
     let write f s = writeFile (pref ++ f) s
 
-    Dir.createDirectoryIfMissing True "opt-graphs"
+    Dir.createDirectoryIfMissing True "out/opt-graphs"
     (prgU,prgH) <- E10k.graphH
     (lpgU,lpgH) <- LPG.graphH
     let helpers = prgH `Sem.mergeHelpers` lpgH
 
     -- Dot for unconfigured graphs...
-    writeFile "opt-graphs/prg_u.dot" $ toDot prgU
-    writeFile "opt-graphs/lpg_u.dot" $ toDot lpgU
+    writeFile "out/opt-graphs/prg_u.dot" $ toDot prgU
+    writeFile "out/opt-graphs/lpg_u.dot" $ toDot lpgU
 
     -- Configure LPG
     let lpgC  = C.applyConfig lpgCfg lpgU
-    writeFile "opt-graphs/lpg_c.dot" $ toDot lpgC
+    writeFile "out/opt-graphs/lpg_c.dot" $ toDot lpgC
 
 
     -- Evaluate configurations
     let configs = [("cfg_empty_",prgCfgEmpty), ("cfg_test_", prgCfg)]
 
     -- Evaluate graph
-    plg <- O.optimize helpers prgU lpgC plAssign (O.dbgDotfiles "opt-graphs")
-            costFunction configs
+    plg <- O.optimize helpers prgU lpgC plAssign
+            (O.dbgDotfiles "out/opt-graphs") costFunction configs
     return ()
 
 
