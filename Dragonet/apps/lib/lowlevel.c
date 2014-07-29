@@ -58,6 +58,25 @@ static void control_recv(struct dnal_app_queue *aq,
     }
 }
 
+/**
+ * Receive a message that is not a graph command.
+ * Graph commands will be processed, but the function will only return when a
+ * suitable message is received
+ */
+static void control_recv_nograph(struct dnal_app_queue *aq,
+                                 struct app_control_message *msg)
+{
+    bool first = true;
+    do {
+        if (!first) {
+            dynrs_action(&aq->graphsrv, &msg->data.graph_cmd.act);
+        } else {
+            first = false;
+        }
+        control_recv(aq, msg);
+    } while (msg->type == APPCTRL_GRAPH_CMD);
+}
+
 static bool control_tryrecv(struct dnal_app_queue *aq,
                             struct app_control_message *msg)
 {
@@ -119,6 +138,11 @@ static nodefun_t graph_fnode_resolve(const char *name, void *data)
     return NULL;
 }
 
+static void process_graph_cmd(dnal_appq_t aq,
+                              struct app_control_message *msg)
+{
+
+}
 
 errval_t dnal_aq_create(const char  *stackname,
                         const char  *slotname,
@@ -158,7 +182,7 @@ errval_t dnal_aq_create(const char  *stackname,
     control_send(aq, &msg);
 
     // Get welcome message
-    control_recv(aq, &msg);
+    control_recv_nograph(aq, &msg);
     assert(msg.type == APPCTRL_WELCOME);
 
     printf("App ID=%"PRId64"\n", msg.data.welcome.id);
@@ -312,7 +336,7 @@ errval_t dnal_socket_bind(dnal_sockh_t                 sh,
     }
 
     control_send(aq, &msg);
-    control_recv(aq, &msg);
+    control_recv_nograph(aq, &msg);
     return sockh_from_sockinfo(sh, &msg, dest);
 }
 
@@ -328,7 +352,7 @@ errval_t dnal_socket_span(dnal_sockh_t sh,
     msg.type = APPCTRL_SOCKET_SPAN;
     msg.data.socket_span.id = sh->id;
     control_send(naq, &msg);
-    control_recv(naq, &msg);
+    control_recv_nograph(naq, &msg);
     return sockh_from_sockinfo(nsh, &msg, &sh->dest);
 }
 
