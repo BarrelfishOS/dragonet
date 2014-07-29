@@ -18,8 +18,6 @@ bool spawn_impl(struct ctx_generic *ctx, struct input *in, enum out_spawns s,
                 (unsigned long) ns);
         abort();
     }
-    spawn = node->spawns[ns];
-    //printf("Spawn n=%s sp=%d pr=%d\n", node->name, s, p);
-    return task_queue_put(&node->graph->tqueue, spawn, in, p);
+    return dyn_spawn(node->graph, node->spawns[ns], in, p);
 }
 

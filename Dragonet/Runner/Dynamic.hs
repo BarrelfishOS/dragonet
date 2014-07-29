@@ -1,5 +1,7 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 module Runner.Dynamic (
+    GraphHandle,
+    createPipelineClient,
     createPipeline
 ) where
 
@@ -39,11 +41,11 @@ import Debug.Trace (trace)
 import qualified Control.Monad.Trans.State.Strict as ST
 
 
-newtype GraphHandle = GraphHandle (Ptr GraphHandle)
 newtype NodeHandle = NodeHandle Word64
 newtype EdgeHandle = EdgeHandle Word64
 newtype SpawnHandle = SpawnHandle Word64
 newtype QueueHandle = QueueHandle Word64
+type GraphHandle = PI.GraphHandle
 type NodeFun = FunPtr (PI.StateHandle -> PI.InputHandle -> IO Word32)
 type MuxId = Word32
 
@@ -62,6 +64,9 @@ buildDynNode' ds l
     | isDemux = mkDemuxNode lbl
     | isMux = mkMuxNode lbl muxId
     | isToQ = mkToQueueNode lbl qh
+    | isFS = mkFromSocketNode lbl fsId
+    | isTS = mkToSocketNode lbl tsId
+    | isUDPDemux = mkUDPDemuxNode lbl udpSIP udpSP udpDIP udpDP
     | PG.FNode {} <- l = mkFNode lbl ifun
     | PG.ONode { PG.nOperator = op } <- l = mkONode lbl op
     | otherwise = error "Unsupported node type"
@@ -85,6 +90,22 @@ buildDynNode' ds l
         isFromQ = isJust mbFPL
         Just fpln = mbFPL
         Just fqh = fpln `M.lookup` dsInQs ds
+
+        mbFS = PGU.getPGNAttr l "fromsocket"
+        isFS = isJust mbFS
+        Just fsId = read <$> mbFS
+
+        mbTS = PGU.getPGNAttr l "tosocket"
+        isTS = isJust mbTS
+        Just tsId = read <$> mbTS
+
+        isUDPDemux = PG.nAttrElem (PG.NAttrCustom "udpdemux") l
+        udpSIP = maybe 0 read $ PGU.getPGNAttr l "srcip"
+        udpDIP = maybe 0 read $ PGU.getPGNAttr l "dstip"
+        udpSP = maybe 0 read $ PGU.getPGNAttr l "srcport"
+        udpDP = maybe 0 read $ PGU.getPGNAttr l "dstport"
+
+
 
 
 
@@ -242,6 +263,24 @@ data DynState = DynState {
 }
 
 
+-- Only usee graph handle to control this pipeline, but don't start anything
+createPipelineClient :: GraphHandle -> PL.PLabel -> IO PD.DynPipeline
+createPipelineClient gh pl = do
+    tds <- STM.atomically $ STM.newTVar $
+        DynState {
+            dsLabel = pl,
+            dsGraph = gh,
+            dsSpawns = [],
+            dsInQs = M.empty,
+            dsOutQs = M.empty,
+            dsNextNH = 0,
+            dsNextEH = 0,
+            dsNextSH = 0,
+            dsNextQH = 0 }
+    return $ mkDPL pl tds
+
+
+-- Start pipeline execution engine in this thread
 createPipeline :: PL.PLGraph -> String -> String -> PL.PLabel
                     -> IO PD.DynPipeline
 createPipeline plg stackname helpers mname = do
@@ -255,24 +294,14 @@ createPipeline plg stackname helpers mname = do
         dl <- dl_init
         gh <- dl_client dl
 
-        tds <- STM.atomically $ STM.newTVar $
-            DynState {
-                dsLabel = mname,
-                dsGraph = gh,
-                dsSpawns = [],
-                dsInQs = M.empty,
-                dsOutQs = M.empty,
-                dsNextNH = 0,
-                dsNextEH = 0,
-                dsNextSH = 0,
-                dsNextQH = 0 }
         -- Return DynPipeline to main thread
-        STM.atomically $ STM.putTMVar mv $ mkDPL mname tds
+        STM.atomically $ STM.putTMVar mv gh
         putStrLn $ mname ++ ": Starting event loop"
         dl_run dl
 
-    -- Wait for message from execution thread
-    STM.atomically $ STM.takeTMVar mv
+    -- Wait for graph handle from execution thread
+    gh <- STM.atomically $ STM.takeTMVar mv
+    createPipelineClient gh mname
     where
         -- LLVM file with helper utilities
         llvm_helpers = "dist/build/" ++ helpers ++ ".bc"
@@ -455,6 +484,29 @@ mkFromQueueNode l qh = do
         withCString l $ \cl -> c_mknode_fromqueue gh nh cl qh
     return nh
 
+mkToSocketNode :: String -> Word64 -> DynM NodeHandle
+mkToSocketNode l sid = do
+    nh <- dmNewNodeHandle
+    dmWithGHIO $ \gh ->
+        withCString l $ \cl -> c_mknode_tosocket gh nh cl sid
+    return nh
+
+mkFromSocketNode :: String -> Word64 -> DynM NodeHandle
+mkFromSocketNode l sid = do
+    nh <- dmNewNodeHandle
+    dmWithGHIO $ \gh ->
+        withCString l $ \cl -> c_mknode_fromsocket gh nh cl sid
+    return nh
+
+mkUDPDemuxNode ::
+    String -> Word32 -> Word16 -> Word32 -> Word16 -> DynM NodeHandle
+mkUDPDemuxNode l sIP sP dIP dP = do
+    nh <- dmNewNodeHandle
+    dmWithGHIO $ \gh ->
+        withCString l $ \cl -> c_mknode_udpdemux gh nh cl sIP sP dIP dP
+    return nh
+
+
 
 mkSpawn :: NodeHandle -> DynM SpawnHandle
 mkSpawn nh = do
@@ -543,6 +595,15 @@ foreign import ccall "dynrc_mknode_toqueue"
 foreign import ccall "dynrc_mknode_fromqueue"
     c_mknode_fromqueue ::
         GraphHandle -> NodeHandle -> CString -> QueueHandle -> IO ()
+foreign import ccall "dynrc_mknode_tosocket"
+    c_mknode_tosocket ::
+        GraphHandle -> NodeHandle -> CString -> Word64 -> IO ()
+foreign import ccall "dynrc_mknode_fromsocket"
+    c_mknode_fromsocket ::
+        GraphHandle -> NodeHandle -> CString -> Word64 -> IO ()
+foreign import ccall "dynrc_mknode_udpdemux"
+    c_mknode_udpdemux :: GraphHandle -> NodeHandle -> CString
+            -> Word32 -> Word16 -> Word32 -> Word16 -> IO ()
 
 
 foreign import ccall "dynrc_mkspawn"

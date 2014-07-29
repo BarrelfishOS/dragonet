@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <dyn_remote.h>
+
 typedef uint64_t app_id_t;
 typedef uint64_t socket_id_t;
 
@@ -12,10 +14,9 @@ typedef uint64_t socket_id_t;
 
 enum app_control_type {
     APPCTRL_WELCOME,            // Dragonet -> App
-    APPCTRL_OUTQUEUE,           // Dragonet -> App
-    APPCTRL_INQUEUE,            // Dragonet -> App
     APPCTRL_STATUS,             // Dragonet -> App
     APPCTRL_SOCKET_INFO,        // Dragonet -> App
+    APPCTRL_GRAPH_CMD,          // Dragonet -> App
     APPCTRL_REGISTER,           // App -> Dragonet
     APPCTRL_SOCKET_UDPLISTEN,   // App -> Dragonet
     APPCTRL_SOCKET_UDPFLOW,     // App -> Dragonet
@@ -28,20 +29,16 @@ struct app_control_message {
     union {
         struct {
             app_id_t id;
-            uint8_t  num_inq;
-            uint8_t  num_outq;
         } welcome;
-        struct {
-            char label[MAX_QUEUELBL];
-        } queue;
         struct {
             bool success;
         } status;
         struct {
             socket_id_t id;
-            int32_t mux_id;
-            uint8_t outq;
         } socket_info;
+        struct {
+            struct dynr_action act;
+        } graph_cmd;
         struct {
             char label[MAX_APPLBL];
         } register_app;
@@ -66,7 +63,7 @@ struct app_control_message {
 
 void app_control_init(
     const char *stackname,
-    void (*new_application)(int),
+    void (*new_application)(int,struct dynr_client *),
     void (*register_app)(int,const char *),
     void (*stop_application)(int,bool),
     void (*socket_udplisten)(int,uint32_t,uint16_t),
@@ -74,12 +71,10 @@ void app_control_init(
     void (*socket_span)(int,socket_id_t),
     void (*socket_close)(int,socket_id_t));
 
-void app_control_send_welcome(int fd, app_id_t id,
-                              uint8_t num_inq, uint8_t num_outq);
+void app_control_send_welcome(int fd, app_id_t id);
 void app_control_send_status(int fd, bool success);
-void app_control_send_queue(int fd, bool out, const char *label);
-void app_control_send_socket_info(int fd, socket_id_t id, uint8_t outq,
-                                  int32_t mux_id);
+void app_control_send_socket_info(int fd, socket_id_t id);
+void app_control_send_graph_cmd(int fd, struct dynr_action *action);
 
 
 #endif // ndef APP_CONTROL_H_

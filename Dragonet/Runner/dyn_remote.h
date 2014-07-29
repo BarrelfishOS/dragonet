@@ -21,6 +21,9 @@ enum dynr_action_type {
     DYNR_ACT_MKNODE_MUX,
     DYNR_ACT_MKNODE_TOQUEUE,
     DYNR_ACT_MKNODE_FROMQUEUE,
+    DYNR_ACT_MKNODE_TOSOCKET,
+    DYNR_ACT_MKNODE_FROMSOCKET,
+    DYNR_ACT_MKNODE_UDPDEMUX,
 
     DYNR_ACT_MKSPAWN,
     DYNR_ACT_UPDATESPAWN,
@@ -64,6 +67,19 @@ struct dynr_action {
             char name[DYNR_MAXNAME + 1];
             dynr_queue_t queue;
         } mknode_queue;
+        struct {
+            dynr_node_t node;
+            char name[DYNR_MAXNAME + 1];
+            uint64_t socket;
+        } mknode_socket;
+        struct {
+            dynr_node_t node;
+            char name[DYNR_MAXNAME + 1];
+            uint32_t s_ip;
+            uint32_t d_ip;
+            uint16_t s_port;
+            uint16_t d_port;
+        } mknode_udpdemux;
         struct {
             dynr_spawn_t spawn;
             dynr_node_t  node;
@@ -180,6 +196,21 @@ void dynrc_mknode_fromqueue(struct dynr_client *client,
                             dynr_node_t         node,
                             const char         *name,
                             dynr_queue_t        queue);
+void dynrc_mknode_tosocket(struct dynr_client *client,
+                           dynr_node_t         node,
+                           const char         *name,
+                           uint64_t            socket);
+void dynrc_mknode_fromsocket(struct dynr_client *client,
+                             dynr_node_t         node,
+                             const char         *name,
+                             uint64_t            socket);
+void dynrc_mknode_udpdemux(struct dynr_client *client,
+                           dynr_node_t         node,
+                           const char         *name,
+                           uint32_t            s_ip,
+                           uint16_t            s_port,
+                           uint32_t            d_ip,
+                           uint16_t            d_port);
 
 void dynrc_mkspawn(struct dynr_client *client,
                    dynr_spawn_t        spawn,

@@ -14,9 +14,17 @@
 
 #define MAX_APPS 20
 
+#define dprintf(x...) do {} while (0)
+
+static void app_graph_send(struct dynr_action *act, void *data)
+{
+    int *fd = data;
+    app_control_send_graph_cmd(*fd, act);
+}
+
 void app_control_init(
     const char *stackname,
-    void (*new_application)(int),
+    void (*new_application)(int,struct dynr_client *),
     void (*register_app)(int,const char *),
     void (*stop_application)(int,bool),
     void (*socket_udplisten)(int,uint32_t,uint16_t),
@@ -25,11 +33,15 @@ void app_control_init(
     void (*socket_close)(int,socket_id_t))
 {
     int appfds[MAX_APPS];
+    struct dynr_client *graph_clients[MAX_APPS];
     int num_apps = 0, s, i, fd, maxfd, cnt;
     fd_set reads, reads_orig, errs;
     struct sockaddr_un addr;
     struct app_control_message msg;
     ssize_t len;
+    struct dynr_client *graph;
+
+    memset(graph_clients, 0, sizeof(graph_clients));
 
     if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         perror("app_control_init: creating socket failed");
@@ -53,7 +65,7 @@ void app_control_init(
     FD_SET(s, &reads_orig);
     maxfd = s;
 
-    printf("Starting event loop\n");
+    dprintf("Starting event loop\n");
     while (true) {
         reads = reads_orig;
         errs = reads_orig;
@@ -93,11 +105,15 @@ void app_control_init(
                 fprintf(stderr, "app_control_init: connection limit reached\n");
                 close(fd);
             } else {
-                printf("New application\n");
-                appfds[num_apps++] = fd;
+                dprintf("New application\n");
+                appfds[num_apps] = fd;
+                graph = malloc(sizeof(*graph));
+                graph_clients[num_apps] = graph;
+                dynrc_init(graph, app_graph_send, appfds + num_apps);
+                num_apps++;
                 maxfd = (fd > maxfd ? fd : maxfd);
                 FD_SET(fd, &reads_orig);
-                new_application(fd);
+                new_application(fd, graph);
             }
         }
 
@@ -124,19 +140,19 @@ void app_control_init(
 
             switch (msg.type) {
                 case APPCTRL_REGISTER:
-                    printf("APPCTRL_REGISTER\n");
+                    dprintf("APPCTRL_REGISTER\n");
                     msg.data.register_app.label[MAX_APPLBL - 1]
                         = 0;
                     register_app(appfds[i], msg.data.register_app.label);
                     break;
                 case APPCTRL_SOCKET_UDPLISTEN:
-                    printf("APPCTRL_SOCKET_UDPLISTEN\n");
+                    dprintf("APPCTRL_SOCKET_UDPLISTEN\n");
                     socket_udplisten(appfds[i],
                             msg.data.socket_udplisten.ip,
                             msg.data.socket_udplisten.port);
                     break;
                 case APPCTRL_SOCKET_UDPFLOW:
-                    printf("APPCTRL_SOCKET_UDPFLOW: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+                    dprintf("APPCTRL_SOCKET_UDPFLOW: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
                             msg.data.socket_udpflow.s_ip,
                             msg.data.socket_udpflow.s_port,
                             msg.data.socket_udpflow.d_ip,
@@ -148,11 +164,11 @@ void app_control_init(
                             msg.data.socket_udpflow.d_port);
                     break;
                 case APPCTRL_SOCKET_SPAN:
-                    printf("APPCTRL_SOCKET_SPAN\n");
+                    dprintf("APPCTRL_SOCKET_SPAN\n");
                     socket_span(appfds[i], msg.data.socket_span.id);
                     break;
                 case APPCTRL_SOCKET_CLOSE:
-                    printf("APPCTRL_SOCKET_CLOSE\n");
+                    dprintf("APPCTRL_SOCKET_CLOSE\n");
                     socket_close(appfds[i], msg.data.socket_close.id);
                     break;
                 default:
@@ -162,15 +178,12 @@ void app_control_init(
     }
 }
 
-void app_control_send_welcome(int fd, app_id_t id,
-                              uint8_t num_inq, uint8_t num_outq)
+void app_control_send_welcome(int fd, app_id_t id)
 {
-    printf("app_control_send_welcome\n");
+    dprintf("app_control_send_welcome\n");
     struct app_control_message msg;
     msg.type = APPCTRL_WELCOME;
     msg.data.welcome.id = id;
-    msg.data.welcome.num_inq = num_inq;
-    msg.data.welcome.num_outq = num_outq;
     if (send(fd, &msg, sizeof(msg), 0) < sizeof(msg)) {
         fprintf(stderr, "app_control_send_welcome: incomplete send\n");
     }
@@ -178,7 +191,7 @@ void app_control_send_welcome(int fd, app_id_t id,
 
 void app_control_send_status(int fd, bool success)
 {
-    printf("app_control_send_status\n");
+    dprintf("app_control_send_status\n");
     struct app_control_message msg;
     msg.type = APPCTRL_STATUS;
     msg.data.status.success = success;
@@ -187,32 +200,25 @@ void app_control_send_status(int fd, bool success)
     }
 }
 
-void app_control_send_queue(int fd, bool out, const char *label)
+void app_control_send_socket_info(int fd, socket_id_t id)
 {
-    printf("app_control_send_queue (o=%d,l=%s)\n", out, label);
-    struct app_control_message msg;
-    msg.type = (out ? APPCTRL_OUTQUEUE : APPCTRL_INQUEUE);
-    if (strlen(label) >= MAX_QUEUELBL) {
-        fprintf(stderr, "app_control_send_queue: Queue label too long\n");
-        return;
-    }
-    strcpy(msg.data.queue.label, label);
-    if (send(fd, &msg, sizeof(msg), 0) < sizeof(msg)) {
-        fprintf(stderr, "app_control_send_queue: incomplete send\n");
-    }
-}
-
-void app_control_send_socket_info(int fd, socket_id_t id, uint8_t outq,
-                                  int32_t mux_id)
-{
-    printf("app_control_send_socket_info\n");
+    dprintf("app_control_send_socket_info\n");
     struct app_control_message msg;
     msg.type = APPCTRL_SOCKET_INFO;
     msg.data.socket_info.id = id;
-    msg.data.socket_info.outq = outq;
-    msg.data.socket_info.mux_id = mux_id;
     if (send(fd, &msg, sizeof(msg), 0) < sizeof(msg)) {
         fprintf(stderr, "app_control_send_socket_info: incomplete send\n");
+    }
+}
+
+void app_control_send_graph_cmd(int fd, struct dynr_action *action)
+{
+    dprintf("app_control_send_graph_cmd\n");
+    struct app_control_message msg;
+    msg.type = APPCTRL_GRAPH_CMD;
+    memcpy(&msg.data.graph_cmd.act, action, sizeof(*action));
+    if (send(fd, &msg, sizeof(msg), 0) < sizeof(msg)) {
+        fprintf(stderr, "app_control_send_graph_cmd: incomplete send\n");
     }
 }
 

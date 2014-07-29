@@ -4,6 +4,8 @@
 #include <pthread.h>
 #include <assert.h>
 #include <unistd.h>
+#include <proto_ipv4.h>
+#include <udpproto.h>
 
 #include "dynamic.h"
 
@@ -55,14 +57,8 @@ struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh,
                                   void             *resolver_data)
 {
     dprintf("dyn_mkgraph\n");
-    struct dynamic_graph *g = malloc(sizeof(*g));
-    g->num_outqs = 0;
-    g->num_nodes = 0;
-    g->outqueues = NULL;
-    g->nodes = NULL;
-    g->spawns = NULL;
+    struct dynamic_graph *g = calloc(1, sizeof(*g));
     g->plh = plh;
-    g->stop = false;
     g->resolver = resolver;
     g->resolver_data = resolver_data;
     g->version = 1;
@@ -70,17 +66,6 @@ struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh,
     task_queue_init(&g->tqueue);
     pthread_mutex_init(&g->lock, NULL);
     return g;
-}
-
-void dyn_add_init(struct dynamic_graph *graph,
-                  struct dynamic_spawn *spawn)
-{
-    dprintf("dyn_add_init %s\n",
-            (spawn->node != NULL ? spawn->node->name : NULL));
-    if (!task_queue_put(&graph->tqueue, spawn, NULL, SPAWNPRIO_HIGH)) {
-        fprintf(stderr, "dyn_add_source: task_queue_put failed\n");
-        abort();
-    }
 }
 
 static node_out_t run_onode(struct dynamic_node *n,
@@ -169,12 +154,11 @@ static node_out_t run_node(struct dynamic_node *n,
             return n->tdata.fnode.nodefun(n->tdata.fnode.ctx, st, in);
 
         case DYN_ONODE:
-            return run_onode(n, version);;
+            return run_onode(n, version);
 
         case DYN_FROMQUEUE:
             assert(n->spawns != NULL);
-            task_queue_put(&n->graph->tqueue, n->spawns[0], NULL,
-                            SPAWNPRIO_LOW);
+            dyn_spawn(n->graph, n->spawns[0], NULL, SPAWNPRIO_LOW);
             din = pl_poll(n->tdata.queue.queue);
             if (din != NULL) {
                 *in = din;
@@ -201,6 +185,27 @@ static node_out_t run_node(struct dynamic_node *n,
             }
             *in = NULL;
             return -2; // FIXME: why there is return value of -2?
+
+        case DYN_TOSOCKET:
+            n->graph->cur_socket_buf = *in;
+            n->graph->cur_socket = n->tdata.socket.sdata;
+            *in = NULL;
+            return -2;
+
+        case DYN_FROMSOCKET:
+            return 0;
+
+        case DYN_UDPDEMUX:
+            out = PORT_BOOL(
+                (!n->tdata.udpdemux.s_ip ||
+                    n->tdata.udpdemux.s_ip == ipv4_srcIP_rd(*in)) &&
+                (!n->tdata.udpdemux.d_ip ||
+                    n->tdata.udpdemux.d_ip == ipv4_dstIP_rd(*in)) &&
+                (!n->tdata.udpdemux.s_port ||
+                    n->tdata.udpdemux.s_port == udp_hdr_sport_read(*in)) &&
+                (!n->tdata.udpdemux.d_port ||
+                    n->tdata.udpdemux.d_port == udp_hdr_dport_read(*in)));
+            return out;
 
         default:
             fprintf(stderr, "Invalid node type: %d\n", n->type);
@@ -250,13 +255,14 @@ void dyn_rungraph(struct dynamic_graph *graph)
         fprintf(stderr, "PANIC: task queue empty\n");
         abort();
     }
+    dprintf("  -> spawn=%p\n", spawn);
     if (spawn->node == NULL) {
         fprintf(stderr, "Warning: Task starting at no longer existing "
                         "node, dropping task...\n");
         if (in != NULL) {
             input_free_plh(plh, in);
         }
-        return;
+        goto out;
     }
     source = spawn->node;
 
@@ -311,6 +317,10 @@ void dyn_rungraph(struct dynamic_graph *graph)
         while (pl_process_event(graph->outqueues[i]));
     }
 
+out:
+    if (--spawn->refcount == 0) {
+        free(spawn);
+    }
     dprintf("dyn_rungraph done\n");
 }
 
@@ -459,15 +469,80 @@ struct dynamic_node *dyn_mknode_fromqueue(struct dynamic_graph *graph,
     return n;
 }
 
+static void *get_sockdata(struct dynamic_graph *graph,
+                          uint64_t sid)
+{
+    if (graph->socket_get == NULL) {
+        return NULL;
+    }
+    return graph->socket_get(sid, graph->socket_data);
+
+}
+
+struct dynamic_node *dyn_mknode_tosocket(struct dynamic_graph *graph,
+                                         const char           *name,
+                                         uint64_t              sid)
+{
+    dprintf("dyn_mknode_tosocket\n");
+    struct dynamic_node *n = mknode(graph, name, DYN_TOSOCKET);
+    n->tdata.socket.sid = sid;
+    n->tdata.socket.sdata = get_sockdata(graph, sid);
+    return n;
+}
+
+struct dynamic_node *dyn_mknode_fromsocket(struct dynamic_graph *graph,
+                                           const char           *name,
+                                           uint64_t              sid)
+{
+    dprintf("dyn_mknode_fromsocket\n");
+    struct dynamic_node *n = mknode(graph, name, DYN_FROMSOCKET);
+    n->tdata.socket.sid = sid;
+    n->tdata.socket.sdata = get_sockdata(graph, sid);
+    return n;
+}
+
+struct dynamic_node *dyn_mknode_udpdemux(struct dynamic_graph *graph,
+                                         const char           *name,
+                                         uint32_t              s_ip,
+                                         uint16_t              s_port,
+                                         uint32_t              d_ip,
+                                         uint16_t              d_port)
+{
+    dprintf("dyn_mknode_udpdemux\n");
+    struct dynamic_node *n = mknode(graph, name, DYN_UDPDEMUX);
+    n->tdata.udpdemux.s_ip = s_ip;
+    n->tdata.udpdemux.s_port = s_port;
+    n->tdata.udpdemux.d_ip = d_ip;
+    n->tdata.udpdemux.d_port = d_port;
+    return n;
+}
+
+static void update_sockspawn(struct dynamic_graph *graph,
+                             void                 *sock_data,
+                             struct dynamic_spawn *spawn)
+{
+    if (graph->socket_set_spawn != NULL) {
+        graph->socket_set_spawn(sock_data, spawn, graph->socket_data);
+    } else {
+        fprintf(stderr, "update_sockspawn: socket_set_spawn not set\n");
+    }
+}
+
 struct dynamic_spawn *dyn_mkspawn(struct dynamic_graph *graph,
                                   struct dynamic_node *node)
 {
-    dprintf("dyn_mkspawn\n");
     struct dynamic_spawn *s = malloc(sizeof(*s));
+    dprintf("dyn_mkspawn n=%p -> %p\n", node, s);
     s->node = node;
     s->refcount = 1;
+    s->sock_data = NULL;
     s->next = graph->spawns;
     graph->spawns = s;
+
+    if (node->type == DYN_FROMSOCKET) {
+        s->sock_data = node->tdata.socket.sdata;
+        update_sockspawn(graph, s->sock_data, s);
+    }
     return s;
 }
 
@@ -484,6 +559,9 @@ void dyn_rmspawn(struct dynamic_graph *graph,
     dprintf("dyn_rmspawn\n");
     struct dynamic_spawn *s, *p;
 
+    if (spawn->sock_data != NULL) {
+        update_sockspawn(graph, spawn->sock_data, NULL);
+    }
     // Remove from linked list
     p = NULL;
     s = graph->spawns;
@@ -543,5 +621,28 @@ void dyn_addspawn(struct dynamic_node *node, struct dynamic_spawn *spawn)
     node->spawns = realloc(node->spawns,
             node->num_spawns * sizeof(*node->spawns));
     node->spawns[node->num_spawns - 1] = spawn;
+}
+
+void dyn_add_init(struct dynamic_graph *graph,
+                  struct dynamic_spawn *spawn)
+{
+    dprintf("dyn_add_init %s\n",
+            (spawn->node != NULL ? spawn->node->name : NULL));
+    if (!dyn_spawn(graph, spawn, NULL, SPAWNPRIO_HIGH)) {
+        fprintf(stderr, "dyn_add_init: task_queue_put failed\n");
+        abort();
+    }
+}
+
+
+bool dyn_spawn(struct dynamic_graph *graph,
+               struct dynamic_spawn *spawn,
+               struct input *in,
+               enum spawn_priority p)
+{
+    dprintf("dyn_addspawn %s\n",
+            (spawn->node != NULL ? spawn->node->name : NULL));
+    spawn->refcount++;
+    return task_queue_put(&graph->tqueue, spawn, in, p);
 }
 

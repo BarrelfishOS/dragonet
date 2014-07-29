@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -10,6 +9,7 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <sched.h>
+#include <errno.h>
 
 #include <pipelines.h>
 #include <app_control.h>
@@ -21,23 +21,19 @@
 struct dnal_app_queue {
     pipeline_handle_t pipeline_handle;
     struct state *state;
-    queue_handle_t *in_queue;
-    queue_handle_t *out_queue;
-    size_t num_inq;
-    size_t num_outq;
     size_t nextpoll;
     struct dnal_socket_handle *socks;
     int control_fd;
+    struct dynr_server graphsrv;
 };
 
 struct dnal_socket_handle {
     struct dnal_app_queue *aq;
     uint64_t id;
-    int32_t  mux_id;
-    uint8_t  outqueue;
     bool bound;
     bool ready;
     struct dnal_net_destination dest;
+    struct dynamic_spawn *spawn;
     void *opaque;
 
     struct dnal_socket_handle *next;
@@ -62,6 +58,34 @@ static void control_recv(struct dnal_app_queue *aq,
     }
 }
 
+static bool control_tryrecv(struct dnal_app_queue *aq,
+                            struct app_control_message *msg)
+{
+    ssize_t res;
+    res = recv(aq->control_fd, msg, sizeof(*msg), MSG_DONTWAIT);
+    if (res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        return false;
+    }
+
+    if (res == -1) {
+        perror("control_tryrecv(1): recv failed");
+        abort();
+    }
+
+    if (res >= sizeof(*msg)) {
+        return true;
+    }
+
+    if (recv(aq->control_fd, ((uint8_t *) msg) + res, sizeof(*msg) - res,
+                MSG_WAITALL) != sizeof(*msg) - res)
+    {
+        perror("control_tryrecv: Incomplete recv");
+        abort();
+    }
+    return true;
+}
+
+
 struct dnal_socket_handle *socket_by_id(struct dnal_app_queue *aq, uint64_t id)
 {
     struct dnal_socket_handle *sh = aq->socks;
@@ -74,6 +98,26 @@ struct dnal_socket_handle *socket_by_id(struct dnal_app_queue *aq, uint64_t id)
     return NULL;
 }
 
+static void *graph_socket_get(uint64_t socket_id, void *data)
+{
+    struct dnal_app_queue *aq = data;
+    struct dnal_socket_handle *sh = socket_by_id(aq, socket_id);
+    return sh;
+}
+
+static void graph_socket_set_spawn(void *sockdata,
+                                   struct dynamic_spawn *spawn,
+                                   void *data)
+{
+    struct dnal_socket_handle *sh = sockdata;
+    sh->spawn = spawn;
+}
+
+static nodefun_t graph_fnode_resolve(const char *name, void *data)
+{
+    fprintf(stderr, "graph_fnode_resolve: Not implemented!\n");
+    return NULL;
+}
 
 
 errval_t dnal_aq_create(const char  *stackname,
@@ -81,7 +125,7 @@ errval_t dnal_aq_create(const char  *stackname,
                         dnal_appq_t *appqueue)
 {
     struct dnal_app_queue *aq;
-    int s, i, num_in, num_out;
+    int s;
     struct sockaddr_un addr;
     struct app_control_message msg;
 
@@ -116,50 +160,20 @@ errval_t dnal_aq_create(const char  *stackname,
     // Get welcome message
     control_recv(aq, &msg);
     assert(msg.type == APPCTRL_WELCOME);
-    uint64_t appid_copy = msg.data.welcome.id;
 
     printf("App ID=%"PRId64"\n", msg.data.welcome.id);
-    num_in = msg.data.welcome.num_inq;
-    num_out = msg.data.welcome.num_outq;
-    aq->in_queue = calloc(num_in, sizeof(*aq->in_queue));
-    aq->out_queue = calloc(num_out, sizeof(*aq->out_queue));
-    aq->num_inq = num_in;
-    aq->num_outq = num_out;
     aq->nextpoll = 0;
 
     // Initialize pipeline interface
     aq->pipeline_handle = pl_init(stackname, slotname);
     aq->state = pl_get_state(aq->pipeline_handle);
 
-    // Creating in queues
-    for (i = 0; i < num_in; i++) {
-        control_recv(aq, &msg);
-        assert(msg.type == APPCTRL_INQUEUE);
-        printf("  Creating in-queue: %s\n", msg.data.queue.label);
-        aq->in_queue[i] =
-                pl_inqueue_create(aq->pipeline_handle, msg.data.queue.label);
-    }
+    // Initialize graph
+    dynrs_init(&aq->graphsrv, aq->pipeline_handle, graph_fnode_resolve, aq);
+    aq->graphsrv.graph->socket_get = graph_socket_get;
+    aq->graphsrv.graph->socket_set_spawn = graph_socket_set_spawn;
+    aq->graphsrv.graph->socket_data = aq;
 
-    // Binding to outqueues
-    for (i = 0; i < num_out; i++) {
-        control_recv(aq, &msg);
-        assert(msg.type == APPCTRL_OUTQUEUE);
-        printf("  Binding out-queue: %s\n", msg.data.queue.label);
-        aq->out_queue[i] =
-                pl_outqueue_bind(aq->pipeline_handle, msg.data.queue.label);
-    }
-
-    // Make sure everything is ready
-    pl_wait_ready(aq->pipeline_handle);
-    while (aq->state->tap_handler == NULL) {
-        sched_yield();
-    }
-
-    char fname[250];
-    snprintf(fname, sizeof(fname), "APP%"PRIu64"%s", appid_copy, APP_READY_FNAME);
-
-    // FIXME: create a file with appid_copy  and "appReady"
-    declare_dragonet_initialized(fname, "App ready!\n");
     printf("Data path ready\n");
     *appqueue = aq;
     return SYS_ERR_OK;
@@ -170,55 +184,43 @@ errval_t dnal_aq_poll(dnal_appq_t           aq,
 {
     struct input *in;
     struct dnal_socket_handle *sh;
-    size_t i;
+    struct app_control_message msg;
+    struct dynamic_graph *graph;
 
-//    dprint("debug:%s:%s:%d:checking queus %d\n",
-//            __FILE__, __FUNCTION__, __LINE__, (int)aq->num_outq);
-    // First process buffers that are returned to us
-    for (i = 0; i < aq->num_outq; i++) {
-        bool ret = pl_process_event(aq->out_queue[i]);
-        if (ret) {
-            // FIXME: The return values of this function don't make sense
-//            dprint("debug:%s:%s:%d:aborting event %d\n",
-//            __FILE__, __FUNCTION__, __LINE__, (int)i);
-//            return DNERR_EVENT_ABORT;
-        }
-    }
-
-//    dprint("debug:%s:%s:%d: checking for packet start %d\n",
-//            __FILE__, __FUNCTION__, __LINE__, (int)aq->nextpoll);
-    // Now check for packets
-    i = aq->nextpoll;
-    do {
-        in = pl_poll(aq->in_queue[i]);
-        i = (i + 1) % aq->num_inq;
-    } while (in == NULL && i != aq->nextpoll);
-    aq->nextpoll = i;
-
-//    dprint("debug:%s:%s:%d: checking for packet done %d\n",
-//            __FILE__, __FUNCTION__, __LINE__, (int)i);
-    if (in == NULL) {
-//    dprint("debug:%s:%s:%d: null \n", __FILE__, __FUNCTION__, __LINE__);
-        return DNERR_NOEVENT;
-    }
-
-    if ((sh = socket_by_id(aq, in->attr->socket_id)) == NULL) {
-        dprint("debug:%s:%s:%d: no spcket\n", __FILE__, __FUNCTION__, __LINE__);
-        fprintf(stderr, "Warning: dropping packet for non-existent socket\n");
+    // Check control channel
+    if (control_tryrecv(aq, &msg)) {
+        // We should only get graph commands here
+        assert(msg.type == APPCTRL_GRAPH_CMD);
+        dynrs_action(&aq->graphsrv, &msg.data.graph_cmd.act);
         return DNERR_EVENT_ABORT;
     }
 
+    // If the graph is currently stopped, we can't do anything but wait for the
+    // next command
+    if (aq->graphsrv.stopped) {
+        return DNERR_EVENT_ABORT;
+    }
+
+
+    // Run graph for one iteration
+    graph = aq->graphsrv.graph;
+    graph->cur_socket = NULL;
+    graph->cur_socket_buf = NULL;
+    dynrs_run(&aq->graphsrv);
+
+    in = graph->cur_socket_buf;
+    sh = graph->cur_socket;
+    if (in == NULL) {
+        // TODO
+        return DNERR_EVENT_ABORT;
+    }
+
+    assert(sh != NULL);
     event->type = DNAL_AQET_INPACKET;
     event->data.inpacket.socket = sh;
     event->data.inpacket.buffer = in;
 
     dprint("debug:%s:%s:%d: done\n", __FILE__, __FUNCTION__, __LINE__);
-    return SYS_ERR_OK;
-}
-
-static errval_t aq_send_packet(dnal_appq_t   aq,
-                               struct input *buf)
-{
     return SYS_ERR_OK;
 }
 
@@ -271,8 +273,6 @@ static errval_t sockh_from_sockinfo(struct dnal_socket_handle   *sh,
         sh->bound = true;
         sh->dest = *dest;
         sh->id = msg->data.socket_info.id;
-        sh->mux_id = msg->data.socket_info.mux_id;
-        sh->outqueue = msg->data.socket_info.outq;
         sh->next = aq->socks;
         aq->socks = sh;
     } else {
@@ -306,16 +306,6 @@ errval_t dnal_socket_bind(dnal_sockh_t                 sh,
             msg.data.socket_udpflow.d_ip = dest->data.ip4udp.ip_local;
             msg.data.socket_udpflow.s_port = dest->data.ip4udp.port_remote;
             msg.data.socket_udpflow.d_port = dest->data.ip4udp.port_local;
-
-            printf("This is flow binding\n");
-                    printf("before bind: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
-                           msg.data.socket_udpflow.d_ip,
-                           msg.data.socket_udpflow.d_port,
-                           msg.data.socket_udpflow.s_ip,
-                           msg.data.socket_udpflow.s_port
-                          );
-
-
         }
     } else {
         return DNERR_BADDEST;
@@ -348,7 +338,6 @@ errval_t dnal_socket_send(dnal_sockh_t                 sh,
 {
     uint16_t src_port, dst_port;
     uint32_t src_ip, dst_ip;
-    int ret;
 
     if (!sh->bound) {
         return DNERR_SOCKETNOTBOUND;
@@ -398,17 +387,10 @@ errval_t dnal_socket_send(dnal_sockh_t                 sh,
     buf->attr->udp_dport = dst_port;
 
     // Send out packet
-    input_set_muxid(buf, sh->mux_id);
-    ret = pl_enqueue(sh->aq->out_queue[sh->outqueue], buf);
-    if (ret < 0) {
-        printf("\n\n%s:%s:%d:Warning:TX: send_packet failed as pl_enqueue failed, %d\n\n",
-               __FILE__, __FUNCTION__, __LINE__, ret);
-        return DNERR_UNKNOWN;
-    }
-
-    // Weird, but necessary since pl_enqueue replaces the buffer in buf with a
-    // new one
-    return dnal_aq_buffer_free(sh->aq, buf);
+    // TODO: Should we do something to send this immediately
+    assert(sh->spawn != NULL);
+    dyn_spawn(sh->aq->graphsrv.graph, sh->spawn, buf, SPAWNPRIO_HIGH);
+    return SYS_ERR_OK;
 }
 
 /**

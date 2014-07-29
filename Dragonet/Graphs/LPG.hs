@@ -35,13 +35,18 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
                     PG.CVMaybe msPort,
                     PG.CVMaybe mdIP,
                     PG.CVMaybe mdPort]) = do
-            (dxN,_) <- C.confMNewNode $ addFSemantics $
+            (dxN,_) <- C.confMNewNode $ addFAttrs $ addFSemantics $
                         PG.baseFNode filterS bports
             (fsN,_) <- C.confMNewNode $
+                        PG.nAttrsAdd [PG.NAttrCustom "source",
+                            PG.NAttrCustom $ "fromsocket=" ++ show sid] $
                         PG.baseFNode ("FromSocket" ++ show sid) ["out"]
-            (tsN,_) <- C.confMNewNode $ PG.nAttrAdd (PG.NAttrCustom "sink") $
+            (tsN,_) <- C.confMNewNode $
+                        PG.nAttrsAdd [PG.NAttrCustom "sink",
+                            PG.NAttrCustom $ "tosocket=" ++ show sid] $
                         PG.baseFNode ("ToSocket" ++ show sid) ["out","drop"]
-            (vsN,_) <- C.confMNewNode $ PG.baseONode ("ValidSocket" ++ show sid)
+            (vsN,_) <- C.confMNewNode $
+                        PG.baseONode ("RxValidSocket" ++ show sid)
                         bports PG.NOpAnd
             let dfEdges = map (\(a,b,p) -> (a,b,PG.Edge p)) [
                     (vhN,dxN,"true"),  -- RxL4UDPValidHeaderLength -> Filter
@@ -62,7 +67,7 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
                 uncvi (PG.CVInt i) = i
                 mbIP = maybe "*" (IP4.ipToString . fromIntegral . uncvi)
                 mbPort = maybe "*" (show . uncvi)
-                filterS = "Filter: UDP(" ++ mbIP msIP ++ ":" ++ mbPort msPort
+                filterS = "RxL4UDP(" ++ mbIP msIP ++ ":" ++ mbPort msPort
                             ++ " / " ++ mbIP mdIP ++ ":" ++ mbPort mdPort ++ ")"
                 ipSems n i = SMTBV.bv i 32 SMTC.===
                             SMT.app
@@ -80,6 +85,14 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
                 fSems = SMTC.not tSems
                 addFSemantics n = n {
                     PG.nSemantics = [("true",tSems),("false",fSems) ] }
+                fAttrs = map PG.NAttrCustom $ catMaybes [
+                    Just "udpdemux",
+                    do { i <- msIP ; return $ "srcip=" ++ show i },
+                    do { i <- mdIP ; return $ "dstip=" ++ show i },
+                    do { i <- msP ; return $ "srcport=" ++ show i },
+                    do { i <- mdP ; return $ "dstport=" ++ show i }]
+                addFAttrs n = PG.nAttrsAdd fAttrs n
+
                 bports = ["false","true"]
 
 addCfgFun n

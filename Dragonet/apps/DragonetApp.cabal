@@ -29,9 +29,13 @@ library
                         ../lib/Dragonet/Pipelines/pipelines_helper.c,
                         ../c_impl/implementation.c,
                         ../c_impl/state.c,
-                        ../c_impl/state.c
+                        ../c_impl/state.c,
+                        ../Runner/dyn_remote_server.c,
+                        ../Runner/dynamic.c,
+                        ../Runner/rt_queue.c
     Include-dirs:       ../c_impl/include/,
                         ../lib/Dragonet/Pipelines/,
-                        ../apps/lib/include/
+                        ../apps/lib/include/,
+                        ../Runner/
     CC-options:         -Wall -std=gnu99 -Wno-unused-function
     build-depends:      bulktransfer, shmchan, barrelfish, process

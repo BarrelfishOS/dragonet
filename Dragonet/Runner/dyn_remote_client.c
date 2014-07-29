@@ -181,6 +181,66 @@ void dynrc_mknode_fromqueue(struct dynr_client *client,
     client->send(&act, client->send_data);
 }
 
+void dynrc_mknode_tosocket(struct dynr_client *client,
+                           dynr_node_t         node,
+                           const char         *name,
+                           uint64_t            socket)
+{
+    dprintf("dynrc_mknode_tosocket\n");
+    struct dynr_action act = {
+        .type = DYNR_ACT_MKNODE_TOSOCKET,
+        .data.mknode_socket = {
+            .node = node,
+            .socket = socket,
+        },
+    };
+    assert(strlen(name) <= DYNR_MAXNAME);
+    strcpy(act.data.mknode_socket.name, name);
+    client->send(&act, client->send_data);
+}
+
+void dynrc_mknode_fromsocket(struct dynr_client *client,
+                             dynr_node_t         node,
+                             const char         *name,
+                             uint64_t            socket)
+{
+    dprintf("dynrc_mknode_fromsocket\n");
+    struct dynr_action act = {
+        .type = DYNR_ACT_MKNODE_FROMSOCKET,
+        .data.mknode_socket = {
+            .node = node,
+            .socket = socket,
+        },
+    };
+    assert(strlen(name) <= DYNR_MAXNAME);
+    strcpy(act.data.mknode_socket.name, name);
+    client->send(&act, client->send_data);
+}
+
+void dynrc_mknode_udpdemux(struct dynr_client *client,
+                           dynr_node_t         node,
+                           const char         *name,
+                           uint32_t            s_ip,
+                           uint16_t            s_port,
+                           uint32_t            d_ip,
+                           uint16_t            d_port)
+{
+    dprintf("dynrc_mknode_udpdemux\n");
+    struct dynr_action act = {
+        .type = DYNR_ACT_MKNODE_UDPDEMUX,
+        .data.mknode_udpdemux = {
+            .node = node,
+            .s_ip = s_ip,
+            .s_port = s_port,
+            .d_ip = d_ip,
+            .d_port = d_port,
+        },
+    };
+    assert(strlen(name) <= DYNR_MAXNAME);
+    strcpy(act.data.mknode_udpdemux.name, name);
+    client->send(&act, client->send_data);
+
+}
 
 void dynrc_mkspawn(struct dynr_client *client,
                    dynr_spawn_t        spawn,

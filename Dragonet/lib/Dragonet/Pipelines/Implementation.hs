@@ -12,6 +12,7 @@ module Dragonet.Pipelines.Implementation(
     InputHandle(..),
     UDPListenHandle(..),
     UDPFlowHandle(..),
+    GraphHandle(..),
 
     runPipelines,
     runPipelines',
@@ -66,6 +67,7 @@ newtype QueueHandle = QueueHandle (Ptr QueueHandle)
 newtype InputHandle = InputHandle (Ptr InputHandle)
 newtype UDPListenHandle = UDPListenHandle (Ptr UDPListenHandle)
 newtype UDPFlowHandle = UDPFlowHandle (Ptr UDPFlowHandle)
+newtype GraphHandle = GraphHandle (Ptr GraphHandle)
 
 
 getPLIs :: (Pipeline -> Pipeline -> (POutput,PInput)) -> PLGraph

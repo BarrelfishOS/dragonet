@@ -14,6 +14,8 @@ module Dragonet.Pipelines.Applications (
     sendMessage
 ) where
 
+import Dragonet.Pipelines.Implementation (GraphHandle(..))
+
 import Foreign.Ptr
 import Foreign.ForeignPtr
 import Foreign.C.String
@@ -30,26 +32,27 @@ type IPv4Addr = Word32
 type UDPPort = Word16
 type UDPEndpoint = (IPv4Addr,UDPPort)
 
+instance Show GraphHandle where
+    show _ = "GraphHandle ()"
+
 data Event =
-    EvAppConnected |
+    EvAppConnected GraphHandle |
     EvAppRegister String |
     EvAppStopped Bool | -- The boolean indicates regular termination
     EvSocketUDPListen UDPEndpoint |
     EvSocketUDPFlow UDPEndpoint UDPEndpoint |
     EvSocketSpan SocketId |
     EvSocketClose SocketId
-    deriving (Show,Eq,Ord)
+    deriving (Show)
 
 data TxMessage =
-    MsgWelcome AppId Int Int |
-    MsgInQueue String |
-    MsgOutQueue String |
+    MsgWelcome AppId |
     MsgStatus Bool |
-    MsgSocketInfo SocketId Word8 Int32
+    MsgSocketInfo SocketId
     deriving (Show,Eq,Ord)
 
 
-type OpNewApp = ChanHandle -> IO ()
+type OpNewApp = ChanHandle -> GraphHandle -> IO ()
 type OpRegister = ChanHandle -> CString -> IO ()
 type OpStopApp = ChanHandle -> Bool -> IO ()
 type OpUDPListen = ChanHandle -> IPv4Addr -> UDPPort -> IO ()
@@ -65,16 +68,13 @@ foreign import ccall "app_control_init"
             FunPtr OpSocketClose -> IO ()
 foreign import ccall "app_control_send_welcome"
     c_app_control_send_welcome ::
-        ChanHandle -> AppId -> Word8 -> Word8 -> IO ()
+        ChanHandle -> AppId -> IO ()
 foreign import ccall "app_control_send_status"
     c_app_control_send_status ::
         ChanHandle -> Bool -> IO ()
-foreign import ccall "app_control_send_queue"
-    c_app_control_send_queue ::
-        ChanHandle -> Bool -> CString -> IO ()
 foreign import ccall "app_control_send_socket_info"
     c_app_control_send_socket_info ::
-        ChanHandle -> SocketId -> Word8 -> Int32 -> IO ()
+        ChanHandle -> SocketId -> IO ()
 
 
 foreign import ccall "wrapper"
@@ -107,7 +107,7 @@ appControlInit sn a b c d e f g = do
 
 
 hOpNewApp :: (ChanHandle -> Event -> IO ()) -> OpNewApp
-hOpNewApp eh ch = eh ch EvAppConnected
+hOpNewApp eh ch gh = eh ch $ EvAppConnected gh
 
 hOpRegister :: (ChanHandle -> Event -> IO ()) -> OpRegister
 hOpRegister eh ch cs = do
@@ -137,14 +137,8 @@ interfaceThread stackname eh = do
         (hOpUDPListen eh) (hOpUDPFlow eh) (hOpSocketSpan eh) (hOpSocketClose eh)
 
 sendMessage :: ChanHandle -> TxMessage -> IO ()
-sendMessage ch (MsgWelcome appid i o) =
-    c_app_control_send_welcome ch appid i' o'
-    where (i',o') = (fromIntegral i, fromIntegral o)
-sendMessage ch (MsgOutQueue l) =
-    withCString l $ \l' -> c_app_control_send_queue ch True l'
-sendMessage ch (MsgInQueue l) =
-    withCString l $ \l' -> c_app_control_send_queue ch False l'
+sendMessage ch (MsgWelcome appid) = c_app_control_send_welcome ch appid
 sendMessage ch (MsgStatus status) = c_app_control_send_status ch status
-sendMessage ch (MsgSocketInfo sid oq mux) =
-    c_app_control_send_socket_info ch sid oq mux
+sendMessage ch (MsgSocketInfo sid) =
+    c_app_control_send_socket_info ch sid
 

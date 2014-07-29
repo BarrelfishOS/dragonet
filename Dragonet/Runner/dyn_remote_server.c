@@ -217,6 +217,30 @@ void dynrs_action(struct dynr_server *server,
             n = dyn_mknode_fromqueue(g, a->data.mknode_queue.name, rq->qh);
             node_add(server, node_create(a->data.mknode_queue.node, n));
             break;
+        case DYNR_ACT_MKNODE_TOSOCKET:
+            dprintf("dynrs_action: DYNR_ACT_MKNODE_TOSOCKET\n");
+            assert(node_get(server, a->data.mknode_socket.node) == NULL);
+            n = dyn_mknode_tosocket(g, a->data.mknode_socket.name,
+                    a->data.mknode_socket.socket);
+            node_add(server, node_create(a->data.mknode_socket.node, n));
+            break;
+        case DYNR_ACT_MKNODE_FROMSOCKET:
+            dprintf("dynrs_action: DYNR_ACT_MKNODE_FROMSOCKET\n");
+            assert(node_get(server, a->data.mknode_socket.node) == NULL);
+            n = dyn_mknode_fromsocket(g, a->data.mknode_socket.name,
+                    a->data.mknode_socket.socket);
+            node_add(server, node_create(a->data.mknode_socket.node, n));
+            break;
+        case DYNR_ACT_MKNODE_UDPDEMUX:
+            dprintf("dynrs_action: DYNR_ACT_MKNODE_UDPDEMUX\n");
+            assert(node_get(server, a->data.mknode_udpdemux.node) == NULL);
+            n = dyn_mknode_udpdemux(g, a->data.mknode_udpdemux.name,
+                    a->data.mknode_udpdemux.s_ip,
+                    a->data.mknode_udpdemux.s_port,
+                    a->data.mknode_udpdemux.d_ip,
+                    a->data.mknode_udpdemux.d_port);
+            node_add(server, node_create(a->data.mknode_udpdemux.node, n));
+            break;
 
         case DYNR_ACT_MKSPAWN:
             dprintf("dynrs_action: DYNR_ACT_MKSPAWN\n");

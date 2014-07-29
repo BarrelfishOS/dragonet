@@ -14,6 +14,9 @@ enum dynamic_node_type {
     DYN_MUX,
     DYN_TOQUEUE,
     DYN_FROMQUEUE,
+    DYN_TOSOCKET,
+    DYN_FROMSOCKET,
+    DYN_UDPDEMUX,
 };
 
 enum dynamic_node_op {
@@ -59,6 +62,16 @@ struct dynamic_node {
         struct {
             queue_handle_t queue;
         } queue;
+        struct {
+            void    *sdata;
+            uint64_t sid;
+        } socket;
+        struct {
+            uint32_t s_ip;
+            uint32_t d_ip;
+            uint16_t s_port;
+            uint16_t d_port;
+        } udpdemux;
     } tdata;
 
     /** Linked list of nodes in graph */
@@ -97,11 +110,23 @@ struct dynamic_graph {
     void                 *resolver_data;
     int                   version;
     volatile bool         stop;
+
+    // Hacks for socket node
+    void               *(*socket_get)(uint64_t, void *);
+    void                (*socket_set_spawn)(void *, struct dynamic_spawn *,
+                                            void *);
+    void                 *socket_data;
+    // Current socket and buffer
+    struct input         *cur_socket_buf;
+    void                 *cur_socket;
+
 };
 
 struct dynamic_spawn {
     struct dynamic_node *node;
     uint32_t refcount;
+    void *sock_data;
+
     struct dynamic_spawn *next;
 };
 
@@ -110,8 +135,6 @@ struct dynamic_spawn {
 struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh,
                                   fn_resolver_t resolver,
                                   void *resolver_data);
-void dyn_add_init(struct dynamic_graph *graph,
-                  struct dynamic_spawn *spawn);
 void dyn_rungraph(struct dynamic_graph *graph);
 void dyn_stopgraph(struct dynamic_graph *graph);
 void dyn_cleargraph(struct dynamic_graph *graph);
@@ -141,6 +164,18 @@ struct dynamic_node *dyn_mknode_toqueue(struct dynamic_graph *graph,
 struct dynamic_node *dyn_mknode_fromqueue(struct dynamic_graph *graph,
                                           const char           *name,
                                           queue_handle_t        queue);
+struct dynamic_node *dyn_mknode_tosocket(struct dynamic_graph *graph,
+                                         const char           *name,
+                                         uint64_t              sid);
+struct dynamic_node *dyn_mknode_fromsocket(struct dynamic_graph *graph,
+                                           const char           *name,
+                                           uint64_t              sid);
+struct dynamic_node *dyn_mknode_udpdemux(struct dynamic_graph *graph,
+                                         const char           *name,
+                                         uint32_t              s_ip,
+                                         uint16_t              s_port,
+                                         uint32_t              d_ip,
+                                         uint16_t              d_port);
 
 struct dynamic_spawn *dyn_mkspawn(struct dynamic_graph *graph,
                                   struct dynamic_node *node);
@@ -155,6 +190,13 @@ struct dynamic_edge *dyn_addedge(struct dynamic_node *source,
                                  struct dynamic_node *sink);
 
 void dyn_addspawn(struct dynamic_node *node, struct dynamic_spawn *dst);
+
+void dyn_add_init(struct dynamic_graph *graph,
+                  struct dynamic_spawn *spawn);
+bool dyn_spawn(struct dynamic_graph *graph,
+               struct dynamic_spawn *spawn,
+               struct input *in,
+               enum spawn_priority p);
 
 #endif // ndef DYNAMIC_H_
 
