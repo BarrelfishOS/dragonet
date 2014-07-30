@@ -25,6 +25,151 @@ def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
     # socket info per slot
     appID = 0
     unique_clients = list(set(CLIENTS))
+
+    # Make sure that number of unique clients is more than threadsPerPort
+    if createDedicatedFlows and len(CLIENTS) < threadsPerPort :
+        raise Exception("Not enough unique clients (%d) for load balancing per threads %d" % (
+            len(CLIENTS),  threadsPerPort))
+    if noPorts > 1:
+        raise Exception("Multiport setup requested, which needs some more hacking  noPorts = %d" % (
+                noPorts))
+        sys.exit()
+
+    for p in range(0, noPorts):
+        portNo = SERVER_INITIAL_PORT + p
+        # Assuming that one port goes to one application
+        # For every thread
+        for c in range(0, threadsPerPort):
+            if createDedicatedFlows:
+                if c == 0 :
+                    ret = ret + (" -a t%d -p %d " % (appID, portNo))
+                else :
+                    ret = ret + (" -a t%d " % (appID))
+                    # check previous occurances of this client
+                    prev_entries = [i for i, x in enumerate(CLIENTS[:c]) if x == CLIENTS[c]]
+                    ret = ret + (" -f %s:%d/%s:%d " % (
+                            TARGET, portNo,
+                            MINFO_CLIENT[CLIENTS[c]]["EGRESS_INFO"]["src"],
+                            (CLIENT_INITIAL_PORT + len(prev_entries))
+                        ))
+            else: # createDedicatedFlows
+                ret = ret + (" -a t%d -p %d " % (appID, portNo))
+
+            appID = appID + 1
+
+    # thread info per slot
+    appID = 0
+    for p in range(0, noPorts):
+        for c in range(0, threadsPerPort):
+            ret = ret + (" -t -q t%d " % (appID))
+            appID = appID + 1
+    print "FancyEcho Parameters: %s" % (ret)
+    return ret
+
+
+def genMemcachedParameters(noPorts, threadsPerPort, createDedicatedFlows = True):
+    ret = ""
+    # socket info per slot
+    appID = 0
+    unique_clients = list(set(CLIENTS))
+
+    assert(SERVERS_INSTANCES == 1)
+
+    # Make sure that number of unique clients is more than threadsPerPort
+    if createDedicatedFlows and len(CLIENTS) < threadsPerPort :
+        raise Exception("Not enough unique clients (%d) for load balancing per threads %d" % (
+            len(CLIENTS),  threadsPerPort))
+    if noPorts > 1:
+        raise Exception("Multiport setup requested, which needs some more hacking  noPorts = %d" % (
+                noPorts))
+        sys.exit()
+
+    for p in range(0, noPorts):
+        portNo = SERVER_INITIAL_PORT + p
+        for c in range(0, threadsPerPort):
+            if createDedicatedFlows:
+            #if c == 0 :
+                #        ret = ret + (" -a t%d -p %d " % (appID, portNo))
+            #else :
+                    # check previous occurances of this client
+                    prev_entries = [i for i, x in enumerate(CLIENTS[:c]) if x == CLIENTS[c]]
+                    ret = ret + (" -a t%d -f %s:%d/%s:%d " % (appID,
+                            TARGET, portNo,
+                            MINFO_CLIENT[CLIENTS[c]]["EGRESS_INFO"]["src"],
+                            0
+                            # (CLIENT_INITIAL_PORT + len(prev_entries))
+                        ))
+            else: # createDedicatedFlows
+                ret = ret + (" -a t%d -p %d " % (appID, portNo))
+
+            appID = appID + 1
+
+    # thread info per slot
+    appID = 0
+    for p in range(0, noPorts):
+        for c in range(0, threadsPerPort):
+            ret = ret + (" -t -q t%d " % (appID))
+            appID = appID + 1
+
+    print "memcached dragonet Parameters: %s" % (ret)
+    return ret
+
+
+
+
+def genFancyEchoParameters_old(noPorts, threadsPerPort, createDedicatedFlows = True):
+    ret = ""
+    # socket info per slot
+    appID = 0
+    unique_clients = list(set(CLIENTS))
+
+    # Make sure that number of unique clients is more than threadsPerPort
+    if createDedicatedFlows and len(CLIENTS) < threadsPerPort :
+        raise Exception("Not enough unique clients (%d) for load balancing per threads %d" % (
+            len(CLIENTS),  threadsPerPort))
+    if noPorts > 1:
+        raise Exception("Multiport setup requested, which needs some more hacking  noPorts = %d" % (
+                noPorts))
+        sys.exit()
+
+    for p in range(0, noPorts):
+        portNo = SERVER_INITIAL_PORT + p
+        # For every thread
+        for c in range(0, threadsPerPort):
+            if createDedicatedFlows:
+                if c == 0 :
+                    ret = ret + (" -a t%d -p %d " % (appID, portNo))
+                else :
+                    ret = ret + (" -a t%d " % (appID))
+                    # check previous occurances of this client
+                    prev_entries = [i for i, x in enumerate(CLIENTS[:c]) if x == CLIENTS[c]]
+                    ret = ret + (" -f %s:%d/%s:%d " % (
+                            TARGET, portNo,
+                            MINFO_CLIENT[CLIENTS[c]]["EGRESS_INFO"]["src"],
+                            (CLIENT_INITIAL_PORT + len(prev_entries))
+                        ))
+            else: # createDedicatedFlows
+                ret = ret + (" -a t%d -p %d " % (appID, portNo))
+
+            appID = appID + 1
+
+    # thread info per slot
+    appID = 0
+    for p in range(0, noPorts):
+        for c in range(0, threadsPerPort):
+            ret = ret + (" -t -q t%d " % (appID))
+            appID = appID + 1
+    print "FancyEcho Parameters: %s" % (ret)
+    return ret
+
+
+
+
+def genFancyEchoParameters_old(noPorts, threadsPerPort, createDedicatedFlows = True):
+    ret = ""
+    # socket info per slot
+    appID = 0
+    unique_clients = list(set(CLIENTS))
     instances_per_client = (len(CLIENTS)/len(UNIQUE_CLIENTS))
     if not (len(CLIENTS) % len(UNIQUE_CLIENTS)) == 0:
         print "Not enough not all clients are repeated same times.  All clients: %d, unique clients: %d  " % (
@@ -73,35 +218,21 @@ def SRV_CMDS(name):
     if name == "llvmE10k" :
         return {
                     "client_extra_opts" : "-N",
-                    "init_cmd_special_min" : [
-                      "cd dragonet/Dragonet/ ; sudo ./deployDragonetE10k.sh %d %s" % (
-                          HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
-                            ),
-                                    ],
-
                     "init_cmd_special" : [
-                      "cd dragonet/Dragonet/ ; sudo ./deployDragonetE10k.sh %d %s" % (
+                      "cd dragonet/Dragonet/ ; sudo  taskset -c %s  ./deployDragonetE10k.sh %d %s" % (
+                          toCoreList2(range(20 - (HWQUEUES * 2), 20)),
                           HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
                             ),
-                      "cd dragonet/Dragonet/ ; sudo ./runBetterBg.sh 0 ./ ./fancyecho-out.log  ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
-                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
+                      "sleep 4",
+                      "cd dragonet/Dragonet/ ; sudo ./runBetterBg.sh 2 ./ ./fancyecho-out.log  ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
+                            genMemcachedParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
+                          #genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
 
                       "cd dragonet/Dragonet/ ; ./wait_for_dn_app.sh %d %d " % (HWQUEUES, SERVERS_INSTANCES * SERVER_CORES),
                                     ],
 
-                    "init_cmd_special2" : [
-                        "cd dragonet/Dragonet/ ; sudo taskset -c %s ./deployDragonetE10k.sh %d %s" % (
-                                toCoreList2(range(0, (HWQUEUES* 2))), HWQUEUES,
-                                toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
-                            ),
-                      "cd dragonet/Dragonet/ ; ./runBetterBg.sh 2 ./ ./fancyecho-out.log  ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
-                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
-                                ],
-
                     "init_cmd" : [],
                     "exec_cmd" : "echo 'Server should already be running'" ,
-                    "exec_cmd_complex" : "./runBetterCD.sh ../../Dragonet/ ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
-                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
                     "kill_cmd_special" : [
                                 "tail dragonet/Dragonet/some.log",
                                 "tail dragonet/Dragonet/fancyecho-out.log",
@@ -165,6 +296,8 @@ def SRV_CMDS(name):
                     "out_cmd" : [],
                 }
 
+
+
     if name == "fancyEchoLinux" :
         return {
                     "client_extra_opts" : "-N",
@@ -176,10 +309,16 @@ def SRV_CMDS(name):
                       + "./fancyEchoLinux %s " % (
                             genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, False)),
                         "sleep 2",
+                        "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
                                     ],
                     "init_cmd" : [],
                     "exec_cmd" : "echo 'fancyEchoLinux should be already running'",
                     "kill_cmd" : [
+                                "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_2"),
+                                "cd dragonet/Dragonet/ ; ./diff_stats.py %s %s " % (
+                                    "./ethtool_out_1", "./ethtool_out_2"),
+                                "cd dragonet/Dragonet/ ; ./diff_stats.py %s %s 1000 | grep rx_packets " % (
+                                    "./ethtool_out_1", "./ethtool_out_2"),
                                 "sudo killall fancyEchoLinux || true",
                                  ],
                     "out_cmd" : [],
@@ -205,6 +344,30 @@ def SRV_CMDS(name):
                     "out_cmd" : [],
                 }
 
+
+    if name == "fancyEchoLinuxOpt" or name == "fancyEchoLinuxPoll" :
+        return {
+                    "client_extra_opts" : "-N",
+
+                    "init_cmd_special" : [
+                      "echo 50 | sudo tee /proc/sys/net/core/busy_poll",
+                      "echo 50 | sudo tee  /proc/sys/net/core/busy_read",
+                      "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
+                          toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))
+                      + " ./runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
+                      + "./fancyEchoLinux %s " % (
+                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, False)),
+                        "sleep 2",
+                                    ],
+                    "init_cmd" : [],
+                    "exec_cmd" : "echo 'fancyEchoLinux should be already running'",
+                    "kill_cmd" : [
+                                "sudo killall fancyEchoLinux || true",
+                                "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                                "echo 0 | sudo tee  /proc/sys/net/core/busy_read",
+                                 ],
+                    "out_cmd" : [],
+                }
 
     if name == "HImplOnload" :
         return {

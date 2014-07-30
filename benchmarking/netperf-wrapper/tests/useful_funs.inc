@@ -127,20 +127,34 @@ def myavg(l):
         return 0
     return (sum(l)/len(l))
 
+def target_lookup (addr):
+    if (addr.startswith("127.")) :
+        return "localhost"
+    if (addr == "10.113.4.95") :
+        return "Intel"
+    if (addr == "10.113.4.195") :
+        return "SF"
+    if (addr == "192.168.123.1") :
+        return "Tuntap"
+    return addr
 
-def netperf_attr_wrapper(p, l=None, func=get_netperf_attr):
+
+def netperf_attr_wrapper(p, l=None, func=get_netperf_attr, type1='data'):
     if l == None or l == "":
        l = p
     res =  {
         'data': func,
         'args' : {'attribute': p},
-        'label': l
+        'label': l,
+        'type': type1
        }
     return res
 
 
-def get_metadata_attr(allResults, meta, attribute, agg=None):
+def get_metadata_attr(allResults, meta, attribute, agg=None, multiAgg=None):
     """should return the metadata attribute"""
+    if multiAgg != None:
+        return multiAgg(meta)
     if attribute in meta.keys() :
         if agg != None and agg != False:
             return agg (meta[attribute])
@@ -150,15 +164,17 @@ def get_metadata_attr(allResults, meta, attribute, agg=None):
         return ""
 
 
-def meta_attr_wrapper(p, l=None, func=get_metadata_attr, agg=None):
+def meta_attr_wrapper(p, l=None, func=get_metadata_attr, agg=None, multiAgg=None, type1='meta'):
     if l == None or l == "":
        l = p
     res =  {
         'data': func,
         'args' : {'attribute': p,
-                   'agg': agg
+                   'agg': agg,
+                   'multiAgg' : multiAgg
                  },
-        'label': l
+        'label': l,
+        'type': type1
        }
     return res
 
@@ -242,7 +258,7 @@ def get_result_str(allResults, meta, client, attribute, aggregator=find_uniq):
     return (ans)
 
 
-def result_attr_wrapper(p, l=None, c="memaslap0", func=get_result_attr, agg=sum):
+def result_attr_wrapper(p, l=None, c="memaslap0", func=get_result_attr, agg=sum, axis=1, color=None, type1='data'):
     if l == None or l == "":
        l = p
     if func == None or func == "":
@@ -255,7 +271,10 @@ def result_attr_wrapper(p, l=None, c="memaslap0", func=get_result_attr, agg=sum)
             'attribute': p,
             'aggregator': agg,
                 },
-        'label': l
+        'label': l,
+        'axis': axis,
+        'color': color,
+        'type': type1
        }
     return res
 

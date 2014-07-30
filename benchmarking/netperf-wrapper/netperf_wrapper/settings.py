@@ -46,6 +46,13 @@ def writeLog(msg):
     if LOGFILE_HANDLE:
         LOGFILE_HANDLE.write("%s\n" % (msg))
 
+def pwLog(msg):
+    #global LOGFILE_HANDLE
+    if LOGFILE_HANDLE:
+        LOGFILE_HANDLE.write("%s\n" % (msg))
+    print ("%s\n" % (msg))
+
+
 def timeStamped(t=None, fmt='%Y%m%d%H%M%S'):
     if t :
         return t.strftime(fmt).format()

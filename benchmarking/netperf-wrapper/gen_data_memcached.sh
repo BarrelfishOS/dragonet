@@ -100,6 +100,11 @@ run_bm_tp_rr() {
         NVTPS=`cat ${TMPFILE} | grep "^total TPS: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1`
         NTP=`cat ${TMPFILE} | grep "^total TPS: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1 | cut -d'.' -f1`
 
+        if [ ${NBRUST} -gt 2048 ] ; then
+            echo "Stopping at ${LBRUST} as clients tend run out of memory beyond this point for memaslap"
+            break
+        fi
+
         if [ -z ${NTP} ] ; then
             echo "System si not running atall for given configuration. So, assuming that last was the best run: ${LBRUST}"
             cat ${TMPFILE} >>  ${MYTMPDIR}/${title}.log
@@ -129,7 +134,7 @@ run_bm_tp_rr() {
     title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},Q_${HWQUEUES},P_${PACKET_SIZE},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},C_${LBRUST},BEST"
     echo "running for ${title}"
 
-    retry 2 ./netperf-wrapper -d ${DELAY} -I ${ITERATIONS} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
+    retry 4 ./netperf-wrapper -d ${DELAY} -I ${ITERATIONS} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
         -H ${srvName} ${cliName6} \
         --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
@@ -189,27 +194,96 @@ get_best_tp()
     run_bm_tp_rr  ${SELTARGET} ${SELTARGET_T} ${OUTDIR}
 }
 
-get_scalability_linux() {
+get_scalability_linux_rss() {
 
     HWQUEUES=1
-
     setup_output_location
-    get_best_tp 2 1
-    get_best_tp 4 1
-    get_best_tp 4 1
-    get_best_tp 6 1
-    get_best_tp 8 1
+    get_best_tp 1 2
+}
 
+
+
+get_scalability_linux_sp() {
+
+    HWQUEUES=1
+    setup_output_location
+
+    get_best_tp 8 1
+    get_best_tp 16 1
+    get_best_tp 10 1
+    get_best_tp 12 1
+    get_best_tp 14 1
+}
+
+
+get_scalability_only_one() {
+    get_best_tp 1 10
+}
+
+get_scalability_all() {
+
+    get_best_tp 1 6
+
+#    setup_output_location
     get_best_tp 1 1
     get_best_tp 1 2
     get_best_tp 1 4
     get_best_tp 1 6
     get_best_tp 1 8
     get_best_tp 1 10
+}
+
+get_scalability_all_v2() {
+    get_best_tp 1 10
     get_best_tp 1 12
     get_best_tp 1 14
     get_best_tp 1 16
     get_best_tp 1 18
+}
+
+
+
+get_scalability_linux() {
+
+    HWQUEUES=1
+    setup_output_location
+    get_best_tp 1 1
+    get_best_tp 1 2
+    get_best_tp 1 4
+    get_best_tp 1 6
+    get_best_tp 1 8
+    get_best_tp 1 16
+    get_best_tp 1 10
+    get_best_tp 1 12
+    get_best_tp 1 14
+    get_best_tp 1 18
+}
+
+get_scalability_linux_multiport() {
+    get_best_tp 2 1
+    get_best_tp 4 1
+    get_best_tp 6 1
+    get_best_tp 8 1
+    get_best_tp 16 1
+}
+
+get_scalability_remaining() {
+
+    HWQUEUES=1
+    setup_output_location
+
+    get_best_tp 1 6
+    get_best_tp 1 10
+    get_best_tp 1 12
+    get_best_tp 1 14
+    get_best_tp 1 18
+
+    get_best_tp 6 1
+    get_best_tp 10 1
+    get_best_tp 12 1
+    get_best_tp 14 1
+    get_best_tp 18 1
+
     fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
     ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
     echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
@@ -227,25 +301,25 @@ gen_graph() {
     echo "./netperf-wrapper -p bboxNet -o ${OUTDIRP}/TP_MAX/${fnameNet} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${graphGenFile}
 }
 
-get_scalability_special22() {
+get_scalability_dn() {
 
     HWQUEUES=1
     setup_output_location
-#    get_best_tp 1 1
-#    get_best_tp 1 2
+    get_best_tp 1 1
+    get_best_tp 1 2
     get_best_tp 1 4
-#    get_best_tp 2 1
-#    get_best_tp 4 1
+    get_best_tp 2 1
+    get_best_tp 4 1
     HWQUEUES=2
     setup_output_location
-#    get_best_tp 2 1
+    get_best_tp 1 2
+    get_best_tp 1 4
+    get_best_tp 2 1
     get_best_tp 4 1
-#    get_best_tp 1 2
-#    get_best_tp 1 4
-#    HWQUEUES=4
-#    setup_output_location
-#    get_best_tp 1 4
-#    get_best_tp 4 1
+    HWQUEUES=4
+    setup_output_location
+    get_best_tp 1 4
+    get_best_tp 4 1
 
 #    fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
 #    ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
@@ -347,6 +421,8 @@ use_sbrinz2_server_intel_switched() {
 }
 
 use_asiago_server() {
+
+    rm asiago_details.mconf
     srvName="asiago"
 
     INTEL_T="10.22.4.95"
@@ -355,7 +431,8 @@ use_asiago_server() {
     SF_T="10.23.4.195"
     SF_S_T="10.113.4.195"
 
-    cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere  -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata"
+    #cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere  -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata"
+    cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
     cliName6Short="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
 #    cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata"
     cliName6="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
@@ -409,26 +486,99 @@ ECHO_SERVER="memcached_poll"
 ECHO_SERVER="memcached_dragonet"
 ECHO_SERVER="memcached_onload"
 ECHO_SERVER="memcached"
-MAIN_OUTPUT_DIR="../memcachedResults/sf_scale_test/${1}/"
+
 MAIN_OUTPUT_DIR="../netperfScaleResults/intelTest/${1}/"
 MAIN_OUTPUT_DIR="../netperfScaleResults/deleteme_smartOracle/${1}/"
 MAIN_OUTPUT_DIR="../netperfScaleResults/smartOracle/r1/${1}/"
 GRAPH_GEN_CMDS="${MAIN_OUTPUT_DIR}/graph_gen_cmds.sh"
+
 
 ./cleanup.sh 2> /dev/null
 
 #use_burrata_server_intel_switched
 #use_asiago_server_intel_switched
 #use_asiago_server_sf_switched
+
+UDP_TEST_NAME="memcached_rr"
+
+
 #use_asiago_server_intel_switched
-use_asiago_server_sf_switched
+#ECHO_SERVER="memcached"
+#ECHO_SERVER="memcached_poll"
+#ECHO_SERVER="llvmE10k"
+
+#use_asiago_server_sf_switched
+#ECHO_SERVER="memcached"
+#ECHO_SERVER="memcached_onload"
+#ECHO_SERVER="llvmSF"
+
+PACKET_SIZE=1024
+HWQUEUES=1
+
+#use_asiago_server_sf_switched
+#ECHO_SERVER="memcached"
+#ECHO_SERVER="memcached_onload"
+#ECHO_SERVER="llvmSF"
+
+#MAIN_OUTPUT_DIR="../memcachedResults_v2/scalability/P1024/Dragonet_SF_Q1_N2/"
+#setup_output_location
+#get_scalability_only_one
+
+
+use_asiago_server_intel_switched
+ECHO_SERVER="llvmE10k"
+
+MAIN_OUTPUT_DIR="../memcachedResults_v2/scalability/P1024/Dragonet_Intel_Q1/"
+setup_output_location
+get_scalability_only_one
+exit 0
+
+get_scalability_all
+
+get_scalability_only_one
+get_scalability_only_one
+
+#get_scalability_only_one
 
 UDP_TEST_NAME="udp_rr"
+
+PACKET_SIZE=64
+
 #ECHO_SERVER="netserver"
 ECHO_SERVER="llvmE10k"
 ECHO_SERVER="fancyEchoOnload"
+ECHO_SERVER="fancyEchoOnload"
+ECHO_SERVER="fancyEchoOnload"
+ECHO_SERVER="fancyEchoLinuxPoll"
+
+
+
+#ECHO_SERVER="llvmE10k"
+#use_asiago_server_intel_switched
 ECHO_SERVER="llvmSF"
+use_asiago_server_sf_switched
+
 PACKET_SIZE=1024
+MAIN_OUTPUT_DIR="../netperfScaleResults/Scalability/P1024/dragonet_SF_Q2/${1}/"
+HWQUEUES=2
+setup_output_location
+get_scalability_all
+exit 0
+
+
+##############################
+
+get_scalability_all
+get_scalability_linux_rss
+./graphGen.sh ${MAIN_OUTPUT_DIR}
+get_scalability_linux_sp
+exit 0
+
+##############################
+
+#get_scalability_linux
+get_scalability_dn
+
 MAIN_OUTPUT_DIR="../netperfScaleResults/dnIntelSp/${1}/"
 setup_output_location
 
@@ -438,19 +588,7 @@ get_scalability_special22
 exit 0
 ##############################
 
-ECHO_SERVER="fancyEchoOnload"
-PACKET_SIZE=1024
-MAIN_OUTPUT_DIR="../netperfScaleResults/Linux/${1}/"
-setup_output_location
 
-
-
-get_scalability_linux
-gen_graph ${MAIN_OUTPUT_DIR}
-./graphGen.sh ${MAIN_OUTPUT_DIR}
-exit 0
-
-##############################
 MAIN_OUTPUT_DIR="../netperfScaleResults/smartOracle/rAll/${1}/"
 PACKET_SIZE=1024
 setup_output_location

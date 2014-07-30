@@ -27,7 +27,7 @@ from . import runners, transformers
 
 from .util import classname
 
-from .settings import settings, writeLog
+from .settings import settings, writeLog, pwLog
 import collections
 
 class Aggregator(object):
@@ -103,7 +103,7 @@ class Aggregator(object):
         #print "##############################"
         #print "##############################"
 
-        writeLog("%s:Setting up machines\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
+        pwLog("%s:Setting up machines" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
 
         #result = {}
         result = OrderedDict()
@@ -119,7 +119,7 @@ class Aggregator(object):
         except KeyboardInterrupt:
             raise
 
-        writeLog("%s: Start run\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
+        pwLog("%s: Start run" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
 
         #print "##############################"
         try:
@@ -132,7 +132,7 @@ class Aggregator(object):
                     #print "Instantiating tool on machine [%s] " % (str(m))
                     self.m_instances[m]['machine'].threads[n] = i['runner'](self.m_instances[m]['machine'], n, **i)
 
-            print "%s: Starting server applications\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+            pwLog("%s: Starting server applications" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
             for m, mi in list(self.m_instances.items()):
                 if not mi['is_server'] :
                     continue
@@ -141,10 +141,19 @@ class Aggregator(object):
                     self.m_instances[m]['machine'].threads[n].start()
 
 
+            pwLog( "%s: Making sure that servers are up" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
+            for m, mi in list(self.m_instances.items()):
+                if not mi['is_server'] :
+                    continue
+                for n,i in list(self.m_instances[m]['machine'].tool_instances.items()):
+                    #print "Running tool on machine [%s] " % (str(m))
+                    self.m_instances[m]['machine'].threads[n].is_ready_check()
+
+
             #time.sleep(2)
             #print "##############################"
             #print "Starting client applications now "
-            print "%s: Starting client applications\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+            pwLog("%s: Starting client applications\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
             for m, mi in list(self.m_instances.items()):
                 if mi['is_server'] :
                     continue
@@ -157,7 +166,7 @@ class Aggregator(object):
 
 
             real_bm_start_time = datetime.now()
-            print "%s: Benchmark running, for threads which are marked for waiting\n" % real_bm_start_time.strftime("%Y-%m-%d:%H:%M:%S")
+            pwLog("%s: Benchmark running, for threads which are marked for waiting" % real_bm_start_time.strftime("%Y-%m-%d:%H:%M:%S"))
             #print "##############################"
             #print "Waiting for applications to die out"
             for m, mi in list(self.m_instances.items()):
@@ -167,8 +176,8 @@ class Aggregator(object):
                         while t.isAlive():
                             t.join(1)
                         if not t.returncode == 0:
-                            print "WARNING: thread %s failed with return code %s\n" % (
-                                t.name,  str(t.returncode))
+                            pwLog("WARNING: thread %s failed with return code %s\n" % (
+                                t.name,  str(t.returncode)))
                             if t.is_catastrophic:
                                 print "WARNING: killing all processes"
                                 self.forced_cleanup()
@@ -177,9 +186,9 @@ class Aggregator(object):
 
 
             real_bm_end_time = datetime.now()
-            print "%s: Benchmark done (runtime = %f secs), killing other threads\n" % (
+            pwLog("%s: Benchmark done (runtime = %f secs), killing other threads" % (
                     real_bm_end_time.strftime("%Y-%m-%d:%H:%M:%S"),
-                    (real_bm_end_time - real_bm_start_time).total_seconds())
+                    (real_bm_end_time - real_bm_start_time).total_seconds()))
 
             #print "Main threads are done, killing others"
             for m, mi in list(self.m_instances.items()):
@@ -187,14 +196,14 @@ class Aggregator(object):
                     if t.isAlive():
                         t.kill()
 
-            print "%s: Waiting for kill cleanup\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+            pwLog("%s: Waiting for kill cleanup" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
             #print "Main threads are done, killing others"
             for m, mi in list(self.m_instances.items()):
                 for n,t in list(self.m_instances[m]['machine'].threads.items()):
                     while t.isAlive():
                         t.join(1)
 
-            print "%s: Processing results\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+            pwLog("%s: Processing results" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
             #print "##############################"
             #print "Processing results"
             for m, mi in list(self.m_instances.items()):
@@ -220,7 +229,7 @@ class Aggregator(object):
 
 
         # Cleanup servers
-        print "%s: cleaning up server applications\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+        pwLog("%s: cleaning up server applications\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
         for m, mi in list(self.m_instances.items()):
             if not mi['is_server'] :
                 continue
@@ -230,7 +239,7 @@ class Aggregator(object):
 
 
         #pprint.pprint(result, self.logfile)
-        print "%s: Done with collecting data\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+        pwLog("%s: Done with collecting data\n" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
         return result
 
     def kill_runners(self):

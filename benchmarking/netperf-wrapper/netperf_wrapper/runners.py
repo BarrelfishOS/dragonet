@@ -23,7 +23,7 @@ import threading, time, shlex, subprocess, re, time, sys, math, os, tempfile, si
 
 from datetime import datetime
 
-from .settings import settings, Glob, writeLog
+from .settings import settings, Glob, writeLog, pwLog
 from collections import OrderedDict
 
 import json as js
@@ -103,8 +103,8 @@ class ProcessRunner(threading.Thread):
     """Default process runner for any process."""
 
     def __init__(self, machine, name, command, wait_for,
-            init_cmd, kill_cmd, out_cmd, is_catastrophic,
-            delay, *args, **kwargs
+            init_cmd,  kill_cmd, out_cmd, is_catastrophic,
+            delay, is_ready_cmd = [], *args, **kwargs
             ):
         threading.Thread.__init__(self)
         self.name = name
@@ -114,6 +114,7 @@ class ProcessRunner(threading.Thread):
         self.machine_ref = machine
         self.wait_for = wait_for
         self.init_cmd = init_cmd
+        self.is_ready_cmd = is_ready_cmd
         self.kill_cmd = kill_cmd
         self.out_cmd = out_cmd
         self.is_catastrophic = is_catastrophic
@@ -134,6 +135,9 @@ class ProcessRunner(threading.Thread):
 
     def logMsg(self, msg):
         writeLog("%s: %s\n" % (self.name, msg))
+
+    def PlogMsg(self, msg):
+        pwLog("%s: %s\n" % (self.name, msg))
 
     def fork(self):
         # doing initial setup
@@ -167,6 +171,17 @@ class ProcessRunner(threading.Thread):
 
     def should_wait(self):
         return self.wait_for
+
+    def is_ready_check(self):
+        if self.is_ready_cmd:
+            try:
+                for cmd in self.is_ready_cmd:
+                    ans = self.machine_ref._exec_cmd_blocking(cmd)
+                    self.logMsg ("IS_READY_CMD: Machine %s: the response of executing is_ready_cmd [%s] is \n%s\n" %(
+                        self.machine_ref, cmd, ans))
+            except OSError:
+                pass
+
 
     def kill_explicit(self):
         if self.kill_cmd:

@@ -21,6 +21,7 @@
 
 import json, sys, csv, math, inspect, os
 #import settings as settings
+import pprint as PP
 
 from itertools import cycle
 
@@ -35,6 +36,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cbook as cbook
 
+pp = PP.PrettyPrinter(indent=4)
 
 boxprops = dict(linestyle='--', linewidth=3, color='darkgoldenrod')
 flierprops = dict(marker='o', markerfacecolor='green', markersize=12,
@@ -74,18 +76,16 @@ PLOT_KWARGS = (
     'zorder'
     )
 
-
 def target_lookup (addr):
     if (addr.startswith("127.")) :
         return "localhost"
-    if (addr == "10.23.4.21") :
-        return "SFD"
-    if (addr == "10.22.4.11") :
-        return "IntelD"
+    if (addr == "10.113.4.95") :
+        return "Intel"
+    if (addr == "10.113.4.195") :
+        return "SF"
     if (addr == "192.168.123.1") :
         return "Tuntap"
     return addr
-
 
 def plot_attr_details(trow, sorder, infod):
     nr = len(infod[trow[0]])
@@ -115,8 +115,15 @@ def plot_attr_details(trow, sorder, infod):
     fig.savefig('fig1.png', bbox_inches='tight')
 
 
-def collect_attributes(result, config, titles, values):
-    #for s in config['series']:
+#def collect_attributes(result, config, titles, values, meta, attr_info):
+def collect_attributes(result, config, values, attr_info):
+
+    if 'meta' not in attr_info.keys():
+        attr_info['meta'] = []
+
+    if 'titles' not in attr_info.keys():
+        attr_info['titles'] = []
+
     for s in config['attrs']['attrlist']:
         args = None
         if 'value' in s.keys():
@@ -127,46 +134,108 @@ def collect_attributes(result, config, titles, values):
         else:
             ans = s['data'](result._results, result.metadata)
 
-        #print "%s: %s " % (s['label'], str(ans))
         print "%s: %s: %s" % (s['label'], str(ans)[:100],
                result.metadata['TITLE'])
+
         if (s['label'] not in values.keys()) :
-            titles.append(s['label'])
+            attr_info['titles'].append(s['label'])
             values[s['label']] = [ans]
         else :
             values[s['label']].append(ans)
 
+        if 'type' in s.keys() and s['type'] == 'meta' and s['label'] not in attr_info['meta']:
+            attr_info['meta'].append(s['label'])
+#    pp.pprint(attr_info)
 
 def mystr(obj):
     return str(obj)[:9]
 
-def sort_attr_details(skey, trow, infod):
-    #if not skey in infod.keys():
-    #    print "Can't sort results as given key [%s] is missing" % (skey)
-    #    return
+#def sort_attr_details(skey, trow, infod, meta_titles, fixed_meta, fixed_meta_str, changing_meta):
+def sort_attr_details(skey, infod, attr_info):
 
-    nr = len(infod[trow[0]])
+    attr_info['titleStr'] = ""
+    attr_info['x_axis'] = []
+    attr_info['x_axis_main'] = []
+    attr_info['x_axis_other'] = []
+    attr_info['fixed_meta'] = []
+    attr_info['changing_meta'] = []
+    sort_order = []
+
+    print "meta titles: %s" % (attr_info['meta'])
+    for k in attr_info['titles']:
+        if k not in attr_info['meta']:
+            continue
+        unique_entries = list(set(infod[k]))
+        if len(unique_entries) == 1:
+            if len(attr_info['titleStr']) > 0:
+                attr_info['titleStr'] = attr_info['titleStr'] + (", ")
+            attr_info['titleStr'] = attr_info['titleStr'] + ("%s:%s" % (k, infod[k][0]))
+
+            attr_info['fixed_meta'].append(k)
+        else :
+            # Assuming this is changing parameter
+            attr_info['changing_meta'].append(k)
+            attr_info['x_axis'].append(k)
+            if k in skey:
+                attr_info['x_axis_main'].append(k)
+                attr_info['x_axis_group_keys'] = unique_entries
+            else :
+                if infod[k] == infod[skey[0]]:
+                    print "Key %s (%s) is same as main key %s (%s), so ignoring it" % (
+                            k, infod[k],  skey[0], infod[skey[0]])
+                else:
+                    print "ERROR: values for key %s (%s) is different from main key %s (%s), so quitting" % (
+                            k, infod[k], skey[0], infod[skey[0]])
+                    #sys.exit(1)
+                    attr_info['x_axis_other'].append(k)
+
+    if attr_info['x_axis_main'] == []:
+        attr_info['x_axis_main'] = skey
+
+    sort_order = attr_info['x_axis_main'] + attr_info['x_axis_other'] + attr_info['fixed_meta']
+
+    print "graph title: %s" % (attr_info['fixed_meta'])
+    print "graph title: %s" % (attr_info['titleStr'])
+    print "graph x_axis: %s" % (attr_info['x_axis'])
+    print "graph x_axis_main: %s" % (attr_info['x_axis_main'])
+    print "graph x_axis_other: %s" % (attr_info['x_axis_other'])
+    print "sort order keys: %s" % (sort_order)
+
+    nr = len(infod[attr_info['titles'][0]])
+    ll2 = []
     ll = []
+
     for i in range(0, nr):
         #ll.append((infod[skey][i], i))
 
         ll.append((
-                infod[trow[0]][i],
-                infod[trow[1]][i],
-                infod[trow[2]][i],
-                infod[trow[3]][i],
-                infod[trow[4]][i],
+                infod[sort_order[0]][i],
+                infod[sort_order[1]][i],
+                infod[sort_order[2]][i],
+                infod[sort_order[3]][i],
+                infod[sort_order[4]][i],
+                i))
+
+        ll2.append((
+                infod[attr_info['titles'][0]][i],
+                infod[attr_info['titles'][1]][i],
+                infod[attr_info['titles'][2]][i],
+                infod[attr_info['titles'][3]][i],
+                infod[attr_info['titles'][4]][i],
                 i))
     print ll
     sll = sorted(ll)
-    sorder = map (lambda x: x[-1], sll)
-    #print "sorted list = %s" % (sll)
-    #print "sorted order = %s" % (sorder)
-    return sorder
+    attr_info['sorder'] = map (lambda x: x[-1], sll)
+#    print "sorted list "
+#    pp.pprint(sll)
+#    print "sorted order = %s" % (attr_info['sorder'])
+    pp.pprint(attr_info['sorder'])
+    return attr_info['sorder']
 
 
-def show_attr_details(trow, sorder, infod):
+def show_attr_details(attr_info, sorder, infod):
 
+    trow = attr_info['titles']
 #    trow = self.nresults_titles
 #    infod = self.nresults
 
@@ -248,7 +317,7 @@ class Formatter(object):
         if results[0].dump_file is not None:
             sys.stderr.write("No output formatter selected.\nTest data is in %s (use with -i to format).\n" % results[0].dump_file)
 
-    def format2(self, results, trow=None, sorder=None, infod=None):
+    def format2(self, results, trow=None, sorder=None, infod=None, attr_info=None):
         self.format(results)
 
 DefaultFormatter = Formatter
@@ -483,8 +552,6 @@ class PlotFormatter(Formatter):
 
         self.start_position = 1
 
-
-
     def _init_box2_plot(self, config=None, axis=None):
         if axis is None:
             axis = self.figure.gca()
@@ -494,6 +561,18 @@ class PlotFormatter(Formatter):
         self._init_timeseries_plot(config, axis)
         axis.set_xlabel('')
 
+        self.start_position = 1
+
+
+
+    def _init_boxscale_plot(self, config=None, axis=None):
+        if axis is None:
+            axis = self.figure.gca()
+
+        if config is None:
+            config = self.config
+
+        axis.set_xlabel('')
         self.start_position = 1
 
     def _init_boxc_plot(self, config=None, axis=None):
@@ -919,7 +998,6 @@ class PlotFormatter(Formatter):
 
 
 
-
     def do_box2_plot(self, results, config=None, axis=None):
         if config is None:
             config = self.config
@@ -1022,6 +1100,95 @@ class PlotFormatter(Formatter):
         #axis.set_ylim(ymin=0, ymax=110)
         axis.set_ylim(ymin=0 )
 
+
+
+
+    def do_boxscale_plot(self, results, config=None, axis=None):
+        if axis is None:
+            axis = self.figure.gca()
+        if config is None:
+            config = self.config
+
+        if 'dual_axes' in config and config['dual_axes']:
+            axis.set_ylabel(config['axis_labels'][0])
+            axis.set_xlabel(str(self.attr_info['x_axis_main']))
+            second_axis = axis.twinx()
+#            second_axis = self.figure.add_axes(axis.get_position(), sharex=axis, frameon=False)
+#            second_axis.yaxis.tick_right()
+#            axis.yaxis.tick_left()
+#            second_axis.yaxis.set_label_position('right')
+#            second_axis.yaxis.set_offset_position('right')
+#            second_axis.xaxis.set_visible(False)
+
+            second_axis.set_ylim(ymin=0 )
+            second_axis.set_ylabel(config['axis_labels'][1])
+            config['axes'] = [axis,second_axis]
+        else:
+            config['axes'] = [axis]
+
+        nr = len(self.infod[self.trow[0]])
+        axis_to_plot = []
+
+        group_size = nr # len(results)
+        ticklabels = []
+        ticks = []
+        pos = 1
+
+        if self.sorder == None or self.sorder == []:
+            order = range(0, nr)
+        else :
+            order = self.sorder
+
+        for i in order:
+            title3 = ''
+            for k in self.attr_info['x_axis_main']:
+                if len(title3) > 0:
+                    title3 = title3 + ", "
+                title3 = title3 + "%s" % (self.infod[k][i])
+
+            axis_to_plot.append(title3)
+            ticklabels.append(title3)
+
+            #positions = range(i,pos+group_size)
+            #ticks.append(self.np.mean(positions))
+
+        colours = ['b', 'g', 'c', 'm', 'k']
+        while len(colours) < len(results):
+            colours = colours *2
+
+        #print "config is as follows"
+        #pp.pprint(config)
+        for i,s in enumerate(config['series']):
+#            print "Current series [%d]  is as follows\n" % (i)
+#            pp.pprint(s)
+            data = []
+
+            print "\n\ntitle:%s #####" % (self.attr_info['titleStr'])
+            if 'label' in s:
+                xkey = self.attr_info['x_axis_main'][0]
+                for i in order:
+                    data.append(self.infod[s['label']][i])
+                    arr = np.array(self.infod[s['label']][i])
+                    avg = np.average(arr)
+                    err = np.std(arr)
+                    print "%s %s %s %s #####" % (self.infod[xkey][i],
+                            avg, err,
+                            self.infod[s['label']][i]
+                           )
+                    #data.append(self.infod[s['label']][i])
+            axes_id = s['axis'] - 1
+            config['axes'][axes_id].set_ylim(ymin=0, ymax=max(max(data)))
+
+            if axes_id > 0:
+                continue
+            print "max:%f  #####" % (max(max(data)))
+#            print "Current series data on axis %d is as follows: (%s), %f \n" % (
+#                    axes_id, max(data), max(max(data)))
+#            pp.pprint(data)
+
+            bp = config['axes'][axes_id].boxplot(data)
+
+        axis.set_xticklabels(ticklabels, fontsize=15, rotation=90)
 
     def do_box_plot(self, results, config=None, axis=None):
         if config is None:
@@ -1166,11 +1333,12 @@ class PlotFormatter(Formatter):
         for i,config in enumerate(self.configs):
             getattr(self, 'do_%s_plot' % config['type'])(results, config=config)
 
-    def format2(self, results, trow, sorder, infod):
-        if not trow[0]:
+    def format2(self, results, trow, sorder, infod, attr_info=None):
+        if not attr_info['titles'][0]:
             return
-        self.trow = trow
-        self.sorder = sorder
+        self.attr_info = attr_info
+        self.trow = attr_info['titles']
+        self.sorder = attr_info['sorder']
         self.infod = infod
 
         getattr(self, 'do_%s_plot' % self.config['type'])(results)
@@ -1252,9 +1420,10 @@ class PlotFormatter(Formatter):
             plot_title = self.settings.DESCRIPTION
             y=0.98
             if 'description' in self.config:
-                plot_title += "\n" + self.config['description']
+                #plot_title += "\n !! " + self.config['description']
+                plot_title += "\n" + self.attr_info['titleStr']
             if self.settings.TITLE and not skip_title:
-                plot_title += "\n" + self.settings.TITLE
+                plot_title += "\n ## " + self.settings.TITLE
             if 'description' in self.config and self.settings.TITLE and not skip_title:
                 y=1.00
             titles.append(self.figure.suptitle(plot_title, fontsize=14, y=y))
@@ -1322,6 +1491,7 @@ class PlotFormatter(Formatter):
     def _do_scaling(self, axis, data, btm, top):
         """Scale the axis to the selected bottom/top percentile"""
         data = [x for x in data if x is not None]
+        print "Trying to scale data"
         if not data:
             return
         top_percentile = self.np.percentile(data, top)*1.05
@@ -1338,27 +1508,6 @@ class PlotFormatter(Formatter):
     def show_nresults(self):
         show_attr_details(self.nresults_titles, self.nresults)
         return
-
-        trow = self.nresults_titles
-        infod = self.nresults
-        for k in trow:
-            print "|%10s " % (mystr(k)),
-        print "|\n",
-
-        nr = len(infod[trow[0]])
-        for i in range(0, nr):
-#            if infod['BURST_SIZE'][i][0] != 1.0 :
-#                continue
-#            if infod['TARGET'][i] != "10.23.4.21" :
-#                continue
-
-            for k in trow:
-                data = infod[k][i]
-                if k == "TITLE":
-                    print "|%30s " % (str(data)),
-                else :
-                    print "|%10s " % (mystr(data)),
-            print "|\n",
 
 def mystr(obj):
     return str(obj)[:9]
