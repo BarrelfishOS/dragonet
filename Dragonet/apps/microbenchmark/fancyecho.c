@@ -352,24 +352,17 @@ static void *run_thread(void *arg)
             while (cs != NULL) {
                 err_expect_ok(dnal_socket_create(daq, &dsh));
                 pthread_mutex_lock(&cs->ep->mutex);
-                //if (cs->ep->opaque == NULL) {
+                if (cs->ep->opaque == NULL) {
                     dnd.type = DNAL_NETDSTT_IP4UDP;
                     dnd.data.ip4udp.ip_local = cs->ep->ep.l_ip;
                     dnd.data.ip4udp.ip_remote = cs->ep->ep.r_ip;
                     dnd.data.ip4udp.port_local = cs->ep->ep.l_port;
                     dnd.data.ip4udp.port_remote = cs->ep->ep.r_port;
-                    printf("before bind: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
-                            dnd.data.ip4udp.ip_local,
-                            dnd.data.ip4udp.port_local,
-                            dnd.data.ip4udp.ip_remote,
-                            dnd.data.ip4udp.port_remote
-                          );
-
                     err_expect_ok(dnal_socket_bind(dsh, &dnd));
                     cs->ep->opaque = dsh;
-//                } else {
-//                    err_expect_ok(dnal_socket_span(cs->ep->opaque, daq, dsh));
-//                }
+                } else {
+                    err_expect_ok(dnal_socket_span(cs->ep->opaque, daq, dsh));
+                }
                 pthread_mutex_unlock(&cs->ep->mutex);
                 cs->opaque = dsh;
                 cs = cs->next;
