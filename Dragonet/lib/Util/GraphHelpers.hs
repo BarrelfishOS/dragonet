@@ -15,8 +15,10 @@ module Util.GraphHelpers(
     recurseNFW,
     topsortLN,
     updateN,
-    labPre, labLPre,
+    labPre, labLPre, labLSucc,
+    labReachable,
     rdfsStop,
+    nodeToLNode,
 ) where
 
 import Data.Graph.Inductive
@@ -180,6 +182,16 @@ labPre g n = map (nodeToLNode g) $ pre g (fst n)
 labLPre :: Graph gr => gr a b -> LNode a -> [(LNode a, LEdge b)]
 labLPre graph node = map mapfn $ inn graph (fst node)
     where mapfn edge@(src, _, _) = (nodeToLNode graph src, edge)
+
+-- labaled node sucessors on a graph
+labLSucc :: Graph gr => gr a b -> LNode a -> [(LNode a, LEdge b)]
+labLSucc graph node = map mapfn $ out graph (fst node)
+    where mapfn edge@(src, _, _) = (nodeToLNode graph src, edge)
+
+-- DFS.reachable on labled nodes
+labReachable :: Graph gr => gr a b -> LNode a -> [LNode a]
+labReachable gr src = map (nodeToLNode gr) $ DFS.reachable (fst src) gr
+
 
 -- similar to xdfsWith, but the search is stopped when a particular node is
 -- found. The node is included in the results

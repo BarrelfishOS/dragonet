@@ -1,20 +1,21 @@
 module Dragonet.Predicate (
     PredicateExpr(..),
     predAnd, predOr,
-    parseFile, parseStr
+    predEval,
+    parseFile, parseStr, predGetTerms
 ) where
 
 import Dragonet.ProtocolGraph (PGraph, PGNode, PGEdge, Node(..), NLabel, NPort, Edge(..), NOperator(..))
 import qualified Text.ParserCombinators.Parsec as P
 
 import Debug.Trace (trace)
-import Data.List (intercalate)
+import Data.List (intercalate, lookup, concat)
 
 -- path predicates
 
 
-traceMessages = True
-xtrace = if traceMessages then \a b -> b else trace
+traceMessages = False
+xtrace = if traceMessages then trace else \a b -> b
 
 data PredicateExpr = PredicateTerm NLabel NPort |
                      PredicateOr  [PredicateExpr] |
@@ -25,12 +26,12 @@ data PredicateExpr = PredicateTerm NLabel NPort |
     deriving (Eq)
 
 instance Show PredicateExpr where
-    show (PredicateTerm node port) = "(" ++ node ++ "," ++ port ++ ")"
-    show (PredicateOr l)  = "( " ++ (intercalate " OR " $ map show l) ++ " ) "
-    show (PredicateAnd l) = "( " ++ (intercalate " AND " $ map show l) ++ " ) "
-    show (PredicateNot e) = "(NOT " ++ (show e) ++ ")"
-    show PredicateTrue    = "True"
-    show PredicateFalse   = "False"
+    show (PredicateTerm node port) = "pred(" ++ node ++ "," ++ port ++ ")"
+    show (PredicateOr l)  = "or(" ++ (intercalate ","  $ map show l) ++ ")"
+    show (PredicateAnd l) = "and(" ++ (intercalate "," $ map show l) ++ ")"
+    show (PredicateNot e) = "not("++ (show e) ++ ")"
+    show PredicateTrue    = "true"
+    show PredicateFalse   = "false"
     show PredicateUndef   = "UNDEFINED"
 
 -- create an AND predicate, and do folding when possible
@@ -63,17 +64,20 @@ predicateOR x  = let x'   = xtrace ("OR args: " ++ (show x)) x
                   in ret'
  where
   doOR :: PredicateExpr -> [PredicateExpr] -> PredicateExpr
-  doOR result              []                  = result
-  doOR _                  (PredicateTrue:xs)   = PredicateTrue
-  doOR PredicateUndef     (PredicateFalse:xs)  = doOR PredicateFalse xs
-  doOR result             (PredicateFalse:xs)  = doOR result xs
-  doOR PredicateUndef     (x:xs)               = doOR (PredicateOr [x]) xs
-  doOR PredicateFalse     (x:xs)               = doOR x xs
-  doOR (PredicateOr [r0]) (x:xs)               = case x == r0 of
-                                                    True  -> doOR x xs
-                                                    False -> doOR (PredicateOr [x,r0]) xs
-  doOR (PredicateOr r) (x:xs)                  = doOR (PredicateOr (x:r)) xs
-  doOR r               l                       = error $ "This should not happen (OR)" ++ "result: --" ++ (show r) ++ "-- rest: --" ++ (show l) ++ "--"
+  doOR result                []                   = result
+  doOR _                     (PredicateTrue:xs)   = PredicateTrue
+  doOR PredicateUndef        (PredicateFalse:xs)  = doOR PredicateFalse xs
+  doOR result                (PredicateFalse:xs)  = doOR result xs
+  doOR PredicateUndef        (x:xs)               = doOR (PredicateOr [x]) xs
+  doOR PredicateFalse        (x:xs)               = doOR x xs
+  doOR r@(PredicateTerm _ _) (x:xs)               = case x == r of
+                                                    True -> doOR r xs
+                                                    False -> doOR (PredicateOr [r,x]) xs
+  doOR (PredicateOr [r0])    (x:xs)               = case x == r0 of
+                                                    True  -> doOR r0 xs
+                                                    False -> doOR (PredicateOr [r0,x]) xs
+  doOR (PredicateOr r) (x:xs)                     = doOR (PredicateOr (x:r)) xs
+  doOR r               l                          = error $ "This should not happen (OR) " ++ "result: --" ++ (show r) ++ "-- rest: --" ++ (show l) ++ "--"
 
 predicateNOT :: PredicateExpr -> PredicateExpr
 predicateNOT PredicateTrue = PredicateFalse
@@ -87,6 +91,32 @@ predOr  = predicateOR
 predNot = predicateNOT
 --predAnd = PredicateAnd
 --predOr  = PredicateOr
+
+-- evaluate (and hopefully simplify!) a predicate expression given a set of term
+-- assignments
+predEval :: PredicateExpr -> [((NLabel,NPort), PredicateExpr)] -> PredicateExpr
+-- replace terms when possible
+predEval oldexpr@(PredicateTerm l1 p1)  terms =
+    case lookup (l1,p1) terms of
+        Nothing   -> oldexpr
+        Just expr -> predEval expr terms -- (let's hope there are no cycles there :)
+-- constants
+predEval PredicateTrue _  = PredicateTrue
+predEval PredicateFalse _ = PredicateFalse
+-- fold
+predEval (PredicateAnd l) _ = predAnd l
+predEval (PredicateOr  l) _ = predOr  l
+predEval (PredicateNot p) _ = predNot p
+
+
+predGetTerms :: PredicateExpr -> [(NLabel,NPort)]
+predGetTerms PredicateTrue  = []
+predGetTerms PredicateFalse = []
+predGetTerms (PredicateTerm nlabel nport) = [(nlabel,nport)]
+predGetTerms (PredicateAnd l) = concat $ map predGetTerms l
+predGetTerms (PredicateOr  l) = concat $ map predGetTerms l
+predGetTerms (PredicateNot p) = predGetTerms p
+
 
 {-
  - silly parser for building predicate expressions
@@ -166,7 +196,7 @@ pred_parse = do
 parseStr :: String -> PredicateExpr
 parseStr input = case P.parse pred_parse "(top level)" input of
     Right x -> x
-    Left err -> error $ show err
+    Left err -> error $ "Could not parse: --" ++ input ++ "-- error:" ++ (show err)
 
 parseFile :: FilePath -> IO (PredicateExpr)
 parseFile fname = readFile fname >>= return . parseStr

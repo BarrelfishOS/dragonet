@@ -1,16 +1,18 @@
 {-# LANGUAGE QuasiQuotes #-}
 
---import qualified Data.Graph.Inductive as DGI
+import qualified Data.Graph.Inductive as DGI
 
 import Dragonet.Predicate
-import Dragonet.ProtocolGraph (PGraph, PGNode, PGEdge, Node(..), NPort, Edge(..), NOperator(..), ESAttribute(..))
-import Dragonet.ProtocolGraph.Utils (getFNodeByName, getFNodeByName')
+import Dragonet.ProtocolGraph (PGraph, PGNode, PGEdge, Node(..), NPort, Edge(..), NOperator(..), ESAttribute(..), NLabel)
+import Dragonet.ProtocolGraph.Utils (getFNodeByName, getFNodeByName', getPGNodeByName)
 import Dragonet.DotGenerator (toDot)
 import qualified Dragonet.Unicorn as U
 import qualified Util.GraphHelpers as GH
+import qualified Data.Graph.Inductive.Query.DFS as DFS
 
 import Control.Monad.State (State, MonadState, gets, modify, runState)
-import Control.Monad (Monad)
+import Control.Monad (Monad, mapM_)
+import Control.Exception (assert)
 import Control.Applicative ((<$>))
 import Data.Maybe
 import Data.List (intercalate)
@@ -22,13 +24,13 @@ import Text.RawString.QQ (r)
 import qualified Graphs.LPG as L
 import qualified Dragonet.Configuration as C
 
-import TestOptimization (lpgCfg)
+import Graphs.Cfg (lpgCfg)
 
 ------------------------------------------------
 -- helpers (to be eventually moved to other files)
 
-traceMessages = True
-xtrace = if traceMessages then \a b -> b else trace
+traceMessages = False
+xtrace = if traceMessages then trace else \a b -> b
 
 -- node type tests
 isONode :: PGNode -> Bool
@@ -67,6 +69,12 @@ initPredCompSt gr node = initPredCompSt_ {
     , predDst   = getFNodeByName gr node
 }
 
+-- equality based on label: same type and same label
+pgEqLabel :: PGNode -> PGNode -> Bool
+pgEqLabel (_, FNode {nLabel = x1}) (_, FNode {nLabel = x2}) = x1 == x2
+pgEqLabel (_, ONode {nLabel = x1}) (_, ONode {nLabel = x2}) = x1 == x2
+pgEqLabel _ _ = False
+
 pgEdgePort :: PGEdge -> NPort
 pgEdgePort pedge = case pedge of
     (_, _, ESpawn _ _) -> error "spawn edges do not have ports"
@@ -80,17 +88,16 @@ pgIsNormalEdge e = case e of
 
 pgIsSpawnEdge = not . pgIsNormalEdge
 
--- normal incomming edges (label of connected node, edge)
-pgInEdges :: PGraph -> PGNode -> [(PGNode, PGEdge)]
-pgInEdges gr dst = filter (pgIsNormalEdge . snd) $ GH.labLPre gr dst
+-- normal incomming dependencies (label of connected node, edge)
+pgDeps :: PGraph -> PGNode -> [(PGNode, PGEdge)]
+pgDeps gr dst = filter (pgIsNormalEdge . snd) $ GH.labLPre gr dst
 
--- normal incomming edges (label of connected node, edge)
-pgInSpawnEdges :: PGraph -> PGNode -> [(PGNode, PGEdge)]
-pgInSpawnEdges gr dst = filter (pgIsSpawnEdge . snd) $ GH.labLPre gr dst
+pgSpawnDeps :: PGraph -> PGNode -> [(PGNode, PGEdge)]
+pgSpawnDeps gr dst = filter (pgIsSpawnEdge . snd) $ GH.labLPre gr dst
 
 -- is the node a traget spawn edges
 pgIsSpawnTarget :: PGraph -> PGNode -> Bool
-pgIsSpawnTarget g n = not $ null $ pgInSpawnEdges g n
+pgIsSpawnTarget g n = not $ null $ pgSpawnDeps g n
 
 pgSpawnEdgePred :: PGEdge -> PredicateExpr
 pgSpawnEdgePred (_, _, ESpawn _ attrs) = expr
@@ -110,8 +117,43 @@ pgSpawnEdgePred (_, _, ESpawn _ attrs) = expr
 
 --predicates from incomming spawn edges (combine them with and)
 pgSpawnPreds :: PGraph -> PGNode -> PredicateExpr
-pgSpawnPreds pg n = predAnd $ map (pgSpawnEdgePred . snd) $ pgInSpawnEdges pg n
+pgSpawnPreds pg n = case length spawn_edges of
+    0 -> PredicateTrue
+    1 -> mapfn $ (spawn_edges !! 0)
+    otherwise -> predAnd $ map mapfn spawn_edges
+    where mapfn = (pgSpawnEdgePred . snd)
+          spawn_edges = pgSpawnDeps pg n
 
+-- domination (does not consider spawn edges)
+dominates :: PGraph -> (PGNode, NPort) -> PGNode -> Bool
+-- F-node
+dominates g (src, p) dst@(_, FNode {})
+    | ndeps == 0 = False -- nowhere to go, cannot find a connection to @dst
+    | ndeps > 1  = error $ "F-nodes have at most one incomming edge" ++ (nLabel $ snd dst)
+    -- ndeps == 1
+    | pgEqLabel dep_node src = (dep_port == p) -- same node
+    | otherwise = dominates g (src, p) dep_node
+    where deps = pgDeps g dst
+          ndeps = length deps
+          (dep_node,dep_edge) = deps !! 0
+          dep_port            = pgEdgePort dep_edge
+-- O-Node
+dominates g (src, p) dst@(_, ONode { nOperator = op}) = comb_op $ map check_fn deps
+    where deps = pgDeps g dst
+          check_fn :: (PGNode, PGEdge) -> Bool
+          check_fn (xnode, xedge)
+             | pgEqLabel xnode src && (pgEdgePort xedge) == p = True
+             | otherwise = dominates g (src, p) xnode
+          comb_op = case op of
+                     NOpAnd -> or   -- we only need one to dominate
+                     NOpOr  -> and  -- we need both to dominate
+                     otherwise -> error "NYI: not sure about the semantics. We might need to map with not"
+
+-- silly helper
+dominatesStr :: PGraph -> (String, String) -> String -> Bool
+dominatesStr g (src, psrc) dst = dominates g (src', psrc) dst'
+    where src' = getFNodeByName g src
+          dst' = getFNodeByName g dst
 
 -- Compute a predicate expression for flows (packets, whatever) that start from
 --  predSrc and reach predDst, in predGraph
@@ -121,30 +163,30 @@ computePred :: PredCompSt -> PredicateExpr
 --  predicate of pre(dst) AND predicate of src->pre(dst)
 computePred st@(PredCompSt { predDst = (_, FNode {}) } )
     -- we reached an entry node
-    | npredecessors == 0 = pgSpawnPreds gr dst
-    | npredecessors > 1  = error "F-nodes have at most one predecessor"
-    -- npredecessors == 1
-    | spawn_target       = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat is an OR?)
+    | ndeps == 0   = pgSpawnPreds gr dst
+    | ndeps > 1    = error $ "F-nodes have at most one incomming edge" ++ (nLabel $ snd dst)
+    -- ndeps == 1
+    | spawned = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat is an OR?)
     -- recurse
-    | otherwise          = expr
+    | otherwise   = expr
     where (dst', gr) = (predDst st, predGraph st)
-          dst = trace ("Visiting node: " ++ (nLabel $ snd dst')) dst'
+          dst = dst' --trace ("Visiting node: " ++ (nLabel $ snd dst')) dst'
           -- predecessors of destintation (going backwards)
           -- (only consider normal edges)
-          spawn_target   = pgIsSpawnTarget gr dst
-          predecessors   = pgInEdges gr dst
-          npredecessors  = length predecessors
-          (pnode, pedge) = predecessors !! 0
-          port           = pgEdgePort pedge
-          nlabel         = nLabel (snd pnode)
-          newst          = st { predDst = pnode, predInPort = Just port}
-          expr'          = computePred newst
-          term           = PredicateTerm nlabel port
-          expr           = case pnode of
-                             (_, ONode {})            -> expr'
-                             (_, FNode {nPorts = np}) -> if length np == 1
-                                                             then expr'
-                                                             else predAnd [expr', term]
+          spawned = pgIsSpawnTarget gr dst
+          deps    = pgDeps gr dst
+          ndeps   = length deps
+          (dn,de) = deps !! 0
+          port    = pgEdgePort de
+          nlabel  = nLabel (snd dn)
+          newst   = st { predDst = dn, predInPort = Just port}
+          expr'   = computePred newst
+          term    = PredicateTerm nlabel port
+          expr    = case dn of
+                      (_, ONode {})            -> expr'
+                      (_, FNode {nPorts = np}) -> if length np == 1
+                                                     then expr'
+                                                     else predAnd [expr', term]
 -- compute predicate of src->dst, where dst is an ONode:
 --  OP (e.g., AND) [ predicate of src -> pre ] for each pre in pre(dst)
 computePred st@(PredCompSt { predDst = (_, ONode { nOperator = op })} ) = expr
@@ -250,6 +292,10 @@ tryEmbedNode lpg_node = do
         Just prg_node' -> tryEmbedMatchedNode lpg_node prg_node'
     return ()
 
+
+simplifyLpgPredicate :: PredicateExpr -> EmbedExec (PredicateExpr)
+simplifyLpgPredicate x = error "NYI!"
+
 tryEmbedMatchedNode :: PGNode -> PGNode -> EmbedExec ()
 tryEmbedMatchedNode lpg_node prg_node = do
     (lpg, prg) <- gets $ \s -> (lpg s, prg s)
@@ -263,8 +309,9 @@ tryEmbedMatchedNode lpg_node prg_node = do
 
 doEmbedNode :: PGNode -> EmbedExec ()
 doEmbedNode lpg_node = do
+    -- TODO
     -- remove from LPG
-    -- add candidates
+    -- add new candidates
     return ()
 
 embedNodes :: EmbedExec ()
@@ -277,7 +324,6 @@ embedNodes = do
             tryEmbedNode x                          -- try to embed x
             embedNodes                              -- recurse
 
-
 -- print a path predicate
 prPathPredicate :: PGraph -> String -> IO (PredicateExpr)
 prPathPredicate g node = do
@@ -285,22 +331,31 @@ prPathPredicate g node = do
     putStrLn $"path to " ++ node  ++ " has a path predicate: " ++ (show x)
     return x
 
+-- is src reachable from dst
+isReachable :: PGraph -> NLabel -> NLabel -> Bool
+isReachable gr src dst = elem dst reachable
+    where src' = getPGNodeByName gr src
+          reachable = map (nLabel . snd) $ GH.labReachable gr src'
+
+-- notes connected to a given port
+pgPortNodes :: PGraph -> PGNode -> NPort -> [PGNode]
+pgPortNodes gr node port = ret
+    where ret = map fst $ filter fn $ GH.labLSucc gr node
+          fn (_, (_, _, Edge p)) = p == port
+          fn _ = False
+
+-- check whether a node is reachable fro a (node, port)
+isReachableFromPort :: PGraph -> (NLabel, NPort) -> NLabel -> Bool
+isReachableFromPort gr (sn,sp) dst = or $ map (\s -> isReachable gr s dst) sources
+    where sn' = getPGNodeByName gr sn
+          sources = map (nLabel . snd) $ pgPortNodes gr sn' sp
+
 main = do
-    --(lpgU,_) <- L.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
-    --let lpgC  = C.applyConfig lpgCfg lpgU
-    --writeFile "unicorn-tests/lpg.dot"  $ toDot lpgC
+    (lpgU,_) <- L.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
+    let lpgC  = C.applyConfig lpgCfg lpgU
+    writeFile "unicorn-tests/lpg-offload.dot"  $ toDot lpgC
+    pred <- prPathPredicate lpgC "TxL4UDPFillChecksum"
 
-    writeFile "unicorn-tests/g2.dot"  $ toDot g2
-    prPathPredicate g2 "X"
-
-    --lpg <- U.fileToGraph "unicorn-tests/offload-tx-lpg.unicorn"
-    --prg <- U.fileToGraph "unicorn-tests/offload-tx-prg.unicorn"
-    --let (emb, st) = runEmbeddingTx initEmbedSt { lpg = lpg, prg = prg }
-    --putStrLn (ppShow $ map (\(_,x) -> nLabel x) (embCandidates st))
-    --prPathPredicate lpg "TxEntry" "TxUdpChecksum"
-    --prPathPredicate prg "TxEntry" "TxUdpChecksum"
-    --prPathPredicate lpg "TxEthernetHdrFill" "TxOut"
-    --prPathPredicate lpg "TxUdpChecksum" "TxOut"
     return ()
 
 
@@ -341,7 +396,62 @@ main = do
 -- We need to use CTX1 for packets that match the context configuration and CTX0
 -- for everything else.
 
--- another test graph
+test_dominance :: (PGraph, (String, String), String, Bool) -> IO ()
+test_dominance  (g, src, dst, expect) = do
+    let res = dominatesStr g src dst
+    putStrLn $ "Checking: " ++ (show (src, dst, expect))
+    case (expect == res) of
+        True -> putStrLn "  =>OK!"
+        False -> putStrLn " =>FAIL!"
+
+g4_test_dominance :: IO ()
+g4_test_dominance = mapM_ test_dominance tests
+    where tests = [ (g4, ("A", "IDONTEXIST"), "X", False)
+                  , (g4, ("A", "a"), "X", True)
+                  , (g4, ("A", "a"), "O", True)
+                  ]
+
+g4 :: PGraph
+g4 = U.strToGraph [r|
+graph g4 {
+
+    node A { port a[X] }
+
+    node X {
+        port a[O_]
+        port b[Y]
+    }
+
+    node Y {
+        port a[O_]
+        port b[]
+    }
+
+    or O_ {
+        port true[O]
+        port false[] }
+
+    node O {}
+}
+|]
+
+g3 :: PGraph
+g3 = U.strToGraph [r|
+graph g2 {
+
+    node X  { }
+    or   X_ { port true[X]
+              port false[] }
+    node A  { port o[X_] }
+    node B  { port o[X_] }
+
+    node S1 {
+        spawn start A [predicate "pred(n1,p1)"]
+        spawn start B [predicate "pred(n1,p1)"]
+    }
+}
+|]
+
 g2 :: PGraph
 g2 = U.strToGraph [r|
 graph g2 {
@@ -359,7 +469,6 @@ graph g2 {
 }
 |]
 
--- a test graph
 g1 :: PGraph
 g1 = U.strToGraph [r|
 graph g1 {
