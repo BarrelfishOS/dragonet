@@ -367,7 +367,6 @@ static void setup_thread(LIBEVENT_THREAD *me) {
     // Initializing the thread level lock for dragonet data-structures
 //    me->dn_tstate.dn_lock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_init(&me->dn_tstate.dn_lock, NULL);
-
 #endif // DRAGONET
 }
 

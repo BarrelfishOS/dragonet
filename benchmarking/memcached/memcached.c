@@ -55,6 +55,8 @@
 #endif
 
 
+#include "dnet_interface.h"
+
 /*
  * forward declarations
  */
@@ -4398,7 +4400,8 @@ static int server_socket(const char *interface,
                */
             // Make sure that this is UDP protocol
             if (!IS_UDP(transport)) {
-                printf("Error: Non-UDP socket requested from dragonet\n");
+                printf("Error: Non-UDP socket requested from dragonet: %d\n",
+                        transport);
                 return 1;
             }
 
@@ -5015,7 +5018,7 @@ int main (int argc, char **argv) {
           "I:"  /* Max item size */
           "S"   /* Sasl ON */
           "F"   /* Disable flush_all */
-          "N"   /* Use Dragonet network stack */
+          "N:"   /* Use Dragonet network stack */
           "o:"  /* Extended generic options */
         ))) {
         switch (c) {
@@ -5031,11 +5034,23 @@ int main (int argc, char **argv) {
 
         case 'U':
             settings.udpport = atoi(optarg);
-            udp_specified = true;
+            if (settings.udpport > 0) {
+                printf("udp port specified is true and val is %"PRIu16"\n", settings.udpport);
+                udp_specified = true;
+                tcp_specified = false;
+            } else {
+                udp_specified = false;
+            }
             break;
         case 'p':
             settings.port = atoi(optarg);
-            tcp_specified = true;
+            if (settings.port > 0) {
+                printf("TCP port is true and val is %"PRIu16"\n", settings.port);
+                tcp_specified = true;
+            } else {
+                printf("marking tcp port as false, and value is %"PRIu16"\n", settings.port);
+                tcp_specified = false;
+            }
             break;
         case 's':
             settings.socketpath = optarg;
@@ -5048,7 +5063,9 @@ int main (int argc, char **argv) {
             break;
 #ifdef DRAGONET
         case 'N':
+
             use_dragonet_stack = 1;
+            use_dragonet_stack_portmap = strdup(optarg);
             break;
 #endif // DRAGONET
         case 'c':
@@ -5270,7 +5287,7 @@ int main (int argc, char **argv) {
             fprintf(stderr, "Illegal argument \"%c\"\n", c);
             return 1;
         }
-    }
+    } // end while: parsing cmdline options
 
 
 #ifdef DRAGONET
@@ -5282,6 +5299,9 @@ int main (int argc, char **argv) {
                    "only works with UDP. Please specify UDP port with -U option");
             exit(1);
         }
+
+
+    parse_client_list(use_dragonet_stack_portmap, settings.num_threads);
 
 #if 0
         // call init dragonet interface
@@ -5322,10 +5342,9 @@ int main (int argc, char **argv) {
         }
     }
 
-    if (tcp_specified && !udp_specified) {
-        settings.udpport = settings.port;
-    } else if (udp_specified && !tcp_specified) {
-        settings.port = settings.udpport;
+    if (tcp_specified && udp_specified) {
+        printf("ERROR: you can't have both TCP and UDP on at same time, please choose one\n");
+        exit(1);
     }
 
     if (maxcore != 0) {

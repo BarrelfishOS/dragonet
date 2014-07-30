@@ -35,11 +35,11 @@ endif
 
 BULKTRANSPORT_INCLUDES = "-I../../external/bulktransfer/include/"
 BARRELFISH_INCLUDES = "-I../../external/barrelfish/include/"
-BULKTRANSPORTLIB = $(shell find ../../external/bulktransfer/dist/ -name "libHSbulktransfer*" -exec dirname {} \;)
+BULKTRANSPORTLIB = $(shell find ../../external/bulktransfer/dist/ -name "libHSbulktransfer*" -exec dirname {}  \;)
 
 BARRELFISHLIB = $(shell find ../../external/barrelfish/dist/ -name "libHSbarrelfish*" -exec dirname {} \;)
 
-SHMCHANLIB = $(shell find ../../external/shmchan/dist/ -name "libHSshmchan*" -exec dirname {} \;)
+SHMCHANLIB = $(shell find ../../external/shmchan/dist/ -name "libHSshmchan*" -exec dirname {}  \;)
 
 DRAGONETAPP_INCLUDES = -I../../Dragonet/c_impl/include/ \
 		       -I../../Dragonet/lib/Dragonet/Pipelines/ \
@@ -54,11 +54,11 @@ memcached_debug_CFLAGS = @PROFILER_FLAGS@
 # Note: the order in which you link the library is important.  The apps library
 # needs to be first as it is using things from bulktransfer, shm and barrelfish
 # libraries.
-memcached_LDADD = -lrt \
-		    -L$(DRAGONETAPPLIB) -lHSapps-0.1.0.0 \
+memcached_LDADD = -L$(DRAGONETAPPLIB) -lHSapps-0.1.0.0 \
 		    -L$(BULKTRANSPORTLIB) -lHSbulktransfer-0.1.0.0 \
 		    -L$(SHMCHANLIB) -lHSshmchan-0.1.0.0 \
-		    -L$(BARRELFISHLIB) -lHSbarrelfish-0.1.0.0
+		    -L$(BARRELFISHLIB) -lHSbarrelfish-0.1.0.0 \
+		    -lrt
 
 memcached_DEPENDENCIES =
 memcached_debug_DEPENDENCIES =
