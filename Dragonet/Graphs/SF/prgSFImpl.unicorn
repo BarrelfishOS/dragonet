@@ -1,0 +1,18 @@
+graph SFPRG {
+    node RxQueue {
+        implementation TapRxQueue
+        attr "init"
+        attr "source"
+        attr "software"
+        spawn poll RxQueue
+        port out[]
+        port drop[]
+        port init[] }
+
+    node TxQueue {
+        implementation TapTxQueue
+        attr "init"
+        attr "sink"
+        attr "software" }
+}
+
