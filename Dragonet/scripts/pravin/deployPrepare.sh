@@ -1,12 +1,14 @@
 #!/bin/bash
 
+SCRIPTDIR="./scripts/pravin/"
 set -x
 set -e
-sudo killall llvm-cgen || true
+sudo killall stack-tap || true
 sudo killall bench-fancyecho || true
 sudo killall bench-echo || true
-sudo killall llvm-cgen-e10k || true
-sudo killall llvm-cgen-sf || true
+sudo killall stack-e10k || true
+sudo killall stack-sf || true
+rm -f some.log
 sudo bash -c 'echo 32 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages'
 sudo rm -rf /dev/shm/dragonet*
 sudo rm -rf /dev/shm/bulk_pool_*

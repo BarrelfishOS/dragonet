@@ -1,7 +1,9 @@
 #!/bin/bash
 
-./deployPrepare.sh
+SCRIPTDIR="./scripts/pravin/"
+${SCRIPTDIR}/deployPrepare.sh
 
-#sudo LD_PRELOAD=/lib/libciul.so.1.1.1 strace -fCrtT ./dist/build/llvm-cgen-sf/llvm-cgen-sf $@
-sudo LD_PRELOAD=/lib/libciul.so.1.1.1 ./dist/build/llvm-cgen-sf/llvm-cgen-sf $@
+APPNAME="stack-sf"
+#sudo LD_PRELOAD=/lib/libciul.so.1.1.1 strace -fCrtT ./dist/build/${APPNAME}/${APPNAME} $@
+sudo LD_PRELOAD=/lib/libciul.so.1.1.1 ./dist/build/${APPNAME}/${APPNAME} $@
 

@@ -1,4 +1,6 @@
 #!/bin/bash
+
+SCRIPTDIR="./scripts/pravin/"
 ulimit -n 65000
 # set the wait time after running the command
 waitTime=${1}

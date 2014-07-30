@@ -78,12 +78,35 @@ executable stack-tap
                         c_impl/e10k/include
     CC-options:         -Wall -Wno-unused-function
     x-helpers-files:    llvm-dyn-helpers.bc,
-                        llvm-helpers.bc
+                        llvm-helpers-tap.bc
     x-helpers-makefile: Makefile.llvm-helpers
     x-helpers-includes: c_impl/include,
                         lib/Dragonet/Pipelines,
                         ../external/bulktransfer/lib/include
     default-language:   Haskell2010
+
+
+executable stack-sf
+    hs-source-dirs:     ., stack
+    main-is:            stack-sf.hs
+    build-depends:      Dragonet, base, smtLib, fgl, containers, mtl, directory,
+                        llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
+                        transformers
+    ghc-options:        -threaded
+    C-sources:          stack/Runner/dyn_remote_client.c
+    Include-dirs:       c_impl/include,
+                        c_impl/e10k/include
+    CC-options:         -Wall -Wno-unused-function
+    x-helpers-files:    llvm-dyn-helpers.bc,
+                        llvm-helpers-sf.bc
+    x-helpers-makefile: Makefile.llvm-helpers
+    x-helpers-includes: c_impl/include,
+                        lib/Dragonet/Pipelines,
+                        ../external/bulktransfer/lib/include,
+                        ../openonload-201310-u2/src/include/
+    default-language:   Haskell2010
+
+
 
 executable generateCSkeleton
     main-is:            generateCSkeleton.hs

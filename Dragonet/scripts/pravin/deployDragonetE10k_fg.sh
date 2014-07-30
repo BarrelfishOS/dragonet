@@ -1,9 +1,10 @@
 #!/bin/bash
 
-./deployPrepare.sh
+SCRIPTDIR="./scripts/pravin/"
 
-
-#sudo strace -fCrtT ./dist/build/llvm-cgen-e10k/llvm-cgen-e10k $@
-sudo ./dist/build/llvm-cgen-e10k/llvm-cgen-e10k $@
+${SCRIPTDIR}/deployPrepare.sh
+APPNAME="stack-e10k"
+#sudo strace -fCrtT ./dist/build/${APPNAME}/${APPNAME} $@
+sudo ./dist/build/${APPNAME}/${APPNAME} $@
 
 # Initialized

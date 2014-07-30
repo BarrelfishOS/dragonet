@@ -220,7 +220,7 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
                         Just app = M.lookup aid $ ssApplications ss
                         agh = adGraphHandle app
                 createPL pl = do
-                    putStrLn $ "Creating local pipeline: " ++ pl
+                    putStrLn $ "Creating local pipeline: ##### " ++ pl
                     createPipeline plg stackname llvmH pl
             PLD.run ctx plConnect createPL $ addMuxIds plg
             putStrLn "updateGraph exit"

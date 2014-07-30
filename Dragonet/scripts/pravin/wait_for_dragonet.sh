@@ -1,5 +1,6 @@
 #!/bin/bash
 
+SCRIPTDIR="./scripts/pravin/"
 # the tool should get only one number as commandline arg
 if [ $# != 1 ] ; then
     echo "ERROR: This script expects only one argument, as number of HW queues"

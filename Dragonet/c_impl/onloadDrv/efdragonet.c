@@ -655,7 +655,10 @@ static void tap_init(struct state *state, char *dev_name)
 static uint64_t qstat[MAX_QUEUES] = {0, 0};
 //node_out_t do_pg__SFRxQueue(struct state *state, struct input *in)
 static
-node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
+node_out_t rx_queue(
+        //struct ctx_SFRxQueue *context,
+        struct ctx_TapRxQueue *context,
+        struct state *state, struct input **in, uint8_t qi)
 {
 
     assert(qi < MAX_QUEUES);
@@ -670,7 +673,7 @@ node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
             dprint("%s:%s:%d: [QID:%"PRIu8"], "
                 "initialization will be done on queue-0, returning\n",
               __FILE__,  __func__, __LINE__, qi);
-            return P_Queue_drop;
+            return P_RxQueue_drop;
         }
         tap_init(state, IFNAME);
 
@@ -684,8 +687,9 @@ node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
 
         // FIXME: enable following line.  I don't know why it generates compiliation error
         //declare_dragonet_initialized(DN_READY_FNAME, "SF driver started!\n");
+        *in = input_alloc();
         printf("Initialized\n");
-        return P_Queue_init;
+        return P_RxQueue_init;
     }
 
 
@@ -706,14 +710,16 @@ node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
             qi, q, q->queue_handle);
 
 
+    *in = input_alloc();
+
     // start working on RX space
-    pkt_prepend(in, in->space_before);
-    ssize_t len = onload_rx_wrapper(q, (uint8_t *)in->data, in->len);
+    pkt_prepend(*in, (*in)->space_before);
+    ssize_t len = onload_rx_wrapper(q, (uint8_t *)(*in)->data, (*in)->len);
     if (len == 0) {
         dprint("%s:%d: [QID: %"PRIu8"], [pktid:%d], pkt with zero len\n",
             __func__, __LINE__, qi, q->rx_pkts);
-        pkt_prepend(in, -in->len);
-        return P_Queue_drop;
+        pkt_append(*in, -((*in)->len - len));
+        return P_RxQueue_drop;
     }
 
     if (qstat[qi] % 1000 == 0) {
@@ -724,17 +730,19 @@ node_out_t rx_queue(struct state *state, struct input *in, uint8_t qi)
     }
     ++qstat[qi];
 
-    in->qid = qi;
-    pkt_append(in, -(in->len - len));
+    (*in)->qid = qi;
+    pkt_append(*in, -((*in)->len - len));
     dprint
     //printf
         ("%s:%d: [QID:%"PRIu8"], [pktid:%d]: ############## pkt received, data: %p, len:%zu\n",
-            __func__, __LINE__, qi, q->rx_pkts, in->data, len);
-    return P_Queue_out;
+            __func__, __LINE__, qi, q->rx_pkts, (*in)->data, len);
+    return P_RxQueue_out;
 }
 
 //node_out_t do_pg__SFTxQueue(struct state *state, struct input *in)
-node_out_t tx_queue(struct state *state, struct input *in, uint8_t qi)
+node_out_t tx_queue(
+        struct ctx_TapTxQueue *context,
+        struct state *state, struct input **in, uint8_t qi)
 {
     struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
     struct dragonet_sf_queue *q;
@@ -752,28 +760,34 @@ node_out_t tx_queue(struct state *state, struct input *in, uint8_t qi)
             __FILE__,  __func__, __LINE__, qi, q->tx_pkts,
             state->tap_handler, sf_driver->sfif,
             &sf_driver->queues[0], sf_driver->queues[0].queue_handle,
-            qi, q, q->queue_handle, in->data, in->len);
+            qi, q, q->queue_handle, (*in)->data, (*in)->len);
 
-    onload_tx_wrapper(q, in->data, in->len);
+    onload_tx_wrapper(q, (*in)->data, (*in)->len);
 
     dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d]:"
             "##############  packet sent, data: %p, len:%"PRIu32"\n",
-            __FILE__, __func__, __LINE__, qi, q->tx_pkts, in->data, in->len);
-    return 0;
+            __FILE__, __func__, __LINE__, qi, q->tx_pkts, (*in)->data, (*in)->len);
+    //return 0;
+    return P_RxQueue_out;
 }
 
 
-node_out_t do_pg__TapTxQueue(struct state *state, struct input *in) {
+#if 0
+node_out_t do_pg__TapTxQueue(struct ctx_TapTxQueue *context,
+        struct state *state, struct input **in)
+{
     dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    return  tx_queue(state, in, 0);
+    return  tx_queue(state, *in, 0);
 }
 
 
-node_out_t do_pg__TapRxQueue(struct state *state, struct input *in) {
+node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context,
+        struct state *state, struct input **in)
+{
     dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    return  rx_queue(state, in, 0);
+    return  rx_queue(state, *in, 0);
 }
-
+#endif // 0
 
 
 // ############################ from e10kControl #########################
@@ -844,54 +858,84 @@ bool sf_ctrl_5tuple_set(struct state *state,
 
 // ################# from impl_sf.c ########################
 
-//node_out_t do_pg__RxE10kQueue000(struct state *state, struct input *in)
-node_out_t do_pg__RxE10kQueue000(struct state *state, struct input *in)
+//node_out_t do_pg__SFRxQueue000(struct state *state, struct input *in)
+node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context,
+//node_out_t do_pg__SFRxQueue(struct ctx_SFRxQueue *context,
+        struct state *state, struct input **in)
 {
     dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    return rx_queue(state, in, 0);
+    // Respawn this node
+   // spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
+    spawn(context, NULL, S_TapRxQueue_poll, SPAWNPRIO_LOW);
+
+    return rx_queue(context, state, in, 0);
+    //return P_RxQueue_out;
+    //return P_RxQueue_init;
 }
 
-node_out_t do_pg__RxE10kQueue001(struct state *state, struct input *in)
+#if 0
+node_out_t do_pg__SFRxQueue001(struct ctx_SFRxQueue *context,
+        struct state *state, struct input *in)
 {
     dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    return rx_queue(state, in, 1);
+    // Respawn this node
+    spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
+    return rx_queue(context, state, in, 1);
 }
 
-node_out_t do_pg__RxE10kQueue002(struct state *state, struct input *in)
+node_out_t do_pg__SFRxQueue002(struct ctx_SFRxQueue *context,
+        struct state *state, struct input *in)
 {
     dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    return rx_queue(state, in, 2);
+    // Respawn this node
+    spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
+    return rx_queue(context, state, in, 2);
 }
 
-node_out_t do_pg__RxE10kQueue003(struct state *state, struct input *in)
+node_out_t do_pg__SFRxQueue003(struct ctx_SFRxQueue *context,
+        struct state *state, struct input *in)
 {
     dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    return rx_queue(state, in, 3);
+    // Respawn this node
+    spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
+    return rx_queue(context, state, in, 3);
 }
+#endif // 0
 
-
-node_out_t do_pg__TxE10kQueue000(struct state *state, struct input *in)
+node_out_t do_pg__TapTxQueue(struct ctx_TapTxQueue *context,
+//node_out_t do_pg__SFTxQueue(struct ctx_SFRxQueue *context,
+        struct state *state, struct input **in)
 {
     dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    return tx_queue(state, in, 0);
+    return tx_queue(context, state, in, 0);
 }
 
-node_out_t do_pg__TxE10kQueue001(struct state *state, struct input *in)
+#if 0
+node_out_t do_pg__SFTxQueue001(struct ctx_SFRxQueue *context,
+        struct state *state, struct input *in)
 {
     dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    return tx_queue(state, in, 1);
+    // Respawn this node
+    spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
+    return tx_queue(context, state, in, 1);
 }
 
-node_out_t do_pg__TxE10kQueue002(struct state *state, struct input *in)
+node_out_t do_pg__SFTxQueue002(struct ctx_SFRxQueue *context,
+        struct state *state, struct input *in)
 {
     dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    return tx_queue(state, in, 2);
+    // Respawn this node
+    spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
+    return tx_queue(context, state, in, 2);
 }
 
-node_out_t do_pg__TxE10kQueue003(struct state *state, struct input *in)
+node_out_t do_pg__SFTxQueue003(struct ctx_SFRxQueue *context,
+        struct state *state, struct input *in)
 {
     dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    return tx_queue(state, in, 3);
+    // Respawn this node
+    spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
+    return tx_queue(context, state, in, 3);
 }
 
-
+#endif // 0

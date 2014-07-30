@@ -12,7 +12,7 @@ main = do
     (nQ, apps) <- parseDNArgs
     putStrLn $ "Running hardware queues: " ++ show nQ
     putStrLn $ "Running with app slots: " ++ show apps
-    let helpers = "llvm-helpers"
+    let helpers = "llvm-helpers-tap"
         pstate = INC.policyStateInit nQ () dummyHwPolicy
     runStackParsed apps pg4tap pstate dummyHwAction helpers
 

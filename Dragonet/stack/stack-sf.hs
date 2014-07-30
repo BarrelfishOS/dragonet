@@ -4,7 +4,8 @@ import qualified Dragonet.Pipelines as PL
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.ProtocolGraph.Utils as PGU
 
-import qualified Graphs.Tap as Tap
+import qualified Graphs.SF as SF
+--import qualified Graphs.Tap as Tap
 
 import Stack
 
@@ -13,7 +14,7 @@ import Stack
 costFunction :: StackState -> O.CostFunction Int
 costFunction _ _ = 1
 
--- TAP config is trivial
+-- SF config is trivial
 oracle :: PG.PGraph -> StackState -> [(String,C.Configuration)]
 oracle _ _ = [("default",[])]
 
@@ -31,6 +32,7 @@ plAssignSplit _ _ (_,n)
 
 main = do
     -- Prepare graphs and so on
-    prgH <- Tap.graphH
-    instantiate prgH "llvm-helpers-tap" costFunction oracle implCfg plAssignSplit
+    prgH <- SF.graphH
+    --prgH <- Tap.graphH
+    instantiate prgH "llvm-helpers-sf" costFunction oracle implCfg plAssignSplit
 

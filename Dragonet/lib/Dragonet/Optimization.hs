@@ -124,7 +124,9 @@ cleanupGraph g
         badSnks = filter (not . hasAttr "sink" . snd) snks
         badNodes = L.nub $ map fst $ badSrcs ++ badSnks
         g' = DGI.delNodes badNodes g
-        onlySpawnEs = all isSpawnE
+        --onlySpawnEs = all isSpawnE
+        onlySpawnEs = null
             where isSpawnE (_,PG.ESpawn {}) = True
                   isSpawnE _ = False
+
 

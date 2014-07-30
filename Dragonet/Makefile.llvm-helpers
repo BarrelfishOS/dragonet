@@ -63,7 +63,7 @@ cfiles_cimpl      = $(CIMPL_DIR)/impl_arp.c \
                     $(CIMPL_DIR)/state.c \
                     $(CIMPL_DIR)/support/Ethernet.c \
                     $(CIMPL_DIR)/support/Icmp.c
- 
+
 
 cfiles_cimpl_tap  = $(CIMPL_DIR)/impl_tap.c
 cfiles_cimpl_e10k = $(CIMPL_DIR)/impl_e10k.c \
@@ -71,17 +71,16 @@ cfiles_cimpl_e10k = $(CIMPL_DIR)/impl_e10k.c \
                     $(CIMPL_DIR)/e10k/e10k_phy.c \
                     $(CIMPL_DIR)/e10k/linux_hugepage.c \
                     $(CIMPL_DIR)/e10k/linux_pci_uio.c
-cfiles_cimpl_sf =   $(CIMPL_DIR)/onloadDrv/sfWrapper.c \
-                    $(CIMPL_DIR)/onloadDrv/efdragonet.c \
+cfiles_cimpl_sf =   $(CIMPL_DIR)/onloadDrv/efdragonet.c \
                     $(CIMPL_DIR)/onloadDrv/efvi_sfw.c
 
-ofiles_sf_related =  efdragonet.o efvi_sfw.o
+#ofiles_sf_related =  efdragonet.o efvi_sfw.o
 
 bcfiles_cimpl      = $(call bcmap_cimpl, $(cfiles_cimpl))
 bcfiles_cimpl_tap  = $(call bcmap_cimpl, $(cfiles_cimpl_tap))
 bcfiles_cimpl_e10k = $(call bcmap_cimpl, $(cfiles_cimpl_e10k))
 bcfiles_cimpl_sf   = $(call bcmap_cimpl, $(cfiles_cimpl_sf))
-ofiles_sf_helper   = $(call omap_sf_hack, $(ofiles_sf_related))
+#ofiles_sf_helper   = $(call omap_sf_hack, $(ofiles_sf_related))
 
 
 $(BUILD_DIR)/c_impl/%.bc : $(CIMPL_DIR)/%.c
@@ -102,19 +101,19 @@ $(BUILD_DIR)/llvm-c_impl-e10k.bc: $(bcfiles_cimpl_e10k)
 $(BUILD_DIR)/llvm-c_impl-sf.bc: $(bcfiles_cimpl_sf)
 	$(LLVM_LINK) $^ -o $@
 
-efdragonet.o: sf_onloadLibs
-	cp ../openonload-201310-u2/build/gnu_x86_64/tests/ef_vi/efdragonet.o     ./dist/build/c_impl/onloadDrv/
-
-efvi_sfw.o: sf_onloadLibs
-	cp ../openonload-201310-u2/build/gnu_x86_64/tests/ef_vi/efvi_sfw.o    ./dist/build/c_impl/onloadDrv/
-
-sf_onloadLibs:
-	# cd ../openonload-201310-u2/ && ./scripts/onload_build --user
+#efdragonet.o: sf_onloadLibs
+#	cp ../openonload-201310-u2/build/gnu_x86_64/tests/ef_vi/efdragonet.o     ./dist/build/c_impl/onloadDrv/
+#
+#efvi_sfw.o: sf_onloadLibs
+#	cp ../openonload-201310-u2/build/gnu_x86_64/tests/ef_vi/efvi_sfw.o    ./dist/build/c_impl/onloadDrv/
+#
+#sf_onloadLibs:
+#	# cd ../openonload-201310-u2/ && ./scripts/onload_build --user
 
 
 helpers_common = $(BUILD_DIR)/llvm-c_impl.bc  $(BUILD_DIR)/llvm-lib.bc $(BUILD_DIR)/llvm-external.bc
 
-$(BUILD_DIR)/llvm-helpers.bc: $(BUILD_DIR)/llvm-c_impl-tap.bc $(helpers_common)
+$(BUILD_DIR)/llvm-helpers-tap.bc: $(BUILD_DIR)/llvm-c_impl-tap.bc $(helpers_common)
 	$(LLVM_LINK) $^ -o $@
 
 $(BUILD_DIR)/llvm-helpers-e10k.bc: $(BUILD_DIR)/llvm-c_impl-e10k.bc $(helpers_common)

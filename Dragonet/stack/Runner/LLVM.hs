@@ -1577,6 +1577,7 @@ makeNodeFunsInternal m = m {
 runPipeline :: PL.PLGraph -> String -> String -> PLI.PipelineImpl -> IO ()
 runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
     putStrLn $ "Initializing pipeline " ++ mname
+    putStrLn $ "Using llvm helpers file " ++ llvm_helpers_filename
     writeFile ("pipeline-" ++ mname ++ ".dot") $ toDot pgraph
     LLVM.Ctx.withContext $ \ctx ->
         liftError $ LLVM.Mod.withModuleFromBitcode ctx llvm_helpers $ \mod2 -> do
@@ -1615,5 +1616,6 @@ runPipeline plg stackname helpers pli = fmap (const ()) $ forkOS $ do
         pgraph = PL.plGraph pl
         mname = PL.plLabel pl
         -- LLVM file with helper utilities
-        llvm_helpers = LLVM.Mod.File $ "dist/build/" ++ helpers ++ ".bc"
+        llvm_helpers = LLVM.Mod.File llvm_helpers_filename
+        llvm_helpers_filename = "dist/build/" ++ helpers ++ ".bc"
 

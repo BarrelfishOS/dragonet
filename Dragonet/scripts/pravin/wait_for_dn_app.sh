@@ -1,5 +1,7 @@
 #!/bin/bash
 
+SCRIPTDIR="./scripts/pravin/"
+
 # the tool should get only one number as commandline arg
 if [ $# != 2 ] ; then
     echo "ERROR: This script expects only one argument, as number of application slots"
@@ -15,7 +17,7 @@ echo "Waiting for ${hwQueue} hardware queues and ${appSlots} application slots"
 set +x
 set -e
 
-./wait_for_dragonet.sh ${hwQueue}
+${SCRIPTDIR}/wait_for_dragonet.sh ${hwQueue}
 
 evCount=1
 while true;

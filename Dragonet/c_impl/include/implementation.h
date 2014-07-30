@@ -33,7 +33,7 @@ get_tsc(void) {
 //#define MYDEBUG     1
 #ifdef MYDEBUG
 //#define dprint(x...)    do { printf("TID:%d:Cycle:%"PRIu64":", (int)pthread_self(), get_tsc()); printf(":debug:" x); } while(0)
-#define dprint(x...)    do { printf("TID:%d:", (int)pthread_self()); printf(":debug:" x); } while(0)
+#define dprint(x...)    do { printf("TID:%d:%s:%s:%d: ", (int)pthread_self(), __FILE__, __FUNCTION__, __LINE__); printf(":" x); } while(0)
 #else
 #define dprint(x...)   ((void)0)
 #endif // MYDEBUG
