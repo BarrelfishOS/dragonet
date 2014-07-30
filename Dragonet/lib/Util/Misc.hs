@@ -1,6 +1,7 @@
 module Util.Misc (
     splitBy, splitByFirst, joinBy, minusL, partListBy,
     fst3, snd3, thd3,
+    mapT2
 ) where
 
 import qualified Data.List as L
@@ -52,4 +53,7 @@ snd3 (_,a,_) = a
 
 thd3 :: (a,b,c) -> c
 thd3 (_,_,a) = a
+
+mapT2 :: (a -> b) -> (a,a) -> (b,b)
+mapT2 f (a,b) = (f a, f b)
 

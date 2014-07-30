@@ -12,16 +12,18 @@ import qualified SMTLib2 as SMT
 import qualified SMTLib2.Core as SMTC
 import qualified SMTLib2.BitVector as SMTBV
 
+import Control.Monad (forM)
 import Data.Functor ((<$>))
 import qualified Data.List as L
 import Data.Maybe
 import Dragonet.Implementation.IPv4 as IP4
 import Data.String (fromString)
+import Util.Misc (mapT2)
 
 import Graphs.Helpers
 
 configLPGUDPSockets :: PG.ConfFunction
-configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
+configLPGUDPSockets _ inE outE cfg = concat <$> mapM addEndpoint tuples
     where
         PG.CVList tuples = cfg
         hasL l n = l == PG.nLabel n
@@ -33,46 +35,73 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
             Just x  -> x
             Nothing -> fromJust $ findN outE "TxL4UDPInitiateResponse"
         Just cN  = findN outE "RxL4UDPUnusedPort"
-        addSocket (PG.CVTuple [
-                    PG.CVInt sid,
+
+        addSocket (inN,inP) outN (PG.CVInt sid) = do
+            -- Create ToSocket Node
+            (tsN,_) <- C.confMNewNode $
+                        PG.nAttrsAdd [
+                            PG.NAttrCustom "sink",
+                            PG.NAttrCustom $ "tosocket=" ++ show sid] $
+                        PG.baseFNode ("ToSocket" ++ show sid) ["out","drop"]
+            -- Create FromSocket Node
+            (fsN,_) <- C.confMNewNode $
+                        PG.nAttrsAdd [
+                            PG.NAttrCustom "source",
+                            PG.NAttrCustom $ "fromsocket=" ++ show sid] $
+                        PG.baseFNode ("FromSocket" ++ show sid) ["out"]
+            return [(inN,tsN,PG.Edge inP),
+                    (fsN,fsN,PG.ESpawn "send" []),
+                    (fsN,outN,PG.Edge "out")]
+
+        addEndpoint (PG.CVTuple [
+                    PG.CVList sids,
                     PG.CVMaybe msIP,
                     PG.CVMaybe msPort,
                     PG.CVMaybe mdIP,
                     PG.CVMaybe mdPort]) = do
+            -- Filter/demultiplexing node
             (dxN,_) <- C.confMNewNode $ addFAttrs $ addFSemantics $
                         PG.baseFNode filterS bports
-            (fsN,_) <- C.confMNewNode $
-                        PG.nAttrsAdd [PG.NAttrCustom "source",
-                            PG.NAttrCustom $ "fromsocket=" ++ show sid] $
-                        PG.baseFNode ("FromSocket" ++ show sid) ["out"]
-            (tsN,_) <- C.confMNewNode $
-                        PG.nAttrsAdd [PG.NAttrCustom "sink",
-                            PG.NAttrCustom $ "tosocket=" ++ show sid] $
-                        PG.baseFNode ("ToSocket" ++ show sid) ["out","drop"]
-            (vsN,_) <- C.confMNewNode $
-                        PG.baseONode ("RxValidSocket" ++ show sid)
+            -- Endpoint packet valid node
+            (veN,_) <- C.confMNewNode $
+                        PG.baseONode (filterS ++ "Valid")
                         bports PG.NOpAnd
+            -- Add socket nodes
+            sEdges <- case sids of
+                [] -> error "Endpoint without sockets"
+                [sid] -> addSocket (veN,"true") irN sid
+                _ -> do
+                    let sports = map (\(PG.CVInt i) -> show i) sids
+                    -- If we have more than one socket, add balance node
+                    (bN,_) <- C.confMNewNode $
+                        PG.nAttrAdd (PG.NAttrCustom "loadbalance") $
+                        PG.baseFNode (filterS ++ "Balance") sports
+                    -- Add sockets
+                    es <- forM sids $ \s@(PG.CVInt i) ->
+                        addSocket (bN,show i) irN s
+                    return $ concat es ++ [(veN,bN,PG.Edge "true")]
             let dfEdges = map (\(a,b,p) -> (a,b,PG.Edge p)) [
                     (vhN,dxN,"true"),  -- RxL4UDPValidHeaderLength -> Filter
-                    (dxN,vsN,"false"), -- Filter -> ValidSocket
-                    (dxN,vsN,"true"),  -- Filter -> ValidSocket
+                    (dxN,veN,"false"), -- Filter -> ValidSocket
+                    (dxN,veN,"true"),  -- Filter -> ValidSocket
                     (dxN,cN,"false"),  -- Filter -> Collect
                     (dxN,cN,"true"),   -- Filter -> Collect
-                    (vN, vsN,"false"), -- RxL4UDPValid -> ValidSocket
-                    (vN, vsN,"true"),  -- RxL4UDPValid -> ValidSocket
-                    (vsN,tsN,"true"),  -- ValidSocket -> ToSocket
-                    (fsN,irN,"out")]   -- FromSocket -> TxL4UDPInitiateResponse
-                spawnEdges = [(fsN,fsN,PG.ESpawn "send" [])]
-            return $ dfEdges ++ spawnEdges
+                    (vN, veN,"false"), -- RxL4UDPValid -> ValidSocket
+                    (vN, veN,"true")]  -- RxL4UDPValid -> ValidSocket
+            return $ dfEdges ++ sEdges
             where
-                tuple@(_,msIP',msP,mdIP',mdP) =
-                    (sid, uncvi <$> msIP, uncvi <$> msPort,
-                        uncvi <$> mdIP, uncvi <$> mdPort)
-                uncvi (PG.CVInt i) = i
-                mbIP = maybe "*" (IP4.ipToString . fromIntegral . uncvi)
-                mbPort = maybe "*" (show . uncvi)
-                filterS = "RxL4UDP(" ++ mbIP msIP ++ ":" ++ mbPort msPort
-                            ++ " / " ++ mbIP mdIP ++ ":" ++ mbPort mdPort ++ ")"
+                bports = ["false","true"]
+                uncvi (PG.CVInt i) = fromIntegral i
+                -- Parse IP and Ports
+                (msIP',mdIP') = mapT2 (uncvi <$>) (msIP, mdIP)
+                (msP,mdP) = mapT2 (uncvi <$>) (msPort, mdPort)
+                -- Build Label
+                mbPort = maybe "*" show
+                mbIP = maybe "*" (IP4.ipToString . fromIntegral)
+                filterS = "RxL4UDP(" ++ mbIP msIP' ++ ":" ++ mbPort msP
+                            ++ " / " ++ mbIP mdIP' ++ ":" ++ mbPort mdP ++ ")"
+
+                -- Build filter Semantics
                 ipSems n i = SMTBV.bv i 32 SMTC.===
                             SMT.app
                                 (fromString $ "IP4." ++ n)
@@ -81,14 +110,18 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
                             SMT.app
                                 (fromString $ "UDP." ++ n)
                                 [SMT.app "pkt" []]
+                --   true port semantics
                 tSems = foldl1 SMTC.and $ catMaybes [
                         ipSems "src" <$> msIP',
                         portSems "src" <$> msP,
                         ipSems "dst" <$> mdIP',
                         portSems "dst" <$> mdP]
+                --   false port semantics
                 fSems = SMTC.not tSems
+                -- Add semantics to filter node
                 addFSemantics n = n {
                     PG.nSemantics = [("true",tSems),("false",fSems) ] }
+                -- Add attributes to filter node
                 fAttrs = map PG.NAttrCustom $ catMaybes [
                     Just "udpdemux",
                     do { i <- msIP ; return $ "srcip=" ++ show i },
@@ -97,7 +130,6 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addSocket tuples
                     do { i <- mdP ; return $ "dstport=" ++ show i }]
                 addFAttrs n = PG.nAttrsAdd fAttrs n
 
-                bports = ["false","true"]
 
 addCfgFun n
     | l == "RxL4UDPCUDPSockets" = configLPGUDPSockets

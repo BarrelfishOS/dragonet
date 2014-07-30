@@ -30,13 +30,16 @@ import qualified Control.Concurrent.STM as STM
 import Control.Concurrent (threadDelay)
 import qualified Data.Map as M
 
+type EndpointId = Int
+
 data AppDesc = AppDesc {
     adLabel :: String,
     adGraphHandle :: PLI.GraphHandle
 }
 
 data SocketDesc = SocketDesc {
-    sdAppId :: PLA.AppId
+    sdAppId :: PLA.AppId,
+    sdEpId  :: EndpointId
 }
 
 data EndpointDesc = EndpointUDPIPv4 {
@@ -50,10 +53,11 @@ data EndpointDesc = EndpointUDPIPv4 {
 data StackState = StackState {
     ssNextAppId :: PLA.AppId,
     ssNextSocketId :: PLA.SocketId,
+    ssNextEndpointId :: EndpointId,
     ssApplications :: M.Map PLA.AppId AppDesc,
     ssAppChans :: M.Map PLA.ChanHandle PLA.AppId,
     ssSockets :: M.Map PLA.SocketId SocketDesc,
-    ssEndpoints :: [EndpointDesc],
+    ssEndpoints :: M.Map EndpointId EndpointDesc,
     ssUpdateGraphs :: STM.TVar StackState -> IO (),
     ssVersion :: Int
 }
@@ -137,6 +141,7 @@ eventHandler sstv ch (PLA.EvSocketUDPListen (ip,port)) = do
         -- TODO: check overlapping
         let Just aid = M.lookup ch $ ssAppChans ss
             sid = ssNextSocketId ss
+            eid = ssNextEndpointId ss
             ep = EndpointUDPIPv4 {
                     edSockets = [sid],
                     edIP4Src = Nothing,
@@ -144,17 +149,37 @@ eventHandler sstv ch (PLA.EvSocketUDPListen (ip,port)) = do
                     edUDPSrc = Nothing,
                     edUDPDst = if port == 0 then Nothing else Just port
                 }
-            sd = SocketDesc {
-                    sdAppId = aid
-                }
+            sd = SocketDesc { sdAppId = aid, sdEpId = eid }
             ss' = ss {
                 ssNextSocketId = sid + 1,
+                ssNextEndpointId = eid + 1,
                 ssSockets = M.insert sid sd $ ssSockets ss,
-                ssEndpoints = ssEndpoints ss ++ [ep]
+                ssEndpoints = M.insert eid ep $ ssEndpoints ss
             }
         STM.writeTVar sstv $ ss'
         return (sid,ss')
     putStrLn $ "SocketUDPListen p=" ++ show (ip,port) ++ " -> " ++ show sid
+    PLA.sendMessage ch $ PLA.MsgSocketInfo sid
+    ssUpdateGraphs ss sstv
+
+eventHandler sstv ch (PLA.EvSocketSpan oldsid) = do
+    (sid,ss) <- STM.atomically $ do
+        ss <- STM.readTVar sstv
+        let Just aid = M.lookup ch $ ssAppChans ss
+            sid = ssNextSocketId ss
+            Just oldsd = M.lookup oldsid $ ssSockets ss
+            eid = sdEpId oldsd
+            Just ep = M.lookup eid $ ssEndpoints ss
+            sd = SocketDesc { sdAppId = aid, sdEpId = eid }
+            ep' = ep { edSockets = edSockets ep ++ [sid] }
+            ss' = ss {
+                ssNextSocketId = sid + 1,
+                ssSockets = M.insert sid sd $ ssSockets ss,
+                ssEndpoints = M.insert eid ep' $ ssEndpoints ss
+            }
+        STM.writeTVar sstv $ ss'
+        return (sid,ss')
+    putStrLn $ "SocketSpan existing=" ++ show oldsid ++ " -> " ++ show sid
     PLA.sendMessage ch $ PLA.MsgSocketInfo sid
     ssUpdateGraphs ss sstv
 
@@ -166,14 +191,14 @@ eventHandler sstv ch ev = do
 -- Main
 lpgConfig ss = [("RxL4UDPCUDPSockets", PG.CVList $ cUdpSockets)]
     where
-        cUdpSockets = map (PG.CVTuple . cUdpSocket) $ ssEndpoints ss
-        cUdpSocket ed = [ PG.CVInt $ fromIntegral sid,
+        cUdpSockets = map (PG.CVTuple . cUdpSocket) $ M.elems $ ssEndpoints ss
+        cUdpSocket ed = [ PG.CVList $ map (PG.CVInt . fromIntegral) sids,
                           PG.CVMaybe msIP,
                           PG.CVMaybe msPort,
                           PG.CVMaybe mdIP,
                           PG.CVMaybe mdPort]
             where
-                [sid] = edSockets ed
+                sids = edSockets ed
                 msIP = PG.CVInt <$> fromIntegral <$> edIP4Src ed
                 mdIP = PG.CVInt <$> fromIntegral <$> edIP4Dst ed
                 msPort = PG.CVInt <$> fromIntegral <$> edUDPSrc ed
@@ -228,10 +253,11 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
         initSS = StackState {
                 ssNextAppId = 1,
                 ssNextSocketId = 1,
+                ssNextEndpointId = 1,
                 ssApplications = M.empty,
                 ssAppChans = M.empty,
                 ssSockets = M.empty,
-                ssEndpoints = [],
+                ssEndpoints = M.empty,
                 ssUpdateGraphs = updateGraph,
                 ssVersion = 0
             }
