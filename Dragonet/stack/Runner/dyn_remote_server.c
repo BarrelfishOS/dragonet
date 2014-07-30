@@ -241,6 +241,12 @@ void dynrs_action(struct dynr_server *server,
                     a->data.mknode_udpdemux.d_port);
             node_add(server, node_create(a->data.mknode_udpdemux.node, n));
             break;
+        case DYNR_ACT_MKNODE_BALANCE:
+            dprintf("dynrs_action: DYNR_ACT_MKNODE_BALANCE\n");
+            assert(node_get(server, a->data.mknode_balance.node) == NULL);
+            n = dyn_mknode_balance(g, a->data.mknode_balance.name);
+            node_add(server, node_create(a->data.mknode_balance.node, n));
+            break;
 
         case DYNR_ACT_MKSPAWN:
             dprintf("dynrs_action: DYNR_ACT_MKSPAWN\n");

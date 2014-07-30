@@ -17,6 +17,7 @@ enum dynamic_node_type {
     DYN_TOSOCKET,
     DYN_FROMSOCKET,
     DYN_UDPDEMUX,
+    DYN_BALANCE,
 };
 
 enum dynamic_node_op {
@@ -72,6 +73,9 @@ struct dynamic_node {
             uint16_t s_port;
             uint16_t d_port;
         } udpdemux;
+        struct {
+            node_out_t next_port;
+        } balance;
     } tdata;
 
     /** Linked list of nodes in graph */
@@ -176,6 +180,8 @@ struct dynamic_node *dyn_mknode_udpdemux(struct dynamic_graph *graph,
                                          uint16_t              s_port,
                                          uint32_t              d_ip,
                                          uint16_t              d_port);
+struct dynamic_node *dyn_mknode_balance(struct dynamic_graph *graph,
+                                        const char           *name);
 
 struct dynamic_spawn *dyn_mkspawn(struct dynamic_graph *graph,
                                   struct dynamic_node *node);

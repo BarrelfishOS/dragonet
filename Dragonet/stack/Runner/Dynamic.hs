@@ -67,6 +67,7 @@ buildDynNode' ds l
     | isFS = mkFromSocketNode lbl fsId
     | isTS = mkToSocketNode lbl tsId
     | isUDPDemux = mkUDPDemuxNode lbl udpSIP udpSP udpDIP udpDP
+    | isBalance = mkBalanceNode lbl
     | PG.FNode {} <- l = mkFNode lbl ifun
     | PG.ONode { PG.nOperator = op } <- l = mkONode lbl op
     | otherwise = error "Unsupported node type"
@@ -100,6 +101,7 @@ buildDynNode' ds l
         Just tsId = read <$> mbTS
 
         isUDPDemux = PG.nAttrElem (PG.NAttrCustom "udpdemux") l
+        isBalance = PG.nAttrElem (PG.NAttrCustom "loadbalance") l
         udpSIP = maybe 0 read $ PGU.getPGNAttr l "srcip"
         udpDIP = maybe 0 read $ PGU.getPGNAttr l "dstip"
         udpSP = maybe 0 read $ PGU.getPGNAttr l "srcport"
@@ -506,6 +508,13 @@ mkUDPDemuxNode l sIP sP dIP dP = do
         withCString l $ \cl -> c_mknode_udpdemux gh nh cl sIP sP dIP dP
     return nh
 
+mkBalanceNode :: String -> DynM NodeHandle
+mkBalanceNode l = do
+    nh <- dmNewNodeHandle
+    dmWithGHIO $ \gh ->
+        withCString l $ \cl -> c_mknode_balance gh nh cl
+    return nh
+
 
 
 mkSpawn :: NodeHandle -> DynM SpawnHandle
@@ -604,6 +613,8 @@ foreign import ccall "dynrc_mknode_fromsocket"
 foreign import ccall "dynrc_mknode_udpdemux"
     c_mknode_udpdemux :: GraphHandle -> NodeHandle -> CString
             -> Word32 -> Word16 -> Word32 -> Word16 -> IO ()
+foreign import ccall "dynrc_mknode_balance"
+    c_mknode_balance :: GraphHandle -> NodeHandle -> CString -> IO ()
 
 
 foreign import ccall "dynrc_mkspawn"

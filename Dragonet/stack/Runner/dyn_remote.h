@@ -24,6 +24,7 @@ enum dynr_action_type {
     DYNR_ACT_MKNODE_TOSOCKET,
     DYNR_ACT_MKNODE_FROMSOCKET,
     DYNR_ACT_MKNODE_UDPDEMUX,
+    DYNR_ACT_MKNODE_BALANCE,
 
     DYNR_ACT_MKSPAWN,
     DYNR_ACT_UPDATESPAWN,
@@ -80,6 +81,10 @@ struct dynr_action {
             uint16_t s_port;
             uint16_t d_port;
         } mknode_udpdemux;
+        struct {
+            dynr_node_t node;
+            char name[DYNR_MAXNAME + 1];
+        } mknode_balance;
         struct {
             dynr_spawn_t spawn;
             dynr_node_t  node;
@@ -211,6 +216,9 @@ void dynrc_mknode_udpdemux(struct dynr_client *client,
                            uint16_t            s_port,
                            uint32_t            d_ip,
                            uint16_t            d_port);
+void dynrc_mknode_balance(struct dynr_client *client,
+                          dynr_node_t         node,
+                          const char         *name);
 
 void dynrc_mkspawn(struct dynr_client *client,
                    dynr_spawn_t        spawn,

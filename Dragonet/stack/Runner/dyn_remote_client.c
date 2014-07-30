@@ -242,6 +242,22 @@ void dynrc_mknode_udpdemux(struct dynr_client *client,
 
 }
 
+void dynrc_mknode_balance(struct dynr_client *client,
+                          dynr_node_t         node,
+                          const char         *name)
+{
+    dprintf("dynrc_mknode_udpdemux\n");
+    struct dynr_action act = {
+        .type = DYNR_ACT_MKNODE_BALANCE,
+        .data.mknode_balance = {
+            .node = node,
+        },
+    };
+    assert(strlen(name) <= DYNR_MAXNAME);
+    strcpy(act.data.mknode_balance.name, name);
+    client->send(&act, client->send_data);
+}
+
 void dynrc_mkspawn(struct dynr_client *client,
                    dynr_spawn_t        spawn,
                    dynr_node_t         node)

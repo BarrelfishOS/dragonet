@@ -207,6 +207,11 @@ static node_out_t run_node(struct dynamic_node *n,
                     n->tdata.udpdemux.d_port == udp_hdr_dport_read(*in)));
             return out;
 
+        case DYN_BALANCE:
+            out = n->tdata.balance.next_port % n->num_ports;
+            n->tdata.balance.next_port = (out + 1) % n->num_ports;
+            return out;
+
         default:
             fprintf(stderr, "Invalid node type: %d\n", n->type);
             abort();
@@ -514,6 +519,14 @@ struct dynamic_node *dyn_mknode_udpdemux(struct dynamic_graph *graph,
     n->tdata.udpdemux.s_port = s_port;
     n->tdata.udpdemux.d_ip = d_ip;
     n->tdata.udpdemux.d_port = d_port;
+    return n;
+}
+
+struct dynamic_node *dyn_mknode_balance(struct dynamic_graph *graph,
+                                        const char *name)
+{
+    struct dynamic_node *n = mknode(graph, name, DYN_BALANCE);
+    n->tdata.balance.next_port = 0;
     return n;
 }
 
