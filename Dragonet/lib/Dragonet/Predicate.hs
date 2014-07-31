@@ -104,9 +104,9 @@ predEval oldexpr@(PredicateTerm l1 p1)  terms =
 predEval PredicateTrue _  = PredicateTrue
 predEval PredicateFalse _ = PredicateFalse
 -- fold
-predEval (PredicateAnd l) _ = predAnd l
-predEval (PredicateOr  l) _ = predOr  l
-predEval (PredicateNot p) _ = predNot p
+predEval (PredicateAnd l) ts = predAnd $ [predEval e ts   | e <- l ]
+predEval (PredicateOr  l) ts = predOr  $ [predEval e ts   | e <- l ]
+predEval (PredicateNot p) ts = predNot $  predEval p ts
 
 
 predGetTerms :: PredicateExpr -> [(NLabel,NPort)]

@@ -16,6 +16,7 @@ module Util.GraphHelpers(
     topsortLN,
     updateN,
     labPre, labLPre, labLSucc,
+    ledgeToEdge,
     labReachable,
     rdfsStop,
     nodeToLNode,
@@ -173,6 +174,9 @@ mergeGraphsBy nC = mergeGraphsBy' ((fromPred .) . nC)
 -- silly helper
 nodeToLNode :: Graph gr => gr a b -> Node -> LNode a
 nodeToLNode g n = (n, fromJust $ lab g n)
+
+ledgeToEdge :: LEdge a -> Edge
+ledgeToEdge (a,b,_) = (a,b)
 
 -- labeled node predecessors on a graph
 labPre :: Graph gr => gr a b -> LNode a -> [LNode a]

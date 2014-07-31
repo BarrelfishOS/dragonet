@@ -18,7 +18,7 @@ import Data.Maybe
 import Data.List (intercalate)
 import Text.Show.Pretty (ppShow)
 
-import Debug.Trace (trace)
+import Debug.Trace (trace, traceShow)
 import Text.RawString.QQ (r)
 
 import qualified Graphs.LPG as L
@@ -88,7 +88,7 @@ pgIsNormalEdge e = case e of
 
 pgIsSpawnEdge = not . pgIsNormalEdge
 
--- normal incomming dependencies (label of connected node, edge)
+-- normal incoming dependencies (label of connected node, edge)
 pgDeps :: PGraph -> PGNode -> [(PGNode, PGEdge)]
 pgDeps gr dst = filter (pgIsNormalEdge . snd) $ GH.labLPre gr dst
 
@@ -115,7 +115,7 @@ pgSpawnEdgePred (_, _, ESpawn _ attrs) = expr
                       1 -> exprs !! 0
                       otherwise -> PredicateAnd exprs
 
---predicates from incomming spawn edges (combine them with and)
+--predicates from incoming spawn edges (combine them with and)
 pgSpawnPreds :: PGraph -> PGNode -> PredicateExpr
 pgSpawnPreds pg n = case length spawn_edges of
     0 -> PredicateTrue
@@ -129,7 +129,7 @@ dominates :: PGraph -> (PGNode, NPort) -> PGNode -> Bool
 -- F-node
 dominates g (src, p) dst@(_, FNode {})
     | ndeps == 0 = False -- nowhere to go, cannot find a connection to @dst
-    | ndeps > 1  = error $ "F-nodes have at most one incomming edge" ++ (nLabel $ snd dst)
+    | ndeps > 1  = error $ "F-nodes have at most one incoming edge" ++ (nLabel $ snd dst)
     -- ndeps == 1
     | pgEqLabel dep_node src = (dep_port == p) -- same node
     | otherwise = dominates g (src, p) dep_node
@@ -164,7 +164,7 @@ computePred :: PredCompSt -> PredicateExpr
 computePred st@(PredCompSt { predDst = (_, FNode {}) } )
     -- we reached an entry node
     | ndeps == 0   = pgSpawnPreds gr dst
-    | ndeps > 1    = error $ "F-nodes have at most one incomming edge" ++ (nLabel $ snd dst)
+    | ndeps > 1    = error $ "F-nodes have at most one incmming edge" ++ (nLabel $ snd dst)
     -- ndeps == 1
     | spawned = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat is an OR?)
     -- recurse
@@ -230,7 +230,7 @@ data EmbedSt = EmbedSt {
 initEmbedSt = EmbedSt {
       lpg           = undefined
     , prg           = undefined
-    , lpgSink       = "TxOut"
+    , lpgSink       = "TxQueue"
     , prgEntry      = "TxEntry"
     , embCandidates = []
 }
@@ -249,7 +249,7 @@ embedTx = do
     candidatesInit
     embedNodes
     -- what happens at this point if there are PRG nodes that modify packets
-    -- that also exist in the LPG. We probably need to abort.
+    -- that also exist in the LPG? We probably need to abort.
     return Nothing
 
 -- initialize candidate list
@@ -257,7 +257,9 @@ candidatesInit :: EmbedExec ()
 candidatesInit = do
     lpg <- gets lpg
     sink <- getFNodeByName lpg <$> gets lpgSink
-    modify $ \s -> s { embCandidates = (lpgGetCandidates lpg sink) }
+    let candidates = lpgGetCandidates lpg sink
+        candidates' =   trace ("\nInitial candidates: " ++ (ppShow $ map (nLabel . snd) candidates)) candidates
+    modify $ \s -> s { embCandidates = candidates' }
     return ()
 
 -- Get the (single) predecssor.
@@ -274,7 +276,6 @@ getSinglePre g n = if (length ps) == 1 then (ps !! 0) else error "expecting sing
 lpgGetCandidates :: PGraph -> PGNode -> [PGNode]
 lpgGetCandidates graph sink = filter isFNode $ GH.rdfsStop isONode [start_node] graph
     where start_node = getSinglePre graph sink
-
 
 -- try to embed node
 --  A node can be embedded if:
@@ -293,25 +294,64 @@ tryEmbedNode lpg_node = do
     return ()
 
 
-simplifyLpgPredicate :: PredicateExpr -> EmbedExec (PredicateExpr)
-simplifyLpgPredicate x = error "NYI!"
+lpgPredRemUnreachable :: PGraph -> String -> PredicateExpr -> PredicateExpr
+lpgPredRemUnreachable lpg lpg_sink pred =
+    let terms = predGetTerms pred
+        -- check all other node ports in the given node. All have to be false
+        check_term :: (NLabel, NPort) -> Bool
+        check_term (nlbl,p0) = case getFNodeByName' lpg nlbl of
+            Nothing -> True
+            Just n -> or [check_port (nlbl, p) | p <- filter (/= p0) (nPorts $ snd $ n)]
+        -- check a single port
+        check_port :: (NLabel, NPort) -> Bool
+        check_port x = isReachableFromPort lpg x lpg_sink
+        --
+        mapfn :: (NLabel, NPort) -> Maybe ((NLabel, NPort), PredicateExpr)
+        mapfn term = case (check_term term) of
+            False -> Just (term, PredicateTrue)
+            True  -> Nothing
+        terms' :: [((NLabel,NPort), PredicateExpr)]
+        terms' = catMaybes $ map mapfn terms 
+    in predEval pred terms'
 
 tryEmbedMatchedNode :: PGNode -> PGNode -> EmbedExec ()
 tryEmbedMatchedNode lpg_node prg_node = do
     (lpg, prg) <- gets $ \s -> (lpg s, prg s)
+    lpg_sink <- gets lpgSink
 
     let pred_prg = computePred $ initPredCompSt_ { predGraph = prg, predDst = prg_node }
-        pred_lpg = computePred $ initPredCompSt_ { predGraph = lpg, predDst = lpg_node }
+        pred_lpg' = computePred $ initPredCompSt_ { predGraph = lpg, predDst = lpg_node }
+        pred_lpg = lpgPredRemUnreachable lpg lpg_sink pred_lpg'
 
-    case predEquiv pred_prg pred_lpg of
+        pred_prg'' = trace (" pred_prg=" ++ (ppShow pred_prg)) pred_prg
+        pred_lpg'' = trace (" pred_lpg=" ++ (ppShow pred_lpg)) pred_lpg
+
+    case predEquiv pred_prg'' pred_lpg'' of
         False -> return () -- cannot embed
         True  -> doEmbedNode lpg_node
 
+modifyLPG :: (PGraph -> PGraph) -> EmbedExec ()
+modifyLPG fn = modify $ \s -> s { lpg = (fn $ lpg s) }
+
 doEmbedNode :: PGNode -> EmbedExec ()
-doEmbedNode lpg_node = do
+doEmbedNode lpg_node@(_, FNode {} ) = do
     -- TODO
-    -- remove from LPG
-    -- add new candidates
+    lpg <- gets lpg
+    let in_edge = case pgIsSpawnTarget lpg lpg_node of
+            True  -> error $ "node " ++ (show lpg_node) ++ "is a spawn target. Cannot embed"
+            False -> case pgDeps lpg lpg_node of
+                [x] -> x
+                x  -> error $ "F-node " ++ (show lpg_node) ++ "has " ++ (show $ length x) ++ "incoming edges"
+    let out_edges = case length (nPorts $ snd lpg_node) of
+            1 -> GH.labLSucc lpg lpg_node
+            x -> error $ "Trying to embed a node with " ++ (show x) ++ " ports"
+
+    -- remove from LPG (not sure if the edge removal is necessary)
+    -- TODO: run some tests
+    modifyLPG $ DGI.delNode (fst lpg_node)
+    modifyLPG $ DGI.delLEdge (snd in_edge)
+    modifyLPG $ DGI.delEdges (map (GH.ledgeToEdge . snd) out_edges)
+    -- TODO: add new candidates
     return ()
 
 embedNodes :: EmbedExec ()
@@ -337,7 +377,7 @@ isReachable gr src dst = elem dst reachable
     where src' = getPGNodeByName gr src
           reachable = map (nLabel . snd) $ GH.labReachable gr src'
 
--- notes connected to a given port
+-- nodes connected to a given port
 pgPortNodes :: PGraph -> PGNode -> NPort -> [PGNode]
 pgPortNodes gr node port = ret
     where ret = map fst $ filter fn $ GH.labLSucc gr node
@@ -350,11 +390,39 @@ isReachableFromPort gr (sn,sp) dst = or $ map (\s -> isReachable gr s dst) sourc
     where sn' = getPGNodeByName gr sn
           sources = map (nLabel . snd) $ pgPortNodes gr sn' sp
 
+dummy_prg :: PGraph
+dummy_prg = U.strToGraph [r|
+graph dummy_prg {
+    node L4Prot {
+        port UDP[TxL4UDPFillChecksum]
+        port Other[_Out]
+    }
+
+    node TxL4UDPFillChecksum {
+        port o[_Out]
+    }
+
+    or _Out {
+        port true[Out]
+        port false[]
+    }
+
+    node Out {}
+}
+|]
+
 main = do
     (lpgU,_) <- L.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
     let lpgC  = C.applyConfig lpgCfg lpgU
     writeFile "unicorn-tests/lpg-offload.dot"  $ toDot lpgC
-    pred <- prPathPredicate lpgC "TxL4UDPFillChecksum"
+    writeFile "unicorn-tests/prg-dummy.dot" $ toDot dummy_prg
+
+    let (x,s) = runEmbeddingTx $ initEmbedSt { lpg = lpgC, prg = dummy_prg }
+
+    writeFile "unicorn-tests/lpg-offload-dummy.dot" $ toDot (lpg s)
+
+    --pred <- prPathPredicate lpgC "TxL4UDPFillChecksum"
+    --putStrLn $ "simplified:" ++ (show $ lpgPredRemUnreachable lpgC "TxQueue" pred)
 
     return ()
 
