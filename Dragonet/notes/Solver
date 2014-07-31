@@ -1,0 +1,29 @@
+
+Scenarios:
+ - load balancing: flows are equally distributed among queues
+ - QoS: two classes
+    - gold: requires 1 queue for every X flows up until the point where all queues are allocated
+    - best effort: remaining queues, but if there are flows it gets at least one queue
+      So, if there are best efforst flows, the gold class will get up to N-1 queues
+    - queues are exlusively assigned to gold and best effort classes
+    - inside each class -> load balancing (see above)
+
+Solver approaches
+-----------------
+
+a) The solver knows the number of queues (e.g., number of CPUs) and produces an
+   assignment of flows to queues. You can do that greedily:
+    . assign the 1st flow so the the optimize function is maximized
+    . assign the 2nd flow so the the optimize function is maximized
+    . ...
+    . assign the Nth flow optimally
+
+b) The solver has an interface to the configuration space where it can:
+   . add a flow to value
+   . finalize configuration to receive a full configuration
+
+   Again, we can operate greedily
+   . assign the 1st flow optimally
+   . assign the 2nd flow optimally
+   . ...
+   assign the Nth flow optimally
