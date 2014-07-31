@@ -66,14 +66,8 @@ data StackState = StackState {
 -- Force socket nodes in their respective pipeline, for the rest use the
 -- function f
 plAssign f ss cfg m@(_,n)
-    | Just ssid <- PGU.getPGNAttr n "fromsocket" =
-            "App" ++ (show $ appId $ read ssid)
-    | Just ssid <- PGU.getPGNAttr n "tosocket" =
-            "App" ++ (show $ appId $ read ssid)
+    | Just said <- PGU.getPGNAttr n "appid" = "App" ++ said
     | otherwise = f ss cfg m
-    where
-        appId sid = sdAppId socket
-            where Just socket = M.lookup sid $ ssSockets ss
 
 plConnect :: PL.Pipeline -> PL.Pipeline -> (PLI.POutput,PLI.PInput)
 plConnect i o = (PLI.POQueue n, PLI.PIQueue n)

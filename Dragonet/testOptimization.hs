@@ -4,6 +4,7 @@ import qualified Dragonet.Unicorn.Parser as UnicornAST
 import qualified Dragonet.Unicorn  as Unicorn
 import Dragonet.DotGenerator (toDot, pipelinesDot)
 import qualified Dragonet.ProtocolGraph as PG
+import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Dragonet.Embedding as Emb
 import Dragonet.Implementation.IPv4 as IP4
 import qualified Dragonet.Configuration as C
@@ -26,7 +27,7 @@ import qualified System.Directory as Dir
 
 
 plAssign _ (_,n)
-    | take 3 lbl == "App" = lbl
+    | Just said <- PGU.getPGNAttr n "appid" = "App" ++ said
     | take 2 lbl == "Tx" = "Tx" ++ tag
     | otherwise = "Rx" ++ tag
     where
