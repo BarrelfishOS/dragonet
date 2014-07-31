@@ -192,7 +192,7 @@ eventHandler sstv ch ev = do
 lpgConfig ss = [("RxL4UDPCUDPSockets", PG.CVList $ cUdpSockets)]
     where
         cUdpSockets = map (PG.CVTuple . cUdpSocket) $ M.elems $ ssEndpoints ss
-        cUdpSocket ed = [ PG.CVList $ map (PG.CVInt . fromIntegral) sids,
+        cUdpSocket ed = [ PG.CVList $ map (buildSock) sids,
                           PG.CVMaybe msIP,
                           PG.CVMaybe msPort,
                           PG.CVMaybe mdIP,
@@ -203,6 +203,11 @@ lpgConfig ss = [("RxL4UDPCUDPSockets", PG.CVList $ cUdpSockets)]
                 mdIP = PG.CVInt <$> fromIntegral <$> edIP4Dst ed
                 msPort = PG.CVInt <$> fromIntegral <$> edUDPSrc ed
                 mdPort = PG.CVInt <$> fromIntegral <$> edUDPDst ed
+        buildSock sid = PG.CVTuple [PG.CVInt $ fromIntegral sid,
+                                    PG.CVInt $ fromIntegral aid]
+            where
+                Just sd = M.lookup sid $ ssSockets ss
+                aid = sdAppId sd
 
 instantiate :: (Ord a, Show a) =>
            (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers

@@ -12,31 +12,32 @@ import qualified Dragonet.ProtocolGraph as PG
 lpgCfg = [
     ("RxL4UDPCUDPSockets", PG.CVList [
             PG.CVTuple [
-                PG.CVList [PG.CVInt 0],
+                PG.CVList [PG.CVTuple [PG.CVInt 0, PG.CVInt 0]],
                 PG.CVMaybe Nothing,
                 PG.CVMaybe Nothing,
                 PG.CVMaybe Nothing,
                 PG.CVMaybe $ Just $ PG.CVInt 7 ],
             PG.CVTuple [
-                PG.CVList [PG.CVInt 1],
+                PG.CVList [PG.CVTuple [PG.CVInt 1, PG.CVInt 0]],
                 PG.CVMaybe Nothing,
                 PG.CVMaybe Nothing,
                 PG.CVMaybe Nothing,
                 PG.CVMaybe $ Just $ PG.CVInt 8 ],
             PG.CVTuple [
-                PG.CVList [PG.CVInt 2],
+                PG.CVList [PG.CVTuple [PG.CVInt 2, PG.CVInt 1]],
                 PG.CVMaybe $ Just $ PG.CVInt 1,
                 PG.CVMaybe $ Just $ PG.CVInt 1337,
                 PG.CVMaybe $ Just $ PG.CVInt 2,
                 PG.CVMaybe $ Just $ PG.CVInt 8 ],
             PG.CVTuple [
-                PG.CVList [PG.CVInt 3],
+                PG.CVList [PG.CVTuple [PG.CVInt 3, PG.CVInt 2]],
                 PG.CVMaybe $ Just $ PG.CVInt 5,
                 PG.CVMaybe $ Just $ PG.CVInt 1338,
                 PG.CVMaybe $ Just $ PG.CVInt 2,
                 PG.CVMaybe $ Just $ PG.CVInt 1234 ],
             PG.CVTuple [
-                PG.CVList [PG.CVInt 4, PG.CVInt 5],
+                PG.CVList [PG.CVTuple [PG.CVInt 4, PG.CVInt 2],
+                           PG.CVTuple [PG.CVInt 5, PG.CVInt 3]],
                 PG.CVMaybe $ Just $ PG.CVInt 6,
                 PG.CVMaybe $ Just $ PG.CVInt 2345,
                 PG.CVMaybe $ Just $ PG.CVInt 3,

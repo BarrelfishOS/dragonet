@@ -37,16 +37,21 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addEndpoint tuples
             Nothing -> fromJust $ findN outE "TxL4UDPInitiateResponse"
         Just cN  = findN outE "RxL4UDPUnusedPort"
 
-        addSocket (inN,inP) outN (PG.CVInt sid) = do
+        socketId (PG.CVTuple [PG.CVInt i, _]) = i
+        socketAppId (PG.CVTuple [_, PG.CVInt i]) = i
+
+        addSocket (inN,inP) outN socket = do
+            let sid = socketId socket
+            let appAttr = PG.NAttrCustom $ "appid=" ++ show (socketAppId socket)
             -- Create ToSocket Node
             (tsN,_) <- C.confMNewNode $
-                        PG.nAttrsAdd [
+                        PG.nAttrsAdd [appAttr,
                             PG.NAttrCustom "sink",
                             PG.NAttrCustom $ "tosocket=" ++ show sid] $
                         PG.baseFNode ("ToSocket" ++ show sid) ["out","drop"]
             -- Create FromSocket Node
             (fsN,_) <- C.confMNewNode $
-                        PG.nAttrsAdd [
+                        PG.nAttrsAdd [appAttr,
                             PG.NAttrCustom "source",
                             PG.NAttrCustom $ "fromsocket=" ++ show sid] $
                         PG.baseFNode ("FromSocket" ++ show sid) ["out"]
@@ -55,7 +60,7 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addEndpoint tuples
                     (fsN,outN,PG.Edge "out")]
 
         addEndpoint (PG.CVTuple [
-                    PG.CVList sids,
+                    PG.CVList sockets,
                     PG.CVMaybe msIP,
                     PG.CVMaybe msPort,
                     PG.CVMaybe mdIP,
@@ -68,18 +73,18 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addEndpoint tuples
                         PG.baseONode (filterS ++ "Valid")
                         bports PG.NOpAnd
             -- Add socket nodes
-            sEdges <- case sids of
+            sEdges <- case sockets of
                 [] -> error "Endpoint without sockets"
-                [sid] -> addSocket (veN,"true") irN sid
+                [sock] -> addSocket (veN,"true") irN sock
                 _ -> do
-                    let sports = map (\(PG.CVInt i) -> show i) sids
+                    let sports = map (show . socketId) sockets
                     -- If we have more than one socket, add balance node
                     (bN,_) <- C.confMNewNode $
                         PG.nAttrAdd (PG.NAttrCustom "loadbalance") $
                         PG.baseFNode (filterS ++ "Balance") sports
                     -- Add sockets
-                    es <- forM sids $ \s@(PG.CVInt i) ->
-                        addSocket (bN,show i) irN s
+                    es <- forM sockets $ \s ->
+                        addSocket (bN,show $ socketId s) irN s
                     return $ concat es ++ [(veN,bN,PG.Edge "true")]
             let dfEdges = map (\(a,b,p) -> (a,b,PG.Edge p)) [
                     (vhN,dxN,"true"),  -- RxL4UDPValidHeaderLength -> Filter
