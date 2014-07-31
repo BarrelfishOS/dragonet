@@ -111,8 +111,8 @@ def genMemcachedParameters2(noPorts, threadsPerPort, createDedicatedFlows = True
 def SRV_CMDS(name):
 
     dragonet_container = {
-                "llvmSF":   ["./deployDragonetSF.sh", "llvm-cgen-sf" ],
-                "llvmE10k": ["./deployDragonetE10k.sh", "llvm-cgen-e10k" ],
+                "llvmSF":   ["./scripts/pravin/deployDragonetSF.sh", "stack-sf" ],
+                "llvmE10k": ["./scripts/pravin/deployDragonetE10k.sh", "stack-e10k" ],
                 }
 
     if name == "memcached" :
@@ -140,19 +140,20 @@ def SRV_CMDS(name):
                       "sleep 4",
                       "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
                         toCoreList2(range((0 + SERVER_CORESHIFT), (SERVER_CORESHIFT + (SERVERS_INSTANCES*SERVER_CORES)))))
-                        + " ./runBetterBg.sh 2 ./ ./memcached-out.log  "
+                        + " ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log  "
                         + " ../benchmarking/memcached/memcached -N %s -c 64000 -m 64000 -u root %s %d -t %d -l %s " % (
                             genMemcachedParameters(SERVERS_INSTANCES, SERVER_CORES, True),
                             "-p 0 -U ",
                             SERVER_INITIAL_PORT, SERVER_CORES, TARGET),
+                      "sleep 4",
                                     ],
 
                     "is_ready_cmd_special" : [
-                      "cd dragonet/Dragonet/ ; ./wait_for_dn_app.sh %d %d ./ " % (HWQUEUES, SERVERS_INSTANCES * SERVER_CORES),
+                                        "sleep 4 ",
+                                        #"cd dragonet/Dragonet/ ; ./wait_for_dn_app.sh %d %d ./ " % (HWQUEUES, SERVERS_INSTANCES * SERVER_CORES),
                                     ],
 
                     "init_cmd" : [],
-                    "exec_cmd_old" : "sudo ./runBetter.sh ../benchmarking/memcached/memcached -N -c 64000 -m 64000 -u root ",
                     "exec_cmd" : "echo 'Server should already be running'" ,
                     "kill_cmd" : [
                                 "tail dragonet/Dragonet/some.log",

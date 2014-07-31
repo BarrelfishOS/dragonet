@@ -217,7 +217,11 @@ get_scalability_linux_sp() {
 
 
 get_scalability_only_one() {
-    get_best_tp 1 10
+    get_best_tp 1 1
+    get_best_tp 1 2
+    get_best_tp 1 4
+    get_best_tp 1 8
+    get_best_tp 1 16
 }
 
 get_scalability_all() {
@@ -431,8 +435,8 @@ use_asiago_server() {
     SF_T="10.23.4.195"
     SF_S_T="10.113.4.195"
 
-    #cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere  -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata"
-    cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
+    cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere  -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata"
+    #cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
     cliName6Short="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
 #    cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata"
     cliName6="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
@@ -514,15 +518,18 @@ UDP_TEST_NAME="memcached_rr"
 
 PACKET_SIZE=1024
 HWQUEUES=1
+UDP_TEST_NAME="udp_rr"
+UDP_TEST_NAME="memcached_rr"
 
-#use_asiago_server_sf_switched
+use_asiago_server_sf_switched
 #ECHO_SERVER="memcached"
 #ECHO_SERVER="memcached_onload"
-#ECHO_SERVER="llvmSF"
-
-#MAIN_OUTPUT_DIR="../memcachedResults_v2/scalability/P1024/Dragonet_SF_Q1_N2/"
-#setup_output_location
-#get_scalability_only_one
+ECHO_SERVER="llvmSF"
+MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet__NRT_FLOWS_SF_Q1/"
+MAIN_OUTPUT_DIR="../memcachedResults_v2/scalability/P1024/Dragonet_NRT_SF_Q1/"
+setup_output_location
+get_scalability_only_one
+exit 0
 
 
 use_asiago_server_intel_switched

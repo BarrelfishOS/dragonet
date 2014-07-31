@@ -215,75 +215,59 @@ def genFancyEchoParameters_old(noPorts, threadsPerPort, createDedicatedFlows = T
 
 def SRV_CMDS(name):
 
-    if name == "llvmE10k" :
-        return {
-                    "client_extra_opts" : "-N",
-                    "init_cmd_special" : [
-                      "cd dragonet/Dragonet/ ; sudo  taskset -c %s  ./deployDragonetE10k.sh %d %s" % (
-                          toCoreList2(range(20 - (HWQUEUES * 2), 20)),
-                          HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
-                            ),
-                      "sleep 4",
-                      "cd dragonet/Dragonet/ ; sudo ./runBetterBg.sh 2 ./ ./fancyecho-out.log  ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
-                            genMemcachedParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
-                          #genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
-
-                      "cd dragonet/Dragonet/ ; ./wait_for_dn_app.sh %d %d " % (HWQUEUES, SERVERS_INSTANCES * SERVER_CORES),
-                                    ],
-
-                    "init_cmd" : [],
-                    "exec_cmd" : "echo 'Server should already be running'" ,
-                    "kill_cmd_special" : [
-                                "tail dragonet/Dragonet/some.log",
-                                "tail dragonet/Dragonet/fancyecho-out.log",
-                                "sudo killall bench-fancyecho || true",
-                                "sudo killall llvm-cgen-e10k",
-                                 ],
-                    "kill_cmd" : [],
-                    "out_cmd" : [],
+    dragonet_container = {
+                "llvmSF":   ["./scripts/pravin/deployDragonetSF.sh", "stack-sf" ],
+                "llvmE10k": ["./scripts/pravin/deployDragonetE10k.sh", "stack-e10k" ],
                 }
 
 
-    if name == "llvmSF" :
+    if name in  dragonet_container.keys() :
         return {
                     "client_extra_opts" : "-N",
-                    "init_cmd_special_min" : [
-                      "cd dragonet/Dragonet/ ; sudo ./deployDragonetSF.sh %d %s" % (
+
+                    "init_cmd_special_pinned_unpinned" : [
+                            #"init_cmd_special" : [
+                      "cd dragonet/Dragonet/ ; sudo %s %d %s" % (
+                          dragonet_container[name][0],
                           HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
                             ),
+                      "sleep 4",
+
+                      "cd dragonet/Dragonet/ ; sudo  ./scripts/pravin/runBetterBg.sh 2 ./ ./fancyecho-out.log  "
+                        + " ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
+                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
                                     ],
+
 
                     "init_cmd_special" : [
-                      "cd dragonet/Dragonet/ ; sudo ./deployDragonetSF.sh %d %s" % (
+                        #"init_cmd_special_pinned" : [
+                      "cd dragonet/Dragonet/ ; sudo taskset -c %s %s %d %s" % (
+                          toCoreList2(range(20 - (HWQUEUES * 2), 20)),
+                          dragonet_container[name][0],
                           HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
                             ),
-                      "cd dragonet/Dragonet/ ; sudo ./runBetterBg.sh 0 ./ ./fancyecho-out.log  ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
-                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
+                      "sleep 4",
 
-                      "cd dragonet/Dragonet/ ; ./wait_for_dn_app.sh %d %d " % (HWQUEUES, SERVERS_INSTANCES * SERVER_CORES),
+                      "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
+                        toCoreList2(range((0 + SERVER_CORESHIFT), (SERVER_CORESHIFT + (SERVERS_INSTANCES*SERVER_CORES)))))
+                        + " ./scripts/pravin/runBetterBg.sh 2 ./ ./fancyecho-out.log  "
+                        + " ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
+                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
                                     ],
 
-                    "init_cmd_special2" : [
-                        "cd dragonet/Dragonet/ ; sudo taskset -c %s ./deployDragonetSF.sh %d %s" % (
-                                toCoreList2(range(0, (HWQUEUES* 2))), HWQUEUES,
-                                toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
-                            ),
-                      "cd dragonet/Dragonet/ ; ./runBetterBg.sh 2 ./ ./fancyecho-out.log  ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
-                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
-                                ],
+                    "is_ready_cmd_special" : [
+                                        "sleep 4 "
+                                    ],
 
                     "init_cmd" : [],
                     "exec_cmd" : "echo 'Server should already be running'" ,
-                    "exec_cmd_complex" : "./runBetterCD.sh ../../Dragonet/ ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
-                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
                     "kill_cmd_special" : [
                                 "tail dragonet/Dragonet/some.log",
                                 "tail dragonet/Dragonet/fancyecho-out.log",
                                 "sudo killall bench-fancyecho || true",
-                                "sudo killall llvm-cgen-sf",
+                                "sudo killall %s || true" % (dragonet_container[name][1]),
                                  ],
                     "kill_cmd" : [],
-
                     "out_cmd" : [],
                 }
 
@@ -295,7 +279,6 @@ def SRV_CMDS(name):
                     "kill_cmd" : [],
                     "out_cmd" : [],
                 }
-
 
 
     if name == "fancyEchoLinux" :
