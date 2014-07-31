@@ -23,6 +23,7 @@ import qualified Dragonet.ProtocolGraph.Utils as PGU
 
 import qualified Graphs.Tap as Tap
 import qualified Graphs.LPG as LPG
+import qualified Graphs.ImplTransforms as IT
 
 import Runner.Dynamic (createPipeline, createPipelineClient)
 
@@ -232,9 +233,12 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
                 dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
                 -- Generate PRG configurations
                 pCfgs = cfgOracle lpgC ss
+                -- Transformations to be applied to graph before implementing it
+                implTransforms = [IT.mergeSockets]
+
             putStrLn $ "LPG config: " ++ show lpgCfg
-            (plg,(_,pCfg)) <- O.optimize helpers prgU lpgC (plAssign cfgPLA ss)
-                    dbg (costFun ss) pCfgs
+            (plg,(_,pCfg)) <- O.optimize helpers prgU lpgC implTransforms
+                    (plAssign cfgPLA ss) dbg (costFun ss) pCfgs
             cfgImpl pCfg
             let createPL pl@('A':'p':'p':aids) = do
                     putStrLn $ "Creating App pipeline: " ++ pl

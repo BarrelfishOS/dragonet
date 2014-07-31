@@ -41,11 +41,13 @@ makeGraph ::
        Sem.Helpers           -- | Semantics helpers combined
     -> PG.PGraph             -- | Unconfigured PRG
     -> PG.PGraph             -- | Configured LPG
+    -> [PG.PGraph
+        -> PG.PGraph]        -- | Implementation transforms
     -> (PG.PGNode -> String) -- | Assign nodes to pipelines
     -> DbgFunSingle a        -- | Debugging function
     -> C.Configuration       -- | Configuration to apply
     -> IO PL.PLGraph
-makeGraph helpers prg lpg pla debug cfg = do
+makeGraph helpers prg lpg implTransforms pla debug cfg = do
     -- Configure graph
     let prgC  = C.applyConfig cfg prg
     debug "prg_c" $ DbgPGraph prgC
@@ -58,8 +60,11 @@ makeGraph helpers prg lpg pla debug cfg = do
     -- Clean-up graph
     let cleanedUp = cleanupGraph reduced
     debug "cleanup" $ DbgPGraph cleanedUp
+    -- Apply implementation transforms
+    let implGraph = foldl (\g t -> t g) cleanedUp implTransforms
+    debug "implT" $ DbgPGraph implGraph
     -- Partition graph
-    let plg = PL.generatePLG pla cleanedUp
+    let plg = PL.generatePLG pla implGraph
     debug "pipelines" $ DbgPLGraph plg
     return plg
 
@@ -67,14 +72,15 @@ optimize :: Ord a =>
        Sem.Helpers                     -- | Semantics helpers combined
     -> PG.PGraph                       -- | Unconfigured PRG
     -> PG.PGraph                       -- | Configured LPG
+    -> [PG.PGraph -> PG.PGraph]        -- | Implementation transforms
     -> (String -> PG.PGNode -> String) -- | Assign nodes to pipelines
     -> DbgFunction a                   -- | Debugging function
     -> CostFunction a                  -- | Cost function
     -> [(String,C.Configuration)]      -- | Configurations to evaluate
     -> IO (PL.PLGraph, (String,C.Configuration))
-optimize hs prg lpg pla dbg cf cfgs = do
+optimize hs prg lpg implTransforms pla dbg cf cfgs = do
     evald <- forM cfgs $ \(lbl,cfg) -> do
-        plg <- makeGraph hs prg lpg (pla lbl) (dbg lbl) cfg
+        plg <- makeGraph hs prg lpg implTransforms (pla lbl) (dbg lbl) cfg
         let cost = cf plg
         dbg lbl lbl $ DbgEvaluated plg cost
         return (cost, plg, (lbl,cfg))

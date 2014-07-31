@@ -14,6 +14,7 @@ import qualified Dragonet.Optimization as O
 import qualified Graphs.E10k as E10k
 import qualified Graphs.LPG as LPG
 import Graphs.Cfg (lpgCfg, prgCfgEmpty, prgCfg)
+import qualified Graphs.ImplTransforms as IT
 
 import qualified Data.Graph.Inductive.Graph as DGI
 
@@ -75,8 +76,8 @@ main = do
     let configs = [("cfg_empty_",prgCfgEmpty), ("cfg_test_", prgCfg)]
 
     -- Evaluate graph
-    plg <- O.optimize helpers prgU lpgC plAssign
-            (O.dbgDotfiles "out/opt-graphs") costFunction configs
+    plg <- O.optimize helpers prgU lpgC [IT.mergeSockets]
+        plAssign (O.dbgDotfiles "out/opt-graphs") costFunction configs
     return ()
 
 
