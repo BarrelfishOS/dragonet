@@ -70,5 +70,13 @@ errval_t bulk_alloc_return_buffer(struct bulk_allocator *alloc,
                                   struct bulk_buffer    *buffer);
 
 
+/**
+ * returns number of free buffers in given allocator.
+ *
+ * @param alloc     the allocator to check
+ */
+size_t bulk_alloc_free_buffer_count(struct bulk_allocator *alloc);
+
+
 #endif /* BULK_ALLOCAOR_H */
 

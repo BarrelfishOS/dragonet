@@ -90,6 +90,7 @@ void dyn_local_run(struct dyn_local *local)
 {
     struct qaction *qa;
 
+    printf("dyn_local_run called...\n");
     while (local->running) {
         // apply all the queued actions
         while ((qa = try_dequeue_action(local)) != NULL ||
@@ -99,6 +100,7 @@ void dyn_local_run(struct dyn_local *local)
             dynrs_action(&local->server, &qa->act);
             free(qa);
         }
+        //printf("dyn_local_run: calling dynrs_run  ...\n");
         dynrs_run(&local->server);
     }
 }

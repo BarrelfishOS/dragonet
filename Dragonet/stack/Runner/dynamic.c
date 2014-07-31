@@ -11,6 +11,7 @@
 
 #define INVALID_VERSION -1
 
+//#define dprintf(x...)    do { printf("TID:%d:%s:%s:%d: ", (int)pthread_self(), __FILE__, __FUNCTION__, __LINE__); printf(":" x); } while(0)
 #define dprintf(x...) do { } while (0)
 //#define dprintf printf
 
@@ -265,6 +266,7 @@ void dyn_rungraph(struct dynamic_graph *graph)
         fprintf(stderr, "Warning: Task starting at no longer existing "
                         "node, dropping task...\n");
         if (in != NULL) {
+            printf("%s:%d: calling input_free\n", __FUNCTION__, __LINE__);
             input_free_plh(plh, in);
         }
         goto out;
@@ -277,7 +279,7 @@ void dyn_rungraph(struct dynamic_graph *graph)
     while ((n = node_stack_pop(ns)) != NULL) {
         count++;
         dprintf("Execute: n=%p n->n=%p\n", n, n->name);
-        dprintf("Execute: %s\n", n->name);
+        dprintf("Execute: %s, count: %zu \n", n->name, count);
         out = run_node(n, plh, st, &in, version);
         dprintf("   port=%d\n", out);
         if (out >= 0 && n->num_ports == 0) {
@@ -288,6 +290,7 @@ void dyn_rungraph(struct dynamic_graph *graph)
         // If the node failed, we can stop here
         if (out == -2) {
             // Abort execution for this packet
+            dprintf("Execute: abort. %s\n", n->name);
             break;
         } else if (out < 0) {
             continue;
@@ -303,12 +306,13 @@ void dyn_rungraph(struct dynamic_graph *graph)
             node_stack_push(ns, e->sink);
             e = e->so_next;
         }
-    }
-    dprintf("Execution done\n");
+    } // end while:
     if (in != NULL) {
+        dprintf("freeing the buffer\n");
         input_free_plh(plh, in);
         in = NULL;
     }
+    dprintf("Execution done\n");
 
     version++;
     if (version == -1) {
@@ -324,6 +328,7 @@ void dyn_rungraph(struct dynamic_graph *graph)
 
 out:
     if (--spawn->refcount == 0) {
+        dprintf("calling free spawn\n");
         free(spawn);
     }
     dprintf("dyn_rungraph done\n");

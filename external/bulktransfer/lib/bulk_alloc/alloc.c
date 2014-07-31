@@ -63,6 +63,11 @@ struct bulk_buffer *bulk_alloc_new_buffer(struct bulk_allocator *alloc)
     return mng->buffer;
 }
 
+size_t bulk_alloc_free_buffer_count(struct bulk_allocator *alloc)
+{
+    return alloc->num_free;
+}
+
 errval_t bulk_alloc_return_buffer(struct bulk_allocator *alloc,
                                   struct bulk_buffer    *buffer)
 {

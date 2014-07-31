@@ -371,10 +371,19 @@ static void free_bulk_buffer(struct dragonet_pipeline *pl,
 
     if (chan == NULL) {
         // Our own buffer
-        bulk_alloc_return_buffer(&pl->alloc, buf);
+        dprint("######### freeing on own pipeline %s, buf = %p, free_buf_count = %zu, out of %zu\n",
+                pl->name, buf, (&pl->alloc)->num_free, (&pl->alloc)->capacity);
+        err = bulk_alloc_return_buffer(&pl->alloc, buf);
+        if (!err_is_ok(err)) {
+            printf("\n%s:%s:%d:ERROR: bulk_alloc_return_buffer failed, %d\n\n",
+               __FILE__, __FUNCTION__, __LINE__, (int)err);
+            abort();
+        }
     } else {
         // We received it over this channel
         //
+        dprint("######### returning over channel, as we [%s] don't own this one, buf = %p\n",
+                pl->name, buf);
         err = bulk_ll_channel_pass(chan, buf, NULL, 0);
         if (!(err_is_ok(err) || err == BULK_TRANSFER_ASYNC)) {
             printf("\n%s:%s:%d:ERROR: bulk_ll_channel_pass failed, %d\n\n",
@@ -396,10 +405,13 @@ static void move_received(struct dragonet_queue  *q,
     dprintf("cb_move_received: %s %"PRIx32" len=%d off=%d\n", pl->name,
             buffer->bufferid, dbmeta->len, dbmeta->off);
     if (q->pending == NULL) {
+
         in = input_struct_alloc(pl);
         in->attr = buffer->address;
         in->attr_buffer = buffer;
         q->pending = in;
+        dprintf("cb_move_received:1: %s, part-1: attributes received:  attr %p\n",
+                pl->name, in->attr_buffer);
     } else {
         in = q->pending;
         q->pending = NULL;
@@ -412,8 +424,9 @@ static void move_received(struct dragonet_queue  *q,
             buffer->pool->buffer_size - (dbmeta->len + dbmeta->off);
         in->data_buffer = buffer;
 
-        dprintf("cb_move_received:2: %s %"PRIx32" len=%d off=%d, data=%p \n",
-                pl->name, buffer->bufferid, dbmeta->len, dbmeta->off, in->data);
+        dprintf("cb_move_received:2: %s %"PRIx32" len=%d off=%d, data=%p, attr_buffer=%p, data_buffer=%p\n",
+                pl->name, buffer->bufferid, dbmeta->len, dbmeta->off, in->data,
+               in->attr_buffer, in->data_buffer);
         // Add packet to q->inputs
         in->next = NULL;
         if (q->inputs == NULL) {
@@ -454,7 +467,7 @@ static void bind_done(struct dragonet_queue *q)
 static void process_event(struct dragonet_queue *q,
                           struct bulk_ll_event  *event)
 {
-//    dprintf("process_event: enter\n");
+    dprintf("process_event: enter %d\n", event->type);
     struct dragonet_queue *oq;
     struct dragonet_pipeline *pl = q->pl;
 
@@ -508,6 +521,8 @@ static void process_event(struct dragonet_queue *q,
             break;
 
         case BULK_LLEV_BUF_PASS:
+            dprint("BULK_LLEV_BUF_PASS: releasing returned buffer %p for pipeline %s\n",
+                    event->data.buffer.buffer, pl->name);
             free_bulk_buffer(pl, event->data.buffer.buffer);
             break;
 
@@ -657,29 +672,47 @@ int pl_enqueue(queue_handle_t queue, struct input *in)
     dprintf("pl_enqueue: enter\n");
     struct bulk_ll_channel *chan = queue;
     struct dragonet_queue *q = chan->user_state;
-    struct dragonet_pipeline *pl = q->pl;
+    struct dragonet_pipeline *pl = q->pl;  // for debug prints
 
-    dprintf("pl_enqueue: q-name:%s, pl name: %s, stack: %s, id: %"PRIu32", len  %d\n",
-            q->name, pl->name, pl->stackname, pl->id, (int)in->len);
+    dprintf("pl_enqueue: q-name:%s, pl name: %s, stack: %s, id: %"PRIu32", len  %d, attr_buffer=%p, data_buffer=%p\n",
+            q->name, pl->name, pl->stackname, pl->id, (int)in->len,
+            in->attr_buffer, in->data_buffer);
 
     struct dragonet_bulk_meta meta = {
         .len = in->len, .off = in->space_before, };
     errval_t err;
 
+    // moving the bulk transport buffers from current packet into the queue
     err = bulk_ll_channel_move(chan, in->attr_buffer, &meta, 0);
-    assert(err_is_ok(err) || err == BULK_TRANSFER_ASYNC);
+    //assert(err_is_ok(err) || err == BULK_TRANSFER_ASYNC);
+    // report error back, instead of assert failure
+    if (! ((err_is_ok(err) || err == BULK_TRANSFER_ASYNC))) {
+        printf("%s:%s:%d: Moving attribute bulk transport buffer from current packet into the queue failed\n",
+                __FILE__, __FUNCTION__, __LINE__);
+        return -1;
+    }
 
     err = bulk_ll_channel_move(chan, in->data_buffer, &meta, 0);
-    assert(err_is_ok(err) || err == BULK_TRANSFER_ASYNC);
+    //assert(err_is_ok(err) || err == BULK_TRANSFER_ASYNC);
+    if (! ((err_is_ok(err) || err == BULK_TRANSFER_ASYNC))) {
+        printf("%s:%s:%d: Moving data bulk-transport buffer from current packet into the queue failed\n",
+                __FILE__, __FUNCTION__, __LINE__);
+        return -2;
+    }
+
 
     // We need to replace these buffers in the current input, and make it empty
+    // FIXME: We don't need to replace them as per new runtime mechanism
+/*
     int ret = input_fill_alloc(pl, in);
     if (ret < 0) {
-        printf("\n%s:%s:%d:Warning: pl_enqueue failed, %d\n\n",
-               __FILE__, __FUNCTION__, __LINE__, ret);
+        printf("\n%s:%s:%d:Warning: pl_enqueue failed for queue name: %s, pl_name: %s, stack: %s, %d\n\n",
+               __FILE__, __FUNCTION__, __LINE__,
+               q->name, pl->name, pl->stackname, ret);
     }
     dprintf("pl_enqueue: %d : exit\n", ret);
-    return ret;
+*/
+    return 0;
 }
 
 // FIXME: The return values of this function don't make sense
@@ -767,16 +800,22 @@ static void input_struct_free(struct dragonet_pipeline *pl, struct input *in)
     }
 }
 
+// allocates two bulk transport buffers, one for attribute and one for data
+//      from given channel, and puts them in given input struct
 static int input_fill_alloc(struct dragonet_pipeline *pl, struct input *in)
 {
     struct bulk_buffer *data_buf;
     struct bulk_buffer *attr_buf;
     uint32_t len;
 
+    dprint("######### adding bulkbufs to struct in for pipeline %s, free_buf_count = %zu, out of %zu\n",
+                pl->name, (&pl->alloc)->num_free, (&pl->alloc)->capacity);
+
     attr_buf = bulk_alloc_new_buffer(&pl->alloc);
     if (attr_buf == NULL) {
-        printf("Warning: input_fill_alloc: no more space left for attr_buf  pl=%sn", pl->name);
-        abort();
+        dprint("Warning: input_fill_alloc: no more space left for attr_buf  pl=%s\n", pl->name);
+        printf("Warning: input_fill_alloc: no more space left for attr_buf  pl=%s\n", pl->name);
+        //abort();
         return -1;
     }
     attr_buf->opaque = NULL;
@@ -785,7 +824,7 @@ static int input_fill_alloc(struct dragonet_pipeline *pl, struct input *in)
     if (data_buf == NULL) {
         printf("Warning: input_fill_alloc: no more space left for data_buf pl=%s\n", pl->name);
         bulk_alloc_return_buffer(&pl->alloc, attr_buf);
-        abort();
+        //abort();
         return -2;
     }
     data_buf->opaque = NULL;
@@ -817,6 +856,10 @@ struct input *pl_input_alloc(pipeline_handle_t plh)
         // Yay there is an input in the cache
         pl->input_cache = in->next;
         pl->input_cnt--;
+
+
+        dprint("######### alloc called: from cached: input buf: %p, %"PRIu64", freeCount: %zu, for pipeline: %s\n",
+            in, in->phys, pl->input_cnt, pl->name);
         return in;
     }
 
@@ -828,6 +871,9 @@ struct input *pl_input_alloc(pipeline_handle_t plh)
         input_struct_free(pl, in);
         return NULL;
     }
+
+    dprint("######### alloc called: input buf: %p, %"PRIu64", freeCount: %zu, for pipeline: %s\n",
+            in, in->phys, pl->input_cnt, pl->name);
     return in;
 }
 
@@ -836,8 +882,20 @@ void pl_input_free(pipeline_handle_t plh, struct input *in)
     struct dragonet_pipeline *pl = plh;
     assert(pl != NULL);
     assert(in != NULL);
+    dprint("######### free called: input buf: %p, %"PRIu64", freeCount: %zu, for pipeline: %s\n",
+            in, in->phys, pl->input_cnt, pl->name);
 
-    if (pl->input_cnt < IN_FULL_POOL_MAX) {
+
+    // check if both buffers are local buffers and there is room in buffer cache
+    if (
+            (in->data_buffer != NULL ) &&
+            (in->attr_buffer != NULL ) &&
+            (((struct bulk_buffer *)in->data_buffer)->opaque == NULL) &&
+            (((struct bulk_buffer *)in->attr_buffer)->opaque == NULL) &&
+            (pl->input_cnt < IN_FULL_POOL_MAX)
+       ) {
+        // You should only cache the input buffers if they belong
+        // to your channel, otherwise they must be released.
         // Cache the input
         input_clean_attrs(in);
         input_clean_packet(in);
@@ -846,6 +904,7 @@ void pl_input_free(pipeline_handle_t plh, struct input *in)
         in->next = pl->input_cache;
         pl->input_cache = in;
     } else {
+        dprint("######### returning two buffers over channel\n");
         free_bulk_buffer(pl, in->data_buffer);
         free_bulk_buffer(pl, in->attr_buffer);
         input_struct_free(pl, in);
