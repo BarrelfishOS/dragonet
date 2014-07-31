@@ -24,7 +24,16 @@ costFunction _ _ = 1
 oracle :: PG.PGraph -> StackState -> [(String,C.Configuration)]
 oracle _ _ = [("default",[
                 ("RxCFDirFilter", PG.CVList []),
-                ("RxC5TupleFilter", PG.CVList [])
+                ("RxC5TupleFilter", PG.CVList [
+                     PG.CVTuple [
+                        PG.CVMaybe Nothing,
+                        PG.CVMaybe Nothing,
+                        PG.CVMaybe $ Just $ PG.CVEnum 1,
+                        PG.CVMaybe Nothing,
+                        PG.CVMaybe $ Just $ PG.CVInt 7,
+                        PG.CVInt 1,
+                        PG.CVInt 1 ]
+                    ])
                 ])]
 
 data CfgAction =
@@ -68,6 +77,17 @@ main = do
     -- Channel and MVar with thread id of control thread
     mtid <- STM.newEmptyTMVarIO
     chan <- STM.newTChanIO
+    STM.atomically $ STM.writeTChan chan $
+        CfgASet5Tuple 0 $ CTRL.FTuple {
+                CTRL.ftPriority = 1,
+                CTRL.ftQueue = 1,
+                CTRL.ftL3Proto = Just CTRL.L3IPv4,
+                CTRL.ftL4Proto = Just CTRL.L4UDP,
+                CTRL.ftL3Src = Nothing,
+                CTRL.ftL3Dst = Nothing,
+                CTRL.ftL4Src = Nothing,
+                CTRL.ftL4Dst = Just 7
+            }
     -- Prepare graphs and so on
     prgH <- E10k.graphH
     instantiate prgH "llvm-helpers-e10k" costFunction oracle (implCfg mtid chan)
