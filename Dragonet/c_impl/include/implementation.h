@@ -142,6 +142,23 @@ struct input_attributes {
     int32_t socket_id;
 };
 
+//  Hopefully, this is correct -AKK
+//
+// (Pointers)                    (Lengths)
+//
+//  addr+bsize  +-----------+ +
+//              |           | |
+//              |           | |---- space before
+// data ------> +-----------+ +
+//              |-----------| |
+//              |-----------| |------ len
+//              |-----------| |
+//              +-----------+ +
+//              |           | |
+//              |           | |------ space after
+//   addr       +-----------+ +
+
+
 struct input {
     // Buffer
     void  *data;
