@@ -2,6 +2,7 @@ module Dragonet.Pipelines.Dynamic (
     DynPipeline(..),
     DynContext,
     initialContext,
+    ctxState,
     run
 ) where
 
@@ -40,6 +41,11 @@ initialContext sname = do
         DynState {
             dsHandle = sh,
             dsPipelines = [] }
+
+ctxState :: DynContext -> IO PLI.StackHandle
+ctxState dctx = do
+    ds <- STM.atomically $ STM.readTVar dctx
+    return $ dsHandle ds
 
 dsPipeline :: DynState -> PL.PLabel -> Maybe (DynPipeline, PLI.PipelineImpl)
 dsPipeline ds pl = find (\(dpl,_) -> dplLabel dpl == pl) $ dsPipelines ds

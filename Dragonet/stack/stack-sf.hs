@@ -1,6 +1,7 @@
 import qualified Dragonet.Configuration as C
 import qualified Dragonet.Optimization as O
 import qualified Dragonet.Pipelines as PL
+import qualified Dragonet.Pipelines.Implementation as PLI
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.ProtocolGraph.Utils as PGU
 
@@ -19,8 +20,8 @@ oracle :: PG.PGraph -> StackState -> [(String,C.Configuration)]
 oracle _ _ = [("default",[])]
 
 -- So is implementing it
-implCfg :: C.Configuration -> IO ()
-implCfg _ = return ()
+implCfg :: PLI.StateHandle -> C.Configuration -> IO ()
+implCfg _ _ = return ()
 
 -- Split Rx and Tx into different pipelines
 plAssignSplit :: StackState -> String -> PG.PGNode -> String

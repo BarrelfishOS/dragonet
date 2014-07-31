@@ -209,7 +209,7 @@ instantiate :: (Ord a, Show a) =>
         -> String                                      -- | Name of llvm-helpers
         -> (StackState -> O.CostFunction a)            -- | Cost Function
         -> (PG.PGraph -> StackState -> [(String,C.Configuration)]) -- | Oracle
-        -> (C.Configuration -> IO ())                  -- | Implement PRG config
+        -> (PLI.StateHandle -> C.Configuration -> IO ()) -- | Implement PRG conf
         -> (StackState -> String -> PG.PGNode -> String) -- | Assign nodes to PL
         -> IO ()
 instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
@@ -218,6 +218,8 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
     let helpers = prgHelp `Sem.mergeHelpers` lpgHelp
         stackname = "dragonet"
     ctx <- PLD.initialContext stackname
+    stackhandle <- PLD.ctxState ctx
+    sharedState <- PLI.stackState stackhandle
 
     -- Function to adapt graph to current stack state
     let updateGraph sstv = do
@@ -239,7 +241,7 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
             putStrLn $ "LPG config: " ++ show lpgCfg
             (plg,(_,pCfg)) <- O.optimize helpers prgU lpgC implTransforms
                     (plAssign cfgPLA ss) dbg (costFun ss) pCfgs
-            cfgImpl pCfg
+            cfgImpl sharedState pCfg
             let createPL pl@('A':'p':'p':aids) = do
                     putStrLn $ "Creating App pipeline: " ++ pl
                     createPipelineClient agh pl
