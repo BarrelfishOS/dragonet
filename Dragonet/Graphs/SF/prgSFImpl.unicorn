@@ -7,12 +7,14 @@ graph SFPRG {
         spawn poll RxQueue
         port out[]
         port drop[]
-        port init[] }
+        port init[]
+    }
 
     node TxQueue {
         implementation TapTxQueue
         attr "init"
         attr "sink"
-        attr "software" }
+        attr "software"
+    }
 }
 

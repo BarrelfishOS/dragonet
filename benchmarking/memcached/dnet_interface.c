@@ -487,7 +487,7 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
     // thread level dragonet-stack specific lock
     dn_tstate->tindex = threads_initialized_count;
     ++threads_initialized_count;
-    pthread_mutex_unlock(&dn_init_lock);
+//    pthread_mutex_unlock(&dn_init_lock);
 
 
     pthread_mutex_lock(&dn_tstate->dn_lock);
@@ -507,11 +507,12 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
     mprint("%s:%s:%d: [TID:%d], \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
 
 
-    pthread_mutex_lock(&dn_init_lock);
+    //pthread_mutex_lock(&dn_init_lock);  // FIXME: temararily disabled
+
     // create a socket
     ret = dnal_socket_create(dn_tstate->daq, &dn_tstate->dsh);
     err_expect_ok(ret);
-    uint64_t sockid = get_socket_id(dn_tstate->dsh);
+    uint64_t sockid = 0 ; // get_socket_id(dn_tstate->dsh);
 
     mprint("%s:%s:%d: [TID:%d], [appName:%s], [sockid:%"PRIu64"]\n", __FILE__, __FUNCTION__, __LINE__,
             dn_tstate->tindex, dn_tstate->app_slot, sockid);
@@ -519,7 +520,8 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
     mprint("%s:%s:%d: [TID:%d], \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
 
     // If this is first thread then bind, else span
-    if (dn_tstate->tindex < filter_count) {
+    //if (dn_tstate->tindex < filter_count) {
+    if (dn_tstate->tindex == 0) {
 
         mprint("debug: %s:%s:%d: [TID:%d], directing specified flow to this thread\n",
                 __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
@@ -542,7 +544,7 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
                 __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex,
                 dn_tstate->dnd.data.ip4udp.port_local
                 );
-        print_socket_details(dn_tstate->dsh);
+        //print_socket_details(dn_tstate->dsh);
         err_expect_ok(dnal_socket_bind(dn_tstate->dsh, &dn_tstate->dnd));
 
         if (dsh_first == NULL) {

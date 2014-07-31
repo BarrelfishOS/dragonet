@@ -7,8 +7,9 @@ import Runner.Common
 pg4tap :: PGraph -> PGraph
 pg4tap pg = tagNodes "" $ renameQueues "TapRxQueue" "TapTxQueue" pg
 
-main :: IO ()
-main = do
+
+main_working :: IO ()
+main_working = do
     (nQ, apps) <- parseDNArgs
     putStrLn $ "Running hardware queues: " ++ show nQ
     putStrLn $ "Running with app slots: " ++ show apps
@@ -105,4 +106,5 @@ main_old = do
         pstate = INC.policyStateInit nQ sfS SFP.sfPolicy
     runStackParsed apps (pg4sf nQ) pstate sfAction helpers
 
+main = main_old
 

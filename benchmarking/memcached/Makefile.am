@@ -43,6 +43,7 @@ SHMCHANLIB = $(shell find ../../external/shmchan/dist/ -name "libHSshmchan*" -ex
 
 DRAGONETAPP_INCLUDES = -I../../Dragonet/c_impl/include/ \
 		       -I../../Dragonet/lib/Dragonet/Pipelines/ \
+		       -I../../Dragonet/stack/Runner/ \
 		       -I../../Dragonet/apps/lib/include/
 DRAGONETAPPLIB = $(shell find ../../Dragonet/apps/dist/ -name "libHSapps*" -exec dirname {} \;)
 

@@ -313,8 +313,9 @@ static void handle_event(struct dnal_aq_event *event, struct cfg_thread *th)
 /*    if ((th->packetCount % 1000) == 0) {
         printf("HWQ:%d, TID:%d:%d: Echo-back to dest: %"PRIu64"\n",
            in->qid, th->localtid, (int)pthread_self(), th->packetCount);
-    }
+   }
 */
+
     ++th->packetCount;
 
 /*
