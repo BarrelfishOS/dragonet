@@ -157,6 +157,34 @@ eventHandler sstv ch (PLA.EvSocketUDPListen (ip,port)) = do
     PLA.sendMessage ch $ PLA.MsgSocketInfo sid
     ssUpdateGraphs ss sstv
 
+eventHandler sstv ch (PLA.EvSocketUDPFlow (sIp,sP) (dIp,dP)) = do
+    (sid,ss) <- STM.atomically $ do
+        ss <- STM.readTVar sstv
+        -- TODO: check overlapping
+        let Just aid = M.lookup ch $ ssAppChans ss
+            sid = ssNextSocketId ss
+            eid = ssNextEndpointId ss
+            ep = EndpointUDPIPv4 {
+                    edSockets = [sid],
+                    edIP4Src =if sIp == 0 then Nothing else Just sIp,
+                    edIP4Dst = if dIp == 0 then Nothing else Just dIp,
+                    edUDPSrc = if sP == 0 then Nothing else Just sP,
+                    edUDPDst = if dP == 0 then Nothing else Just dP
+                }
+            sd = SocketDesc { sdAppId = aid, sdEpId = eid }
+            ss' = ss {
+                ssNextSocketId = sid + 1,
+                ssNextEndpointId = eid + 1,
+                ssSockets = M.insert sid sd $ ssSockets ss,
+                ssEndpoints = M.insert eid ep $ ssEndpoints ss
+            }
+        STM.writeTVar sstv $ ss'
+        return (sid,ss')
+    putStrLn $ "SocketUDPFlow f=" ++ show (sIp,sP) ++ "/" ++ show (dIp,dP) ++
+        " -> " ++ show sid
+    PLA.sendMessage ch $ PLA.MsgSocketInfo sid
+    ssUpdateGraphs ss sstv
+
 eventHandler sstv ch (PLA.EvSocketSpan oldsid) = do
     (sid,ss) <- STM.atomically $ do
         ss <- STM.readTVar sstv

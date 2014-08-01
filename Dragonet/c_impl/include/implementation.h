@@ -46,6 +46,14 @@ get_tsc(void) {
 #endif // MYDEBUGV
 
 
+// Shows packet classification after every 'INTERVAL_STAT_FREQUENCY' packet.
+//  This is for debugging purpose to show where exactly packets are going
+//  Currently supported by E10k queues, fancyecho
+#define SHOW_INTERVAL_STATS  1
+#define INTERVAL_STAT_FREQUENCY     1000
+
+
+
 #define DEFAULT_BUFFER_SIZE 2048
 
 typedef int node_out_t;

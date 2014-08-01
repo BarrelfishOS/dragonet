@@ -52,9 +52,15 @@ static void control_send(struct dnal_app_queue *aq,
 static void control_recv(struct dnal_app_queue *aq,
                          struct app_control_message *msg)
 {
-    if (recv(aq->control_fd, msg, sizeof(*msg), MSG_WAITALL) != sizeof(*msg)) {
-        perror("control_recv: Incomplete recv");
-        abort();
+    ssize_t res, total = 0;
+    while (1) {
+        if ((res = recv(aq->control_fd, ((uint8_t *)msg + total), (sizeof(*msg) - total), MSG_WAITALL)) < 0) {
+            perror("control_recv: Incomplete recv");
+            abort();
+        }
+        total += res;
+        if (total == sizeof(*msg)) break;
+        //printf("came here %d\n", (int)total);
     }
 }
 

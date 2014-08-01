@@ -3,7 +3,7 @@
 
 #include "dynamic.h"
 
-#define DYNR_MAXNAME 40
+#define DYNR_MAXNAME 80
 
 typedef uint64_t dynr_queue_t;
 typedef uint64_t dynr_node_t;

@@ -8,6 +8,12 @@
 #include <udpproto.h>
 #include <proto_ipv4.h>
 #include <dragonet/app_lowlevel.h>
+#include <implementation.h>
+
+// NOTE: Moved to c_impl/include/implementation.h
+//#define SHOW_INTERVAL_STATS  1
+//#define INTERVAL_STAT_FREQUENCY     1000
+
 
 struct cfg_udpep {
     uint32_t             l_ip;
@@ -295,6 +301,7 @@ static void parse_params(int argc, char *argv[])
 
 }
 
+
 static void handle_event(struct dnal_aq_event *event, struct cfg_thread *th)
 {
     struct input *in;
@@ -309,12 +316,15 @@ static void handle_event(struct dnal_aq_event *event, struct cfg_thread *th)
     dest.data.ip4udp.port_local = udp_hdr_dport_read(in);
     dest.data.ip4udp.port_remote = udp_hdr_sport_read(in);
 
+#if SHOW_INTERVAL_STATS
     // Print the stats after every 1K packets.
-/*    if ((th->packetCount % 1000) == 0) {
-        printf("HWQ:%d, TID:%d:%d: Echo-back to dest: %"PRIu64"\n",
-           in->qid, th->localtid, (int)pthread_self(), th->packetCount);
+    if ((th->packetCount % INTERVAL_STAT_FREQUENCY) == 0) {
+        printf("TID:%d:%d: Echo-back to dest: %"PRIu64"\n",
+           th->localtid, (int)pthread_self(), th->packetCount);
    }
-*/
+#endif // SHOW_INTERVAL_STATS
+
+
 
     ++th->packetCount;
 

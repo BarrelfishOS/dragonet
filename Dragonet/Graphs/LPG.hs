@@ -130,8 +130,8 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addEndpoint tuples
                 -- Add attributes to filter node
                 fAttrs = map PG.NAttrCustom $ catMaybes [
                     Just "udpdemux",
-                    do { i <- msIP ; return $ "srcip=" ++ show i },
-                    do { i <- mdIP ; return $ "dstip=" ++ show i },
+                    do { i <- msIP' ; return $ "srcip=" ++ show i },
+                    do { i <- mdIP' ; return $ "dstip=" ++ show i },
                     do { i <- msP ; return $ "srcport=" ++ show i },
                     do { i <- mdP ; return $ "dstport=" ++ show i }]
                 addFAttrs n = PG.nAttrsAdd fAttrs n

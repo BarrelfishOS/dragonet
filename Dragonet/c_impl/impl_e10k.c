@@ -46,6 +46,12 @@
 #define CONFIG_PCI_ADDR "0000:04:00.1"
 #define CONFIG_LOCAL_IP  0x0a71045f //   "10.113.4.95"
 
+
+// NOTE: Moved to c_impl/include/implementation.h
+//#define SHOW_INTERVAL_STATS  1
+//#define INTERVAL_STAT_FREQUENCY     1000
+
+
 struct mem_region_alloc {
     void    *virt;
     uint64_t phys;
@@ -272,8 +278,9 @@ out_err:
     return false;
 }
 
-#define MAX_QUEUES          16
+#define MAX_QUEUES                     128
 static uint64_t qstat[MAX_QUEUES] = {0, 0};
+
 static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
     struct state *state, struct input **in, uint8_t qi)
 {
@@ -347,13 +354,16 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
         port = P_E10kRxQueue0_drop;
         goto add_buf;
     }
+
+#if SHOW_INTERVAL_STATS
     //printf("e10k: Yay, we got a full packet!\n");
-    if (qstat[qi] % 1000 == 0) {
-        //printf
-        dprint
+    if (qstat[qi] % INTERVAL_STAT_FREQUENCY == 0) {
+        printf
+//        dprint
             ("QueueID:%"PRIu8":[TID:%d]: has handled %"PRIu64" packets\n",
                qi, (int)pthread_self(), qstat[qi]);
-    }
+   }
+#endif // SHOW_INTERVAL_STATS
     ++qstat[qi];
 
     qin->qid = qi;
