@@ -394,9 +394,9 @@ int vi_send(struct vi* vi, struct pkt_buf* pkt_buf, int off, int len)
   }
 
   assert(pkt_buf->n_refs == 1);
-  ef_vi_transmit_push(&vi->vi);
   ++pkt_buf->n_refs;
   assert(pkt_buf->n_refs == 2);
+  ef_vi_transmit_push(&vi->vi);
   return rc;
 }
 

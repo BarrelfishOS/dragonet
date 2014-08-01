@@ -48,8 +48,8 @@ get_tsc(void) {
 
 // Shows packet classification after every 'INTERVAL_STAT_FREQUENCY' packet.
 //  This is for debugging purpose to show where exactly packets are going
-//  Currently supported by E10k queues, fancyecho
-#define SHOW_INTERVAL_STATS  1
+//  Currently supported by E10k queues,  sf queues, fancyecho
+//#define SHOW_INTERVAL_STATS  1
 #define INTERVAL_STAT_FREQUENCY     1000
 
 

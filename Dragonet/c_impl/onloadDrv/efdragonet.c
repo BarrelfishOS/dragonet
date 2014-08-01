@@ -722,12 +722,14 @@ node_out_t rx_queue(
         return P_RxQueue_drop;
     }
 
-    if (qstat[qi] % 1000 == 0) {
-        //printf
-        dprint
+#if SHOW_INTERVAL_STATS
+    if (qstat[qi] % INTERVAL_STAT_FREQUENCY == 0) {
+        //dprint
+        printf
             ("QueueID:%"PRIu8":[TID:%d]: has handled %"PRIu64" packets\n",
                qi, (int)pthread_self(), qstat[qi]);
     }
+#endif // SHOW_INTERVAL_STATS
     ++qstat[qi];
 
     (*in)->qid = qi;

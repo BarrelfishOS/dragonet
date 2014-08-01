@@ -672,11 +672,12 @@ int pl_enqueue(queue_handle_t queue, struct input *in)
     dprintf("pl_enqueue: enter\n");
     struct bulk_ll_channel *chan = queue;
     struct dragonet_queue *q = chan->user_state;
-    struct dragonet_pipeline *pl = q->pl;  // for debug prints
+    struct dragonet_pipeline *pl = q->pl;  // for debug print bellow
 
     dprintf("pl_enqueue: q-name:%s, pl name: %s, stack: %s, id: %"PRIu32", len  %d, attr_buffer=%p, data_buffer=%p\n",
             q->name, pl->name, pl->stackname, pl->id, (int)in->len,
             in->attr_buffer, in->data_buffer);
+    assert(pl != NULL);
 
     struct dragonet_bulk_meta meta = {
         .len = in->len, .off = in->space_before, };
