@@ -1,29 +1,56 @@
+We already have two scenarios: load-balancing and QoS
+- load balancing: flows are equally distributed among queues
+- QoS: we consider two classes:
+  . GOLD: requires 1 queue for every X flows up until the point
+    where all queues are allocated
+  . BEST EFFORT: whatever queues remain from GOLD.  But, if there
+    are BE flows they get at least one queue. Hence, if there are
+    BE flows, GOLD gets maximum N-1 queues.
+  . each class has its own exlusive set of queues
+  . each class is load balanced (i.e., the first goal)
 
-Scenarios:
- - load balancing: flows are equally distributed among queues
- - QoS: two classes
-    - gold: requires 1 queue for every X flows up until the point where all queues are allocated
-    - best effort: remaining queues, but if there are flows it gets at least one queue
-      So, if there are best efforst flows, the gold class will get up to N-1 queues
-    - queues are exlusively assigned to gold and best effort classes
-    - inside each class -> load balancing (see above)
+These scenarios are also described in the paper. There I talk
+about packet rates instead of number of flows. I think for now we
+can assume that each flow has the same packet rate, and just
+operate on number of flows.
 
-Solver approaches
------------------
+We discussed some approaches as starting points for the solver,
+since exploring the whole configuration space seems to be
+impractical. I propose the following as a starting point:
 
-a) The solver knows the number of queues (e.g., number of CPUs) and produces an
-   assignment of flows to queues. You can do that greedily:
+The solver has the following interface to the configuration space:
+ - A set of typed unasigned variables. The types can be based on
+   flows or numbers within a particular range (for queues
+   numbers).
+
+ - The solver can assign values to the configuration space, this
+   will produce a new, partial configuration space. Once there
+   are no unassigned variables, the configuration is done.
+
+ - There are variables that need to be assigned together. For
+   example, you cannot just add a flow to a filter, you need to
+   also specify the number of the queue to steer packets to.
+
+ - A way to finalize a partial configuration space. For example,
+   once you have assigned one (filter, queue) pair, you should be
+   able to finalize the configuration although there are still
+   unasigned variables. The unsigned variables will be filled in
+   with default values
+
+The latter allows for performing greedy search, because we can
+evaluate partial solutions. I think we should start with greedy
+search, because it is (very) simple and not too expensive.
+
+Hence in this example a greedy search would look like:
+ . solver input: N flows and an optimization function
+ . find the optimal assignment for the 1st of N flows
+ .  ... for the 2nd ...
+ .  ...
+
+Another approach:
+The solver knows the number of queues (e.g., number of CPUs) and produces an
+ assignment of flows to queues. You can do that greedily:
     . assign the 1st flow so the the optimize function is maximized
     . assign the 2nd flow so the the optimize function is maximized
     . ...
     . assign the Nth flow optimally
-
-b) The solver has an interface to the configuration space where it can:
-   . add a flow to value
-   . finalize configuration to receive a full configuration
-
-   Again, we can operate greedily
-   . assign the 1st flow optimally
-   . assign the 2nd flow optimally
-   . ...
-   assign the Nth flow optimally
