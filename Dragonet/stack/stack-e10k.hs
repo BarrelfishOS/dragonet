@@ -18,14 +18,17 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Word
 
+numQueues :: Integer
+numQueues = 4
 
 -- Does not really matter as we only have one config
 costFunction :: StackState -> O.CostFunction Int
 costFunction _ _ = 1
 
+
 -- Start out with a dummy configuration for e10k
-oracle :: PG.PGraph -> StackState -> [(String,C.Configuration)]
-oracle _ _ = [("default",[
+oracleHardcoded :: PG.PGraph -> StackState -> [(String,C.Configuration)]
+oracleHardcoded _ ss = [("default",[
                 ("RxCFDirFilter", PG.CVList []),
                 ("RxC5TupleFilter", PG.CVList [
 
@@ -267,10 +270,34 @@ oracle _ _ = [("default",[
                         PG.CVInt 0 ]
 
 -}
+                ])])]
 
+oracle :: PG.PGraph -> StackState -> [(String,C.Configuration)]
+oracle _ ss = [("default",[
+                    ("RxCFDirFilter", PG.CVList []),
+                    ("RxC5TupleFilter", PG.CVList fiveTupleC)
+                    ])]
+    where
+        queues = [1..(numQueues-1)] ++ [0]
+        fiveTupleC = map mkEp5T $ zip (cycle queues) $ take 128 $
+                    M.elems $ ssEndpoints ss
+        mkEp5T (queue,ep) = PG.CVTuple [
+                                cvMInt sIP, cvMInt dIP,
+                                PG.CVMaybe $ Just $ PG.CVEnum 1,
+                                cvMInt sP, cvMInt dP,
+                                PG.CVInt prio,
+                                PG.CVInt queue ]
+            where
+                sIP = edIP4Src ep
+                dIP = edIP4Dst ep
+                sP = edUDPSrc ep
+                dP = edUDPDst ep
+                nJust Nothing = 0
+                nJust (Just _) = 1
+                cvMInt :: Integral a => Maybe a -> PG.ConfValue
+                cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
+                prio = (1 +) $ sum [nJust sIP, nJust dIP, nJust sP, nJust dP]
 
-                    ])
-                ])]
 
 data CfgAction =
     CfgASet5Tuple Word8 CTRL.FTuple |
