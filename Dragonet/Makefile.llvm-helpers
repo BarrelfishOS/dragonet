@@ -71,7 +71,8 @@ cfiles_cimpl_e10k = $(CIMPL_DIR)/impl_e10k.c \
                     $(CIMPL_DIR)/e10k/e10k_phy.c \
                     $(CIMPL_DIR)/e10k/linux_hugepage.c \
                     $(CIMPL_DIR)/e10k/linux_pci_uio.c
-cfiles_cimpl_sf =   $(CIMPL_DIR)/onloadDrv/efdragonet.c \
+cfiles_cimpl_sf =   $(CIMPL_DIR)/impl_sf.c \
+		    $(CIMPL_DIR)/onloadDrv/efdragonet.c \
                     $(CIMPL_DIR)/onloadDrv/efvi_sfw.c
 
 #ofiles_sf_related =  efdragonet.o efvi_sfw.o
@@ -120,7 +121,9 @@ $(BUILD_DIR)/llvm-helpers-e10k.bc: $(BUILD_DIR)/llvm-c_impl-e10k.bc $(helpers_co
 	$(LLVM_LINK) $^ -o $@
 
 $(BUILD_DIR)/llvm-helpers-sf.bc: $(BUILD_DIR)/llvm-c_impl-sf.bc $(helpers_common)
-	$(LLVM_LINK) $^ -o $@ # -L ../../openonload-201310-u2/build/gnu_x86_64/lib/ciul/ -Wl,-no-as-needed -lciul
+	$(LLVM_LINK) $^ -o $@
+
+	# -L ../../openonload-201310-u2/build/gnu_x86_64/lib/ciul/ -Wl,-no-as-needed -lciul
 
 
 # dyn helpers

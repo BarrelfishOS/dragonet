@@ -50,6 +50,7 @@
 #include <etherfabric/pd.h>
 #include <etherfabric/memreg.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 #define ROUND_UP(p, align)   (((p)+(align)-1u) & ~((align)-1u))
 
@@ -190,6 +191,76 @@ struct pkt_buf {
 #define TX_RQ_ID_PB(rq_id)       ((rq_id) & 0xfff)
 
 
+
+
+
+// #################################### related to sf control #############
+//struct vi* vis_local = NULL;
+
+
+// ############################ from e10kControl #########################
+
+#define QUEUE_INDEX(q) ((q) - (q)->sf->queues)
+
+typedef void * sf_queue_t;
+
+struct dragonet_sf;
+
+struct dragonet_sf_queue {
+    struct dragonet_sf *sf;
+    bool populated;
+    bool chained;
+    uint8_t qid;
+    sf_queue_t queue;
+    struct vi *queue_handle;
+    int refill_counter_local;
+    int tx_event_count;
+    int tx_discard_event_count;
+    int rx_event_count;
+    int no_event_count;
+    int event_count;
+    int rx_pkts;
+    int tx_pkts;
+    ef_request_id ids[EF_VI_TRANSMIT_BATCH];
+    ef_event evs[EF_VI_RX_BATCH];
+
+    // buffered RX packets (as we process one packet at time)
+    int evs_rx_buffered_indexes[EF_VI_RX_BATCH];
+    int evs_bufferd_rx_total;       // total buffered RX packet
+    int evs_bufferd_rx_last;     // last packet that was reported to userspace
+};
+
+struct dragonet_sf {
+//    struct usp_pci_desc dev;
+//    struct sf_card card;
+    struct net_if *sfif;
+    struct dragonet_sf_queue *queues;
+};
+
+int alloc_filter_default(struct dragonet_sf_queue *sfq);
+int alloc_filter_full_ipv4(struct dragonet_sf_queue *sfq, int protocol,
+            uint32_t localip, uint16_t localport,
+            uint32_t remoteip, uint16_t remoteport);
+int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
+            uint32_t localip, uint16_t localport);
+
+
+// #################################### related to sf control #############
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 struct net_if*
 net_if_alloc(int net_if_id, const char* name, int rss_set_size);
 
@@ -239,6 +310,25 @@ int buf_details(struct pkt_buf* pkt_buf, char *buff, int l);
 #else
 #define dprint2(x...)   ((void)0)
 #endif // MYDEBUG
+
+
+void call_spawn_handle(void *context);
+struct input *call_input_alloc(void);
+// This value should be set based on the parameter to llvm-cgen-sf
+#define SF_MAX_QUEUES           (4)
+
+// this one is connected via switch on asiago
+#define IFNAME              "p801p1"
+#define CONFIG_LOCAL_MAC_sf  0x644d07530f00ULL  // "00:0f:53:07:4d:64"
+#define CONFIG_LOCAL_IP_sf   0x0a7104c3         // "10.113.4.195"
+
+
+// this one is connected via switch on appenzeller
+//#define IFNAME              "p6p2"
+//#define CONFIG_LOCAL_MAC_sf  0x495107530f00ULL  // "00:0f:53:07:51:49"
+//#define CONFIG_LOCAL_IP_sf   0x0a710447         // "10.113.4.71"
+
+
 
 
 #endif  /* __EFVI_SFW_H__ */

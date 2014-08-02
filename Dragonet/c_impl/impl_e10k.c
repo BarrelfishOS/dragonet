@@ -295,6 +295,7 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
     node_out_t port;
 
     // Respawn this node
+    // FIXME: shouldn't  value S_E10kRxQueue0_poll should depend which queue-id?
     spawn(context, NULL, S_E10kRxQueue0_poll, SPAWNPRIO_LOW);
 
     if (e10k == NULL) {
@@ -354,6 +355,7 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
         port = P_E10kRxQueue0_drop;
         goto add_buf;
     }
+
 
 #if SHOW_INTERVAL_STATS
     //printf("e10k: Yay, we got a full packet!\n");

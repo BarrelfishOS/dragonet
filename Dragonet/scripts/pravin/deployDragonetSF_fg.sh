@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -x
+set -e
+
 SCRIPTDIR="./scripts/pravin/"
 ${SCRIPTDIR}/deployPrepare.sh
 

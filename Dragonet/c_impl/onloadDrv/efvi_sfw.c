@@ -381,21 +381,24 @@ int vi_send_v2(struct vi* vi, struct pkt_buf* pkt_buf, int off, int len)
 }
 
 
-// Sends packet and increases the n_refs by 1.
-// It should be 2 here.
+// Sends packet dont touch the the buffer atall after this point
+//  as RX side will get the notification of TX done anytime from now onwards
+// ref count should be 1 here.
 int vi_send(struct vi* vi, struct pkt_buf* pkt_buf, int off, int len)
 {
   assert(pkt_buf->n_refs == 1);
+  //++pkt_buf->n_refs;
+  //assert(pkt_buf->n_refs == 2);
   int rc;
   rc = ef_vi_transmit_init(&vi->vi, pkt_buf->addr[vi->net_if->id] + off, len,
                       MK_TX_RQ_ID(pkt_buf->vi_owner->id, pkt_buf->id));
   if( rc != 0 ) {
     printf("%s:%d: ERROR: pkt DMA failed %d\n", __func__, __LINE__, rc);
+    //--pkt_buf->n_refs;
+    assert(pkt_buf->n_refs == 1);
+    return rc;
   }
 
-  assert(pkt_buf->n_refs == 1);
-  ++pkt_buf->n_refs;
-  assert(pkt_buf->n_refs == 2);
   ef_vi_transmit_push(&vi->vi);
   return rc;
 }

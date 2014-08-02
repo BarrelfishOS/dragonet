@@ -92,17 +92,27 @@ executable stack-sf
     build-depends:      Dragonet, base, smtLib, fgl, containers, mtl, directory,
                         llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
                         transformers
+    --ghc-options:        -threaded -lciul -L/lib/
     ghc-options:        -threaded
-    C-sources:          stack/Runner/dyn_remote_client.c
-    Include-dirs:       c_impl/include,
-                        c_impl/e10k/include
+    C-sources:          stack/Runner/dyn_remote_client.c,
+--                        c_impl/onloadDrv/efdragonet.c,
+                        c_impl/onloadDrv/sf_control.c,
+--                        c_impl/impl_sf.c,
+--                        c_impl/implementation.c,
+--                        stack/Runner/dyn_helpers.c,
+                        c_impl/onloadDrv/efvi_sfw.c
+    Include-dirs:       c_impl/include
+                        ../openonload-201310-u2/src/include/
     CC-options:         -Wall -Wno-unused-function
+    extra-lib-dirs:     ../openonload-201310-u2/build/gnu_x86_64/lib/ciul/
+    extra-libraries:    ciul
     x-helpers-files:    llvm-dyn-helpers.bc,
                         llvm-helpers-sf.bc
     x-helpers-makefile: Makefile.llvm-helpers
     x-helpers-includes: c_impl/include,
                         lib/Dragonet/Pipelines,
                         ../external/bulktransfer/lib/include,
+                        c_impl/e10k/include,
                         ../openonload-201310-u2/src/include/
     default-language:   Haskell2010
 

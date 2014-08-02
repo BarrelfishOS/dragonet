@@ -31,7 +31,6 @@ oracleHardcoded :: PG.PGraph -> StackState -> [(String,C.Configuration)]
 oracleHardcoded _ ss = [("default",[
                 ("RxCFDirFilter", PG.CVList []),
                 ("RxC5TupleFilter", PG.CVList [
-
  -- ############# For only 1 core #############
                      PG.CVTuple [
                         PG.CVMaybe Nothing, -- $ Just $ PG.CVInt $ fromIntegral 175178809, -- srcAddr,
@@ -227,7 +226,7 @@ oracleHardcoded _ ss = [("default",[
 
 
 {-
- -- ############# For only 4 core #############
+ -- ############# For only 4 core (with wildcards) #############
 
                      PG.CVTuple [
                         PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178809, -- srcAddr,
@@ -270,6 +269,7 @@ oracleHardcoded _ ss = [("default",[
                         PG.CVInt 0 ]
 
 -}
+
                 ])])]
 
 oracle :: PG.PGraph -> StackState -> [(String,C.Configuration)]
@@ -421,7 +421,6 @@ main = do
     tcstate <- STM.newTVarIO state
     chan <- STM.newTChanIO
 
-{-
  -- ############# For only 1 core #############
     STM.atomically $ STM.writeTChan chan $
         CfgASet5Tuple 0 $ CTRL.FTuple {
@@ -435,7 +434,6 @@ main = do
                 CTRL.ftL4Src = Nothing, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
             }
--}
 
 {-
  -- ############# For only 8 cores #############
@@ -546,7 +544,7 @@ main = do
             }
 
 
-        -- ### for 12 cores ###
+        -- ############### for 12 cores #####################
 
     STM.atomically $ STM.writeTChan chan $
         CfgASet5Tuple 8 $ CTRL.FTuple {
@@ -602,8 +600,7 @@ main = do
             }
 
 
-
-        -- ### for 12 cores ###
+       -- ################# for 16 cores ################
 
     STM.atomically $ STM.writeTChan chan $
         CfgASet5Tuple 12 $ CTRL.FTuple {
@@ -661,7 +658,7 @@ main = do
 
 
 {-
- -- ############# For only 4 core #############
+ -- ############# For only 4 core (with wildcards) #############
  --
     STM.atomically $ STM.writeTChan chan $
         CfgASet5Tuple 2 $ CTRL.FTuple {
@@ -719,10 +716,12 @@ main = do
 -}
 
 {-
-10.113.4.96 # Burrata
-10.113.4.20 # gruyere
-10.113.4.29 # sbrinz2
-10.113.4.57 # ziger2
+# 10.113.4.96  # Burrata # 175178848
+# 10.113.4.20  # gruyere # 175178772
+# 10.113.4.57  # ziger2  # 175178809
+# 10.113.4.29  # sbrinz2 # 175178781
+# 10.113.4.95  # Asiago  # 175178847  # Intel
+# 10.113.4.195 # Asiago  # 175178947  # solarflare
 -}
 
     -- Prepare graphs and so on

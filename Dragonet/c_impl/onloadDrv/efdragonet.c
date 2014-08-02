@@ -42,7 +42,6 @@
 ** SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
 /* efforward
  *
  * Forward packets between two interfaces without modification.
@@ -72,22 +71,11 @@
 #define LOGW(x)  do{ x; }while(0)
 #define LOGI(x)  do{}while(0)
 
-struct vi* vis_local = NULL;
+//struct vi* vis_local = NULL;
 
-// this one is connected via switch on asiago
-#define IFNAME              "p801p1"
-#define CONFIG_LOCAL_MAC_sf  0x644d07530f00ULL  // "00:0f:53:07:4d:64"
-#define CONFIG_LOCAL_IP_sf   0x0a7104c3         // "10.113.4.195"
-
-// this one is connected via switch on appenzeller
-//#define IFNAME              "p6p2"
-//#define CONFIG_LOCAL_MAC_sf  0x495107530f00ULL  // "00:0f:53:07:51:49"
-//#define CONFIG_LOCAL_IP_sf   0x0a710447         // "10.113.4.71"
-
-
+#if 0
 
 // ############################ from e10kControl #########################
-static int QUEUES = 4;  // This value should be set based on the parameter to llvm-cgen-sf
 
 #define QUEUE_INDEX(q) ((q) - (q)->sf->queues)
 
@@ -123,7 +111,7 @@ struct dragonet_sf {
 //    struct usp_pci_desc dev;
 //    struct sf_card card;
     struct net_if *sfif;
-    //struct dragonet_sf_queue queues[QUEUES];
+    //struct dragonet_sf_queue queues[SF_MAX_QUEUES];
     struct dragonet_sf_queue *queues;
 };
 
@@ -309,6 +297,41 @@ int alloc_filter_full_ipv4(struct dragonet_sf_queue *sfq, int protocol,
     return 1;
 } // end function: alloc_filter_full_ipv4
 
+#endif // 0
+
+
+
+struct vi *alloc_queue(struct net_if *myif);
+size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
+    size_t buf_len);
+void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len,
+        uint8_t qi);
+struct vi *alloc_queue(struct net_if *myif)
+{
+    struct vi* vis;
+    vis = vi_alloc(0, myif, EF_VI_FLAGS_DEFAULT);
+    return vis;
+} // end function: alloc_queue
+
+int alloc_filter_default(struct dragonet_sf_queue *sfq);
+int alloc_filter_default(struct dragonet_sf_queue *sfq)
+{
+    assert(sfq != NULL);
+    struct vi *vis = sfq->queue_handle;
+    assert(vis != NULL);
+
+    // setting up filter
+    ef_filter_spec filter_spec;
+    ef_filter_spec_init(&filter_spec, EF_FILTER_FLAG_NONE);
+    TRY(ef_filter_spec_set_unicast_all(&filter_spec));
+    TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
+    //dprint
+    printf
+        ("%s:%s:%d: [vq:%p], [qid:%"PRIu8"], done\n",
+            __FILE__, __func__, __LINE__, sfq, sfq->qid);
+    return 1;
+} // end function: alloc_filter_default
+
 
 
 
@@ -372,6 +395,7 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
             ++pkt_received_count;
             pkt_buf_release(pkt_buf);
 
+
             pkt_received = copylen;
             ++sfq->refill_counter_local;
             if (sfq->refill_counter_local >=  REFILL_BATCH_SIZE) {
@@ -433,9 +457,17 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
                     n = ef_vi_transmit_unbundle(&viff->vi, &sfq->evs[i], sfq->ids);
                     for( j = 0; j < n; ++j ) {
                         pkt_buf = pkt_buf_from_id(viff, TX_RQ_ID_PB(sfq->ids[j]));
-                        assert(pkt_buf->n_refs == 1);
                         assert(pkt_buf->is_tx == 1);
-                        pkt_buf_release(pkt_buf);
+                        if (pkt_buf->n_refs != 1) {
+                            printf("tx_packet with ref id %d, instead of 1\n", (int) pkt_buf->n_refs);
+                            if (pkt_buf->n_refs > 1) {
+                                pkt_buf_release(pkt_buf);
+                                printf("WARNING: couldn't this buffer, so letting it leak with ref_count = %d\n",
+                                        (int) pkt_buf->n_refs);
+                            }
+                        } else {
+                            pkt_buf_release(pkt_buf);
+                        }
                     } // end for:
                     break;
 
@@ -471,7 +503,8 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
 } // end function: get_packet
 
 
-void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len)
+void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len,
+        uint8_t qi)
 {
     assert(sfq != NULL);
     struct vi *vif = sfq->queue_handle;
@@ -514,6 +547,7 @@ void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len)
     // FIXME: make sure that len is smaller than buffer length
     memcpy(buf_addr, pkt_tx, len);
 
+
     dprint("%s:%s:%d: calling vi_send\n", __FILE__, __func__, __LINE__);
     rc = vi_send(vif, pkt_buf, offset, len);
     if( rc != 0 ) {
@@ -522,21 +556,14 @@ void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len)
          * queue in software.  We simply choose not to send.
          */
         dprint("%s:%s:%d: send queue full, so not sending\n", __FILE__, __func__, __LINE__);
-        LOGW(fprintf(stderr, "WARNING: [%s] dropped send\n",
-                    vif->net_if->name));
+        LOGW(fprintf(stderr, "WARNING: [%s] dropped send on queue %"PRIu8"\n",
+                    vif->net_if->name, qi));
+        assert(pkt_buf->n_refs == 1);
+        pkt_buf_release(pkt_buf);
+        return;
     }
 
-    assert(pkt_buf->n_refs == 2);
 
-    // marking that sending is partially done.  The ref counter should still be 1
-    pkt_buf_release(pkt_buf);
-
-    dprint("%s:%s:%d: vi_send done\n", __FILE__, __func__, __LINE__);
-//    buf_details(pkt_buf, printbuf, sizeof(printbuf));
-    //dprint("%s:%s:%d: ###### 3 %s\n", __FILE__, __func__, __LINE__, printbuf);
-
-    // FIXME: Wait for send ACK
-    dprint("%s:%s:%d: buf[] send done\n", __FILE__, __func__, __LINE__);
 } // end function: send_packet
 
 void *init_and_alloc_default_queue(char *name)
@@ -557,7 +584,7 @@ void *init_and_alloc_default_queue(char *name)
 
     // Allocate memory to hold the actual queue elements
     sf_nic->queues = (struct dragonet_sf_queue *)
-                calloc(QUEUES, sizeof(struct dragonet_sf_queue));
+                calloc(SF_MAX_QUEUES, sizeof(struct dragonet_sf_queue));
     assert(sf_nic->queues != NULL);
 
     // connecting to device with given name using openonalod library and storing the handle
@@ -573,7 +600,7 @@ void *init_and_alloc_default_queue(char *name)
 
     // Initialize the queues
     struct dragonet_sf_queue *iq = sf_nic->queues;
-    for (k = 0; k < QUEUES; k++) {
+    for (k = 0; k < SF_MAX_QUEUES; k++) {
         iq[k].sf = sf_nic;
         iq[k].populated = false;
         iq[k].queue_handle = alloc_queue(sf_nic->sfif);
@@ -585,7 +612,7 @@ void *init_and_alloc_default_queue(char *name)
 
     // Create a default filter to make sure that all traffic ends up in queue-0 by default.
     alloc_filter_default(&sf_nic->queues[0]);
-    vis_local = sf_nic->queues[0].queue_handle;
+//    vis_local = sf_nic->queues[0].queue_handle;
 
     dprint("%s:%s:%d: dragonet_nic = %p,  sf_if = %p, (q0 [%p], q1 [%p], q2[%p])\n",
             __FILE__, __func__, __LINE__,
@@ -630,10 +657,10 @@ pktoff_t onload_rx_wrapper(struct dragonet_sf_queue *selected_vqueue,
 
 static
 int onload_tx_wrapper(struct dragonet_sf_queue *selected_vqueue,
-        uint8_t *data, pktoff_t len)
+        uint8_t *data, pktoff_t len, uint8_t qi)
 {
     dprint("calling onload_tx_wrapper...................\n");
-    send_packet(selected_vqueue, (char *)data, len);
+    send_packet(selected_vqueue, (char *)data, len, qi);
     return len;
 }
 
@@ -650,151 +677,11 @@ static void tap_init(struct state *state, char *dev_name)
 //              __FILE__,  __func__, __LINE__, onload_dev, state->tap_handler);
 }
 
-
-#define MAX_QUEUES          16
-static uint64_t qstat[MAX_QUEUES] = {0, 0};
-//node_out_t do_pg__SFRxQueue(struct state *state, struct input *in)
-static
-node_out_t rx_queue(
-        //struct ctx_SFRxQueue *context,
-        struct ctx_TapRxQueue *context,
-        struct state *state, struct input **in, uint8_t qi)
-{
-
-    assert(qi < MAX_QUEUES);
-    struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
-    struct dragonet_sf_queue *q;
-
-    //pktoff_t maxlen;
-    if (sf_driver == NULL) {
-        if (qi != 0) {
-
-            // We'll do the intialization on queue 0
-            dprint("%s:%s:%d: [QID:%"PRIu8"], "
-                "initialization will be done on queue-0, returning\n",
-              __FILE__,  __func__, __LINE__, qi);
-            return P_RxQueue_drop;
-        }
-        tap_init(state, IFNAME);
-
-        // clear up the stats array
-        memset(qstat, 0, sizeof(qstat));
-
-        state->local_mac = CONFIG_LOCAL_MAC_sf;
-        state->local_ip = CONFIG_LOCAL_IP_sf;
-        dprint("%s:%s:%d: ############## Initializing driver %p done\n",
-              __FILE__,  __func__, __LINE__, state->tap_handler);
-
-        // FIXME: enable following line.  I don't know why it generates compiliation error
-        //declare_dragonet_initialized(DN_READY_FNAME, "SF driver started!\n");
-        *in = input_alloc();
-        printf("Initialized\n");
-        return P_RxQueue_init;
-    }
-
-
-    // get handle on queue, and make sure that it is correct
-    assert(qi < QUEUES);
-    assert(sf_driver != NULL);
-    q = sf_driver->queues + qi;
-    assert(q->queue_handle != NULL);
-    ++q->rx_pkts;
-    dprint
-    //printf
-        ("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
-            "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
-            "######## Trying to RX packet\n",
-            __FILE__,  __func__, __LINE__, qi, q->rx_pkts,
-            state->tap_handler, sf_driver->sfif,
-            &sf_driver->queues[0], sf_driver->queues[0].queue_handle,
-            qi, q, q->queue_handle);
-
-
-    *in = input_alloc();
-
-    // start working on RX space
-    pkt_prepend(*in, (*in)->space_before);
-    ssize_t len = onload_rx_wrapper(q, (uint8_t *)(*in)->data, (*in)->len);
-    if (len == 0) {
-        dprint("%s:%d: [QID: %"PRIu8"], [pktid:%d], pkt with zero len\n",
-            __func__, __LINE__, qi, q->rx_pkts);
-        pkt_append(*in, -((*in)->len - len));
-        return P_RxQueue_drop;
-    }
-
-#if SHOW_INTERVAL_STATS
-    if (qstat[qi] % INTERVAL_STAT_FREQUENCY == 0) {
-        //dprint
-        printf
-            ("QueueID:%"PRIu8":[TID:%d]: has handled %"PRIu64" packets\n",
-               qi, (int)pthread_self(), qstat[qi]);
-    }
-#endif // SHOW_INTERVAL_STATS
-    ++qstat[qi];
-
-    (*in)->qid = qi;
-    pkt_append(*in, -((*in)->len - len));
-    dprint
-    //printf
-        ("%s:%d: [QID:%"PRIu8"], [pktid:%d]: ############## pkt received, data: %p, len:%zu\n",
-            __func__, __LINE__, qi, q->rx_pkts, (*in)->data, len);
-    return P_RxQueue_out;
-}
-
-//node_out_t do_pg__SFTxQueue(struct state *state, struct input *in)
-node_out_t tx_queue(
-        struct ctx_TapTxQueue *context,
-        struct state *state, struct input **in, uint8_t qi)
-{
-    struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
-    struct dragonet_sf_queue *q;
-
-    // get handle on queue, and make sure that it is correct
-    assert(qi < QUEUES);
-    assert(sf_driver != NULL);
-    q = sf_driver->queues + qi;
-    assert(q->queue_handle != NULL);
-
-    ++q->tx_pkts;
-    dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
-            "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
-            "######## Trying to send packet, data: %p, len:%"PRIu32"\n",
-            __FILE__,  __func__, __LINE__, qi, q->tx_pkts,
-            state->tap_handler, sf_driver->sfif,
-            &sf_driver->queues[0], sf_driver->queues[0].queue_handle,
-            qi, q, q->queue_handle, (*in)->data, (*in)->len);
-
-    onload_tx_wrapper(q, (*in)->data, (*in)->len);
-
-    dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d]:"
-            "##############  packet sent, data: %p, len:%"PRIu32"\n",
-            __FILE__, __func__, __LINE__, qi, q->tx_pkts, (*in)->data, (*in)->len);
-    //return 0;
-    return P_RxQueue_out;
-}
-
-
 #if 0
-node_out_t do_pg__TapTxQueue(struct ctx_TapTxQueue *context,
-        struct state *state, struct input **in)
-{
-    dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    return  tx_queue(state, *in, 0);
-}
-
-
-node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context,
-        struct state *state, struct input **in)
-{
-    dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    return  rx_queue(state, *in, 0);
-}
-#endif // 0
-
-
 // ############################ from e10kControl #########################
 
 
+void sf_ctrl_waitready(struct state *state);
 void sf_ctrl_waitready(struct state *state)
 {
     struct dragonet_sf *sf;
@@ -804,6 +691,7 @@ void sf_ctrl_waitready(struct state *state)
     } while (sf == NULL);
 }
 
+// FIXME: moved to impl_sf.c file.  should be deleted from here
 bool sf_ctrl_5tuple_unset(struct state *state, uint8_t index)
 {
     assert(!"NYI");
@@ -811,7 +699,7 @@ bool sf_ctrl_5tuple_unset(struct state *state, uint8_t index)
     /*
     struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
     struct dragonet_sf_queue *q;
-    assert(qi < QUEUES);
+    assert(qi < SF_MAX_QUEUES);
     assert(sf_driver != NULL);
     q = sf_driver->queues + qi;
     assert(q->queue_handle != NULL);
@@ -835,7 +723,7 @@ bool sf_ctrl_5tuple_set(struct state *state,
     struct dragonet_sf_queue *q;
     int ret;
     uint8_t qi = queue;
-    assert(qi < QUEUES);
+    assert(qi < SF_MAX_QUEUES);
     assert(sf_driver != NULL);
     q = sf_driver->queues + qi;
     assert(q->queue_handle != NULL);
@@ -856,9 +744,214 @@ bool sf_ctrl_5tuple_set(struct state *state,
     assert(ret == 1);
     return true;
 }
+#endif // 0
+
+// ############################################################
+// ####################### FOR RX and TX  #####################
+// ############################################################
+
+#define MAX_QUEUES                     128
+static uint64_t qstat[MAX_QUEUES] = {0, 0};  // for per queue packets stats
+
+static node_out_t rx_queue_new_v1(struct ctx_E10kRxQueue0 *context,
+    struct state *state, struct input **in, uint8_t qi)
+{
+    node_out_t out_decision = P_RxQueue_drop;
+    assert(qi < MAX_QUEUES);
+    struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
+    struct dragonet_sf_queue *q;
+
+    //pktoff_t maxlen;
+    if (sf_driver == NULL) {
+        if (qi != 0) {
+
+            // We'll do the intialization on queue 0
+            dprint("%s:%s:%d: [QID:%"PRIu8"], "
+                "initialization will be done on queue-0, returning\n",
+              __FILE__,  __func__, __LINE__, qi);
+
+            out_decision =  P_RxQueue_drop;
+            goto spawn_and_return;
+        }
+        tap_init(state, IFNAME);
+
+        // clear up the stats array
+        memset(qstat, 0, sizeof(qstat));
+
+        state->local_mac = CONFIG_LOCAL_MAC_sf;
+        state->local_ip = CONFIG_LOCAL_IP_sf;
+        dprint("%s:%s:%d: ############## Initializing driver %p done\n",
+              __FILE__,  __func__, __LINE__, state->tap_handler);
+
+        // FIXME: enable following line.  I don't know why it generates compiliation error
+        //declare_dragonet_initialized(DN_READY_FNAME, "SF driver started!\n");
+        *in = input_alloc();  // FIXME: uncomment this!!!
+        printf("Initialized\n");
+
+        out_decision = P_RxQueue_init;
+        goto spawn_and_return;
+    }
 
 
-// ################# from impl_sf.c ########################
+    // get handle on queue, and make sure that it is correct
+    assert(qi < SF_MAX_QUEUES);
+    assert(sf_driver != NULL);
+    q = sf_driver->queues + qi;
+    assert(q->queue_handle != NULL);
+    ++q->rx_pkts;
+    dprint
+    //printf
+        ("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
+            "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
+            "######## Trying to RX packet\n",
+            __FILE__,  __func__, __LINE__, qi, q->rx_pkts,
+            state->tap_handler, sf_driver->sfif,
+            &sf_driver->queues[0], sf_driver->queues[0].queue_handle,
+            qi, q, q->queue_handle);
+
+
+    *in = input_alloc();  // FIXME: uncomment this!!!
+
+    // start working on RX space
+    pkt_prepend(*in, (*in)->space_before);
+    ssize_t len = onload_rx_wrapper(q, (uint8_t *)(*in)->data, (*in)->len);
+    if (len == 0) {
+        dprint("%s:%d: [QID: %"PRIu8"], [pktid:%d], pkt with zero len\n",
+            __func__, __LINE__, qi, q->rx_pkts);
+        pkt_append(*in, -((*in)->len - len));
+
+        out_decision = P_RxQueue_drop;
+        goto spawn_and_return;
+    }
+
+#if SHOW_INTERVAL_STATS
+    if (qstat[qi] % INTERVAL_STAT_FREQUENCY == 0) {
+        //dprint
+        printf
+            ("QueueID:%"PRIu8":[TID:%d]: has handled %"PRIu64" packets\n",
+               qi, (int)pthread_self(), qstat[qi]);
+    }
+#endif // SHOW_INTERVAL_STATS
+    ++qstat[qi];
+
+    (*in)->qid = qi;
+    pkt_append(*in, -((*in)->len - len));
+
+
+
+    dprint
+    //printf
+        ("%s:%d: [QID:%"PRIu8"], [pktid:%d]: ############## pkt received, data: %p, len:%zu\n",
+            __func__, __LINE__, qi, q->rx_pkts, (*in)->data, len);
+
+    out_decision = P_RxQueue_out;
+    goto spawn_and_return;
+
+spawn_and_return:
+    // Respawn this node
+    // FIXME: shouldn't  value S_E10kRxQueue0_poll should depend which queue-id?
+    spawn(context, NULL, S_E10kRxQueue0_poll, SPAWNPRIO_LOW);
+    return out_decision;
+} // end function: rx_queue_new_v1
+
+static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
+{
+    struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
+    struct dragonet_sf_queue *q;
+
+    // get handle on queue, and make sure that it is correct
+    assert(qi < SF_MAX_QUEUES);
+    assert(sf_driver != NULL);
+    q = sf_driver->queues + qi;
+    assert(q->queue_handle != NULL);
+
+    ++q->tx_pkts;
+    dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
+            "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
+            "######## Trying to send packet, data: %p, len:%"PRIu32"\n",
+            __FILE__,  __func__, __LINE__, qi, q->tx_pkts,
+            state->tap_handler, sf_driver->sfif,
+            &sf_driver->queues[0], sf_driver->queues[0].queue_handle,
+            qi, q, q->queue_handle, (*in)->data, (*in)->len);
+
+    onload_tx_wrapper(q, (*in)->data, (*in)->len, qi);
+
+    dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d]:"
+            "##############  packet sent, data: %p, len:%"PRIu32"\n",
+            __FILE__, __func__, __LINE__, qi, q->tx_pkts, (*in)->data, (*in)->len);
+    //return 0;
+    return P_RxQueue_out;
+} // end function: tx_queue
+
+
+
+
+// ################# Implementation based on Intel driver ###########
+
+
+node_out_t do_pg__E10kRxQueue0(struct ctx_E10kRxQueue0 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue_new_v1(context, state, in, 0);
+}
+
+node_out_t do_pg__E10kRxQueue1(struct ctx_E10kRxQueue1 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue_new_v1((struct ctx_E10kRxQueue0 *) context, state, in, 1);
+}
+
+node_out_t do_pg__E10kRxQueue2(struct ctx_E10kRxQueue2 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue_new_v1((struct ctx_E10kRxQueue0 *) context, state, in, 2);
+}
+
+node_out_t do_pg__E10kRxQueue3(struct ctx_E10kRxQueue3 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue_new_v1((struct ctx_E10kRxQueue0 *) context, state, in, 3);
+}
+
+
+node_out_t do_pg__E10kTxQueue0(struct ctx_E10kTxQueue0 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 0);
+}
+
+node_out_t do_pg__E10kTxQueue1(struct ctx_E10kTxQueue1 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 1);
+}
+
+node_out_t do_pg__E10kTxQueue2(struct ctx_E10kTxQueue2 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 2);
+}
+
+node_out_t do_pg__E10kTxQueue3(struct ctx_E10kTxQueue3 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 3);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+#if 0
+
+// ################# Implementation that works with tuntap style graph ###########
 
 //node_out_t do_pg__SFRxQueue000(struct state *state, struct input *in)
 node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context,
@@ -870,39 +963,10 @@ node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context,
    // spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
     spawn(context, NULL, S_TapRxQueue_poll, SPAWNPRIO_LOW);
 
-    return rx_queue(context, state, in, 0);
+    return rx_queue_new_v1(context, state, in, 0);
     //return P_RxQueue_out;
     //return P_RxQueue_init;
 }
-
-#if 0
-node_out_t do_pg__SFRxQueue001(struct ctx_SFRxQueue *context,
-        struct state *state, struct input *in)
-{
-    dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    // Respawn this node
-    spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
-    return rx_queue(context, state, in, 1);
-}
-
-node_out_t do_pg__SFRxQueue002(struct ctx_SFRxQueue *context,
-        struct state *state, struct input *in)
-{
-    dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    // Respawn this node
-    spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
-    return rx_queue(context, state, in, 2);
-}
-
-node_out_t do_pg__SFRxQueue003(struct ctx_SFRxQueue *context,
-        struct state *state, struct input *in)
-{
-    dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    // Respawn this node
-    spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
-    return rx_queue(context, state, in, 3);
-}
-#endif // 0
 
 node_out_t do_pg__TapTxQueue(struct ctx_TapTxQueue *context,
 //node_out_t do_pg__SFTxQueue(struct ctx_SFRxQueue *context,
@@ -912,32 +976,6 @@ node_out_t do_pg__TapTxQueue(struct ctx_TapTxQueue *context,
     return tx_queue(context, state, in, 0);
 }
 
-#if 0
-node_out_t do_pg__SFTxQueue001(struct ctx_SFRxQueue *context,
-        struct state *state, struct input *in)
-{
-    dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    // Respawn this node
-    spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
-    return tx_queue(context, state, in, 1);
-}
 
-node_out_t do_pg__SFTxQueue002(struct ctx_SFRxQueue *context,
-        struct state *state, struct input *in)
-{
-    dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    // Respawn this node
-    spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
-    return tx_queue(context, state, in, 2);
-}
-
-node_out_t do_pg__SFTxQueue003(struct ctx_SFRxQueue *context,
-        struct state *state, struct input *in)
-{
-    dprint("%s:%s:%d: called\n", __FILE__,  __func__, __LINE__);
-    // Respawn this node
-    spawn(context, NULL, S_SFRxQueue_poll, SPAWNPRIO_LOW);
-    return tx_queue(context, state, in, 3);
-}
 
 #endif // 0
