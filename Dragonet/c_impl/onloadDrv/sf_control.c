@@ -206,7 +206,7 @@ int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
 
     //dprint
     printf
-        ("%s:%s:%d: [vq:%p, vis:%p], [qid:%"PRIu8"], inserting listen filter proto [%d], "
+        ("%s:%s:%d:[#### IMP ####] [vq:%p, vis:%p], [qid:%"PRIu8"], inserting listen filter proto [%d], "
             "localip [%"PRIx32"] localport[%"PRIx16"]\n",
             __FILE__, __func__, __LINE__, sfq, vis, sfq->qid,
             protocol, localip1, localport1);
@@ -253,12 +253,12 @@ int alloc_filter_full_ipv4(struct dragonet_sf_queue *sfq, int protocol,
 
     //dprint
     printf
-        ("%s:%s:%d: [vq:%p, vis:%p], [qid:%"PRIu8"] inserting full filter proto [%d], "
+        ("%s:%s:%d: [#### IMP ###] [vq:%p, vis:%p], [qid:%"PRIu8"] inserting full filter proto [%d], "
             "localip [%"PRIx32"] localport[%"PRIx16"], "
-            "RemoteIP [%"PRIx32"] RemotePort[%"PRIx16"], error = %d\n",
+            "RemoteIP [%"PRIx32"] RemotePort[%"PRIx16"]\n",
             __FILE__, __func__, __LINE__, sfq, vis, sfq->qid,
             protocol, localip1, localport1,
-            remoteip1, remoteport1, EINVAL);
+            remoteip1, remoteport1);
 
 //    TRY(ef_filter_spec_set_ip4_full(&filter_spec, protocol,
 //                localip, localport, remoteip, remoteport));

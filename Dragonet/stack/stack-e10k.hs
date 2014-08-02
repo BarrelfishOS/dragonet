@@ -18,13 +18,19 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Word
 
+import qualified MachineDetails as MD
+
 numQueues :: Integer
 numQueues = 4
+
+localIP :: Word32
+localIP = MD.asiagoIP_Intel
 
 -- Does not really matter as we only have one config
 costFunction :: StackState -> O.CostFunction Int
 costFunction _ _ = 1
 
+--------------------------------------------------
 
 -- Start out with a dummy configuration for e10k
 oracleHardcoded :: PG.PGraph -> StackState -> [(String,C.Configuration)]
@@ -33,8 +39,8 @@ oracleHardcoded _ ss = [("default",[
                 ("RxC5TupleFilter", PG.CVList [
  -- ############# For only 1 core #############
                      PG.CVTuple [
-                        PG.CVMaybe Nothing, -- $ Just $ PG.CVInt $ fromIntegral 175178809, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe Nothing, -- $ Just $ PG.CVInt $ fromIntegral MD.ziger2IP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -52,8 +58,8 @@ oracleHardcoded _ ss = [("default",[
 
                         -- queue 3
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178809, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.ziger2IP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9000, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -61,8 +67,8 @@ oracleHardcoded _ ss = [("default",[
                         PG.CVInt 3 ],
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178809, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.ziger2IP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9001, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -72,8 +78,8 @@ oracleHardcoded _ ss = [("default",[
 
                         -- queue 2
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178772, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.gruyereIP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9000, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -81,8 +87,8 @@ oracleHardcoded _ ss = [("default",[
                         PG.CVInt 2 ],
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178772, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.gruyereIP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9001, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -93,8 +99,8 @@ oracleHardcoded _ ss = [("default",[
 
                         -- queue 1
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178781, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.sbrinz2IP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9000, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -102,8 +108,8 @@ oracleHardcoded _ ss = [("default",[
                         PG.CVInt 1 ],
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178781, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.sbrinz2IP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9001, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -114,8 +120,8 @@ oracleHardcoded _ ss = [("default",[
                         -- queue 0
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178848, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.burrataIP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9000, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888,
@@ -123,8 +129,8 @@ oracleHardcoded _ ss = [("default",[
                         PG.CVInt 0 ],
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178848, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.burrataIP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9001, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888,
@@ -135,8 +141,8 @@ oracleHardcoded _ ss = [("default",[
 
 
                      , PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178809, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.ziger2IP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9002, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -146,8 +152,8 @@ oracleHardcoded _ ss = [("default",[
 
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178772, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.gruyereIP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9002, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -157,8 +163,8 @@ oracleHardcoded _ ss = [("default",[
 
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178781, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.sbrinz2IP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9002, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -168,8 +174,8 @@ oracleHardcoded _ ss = [("default",[
 
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178848, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.burrataIP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9002, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888,
@@ -181,8 +187,8 @@ oracleHardcoded _ ss = [("default",[
 
 
                      , PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178809, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.ziger2IP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9003, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -192,8 +198,8 @@ oracleHardcoded _ ss = [("default",[
 
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178772, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.gruyereIP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9003, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -203,8 +209,8 @@ oracleHardcoded _ ss = [("default",[
 
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178781, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.sbrinz2IP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9003, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -214,8 +220,8 @@ oracleHardcoded _ ss = [("default",[
 
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178848, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.burrataIP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe $ Just $ PG.CVInt 9003, -- Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888,
@@ -229,8 +235,8 @@ oracleHardcoded _ ss = [("default",[
  -- ############# For only 4 core (with wildcards) #############
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178809, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.ziger2IP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -238,8 +244,8 @@ oracleHardcoded _ ss = [("default",[
                         PG.CVInt 3 ],
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178772, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.gruyereIP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -249,8 +255,8 @@ oracleHardcoded _ ss = [("default",[
 
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178781, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.sbrinz2IP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
@@ -260,8 +266,8 @@ oracleHardcoded _ ss = [("default",[
 
 
                      PG.CVTuple [
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178848, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178847, -- dstAddr
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral MD.burrataIP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe Nothing,
                         PG.CVMaybe $ Just $ PG.CVInt 888,
@@ -421,6 +427,7 @@ main = do
     tcstate <- STM.newTVarIO state
     chan <- STM.newTChanIO
 
+{-
  -- ############# For only 1 core #############
     STM.atomically $ STM.writeTChan chan $
         CfgASet5Tuple 0 $ CTRL.FTuple {
@@ -428,38 +435,84 @@ main = do
                 CTRL.ftQueue = 0,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Nothing, -- Just 175178809, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
+                CTRL.ftL3Src = Nothing, -- Just MD.ziger2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                --CTRL.ftL4Src = Just 9000, -- sPort, lport
+                CTRL.ftL4Src = Nothing, -- sPort, lport
+                CTRL.ftL4Dst = Just 888 -- dPort,
+            }
+-}
+
+{-
+ -- ############# For 2 cores #############
+    STM.atomically $ STM.writeTChan chan $
+        CfgASet5Tuple 0 $ CTRL.FTuple {
+                CTRL.ftPriority = 1,
+                CTRL.ftQueue = 0,
+                CTRL.ftL3Proto = Just CTRL.L3IPv4,
+                CTRL.ftL4Proto = Just CTRL.L4UDP,
+                CTRL.ftL3Src = Nothing, -- Just MD.ziger2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
                 --CTRL.ftL4Src = Just 9000, -- sPort, lport
                 CTRL.ftL4Src = Nothing, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
             }
 
-{-
- -- ############# For only 8 cores #############
- --
-                        -- queue 3 ----
     STM.atomically $ STM.writeTChan chan $
-        CfgASet5Tuple 0 $ CTRL.FTuple {
-                CTRL.ftPriority = 3,
-                CTRL.ftQueue = 3,
+        CfgASet5Tuple 1 $ CTRL.FTuple {
+                CTRL.ftPriority = 2,
+                CTRL.ftQueue = 1,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178809, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
-                CTRL.ftL4Src = Just 9000, -- sPort, lport
+                CTRL.ftL3Src = Just MD.sbrinz2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                --CTRL.ftL4Src = Just 9000, -- sPort, lport
+                CTRL.ftL4Src = Nothing, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
             }
 
     STM.atomically $ STM.writeTChan chan $
-        CfgASet5Tuple 1 $ CTRL.FTuple {
-                CTRL.ftPriority = 3,
-                CTRL.ftQueue = 3,
+        CfgASet5Tuple 2 $ CTRL.FTuple {
+                CTRL.ftPriority = 2,
+                CTRL.ftQueue = 1,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178809, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
-                CTRL.ftL4Src = Just 9001, -- sPort, lport
+                CTRL.ftL3Src = Just MD.burrataIP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                --CTRL.ftL4Src = Just 9000, -- sPort, lport
+                CTRL.ftL4Src = Nothing, -- sPort, lport
+                CTRL.ftL4Dst = Just 888 -- dPort,
+            }
+-}
+
+
+-- ############# For only 4 cores #############
+{-
+
+                        -- queue 0
+    STM.atomically $ STM.writeTChan chan $
+        CfgASet5Tuple 0 $ CTRL.FTuple {
+                CTRL.ftPriority = 3,
+                CTRL.ftQueue = 0,
+                CTRL.ftL3Proto = Just CTRL.L3IPv4,
+                CTRL.ftL4Proto = Just CTRL.L4UDP,
+                CTRL.ftL3Src =  Just MD.burrataIP, --sAddr, laddr -- burrata
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                CTRL.ftL4Src = Just 9000, -- sPort, lport
+                CTRL.ftL4Dst = Just 888 -- dPort,
+            }
+
+
+                        -- queue 1
+    STM.atomically $ STM.writeTChan chan $
+        CfgASet5Tuple 1 $ CTRL.FTuple {
+                CTRL.ftPriority = 3,
+                CTRL.ftQueue = 1,
+                CTRL.ftL3Proto = Just CTRL.L3IPv4,
+                CTRL.ftL4Proto = Just CTRL.L4UDP,
+                CTRL.ftL3Src = Just MD.sbrinz2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                CTRL.ftL4Src = Just 9000, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
             }
 
@@ -471,130 +524,148 @@ main = do
                 CTRL.ftQueue = 2,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178772, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
+                CTRL.ftL3Src = Just MD.gruyereIP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
                 CTRL.ftL4Src = Just 9000, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
             }
 
+
+
+                -- queue 3 ----
     STM.atomically $ STM.writeTChan chan $
         CfgASet5Tuple 3 $ CTRL.FTuple {
                 CTRL.ftPriority = 3,
-                CTRL.ftQueue = 2,
+                CTRL.ftQueue = 3,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178772, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
+                CTRL.ftL3Src = Just MD.ziger2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                CTRL.ftL4Src = Just 9000, -- sPort, lport
+                CTRL.ftL4Dst = Just 888 -- dPort,
+            }
+-}
+
+{-
+
+-- ############# For only 8 cores #############
+ --
+
+
+                        -- queue 0
+    STM.atomically $ STM.writeTChan chan $
+        CfgASet5Tuple 4 $ CTRL.FTuple {
+                CTRL.ftPriority = 3,
+                CTRL.ftQueue = 0,
+                CTRL.ftL3Proto = Just CTRL.L3IPv4,
+                CTRL.ftL4Proto = Just CTRL.L4UDP,
+                CTRL.ftL3Src =  Just MD.burrataIP, --sAddr, laddr -- burrata
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
                 CTRL.ftL4Src = Just 9001, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
             }
 
 
-
                         -- queue 1
-    STM.atomically $ STM.writeTChan chan $
-        CfgASet5Tuple 4 $ CTRL.FTuple {
-                CTRL.ftPriority = 3,
-                CTRL.ftQueue = 1,
-                CTRL.ftL3Proto = Just CTRL.L3IPv4,
-                CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178781, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
-                CTRL.ftL4Src = Just 9000, -- sPort, lport
-                CTRL.ftL4Dst = Just 888 -- dPort,
-            }
-
-
     STM.atomically $ STM.writeTChan chan $
         CfgASet5Tuple 5 $ CTRL.FTuple {
                 CTRL.ftPriority = 3,
                 CTRL.ftQueue = 1,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178781, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
+                CTRL.ftL3Src = Just MD.sbrinz2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
                 CTRL.ftL4Src = Just 9001, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
             }
 
 
-                        -- queue 0
+                        -- queue 2
     STM.atomically $ STM.writeTChan chan $
         CfgASet5Tuple 6 $ CTRL.FTuple {
-                CTRL.ftPriority = 3,
-                CTRL.ftQueue = 0,
-                CTRL.ftL3Proto = Just CTRL.L3IPv4,
-                CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src =  Just 175178848, --sAddr, laddr -- burrata
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
-                CTRL.ftL4Src = Just 9000, -- sPort, lport
-                CTRL.ftL4Dst = Just 888 -- dPort,
-            }
-
-    STM.atomically $ STM.writeTChan chan $
-        CfgASet5Tuple 7 $ CTRL.FTuple {
-                CTRL.ftPriority = 3,
-                CTRL.ftQueue = 0,
-                CTRL.ftL3Proto = Just CTRL.L3IPv4,
-                CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src =  Just 175178848, --sAddr, laddr -- burrata
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
-                CTRL.ftL4Src = Just 9001, -- sPort, lport
-                CTRL.ftL4Dst = Just 888 -- dPort,
-            }
-
-
-        -- ############### for 12 cores #####################
-
-    STM.atomically $ STM.writeTChan chan $
-        CfgASet5Tuple 8 $ CTRL.FTuple {
-                CTRL.ftPriority = 3,
-                CTRL.ftQueue = 3,
-                CTRL.ftL3Proto = Just CTRL.L3IPv4,
-                CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178809, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
-                CTRL.ftL4Src = Just 9002, -- sPort, lport
-                CTRL.ftL4Dst = Just 888 -- dPort,
-            }
-
-
-
-    STM.atomically $ STM.writeTChan chan $
-        CfgASet5Tuple 9 $ CTRL.FTuple {
                 CTRL.ftPriority = 3,
                 CTRL.ftQueue = 2,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178772, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
-                CTRL.ftL4Src = Just 9002, -- sPort, lport
+                CTRL.ftL3Src = Just MD.gruyereIP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                CTRL.ftL4Src = Just 9001, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
             }
 
 
 
+                -- queue 3 ----
     STM.atomically $ STM.writeTChan chan $
-        CfgASet5Tuple 10 $ CTRL.FTuple {
+        CfgASet5Tuple 7 $ CTRL.FTuple {
                 CTRL.ftPriority = 3,
-                CTRL.ftQueue = 1,
+                CTRL.ftQueue = 3,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178781, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
-                CTRL.ftL4Src = Just 9002, -- sPort, lport
+                CTRL.ftL3Src = Just MD.ziger2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                CTRL.ftL4Src = Just 9001, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
             }
 
 
+
+        -- ############### for 12 cores #####################
+
+
+
+                        -- queue 0
     STM.atomically $ STM.writeTChan chan $
-        CfgASet5Tuple 11 $ CTRL.FTuple {
+        CfgASet5Tuple 8 $ CTRL.FTuple {
                 CTRL.ftPriority = 3,
                 CTRL.ftQueue = 0,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src =  Just 175178848, --sAddr, laddr -- burrata
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
+                CTRL.ftL3Src =  Just MD.burrataIP, --sAddr, laddr -- burrata
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                CTRL.ftL4Src = Just 9002, -- sPort, lport
+                CTRL.ftL4Dst = Just 888 -- dPort,
+            }
+
+
+                        -- queue 1
+    STM.atomically $ STM.writeTChan chan $
+        CfgASet5Tuple 9 $ CTRL.FTuple {
+                CTRL.ftPriority = 3,
+                CTRL.ftQueue = 1,
+                CTRL.ftL3Proto = Just CTRL.L3IPv4,
+                CTRL.ftL4Proto = Just CTRL.L4UDP,
+                CTRL.ftL3Src = Just MD.sbrinz2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                CTRL.ftL4Src = Just 9002, -- sPort, lport
+                CTRL.ftL4Dst = Just 888 -- dPort,
+            }
+
+
+                        -- queue 2
+    STM.atomically $ STM.writeTChan chan $
+        CfgASet5Tuple 10 $ CTRL.FTuple {
+                CTRL.ftPriority = 3,
+                CTRL.ftQueue = 2,
+                CTRL.ftL3Proto = Just CTRL.L3IPv4,
+                CTRL.ftL4Proto = Just CTRL.L4UDP,
+                CTRL.ftL3Src = Just MD.gruyereIP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                CTRL.ftL4Src = Just 9002, -- sPort, lport
+                CTRL.ftL4Dst = Just 888 -- dPort,
+            }
+
+
+
+                -- queue 3 ----
+    STM.atomically $ STM.writeTChan chan $
+        CfgASet5Tuple 11 $ CTRL.FTuple {
+                CTRL.ftPriority = 3,
+                CTRL.ftQueue = 3,
+                CTRL.ftL3Proto = Just CTRL.L3IPv4,
+                CTRL.ftL4Proto = Just CTRL.L4UDP,
+                CTRL.ftL3Src = Just MD.ziger2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
                 CTRL.ftL4Src = Just 9002, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
             }
@@ -602,60 +673,62 @@ main = do
 
        -- ################# for 16 cores ################
 
+
+                        -- queue 0
     STM.atomically $ STM.writeTChan chan $
         CfgASet5Tuple 12 $ CTRL.FTuple {
-                CTRL.ftPriority = 3,
-                CTRL.ftQueue = 3,
-                CTRL.ftL3Proto = Just CTRL.L3IPv4,
-                CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178809, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
-                CTRL.ftL4Src = Just 9003, -- sPort, lport
-                CTRL.ftL4Dst = Just 888 -- dPort,
-            }
-
-
-
-    STM.atomically $ STM.writeTChan chan $
-        CfgASet5Tuple 13 $ CTRL.FTuple {
-                CTRL.ftPriority = 3,
-                CTRL.ftQueue = 2,
-                CTRL.ftL3Proto = Just CTRL.L3IPv4,
-                CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178772, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
-                CTRL.ftL4Src = Just 9003, -- sPort, lport
-                CTRL.ftL4Dst = Just 888 -- dPort,
-            }
-
-
-
-    STM.atomically $ STM.writeTChan chan $
-        CfgASet5Tuple 14 $ CTRL.FTuple {
-                CTRL.ftPriority = 3,
-                CTRL.ftQueue = 1,
-                CTRL.ftL3Proto = Just CTRL.L3IPv4,
-                CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178781, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
-                CTRL.ftL4Src = Just 9003, -- sPort, lport
-                CTRL.ftL4Dst = Just 888 -- dPort,
-            }
-
-
-    STM.atomically $ STM.writeTChan chan $
-        CfgASet5Tuple 15 $ CTRL.FTuple {
                 CTRL.ftPriority = 3,
                 CTRL.ftQueue = 0,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src =  Just 175178848, --sAddr, laddr -- burrata
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
+                CTRL.ftL3Src =  Just MD.burrataIP, --sAddr, laddr -- burrata
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                CTRL.ftL4Src = Just 9003, -- sPort, lport
+                CTRL.ftL4Dst = Just 888 -- dPort,
+            }
+
+
+                        -- queue 1
+    STM.atomically $ STM.writeTChan chan $
+        CfgASet5Tuple 13 $ CTRL.FTuple {
+                CTRL.ftPriority = 3,
+                CTRL.ftQueue = 1,
+                CTRL.ftL3Proto = Just CTRL.L3IPv4,
+                CTRL.ftL4Proto = Just CTRL.L4UDP,
+                CTRL.ftL3Src = Just MD.sbrinz2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                CTRL.ftL4Src = Just 9003, -- sPort, lport
+                CTRL.ftL4Dst = Just 888 -- dPort,
+            }
+
+
+                        -- queue 2
+    STM.atomically $ STM.writeTChan chan $
+        CfgASet5Tuple 14 $ CTRL.FTuple {
+                CTRL.ftPriority = 3,
+                CTRL.ftQueue = 2,
+                CTRL.ftL3Proto = Just CTRL.L3IPv4,
+                CTRL.ftL4Proto = Just CTRL.L4UDP,
+                CTRL.ftL3Src = Just MD.gruyereIP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
+                CTRL.ftL4Src = Just 9003, -- sPort, lport
+                CTRL.ftL4Dst = Just 888 -- dPort,
+            }
+
+
+                -- queue 3 ----
+    STM.atomically $ STM.writeTChan chan $
+        CfgASet5Tuple 15 $ CTRL.FTuple {
+                CTRL.ftPriority = 3,
+                CTRL.ftQueue = 3,
+                CTRL.ftL3Proto = Just CTRL.L3IPv4,
+                CTRL.ftL4Proto = Just CTRL.L4UDP,
+                CTRL.ftL3Src = Just MD.ziger2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
                 CTRL.ftL4Src = Just 9003, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
             }
 -}
-
 
 {-
  -- ############# For only 4 core (with wildcards) #############
@@ -666,8 +739,8 @@ main = do
                 CTRL.ftQueue = 3,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178809, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
+                CTRL.ftL3Src = Just MD.ziger2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
                 --CTRL.ftL4Src = Just 9000, -- sPort, lport
                 CTRL.ftL4Src = Nothing, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
@@ -679,8 +752,8 @@ main = do
                 CTRL.ftQueue = 2,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178772, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
+                CTRL.ftL3Src = Just MD.gruyereIP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
                 --CTRL.ftL4Src = Just 9000, -- sPort, lport
                 CTRL.ftL4Src = Nothing, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
@@ -693,8 +766,8 @@ main = do
                 CTRL.ftQueue = 1,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src = Just 175178781, --sAddr, laddr
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
+                CTRL.ftL3Src = Just MD.sbrinz2IP, --sAddr, laddr
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
                 CTRL.ftL4Src = Nothing, -- sPort, lport
                 --CTRL.ftL4Src = Just 9000, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
@@ -708,20 +781,11 @@ main = do
                 CTRL.ftQueue = 0,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = Just CTRL.L4UDP,
-                CTRL.ftL3Src =  Just 175178848, --sAddr, laddr -- burrata
-                CTRL.ftL3Dst = Just 175178847, --dAddr, raddr
+                CTRL.ftL3Src =  Just MD.burrataIP, --sAddr, laddr -- burrata
+                CTRL.ftL3Dst = Just localIP, --dAddr, raddr
                 CTRL.ftL4Src = Nothing, -- sPort, lport
                 CTRL.ftL4Dst = Just 888 -- dPort,
             }
--}
-
-{-
-# 10.113.4.96  # Burrata # 175178848
-# 10.113.4.20  # gruyere # 175178772
-# 10.113.4.57  # ziger2  # 175178809
-# 10.113.4.29  # sbrinz2 # 175178781
-# 10.113.4.95  # Asiago  # 175178847  # Intel
-# 10.113.4.195 # Asiago  # 175178947  # solarflare
 -}
 
     -- Prepare graphs and so on

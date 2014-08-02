@@ -176,7 +176,7 @@ config5tuple _ inE outE cfg = do
 
         -- Get filter configurations ordered by priority
         cmpPrio = compare `on` c5tPriority
-        cfgs = L.sortBy cmpPrio $ parse5tCFG cfg
+        cfgs = reverse $ L.sortBy cmpPrio $ parse5tCFG cfg
 
         -- Generate node and edges for one filter
         addFilter ((iN,iE),es) c = do

@@ -40,42 +40,66 @@ sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
 }
 
 run_for_4_cores() {
-    echo fancyEcho running on ${SERVERIP} with four application thread and four sockets
+    echo fancyEcho running on ${SERVERIP} with 4 application threads
 sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
 -a t0  -f ${SERVERIP}:888/10.113.4.96:9000 \
 -a t1  -f ${SERVERIP}:888/10.113.4.20:9000 \
 -a t2  -f ${SERVERIP}:888/10.113.4.57:9000 \
 -a t3  -f ${SERVERIP}:888/10.113.4.29:9000 \
 -t -q t0  -t -q t1  -t -q t2  -t -q t3
-
-# old way, with wildcards
-#sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0  -f ${SERVERIP}:888/10.113.4.96:0 -a t1  -f ${SERVERIP}:888/10.113.4.20:0   -a t2  -f ${SERVERIP}:888/10.113.4.57:0  -a t3  -f ${SERVERIP}:888/10.113.4.29:0 -t -q t0  -t -q t1 -t -q t2 -t -q t3
-
 }
 
 
+run_for_4_cores_with_wildcards() {
+# old way, with wildcards
+    echo fancyEcho running on ${SERVERIP} with 4 application threads and wildcards
+sudo ./dist/build/bench-fancyecho/bench-fancyecho \
+    -a t0  -f ${SERVERIP}:888/10.113.4.96:0 \
+    -a t1  -f ${SERVERIP}:888/10.113.4.20:0 \
+    -a t2  -f ${SERVERIP}:888/10.113.4.57:0 \
+    -a t3  -f ${SERVERIP}:888/10.113.4.29:0 \
+    -t -q t0  -t -q t1 -t -q t2 -t -q t3
+}
+
 run_for_2_cores() {
     echo fancyEcho running on ${SERVERIP} with single application thread and single socket
-    sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0 -p 888 -a t1 -p 888 -t -q t0 -t -q t1
+    sudo ./dist/build/bench-fancyecho/bench-fancyecho \
+    -a t0 -p 888 \
+    -a t1  -f ${SERVERIP}:888/10.113.4.96:0 \
+    -f ${SERVERIP}:888/10.113.4.29:0 \
+    -t -q t0 -t -q t1
+}
+
+
+run_for_2_cores_full_filters() {
+    echo fancyEcho running on ${SERVERIP} with single application thread and single socket
+    sudo ./dist/build/bench-fancyecho/bench-fancyecho \
+    -a t0  -f ${SERVERIP}:888/10.113.4.96:9000 \
+    -f ${SERVERIP}:888/10.113.4.29:9000 \
+    -a t1 -p 888 \
+    -t -q t0 -t -q t1
 }
 
 
 run_for_1_cores() {
     echo fancyEcho running on ${SERVERIP} with single application thread and single socket
-sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0  -p 888 -t -q t0
+    sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0  -p 888 -t -q t0
 }
 
-# For intel
-SERVERIP="10.113.4.95"
 
 # For Solarflare
 SERVERIP="10.113.4.195"
+# For intel
+SERVERIP="10.113.4.95"
+run_for_2_cores_full_filters
 
 #run_for_16_cores
 #run_for_16_cores
 #run_for_1_cores
 #run_for_12_cores
-run_for_4_cores
+#run_for_4_cores
+#run_for_8_cores
+#run_for_2_cores
 
 exit 0
 

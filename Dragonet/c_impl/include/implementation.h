@@ -50,10 +50,11 @@ get_tsc(void) {
 //  This is for debugging purpose to show where exactly packets are going
 //  Currently supported by E10k queues,  sf queues, fancyecho
 //#define SHOW_INTERVAL_STATS  1
-#define INTERVAL_STAT_FREQUENCY     10000
+//#define INTERVAL_STAT_FREQUENCY     (1)
+#define INTERVAL_STAT_FREQUENCY     (10000)
 
 
-#define DEFAULT_BUFFER_SIZE 2048
+#define DEFAULT_BUFFER_SIZE             (2048)
 
 typedef int node_out_t;
 typedef uint16_t pktoff_t;

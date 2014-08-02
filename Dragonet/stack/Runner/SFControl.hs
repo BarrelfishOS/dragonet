@@ -17,13 +17,13 @@ import Data.Bits
 import Data.Maybe
 
 data L3Proto = L3IPv4 | L3IPv6
-    deriving (Eq)
+    deriving (Eq,Ord)
 instance Show L3Proto where
     show L3IPv4 = "IPv4"
     show L3IPv6 = "IPv6"
 
 data L4Proto = L4TCP | L4UDP
-    deriving (Eq)
+    deriving (Eq,Ord)
 instance Show L4Proto where
     show L4TCP = "TCP"
     show L4UDP = "UDP"
@@ -37,7 +37,7 @@ data FTuple = FTuple {
     ftL3Dst    :: Maybe Word32,
     ftL4Src    :: Maybe Word16,
     ftL4Dst    :: Maybe Word16
-} deriving (Eq,Show)
+} deriving (Eq,Show,Ord)
 
 data FDirTuple = FDirTuple {
     fdtQueue   :: Word8,
@@ -47,7 +47,7 @@ data FDirTuple = FDirTuple {
     fdtL3Dst   :: Word32,
     fdtL4Src   :: Word16,
     fdtL4Dst   :: Word16
-} deriving (Eq,Show)
+} deriving (Eq,Show,Ord)
 
 
 -- From sf.h

@@ -357,13 +357,14 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
     }
 
 
+
 #if SHOW_INTERVAL_STATS
     //printf("e10k: Yay, we got a full packet!\n");
     if (qstat[qi] % INTERVAL_STAT_FREQUENCY == 0) {
         printf
 //        dprint
-            ("QueueID:%"PRIu8":[TID:%d]: has handled %"PRIu64" packets\n",
-               qi, (int)pthread_self(), qstat[qi]);
+            ("QueueID:%"PRIu8":[TID:%d]: has handled %"PRIu64" packets, size:%zu\n",
+               qi, (int)pthread_self(), qstat[qi], len);
    }
 #endif // SHOW_INTERVAL_STATS
     ++qstat[qi];
@@ -441,6 +442,7 @@ node_out_t do_pg__E10kTxQueue0(struct ctx_E10kTxQueue0 *context,
 {
     return tx_queue(state, in, 0);
 }
+
 
 node_out_t do_pg__E10kTxQueue1(struct ctx_E10kTxQueue1 *context,
         struct state *state, struct input **in)

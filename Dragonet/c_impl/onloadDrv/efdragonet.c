@@ -563,7 +563,6 @@ void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len,
         return;
     }
 
-
 } // end function: send_packet
 
 void *init_and_alloc_default_queue(char *name)
