@@ -4,6 +4,7 @@ module Dragonet.Optimization (
     CostFunction,
 
     makeGraph,
+    makeGraph',
     optimize,
 
     dbgDummy,
@@ -51,8 +52,20 @@ makeGraph helpers prg lpg implTransforms pla debug cfg = do
     -- Configure graph
     let prgC  = C.applyConfig cfg prg
     debug "prg_c" $ DbgPGraph prgC
+    makeGraph' helpers prgC lpg Emb.embeddingRxTx implTransforms pla debug
+
+makeGraph' ::
+       Sem.Helpers                           -- | Semantics helpers combined
+    -> PG.PGraph                             -- | Configured PRG
+    -> PG.PGraph                             -- | Configured LPG
+    -> (PG.PGraph -> PG.PGraph -> PG.PGraph) -- | embedding algorithm
+    -> [PG.PGraph -> PG.PGraph]              -- | Implementation transforms
+    -> (PG.PGNode -> String)                 -- | Assign nodes to pipelines
+    -> DbgFunSingle a                        -- | Debugging function
+    -> IO PL.PLGraph
+makeGraph' helpers prgC lpg embed_fn implTransforms pla debug = do
     -- Embed graph
-    let emb = Emb.embeddingRxTx prgC lpg
+    let emb = embed_fn prgC lpg
     debug "embed" $ DbgPGraph emb
     -- Reduce graph
     reduced <- SS.reducePG emb helpers
@@ -87,8 +100,6 @@ optimize hs prg lpg implTransforms pla dbg cf cfgs = do
     let fst3 (a,_,_) = a
         (_,minPlg,lcfg) = L.minimumBy (compare `on` fst3) evald
     return (minPlg, lcfg)
-
-
 
 dbgDummy :: DbgFunction a
 dbgDummy _ _ _ = return ()

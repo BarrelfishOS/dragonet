@@ -1,5 +1,6 @@
 module Stack (
     instantiate,
+    startStack,
 
     StackState(..),
     EndpointDesc(..),
@@ -212,6 +213,10 @@ eventHandler sstv ch ev = do
 
 --------------------------------------------------------------------------------
 -- Main
+
+-- generates the necessary LPG configuration based on the stack state
+-- (specifically on the state's endpoints and sockets)
+lpgConfig :: StackState -> C.Configuration
 lpgConfig ss = [("RxL4UDPCUDPSockets", PG.CVList $ cUdpSockets)]
     where
         cUdpSockets = map (PG.CVTuple . cUdpSocket) $ M.elems $ ssEndpoints ss
@@ -269,6 +274,7 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
             putStrLn $ "LPG config: " ++ show lpgCfg
             (plg,(_,pCfg)) <- O.optimize helpers prgU lpgC implTransforms
                     (plAssign cfgPLA ss) dbg (costFun ss) pCfgs
+            -- apply PRG confuguration
             cfgImpl sharedState pCfg
             let createPL pl@('A':'p':'p':aids) = do
                     putStrLn $ "Creating App pipeline: " ++ pl
@@ -304,3 +310,79 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
     putStrLn "Starting interface thread"
     PLA.interfaceThread stackname (eventHandler sstv)
 
+
+--
+
+initStackSt = StackState {
+    ssNextAppId = 1,
+    ssNextSocketId = 1,
+    ssNextEndpointId = 1,
+    ssApplications = M.empty,
+    ssAppChans = M.empty,
+    ssSockets = M.empty,
+    ssEndpoints = M.empty,
+    ssUpdateGraphs = undefined,
+    ssVersion = 0
+}
+
+-- TODO: use this in instantiate
+ssNewVer :: STM.TVar StackState -> IO (StackState)
+ssNewVer sstv = STM.atomically $ do
+    ss <- STM.readTVar sstv
+    let ss' = ss { ssVersion = ssVersion ss + 1 }
+    STM.writeTVar sstv ss'
+    return ss'
+
+-- config LPG based on stack state information
+ssConfigLPG :: StackState -> PG.PGraph -> PG.PGraph
+ssConfigLPG ss lpgU = C.applyConfig (lpgConfig ss) lpgU
+
+-- a simpler version of instantiate:
+--  - assumes a configured PRG and does not call optimize
+--  - PRG does not change across execution
+startStack :: (PG.PGraph, Sem.Helpers) -- | unconfigured LPG
+           -> (PG.PGraph, Sem.Helpers) -- | configured PRG
+           -> (PG.PGraph -> PG.PGraph -> PG.PGraph) -- | embedding function
+           -> String -- | name of llvm-helpers
+           -> (StackState -> String -> PG.PGNode -> String) -- | PL assignment
+           -> IO ()
+startStack (lpgU, lpgH) (prgC, prgH) embed_fn llvmH cfgPLA = do
+    let mergeH = prgH `Sem.mergeHelpers` lpgH
+        stackname = "dragonet"
+    ctx <- PLD.initialContext stackname
+    stackH <- PLD.ctxState ctx
+    sharedSt <- PLI.stackState stackH
+
+    let initSS = initStackSt { ssUpdateGraphs = updateGraph }
+        updateGraph sstv = do
+            putStrLn "updateGraph entry"
+            ss <- ssNewVer sstv
+            let lpgC = ssConfigLPG ss lpgU
+                dbg ::O.DbgFunction ()
+                dbg = O.dbgDotfiles $ "out/graphs-dummy/" ++ (show $ ssVersion ss)
+                debug = dbg "dummy"
+                implTransforms = [IT.mergeSockets]
+                lbl = "dummy"
+                pla = (plAssign cfgPLA ss)
+
+            debug "prg" $ O.DbgPGraph prgC
+            plg <- O.makeGraph' mergeH prgC lpgC embed_fn implTransforms (pla lbl) debug
+
+            let createPL pl@('A':'p':'p':aids) = do
+                    putStrLn $ "Creating App pipeline: " ++ pl
+                    createPipelineClient agh pl
+                    where
+                        aid = read aids
+                        Just app = M.lookup aid $ ssApplications ss
+                        agh = adGraphHandle app
+                createPL pl = do
+                    putStrLn $ "Creating local pipeline: ##### " ++ pl
+                    createPipeline plg stackname llvmH pl
+            PLD.run ctx plConnect createPL $ addMuxIds plg
+            putStrLn "updateGraph exit"
+
+    putStrLn "Let's fire her up!!"
+    sstv <- STM.atomically $ STM.newTVar $ initSS
+    updateGraph sstv
+    putStrLn "Starting interface thread"
+    PLA.interfaceThread stackname (eventHandler sstv)

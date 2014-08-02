@@ -100,7 +100,6 @@ void dyn_local_run(struct dyn_local *local)
             dynrs_action(&local->server, &qa->act);
             free(qa);
         }
-        //printf("dyn_local_run: calling dynrs_run  ...\n");
         dynrs_run(&local->server);
     }
 }

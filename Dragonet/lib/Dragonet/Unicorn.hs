@@ -3,6 +3,7 @@ module Dragonet.Unicorn(
     constructGraph,
     constructGraph',
     strToGraph,
+    strToGraph',
     fileToGraph,
 ) where
 
@@ -138,8 +139,12 @@ strToGraph = constructGraph . parseGraph_
 fileToGraph :: FilePath -> IO (PG.PGraph)
 fileToGraph fname = fmap strToGraph $ readFile fname
 
+-- Functions that include sem helpers
 constructGraph' :: Graph -> (PG.PGraph, Sem.Helpers)
 constructGraph' g = (constructGraph g, gSemHelpers g)
+
+strToGraph' :: String -> (PG.PGraph, Sem.Helpers)
+strToGraph' = constructGraph' . parseGraph_
 
 nodeClusterMap :: Cluster -> [(String, Node)]
 nodeClusterMap Cluster {

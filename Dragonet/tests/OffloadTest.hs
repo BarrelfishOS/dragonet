@@ -579,4 +579,3 @@ graph g1 {
     node D {}
 }
 |]
-

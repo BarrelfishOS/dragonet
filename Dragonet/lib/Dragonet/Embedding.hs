@@ -13,6 +13,7 @@ import qualified Data.List as L
 --------------------------------------------------------------------------------
 -- Embedding for both RX and TX path
 
+-- queue nodes in the prg should have the following prefixes:
 rxPref = "RxQueue"
 txPref = "TxQueue"
 
@@ -50,7 +51,7 @@ embeddingRxTx prg lpg = withLPGs
             where
                 lA = PG.nLabel a
                 lB = PG.nLabel b
-        addLPG g pref = GH.mergeGraphsBy (mergeP pref) g $
+        addLPG prg pref = GH.mergeGraphsBy (mergeP pref) prg $
                             tagNodes (qTag pref) lpg
 
 
