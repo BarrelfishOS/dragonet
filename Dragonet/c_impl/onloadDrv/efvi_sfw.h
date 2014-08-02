@@ -195,7 +195,6 @@ struct pkt_buf {
 
 
 // #################################### related to sf control #############
-//struct vi* vis_local = NULL;
 
 
 // ############################ from e10kControl #########################
@@ -248,19 +247,6 @@ int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
 // #################################### related to sf control #############
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 struct net_if*
 net_if_alloc(int net_if_id, const char* name, int rss_set_size);
 
@@ -270,8 +256,6 @@ net_if_map_vi_pool(struct net_if*, struct vi*);
 extern struct pkt_buf*
 pkt_buf_from_id(struct vi* vi, int pkt_buf_i);
 
-//extern void
-//pkt_buf_free(struct pkt_buf* pkt_buf);
 
 extern void
 pkt_buf_release(struct pkt_buf* pkt_buf);
@@ -302,6 +286,7 @@ vi_get_free_pkt_buf_tx(struct vi* vi);
 #define PRINTBUFSIZE    (1023)
 int buf_details(struct pkt_buf* pkt_buf, char *buff, int l);
 
+// NOTE: this is quite outdated after indroduction of dprint in implementation.h
 //#define MYDEBUG     1
 #ifdef MYDEBUG
 #ifndef dprint2
@@ -312,8 +297,6 @@ int buf_details(struct pkt_buf* pkt_buf, char *buff, int l);
 #endif // MYDEBUG
 
 
-void call_spawn_handle(void *context);
-struct input *call_input_alloc(void);
 // This value should be set based on the parameter to llvm-cgen-sf
 #define SF_MAX_QUEUES           (4)
 

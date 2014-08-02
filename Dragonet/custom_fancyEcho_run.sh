@@ -86,18 +86,20 @@ run_for_1_cores() {
     sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0  -p 888 -t -q t0
 }
 
+# For intel
+SERVERIP="10.113.4.95"
 
 # For Solarflare
 SERVERIP="10.113.4.195"
-# For intel
-SERVERIP="10.113.4.95"
-run_for_2_cores_full_filters
+
+run_for_4_cores
+
+#run_for_2_cores_full_filters
 
 #run_for_16_cores
 #run_for_16_cores
 #run_for_1_cores
 #run_for_12_cores
-#run_for_4_cores
 #run_for_8_cores
 #run_for_2_cores
 
