@@ -452,7 +452,7 @@ static void tap_init(struct state *state, char *dev_name)
 #define MAX_QUEUES                     128
 static uint64_t qstat[MAX_QUEUES] = {0, 0};  // for per queue packets stats
 
-static node_out_t rx_queue_new_v1(struct ctx_E10kRxQueue0 *context,
+static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
     struct state *state, struct input **in, uint8_t qi)
 {
     node_out_t out_decision = P_RxQueue_drop;
@@ -548,8 +548,8 @@ static node_out_t rx_queue_new_v1(struct ctx_E10kRxQueue0 *context,
 
 spawn_and_return:
     // Respawn this node
-    // FIXME: shouldn't  value S_E10kRxQueue0_poll should depend which queue-id?
-    spawn(context, NULL, S_E10kRxQueue0_poll, SPAWNPRIO_LOW);
+    // FIXME: shouldn't  value S_SFRxQueue0_poll should depend which queue-id?
+    spawn(context, NULL, S_SFRxQueue0_poll, SPAWNPRIO_LOW);
     return out_decision;
 } // end function: rx_queue_new_v1
 
@@ -588,50 +588,50 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
 // ################# Implementation based on Intel driver ###########
 
 
-node_out_t do_pg__E10kRxQueue0(struct ctx_E10kRxQueue0 *context,
+node_out_t do_pg__SFRxQueue0(struct ctx_SFRxQueue0 *context,
         struct state *state, struct input **in)
 {
     return rx_queue_new_v1(context, state, in, 0);
 }
 
-node_out_t do_pg__E10kRxQueue1(struct ctx_E10kRxQueue1 *context,
+node_out_t do_pg__SFRxQueue1(struct ctx_SFRxQueue1 *context,
         struct state *state, struct input **in)
 {
-    return rx_queue_new_v1((struct ctx_E10kRxQueue0 *) context, state, in, 1);
+    return rx_queue_new_v1((struct ctx_SFRxQueue0 *) context, state, in, 1);
 }
 
-node_out_t do_pg__E10kRxQueue2(struct ctx_E10kRxQueue2 *context,
+node_out_t do_pg__SFRxQueue2(struct ctx_SFRxQueue2 *context,
         struct state *state, struct input **in)
 {
-    return rx_queue_new_v1((struct ctx_E10kRxQueue0 *) context, state, in, 2);
+    return rx_queue_new_v1((struct ctx_SFRxQueue0 *) context, state, in, 2);
 }
 
-node_out_t do_pg__E10kRxQueue3(struct ctx_E10kRxQueue3 *context,
+node_out_t do_pg__SFRxQueue3(struct ctx_SFRxQueue3 *context,
         struct state *state, struct input **in)
 {
-    return rx_queue_new_v1((struct ctx_E10kRxQueue0 *) context, state, in, 3);
+    return rx_queue_new_v1((struct ctx_SFRxQueue0 *) context, state, in, 3);
 }
 
 
-node_out_t do_pg__E10kTxQueue0(struct ctx_E10kTxQueue0 *context,
+node_out_t do_pg__SFTxQueue0(struct ctx_SFTxQueue0 *context,
         struct state *state, struct input **in)
 {
     return tx_queue(state, in, 0);
 }
 
-node_out_t do_pg__E10kTxQueue1(struct ctx_E10kTxQueue1 *context,
+node_out_t do_pg__SFTxQueue1(struct ctx_SFTxQueue1 *context,
         struct state *state, struct input **in)
 {
     return tx_queue(state, in, 1);
 }
 
-node_out_t do_pg__E10kTxQueue2(struct ctx_E10kTxQueue2 *context,
+node_out_t do_pg__SFTxQueue2(struct ctx_SFTxQueue2 *context,
         struct state *state, struct input **in)
 {
     return tx_queue(state, in, 2);
 }
 
-node_out_t do_pg__E10kTxQueue3(struct ctx_E10kTxQueue3 *context,
+node_out_t do_pg__SFTxQueue3(struct ctx_SFTxQueue3 *context,
         struct state *state, struct input **in)
 {
     return tx_queue(state, in, 3);

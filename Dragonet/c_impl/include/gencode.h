@@ -78,6 +78,19 @@ enum out_ports {
     P_TapRxQueue_out = 0,
     P_TapRxQueue_drop = 1,
     P_TapRxQueue_init = 2,
+
+    P_SFRxQueue0_out = 0,
+    P_SFRxQueue0_drop = 1,
+    P_SFRxQueue0_init = 2,
+    P_SFRxQueue1_out = 0,
+    P_SFRxQueue1_drop = 1,
+    P_SFRxQueue1_init = 2,
+    P_SFRxQueue2_out = 0,
+    P_SFRxQueue2_drop = 1,
+    P_SFRxQueue2_init = 2,
+    P_SFRxQueue3_out = 0,
+    P_SFRxQueue3_drop = 1,
+    P_SFRxQueue3_init = 2,
 };
 
 
@@ -93,6 +106,16 @@ enum out_spawns {
     S_E10kRxQueue2_poll = 0,
     S_E10kRxQueue3_poll = 0,
     S_TapRxQueue_poll = 0,
+
+    S_SFInit_q0 = 0,
+    S_SFInit_q1 = 1,
+    S_SFInit_q2 = 2,
+    S_SFInit_q3 = 3,
+    S_SFRxQueue0_poll = 0,
+    S_SFRxQueue1_poll = 0,
+    S_SFRxQueue2_poll = 0,
+    S_SFRxQueue3_poll = 0,
+
 };
 
 
@@ -525,6 +548,56 @@ struct ctx_TapTxQueue {
 };
 
 
+
+struct ctx_SFInit {
+    struct ctx_generic generic;
+};
+
+struct ctx_SFRxQueue0 {
+    struct ctx_generic generic;
+};
+
+struct ctx_SFRxQueue1 {
+    struct ctx_generic generic;
+};
+
+struct ctx_SFRxQueue2 {
+    struct ctx_generic generic;
+};
+
+struct ctx_SFRxQueue3 {
+    struct ctx_generic generic;
+};
+
+struct ctx_SFL3IPv4Classified {
+    struct ctx_generic generic;
+};
+
+struct ctx_SFL3IPv4ValidChecksum {
+    struct ctx_generic generic;
+};
+
+struct ctx_SFTxQueue0 {
+    struct ctx_generic generic;
+};
+
+struct ctx_SFTxQueue1 {
+    struct ctx_generic generic;
+};
+
+struct ctx_SFTxQueue2 {
+    struct ctx_generic generic;
+};
+
+struct ctx_SFTxQueue3 {
+    struct ctx_generic generic;
+};
+
+
+
+
+
+
 node_out_t do_pg__RxQueue(struct ctx_RxQueue *context, struct state *state, struct input **in);
 node_out_t do_pg__RxL2EtherClassified(struct ctx_RxL2EtherClassified *context, struct state *state, struct input **in);
 node_out_t do_pg__RxL2EtherValidLength(struct ctx_RxL2EtherValidLength *context, struct state *state, struct input **in);
@@ -615,6 +688,19 @@ node_out_t do_pg__E10kTxQueue3(struct ctx_E10kTxQueue3 *context, struct state *s
 node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context, struct state *state, struct input **in);
 node_out_t do_pg__TapTxQueue(struct ctx_TapTxQueue *context, struct state *state, struct input **in);
 
+
+
+node_out_t do_pg__SFInit(struct ctx_SFInit *context, struct state *state, struct input **in);
+node_out_t do_pg__SFRxQueue0(struct ctx_SFRxQueue0 *context, struct state *state, struct input **in);
+node_out_t do_pg__SFRxQueue1(struct ctx_SFRxQueue1 *context, struct state *state, struct input **in);
+node_out_t do_pg__SFRxQueue2(struct ctx_SFRxQueue2 *context, struct state *state, struct input **in);
+node_out_t do_pg__SFRxQueue3(struct ctx_SFRxQueue3 *context, struct state *state, struct input **in);
+node_out_t do_pg__SFL3IPv4Classified(struct ctx_SFL3IPv4Classified *context, struct state *state, struct input **in);
+node_out_t do_pg__SFL3IPv4ValidChecksum(struct ctx_SFL3IPv4ValidChecksum *context, struct state *state, struct input **in);
+node_out_t do_pg__SFTxQueue0(struct ctx_SFTxQueue0 *context, struct state *state, struct input **in);
+node_out_t do_pg__SFTxQueue1(struct ctx_SFTxQueue1 *context, struct state *state, struct input **in);
+node_out_t do_pg__SFTxQueue2(struct ctx_SFTxQueue2 *context, struct state *state, struct input **in);
+node_out_t do_pg__SFTxQueue3(struct ctx_SFTxQueue3 *context, struct state *state, struct input **in);
 
 
 #endif // GENERATEDCODE_H_

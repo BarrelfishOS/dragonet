@@ -5,9 +5,7 @@ import qualified Dragonet.Pipelines.Implementation as PLI
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.ProtocolGraph.Utils as PGU
 
---import qualified Graphs.E10k as E10k
 import qualified Graphs.SF as SF
---import qualified Runner.E10KControl as CTRL
 import qualified Runner.SFControl as CTRL
 
 import Stack
@@ -34,7 +32,7 @@ localIP = MD.asiagoIP_Intel
 costFunction :: StackState -> O.CostFunction Int
 costFunction _ _ = 1
 
--- Start out with a dummy configuration for e10k
+-- Start out with a dummy configuration for SF
 oracleHardcoded :: PG.PGraph -> StackState -> [(String,C.Configuration)]
 oracleHardcoded _ ss = [("default",[
                 ("RxCFDirFilter", PG.CVList []),
@@ -110,7 +108,7 @@ data CfgState = CfgState {
 implCfg :: STM.TVar CfgState -> STM.TChan CfgAction -> PLI.StateHandle
             -> C.Configuration -> IO ()
 implCfg tcstate chan sh config = do
-    putStrLn $ "e10k-implCfg: " ++ show config
+    putStrLn $ "sf-implCfg: " ++ show config
     cstate <- STM.atomically $ STM.readTVar tcstate
     -- Ensure control thread is running
     cstate' <- case csThread cstate of
