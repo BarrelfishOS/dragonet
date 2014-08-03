@@ -146,7 +146,7 @@ class Aggregator(object):
                 if not mi['is_server'] :
                     continue
                 for n,i in list(self.m_instances[m]['machine'].tool_instances.items()):
-                    #print "Running tool on machine [%s] " % (str(m))
+                    print "Running is_ready_cmd on machine [%s] " % (str(m))
                     self.m_instances[m]['machine'].threads[n].is_ready_check()
 
 

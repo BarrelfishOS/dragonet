@@ -17,52 +17,73 @@ def toCoreList2(clist, separator=",", prefix=""):
             ret = "%s%d" % (prefix, c)
         else :
             ret = "%s%s%s%d" % (ret, separator, prefix, c)
-    print "toCoreList2 %s" % (ret)
+    #print "toCoreList2 %s" % (ret)
     return ret
+
+def getClientPortList(clientList, startPort, noPorts=1) :
+    portList = []
+    for cl in range(0, len(clientList)):
+        prev_entries = [i for i, x in enumerate(clientList[:cl]) if x == clientList[cl]]
+        portList.append(startPort + len(prev_entries))
+    return portList
 
 def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True):
     ret = ""
     # socket info per slot
     appID = 0
+    portNo = SERVER_INITIAL_PORT
     unique_clients = list(set(CLIENTS))
+    sorted_clients = sorted(CLIENTS)
+    sorted_clients_port_mapping = getClientPortList(sorted_clients, CLIENT_INITIAL_PORT, noPorts)
+    #    print "Sorted clients are %s" % ( sorted_clients )
+    #print "Sorted clients port mapping %s" % (sorted_clients_port_mapping)
+
 
     # Make sure that number of unique clients is more than threadsPerPort
-    if createDedicatedFlows and len(CLIENTS) < threadsPerPort :
+    if createDedicatedFlows and len(sorted_clients ) < threadsPerPort :
         raise Exception("Not enough unique clients (%d) for load balancing per threads %d" % (
-            len(CLIENTS),  threadsPerPort))
+            len(sorted_clients),  threadsPerPort))
     if noPorts > 1:
         raise Exception("Multiport setup requested, which needs some more hacking  noPorts = %d" % (
                 noPorts))
         sys.exit()
 
-    for p in range(0, noPorts):
-        portNo = SERVER_INITIAL_PORT + p
-        # Assuming that one port goes to one application
-        # For every thread
-        for c in range(0, threadsPerPort):
-            if createDedicatedFlows:
-                if c == 0 :
-                    ret = ret + (" -a t%d -p %d " % (appID, portNo))
-                else :
-                    ret = ret + (" -a t%d " % (appID))
-                    # check previous occurances of this client
-                    prev_entries = [i for i, x in enumerate(CLIENTS[:c]) if x == CLIENTS[c]]
+    assert(len(unique_clients) >= 4)
+    clientsPerThread = len(CLIENTS) / threadsPerPort
+
+    if threadsPerPort == 1 :
+        ret = ret + (" -a t%d -p %d " % (appID, SERVER_INITIAL_PORT))
+    else :
+        alreadyCovered = 0
+        for kk in range(0, threadsPerPort):
+            ret = ret + (" -a t%d " % (kk))
+            if createDedicatedFlows :
+                for ii in range(alreadyCovered, alreadyCovered + clientsPerThread):
+                    if (ii >= len(sorted_clients)) :
+                       break
                     ret = ret + (" -f %s:%d/%s:%d " % (
-                            TARGET, portNo,
-                            MINFO_CLIENT[CLIENTS[c]]["EGRESS_INFO"]["src"],
-                            (CLIENT_INITIAL_PORT + len(prev_entries))
+                            TARGET, SERVER_INITIAL_PORT,
+                            MINFO_CLIENT[sorted_clients[ii]]["EGRESS_INFO"]["src"],
+                            sorted_clients_port_mapping[ii]
                         ))
+                alreadyCovered = alreadyCovered + clientsPerThread
+
+                # Handling case where number of clients cant equally balanced between threads
+                if kk < (len(CLIENTS) % threadsPerPort) :
+                    ret = ret + (" -f %s:%d/%s:%d " % (
+                            TARGET, SERVER_INITIAL_PORT,
+                            MINFO_CLIENT[sorted_clients[alreadyCovered]]["EGRESS_INFO"]["src"],
+                            sorted_clients_port_mapping[alreadyCovered]
+                        ))
+                    alreadyCovered = alreadyCovered + 1
+
+
             else: # createDedicatedFlows
-                ret = ret + (" -a t%d -p %d " % (appID, portNo))
+                ret = ret + (" -a t%d -p %d " % (kk, SERVER_INITIAL_PORT))
 
-            appID = appID + 1
+    for kk in range(0, threadsPerPort):
+        ret = ret + (" -t -q t%d " % (kk))
 
-    # thread info per slot
-    appID = 0
-    for p in range(0, noPorts):
-        for c in range(0, threadsPerPort):
-            ret = ret + (" -t -q t%d " % (appID))
-            appID = appID + 1
     print "FancyEcho Parameters: %s" % (ret)
     return ret
 
@@ -122,7 +143,6 @@ def genFancyEchoParameters_old(noPorts, threadsPerPort, createDedicatedFlows = T
     # socket info per slot
     appID = 0
     unique_clients = list(set(CLIENTS))
-
     # Make sure that number of unique clients is more than threadsPerPort
     if createDedicatedFlows and len(CLIENTS) < threadsPerPort :
         raise Exception("Not enough unique clients (%d) for load balancing per threads %d" % (
@@ -231,9 +251,8 @@ def SRV_CMDS(name):
                           dragonet_container[name][0],
                           HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
                             ),
-                      "sleep 4",
 
-                      "cd dragonet/Dragonet/ ; sudo  ./scripts/pravin/runBetterBg.sh 2 ./ ./fancyecho-out.log  "
+                      "cd dragonet/Dragonet/ ; sudo  ./scripts/pravin/runBetterBg.sh 4 ./ ./fancyecho-out.log  "
                         + " ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
                             genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
                                     ],
@@ -246,17 +265,19 @@ def SRV_CMDS(name):
                           dragonet_container[name][0],
                           HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
                             ),
-                      "sleep 4",
 
                       "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
                         toCoreList2(range((0 + SERVER_CORESHIFT), (SERVER_CORESHIFT + (SERVERS_INSTANCES*SERVER_CORES)))))
-                        + " ./scripts/pravin/runBetterBg.sh 2 ./ ./fancyecho-out.log  "
+                        + " ./scripts/pravin/runBetterBg.sh 10  ./ ./fancyecho-out.log  "
                         + " ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
                             genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
                                     ],
 
                     "is_ready_cmd_special" : [
-                                        "sleep 4 "
+                      "cd dragonet/Dragonet/ ; ./scripts/pravin/wait_for_dn_app.sh %d %d %s" % (
+                            # FIXME: The server_cores may not be correct, but it should be based on how many stacks are created
+                            HWQUEUES, SERVER_CORES,
+                            dragonet_container[name][1]),
                                     ],
 
                     "init_cmd" : [],
@@ -264,8 +285,8 @@ def SRV_CMDS(name):
                     "kill_cmd_special" : [
                                 "tail dragonet/Dragonet/some.log",
                                 "tail dragonet/Dragonet/fancyecho-out.log",
-                                "sudo killall bench-fancyecho || true",
-                                "sudo killall %s || true" % (dragonet_container[name][1]),
+                                #"sudo killall bench-fancyecho",
+                                #"sudo killall %s" % (dragonet_container[name][1]),
                                  ],
                     "kill_cmd" : [],
                     "out_cmd" : [],

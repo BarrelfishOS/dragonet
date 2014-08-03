@@ -143,10 +143,10 @@ class ProcessRunner(threading.Thread):
         # doing initial setup
         if self.init_cmd:
             for cmd in self.init_cmd:
-                self.logMsg ("INIT: Machine %s: Executing init command [%s]" % (
-                        self.machine_ref, cmd))
+                self.PlogMsg ("INIT: Machine %s: Executing init command [%s]" % (
+                        self.machine_ref.deployment_host, cmd))
                 ans = self.machine_ref._exec_cmd_blocking(cmd)
-                self.logMsg ("INIT: Machine %s: the response of executing init command is \n%s\n" %( self.machine_ref, ans))
+                self.PlogMsg ("INIT: Machine %s: the response of executing init command is \n%s\n" %( self.machine_ref.deployment_host, ans))
 
         # Use named temporary files to avoid errors on double-delete when
         # running on Windows/cygwin.
@@ -176,11 +176,14 @@ class ProcessRunner(threading.Thread):
         if self.is_ready_cmd:
             try:
                 for cmd in self.is_ready_cmd:
+                    print "running READY cmd [%s] on machine [%s]" % (cmd, self.machine_ref.deployment_host)
                     ans = self.machine_ref._exec_cmd_blocking(cmd)
                     self.logMsg ("IS_READY_CMD: Machine %s: the response of executing is_ready_cmd [%s] is \n%s\n" %(
-                        self.machine_ref, cmd, ans))
+                        self.machine_ref.deployment_host, cmd, ans))
             except OSError:
                 pass
+        else:
+            print "Server has no isready cmd"
 
 
     def kill_explicit(self):
@@ -330,6 +333,12 @@ class NetperfSumaryRunner(ProcessRunner):
             self.logMsg ("Bytes lost = %d\n" % missing_bytes)
         assert(cmd_output['THROUGHPUT_UNITS'] == "10^9bits/s")
         result['RESULT'] = cmd_output['REMOTE_RECV_THROUGHPUT']
+        if float(cmd_output['TRANSACTION_RATE']) == 0 :
+            print "Warning: Client %s, on machine %s had zero transactions\nFailed Command: [%s]" % (
+                   self.name, self.machine_ref.deployment_host, self.command)
+            self.PlogMsg("Warning: Client %s, on machine %s had zero transactions\nFailed Command: [%s]" % (
+                   self.name, self.machine_ref.deployment_host,
+                   self.command))
         result['CMD_OUTPUT'] = cmd_output
 
         return result
@@ -386,6 +395,11 @@ class MemaslapSumaryRunner(ProcessRunner):
             if ("TPS" in cmd_output.keys()) :
                 result['RESULT'] = float(cmd_output["TPS"])
                 cmd_output['ORESULT'] = float(cmd_output["TPS"])
+                if (result['RESULT'] < 10) :
+                    self.PlogMsg("Warning: Client %s, on machine %s has only %f transactions\nFailed Command: [%s]" % (
+                        self.name, self.machine_ref.deployment_host, result['RESULT'],
+                        self.command))
+
             else :
                 print "Run imcomplete as attribute 'TPS' is not present in output"
                 print "Existing keys: %s" % (str(cmd_output.keys()))

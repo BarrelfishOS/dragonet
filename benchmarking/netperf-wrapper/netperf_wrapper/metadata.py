@@ -59,6 +59,8 @@ class CommandRunner(object):
                 command = "ssh %s '%s'" % (self.hostname, command)
             res = subprocess.check_output(command, universal_newlines=True, shell=True,
                                           stderr=subprocess.STDOUT, env=self.env)
+#            print "command [%s] on machine [%s] generated output [%s] " % (
+#                    command, self.hostname, res.strip())
             return res.strip()
         except subprocess.CalledProcessError:
             return None
@@ -71,6 +73,8 @@ MACHINE_CONFIG_BASE = "./"
 
 def record_machine_metadata(mname, targetMachine=None, ipv=4, forceRefresh=False):
 
+
+    print "generating data for machine %s" % (mname)
     get_command_output.set_hostname(None)
     local_hostname = get_command_output("hostname")
     if mname != None and mname.lower() not in ['localhost', '127.0.0.1', local_hostname] :
@@ -114,7 +118,7 @@ def record_machine_metadata(mname, targetMachine=None, ipv=4, forceRefresh=False
     m['GATEWAYS'] = get_gateways()
     if m['TARGET_MACHINE'] :
         m['EGRESS_INFO'] = get_egress_info(target=m['TARGET_MACHINE'], ip_version=m['IP_VERSION'], ifaces=m['IP_ADDRS'])
-        if 'src' in m['EGRESS_INFO']:
+        if m['EGRESS_INFO'] != None and 'src' in m['EGRESS_INFO']:
             m['INGRESS_INFO'] = get_egress_info(target=m['EGRESS_INFO']['src'], ip_version=m['IP_VERSION'] )
         m['EGRESS_INFO'] = get_egress_info(target=m['TARGET_MACHINE'], ip_version=m['IP_VERSION'], ifaces=m['IP_ADDRS'])
 
@@ -254,6 +258,8 @@ def get_gateways():
 
 def get_egress_info(target, ip_version, ifaces={}):
     route = {}
+    if ifaces == None:
+        ifaces = {}
 
     for key,v in ifaces.items():
         if v[0] == target:

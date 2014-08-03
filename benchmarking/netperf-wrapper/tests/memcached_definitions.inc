@@ -38,6 +38,7 @@ def genMemcachedParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
 
     # Make sure that number of unique clients is more than threadsPerPort
     #if createDedicatedFlows and len(unique_clients) < threadsPerPort :
+    #if createDedicatedFlows and len(CLIENTS) < threadsPerPort :
     if createDedicatedFlows and len(unique_clients) < HWQUEUES:
         raise Exception("Not enough unique clients (%d) for load balancing per HW queue %d" % (
             len(CLIENTS),  threadsPerPort))
@@ -58,26 +59,23 @@ def genMemcachedParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
         portNo = SERVER_INITIAL_PORT + p
         for c in range(0, threadsPerPort):
             if createDedicatedFlows:
-            #if c == 0 :
-                #        ret = ret + ("p[%d]" % (portNo))
-            #else :
-                    #prev_entries = [i for i, x in enumerate(CLIENTS[:c]) if x == CLIENTS[c]]
-                    #curr_client = CLIENTS[c]
-                    #curr_client_port = (CLIENT_INITIAL_PORT + len(prev_entries))
-                    curr_client = unique_clients[c%len(unique_clients)]
-                    curr_client_port = 0
-                    ret = ret + ("f[%s:%d/%s:%d]" % (
+                    if c < len(unique_clients) :
+                        curr_client = unique_clients[c]
+                        curr_client_port = 0
+                        ret = ret + ("f[%s:%d/%s:%d]" % (
                             TARGET, portNo,
                             MINFO_CLIENT[curr_client]["EGRESS_INFO"]["src"],
                             curr_client_port
-                        ))
+                            ))
+                    else :
+                        break
             else: # createDedicatedFlows
                 ret = ret + ("p[%d]" % (portNo))
+                break
 
             appID = appID + 1
     print "memcached dragonet Parameters: %s" % (ret)
     return ret
-
 
 def genMemcachedParameters2(noPorts, threadsPerPort, createDedicatedFlows = True):
     ret = ""
@@ -114,6 +112,13 @@ def SRV_CMDS(name):
                 "llvmSF":   ["./scripts/pravin/deployDragonetSF.sh", "stack-sf" ],
                 "llvmE10k": ["./scripts/pravin/deployDragonetE10k.sh", "stack-e10k" ],
                 }
+    dragonet_filter_selector = {
+                "llvmSF":   False,
+                "llvmE10k": True,
+            }
+
+
+
 
     if name == "memcached" :
         return {
@@ -137,29 +142,32 @@ def SRV_CMDS(name):
                           dragonet_container[name][0],
                           HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
                             ),
-                      "sleep 4",
                       "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
                         toCoreList2(range((0 + SERVER_CORESHIFT), (SERVER_CORESHIFT + (SERVERS_INSTANCES*SERVER_CORES)))))
                         + " ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log  "
                         + " ../benchmarking/memcached/memcached -N %s -c 64000 -m 64000 -u root %s %d -t %d -l %s " % (
-                            genMemcachedParameters(SERVERS_INSTANCES, SERVER_CORES, True),
+                            genMemcachedParameters(SERVERS_INSTANCES, SERVER_CORES, dragonet_filter_selector[name]),
                             "-p 0 -U ",
                             SERVER_INITIAL_PORT, SERVER_CORES, TARGET),
-                      "sleep 4",
+                       "sleep 4",
                                     ],
 
                     "is_ready_cmd_special" : [
-                                        "sleep 4 ",
-                                        #"cd dragonet/Dragonet/ ; ./wait_for_dn_app.sh %d %d ./ " % (HWQUEUES, SERVERS_INSTANCES * SERVER_CORES),
+                      "cd dragonet/Dragonet/ ; ./scripts/pravin/wait_for_dn_app.sh %d %d %s %s" % (
+                            HWQUEUES, SERVER_CORES,
+                            dragonet_container[name][1],
+                            "memcached"),
+                       "sleep 2",
                                     ],
+
 
                     "init_cmd" : [],
                     "exec_cmd" : "echo 'Server should already be running'" ,
                     "kill_cmd" : [
                                 "tail dragonet/Dragonet/some.log",
                                 "tail dragonet/Dragonet/memcached-out.log",
-                                "sudo killall memcached || true",
-                                "sudo killall %s || true" % (dragonet_container[name][1]),
+                                #"sudo killall memcached || true",
+                                #"sudo killall %s || true" % (dragonet_container[name][1]),
                                  ],
                     "out_cmd" : [],
                 }

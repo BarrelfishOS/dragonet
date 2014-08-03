@@ -56,9 +56,10 @@ title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},,SRV_${SERVERCORES},
 run_bm_tp_rr() {
     target=${1}
     target_t=${2}
+    resultLocation=${3}
     result="${3}/latency_${target_t}.png"
     log="${3}/latency_${target_t}.log"
-
+    ONLYBEST=${4}
     ALLRESULTS="${3}/maxTP_${target_t}_${PKTSIZE}/"
     mkdir -p ${ALLRESULTS}
 
@@ -75,9 +76,20 @@ run_bm_tp_rr() {
 #    set -e
     CTP=0
     NTP=1
-    LBRUST=1
-    CBRUST=1
-    NBRUST=1
+    LBRUST=16
+    CBRUST=16
+    NBRUST=16
+
+
+    if [ ${ONLYBEST} -ne 1 ] ; then
+        let LBRUST=ONLYBEST
+        let CBRUST=ONLYBEST
+        let NBRUST=CBRUST+CBRUST
+    else
+
+    # Initial reset of stack
+    reset_and_warmup_stack ${target} ${target_t} ${resultLocation}
+
     while [  "$NTP" -gt "$CTP" ]; do
 #        set -x
 #        set -e
@@ -89,7 +101,7 @@ run_bm_tp_rr() {
         echo "#################################################"
         echo "running for ${title}"
 
-        retry 2 ./netperf-wrapper -d ${DELAY} -I 1 -l ${SHORTRUN} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
+        retry 2 ./netperf-wrapper -d ${DELAY} -I 1 -l ${SHORTRUN} -c noServer --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
         -H ${srvName} ${cliName6} \
         --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
@@ -126,7 +138,9 @@ run_bm_tp_rr() {
         ./cleanup.sh 2> /dev/null
         #sleep 3
     done
+    fi
 
+    reset_and_warmup_stack ${target} ${target_t} ${resultLocation}
     set -x
     set -e
 
@@ -134,7 +148,7 @@ run_bm_tp_rr() {
     title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},Q_${HWQUEUES},P_${PACKET_SIZE},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},C_${LBRUST},BEST"
     echo "running for ${title}"
 
-    retry 4 ./netperf-wrapper -d ${DELAY} -I ${ITERATIONS} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
+    retry 4 ./netperf-wrapper -d ${DELAY} -I ${ITERATIONS} -l ${DURATION} -c noServer  --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
         -H ${srvName} ${cliName6} \
         --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
@@ -142,16 +156,83 @@ run_bm_tp_rr() {
 
     set +x
     set +e
-    cat ${SAMARRYFILE} >> ${FINALRESULT}
+    #cat ${SAMARRYFILE} >> ${FINALRESULT}
     cat ${TMPFILE} >>  ${MYTMPDIR}/${title}.log
     rm -f ${SAMARRYFILE}
-#    echo "done with while [  $NTP -gt $CTP ]; do"
-#    echo "#############################################################"
-#    echo "############ BEST TP for instances:${SERVERINSTANCES} CORES:${SERVERCORES} [$NTP:$CBRUST]"
-#    echo "#############################################################"
     ./cleanup.sh 2> /dev/null
-#    sleep 3
 }
+
+reset_and_warmup_stack()
+{
+
+    target=${1}
+    target_t=${2}
+    ALLRESULTS="${3}/maxTP_${target_t}_${PKTSIZE}/"
+
+    brust=2
+    SHORTRUN=5
+
+    NTP=1
+    iterations=0
+
+    while [ 1 ]; do
+
+    let iterations=iterations+1
+    ./cleanupServer.sh
+
+    echo "###################################################################"
+    echo "#### Resetting the stack ${ECHO_SERVER} Iteration: ${iterations} ##"
+    echo "###################################################################"
+
+    mkdir -p ${ALLRESULTS}
+
+    MYTMPDIR=${ALLRESULTS}
+    TMPFILE="${MYTMPDIR}/warmup.txt"
+
+    title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},Q_${HWQUEUES},P_${PACKET_SIZE},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},C_${brust},warmup"
+    echo "running for ${title}"
+
+    retry 2 ./netperf-wrapper -d 2 -l ${SHORTRUN} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
+        -H ${srvName} ${cliName6} \
+        --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
+        --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
+        --concurrency ${brust} -t "${title}" -o "${ALLRESULTS}" -L "${MYTMPDIR}/${title}.log" 2>&1 | tee ${TMPFILE}
+
+
+    # FIXME: make sure that stack is working properly and all clients are seeing reasonable transacations
+    TOTALTPS=`cat ${TMPFILE} | grep "^total TPS: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1 | cut -d'.' -f1`
+    NTP=`cat ${TMPFILE} | grep "^MIN TPS: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1 | cut -d'.' -f1`
+    if [[ ! -z "${NTP}" ]] && [[ "${NTP}" -ge 100 ]] ; then
+        echo "Stack is running and working properly (reported min TPS ${NTP})"
+        break
+    fi
+    if [[ ! -z "${TOTALTPS}" ]] && [[ "${TOTALTPS}" -ge 100 ]] ; then
+    echo "Seems that only few clients are stuck, so retyring quickly without restarting whole stack"
+
+        retry 2 ./netperf-wrapper -d 2 -l ${SHORTRUN} -c noServer --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
+        -H ${srvName} ${cliName6} \
+        --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
+        --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
+        --concurrency ${brust} -t "${title}" -o "${ALLRESULTS}" -L "${MYTMPDIR}/${title}.log" 2>&1 | tee ${TMPFILE}
+
+        NTP11=`cat ${TMPFILE} | grep "^MIN TPS: " | head -n1 | cut -d'[' -f2 | cut -d']' -f1 | cut -d'.' -f1`
+        if [[ ! -z "${NTP11}" ]] && [[ "${NTP11}" -ge 100 ]] ; then
+            echo "Stack is running and working properly (reported min TPS        ${NTP11})"
+            break
+        fi
+    fi
+
+    if [ ${iterations} -gt 3 ] ; then
+        echo "We have already tried to reset the stack ${iterations} times, so giving up"
+        exit 1
+    fi
+    sleep 3
+
+    done
+    cat ${TMPFILE} >>  ${MYTMPDIR}/${title}.log
+    ./cleanup.sh 2> /dev/null
+}
+
 
 get_best_latency()
 {
@@ -175,7 +256,9 @@ get_best_latency()
 }
 
 
-get_best_tp()
+
+
+find_best_tp()
 {
     SERVERINSTANCES=$1
     SERVERCORES=$2
@@ -191,14 +274,14 @@ get_best_tp()
     OUTDIR="${OUTDIRP}/TP_MAX/P_${SERVERCORES}/T_${SERVERCORES}/"
     mkdir -p ${OUTDIR}
     # for increasing TP on transaction based benchmark
-    run_bm_tp_rr  ${SELTARGET} ${SELTARGET_T} ${OUTDIR}
+    run_bm_tp_rr  ${SELTARGET} ${SELTARGET_T} ${OUTDIR} ${FOR_BEST_RUN}
 }
 
 get_scalability_linux_rss() {
 
     HWQUEUES=1
     setup_output_location
-    get_best_tp 1 2
+    find_best_tp 1 2
 }
 
 
@@ -208,41 +291,44 @@ get_scalability_linux_sp() {
     HWQUEUES=1
     setup_output_location
 
-    get_best_tp 8 1
-    get_best_tp 16 1
-    get_best_tp 10 1
-    get_best_tp 12 1
-    get_best_tp 14 1
+    find_best_tp 8 1
+    find_best_tp 16 1
+    find_best_tp 10 1
+    find_best_tp 12 1
+    find_best_tp 14 1
 }
 
 
+get_scalability_only_one_para() {
+    threads=${1}
+    find_best_tp 1 ${threads}
+}
+
+
+
 get_scalability_only_one() {
-    get_best_tp 1 1
-    get_best_tp 1 2
-    get_best_tp 1 4
-    get_best_tp 1 8
-    get_best_tp 1 16
+    find_best_tp 1 4
 }
 
 get_scalability_all() {
 
-    get_best_tp 1 6
+    find_best_tp 1 6
 
 #    setup_output_location
-    get_best_tp 1 1
-    get_best_tp 1 2
-    get_best_tp 1 4
-    get_best_tp 1 6
-    get_best_tp 1 8
-    get_best_tp 1 10
+    find_best_tp 1 1
+    find_best_tp 1 2
+    find_best_tp 1 4
+    find_best_tp 1 6
+    find_best_tp 1 8
+    find_best_tp 1 10
 }
 
 get_scalability_all_v2() {
-    get_best_tp 1 10
-    get_best_tp 1 12
-    get_best_tp 1 14
-    get_best_tp 1 16
-    get_best_tp 1 18
+    find_best_tp 1 10
+    find_best_tp 1 12
+    find_best_tp 1 14
+    find_best_tp 1 16
+    find_best_tp 1 18
 }
 
 
@@ -251,24 +337,24 @@ get_scalability_linux() {
 
     HWQUEUES=1
     setup_output_location
-    get_best_tp 1 1
-    get_best_tp 1 2
-    get_best_tp 1 4
-    get_best_tp 1 6
-    get_best_tp 1 8
-    get_best_tp 1 16
-    get_best_tp 1 10
-    get_best_tp 1 12
-    get_best_tp 1 14
-    get_best_tp 1 18
+    find_best_tp 1 1
+    find_best_tp 1 2
+    find_best_tp 1 4
+    find_best_tp 1 6
+    find_best_tp 1 8
+    find_best_tp 1 16
+    find_best_tp 1 10
+    find_best_tp 1 12
+    find_best_tp 1 14
+    find_best_tp 1 18
 }
 
 get_scalability_linux_multiport() {
-    get_best_tp 2 1
-    get_best_tp 4 1
-    get_best_tp 6 1
-    get_best_tp 8 1
-    get_best_tp 16 1
+    find_best_tp 2 1
+    find_best_tp 4 1
+    find_best_tp 6 1
+    find_best_tp 8 1
+    find_best_tp 16 1
 }
 
 get_scalability_remaining() {
@@ -276,17 +362,17 @@ get_scalability_remaining() {
     HWQUEUES=1
     setup_output_location
 
-    get_best_tp 1 6
-    get_best_tp 1 10
-    get_best_tp 1 12
-    get_best_tp 1 14
-    get_best_tp 1 18
+    find_best_tp 1 6
+    find_best_tp 1 10
+    find_best_tp 1 12
+    find_best_tp 1 14
+    find_best_tp 1 18
 
-    get_best_tp 6 1
-    get_best_tp 10 1
-    get_best_tp 12 1
-    get_best_tp 14 1
-    get_best_tp 18 1
+    find_best_tp 6 1
+    find_best_tp 10 1
+    find_best_tp 12 1
+    find_best_tp 14 1
+    find_best_tp 18 1
 
     fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
     ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
@@ -309,21 +395,21 @@ get_scalability_dn() {
 
     HWQUEUES=1
     setup_output_location
-    get_best_tp 1 1
-    get_best_tp 1 2
-    get_best_tp 1 4
-    get_best_tp 2 1
-    get_best_tp 4 1
+    find_best_tp 1 1
+    find_best_tp 1 2
+    find_best_tp 1 4
+    find_best_tp 2 1
+    find_best_tp 4 1
     HWQUEUES=2
     setup_output_location
-    get_best_tp 1 2
-    get_best_tp 1 4
-    get_best_tp 2 1
-    get_best_tp 4 1
+    find_best_tp 1 2
+    find_best_tp 1 4
+    find_best_tp 2 1
+    find_best_tp 4 1
     HWQUEUES=4
     setup_output_location
-    get_best_tp 1 4
-    get_best_tp 4 1
+    find_best_tp 1 4
+    find_best_tp 4 1
 
 #    fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
 #    ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
@@ -333,9 +419,9 @@ get_scalability_dn() {
 
 
 get_scalability_special() {
-#    get_best_tp 1 4
-    get_best_tp 4 1
-    #get_best_tp 1 1
+#    find_best_tp 1 4
+    find_best_tp 4 1
+    #find_best_tp 1 1
     fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
     ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
     echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
@@ -343,15 +429,15 @@ get_scalability_special() {
 
 
 get_scalability_instances() {
-    get_best_tp 1 1
-    get_best_tp 2 1
-    get_best_tp 4 1
-    get_best_tp 8 1
-#    get_best_tp 10 1
-#    get_best_tp 12 1
-#    get_best_tp 14 1
-    get_best_tp 16 1
-#    get_best_tp 18 1
+    find_best_tp 1 1
+    find_best_tp 2 1
+    find_best_tp 4 1
+    find_best_tp 8 1
+#    find_best_tp 10 1
+#    find_best_tp 12 1
+#    find_best_tp 14 1
+    find_best_tp 16 1
+#    find_best_tp 18 1
 
     fname="scalability-instances-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
     ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
@@ -359,15 +445,15 @@ get_scalability_instances() {
 }
 
 get_scalability_threads() {
-    get_best_tp 1 1
-#    get_best_tp 1 2
-    get_best_tp 1 4
-    get_best_tp 1 8
-#    get_best_tp 1 10
-#    get_best_tp 1 12
-#    get_best_tp 1 14
-#    get_best_tp 1 16
-#    get_best_tp 1 18
+    find_best_tp 1 1
+#    find_best_tp 1 2
+    find_best_tp 1 4
+    find_best_tp 1 8
+#    find_best_tp 1 10
+#    find_best_tp 1 12
+#    find_best_tp 1 14
+#    find_best_tp 1 16
+#    find_best_tp 1 18
 
     fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
     ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
@@ -436,6 +522,7 @@ use_asiago_server() {
     SF_S_T="10.113.4.195"
 
     cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere  -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata"
+    cliName6Long="-C burrata -C gruyere -C  ziger2 -C sbrinz2 -C burrata -C gruyere -C  ziger2 -C sbrinz2  -C burrata -C gruyere -C  ziger2 -C sbrinz2 -C burrata -C gruyere -C  ziger2 -C sbrinz2"
     #cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
     cliName6Short="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
 #    cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata"
@@ -475,7 +562,7 @@ ITERATIONS=5
 ITERATIONS=3
 
 DURATION=10
-CORESHIFT=2
+CORESHIFT=0
 SERVERINSTANCES=1
 
 DELAY=5
@@ -510,6 +597,7 @@ UDP_TEST_NAME="memcached_rr"
 #ECHO_SERVER="memcached"
 #ECHO_SERVER="memcached_poll"
 #ECHO_SERVER="llvmE10k"
+#use_asiago_server_intel_switched
 
 #use_asiago_server_sf_switched
 #ECHO_SERVER="memcached"
@@ -521,12 +609,63 @@ HWQUEUES=1
 UDP_TEST_NAME="udp_rr"
 UDP_TEST_NAME="memcached_rr"
 
-use_asiago_server_sf_switched
+#use_asiago_server_sf_switched
 #ECHO_SERVER="memcached"
 #ECHO_SERVER="memcached_onload"
 ECHO_SERVER="llvmSF"
-MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet__NRT_FLOWS_SF_Q1/"
 MAIN_OUTPUT_DIR="../memcachedResults_v2/scalability/P1024/Dragonet_NRT_SF_Q1/"
+
+
+FOR_BEST_RUN=1
+HWQUEUES=4
+UDP_TEST_NAME="memcached_rr"
+#ECHO_SERVER="noServer"
+#ECHO_SERVER="llvmSF"
+#use_asiago_server_sf_switched
+ECHO_SERVER="llvmE10k"
+use_asiago_server_intel_switched
+#MAIN_OUTPUT_DIR="../memcachedResults_v2/scalability/P1024/Dragonet_NRT_SF/"
+MAIN_OUTPUT_DIR="../memcachedResults_v2/scalability/P1024/Dragonet_NRT_Intel_N/"
+cliName6Long="-C burrata -C gruyere -C  ziger2 -C burrata -C gruyere -C  ziger2 -C sbrinz2 -C burrata -C gruyere -C  ziger2 -C sbrinz2"
+
+setup_output_location
+get_scalability_only_one_para 1
+get_scalability_only_one_para 2
+get_scalability_only_one_para 4
+get_scalability_only_one_para 6
+get_scalability_only_one_para 8
+get_scalability_only_one_para 12
+get_scalability_only_one_para 14
+get_scalability_only_one_para 16
+get_scalability_only_one_para 18
+exit 0
+get_scalability_only_one_para 10
+
+#get_scalability_only_one_para 8
+
+#use_asiago_server_intel_switched
+#MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet_NRT_FLOWS_E10k_Q4/"
+
+
+#MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet_NRT_FLOWS_SF_Q4/"
+
+FOR_BEST_RUN=1
+MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet_NRT_FLOWS_SF_Q4_D/"
+
+#FOR_BEST_RUN=64
+#MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet_NRT_FLOWS_E10k_Q4_D/"
+
+cliName6Long="-C burrata -C gruyere -C  ziger2 -C sbrinz2 -C burrata -C gruyere -C  ziger2 -C sbrinz2 -C burrata -C gruyere -C  ziger2 -C sbrinz2  -C burrata -C gruyere -C  ziger2 -C sbrinz2"
+
+
+
+
+UDP_TEST_NAME="udp_rr"
+HWQUEUES=4
+#ECHO_SERVER="llvmE10k"
+ECHO_SERVER="noServer"
+use_asiago_server_intel_switched
+MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet_NRT_FLOWS_E10k_Q4/"
 setup_output_location
 get_scalability_only_one
 exit 0
@@ -642,7 +781,7 @@ get_scalability_special
 
 get_best_latency 1 1 1
 get_scalability_special
-get_best_tp 1
+find_best_tp 1
 
 #exit 0
 
