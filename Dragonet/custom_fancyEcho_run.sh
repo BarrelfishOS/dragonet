@@ -92,6 +92,8 @@ SERVERIP="10.113.4.95"
 # For Solarflare
 SERVERIP="10.113.4.195"
 
+./scripts/pravin/wait_for_dragonet.sh
+
 run_for_4_cores
 
 #run_for_2_cores_full_filters

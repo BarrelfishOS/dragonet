@@ -63,6 +63,7 @@
 /* Initial power multiplier for the hash table */
 #define HASHPOWER_DEFAULT 16
 
+
 /* unistd.h is here */
 #if HAVE_UNISTD_H
 # include <unistd.h>

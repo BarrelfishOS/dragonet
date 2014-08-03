@@ -5147,6 +5147,14 @@ int main (int argc, char **argv) {
                                 " Set this value to the number of cores in"
                                 " your machine or less.\n");
             }
+            if (settings.num_threads >= MAX_THREADS) {
+                fprintf(stderr, "ERROR: too many worker threads"
+                        "Dragonet currently supports only upto %d threads.\n",
+                        MAX_THREADS);
+                exit(1);
+                return -1;
+            }
+
             break;
         case 'D':
             if (! optarg || ! optarg[0]) {

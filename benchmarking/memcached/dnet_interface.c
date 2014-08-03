@@ -204,45 +204,11 @@ parse_client_list(char *client_list_str, int thread_count)
     return client_list;
 } // end function: parse_client_list
 
-// to record first socket which called listen
-static dnal_sockh_t dsh_first = NULL;
+static dnal_sockh_t dsh_connected_socket_list[MAX_THREADS];
 
 // Lock to protect dragonet initialization
 static pthread_mutex_t dn_init_lock = PTHREAD_MUTEX_INITIALIZER; // dragonet lock
 static int threads_initialized_count = 0;
-
-#if 0
-// Wrapper which stores the packet received with callback tempararily
-// and calls event handler mechanism
-static void recv_cb(socket_handle_t sh1, struct input *in, void *data)
-{
-
-    mprint("debug: %s:%s:%d: callback arrived\n", __FILE__, __FUNCTION__, __LINE__);
-    struct dn_thread_state *current_thread_st_copy;
-    // we need to have one current packet for each thread.
-    current_thread_st_copy = current_thread_st;
-    current_thread_st_copy->current_packet = in;
-    // release dragonet lock here
-    pthread_mutex_unlock(&dn_lock);
-
-    // Whichever thread called stack_process_event should get the callback
-    // Most of the memcached work should happen here
-    current_thread_st_copy->callback_memcached_fn(
-                current_thread_st_copy->callback_memcached_fd,
-                current_thread_st_copy->callback_memcached_which,
-                current_thread_st_copy->callback_memcached_arg);
-
-    // Does input_free needs to be guarded with Dragonet lock?
-    pthread_mutex_lock(&dn_lock);
-    assert(current_thread_st_copy != NULL);
-    assert(current_thread_st_copy->current_packet != NULL);
-    stack_input_free(current_thread_st_copy->stack,
-            current_thread_st_copy->current_packet);
-
-    // Not unlocking as event handler will unlock this.
-    //pthread_mutex_unlock(&dn_lock);
-} // end function:  recv_cb
-#endif // 0
 
 
 /*
@@ -389,16 +355,18 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
      in->attr->offset_l5,
      buff, bufsize);
 
+#ifdef SHOW_INTERVAL_STAT
 
-    if((dnt_state->pkt_count) % 1000 == 0) {
-        mprint
-        //printf
+    if((dnt_state->pkt_count) % INTERVAL_STAT_FREQUENCY == 0) {
+        //mprint
+        printf
             ("[TID:%d], [pkt_count:%"PRIu64"], sport = %"PRIx16", dport=%"PRIx16", "
             "srcip = %"PRIx32" dstip = %"PRIx32", len = %d \n",
             dnt_state->tindex, dnt_state->pkt_count,
             in->attr->udp_sport, in->attr->udp_dport, in->attr->ip4_src,
             in->attr->ip4_dst, len);
     }
+#endif // SHOW_INTERVAL_STAT
 
     ++dnt_state->pkt_count;
 
@@ -512,16 +480,15 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
     // create a socket
     ret = dnal_socket_create(dn_tstate->daq, &dn_tstate->dsh);
     err_expect_ok(ret);
-    uint64_t sockid = 0 ; // get_socket_id(dn_tstate->dsh);
 
-    mprint("%s:%s:%d: [TID:%d], [appName:%s], [sockid:%"PRIu64"]\n", __FILE__, __FUNCTION__, __LINE__,
-            dn_tstate->tindex, dn_tstate->app_slot, sockid);
+    mprint("%s:%s:%d: [TID:%d], [appName:%s] \n", __FILE__, __FUNCTION__, __LINE__,
+            dn_tstate->tindex, dn_tstate->app_slot);
 
     mprint("%s:%s:%d: [TID:%d], \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
 
     // If this is first thread then bind, else span
-    //if (dn_tstate->tindex < filter_count) {
-    if (dn_tstate->tindex == 0) {
+    if (dn_tstate->tindex < filter_count) {
+    //if (dn_tstate->tindex == 0) {
 
         mprint("debug: %s:%s:%d: [TID:%d], directing specified flow to this thread\n",
                 __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
@@ -547,22 +514,24 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
         //print_socket_details(dn_tstate->dsh);
         err_expect_ok(dnal_socket_bind(dn_tstate->dsh, &dn_tstate->dnd));
 
-        if (dsh_first == NULL) {
-            dsh_first = dn_tstate->dsh;
-        }
-
+        // FIXME: maybe I should have lock around this as well.
+        dsh_connected_socket_list[dn_tstate->tindex] = dn_tstate->dsh;
 
     } else {
-        if (dsh_first == NULL) {
-            printf("%s:%s:%d: ERROR: No filters set atall\n",
-                   __FILE__, __FUNCTION__, __LINE__);
+        int socket_index = dn_tstate->tindex % filter_count;
+
+        if (dsh_connected_socket_list[socket_index] == NULL) {
+            printf("%s:%s:%d: ERROR: Prolem in initialization order.\n"
+                    "This socket-id %d should have been already set.\n",
+                   __FILE__, __FUNCTION__, __LINE__, socket_index);
             exit(1);
         }
 
         mprint("debug: %s:%s:%d: [TID:%d], This is not first thread, "
                 "so using existing socket for spanning\n",
                 __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
-        err_expect_ok(dnal_socket_span(dsh_first, dn_tstate->daq, dn_tstate->dsh));
+        err_expect_ok(dnal_socket_span(dsh_connected_socket_list[socket_index],
+                    dn_tstate->daq, dn_tstate->dsh));
     }
     pthread_mutex_unlock(&dn_init_lock);
 

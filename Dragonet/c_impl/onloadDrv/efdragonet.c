@@ -483,8 +483,8 @@ static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
               __FILE__,  __func__, __LINE__, state->tap_handler);
 
         // FIXME: enable following line.  I don't know why it generates compiliation error
-        //declare_dragonet_initialized(DN_READY_FNAME, "SF driver started!\n");
-        *in = input_alloc();  // FIXME: uncomment this!!!
+        declare_dragonet_initialized(DN_READY_FNAME, "SF driver started!\n");
+        *in = input_alloc();
         printf("Initialized\n");
 
         out_decision = P_RxQueue_init;

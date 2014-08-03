@@ -28,6 +28,7 @@ void input_free(struct input *in)
 
 void declare_dragonet_initialized(char *fname, char *msg)
 {
+    printf("##################### creating file [%s] ############\n", fname);
    int fid = creat(fname, 0644);
    assert(fid >= 0);
    int ret = write(fid, msg, strlen(msg));

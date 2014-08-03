@@ -1,42 +1,54 @@
 #!/bin/bash
 
+ensure_running_process() {
+    process=${1}
+    # Make sure that stack is still running and not crashed by
+    # checking its pid
+    isRunning=$(pidof ${process} | wc -l)
+    if [ "${isRunning}" == "0"  ] ; then
+        echo "Stack with name ${process} is not running anymore"
+        exit 1
+    fi
+}
+
 SCRIPTDIR="./scripts/pravin/"
 # the tool should get only one number as commandline arg
-if [ $# != 1 ] ; then
-    echo "ERROR: This script expects only one argument, as number of HW queues"
-    echo "NOTE: It assumes that there are 2 queues (RX and TX) for every HW queue"
-    echo "USAGE: $0 <no. of HW queues>"
-    echo "EXAMPLE: $0 1"
-    echo "EXAMPLE: $0 4"
+if [ $# != 2 ] ; then
+    echo "ERROR: This script expects two arguments, as number of HW queues, and stackname"
+    echo "USAGE: $0 <no. of HW queues> <stack-name>"
+    echo "EXAMPLE: $0 1 stack-sf"
+    echo "EXAMPLE: $0 4 stack-e10k"
 fi
 
 hwQcount=${1}
 pipelineCount=`expr 2 \* ${hwQcount}`
+stackName=${2}
 
 echo "Waiting for ${hwQcount} hw queues ( ${pipelineCount} pipelines)"
 
 set +x
 set -e
 
+counter=0
+
 while true;
 do
-    readyCount=$(ls -l *.ready 2> /dev/null | wc -l)
-    failedCount=$(ls -l *.failed 2> /dev/null | wc -l)
-    #failedCount=`ls -l *.failed | wc -l`
-    if [ "${failedCount}" != "0"  ] ; then
-        echo "One of the pipeline failed! FailedCount=${failedCount}"
-        cat some.log
-        ls *.failed
-        exit
-    fi
-
-    if [ "${readyCount}" == "${pipelineCount}"  ] ; then
-        echo "All ${readyCount} pipelines are ready!"
-        ls *.ready
-        cat some.log
+    let counter=counter+1
+    dnreadyCount=$(ls -l *.dnready 2> /dev/null | wc -l)
+    if [ "${dnreadyCount}" != "0"  ] ; then
+        echo "The NIC driver is started and running"
+        #cat some.log
+        cat *.dnready
+        sleep 4
         exit 0
     fi
-    echo "Pipelines ready=${readyCount}, Pipelines failed=${failedCount}"
+
+    ensure_running_process ${stackName}
+
+    if [ ${counter} -gt 60 ] ; then
+        echo "The NIC driver has not started yet, giving up"
+        exit 1
+    fi
     sleep 1
 done
 

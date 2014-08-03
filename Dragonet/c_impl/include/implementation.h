@@ -49,9 +49,10 @@ get_tsc(void) {
 // Shows packet classification after every 'INTERVAL_STAT_FREQUENCY' packet.
 //  This is for debugging purpose to show where exactly packets are going
 //  Currently supported by E10k queues,  sf queues, fancyecho
+//  memecached has its own copy of these variables in dnet_interface.h
 //#define SHOW_INTERVAL_STATS  1
-#define INTERVAL_STAT_FREQUENCY     (1)
-//#define INTERVAL_STAT_FREQUENCY     (10000)
+//#define INTERVAL_STAT_FREQUENCY     (1)
+#define INTERVAL_STAT_FREQUENCY     (1000)
 
 
 #define DEFAULT_BUFFER_SIZE             (2048)

@@ -282,6 +282,9 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
                     createPipeline plg stackname llvmH pl
             PLD.run ctx plConnect createPL $ addMuxIds plg
             putStrLn "updateGraph exit"
+            -- FIXME: Create file here.
+            putStrLn "################### calling appendFile with app ready notice"
+            appendFile("allAppslist.appready") $ "Application is ready!\n"
 
         initSS = StackState {
                 ssNextAppId = 1,
