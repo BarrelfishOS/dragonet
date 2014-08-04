@@ -15,7 +15,7 @@ module Util.GraphHelpers(
     recurseNFW,
     topsortLN,
     updateN,
-    labPre, labLPre, labLSucc,
+    labPre, labSuc, labLPre, labLSucc,
     ledgeToEdge,
     labReachable,
     rdfsStop,
@@ -41,6 +41,7 @@ delDupEdges = gmap fixC
 labelNode :: Graph gr => gr a b -> Node -> Maybe (LNode a)
 labelNode g n = do { a <- lab g n; return (n,a) }
 
+-- find based on its label
 findNodeByL :: Graph gr => (a -> Bool) -> gr a b -> Maybe (LNode a)
 findNodeByL f g = L.find (\(_,l) -> f l) $ labNodes g
 
@@ -181,6 +182,10 @@ ledgeToEdge (a,b,_) = (a,b)
 -- labeled node predecessors on a graph
 labPre :: Graph gr => gr a b -> LNode a -> [LNode a]
 labPre g n = map (nodeToLNode g) $ pre g (fst n)
+
+-- labeled node successors on a graph
+labSuc :: Graph gr => gr  a b -> LNode a -> [LNode a]
+labSuc g n = map (nodeToLNode g) $ suc g (fst n)
 
 -- same as above, but includes edge labels
 labLPre :: Graph gr => gr a b -> LNode a -> [(LNode a, LEdge b)]

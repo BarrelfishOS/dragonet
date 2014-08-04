@@ -5,6 +5,7 @@ module Graphs.E10k (
     C5TPort,
     C5Tuple(..),
     CFDirTuple(..),
+    prepareConf,
 
     graphH
 ) where
@@ -23,6 +24,7 @@ import Control.Monad
 import Data.Function (on)
 import Data.Functor ((<$>))
 import Data.String (fromString)
+import Debug.Trace (trace)
 
 import qualified SMTLib2 as SMT
 import qualified SMTLib2.Core as SMTC
@@ -44,6 +46,7 @@ addCfgFun :: Node -> ConfFunction
 addCfgFun n
     | l == "RxC5TupleFilter" = config5tuple
     | l == "RxCFDirFilter"   = configFDir
+    | l == "RxQueues" || l == "TxQueues" = configQueues -- not a real configuration, but helpful for building PRGs
     | otherwise = error $ "Unknown LPG CNode: '" ++ l ++ "'"
     where l = nLabel n
 
@@ -247,7 +250,6 @@ parseFDT (CVTuple
         convProto (CVEnum 3) = C5TPL4Other
         convInt (CVInt i) = fromIntegral i
 
-
 configFDir :: ConfFunction
 configFDir _ inE outE cfg = do
     ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
@@ -277,10 +279,42 @@ configFDir _ inE outE cfg = do
             let fEdge = (n,queue $ cfdtQueue c,Edge "false")
             return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
 
+configQueues :: ConfFunction
+configQueues cfgn inE outE (CVInt qs) = do
+    ret <- foldM addNode [] [1..qs]
+    return ret
+    where addNode prev n = do
+            let name = case (nLabel cfgn) of
+                         "RxQueues" -> "RxQueue" ++ (show n)
+                         "TxQueues" -> "TxQueue" ++ (show n)
+                attrs = nAttributes cfgn
+                ports = nPorts cfgn
+                node = (baseFNode name []) { nAttributes = attrs
+                                           , nPorts = ports }
+
+            (nid, _) <- confMNewNode node
+
+            let edge_to_self :: (PGNode, Edge) -> Bool
+                edge_to_self ((_, CNode { nLabel = xlbl }), _) = xlbl == nLabel cfgn
+                edge_to_self _ = False
+                self :: [Edge]
+                self_in  = L.sort $ [ e | (_, e) <- filter edge_to_self inE]
+                self_out = L.sort $ [ e | (_, e) <- filter edge_to_self outE]
+                self = case (self_in == self_out) of
+                    True -> self_in
+                    False -> error "incomming and outgoing self edges do not match"
+                iE  = [ (fst x, nid, e)  | (x, e) <- filter (not . edge_to_self) inE]
+                oE  = [ (nid, fst x, e)  | (x, e) <- filter (not . edge_to_self) outE]
+                sE  = [ (nid, nid, e)    | e <- self ]
+            return $ prev ++ iE ++ oE ++ sE
+
+
+prepareConf :: PGraph -> PGraph
+prepareConf = replaceConfFunctions addCfgFun
 
 graphH :: IO (PGraph,SEM.Helpers)
 graphH = do
     (pg,helpers) <- parseGraph "Graphs/E10k/prgE10kImpl.unicorn"
-    let pg' = replaceConfFunctions addCfgFun pg
+    let pg' = prepareConf pg
     return (pg',helpers)
 

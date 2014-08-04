@@ -5,7 +5,9 @@ module Dragonet.ProtocolGraph.Utils (
     getPGNodeByName,
     getFNodeByName,
     getFNodeByName',
-    getPGNAttr
+    getFNodeByNameTag',
+    getPGNAttr,
+    spawnDeps, isSpawnTarget, edgeDeps, edgePort
 ) where
 
 import Dragonet.ProtocolGraph
@@ -51,11 +53,16 @@ getFNodeByName' graph name = GH.findNodeByL fn graph
     where fn (FNode {nLabel = label}) = (label == name)
           fn _ = False
 
+getFNodeByNameTag' :: PGraph -> NLabel -> NTag -> Maybe PGNode
+getFNodeByNameTag' graph label' tag' = GH.findNodeByL fn graph
+    where fn (FNode {nLabel = label, nTag = tag }) = (label == label') && (tag == tag')
+          fn _ = False
+
 getFNodeByName :: PGraph -> NLabel -> PGNode
 getFNodeByName graph name = case GH.findNodeByL fn graph of
     Just x -> x
     Nothing -> error $ "Unable to find f-node with name: " ++ name
-    where fn (FNode label _ _ _ _ _) = (label == name)
+    where fn (FNode label _ _ _ _ _ _) = (label == name)
           fn _ = False
 
 -- Get key=value attribute with key == n
@@ -65,3 +72,33 @@ getPGNAttr node n = getVal <$> (find matches $ nAttributes node)
         matches (NAttrCustom s) = (n ++ "=") `isPrefixOf` s
         matches _ = False
         getVal (NAttrCustom s) = drop (length n + 1) s
+
+-- is this a normal (not spawn) edge?
+isNormalEdge :: PGEdge -> Bool
+isNormalEdge e = case e of
+    (_, _, ESpawn _ _) -> False
+    (_, _, Edge _)     -> True
+
+isSpawnEdge = not . isNormalEdge
+
+spawnDeps :: PGraph -> PGNode -> [(PGNode, PGEdge)]
+spawnDeps gr dst = filter (isSpawnEdge . snd) $ GH.labLPre gr dst
+
+-- equality based on label: same type and same label
+eqLabel :: PGNode -> PGNode -> Bool
+eqLabel (_, FNode {nLabel = x1}) (_, FNode {nLabel = x2}) = x1 == x2
+eqLabel (_, ONode {nLabel = x1}) (_, ONode {nLabel = x2}) = x1 == x2
+eqLabel _ _ = False
+
+edgePort :: PGEdge -> NPort
+edgePort pedge = case pedge of
+    (_, _, ESpawn _ _) -> error "spawn edges do not have ports"
+    (_, _, Edge p)     -> p
+
+-- normal incoming dependencies (label of connected node, edge)
+edgeDeps :: PGraph -> PGNode -> [(PGNode, PGEdge)]
+edgeDeps gr dst = filter (isNormalEdge . snd) $ GH.labLPre gr dst
+
+-- is the node a traget spawn edges
+isSpawnTarget :: PGraph -> PGNode -> Bool
+isSpawnTarget g n = not $ null $ spawnDeps g n

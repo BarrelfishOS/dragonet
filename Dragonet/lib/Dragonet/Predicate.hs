@@ -1,21 +1,64 @@
 module Dragonet.Predicate (
     PredicateExpr(..),
     predAnd, predOr,
-    predEval,
+    predEval, predEquiv,
+    initPredCompSt_, initPredCompSt, PredCompSt(..),
+    computePred,
     parseFile, parseStr, predGetTerms
 ) where
 
-import Dragonet.ProtocolGraph (PGraph, PGNode, PGEdge, Node(..), NLabel, NPort, Edge(..), NOperator(..))
-import qualified Text.ParserCombinators.Parsec as P
+import Dragonet.ProtocolGraph (PGraph, PGNode, PGEdge, Node(..), NPort, Edge(..), NOperator(..), ESAttribute(..), NLabel)
+import Dragonet.ProtocolGraph.Utils (getFNodeByName, edgeDeps, edgePort, spawnDeps, isSpawnTarget)
+import qualified Util.GraphHelpers as GH
 
+import Data.Maybe
 import Debug.Trace (trace)
 import Data.List (intercalate, lookup, concat)
+import qualified Text.ParserCombinators.Parsec as P
 
--- path predicates
-
+-- Path predicates:
+--  A path predicate is an expression with terms that in the form of:
+--  (node, port of node)
+--  They characterize the input (e.g., packet) of the graph based on which
+--  choices would be made
+--
+-- The code in this module preforms similar operations with the semantic helpers
+-- and the SMT solver -- both are essentially different approaches of doing the
+-- same thing. Eventually, we need to choose one. The SMT solver is more
+-- general, but potentially less performant.
 
 traceMessages = False
 xtrace = if traceMessages then trace else \a b -> b
+
+pgSpawnEdgePred :: PGEdge -> PredicateExpr
+pgSpawnEdgePred (_, _, ESpawn _ attrs) = expr
+    where isPredAttr ::  ESAttribute -> Bool
+          isPredAttr (ESAttrPredicate _) = True -- only this one for now
+
+          parse :: ESAttribute -> PredicateExpr
+          parse (ESAttrPredicate x) = parseStr $ xtrace ("parsing: " ++ x) x
+
+          predicates = filter isPredAttr attrs
+          predicates' = xtrace ("predicates are: " ++ (show predicates)) predicates
+          exprs = map parse predicates'
+          expr = case length exprs of
+                      0 -> PredicateTrue
+                      1 -> exprs !! 0
+                      otherwise -> PredicateAnd exprs
+
+--predicates from incoming spawn edges (combine them with and)
+pgSpawnPreds :: PGraph -> PGNode -> PredicateExpr
+pgSpawnPreds pg n = case length spawn_edges of
+    0 -> PredicateTrue
+    1 -> mapfn $ (spawn_edges !! 0)
+    otherwise -> predAnd $ map mapfn spawn_edges
+    where mapfn = (pgSpawnEdgePred . snd)
+          spawn_edges = spawnDeps pg n
+
+
+--
+------- Path predicates -----
+--
 
 data PredicateExpr = PredicateTerm NLabel NPort |
                      PredicateOr  [PredicateExpr] |
@@ -33,6 +76,18 @@ instance Show PredicateExpr where
     show PredicateTrue    = "true"
     show PredicateFalse   = "false"
     show PredicateUndef   = "UNDEFINED"
+
+--
+------- Predicate builders -----
+--
+
+-- interface
+predAnd = predicateAND        -- these versions do folding
+predOr  = predicateOR
+predNot = predicateNOT
+--predAnd = PredicateAnd      -- these versions do not
+--predOr  = PredicateOr
+
 
 -- create an AND predicate, and do folding when possible
 predicateAND :: [PredicateExpr] -> PredicateExpr
@@ -85,14 +140,7 @@ predicateNOT PredicateFalse = PredicateTrue
 -- TODO: fold AND/OR
 predicateNOT x = PredicateNot x
 
--- potentially replace them with the versions above that do folding
-predAnd = predicateAND
-predOr  = predicateOR
-predNot = predicateNOT
---predAnd = PredicateAnd
---predOr  = PredicateOr
-
--- evaluate (and hopefully simplify!) a predicate expression given a set of term
+-- evaluate (and hopefully simplify) a predicate expression given a set of term
 -- assignments
 predEval :: PredicateExpr -> [((NLabel,NPort), PredicateExpr)] -> PredicateExpr
 -- replace terms when possible
@@ -117,10 +165,101 @@ predGetTerms (PredicateAnd l) = concat $ map predGetTerms l
 predGetTerms (PredicateOr  l) = concat $ map predGetTerms l
 predGetTerms (PredicateNot p) = predGetTerms p
 
+--
+------- Computing predicate epxressions -----
+--
 
-{-
- - silly parser for building predicate expressions
- -}
+-- state for computing predicate expression:
+-- compStop will stop the search when a particular type of node is met.
+-- Normally, the search will stop when an entry node with no dependencies is
+-- reached. However, when are searching in an embedded graph, we need to stop
+-- when we reach the sink node.
+data PredCompSt = PredCompSt {
+      predGraph  :: PGraph
+    , predDst    :: PGNode
+    , predInPort :: Maybe NPort
+    , compStop   :: PGNode -> Bool
+} deriving (Show)
+
+-- check whether two predicates are equivalent: simple equality for now
+predEquiv :: PredicateExpr -> PredicateExpr -> Bool
+predEquiv a b =  a == b
+
+-- initialize state
+initPredCompSt_ = PredCompSt {
+      predGraph  = undefined
+    , predDst    = undefined
+    , predInPort = Nothing
+    , compStop   = \x -> False
+}
+
+-- initializer helper
+initPredCompSt :: PGraph -> String -> PredCompSt
+initPredCompSt gr node = initPredCompSt_ {
+      predGraph = gr
+    , predDst   = getFNodeByName gr node
+}
+
+-- Compute a predicate expression for flows (packets, whatever) that start from
+--  predSrc and reach predDst, in predGraph
+--  (assumes no circles exist)
+computePred :: PredCompSt -> PredicateExpr
+-- compute predicate of src->dst, where dst is an FNode:
+--  predicate of pre(dst) AND predicate of src->pre(dst)
+computePred st@(PredCompSt { predDst = (_, FNode {}), compStop = stopfn})
+    -- we reached an entry node
+    | ndeps == 0   = pgSpawnPreds gr dst
+    | ndeps > 1    = error $ "F-nodes have at most one incmming edge" ++ (nLabel $ snd dst)
+    -- ndeps == 1
+    | stopfn dn   = PredicateTrue
+    | spawned = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat is an OR?)
+    -- recurse
+    | otherwise   = expr
+    where (dst', gr) = (predDst st, predGraph st)
+          dst = dst' -- trace ("Visiting node: " ++ (nLabel $ snd dst')) dst'
+          -- predecesors of destintation (going backwards)
+          -- (only consider normal edges)
+          spawned = isSpawnTarget gr dst
+          deps    = edgeDeps gr dst
+          ndeps   = length deps
+          (dn,de) = deps !! 0
+          port    = edgePort de
+          nlabel  = nLabel (snd dn)
+          newst   = st { predDst = dn, predInPort = Just port}
+          expr'   = computePred newst
+          term    = PredicateTerm nlabel port
+          expr    = case dn of
+                      (_, ONode {})            -> expr'
+                      (_, FNode {nPorts = np}) -> if length np == 1
+                                                     then expr'
+                                                     else predAnd [expr', term]
+-- compute predicate of src->dst, where dst is an ONode:
+--  OP (e.g., AND) [ predicate of src -> pre ] for each pre in pre(dst)
+computePred st@(PredCompSt { predDst = (_, ONode { nOperator = op })} ) = expr
+    where inport = fromJust $ predInPort st
+          -- predecessors of destintation (going backwards)
+          predecessors = GH.labLPre (predGraph st) (predDst st)
+          -- get predicates for all predecessors
+          exprargs :: [PredicateExpr]
+          exprargs = map getPred predecessors
+          -- here we assume that O-nodes are not connecte in reverse
+          -- (true->false, false->true)
+          getPred :: (PGNode, PGEdge) -> PredicateExpr
+          getPred (n,_) = computePred $ st {predDst = n, predInPort = Just "true"}
+          -- predicate operand
+          expr = case (inport, op) of
+                  ("true", NOpAnd)  -> predAnd exprargs
+                  ("true", NOpOr)   -> predOr exprargs
+                  ("true", _)       -> error "NYI"
+                  ("false", NOpAnd) -> predOr  $ map PredicateNot exprargs
+                  ("false", NOpOr)  -> predAnd $ map PredicateNot exprargs
+                  ("false", _)      -> error "NYI"
+                  (_, _)            -> error $ "Expecting true/false, not:" ++ inport
+
+
+--
+------- silly parser for building predicate expression
+--
 
 wspace :: P.CharParser st ()
 wspace = P.skipMany (P.oneOf " \t")

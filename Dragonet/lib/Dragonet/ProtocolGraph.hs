@@ -51,7 +51,8 @@ data Node =
         nAttributes     :: [NAttribute],
         nPorts          :: [NPort],
         nImplementation :: NImplementation,
-        nSemantics      :: [(NPort,PortSemantics)]
+        nSemantics      :: [(NPort,PortSemantics)],
+        nOrigin         :: String  -- LPG, PRG, etc (mostly for debugging)
         } |
     ONode {
         nLabel          :: NLabel,
@@ -191,7 +192,8 @@ baseFNode label ports =
         nAttributes     = [],
         nPorts          = ports,
         nImplementation = NImplFunction label,
-        nSemantics      = []
+        nSemantics      = [],
+        nOrigin         = ""
         }
 
 baseONode :: NLabel -> [NPort] -> NOperator -> Node

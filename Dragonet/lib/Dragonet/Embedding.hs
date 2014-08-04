@@ -4,54 +4,61 @@ module Dragonet.Embedding(
 
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Util.GraphHelpers as GH
+import Dragonet.Embedding.Offload (embedOffload)
+import Dragonet.Conventions (rxQPref, txQPref, qTag)
 
 import qualified Data.Graph.Inductive as DGI
 import Data.Maybe
 import qualified Data.List as L
-
+import Debug.Trace (trace)
+import Text.Show.Pretty (ppShow)
 
 --------------------------------------------------------------------------------
 -- Embedding for both RX and TX path
-
--- queue nodes in the prg should have the following prefixes:
-rxPref = "RxQueue"
-txPref = "TxQueue"
-
-qTag pref = "Q" ++ pref
 
 tagNodes :: String -> PG.PGraph -> PG.PGraph
 tagNodes tag = DGI.nmap tagN
     where tagN n = n { PG.nTag = tag }
 
+setOrigin :: String -> PG.PGraph -> PG.PGraph
+setOrigin origin = DGI.nmap f
+    where f n@(PG.FNode {}) = n { PG.nOrigin = origin }
+          f n               = n
+
 tagPrgQueues :: PG.PGraph -> PG.PGraph
 tagPrgQueues = DGI.nmap tagQueue
     where
-        isQueueNode n = rxPref `L.isPrefixOf` l || txPref `L.isPrefixOf` l
+        isQueueNode n = rxQPref `L.isPrefixOf` l || txQPref `L.isPrefixOf` l
             where l = PG.nLabel n
         tagQueue n
             | isQueueNode n = n {
-                    PG.nTag = qTag $ drop (length rxPref) $ PG.nLabel n }
+                    PG.nTag = qTag $ drop (length rxQPref) $ PG.nLabel n }
             | otherwise = n
 
+
+-- connect one LPG to the PRG queues identified by rxQ:
+-- This also tags the lpg nodes with the queue identifier
+addLPG :: PG.PGraph -> PG.PGraph -> String -> PG.PGraph
+addLPG lpg prg rxQ = GH.mergeGraphsBy mergeP lpg' prg
+    where lpg'  = tagNodes (qTag rxQ) lpg -- tag lpg nodes
+          mergeP prgN lpgN
+            | lpn == rxQPref ++ rxQ && lln == rxQPref = True -- rx queue match
+            | lpn == txQPref ++ rxQ && lln == txQPref = True -- tx queue match
+            | otherwise = False
+            where lpn = PG.nLabel prgN -- prg node label
+                  lln = PG.nLabel lpgN -- lpg node label
+
 embeddingRxTx :: PG.PGraph -> PG.PGraph -> PG.PGraph
-embeddingRxTx prg lpg = withLPGs
+embeddingRxTx prg lpg = embg'
     where
-        prg' = tagPrgQueues prg
+        prg' = setOrigin "PRG" $ tagPrgQueues prg
+        lpg' = setOrigin "LPG" lpg
         -- List of queue identifiers
-        rxQs = [ drop (length rxPref) l |
+        rxQs = [ drop (length rxQPref) l |
                     (_, n)<- DGI.labNodes prg,
                     let l = PG.nLabel n,
-                    rxPref `L.isPrefixOf` l]
+                    rxQPref `L.isPrefixOf` l]
         -- PRG with full LPG added for each queue
-        withLPGs = foldl addLPG prg' rxQs
-        mergeP pr a b
-            | lB == rxPref ++ pr && lA == rxPref = True
-            | lB == txPref ++ pr && lA == txPref = True
-            | otherwise = False
-            where
-                lA = PG.nLabel a
-                lB = PG.nLabel b
-        addLPG prg pref = GH.mergeGraphsBy (mergeP pref) prg $
-                            tagNodes (qTag pref) lpg
-
-
+        -- rxQs contains the name of the queue without the prefix
+        embg  = foldl (addLPG lpg') prg' rxQs
+        embg' = foldl embedOffload  embg rxQs

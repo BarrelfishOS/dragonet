@@ -65,6 +65,7 @@ plAssignSplit _ _ (_,n)
 
 main = do
     (prgU, prgH) <- GH.parseGraph "Graphs/E10k/prgE10kDummy.unicorn"
-    (lpgU, lpgH) <- LPG.graphH
+    (lpgU, lpgH) <- LPG.graphH_   "Graphs/LPG/lpgConfImpl-offload.unicorn"
+    --(lpgU, lpgH) <- LPG.graphH
     S.startStack (lpgU,lpgH) (prgU, prgH) Emb.embeddingRxTx "llvm-helpers-tap" plAssignSplit
 

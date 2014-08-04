@@ -365,8 +365,9 @@ startStack (lpgU, lpgH) (prgC, prgH) embed_fn llvmH cfgPLA = do
                 lbl = "dummy"
                 pla = (plAssign cfgPLA ss)
 
-            debug "prg" $ O.DbgPGraph prgC
+            --debug "prg" $ O.DbgPGraph prgC
             plg <- O.makeGraph' mergeH prgC lpgC embed_fn implTransforms (pla lbl) debug
+            error "DONE!"
 
             let createPL pl@('A':'p':'p':aids) = do
                     putStrLn $ "Creating App pipeline: " ++ pl

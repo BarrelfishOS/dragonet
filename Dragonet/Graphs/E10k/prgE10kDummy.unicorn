@@ -1,15 +1,33 @@
-graph tapPRG {
-    node RxQueue {
+graph e10kDummyPRG {
+    node RxQueue1 {
         implementation TapRxQueue
         attr "init"
         attr "source"
         attr "software"
-        spawn poll RxQueue
+        spawn poll RxQueue1
         port out[]
         port drop[]
         port init[] }
 
-    node TxQueue {
+    node RxQueue2 {
+        implementation TapRxQueue
+        attr "init"
+        attr "source"
+        attr "software"
+        spawn poll RxQueue2
+        port out[]
+        port drop[]
+        port init[] }
+
+    //node foo { port p [RxQueue1] }
+
+    node TxQueue1 {
+        implementation TapTxQueue
+        attr "init"
+        attr "sink"
+        attr "software" }
+
+    node TxQueue2 {
         implementation TapTxQueue
         attr "init"
         attr "sink"
