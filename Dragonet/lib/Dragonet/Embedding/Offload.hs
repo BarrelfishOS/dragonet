@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Dragonet.Embedding.Offload (
     embedOffload
 ) where
