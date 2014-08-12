@@ -45,7 +45,7 @@ do
 
     ensure_running_process ${stackName}
 
-    if [ ${counter} -gt 60 ] ; then
+    if [ ${counter} -gt 160 ] ; then
         echo "The NIC driver has not started yet, giving up"
         exit 1
     fi

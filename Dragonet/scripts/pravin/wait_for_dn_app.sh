@@ -59,7 +59,7 @@ do
         echo "Apps ready=${readyCount}, and is expected to reach "${appSlots}""
         evCount=`expr 1 + ${evCount}`
 
-        if [ ${evCount} -gt 200  ] ; then
+        if [ ${evCount} -gt 600  ] ; then
             echo "ERROR: Event-count ${evCount} reached!, giving up on waiting"
             exit 1
         fi

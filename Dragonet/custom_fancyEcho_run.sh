@@ -61,12 +61,11 @@ sudo ./dist/build/bench-fancyecho/bench-fancyecho \
     -t -q t0  -t -q t1 -t -q t2 -t -q t3
 }
 
-run_for_2_cores() {
+run_for_2_cores_SP() {
     echo fancyEcho running on ${SERVERIP} with single application thread and single socket
     sudo ./dist/build/bench-fancyecho/bench-fancyecho \
-    -a t0 -p 888 \
-    -a t1  -f ${SERVERIP}:888/10.113.4.96:0 \
-    -f ${SERVERIP}:888/10.113.4.29:0 \
+    -a t0  -f ${SERVERIP}:888/10.113.4.96:9000 -f ${SERVERIP}:888/10.113.4.20:9000 \
+    -a t1  -f ${SERVERIP}:888/10.113.4.57:9000 -f ${SERVERIP}:888/10.113.4.29:9000 \
     -t -q t0 -t -q t1
 }
 
@@ -86,15 +85,21 @@ run_for_1_cores() {
     sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0  -p 888 -t -q t0
 }
 
-# For intel
-SERVERIP="10.113.4.95"
-
 # For Solarflare
+STACKNAME="stack-sf"
 SERVERIP="10.113.4.195"
 
-./scripts/pravin/wait_for_dragonet.sh
 
-run_for_4_cores
+# For intel
+STACKNAME="stack-e10k"
+SERVERIP="10.113.4.95"
+
+
+./scripts/pravin/wait_for_dragonet.sh 4 ${STACKNAME}
+
+run_for_2_cores_SP
+
+#run_for_4_cores
 
 #run_for_2_cores_full_filters
 
