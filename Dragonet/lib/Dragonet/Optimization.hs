@@ -15,6 +15,7 @@ import qualified Dragonet.Configuration as C
 import Dragonet.DotGenerator (toDot, pipelinesDot)
 import qualified Dragonet.Embedding as Emb
 import qualified Dragonet.ProtocolGraph as PG
+import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Dragonet.Pipelines as PL
 import qualified Dragonet.Semantics as Sem
 import qualified Dragonet.Semantics.Simplify as SS
@@ -23,7 +24,9 @@ import Control.Monad (forM, forM_)
 
 import Data.Function (on)
 import qualified Data.Graph.Inductive as DGI
+import qualified Data.Graph.Inductive.Query.DFS as DGIDFS
 import qualified Data.List as L
+import qualified Data.Set as S
 
 import qualified System.FilePath as FP
 import qualified System.Directory as Dir
@@ -76,8 +79,11 @@ makeGraph' helpers prgC lpg embed_fn implTransforms pla debug = do
     -- Apply implementation transforms
     let implGraph = cleanupGraph $ foldl (\g t -> t g) cleanedUp implTransforms
     debug "implT" $ DbgPGraph implGraph
+    -- Drop hardware nodes
+    let nohwGraph = dropHardwareNodes implGraph
+    debug "nohw" $ DbgPGraph nohwGraph
     -- Partition graph
-    let plg = PL.generatePLG pla implGraph
+    let plg = PL.generatePLG pla nohwGraph
     debug "pipelines" $ DbgPLGraph plg
     return plg
 
@@ -128,7 +134,6 @@ dbgDotfiles bdir cl gl d =
 -- This does not really belong here...
 --
 -- Remove sources without "source" attribute and sinks without "sink" attribute
--- can also be used to remove hardware parts of the embeded graph
 cleanupGraph :: PG.PGraph -> PG.PGraph
 cleanupGraph g
     | null badNodes = g
@@ -141,9 +146,22 @@ cleanupGraph g
         badSnks = filter (not . hasAttr "sink" . snd) snks
         badNodes = L.nub $ map fst $ badSrcs ++ badSnks
         g' = DGI.delNodes badNodes g
-        --onlySpawnEs = all isSpawnE
-        onlySpawnEs = null
+        onlySpawnEs = all isSpawnE
             where isSpawnE (_,PG.ESpawn {}) = True
                   isSpawnE _ = False
 
+dropHardwareNodes :: PG.PGraph -> PG.PGraph
+dropHardwareNodes pg = DGI.delNodes (S.toList dropNodes) pg
+    where
+        nsepg = PGU.dropSpawnEdges pg
+        dropNodes = (rxHwNodes `S.union` txHwNodes) S.\\
+                        (S.fromList (rxNodes ++ txNodes))
+
+        rxNodes = [n | (n,l) <- DGI.labNodes pg,
+                       "RxQueue" `L.isPrefixOf` PG.nLabel l]
+        rxHwNodes = S.fromList $ DGI.dfs rxNodes $ DGI.grev nsepg
+
+        txNodes = [n | (n,l) <- DGI.labNodes pg,
+                       "TxQueue" `L.isPrefixOf` PG.nLabel l]
+        txHwNodes = S.fromList $ DGI.dfs txNodes nsepg
 

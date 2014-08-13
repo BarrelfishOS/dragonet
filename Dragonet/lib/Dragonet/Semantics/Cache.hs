@@ -16,7 +16,8 @@ import qualified SMTLib2.BitVector as SMTB
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Control.Monad.Trans.Class as MT
-import qualified Control.Monad.State as ST
+import qualified Control.Monad.State.Class as ST
+import qualified Control.Monad.State.Strict as STS
 import Control.Monad.IO.Class (liftIO,MonadIO)
 import Control.Monad (forM_)
 
@@ -32,9 +33,9 @@ data Expr e = Expr {
     }
 
 instance Show e => Show (Expr e) where
-    show Expr { eSMT = s, eBase = e } = "Expr " ++ show s ++ " " ++ show e
+    show Expr { eSMT = s, eBase = e } = "Expr " ++ show (SMT.pp s) ++ " " ++ show e
 
-newtype Solver m a = Solver (ST.StateT State m a)
+newtype Solver m a = Solver (STS.StateT State m a)
     deriving (Monad, MonadIO)
 
 instance (S.SolverM m e) => ST.MonadState State (Solver m) where
@@ -60,7 +61,7 @@ instance (S.SolverM m e) => S.SolverM (Solver m) (Expr e) where
     isolated (Solver a) = do
         st <- ST.get
         liftS $ S.isolated $ do
-            (x,_) <- ST.runStateT a st
+            (x,_) <- STS.runStateT a st
             return x
 
     checkSat Expr { eSMT = smt, eBase = e }= do
@@ -111,6 +112,6 @@ instance (S.SolverM m e) => S.SolverM (Solver m) (Expr e) where
 runCacheSolver :: (S.SolverM n f) => Solver n a -> n a
 runCacheSolver (Solver act) = do
     let st = State { stCache =  M.empty }
-    (a,_) <- ST.runStateT act st
+    (a,_) <- STS.runStateT act st
     return a
 

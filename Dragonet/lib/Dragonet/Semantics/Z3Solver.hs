@@ -17,7 +17,8 @@ import qualified Z3.Monad as Z3
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Control.Monad.Trans.Class as MT
-import qualified Control.Monad.State as ST
+import qualified Control.Monad.State.Class as ST
+import qualified Control.Monad.State.Strict as STS
 import Control.Monad.IO.Class (liftIO,MonadIO)
 import Control.Monad (forM_)
 
@@ -49,7 +50,7 @@ data FuncInfo =
     BuiltinBin (Z3.AST -> Z3.AST -> Solver Z3.AST) |
     Constant Z3.AST
 
-newtype Solver a = Solver (ST.StateT State Z3.Z3 a)
+newtype Solver a = Solver (STS.StateT State Z3.Z3 a)
     deriving (Monad, MonadIO)
 
 instance ST.MonadState State Solver where
@@ -216,6 +217,6 @@ runZ3Solver (Solver act) = Z3.evalZ3 $ do
                 stExFalse = exFalse,
                 stBitVecs = M.empty
             }
-    (a,_) <- ST.runStateT act st
+    (a,_) <- STS.runStateT act st
     return a
 
