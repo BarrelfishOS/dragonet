@@ -269,7 +269,7 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
                 -- Generate PRG configurations
                 pCfgs = cfgOracle lpgC ss
                 -- Transformations to be applied to graph before implementing it
-                implTransforms = [IT.mergeSockets]
+                implTransforms = [IT.coupleTxSockets, IT.mergeSockets]
 
             putStrLn $ "LPG config: " ++ show lpgCfg
             (plg,(_,pCfg)) <- O.optimize helpers prgU lpgC implTransforms

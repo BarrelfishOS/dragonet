@@ -1,5 +1,6 @@
 module Graphs.ImplTransforms (
-    mergeSockets
+    mergeSockets,
+    coupleTxSockets
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG
@@ -8,8 +9,10 @@ import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Util.GraphHelpers as GH
 import qualified Data.Graph.Inductive.Graph as DGI
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Word (Word64)
 import Data.Functor ((<$>))
+import Data.Maybe
 
 type MSNCtx = (PG.PGraph,
                     M.Map Word64 DGI.Node,
@@ -68,4 +71,25 @@ mergeSockets :: PG.PGraph -> PG.PGraph
 mergeSockets pg = pg'
     where (pg',_,_) = foldl mergeSockNode (pg,M.empty,M.empty) $ DGI.labNodes pg
 
+-- Remove fromSocket nodes from TxQueues
+coupleTxSockets :: PG.PGraph -> PG.PGraph
+coupleTxSockets pg = DGI.delNodes badFsn pg
+    where
+        tsn = S.fromList $ [(PG.nTag l,sid) |
+                            (_,l) <- DGI.labNodes pg,
+                            let msid = PGU.getPGNAttr l "tosocket",
+                            isJust msid,
+                            let Just sid = msid]
+        fsn = [n | (n,l) <- DGI.labNodes pg,
+                      let msid = PGU.getPGNAttr l "fromsocket",
+                      isJust msid]
+
+        badFsn = [n | (n,l) <- DGI.labNodes pg,
+                      let msid = PGU.getPGNAttr l "fromsocket",
+                      isJust msid,
+                      let Just sid = msid,
+                      (PG.nTag l,sid) `S.notMember` tsn]
+        label n = (PG.nTag l,PG.nLabel l)
+            where l = fromJust $ DGI.lab pg n
+        l = map label
 

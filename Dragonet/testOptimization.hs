@@ -76,8 +76,9 @@ main = do
     let configs = [("cfg_empty_",prgCfgEmpty), ("cfg_test_", prgCfg)]
 
     -- Evaluate graph
-    plg <- O.optimize helpers prgU lpgC [IT.mergeSockets]
-        plAssign (O.dbgDotfiles "out/opt-graphs") costFunction configs
+    let transforms = [IT.coupleTxSockets, IT.mergeSockets]
+    plg <- O.optimize helpers prgU lpgC transforms plAssign
+            (O.dbgDotfiles "out/opt-graphs") costFunction configs
     return ()
 
 

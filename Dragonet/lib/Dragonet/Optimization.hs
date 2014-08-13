@@ -74,7 +74,7 @@ makeGraph' helpers prgC lpg embed_fn implTransforms pla debug = do
     let cleanedUp = cleanupGraph reduced
     debug "cleanup" $ DbgPGraph cleanedUp
     -- Apply implementation transforms
-    let implGraph = foldl (\g t -> t g) cleanedUp implTransforms
+    let implGraph = cleanupGraph $ foldl (\g t -> t g) cleanedUp implTransforms
     debug "implT" $ DbgPGraph implGraph
     -- Partition graph
     let plg = PL.generatePLG pla implGraph
