@@ -69,4 +69,5 @@ embeddingRxTx prg lpg = embg'
         -- PRG with full LPG added for each queue
         -- rxQs contains the name of the queue without the prefix
         embg  = foldl (addLPG lpg') prg' rxQs
+        --embg' = embg
         embg' = foldl embedOffload  embg rxQs

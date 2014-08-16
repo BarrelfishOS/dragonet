@@ -7,6 +7,13 @@ syn region uniComment start="/\*" end="\*/"
 syn region uniComment start="//" end="$"
 hi def link uniComment Comment
 
+setlocal expandtab
+setlocal tabstop=4
+setlocal softtabstop=4
+setlocal shiftwidth=4
+
 if exists("b:current_syntax")
   finish
 endif
+
+

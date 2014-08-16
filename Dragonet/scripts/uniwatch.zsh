@@ -33,7 +33,7 @@ do
 		fi
 	fi
 
-	sleep .4 # wait until dust settles
+	#sleep .4 # wait until dust settles
 	echo "Compiling $unifle via $docmd"
 	eval $docmd
 	echo

@@ -31,8 +31,9 @@ node_to_pgnode Node {
                 nPorts = ports,
                 nAttrs = attrs,
                 nPortSems = sems,
+                nPortPreds = preds,
                 nImplFun = mi } =
-    node { PG.nSemantics = sems }
+    node { PG.nSemantics = sems , PG.nPredicates = preds }
     where
         pnames = map pName ports
         node = addImplFun mi $ PG.nAttrsAdd attrs $ PG.baseFNode name pnames

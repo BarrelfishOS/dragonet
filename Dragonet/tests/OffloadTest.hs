@@ -83,13 +83,10 @@ prPathPredicate g node = do
 
 
 main = do
-    writeFile "unicorn-tests/lpg-offload.dot"  $ toDot lpgC
-    writeFile "unicorn-tests/prg-dummy.dot" $ toDot dummy_prg
-
-    let (x,s) = runEmbeddingTx $ initEmbedSt { lpg = lpgC, prg = dummy_prg }
-
-    writeFile "unicorn-tests/lpg-offload-dummy.dot" $ toDot (lpg s)
-
+    --writeFile "unicorn-tests/lpg-offload.dot"  $ toDot lpgC
+    --writeFile "unicorn-tests/prg-dummy.dot" $ toDot dummy_prg
+    --let (x,s) = runEmbeddingTx $ initEmbedSt { lpg = lpgC, prg = dummy_prg }
+    --writeFile "unicorn-tests/lpg-offload-dummy.dot" $ toDot (lpg s)
     --pred <- prPathPredicate lpgC "TxL4UDPFillChecksum"
     --putStrLn $ "simplified:" ++ (show $ lpgPredRemUnreachable lpgC "TxQueue" pred)
 
@@ -120,9 +117,6 @@ main = do
 -- This means that packets that do not adhere to the setup parameters need to
 -- sent via another context.
 --
--- From a reading of the ixgbe linux driver source code, I believe that linux
--- willl set the TX context for every packet.
---
 -- We can only offload nodes that:
 --  . have no dependencies
 --  . all of their dependencies can be offloaded
@@ -132,6 +126,11 @@ main = do
 --  CTX1: IPv4 header/UDP checksum offload
 -- We need to use CTX1 for packets that match the context configuration and CTX0
 -- for everything else.
+--
+-- From a reading of the ixgbe linux driver source code, I believe that linux
+-- willl set the TX context for every packet and so it ends up  using a single
+-- context
+--
 
 test_dominance :: (PGraph, (String, String), String, Bool) -> IO ()
 test_dominance  (g, src, dst, expect) = do

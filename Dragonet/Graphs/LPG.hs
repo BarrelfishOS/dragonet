@@ -25,7 +25,7 @@ import Graphs.Helpers
 configLPGUDPSockets :: PG.ConfFunction
 configLPGUDPSockets _ inE outE cfg = concat <$> mapM addEndpoint tuples
     where
-        esa_attrs = [PG.ESAttrPredicate "pred(TxL4Prot,UDP)"] -- spawn edge attributes
+        esa_attrs = [PG.ESAttrPredicate "and(pred(EthType,IPv4),pred(IpProt,UDP))"] -- spawn edge attributes
         PG.CVList tuples = cfg
         hasL l n = l == PG.nLabel n
         findN ps l = (fst . fst) <$> L.find (hasL l . snd . fst) ps
@@ -54,10 +54,10 @@ configLPGUDPSockets _ inE outE cfg = concat <$> mapM addEndpoint tuples
                         PG.nAttrsAdd [appAttr,
                             PG.NAttrCustom "source",
                             PG.NAttrCustom $ "fromsocket=" ++ show sid] $
-                        PG.baseFNode ("FromSocket" ++ show sid) ["out"]
+                        PG.baseFNode ("FromSocket" ++ show sid) ["true"]
             return [(inN,tsN,PG.Edge inP),
                     (fsN,fsN,PG.ESpawn "send" esa_attrs),
-                    (fsN,outN,PG.Edge "out")]
+                    (fsN,outN,PG.Edge "true")]
 
         addEndpoint (PG.CVTuple [
                     PG.CVList sockets,

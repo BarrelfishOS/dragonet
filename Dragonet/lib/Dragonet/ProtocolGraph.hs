@@ -52,6 +52,7 @@ data Node =
         nPorts          :: [NPort],
         nImplementation :: NImplementation,
         nSemantics      :: [(NPort,PortSemantics)],
+        nPredicates     :: [(NPort, String)],
         nOrigin         :: String  -- LPG, PRG, etc (mostly for debugging)
         } |
     ONode {
@@ -193,6 +194,7 @@ baseFNode label ports =
         nPorts          = ports,
         nImplementation = NImplFunction label,
         nSemantics      = [],
+        nPredicates     = [],
         nOrigin         = ""
         }
 

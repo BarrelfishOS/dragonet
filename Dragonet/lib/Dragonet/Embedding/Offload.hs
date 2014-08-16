@@ -6,7 +6,7 @@ module Dragonet.Embedding.Offload (
 import qualified Util.GraphHelpers as GH
 import qualified Dragonet.ProtocolGraph as PG
 import Dragonet.ProtocolGraph.Utils (getFNodeByNameTag', getPGNodeByName, isSpawnTarget, edgeDeps)
-import Dragonet.Predicate (PredicateExpr(..), predGetTerms, predEval, predEquiv)
+import Dragonet.Predicate (PredExpr(..), predGetAtoms, predEval, predEquiv)
 import Dragonet.Predicate (computePred, initPredCompSt_, PredCompSt(..))
 import Dragonet.Conventions (rxQPref, txQPref, qTag)
 
@@ -119,12 +119,12 @@ txCandidatesInit = do
         sink = case GH.findNodeByL findFn graph of
                 Nothing -> error $ "Cannot find PRG node with label prefix " ++ txQPref ++ " and tagged as " ++ qtag
                 Just x  -> x
-        sink_ = tr sink $ "=======> SINK NODE: " ++ (ppShow sink)
+        sink_ = tr sink $ "=======> SINK NODE: " ++ (PG.nLabel $ snd sink)
 
-        candidates  = getTxCandidates graph sink
-        candidates_ = tr candidates $ ("\nInitial candidates: " ++ (ppShow $ map (PG.nLabel . snd) candidates))
+        candidates  = getTxCandidates graph sink_
+        candidates_ = tr candidates $ ("\nInitial candidates: " ++ (show $ map (PG.nLabel . snd) candidates))
 
-    modify $ \s -> s { txEmbCandidates = candidates, txLpgSinkNode = sink}
+    modify $ \s -> s { txEmbCandidates = candidates_, txLpgSinkNode = sink_}
     return ()
 
 -- Get the embedding candidate list given the sink node.
@@ -142,11 +142,13 @@ getTxCandidates graph sink = filter isFNode $ GH.rdfsStop isFNode [node0] graph
 embedTxNodes :: EmbedExec ()
 embedTxNodes = do
     candidates <- gets txEmbCandidates
-    case candidates of
+    let candidates' = tr candidates $ "Candidate list: " ++ (show $ map (PG.nLabel . snd) candidates)
+    case candidates' of
         []     -> return ()
         (x:xs) -> do
             modify $ \s -> s { txEmbCandidates = xs } -- update candidate list
-            tryEmbedTxNode x                          -- try to embed x
+            let x' = tr x $ "Trying to embed: " ++ (PG.nLabel $ snd x)
+            tryEmbedTxNode x'                         -- try to embed node
             embedTxNodes                              -- recurse
 
 -- try to embed node
@@ -167,7 +169,7 @@ tryEmbedTxNode lpg_node = do
 
     case prg_node of
         Nothing -> return ()
-        Just prg_node' -> tryEmbedTxMatchedNode lpg_node prg_node'
+        Just prg_node' -> tr (tryEmbedTxMatchedNode lpg_node prg_node') $ "===>Trying to embedding mathced nodes: prg_node=" ++ (show prg_node') ++ " and lpg_node=" ++ (show lpg_node) ++ "<====\n"
     return ()
 
 -- Rationale:
@@ -185,12 +187,12 @@ tryEmbedTxNode lpg_node = do
 -- node and the PRG node path predicates, because the packets that do not match
 -- it will never go beyond the sink.
 --
--- Hence, as a heuristic, we check for these predicate terms by checking if the
+-- Hence, as a heuristic, we check for these predicate atoms by checking if the
 -- sink node is rechable from all other ports besides the port that corresponds
 -- to the predicate.
 --
 -- An optiomization here might be to stop after a number of nodes.
-lpgPredRemUnreachable :: PredicateExpr -> EmbedExec (PredicateExpr)
+lpgPredRemUnreachable :: PredExpr -> EmbedExec (PredExpr)
 lpgPredRemUnreachable pred = do
 
     graph <- gets embGraph
@@ -202,8 +204,8 @@ lpgPredRemUnreachable pred = do
         is_sink :: PG.PGNode -> Bool
         is_sink (_, n) = (PG.nLabel n == sink_lbl) &&
                          (PG.nTag   n == qtag)
-        -- first, find all the terms in the expression
-        terms = predGetTerms pred
+        -- first, find all the atoms in the expression
+        atoms = predGetAtoms pred
         -- check_term checks a single term
         -- it goes over all other node ports in the given node.
         -- All have to be unable to reach the sink
@@ -217,14 +219,14 @@ lpgPredRemUnreachable pred = do
             Just x -> True
             Nothing -> False
         --
-        mapfn :: (PG.NLabel, PG.NPort) -> Maybe ((PG.NLabel, PG.NPort), PredicateExpr)
-        mapfn term = case (check_term term) of
-            False -> Just (term, PredicateTrue)
+        mapfn :: (PG.NLabel, PG.NPort) -> Maybe (PG.NLabel, PG.NPort, PredExpr)
+        mapfn term@(tl,tp) = case (check_term term) of
+            False -> Just (tl, tp, PredTrue)
             True  -> Nothing
-        terms' :: [((PG.NLabel,PG.NPort), PredicateExpr)]
-        terms' = catMaybes $ map mapfn terms
+        atoms' :: [(PG.NLabel,PG.NPort, PredExpr)]
+        atoms' = catMaybes $ map mapfn atoms
 
-    return $ predEval pred terms'
+    return $ predEval pred atoms'
 
 
 tryEmbedTxMatchedNode :: PG.PGNode -> PG.PGNode -> EmbedExec ()
@@ -243,11 +245,14 @@ tryEmbedTxMatchedNode lpg_node prg_node = do
     -- heuristic to simplify predicates
     pred_lpg <- lpgPredRemUnreachable pred_lpg'
 
-    let pred_prg_ = tr pred_prg (" pred_prg=" ++ (ppShow pred_prg))
-        pred_lpg_ = tr pred_lpg (" pred_lpg=" ++ (ppShow pred_lpg))
-        lpg_node_ = tr lpg_node (" lpg_node=-->" ++ (ppShow lpg_node) ++ "<--" ++ " prg node -->" ++ (ppShow prg_node) ++ "<--")
-
-    case predEquiv pred_prg pred_lpg of
+    let equiv = predEquiv pred_prg pred_lpg
+        equiv_ = tr equiv $ "----> Testing equvalence of predicates:  \n"
+                              ++ "pred_prg:" ++ (show pred_prg) ++ "\n"
+                              ++ "pred_lpg:" ++ (show pred_lpg) ++ "\n"
+                              ++ "lpg node:" ++ (show $ PG.nLabel $ snd lpg_node) ++ "\n"
+                              ++ "prg node:" ++ (show $ PG.nLabel $ snd prg_node) ++ "\n"
+                              ++ "result:  " ++ (show equiv)      ++ "\n"
+    case equiv_ of
         False -> return () -- cannot embed
         True  -> doEmbedTxNode lpg_node
 

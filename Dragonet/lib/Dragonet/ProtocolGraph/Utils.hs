@@ -62,7 +62,7 @@ getFNodeByName :: PGraph -> NLabel -> PGNode
 getFNodeByName graph name = case GH.findNodeByL fn graph of
     Just x -> x
     Nothing -> error $ "Unable to find f-node with name: " ++ name
-    where fn (FNode label _ _ _ _ _ _) = (label == name)
+    where fn (FNode label _ _ _ _ _ _ _) = (label == name)
           fn _ = False
 
 -- Get key=value attribute with key == n

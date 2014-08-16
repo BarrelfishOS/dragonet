@@ -162,7 +162,7 @@ graph lpg {
         cluster L3ICMP {
             boolean ValidHeaderLength {
                 port true[ValidChecksum IsTypeRequest]
-		port false[] }
+                port false[] }
 
             boolean ValidChecksum {
                 port true false[Valid] }
@@ -173,9 +173,13 @@ graph lpg {
             boolean IsTypeRequest {
                 port true false[NeedsResponse] }
 
-            and NeedsResponse {
-                port true[..TxL3ICMPInitiateResponse]
+            and NeedsResponse_ {
+                port true[NeedsResponse]
                 port false[] }
+
+            node NeedsResponse {
+                spawn response ..TxL3ICMPInitiateResponse [predicate "and(pred(EthType,IPv4),pred(IpProt,ICMP))"]
+            }
         }
 
         /*******************************************/
@@ -203,7 +207,7 @@ graph lpg {
                         dIP:   <UInt 32>,
                         dPort: <UInt 16>) }
                 port unused[UnusedPort]
-                port send[..TxL4UDPStart] }
+                port true[..TxL4UDPStart] }
 
             nor UnusedPort {
                 port false[]
@@ -352,9 +356,13 @@ graph lpg {
                 port false[]
            }
 
-            or TCPOutMerge {
-                port true[...TxL4TCPInitiateResponse]
+            or TCPOutMerge_ {
+                port true[TCPOutMerge]
                 port false[] }
+
+            node TCPOutMerge {
+                spawn response ...TxL4TCPInitiateResponse   [predicate "and(pred(EthType,IPv4),pred(IpProt,TCP))"]
+            }
 
            } // end cluster: Socket
 
@@ -376,68 +384,82 @@ graph lpg {
                 port drop[] }
 
             node AllocateHeader {
-                port out[FillHeader FillChecksum .L3IPv4Prepare] }
+                port true[FillHeader FillChecksum .L3IPv4Prepare] }
 
-            node FillHeader   { port out[Done] }
-            node FillChecksum { port out[Done] }
+            node FillHeader   { port true[Done] }
+            node FillChecksum { port true[Done] }
 
-	    and Done { port true false[.L4Done] }
+            and Done { port true false[.UDPv4Done] }
         }
 
         cluster L4TCP {
             node InitiateResponse {
                 port out[AllocateHeader]
-		port drop[] }
+                port drop[] }
 
             node AllocateHeader {
-                port out[FillHeader .L3IPv4Prepare] }
+                port true[FillHeader .L3IPv4Prepare] }
 
             boolean FillHeader {
-                port true false[.L4Done] }
+                port true false[.TCPv4Done] }
         }
 
         cluster L3ICMP {
             node InitiateResponse {
-                port out[AllocateHeader]
-		port drop[] }
+                port out[AllocateHeader] }
 
             node AllocateHeader {
-                port out[FillHeader .L3IPv4Prepare] }
+                port true[FillHeader .L3IPv4Prepare] }
 
             boolean FillHeader {
-                port true false[.L4Done] }
+                port true false[.L3_AND_L4Done] } // we are sending ICMP, no need to wait for anything else
         }
 
-	cluster L3IPv4 {
+        cluster L3IPv4 {
             or Prepare {
                 port true[AllocateHeader]
                 port false[] }
 
             node AllocateHeader {
-                port out[FillHeader] }
+                port out[FillHeader FillChecksum Routing] }
 
             node FillHeader {
-                port out[Routing] }
+                port true[Done] }
+
+
+            node FillChecksum {
+                    port true[Done] }
 
             boolean Routing {
                 port true false[.L3ARPLookup] }
+
+            and Done { // UDPv4Done, TCPv4Done
+                    port true false [.UDPv4Done .TCPv4Done]
+            }
         }
 
         cluster L3ARP {
             node SendGratuitous {
                 attr "noreplicateininout"
-                port false true[Prepare] }
+                port false true[Prepare]
 
+                predicate true "pred(EthType,ARP)"
+            }
+
+            // for now we hard-code that the restart operation will result in an IPv4 packet
             node ProcessPendingResponse {
-                spawn restart LookupRequestIn
+                spawn restart LookupRequestIn [predicate "pred(EthType,IPv4)"]
                 port out [] }
 
             node InitiateResponse {
                 port false true[Prepare]
-		port drop[] }
+                port drop[]
+
+               predicate true "pred(EthType,ARP)"
+            }
 
             or Prepare {
-                port true[AllocateHeader .L4Done] // L4Done: we are sending ARP, no need to wait for L4
+                port true[AllocateHeader .L3_AND_L4Done] // we are sending ARP, no need to wait for anything else
                 port false[] }
 
             node AllocateHeader {
@@ -462,14 +484,28 @@ graph lpg {
             node SendRequest {
                 attr "noreplicateout"
                 port false true[Prepare]
-                port drop[] }
+                port drop[]
+
+                predicate true "pred(EthType,ARP)"
+            }
         }
 
+        and UDPv4Done {
+                port true[L3_AND_L4Done]
+                port false[]
+        }
+
+        and TCPv4Done {
+                port true[L3_AND_L4Done]
+                port false[]
+        }
+
+        // L4 and L3 done
         // ICMP/ARP are not technically L4, but ICMP_OR_TCP_OR_UDP_OR_ARP__DONE is probably a more confusing name
-	or L4Done {
-		port true[Done]
-		port false[]
-	}
+        or L3_AND_L4Done {
+                port true[Done]
+                port false[]
+        }
 
 
         cluster L2Ether {
@@ -481,13 +517,13 @@ graph lpg {
                 port out[FillHeader] }
 
             node FillHeader {
-                port out[.Done] }
+                port true[.Done] }
         }
 
-	and Done {
-		port true[Queue]
-		port false[]
-	}
+        and Done {
+                port true[Queue]
+                port false[]
+        }
 
         node Queue { attr "sink" }
     }
