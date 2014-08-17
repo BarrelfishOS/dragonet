@@ -2,6 +2,7 @@ module Dragonet.DotGenerator(
     toDot,
     toDotWith,
     toDotWith',
+    toDotHighlight,
     toDotClustered,
     toDotClusteredWith,
     pipelinesDot,
@@ -15,6 +16,7 @@ import qualified Data.GraphViz.Attributes.Complete as GA
 import qualified Data.GraphViz.Attributes.Colors.X11 as GC
 import qualified Data.Text.Lazy as T
 import qualified Data.List as L
+import qualified Data.Set as S
 import qualified Control.Arrow as A
 import Data.Maybe
 
@@ -111,6 +113,7 @@ nodeStyle n@PG.CNode {} =
         [GA.Style [GA.SItem GA.Filled [], GA.SItem GA.Diagonals []],
          GA.FillColor [GA.WC (GA.X11Color GC.PaleTurquoise) Nothing]]
 
+
 -- Generate node attributes
 formatNode :: (String -> String) -> (String -> String) -> (n,PG.Node)
                  -> GA.Attributes
@@ -140,10 +143,11 @@ clusterId l = GV.Str $ t l
 formatCluster :: String -> [GV.GlobalAttributes]
 formatCluster l = [GV.GraphAttrs [GA.Label $ GA.StrLabel $ t l]]
 
+type PgParams = GV.GraphvizParams DGI.Node (PG.Node) ELabel String (PG.Node)
 
 -- Parameters for graphs clustered by node tags
 params :: (String -> String) -> (String -> String)
-    -> GV.GraphvizParams DGI.Node (PG.Node) ELabel String (PG.Node)
+    -> PgParams
 params nlf plf = GV.defaultParams {
     GV.fmtEdge = formatEdge,
     GV.fmtNode = formatNode nlf plf,
@@ -158,7 +162,7 @@ params nlf plf = GV.defaultParams {
 -- Parameters for clustering by a given cluster map
 paramsCluster :: (String -> String) -> (String -> String)
     -> [(DGI.Node, [String])]
-    -> GV.GraphvizParams DGI.Node (PG.Node) ELabel String (PG.Node)
+    -> PgParams
 paramsCluster nlf plf cm = (params nlf plf)
                           { GV.clusterBy = clusterByMap cm,
                             GV.isDotCluster = const True,
@@ -173,14 +177,32 @@ dotString d = T.unpack $ GV.printDotGraph d
 toDot :: PG.PGraph -> String
 toDot = toDotWith id id
 
+hlParamsWith :: (PG.PGNode -> Bool) -> PgParams -> PgParams
+hlParamsWith isHl ps = ps'
+    where old_fmtN :: (DGI.Node, PG.Node) -> GV.Attributes
+          old_fmtN = GV.fmtNode ps
+          new_fmtN :: (DGI.Node, PG.Node) -> GV.Attributes
+          new_fmtN node = (old_fmtN node) ++ hl
+                   where hl = case isHl node of
+                            True -> [GV.fillColor GC.Red, GV.style GV.filled]
+                            False -> []
+          ps' = ps {GV.fmtNode = new_fmtN}
+
+-- same as toDot, but highlight nodes in the first argument
+toDotHighlight :: [String] -> PG.PGraph -> String
+toDotHighlight hllist = toDotWith' pm
+    where hlset = S.fromList hllist
+          pm = hlParamsWith hlfn
+          hlfn :: PG.PGNode -> Bool
+          hlfn (_, node) = (PG.nLabel node) `S.member` hlset
+
 -- Get dot source for graph, applying the mappings to generated node/port labels
 toDotWith :: (String -> String) -> (String -> String) -> PG.PGraph -> String
 toDotWith nlf plf g = dotString $ GV.graphToDot p $ getELs g
     where p = params nlf plf
 
 -- Get dot source for graph, applying a mapping to the parameters
-toDotWith' :: (GV.GraphvizParams DGI.Node (PG.Node) ELabel String (PG.Node)
-        -> GV.GraphvizParams DGI.Node (PG.Node) ELabel String (PG.Node))
+toDotWith' :: (PgParams -> PgParams)
         -> PG.PGraph -> String
 toDotWith' pm g = dotString $ GV.graphToDot (pm p) $ getELs g
     where p = params id id
