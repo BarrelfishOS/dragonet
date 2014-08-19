@@ -39,8 +39,9 @@ tagPrgQueues = DGI.nmap tagQueue
 -- connect one LPG to the PRG queues identified by rxQ:
 -- This also tags the lpg nodes with the queue identifier
 addLPG :: PG.PGraph -> PG.PGraph -> String -> PG.PGraph
-addLPG lpg prg rxQ = GH.mergeGraphsBy mergeP lpg' prg
+addLPG lpg prg rxQ = GH.mergeGraphsBy mergeP prg lpg'
     where lpg'  = tagNodes (qTag rxQ) lpg -- tag lpg nodes
+          mergeP :: PG.Node -> PG.Node -> Bool
           mergeP prgN lpgN
             | lpn == rxQPref ++ rxQ && lln == rxQPref = True -- rx queue match
             | lpn == txQPref ++ rxQ && lln == txQPref = True -- tx queue match

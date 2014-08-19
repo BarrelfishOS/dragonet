@@ -112,12 +112,12 @@ txCandidatesInit = do
     qtag  <- gets qtag
     let findFn :: (PG.Node -> Bool)
         findFn n = (PG.nTag n)    == qtag    &&
-                   (PG.nLabel n)  == txQPref &&
-                   (PG.nOrigin n) == "LPG"
+                   txQPref `L.isPrefixOf` (PG.nLabel n) &&
+                   (PG.nOrigin n) == "PRG" -- merged
 
         sink :: PG.PGNode
         sink = case GH.findNodeByL findFn graph of
-                Nothing -> error $ "Cannot find LPG node with label " ++ txQPref ++ " and tagged as " ++ qtag
+                Nothing -> error $ "Cannot find PRG node with label prefix " ++ txQPref ++ " and tagged as " ++ qtag
                 Just x  -> x
         sink_ = tr sink $ "=======> SINK NODE: " ++ (ppShow sink)
 

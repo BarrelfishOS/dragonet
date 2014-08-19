@@ -312,7 +312,10 @@ createPipeline plg stackname helpers mname = do
             hInit <- castFunPtr <$> hf "dyn_local_init"
             hGraph <- castFunPtr <$> hf "dyn_local_client"
             hRun <- castFunPtr <$> hf "dyn_local_run"
-            let nodeFun l = castFunPtr <$> (hf $ "do_pg__" ++ l)
+            let nodeFun l = do
+                    x <- castFunPtr <$> (hf $ "do_pg__" ++ l)
+                    -- force evaluation
+                    return $! x
             return (localInitWrap hInit stackname mname nodeFun,
                     localGraphFH hGraph,
                     localRunFH hRun)
