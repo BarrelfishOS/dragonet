@@ -13,19 +13,22 @@ import Control.Applicative
 import Control.Monad
 import Data.Char
 import Data.List as L
+import System.Environment as ENV
 
 llvmVersions = ["3.4", "3.5"]
-config_force_version = False
+
+forceLlvmVer :: IO (Bool)
+forceLlvmVer = isJust <$> ENV.lookupEnv "DRAGONET_FORCE_LLVM_VERSION"
 
 -- Versioned llvm program
 --   e.g. llvm-link could be named just llvm-link, or lllvm-link-3.4
 --   all versions in llvmVersions are tried
-llvmProgram :: String -> Program
-llvmProgram name = (simpleProgram name) {
+llvmProgram :: Bool -> String -> Program
+llvmProgram force_version name = (simpleProgram name) {
                         programFindLocation = findFirst names }
     where
         vnames = (map ((++) (name ++ "-")) llvmVersions)
-        names = if config_force_version
+        names = if force_version
                 then vnames
                 else name:vnames
         findFirst [] _ _ = return Nothing
@@ -35,11 +38,14 @@ llvmProgram name = (simpleProgram name) {
                 Just p -> return prog
                 Nothing -> findFirst ns verb a
 
-main = defaultMainWithHooks simpleUserHooks {
-    buildHook = myBuildHook,
-    hookedPrograms = hookedPrograms simpleUserHooks ++
-        [simpleProgram "clang", simpleProgram "make",
-         llvmProgram "llvm-link"]
+main = do
+    force_ver <- forceLlvmVer
+    defaultMainWithHooks simpleUserHooks {
+        buildHook = myBuildHook,
+        hookedPrograms = hookedPrograms simpleUserHooks ++ [
+            simpleProgram "clang",
+            simpleProgram "make",
+            llvmProgram force_ver "llvm-link"]
     }
 
 -- Run clang to get llvm bitcode
@@ -93,10 +99,11 @@ parseNameList s = filter (not . null) $ map trim $ splitBy ',' s
 
 -- Build hook that will build llvm-bitcode for our C helpers
 myBuildHook pkg_descr local_bld_info user_hooks bld_flags = do
+    force_ver <- forceLlvmVer
     let bld_dir = buildDir local_bld_info
         progs = withPrograms local_bld_info
         (Just clang) = lookupProgram (simpleProgram "clang") progs
-        (Just llvmlink) = lookupProgram (llvmProgram "llvm-link") progs
+        (Just llvmlink) = lookupProgram (llvmProgram force_ver "llvm-link") progs
         (Just make) = lookupProgram (simpleProgram "make") progs
         verb = fromFlag $ buildVerbosity bld_flags
 
