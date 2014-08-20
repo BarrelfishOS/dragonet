@@ -41,13 +41,20 @@ tagPrgQueues = DGI.nmap tagQueue
 addLPG :: PG.PGraph -> PG.PGraph -> String -> PG.PGraph
 addLPG lpg prg rxQ = GH.mergeGraphsBy mergeP prg lpg'
     where lpg'  = tagNodes (qTag rxQ) lpg -- tag lpg nodes
+          --dbg_lpg   = "\n\nQ=" ++ rxQ ++ "\n\nLPG=" ++ (ppShow lpg') ++ "\n\n"
           mergeP :: PG.Node -> PG.Node -> Bool
-          mergeP prgN lpgN
-            | lpn == rxQPref ++ rxQ && lln == rxQPref = True -- rx queue match
-            | lpn == txQPref ++ rxQ && lln == txQPref = True -- tx queue match
+          -- NB: it seems that the arguments here need to be reversed (i.e., lpg
+          -- node first, and then prg node) compared to the mergeGraphsBy
+          -- function
+          mergeP lpgN prgN
+            | prgL == rxQPref ++ rxQ && lpgL == rxQPref = True -- rx queue match
+            | prgL == txQPref ++ rxQ && lpgL == txQPref = True -- tx queue match
             | otherwise = False
-            where lpn = PG.nLabel prgN -- prg node label
-                  lln = PG.nLabel lpgN -- lpg node label
+            where prgL = PG.nLabel prgN -- prg node label
+                  lpgL = PG.nLabel lpgN -- lpg node label
+                  --dbg = "trying to merge prg node:\n" ++ prgL ++ " and LPG node "  ++ lpgL ++ ":"
+                  --dbg_true = dbg ++ "MERGED"
+                  --dbg_false = dbg ++ "NOT MERGED"
 
 embeddingRxTx :: PG.PGraph -> PG.PGraph -> PG.PGraph
 embeddingRxTx prg lpg = embg'
