@@ -6,8 +6,10 @@ module Dragonet.Embedding.Offload (
 import qualified Util.GraphHelpers as GH
 import qualified Dragonet.ProtocolGraph as PG
 import Dragonet.ProtocolGraph.Utils (getFNodeByNameTag', getPGNodeByName, isSpawnTarget, edgeDeps)
-import Dragonet.Predicate (PredExpr(..), predGetAtoms, predEval, predEquiv)
+import Dragonet.Predicate (PredExpr(..), predGetAtoms, predEval, predEquiv, predEquivHard)
 import Dragonet.Predicate (computePred, initPredCompSt_, PredCompSt(..))
+-- todo transofrm all
+import qualified Dragonet.Predicate as PR
 import Dragonet.Conventions (rxQPref, txQPref, qTag)
 
 import qualified Data.Graph.Inductive as DGI
@@ -242,16 +244,18 @@ tryEmbedTxMatchedNode lpg_node prg_node = do
         pred_prg = computePred $ initPredCompSt_ { predGraph = graph
                                                  , predDst = prg_node
                                                  , compStop = prg_stopfn }
-        pred_lpg' = computePred $ initPredCompSt_ { predGraph = graph
-                                                  , predDst = lpg_node }
+        pred_lpg' = PR.nodePred graph lpg_node
+        pred_sink = PR.nodePred graph lpg_sink
 
-    -- heuristic to simplify predicates
+    -- heuristic to simplify predicates (see comment in function)
     pred_lpg <- lpgPredRemUnreachable pred_lpg'
 
-    let equiv = predEquiv pred_prg pred_lpg
+    let --equiv = predEquivHard pred_prg pred_lpg
+        equiv = PR.predEquivUnder (pred_prg, pred_lpg) pred_sink
         equiv_ = trN equiv $ "----> Testing equivalence of predicates:  \n"
                               ++ "pred_prg:" ++ (show pred_prg) ++ "\n"
                               ++ "pred_lpg:" ++ (show pred_lpg) ++ "\n"
+                              ++ "pred_sink:" ++ (show pred_sink) ++ "\n"
                               ++ "lpg node:" ++ (show $ PG.nLabel $ snd lpg_node) ++ "\n"
                               ++ "prg node:" ++ (show $ PG.nLabel $ snd prg_node) ++ "\n"
                               ++ "result:  " ++ (show equiv)      ++ "\n"

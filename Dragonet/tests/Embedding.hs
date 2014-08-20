@@ -232,6 +232,9 @@ graph prg3 {
             attr "software"
             port IPv4[L4ProtV4 L3IPv4FillChecksum]
             port other[L4Done L3Done]
+
+            predicate IPv4 "pred(EthType,IPv4)"
+            predicate other "not(pred(EthType,IPv4))"
         }
 
         node L4ProtV4 {
@@ -239,6 +242,10 @@ graph prg3 {
             port UDP[CtxUDPv4]
             port TCP[CtxTCPv4]
             port other[CtxIPv4]
+
+            predicate UDP "pred(IpProt,UDP)"
+            predicate TCP "pred(IpProt,TCP)"
+            predicate other "and(not(pred(IpProt,TCP)),not(pred(IpProt,UDP)))"
         }
 
         // only set up IPv4 checksum
@@ -283,12 +290,22 @@ graph prg3 {
 
     cluster Rx {
         node In { port o[Queue] }
-        node Queue {}
+        node Queue {
+            implementation NoImplementationHere
+            attr "software"
+            attr "source"
+            attr "init"
+            spawn poll Queue
+            port out[]
+            port drop[]
+            port init[] }
     }
 }
 |]
 
-t3 = lpgTest prg3 [nodeOffloaded "TxL4UDPFillChecksum"] "TX UDP Checksum was not offloaded (prg3)"
+t3 = lpgTest prg3 [nodeOffloaded "TxL4UDPFillChecksum",
+                   nodeOffloaded "TxL3IPv4FillChecksum"]
+             "TX UDP and IPv4 Checksum was not offloaded (prg3)"
 
 tests =
  TestList [

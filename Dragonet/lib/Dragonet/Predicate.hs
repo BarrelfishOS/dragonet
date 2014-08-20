@@ -1,6 +1,7 @@
 module Dragonet.Predicate (
     PredExpr(..),
     predEval, predEquiv, predEquivHard,
+    predEquivUnder,
     --
     isDNF,
     --
@@ -361,6 +362,29 @@ dnfGetANDs x =  assert check ret
                     (PredAnd l) -> [l]
                     (PredOr  l) -> concat $ map dnfGetANDs l
 
+dnfTermAssign :: PredExpr -> PredAssignment
+dnfTermAssign (PredAtom l p)               = (l, p, PredTrue)
+dnfTermAssign ((PredNot (PredAtom l p)))   = (l, p, PredFalse)
+
+-- first level (only terms, and)
+dnfSAT1 :: PredExpr -> [PredAssignment]
+dnfSAT1 (PredAtom l p)             = [(l, p, PredTrue)]
+dnfSAT1 ((PredNot (PredAtom l p))) = [(l, p, PredFalse)]
+dnfSAT1 (PredAnd l)                = L.concat $ map dnfSAT1 l
+
+dnfSAT_ :: PredExpr -> Maybe [[PredAssignment]]
+-- constants
+dnfSAT_ PredFalse = Nothing   -- not satisfiable
+dnfSAT_ PredTrue  = Just [[]] -- always  satisfiable (tautology)
+-- terminals
+dnfSAT_  expr
+    | PredOr  l <- expr = Just $ map dnfSAT1 l
+    | otherwise         = Just $ [dnfSAT1 expr]
+
+
+dnfSAT :: PredExpr -> Maybe [[PredAssignment]]
+dnfSAT expr = assert (isDNF expr) $ dnfSAT_ expr  -- we should remove this check eventually
+
 -- simplify OR for DNF
 --
 -- IDEA: If we consider the AND expressions under the OR of the DNF form, and
@@ -603,6 +627,20 @@ predEquivHard expr1 expr2 = ret
                           " expr1:" ++ (show expr1) ++ " eval1:" ++ (show eval1) ++ "\n" ++
                           " expr2:" ++ (show expr2) ++ " eval2:" ++ (show eval1) ++ "\n" ++
                           "\n---\n"
+
+predEquivUnder_ :: PredExpr -> PredExpr -> [PredAssignment] -> Bool
+predEquivUnder_ expr1 expr2 a = predEquivHard e1 e2
+    where e1 = predEval expr1 a
+          e2 = predEval expr2 a
+
+predEquivUnder :: (PredExpr, PredExpr) -> PredExpr -> Bool
+predEquivUnder (expr1, expr2) expr_cond = ret
+    where assigns_ = dnfSAT expr_cond
+          assigns = case assigns_ of
+            Just x  -> x
+            Nothing -> error "NYI: condition is unsatisfiable"
+          ret = and [ predEquivUnder_  expr1 expr2 a  | a <- assigns ]
+
 
 --
 ------- Computing predicate epxressions -----
