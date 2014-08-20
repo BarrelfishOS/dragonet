@@ -23,6 +23,7 @@ import Text.Show.Pretty (ppShow)
 
 import Debug.Trace (trace)
 tr = flip $ trace
+trN = \x  _ -> x
 
 
 -- TODO: Rx side
@@ -119,10 +120,10 @@ txCandidatesInit = do
         sink = case GH.findNodeByL findFn graph of
                 Nothing -> error $ "Cannot find PRG node with label prefix " ++ txQPref ++ " and tagged as " ++ qtag
                 Just x  -> x
-        sink_ = tr sink $ "=======> SINK NODE: " ++ (PG.nLabel $ snd sink)
+        sink_ = trN sink $ "=======> SINK NODE: " ++ (PG.nLabel $ snd sink)
 
         candidates  = getTxCandidates graph sink_
-        candidates_ = tr candidates $ ("\nInitial candidates: " ++ (show $ map (PG.nLabel . snd) candidates))
+        candidates_ = trN candidates $ ("\nInitial candidates: " ++ (show $ map (PG.nLabel . snd) candidates))
 
     modify $ \s -> s { txEmbCandidates = candidates_, txLpgSinkNode = sink_}
     return ()
@@ -142,12 +143,12 @@ getTxCandidates graph sink = filter isFNode $ GH.rdfsStop isFNode [node0] graph
 embedTxNodes :: EmbedExec ()
 embedTxNodes = do
     candidates <- gets txEmbCandidates
-    let candidates' = tr candidates $ "Candidate list: " ++ (show $ map (PG.nLabel . snd) candidates)
+    let candidates' = trN candidates $ "Candidate list: " ++ (show $ map (PG.nLabel . snd) candidates)
     case candidates' of
         []     -> return ()
         (x:xs) -> do
             modify $ \s -> s { txEmbCandidates = xs } -- update candidate list
-            let x' = tr x $ "Trying to embed: " ++ (PG.nLabel $ snd x)
+            let x' = trN x $ "Trying to embed: " ++ (PG.nLabel $ snd x)
             tryEmbedTxNode x'                         -- try to embed node
             embedTxNodes                              -- recurse
 
@@ -158,18 +159,19 @@ embedTxNodes = do
 --      LPG:X and lpgTxSink reach PRG:X.
 --  when done, update candidates as needed
 tryEmbedTxNode :: PG.PGNode -> EmbedExec ()
-tryEmbedTxNode lpg_node = do
+tryEmbedTxNode lpg_node@(_, PG.FNode {}) = do
     graph <- gets embGraph
     sink  <- gets txLpgSinkNode
 
     let node_lbl = PG.nLabel $ snd lpg_node
         prg_find :: PG.PGNode -> Bool
         prg_find (_,n) = (PG.nLabel n == node_lbl) && (PG.nOrigin n == "PRG")
-        prg_node = L.find prg_find $ nodesDFS graph [sink]
+        prg_node_ =  L.find prg_find $ nodesDFS graph [sink]
 
-    case prg_node of
+    case prg_node_ of
         Nothing -> return ()
-        Just prg_node' -> tr (tryEmbedTxMatchedNode lpg_node prg_node') $ "===>Trying to embedding mathced nodes: prg_node=" ++ (show prg_node') ++ " and lpg_node=" ++ (show lpg_node) ++ "<====\n"
+        Just prg_node'@(_, PG.FNode {}) -> trN (tryEmbedTxMatchedNode lpg_node prg_node') $ "===>Trying to embedding mathced nodes: prg_node=" ++ (show prg_node') ++ " and lpg_node=" ++ (show lpg_node) ++ "<====\n"
+        Just x -> error $ "PRG node:" ++ (PG.nLabel $ snd x) ++ " is not an F-node, but there is an LPG F-node with the same label"
     return ()
 
 -- Rationale:
@@ -235,7 +237,8 @@ tryEmbedTxMatchedNode lpg_node prg_node = do
     lpg_sink <- gets txLpgSinkNode
 
     let prg_stopfn :: PG.PGNode -> Bool
-        prg_stopfn (_,n) = PG.nOrigin n == "LPG" -- stop when we reach LPG nodes
+        prg_stopfn (_,n@(PG.FNode {})) = PG.nOrigin n == "LPG" -- stop when we reach LPG nodes
+        prg_stopfn _ = False
         pred_prg = computePred $ initPredCompSt_ { predGraph = graph
                                                  , predDst = prg_node
                                                  , compStop = prg_stopfn }
@@ -246,7 +249,7 @@ tryEmbedTxMatchedNode lpg_node prg_node = do
     pred_lpg <- lpgPredRemUnreachable pred_lpg'
 
     let equiv = predEquiv pred_prg pred_lpg
-        equiv_ = tr equiv $ "----> Testing equvalence of predicates:  \n"
+        equiv_ = trN equiv $ "----> Testing equivalence of predicates:  \n"
                               ++ "pred_prg:" ++ (show pred_prg) ++ "\n"
                               ++ "pred_lpg:" ++ (show pred_lpg) ++ "\n"
                               ++ "lpg node:" ++ (show $ PG.nLabel $ snd lpg_node) ++ "\n"

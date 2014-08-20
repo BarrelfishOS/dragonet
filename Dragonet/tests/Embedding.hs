@@ -23,6 +23,9 @@ import qualified Data.List                      as L
 import Control.Monad (sequence, forM_)
 import Control.Applicative ((<$>))
 
+import System.IO.Temp (openTempFile)
+import System.IO (hPutStr,hClose)
+
 import Text.RawString.QQ (r)
 import Text.Show.Pretty (ppShow)
 import Text.Printf (printf)
@@ -31,7 +34,7 @@ import Test.HUnit
 
 
 ------------------------------------------------------------------------------
-t1 = embTest "multiple queues" prg1 lpg1 emb1
+t1 = embTest "multiple queues (prg1,lpg1)" prg1 lpg1 emb1
 ------------------------------------------------------------------------------
 
 myPrgCfg = [ ("RxQueues", PG.CVInt 2),
@@ -63,12 +66,12 @@ graph lpg1 {
 emb1 :: PG.PGraph
 emb1 = U.strToGraph [r|
 graph emb1 {
-    node TxA__Q1 { port out[TxQueue__Q1] }
-    node TxA__Q2 { port out[TxQueue__Q2] }
-    node RxQueue__Q1 { spawn poll RxQueue__Q1 }
-    node RxQueue__Q2 { spawn poll RxQueue__Q2 }
-    node TxQueue__Q1 {}
-    node TxQueue__Q2 {}
+    node TxA__Q1 { port out[TxQueue1__Q1] }
+    node TxA__Q2 { port out[TxQueue2__Q2] }
+    node RxQueue1__Q1 { spawn poll RxQueue1__Q1 }
+    node RxQueue2__Q2 { spawn poll RxQueue2__Q2 }
+    node TxQueue1__Q1 {}
+    node TxQueue2__Q2 {}
 }
 |]
 
@@ -84,16 +87,24 @@ nodeSet g = Set.fromList [nodeToTuple g n | n <- DGI.labNodes g]
                                    L.sort $ [nodeName x | (_,x) <- GH.labSuc g pn])
 
 embTest msg prg lpg expect =
- TestLabel ("Embedding: " ++ msg) $ TestCase $ assertBool errmsg cond
-    where cond = (DGI.noNodes emb) == (DGI.noNodes expect) && expectSet == embSet
-          expectSet = nodeSet expect
-          emb      = embeddingRxTx prg lpg
-          embSet   = nodeSet emb
-          result   = nodeSet $ embeddingRxTx prg lpg
-          errmsg = "prg:      \n" ++ (ppShow $ nodeSet prg) ++ "\n" ++
-                   "lpg:      \n" ++ (ppShow $ nodeSet lpg) ++ "\n" ++
-                   "result:   \n" ++ (ppShow result) ++ "\n" ++
-                   "expected: \n" ++ (ppShow expectSet)
+ TestLabel ("Embedding: " ++ msg) $ TestCase $ do
+    let emb      = embeddingRxTx prg lpg
+        embSet   = nodeSet emb
+        expectSet = nodeSet expect
+        cond      = (DGI.noNodes emb) == (DGI.noNodes expect) && expectSet == embSet
+        errmsg_   = "prg:      \n" ++ (ppShow $ nodeSet prg) ++ "\n" ++
+                    "lpg:      \n" ++ (ppShow $ nodeSet lpg) ++ "\n" ++
+                    "result:   \n" ++ (ppShow embSet) ++ "\n" ++
+                    "expected: \n" ++ (ppShow expectSet) ++ "\n" ++
+                    "embdump:   "
+
+    errmsg <- case cond of
+        True  -> return "SUCCESS"
+        False -> do
+            dumpf <- dumpRandFname ("tests/", "emb-test-.dot") (toDot emb)
+            return (errmsg_ ++ dumpf ++ "\n")
+
+    assertBool errmsg cond
 
 ------------------------------------------------------------------------------
 -- t2: UDP checksum for all packets
@@ -109,9 +120,13 @@ graph prg2 {
         node L4Prot {
             port UDP[L4UDPFillChecksum]
             port Other[_Out]
+
+            predicate UDP "and(pred(EthType,IPv4),pred(IpProt,UDP))"
         }
 
-        node L4UDPFillChecksum { port o[_Out] } or _Out {
+        node L4UDPFillChecksum { port o[_Out] }
+
+       or _Out {
             port true[Out]
             port false[]
         }
@@ -124,10 +139,25 @@ graph prg2 {
             port o[Queue]
         }
 
-        node Queue {}
+        node Queue {
+            implementation NoImplementationHere
+            attr "software"
+            attr "source"
+            attr "init"
+            spawn poll Queue
+            port out[]
+            port drop[]
+            port init[] }
     }
 }
 |]
+
+dumpRandFname :: (FilePath, String) -> (String) -> IO (FilePath)
+dumpRandFname (dirname,ftmpl) d = do
+    (tmpf, tmph) <- openTempFile dirname ftmpl
+    hPutStr tmph d
+    hClose tmph
+    return tmpf
 
 lpgTest :: PG.PGraph -> [(PG.PGraph -> IO Bool)] -> String -> Test
 lpgTest prg doCheck errmsg = TestCase $ do
@@ -183,7 +213,7 @@ nLabelPredicate :: PG.PGraph -> String -> [(String, PredExpr)]
 nLabelPredicate g l = [ (nodeName n, nodePred g n) | n <- nodes ]
     where nodes = GH.filterNodesByL (\x -> (PG.nLabel x) == l) g
 
-t2 = lpgTest prg2 [nodeOffloaded "TxL4UDPFillChecksum"] "TX UDP Checksum was not offloaded"
+t2 = lpgTest prg2 [nodeOffloaded "TxL4UDPFillChecksum"] "TX UDP Checksum was not offloaded (prg2)"
 
 ------------------------------------------------------------------------------
 -- t3: closer to the Intel NIC
@@ -196,7 +226,7 @@ graph prg3 {
             attr "software"
             port o[L3Prot] }
 
-        // NB: maybe we want to have the convention for ports named other that
+        // NB: maybe we want to have the convention for ports named `other' that
         // their predicate is NOT all the other ports of the node
         node L3Prot {
             attr "software"
@@ -258,7 +288,7 @@ graph prg3 {
 }
 |]
 
-t3 = lpgTest prg3 [nodeOffloaded "TxL4UDPFillChecksum"] "TX UDP Checksum was not offloaded"
+t3 = lpgTest prg3 [nodeOffloaded "TxL4UDPFillChecksum"] "TX UDP Checksum was not offloaded (prg3)"
 
 tests =
  TestList [
@@ -276,22 +306,24 @@ remPrefix prefix str = case L.stripPrefix prefix str of
     Nothing -> str
     Just x  -> x
 
+prPred :: PG.PGraph -> String -> IO ()
+prPred gr s = do
+    putStrLn $ "------>" ++ s
+    putStrLn $ ppShow $ nLabelPredicate gr s
+    putStrLn $ "<-------"
+
 
 main = do
-    --writeFile "tests/lpgYYY.dot" $ toDot lpgC
-    --writeFile "tests/prg3.dot" $ toDot prg3
-    --runTestTT tests
-    (lpgU, lpgH) <- lpgT
+
     lpgC <- lpgC
 
-    let  prPred :: PG.PGraph -> String -> IO ()
-         prPred gr s = do
-            putStrLn $ "------>" ++ s
-            putStrLn $ ppShow $ nLabelPredicate gr s
-            putStrLn $ "<-------"
-
+    writeFile "tests/prg1.dot" $ toDot prg1
+    writeFile "tests/prg3.dot" $ toDot prg3
     writeFile "tests/lpgYYY.dot" $ toDot lpgC
 
+    runTestTT tests
+
+    {--
     --prPred lpgC "TxL3ARPInitiateResponse"
     prPred lpgC "TxQueue"
     let txQueuePred  = snd $ (nLabelPredicate lpgC "TxQueue") !! 0
@@ -307,11 +339,9 @@ main = do
     forM_  (zip [1..] (filter filter_fn txQueueAnds')) $ \(i,preds) -> do
         let ofile = "tests/lpgYYY-hl-" ++ (show i) ++ ".dot"
         writeFile ofile $ toDotHighlight (map fst preds) lpgC
-    {--
-   --}
-
     --let hl = ["TxL3ARPLookup_","TxL4TCPInitiateResponse","RxL4TCPSocketTCPOutMerge","TxL3IPv4Routing","TxL3ARPSendGratuitous","RxQueue"]
     --writeFile "tests/lpgYYY-hl.dot" $ toDotHighlight hl lpgC
+   --}
 
     return ()
 

@@ -644,24 +644,28 @@ nodePred g n = computePred $ initPredCompSt_ { predGraph = g, predDst = n }
 portPred :: PredBuild -> PG.PGNode -> PG.NPort -> PredExpr
 portPred bld (_,fnode@(FNode {})) port = pred
     where pred' = tr pred ("node:" ++ (PG.nLabel fnode) ++ " port:" ++ port ++ " port pred:" ++ (show pred))
+          -- NB: In our current semantics, if predicates are defined for a
+          -- particular port, then the port selection predicates are ignored.
+          -- Note that, if needed, they can be added in the port predicates
+          -- (e.g., in the unicorn file)
           pred  = case L.lookup port (PG.nPredicates fnode) of
-                   Just x -> (buildAND bld) [atom,parseStr_ bld x]
+                   Just x -> parseStr_ bld x
                    Nothing -> atom
           atom  = case length (nPorts fnode) of
-                    0 -> error "Is this even possible?"
+                    0 -> error $ "We expect a port named `" ++ port ++ "' in node:\n" ++ (ppShow fnode)
                     1 -> PredTrue
                     _ -> PredAtom (PG.nLabel fnode) port
 
 -- get the predicate expression for a dependency
 depGetPred :: PredCompSt -> (PG.PGNode,  PG.PGEdge) -> PredExpr
 -- dependency is an FNode
-depGetPred st (dep_node@(_, fnode@(FNode {})), dep_edge) = ret
-    where ret'     = tr ret $ "getting predicate of dependency node: " ++ ( (PG.nLabel . snd) dep_node )
-          ret      =  (buildAND bld) [dep_pred, rec_pred]
-          bld      = predBld st
-          dep_port = edgePort dep_edge
-          dep_pred = portPred bld dep_node dep_port
-          rec_pred = computePred $ st {predDst = dep_node, predInPort = Just dep_port}
+depGetPred st (dep_node@(_, fnode@(FNode {})), dep_edge) = ret'
+    where ret'       = ret --tr ret $ "getting predicate of dependency node: " ++ ((PG.nLabel . snd) dep_node) ++ " port:" ++ dep_port
+          ret        =  (buildAND bld) [dep_pred, rec_pred]
+          bld        = predBld st
+          dep_port   = edgePort dep_edge
+          dep_pred   = portPred bld dep_node dep_port
+          rec_pred   = computePred $ st {predDst = dep_node, predInPort = Just dep_port}
 -- dependency is an ONode
 depGetPred st (dep_node@(_, ONode {}), dep_edge) = ret
     where ret' = tr ret $  "getting predicate of dependency node: " ++ ( (PG.nLabel . snd) dep_node )
@@ -677,24 +681,31 @@ computePred :: PredCompSt -> PredExpr
 --  predicate of pre(dst) AND predicate of src->pre(dst)
 computePred st@(PredCompSt { predDst = (_, FNode {}), compStop = stopfn})
     -- we reached an entry node
-    | ndeps == 0   = case pgSpawnPreds (predBld st) gr dst of
-        Just e  -> e -- there is a spawn predicate
-        Nothing -> PredTrue
+    | ndeps == 0   = case spawn_pred of
+                       Just e  -> e        -- there *is* a spawn predicate
+                       Nothing -> PredTrue -- this should probably be false, but it currently breaks some cases
     | ndeps > 1    = error $ "F-nodes have at most one incomming edge" ++ (nLabel $ snd dst)
     -- ndeps == 1
-    | stopfn dn   = PredTrue
-    | isSpawnTarget gr dst = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat is an OR?)
+    | stopfn $ fst dep0    = PredTrue
+    -- | isSpawnTarget gr dst = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat it as an OR?)
     -- recurse
-    | otherwise   = depGetPred st (deps !! 0) --expr --tr expr $ "node " ++ dst_lbl ++ " returns " ++ (show expr)
+    | otherwise   = ret_pred
     where (dst_, gr) = (predDst st, predGraph st)
           dst     = dst_ --tr dst_ ("Visiting node: " ++ dst_lbl)
           dst_lbl = nLabel $ snd dst_
           -- predecesors of destintation (going backwards)
           -- (only consider normal edges)
-          deps    = edgeDeps gr dst
-          inport  = predInPort st
-          ndeps   = length deps
-          dn      = fst $ (deps !! 0)
+          deps       = edgeDeps gr dst
+          dep0       = deps !! 0
+          inport     = predInPort st
+          ndeps      = length deps
+          dep_pred   = depGetPred st dep0
+          spawn_pred = pgSpawnPreds (predBld st) gr dst
+          -- we check if there is also a spawn predicate for this node. If
+          -- that's the case, we OR it with the dependency predicate.
+          ret_pred   = case spawn_pred of
+                         Just x  -> (buildOR $ predBld st) [dep_pred, x]
+                         Nothing -> dep_pred
 
 -- compute predicate of src->dst, where dst is an ONode:
 --  OP (e.g., AND) [ predicate of src -> pre ] for each pre in pre(dst)
