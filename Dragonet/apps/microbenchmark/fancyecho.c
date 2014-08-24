@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <sched.h>
 
 #include <udpproto.h>
 #include <proto_ipv4.h>
@@ -13,6 +14,8 @@
 // NOTE: Moved to c_impl/include/implementation.h
 //#define SHOW_INTERVAL_STATS  1
 //#define INTERVAL_STAT_FREQUENCY     1000
+
+#define IDLE_BEFORE_YIELD 100
 
 
 struct cfg_udpep {
@@ -349,6 +352,7 @@ static void *run_thread(void *arg)
     struct dnal_aq_event event;
     errval_t err;
     bool locked;
+    unsigned int idle = 0;
 
     // Make sure everything is initialized
     for (i = 0; i < th->num_aqs; i++) {
@@ -397,10 +401,18 @@ static void *run_thread(void *arg)
                 // This needs to be inside the critical section, since we'll
                 // send out data through the AQ
                 handle_event(&event, th);
+                idle = 0;
+            } else {
+                idle++;
             }
 
             if (locked) {
                 pthread_mutex_unlock(&caq->mutex);
+            }
+
+            if (idle >= IDLE_BEFORE_YIELD) {
+                sched_yield();
+                idle = 0;
             }
 
         }

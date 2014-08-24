@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <sched.h>
 
 #include "dyn_local.h"
+
+#define IDLE_BEFORE_YIELD 100
 
 extern pipeline_handle_t pipeline_handle;
 
@@ -89,6 +92,7 @@ struct dynr_client *dyn_local_client(struct dyn_local *local)
 void dyn_local_run(struct dyn_local *local)
 {
     struct qaction *qa;
+    unsigned int idle = 0;
 
     printf("dyn_local_run called...\n");
     while (local->running) {
@@ -101,6 +105,15 @@ void dyn_local_run(struct dyn_local *local)
             free(qa);
         }
         dynrs_run(&local->server);
+        if (local->server.graph->was_productive) {
+            idle = 0;
+        } else {
+            idle++;
+        }
+        if (idle > IDLE_BEFORE_YIELD) {
+            sched_yield();
+            idle = 0;
+        }
     }
 }
 

@@ -179,7 +179,8 @@ void dynrs_action(struct dynr_server *server,
         case DYNR_ACT_MKFNODE:
             dprintf("dynrs_action: DYNR_ACT_MKFNODE\n");
             assert(node_get(server, a->data.mkfnode.node) == NULL);
-            n = dyn_mkfnode(g, a->data.mkfnode.name, a->data.mkfnode.impl);
+            n = dyn_mkfnode(g, a->data.mkfnode.name, a->data.mkfnode.impl,
+                    a->data.mkfnode.productive);
             node_add(server, node_create(a->data.mkfnode.node, n));
             break;
         case DYNR_ACT_MKONODE:

@@ -48,6 +48,7 @@ struct dynr_action {
             dynr_node_t node;
             char name[DYNR_MAXNAME + 1];
             char impl[DYNR_MAXNAME + 1];
+            bool productive;
         } mkfnode;
         struct {
             dynr_node_t node;
@@ -173,7 +174,8 @@ void dynrc_cleargraph(struct dynr_client *client);
 void dynrc_mkfnode(struct dynr_client *client,
                    dynr_node_t node,
                    const char *name,
-                   const char *nodefun);
+                   const char *nodefun,
+                   int         productive);
 void dynrc_mkonode_and(struct dynr_client *client,
                        dynr_node_t         node,
                        const char         *name);

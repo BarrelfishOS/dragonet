@@ -141,7 +141,8 @@ out:
     return out;
 }
 
-static node_out_t run_node(struct dynamic_node *n,
+static node_out_t run_node(struct dynamic_graph *graph,
+                           struct dynamic_node *n,
                            pipeline_handle_t    plh,
                            struct state        *st,
                            struct input        **in,
@@ -152,6 +153,8 @@ static node_out_t run_node(struct dynamic_node *n,
     int ret;
     switch (n->type) {
         case DYN_FNODE:
+            graph->was_productive =
+                graph->was_productive || n->tdata.fnode.productive;
             return n->tdata.fnode.nodefun(n->tdata.fnode.ctx, st, in);
 
         case DYN_ONODE:
@@ -179,6 +182,7 @@ static node_out_t run_node(struct dynamic_node *n,
             return 0;
 
         case DYN_TOQUEUE:
+            graph->was_productive = true;
             ret = pl_enqueue(n->tdata.queue.queue, *in);
             if (ret < 0) {
                 dprintf("%s:%s:%d:Warning: packet/event is lost as, pl_enqueue failed, %d\n",
@@ -188,6 +192,7 @@ static node_out_t run_node(struct dynamic_node *n,
             return -2; // FIXME: why there is return value of -2?
 
         case DYN_TOSOCKET:
+            graph->was_productive = true;
             n->graph->cur_socket_buf = *in;
             n->graph->cur_socket = n->tdata.socket.sdata;
             *in = NULL;
@@ -274,13 +279,14 @@ void dyn_rungraph(struct dynamic_graph *graph)
     source = spawn->node;
 
     // Run Graph
+    graph->was_productive = false;
     node_stack_push(ns, source);
     count = 0;
     while ((n = node_stack_pop(ns)) != NULL) {
         count++;
         dprintf("Execute: n=%p n->n=%p\n", n, n->name);
         dprintf("Execute: %s, count: %zu \n", n->name, count);
-        out = run_node(n, plh, st, &in, version);
+        out = run_node(graph, n, plh, st, &in, version);
         dprintf("   port=%d\n", out);
         if (out >= 0 && n->num_ports == 0) {
             // Terminal node
@@ -418,13 +424,15 @@ static struct dynamic_node *mknode(struct dynamic_graph *graph,
 
 struct dynamic_node *dyn_mkfnode(struct dynamic_graph *graph,
                                  const char *name,
-                                 const char *impl)
+                                 const char *impl,
+                                 bool productive)
 {
     dprintf("dyn_mkfnode\n");
     struct dynamic_node *n = mknode(graph, name, DYN_FNODE);
     n->tdata.fnode.nodefun = graph->resolver(impl, graph->resolver_data);
     n->tdata.fnode.ctx = malloc(sizeof(n->tdata.fnode.ctx));
     n->tdata.fnode.ctx->implementation = n;
+    n->tdata.fnode.productive = productive;
     return n;
 }
 

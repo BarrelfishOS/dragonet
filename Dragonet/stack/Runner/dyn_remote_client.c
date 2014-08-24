@@ -46,7 +46,8 @@ void dynrc_cleargraph(struct dynr_client *client)
 void dynrc_mkfnode(struct dynr_client *client,
                    dynr_node_t node,
                    const char *name,
-                   const char *nodefun)
+                   const char *nodefun,
+                   int         productive)
 {
     dprintf("dynrc_mkfnode\n");
     struct dynr_action act = {
@@ -59,6 +60,7 @@ void dynrc_mkfnode(struct dynr_client *client,
     assert(strlen(nodefun) <= DYNR_MAXNAME);
     strcpy(act.data.mkfnode.name, name);
     strcpy(act.data.mkfnode.impl, nodefun);
+    act.data.mkfnode.productive = productive;
     client->send(&act, client->send_data);
 }
 

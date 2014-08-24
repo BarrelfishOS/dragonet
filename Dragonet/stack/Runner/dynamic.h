@@ -53,6 +53,7 @@ struct dynamic_node {
         struct {
             nodefun_t           nodefun;
             struct ctx_generic *ctx;
+            bool                productive;
         } fnode;
         struct {
             enum dynamic_node_op op;
@@ -113,6 +114,7 @@ struct dynamic_graph {
     fn_resolver_t         resolver;
     void                 *resolver_data;
     int                   version;
+    bool                  was_productive;
     volatile bool         stop;
 
     // Hacks for socket node
@@ -145,7 +147,8 @@ void dyn_cleargraph(struct dynamic_graph *graph);
 
 struct dynamic_node *dyn_mkfnode(struct dynamic_graph *graph,
                                  const char *name,
-                                 const char *nodefun);
+                                 const char *nodefun,
+                                 bool productive);
 struct dynamic_node *dyn_mkonode(struct dynamic_graph *graph,
                                  const char *name,
                                  enum dynamic_node_op op);

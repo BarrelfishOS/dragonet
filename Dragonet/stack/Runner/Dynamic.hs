@@ -68,12 +68,13 @@ buildDynNode' ds l
     | isTS = mkToSocketNode lbl tsId
     | isUDPDemux = mkUDPDemuxNode lbl udpSIP udpSP udpDIP udpDP
     | isBalance = mkBalanceNode lbl
-    | PG.FNode {} <- l = mkFNode lbl ifun
+    | PG.FNode {} <- l = mkFNode lbl ifun isProductive
     | PG.ONode { PG.nOperator = op } <- l = mkONode lbl op
     | otherwise = error "Unsupported node type"
     where
         lbl = PG.nLabel l
         PG.NImplFunction ifun = PG.nImplementation l
+        isProductive = not $ PG.nAttrElem (PG.NAttrCustom "unproductive") l
         isDemux
             | PG.FNode { PG.nLabel = "Demux" } <- l = True
             | otherwise = False
@@ -441,12 +442,13 @@ clearGraph :: DynM ()
 clearGraph = dmWithGHIO c_cleargraph
 
 
-mkFNode :: String -> String -> DynM NodeHandle
-mkFNode l i = do
+mkFNode :: String -> String -> Bool -> DynM NodeHandle
+mkFNode l i prod = do
     nh <- dmNewNodeHandle
+    let pr = if prod then 1 else 0
     dmWithGHIO $ \gh ->
         withCString l $ \cl ->
-            withCString i $ \ci -> c_mkfnode gh nh cl ci
+            withCString i $ \ci -> c_mkfnode gh nh cl ci pr
     return nh
 
 mkONode :: String -> PG.NOperator -> DynM NodeHandle
@@ -588,7 +590,8 @@ foreign import ccall "dynrc_cleargraph"
 
 
 foreign import ccall "dynrc_mkfnode"
-    c_mkfnode :: GraphHandle -> NodeHandle -> CString -> CString -> IO ()
+    c_mkfnode ::
+        GraphHandle -> NodeHandle -> CString -> CString -> CInt -> IO ()
 foreign import ccall "dynrc_mkonode_and"
     c_mkonode_and :: GraphHandle -> NodeHandle -> CString -> IO ()
 foreign import ccall "dynrc_mkonode_or"
