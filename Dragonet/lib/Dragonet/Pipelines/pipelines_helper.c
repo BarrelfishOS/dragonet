@@ -369,7 +369,7 @@ static void free_bulk_buffer(struct dragonet_pipeline *pl,
     struct bulk_ll_channel *chan = buf->opaque;
     errval_t err;
 
-    if (chan == NULL) {
+    if (chan == NULL || buf->pool == &pl->pool) {
         // Our own buffer
         dprint("######### freeing on own pipeline %s, buf = %p, free_buf_count = %zu, out of %zu\n",
                 pl->name, buf, (&pl->alloc)->num_free, (&pl->alloc)->capacity);
