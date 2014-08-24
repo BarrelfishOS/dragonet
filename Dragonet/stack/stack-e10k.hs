@@ -175,7 +175,10 @@ implCfg tcstate chan sh config = do
         -- parseProto PG.CVEnum 3 = CTRL.L4Other
 
 
--- Assign all nodes to same pipeline
+
+
+
+-- Create separate pipelines for rx and tx per hardware queue
 plAssign :: StackState -> String -> PG.PGNode -> String
 plAssign _ _ (_,n)
     | take 2 lbl == "Tx" = "Tx" ++ tag
@@ -183,6 +186,10 @@ plAssign _ _ (_,n)
     where
         lbl = PG.nLabel n
         tag = PG.nTag n
+
+-- Only create one pipeline per hardware queue
+plAssignMerged :: StackState -> String -> PG.PGNode -> String
+plAssignMerged _ _ (_,n) = PG.nTag n
 
 
 main = do
@@ -197,5 +204,5 @@ main = do
     -- Prepare graphs and so on
     prgH <- E10k.graphH
     instantiate prgH "llvm-helpers-e10k" costFunction oracle
-        (implCfg tcstate chan) plAssign
+        (implCfg tcstate chan) plAssignMerged
 
