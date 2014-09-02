@@ -722,7 +722,7 @@ computePred st@(PredCompSt { predDst = (_, FNode {}), compStop = stopfn})
     | ndeps == 0   = case spawn_pred of
                        Just e  -> e        -- there *is* a spawn predicate
                        Nothing -> PredTrue -- this should probably be false, but it currently breaks some cases
-    | ndeps > 1    = error $ "F-nodes have at most one incomming edge" ++ (nLabel $ snd dst)
+    | ndeps > 1    = error $ "F-nodes have at most one incomming edge. Offending node:`" ++ (nLabel $ snd dst) ++ "'"
     -- ndeps == 1
     | stopfn $ fst dep0    = PredTrue
     -- | isSpawnTarget gr dst = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat it as an OR?)
@@ -753,7 +753,7 @@ computePred st@(PredCompSt { predDst = (_, ONode { nOperator = op, nLabel = lbl 
           deps :: [(PG.PGNode, PG.PGEdge)]
           deps = edgeDeps (predGraph st) (predDst st)
           -- We calculate the dependencies based on the true port. That is, we
-          -- assume that the flase port is the (NOT true port) of the same node
+          -- assume that the false port is the (NOT true port) of the same node
           true_deps = trueONodeDeps deps
           -- get predicates for all predecessors
           exprargs_ :: [PredExpr]
@@ -777,16 +777,16 @@ computePred st@(PredCompSt { predDst = (_, ONode { nOperator = op, nLabel = lbl 
 depPortName :: (PG.PGNode, PG.PGEdge) -> PG.NPort
 depPortName (_, (_, _, Edge { ePort = eport })) = eport
 
-depNodeId ((nid,_), _) = nid
-
 trueONodeDeps :: [(PG.PGNode, PGEdge)] -> [(PG.PGNode,PG.PGEdge)]
 trueONodeDeps deps = true_deps
     where groups  = L.groupBy ((==) `on` depNodeId) deps
+          depNodeId ((nid,_), _) = nid
           true_deps = map getTrueDep groups
           getTrueDep ds = case length depsl of
                             0 -> error $ "No true port for node: " ++ ( nLabel . snd . fst) (ds !! 0)
                             1 -> depsl !! 0
-               where depsl = filter ((=="true")  . depPortName) ds
+               where depsl = filter ((L.isSuffixOf "true")  . depPortName) ds
+                     -- depsl = filter ((=="true")  . depPortName) ds
 
 -- predicate constructors
 data PredBuild = PredBuild {

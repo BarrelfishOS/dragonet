@@ -6,6 +6,7 @@ module Dragonet.ProtocolGraph (
     PGNode,
     PGEdge,
     PGContext,
+    PGAdj,
 
     NLabel,
     NTag,
@@ -98,6 +99,7 @@ type PGraph = DGI.Gr Node Edge
 type PGNode = DGI.LNode Node
 type PGEdge = DGI.LEdge Edge
 type PGContext = DGI.Context Node Edge
+type PGAdj     = DGI.Adj Edge
 
 
 -------------------------------------------------------------------------------

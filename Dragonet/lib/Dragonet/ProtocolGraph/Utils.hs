@@ -8,6 +8,9 @@ module Dragonet.ProtocolGraph.Utils (
     getFNodeByNameTag',
     getPGNAttr,
     spawnDeps, isSpawnTarget, edgeDeps, edgePort, edgeSucc,
+    isSink_, isSource_,
+    isSpawnEdge_, isSpawnEdge,
+    isNormalEdge_, isNormalEdge
 ) where
 
 import Dragonet.ProtocolGraph
@@ -73,11 +76,17 @@ getPGNAttr node n = getVal <$> (find matches $ nAttributes node)
         matches _ = False
         getVal (NAttrCustom s) = drop (length n + 1) s
 
+isNormalEdge_ :: Edge -> Bool
+isNormalEdge_ e = case e of
+    ESpawn _ _ -> False
+    Edge _     -> True
+
+isSpawnEdge_ :: Edge -> Bool
+isSpawnEdge_ = not . isNormalEdge_
+
 -- is this a normal (not spawn) edge?
 isNormalEdge :: PGEdge -> Bool
-isNormalEdge e = case e of
-    (_, _, ESpawn _ _) -> False
-    (_, _, Edge _)     -> True
+isNormalEdge (_, _, e) = isNormalEdge_ e
 
 isSpawnEdge = not . isNormalEdge
 
@@ -95,10 +104,15 @@ edgePort pedge = case pedge of
     (_, _, ESpawn _ _) -> error "spawn edges do not have ports"
     (_, _, Edge p)     -> p
 
--- normal incoming dependencies (label of connected node, edge)
+-- normal (i.e., not spawn) incoming dependencies
 edgeDeps :: PGraph -> PGNode -> [(PGNode, PGEdge)]
 edgeDeps gr dst = filter (isNormalEdge . snd) $ GH.labLPre gr dst
 
+isSink_ :: PGraph -> DGI.Node -> Bool
+isSink_ gr nid = null $ filter (isNormalEdge_ . snd) (DGI.lsuc gr nid)
+
+isSource_ :: PGraph -> DGI.Node -> Bool
+isSource_ gr nid = null $ filter (isNormalEdge_ . snd) (DGI.lpre gr nid)
 
 -- normal (i.e., not spawn) sucessor nodes
 edgeSucc :: PGraph -> PGNode -> [(PGNode, PGEdge)]

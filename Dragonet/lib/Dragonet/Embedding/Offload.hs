@@ -252,7 +252,7 @@ tryEmbedTxMatchedNode lpg_node prg_node = do
 
     let --equiv = predEquivHard pred_prg pred_lpg
         equiv = PR.predEquivUnder (pred_prg, pred_lpg) pred_sink
-        equiv_ = trN equiv $ "----> Testing equivalence of predicates:  \n"
+        equiv_ = tr equiv $ "----> Testing equivalence of predicates:  \n"
                               ++ "pred_prg:" ++ (show pred_prg) ++ "\n"
                               ++ "pred_lpg:" ++ (show pred_lpg) ++ "\n"
                               ++ "pred_sink:" ++ (show pred_sink) ++ "\n"

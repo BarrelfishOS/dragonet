@@ -2,14 +2,14 @@
 
 import qualified Dragonet.Unicorn               as U
 import qualified Dragonet.ProtocolGraph         as PG
+import qualified Dragonet.ProtocolGraph.Utils   as PGU
 import qualified Dragonet.Configuration         as C
 import qualified Util.GraphHelpers              as GH
 import qualified Graphs.E10k                    as E10k
 import qualified Graphs.LPG                     as LPG
 
-import Dragonet.Embedding (embeddingRxTx)
+import Dragonet.Embedding (embeddingRxTx, embeddingRxTx2)
 import Dragonet.DotGenerator (toDot, toDotHighlight)
-import Dragonet.ProtocolGraph.Utils (getFNodeByName)
 import Dragonet.Predicate (PredExpr, nodePred)
 import qualified Dragonet.Predicate as PR
 import Graphs.Cfg (lpgCfg)
@@ -32,6 +32,27 @@ import Text.Printf (printf)
 
 import Test.HUnit
 
+-- OneOf is a special case of the OR node
+--  only one incoming edge per node (interpreted as true)
+--  only outgoing edges on the true output
+oRisOneOf :: PG.PGraph -> PG.PGNode -> Bool
+oRisOneOf gr n@(_, onode@(PG.ONode { PG.nOperator = op }))
+    | op == PG.NOpOr = t1 && t2
+    | otherwise = error $ "isOneOf called with operator: " ++ (show onode) ++ " but we expect an OR operator"
+    where deps :: [(PG.PGNode, PG.PGEdge)]
+          deps = PGU.edgeDeps gr n
+          sucs :: [(PG.PGNode, PG.PGEdge)]
+          sucs = PGU.edgeSucc gr n
+          depNodeId ((nid,_), _) = nid
+          dep_groups = L.groupBy ((==) `on` depNodeId) deps
+          t1 = and $ [ length l == 1 | l <- dep_groups]
+          t2 = and $ [ (PG.ePort e) == "true" | (_,(_,_,e)) <- sucs ]
+
+duplicateOR :: PG.PGraph -> PG.PGNode -> PG.PGraph
+duplicateOR gr n@(_, onode@(PG.ONode { PG.nOperator = op }))
+    | op == PG.NOpOr = error "NYI!"
+    | otherwise = error $ "duplicate OR called with operator: " ++ (show onode)
+    where succ_edges = PGU.edgeSucc gr n
 
 ------------------------------------------------------------------------------
 t1 = embTest "multiple queues (prg1,lpg1)" prg1 lpg1 emb1
@@ -159,11 +180,8 @@ dumpRandFname (dirname,ftmpl) d = do
     hClose tmph
     return tmpf
 
-lpgTest :: PG.PGraph -> [(PG.PGraph -> IO Bool)] -> String -> Test
-lpgTest prg doCheck errmsg = TestCase $ do
-    (lpgU,lpgH) <- LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
-    let lpgC    = C.applyConfig lpgCfg lpgU
-        emb     = embeddingRxTx prg lpgC
+embTests_ (prg, lpg) doCheck errmsg = do
+    let emb = embeddingRxTx prg lpg
         embout  = "tests/emb.dot"
         errmsg' = --"prg:      \n" ++ (ppShow $ prg) ++ "\n" ++
                   --"lpg:      \n" ++ (ppShow $ lpgC) ++ "\n" ++
@@ -175,12 +193,21 @@ lpgTest prg doCheck errmsg = TestCase $ do
     --writeFile "tests/XXXlpg.dot" $ toDot lpgC
     --writeFile "tests/XXXprg.dot" $ toDot prg
     writeFile "tests/XXXemb.dot" $ toDot emb
-
     check <- or <$> sequence [ fn emb | fn <- doCheck ]
     case (check, dump) of
         (False, True) -> do writeFile "tests/emb.dot" $ toDot emb
         _ ->             do return ()
     assertBool errmsg' check
+
+embTests :: (PG.PGraph, PG.PGraph) -> [(PG.PGraph -> IO Bool)] -> String -> Test
+embTests (prg, lpg) doCheck errmsg = TestCase $ embTests_ (prg, lpg) doCheck errmsg
+
+lpgTest :: PG.PGraph -> [(PG.PGraph -> IO Bool)] -> String -> Test
+lpgTest prg doCheck errmsg = TestCase $ do
+    (lpgU,lpgH) <- LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
+    let lpgC    = C.applyConfig lpgCfg lpgU
+    embTests_ (prg,lpgC) doCheck errmsg
+
 
 nodeExistsOnce :: String -> PG.PGraph -> IO Bool
 nodeExistsOnce l g = do
@@ -307,16 +334,216 @@ t3 = lpgTest prg3 [nodeOffloaded "TxL4UDPFillChecksum",
                    nodeOffloaded "TxL3IPv4FillChecksum"]
              "TX UDP and IPv4 Checksum was not offloaded (prg3)"
 
+------------------------------------------------------------------------------
+-- t4: putting it all together (first attempt)
+-- We consider two simple mock protocols: I (ping, pong) and P (header,csum)
+------------------------------------------------------------------------------
+
+lpg4 = U.strToGraph [r|
+graph lpg4 {
+
+cluster Ap {
+    node ToSock1 { }
+    node ToSock2 { }
+    node ToSock3 { }
+
+    node FromSock1 {
+        port true[.TxP]
+        predicate true "pred(prot,p)"
+    }
+
+    node FromSock2 {
+        port true[.TxP]
+        predicate true "pred(prot,p)"
+    }
+
+    node FromSock3 {
+        port true[.TxP]
+        predicate true "pred(prot,p)"
+    }
+}
+
+cluster Tx {
+
+    node Queue {
+        port out[]
+    }
+
+    or Q_ {
+        port true[Queue]
+        port false[]
+    }
+
+    node Ipong {
+        port true[Q_]
+    }
+
+    and P_done {
+        port true[Q_]
+        port false[]
+    }
+
+    node PCsum {
+        port true[P_done]
+    }
+
+    node PHdr {
+        port true[P_done]
+    }
+
+    or P {
+        port true[PCsum PHdr]
+        port false[]
+    }
+}
+
+cluster Rx {
+    node Queue {
+        port out[Prot]
+    }
+
+    node Prot {
+        port I[isPing]
+        port P[PDemux PCsum]
+        port other[]
+
+        predicate I "pred(prot,i)"
+        predicate P "pred(prot,p)"
+        predicate other "and(not(pred(prot,i)),not(pred(prot,p)))"
+    }
+
+    node isPing {
+        spawn respose .TxIpong [predicate "pred(prot,i)"]
+    }
+
+    boolean PCsum {
+        port true false[ToS1 ToS2 ToS3]
+    }
+
+    // we use a true suffix for the AND node
+    node PDemux {
+        port s1_true[ToS1]
+        port s2_true[ToS2]
+        port s3_true[ToS3]
+        port drop[]
+    }
+
+    and ToS1 {
+        port true[.ApToSock1]
+        port false[]
+    }
+
+    and ToS2 {
+        port true[.ApToSock2]
+        port false[]
+    }
+
+    and ToS3 {
+        port true[.ApToSock3]
+        port false[]
+    }
+}
+
+}
+|]
+
+prg4 = U.strToGraph [r|
+graph prg4 {
+
+cluster Tx {
+    node Queue {
+        attr "software"
+        port out[isP]
+    }
+
+    // again, adding true suffix for the predicate compuation
+    node isP {
+        attr "software"
+        port p_true[PsetCtx]
+        port o_true[Out_]
+
+        predicate p_true "pred(prot,p)"
+        predicate o_true "not(pred(prot,p))"
+    }
+
+    node PsetCtx {
+        attr "software"
+        port o[PCsum]
+    }
+
+    node PCsum {
+        port true[Out_]
+    }
+
+    or Out_ {
+        port true[Out]
+        port false[]
+    }
+
+    node Out {
+        attr "software"
+    }
+}
+
+cluster Rx {
+    node Queue {
+        attr "software"
+        port out[isP]
+    }
+
+    node isP {
+        attr "software"
+        port p[PCsum]
+        port o[Out0]
+
+        predicate p "pred(port,p)"
+        predicate o "not(pred(port,p))"
+    }
+
+    node PCsum {
+        attr "software"
+        port valid[CsumValid]
+        port invalid[CsumInvalid]
+    }
+
+    node CsumValid {
+        attr "software"
+        port out[]
+    }
+    node CsumInvalid {
+        attr "software"
+        port out[]
+    }
+    node Out0 {
+        attr "software"
+        port out[]
+    }
+
+}
+
+}
+|]
+
+t4 = embTests (prg4,lpg4) [] "prg4/lpg4 checks"
+
+------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+
 tests =
  TestList [
-    test0, test0',
-    t1, t2, t3
+    --test0, test0',
+    --t1, t2, t3
+    t4
  ]
 
 lpgT = LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
 lpgU = fst <$> lpgT
-lpgH = snd <$>lpgT
+lpgH = snd <$> lpgT
 lpgC = C.applyConfig lpgCfg <$> lpgU
+
+e10kT = E10k.graphH
+e10kU = fst <$> e10kT
+e10kH = snd <$> e10kT
 
 remPrefix :: String -> String -> String
 remPrefix prefix str = case L.stripPrefix prefix str of
@@ -332,13 +559,23 @@ prPred gr s = do
 
 main = do
 
-    lpgC <- lpgC
+    writeFile "tests/prg4.dot" $ toDot prg4
+    writeFile "tests/lpg4.dot" $ toDot lpg4
+    let emb4 = embeddingRxTx2 prg4 lpg4
+    writeFile "tests/emb4.dot" $ toDot emb4
 
-    writeFile "tests/prg1.dot" $ toDot prg1
-    writeFile "tests/prg3.dot" $ toDot prg3
-    writeFile "tests/lpgYYY.dot" $ toDot lpgC
+    --prPred emb4 "RxQueue"
+    --prPred emb4 "RxisPing"
+    --prPred emb4 "TxQueue"
 
-    runTestTT tests
+    --putStrLn $ ppShow $ embeddingRxTx prg4 lpg4
+
+    --lpgC <- lpgC
+    --writeFile "tests/prg1.dot" $ toDot prg1
+    --writeFile "tests/prg3.dot" $ toDot prg3
+    --writeFile "tests/lpgYYY.dot" $ toDot lpgC
+
+    --runTestTT tests
 
     {--
     --prPred lpgC "TxL3ARPInitiateResponse"
