@@ -43,8 +43,10 @@ node_to_pgnode Boolean {
                 nPortF = pf,
                 nAttrs = attrs,
                 nPortSems = sems,
+                nPortPreds = preds,
                 nImplFun = mi } =
     node { PG.nSemantics = sems,
+           PG.nPredicates = preds,
            PG.nAttributes = a }
     where
         pnames = map pName [pt, pf]

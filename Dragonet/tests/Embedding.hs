@@ -405,12 +405,14 @@ cluster Rx {
     node Prot {
         port I[isPing]
         port P[PDemux PCsum]
-        port other[]
+        port other[Drop]
 
         predicate I "pred(prot,i)"
         predicate P "pred(prot,p)"
         predicate other "and(not(pred(prot,i)),not(pred(prot,p)))"
     }
+
+    node Drop {}
 
     node isPing {
         spawn respose .TxIpong [predicate "pred(prot,i)"]
@@ -418,6 +420,9 @@ cluster Rx {
 
     boolean PCsum {
         port true false[ToS1 ToS2 ToS3]
+
+        predicate true "pred(RxPCsum,valid)"
+        predicate false "pred(RxPCsum,invalid)"
     }
 
     // we use a true suffix for the AND node
@@ -496,8 +501,8 @@ cluster Rx {
         port p[PCsum]
         port o[Out0]
 
-        predicate p "pred(port,p)"
-        predicate o "not(pred(port,p))"
+        predicate p "pred(prot,p)"
+        predicate o "not(pred(prot,p))"
     }
 
     node PCsum {

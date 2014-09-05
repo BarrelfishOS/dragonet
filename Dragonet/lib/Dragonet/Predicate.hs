@@ -10,6 +10,11 @@ module Dragonet.Predicate (
     --
     predBuildSimple, predBuildFold, predBuildDNF, predDoBuild,
     --
+    predFnodePort, predOnodePort, predNodePort,
+    portPred, portPred_,
+    --
+    nodePredCache, PredCache,
+    --
     predParser,
     parseStr, parseStr_,
     parseFile, predGetAtoms,
@@ -18,7 +23,7 @@ module Dragonet.Predicate (
     --
     dnfGetANDs,
     -- exposed for the testing module:
-    PredBuild, builderName,
+    PredBuild(..),
     getAllAssigns,
 ) where
 
@@ -26,7 +31,9 @@ import Dragonet.ProtocolGraph        as PG
 import qualified Util.GraphHelpers   as GH
 import Dragonet.ProtocolGraph.Utils  (getFNodeByName, edgeDeps, edgePort, spawnDeps, isSpawnTarget)
 
+import qualified Data.Graph.Inductive as DGI
 import qualified Data.List as L
+import qualified Data.Map  as M
 import Data.Tuple (swap)
 import Data.Maybe
 import Data.Function (on)
@@ -646,6 +653,8 @@ predEquivUnder (expr1, expr2) expr_cond = ret
 ------- Computing predicate epxressions -----
 --
 
+type PredCache = M.Map DGI.Node PredExpr
+
 -- state for computing predicate expression:
 -- compStop will stop the search when a particular type of node is met.
 -- Normally, the search will stop when an entry node with no dependencies is
@@ -657,6 +666,7 @@ data PredCompSt = PredCompSt {
     , predInPort :: Maybe NPort
     , compStop   :: PG.PGNode -> Bool
     , predBld    :: PredBuild
+    , predCache  :: M.Map DGI.Node PredExpr
 } deriving (Show)
 
 -- initialize state
@@ -666,6 +676,7 @@ initPredCompSt_ = PredCompSt {
     , predInPort = Nothing
     , compStop   = \x -> False
     , predBld    = predBuildDNF -- build dnf expressions
+    , predCache  = M.empty
 }
 
 -- initializer helper
@@ -675,12 +686,22 @@ initPredCompSt gr node = initPredCompSt_ {
     , predDst   = getFNodeByName gr node
 }
 
--- simple helper
+-- simple helper for computing a predicate
 nodePred :: PG.PGraph -> PG.PGNode -> PredExpr
 nodePred g n = computePred $ initPredCompSt_ { predGraph = g, predDst = n }
 
+-- TODO: update and return cache
+nodePredCache :: PG.PGraph -> PG.PGNode -> PredCache -> PredExpr
+nodePredCache g n c = computePred $ initPredCompSt_ {
+      predGraph = g
+    , predDst   = n
+    , predCache = c}
+
 portPred :: PredBuild -> PG.PGNode -> PG.NPort -> PredExpr
-portPred bld (_,fnode@(FNode {})) port = pred
+portPred bld (_,fnode@(FNode {})) port = portPred_ bld fnode port
+
+portPred_ :: PredBuild -> PG.Node -> PG.NPort -> PredExpr
+portPred_ bld fnode@(FNode {}) port = pred
     where pred' = tr pred ("node:" ++ (PG.nLabel fnode) ++ " port:" ++ port ++ " port pred:" ++ (show pred))
           -- NB: In our current semantics, if predicates are defined for a
           -- particular port, then the port selection predicates are ignored.
@@ -691,18 +712,44 @@ portPred bld (_,fnode@(FNode {})) port = pred
                    Nothing -> atom
           atom  = case length (nPorts fnode) of
                     0 -> error $ "We expect a port named `" ++ port ++ "' in node:\n" ++ (ppShow fnode)
-                    1 -> PredTrue
+                    1 -> PredAtom (PG.nLabel fnode) port --PredTrue
                     _ -> PredAtom (PG.nLabel fnode) port
+
+
+predFnodePort :: PredBuild -> PredExpr -> (PG.PGNode, PG.NPort) -> PredExpr
+predFnodePort bld in_pred (node,port) = (buildAND bld) [dep_pred, in_pred]
+    where dep_pred = portPred bld node port
+
+predOnodePort :: PredBuild -> [PredExpr] -> (PG.PGNode, PG.NPort) -> PredExpr
+predOnodePort bld truePreds ((_, ONode {nOperator = op}), port) = expr
+    where expr = case (port, op) of
+            ("true", NOpAnd)  -> bldAND truePreds
+            ("true", NOpOr)   -> bldOR truePreds
+            ("true", _)       -> error "port NYI"
+            ("false", NOpAnd) -> bldOR  $ map bldNOT truePreds
+            ("false", NOpOr)  -> bldAND $ map bldNOT truePreds
+            ("false", _)      -> error "port NYI"
+            (_, _)            -> error $ "Expecting true/false, not:" ++ port
+          bldAND  = buildAND bld
+          bldOR   = buildOR  bld
+          bldNOT  = buildNOT bld
+
+
+predNodePort :: PredBuild -> [PredExpr] -> (PG.PGNode, PG.NPort) -> PredExpr
+predNodePort bld in_preds (node, port) =
+    case node of
+      (_,FNode {}) -> case length in_preds of
+                    1 -> predFnodePort bld (head in_preds) (node, port)
+                    _ -> error "Fnodes should have a single dependency"
+      (_,ONode {}) -> predOnodePort bld in_preds (node, port)
 
 -- get the predicate expression for a dependency
 depGetPred :: PredCompSt -> (PG.PGNode,  PG.PGEdge) -> PredExpr
 -- dependency is an FNode
 depGetPred st (dep_node@(_, fnode@(FNode {})), dep_edge) = ret'
     where ret'       = ret --tr ret $ "getting predicate of dependency node: " ++ ((PG.nLabel . snd) dep_node) ++ " port:" ++ dep_port
-          ret        =  (buildAND bld) [dep_pred, rec_pred]
-          bld        = predBld st
+          ret        = predFnodePort (predBld st) rec_pred (dep_node, dep_port)
           dep_port   = edgePort dep_edge
-          dep_pred   = portPred bld dep_node dep_port
           rec_pred   = computePred $ st {predDst = dep_node, predInPort = Just dep_port}
 -- dependency is an ONode
 depGetPred st (dep_node@(_, ONode {}), dep_edge) = ret
@@ -717,12 +764,14 @@ depGetPred st (dep_node@(_, ONode {}), dep_edge) = ret
 computePred :: PredCompSt -> PredExpr
 -- compute predicate of src->dst, where dst is an FNode:
 --  predicate of pre(dst) AND predicate of src->pre(dst)
-computePred st@(PredCompSt { predDst = (_, FNode {}), compStop = stopfn})
+computePred st@(PredCompSt { predDst = (nid, FNode {}), compStop = stopfn})
+    -- first check the cache
+    | Just dep <- M.lookup nid (predCache st) = dep
     -- we reached an entry node
-    | ndeps == 0   = case spawn_pred of
-                       Just e  -> e        -- there *is* a spawn predicate
-                       Nothing -> PredTrue -- this should probably be false, but it currently breaks some cases
-    | ndeps > 1    = error $ "F-nodes have at most one incomming edge. Offending node:`" ++ (nLabel $ snd dst) ++ "'"
+    | ndeps == 0 = case spawn_pred of
+        Just e  -> e        -- there *is* a spawn predicate
+        Nothing -> PredTrue -- this should probably be false, but it currently breaks some cases
+    | ndeps > 1   = error $ "F-nodes have at most one incomming edge. Offending node:`" ++ (nLabel $ snd dst) ++ "'"
     -- ndeps == 1
     | stopfn $ fst dep0    = PredTrue
     -- | isSpawnTarget gr dst = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat it as an OR?)
@@ -747,8 +796,9 @@ computePred st@(PredCompSt { predDst = (_, FNode {}), compStop = stopfn})
 
 -- compute predicate of src->dst, where dst is an ONode:
 --  OP (e.g., AND) [ predicate of src -> pre ] for each pre in pre(dst)
-computePred st@(PredCompSt { predDst = (_, ONode { nOperator = op, nLabel = lbl })} ) = expr
-    where inport = fromJust $ predInPort st
+computePred st@(PredCompSt {predDst = node@(_, ONode {nLabel = lbl })}) = ret
+    where ret = predOnodePort (predBld st) exprargs (node, inport)
+          inport = fromJust $ predInPort st
           -- predecessors (i.e., dependencies) of destination (going backwards)
           deps :: [(PG.PGNode, PG.PGEdge)]
           deps = edgeDeps (predGraph st) (predDst st)
@@ -761,18 +811,6 @@ computePred st@(PredCompSt { predDst = (_, ONode { nOperator = op, nLabel = lbl 
                             0 -> error $ "No true dependencies for node " ++ lbl
                             _ -> map (depGetPred st) true_deps
           exprargs = exprargs_ --tr exprargs_ $ "Visiting node:" ++ lbl ++ " (expragrs=" ++ (show exprargs_) ++ ")"
-          -- predicate operand
-          bldAND  = buildAND $ predBld st
-          bldOR   = buildOR  $ predBld st
-          bldNOT  = buildNOT $ predBld st
-          expr = case (inport, op) of
-                  ("true", NOpAnd)  -> bldAND exprargs
-                  ("true", NOpOr)   -> bldOR exprargs
-                  ("true", _)       -> error "NYI"
-                  ("false", NOpAnd) -> bldOR  $ map bldNOT exprargs
-                  ("false", NOpOr)  -> bldAND $ map bldNOT exprargs
-                  ("false", _)      -> error "NYI"
-                  (_, _)            -> error $ "Expecting true/false, not:" ++ inport
 
 depPortName :: (PG.PGNode, PG.PGEdge) -> PG.NPort
 depPortName (_, (_, _, Edge { ePort = eport })) = eport
