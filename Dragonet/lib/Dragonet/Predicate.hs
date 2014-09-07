@@ -10,10 +10,11 @@ module Dragonet.Predicate (
     --
     predBuildSimple, predBuildFold, predBuildDNF, predDoBuild,
     --
-    predFnodePort, predOnodePort, predNodePort,
+    predFnodePort, opPred, opNot,
     portPred, portPred_,
     --
     nodePredCache, PredCache,
+    depPredCache,
     --
     predParser,
     parseStr, parseStr_,
@@ -30,6 +31,7 @@ module Dragonet.Predicate (
 import Dragonet.ProtocolGraph        as PG
 import qualified Util.GraphHelpers   as GH
 import Dragonet.ProtocolGraph.Utils  (getFNodeByName, edgeDeps, edgePort, spawnDeps, isSpawnTarget)
+import Dragonet.Conventions (isTruePort, isFalsePort)
 
 import qualified Data.Graph.Inductive as DGI
 import qualified Data.List as L
@@ -686,16 +688,23 @@ initPredCompSt gr node = initPredCompSt_ {
     , predDst   = getFNodeByName gr node
 }
 
--- simple helper for computing a predicate
+-- simple helper for computing a predicate for reaching a particular node
 nodePred :: PG.PGraph -> PG.PGNode -> PredExpr
 nodePred g n = computePred $ initPredCompSt_ { predGraph = g, predDst = n }
 
+-- same as above, but includes a cache
 -- TODO: update and return cache
 nodePredCache :: PG.PGraph -> PG.PGNode -> PredCache -> PredExpr
 nodePredCache g n c = computePred $ initPredCompSt_ {
       predGraph = g
     , predDst   = n
     , predCache = c}
+
+depPredCache :: PG.PGraph -> (PG.PGNode, PG.NPort) -> PredCache -> PredExpr
+depPredCache g (n,p) c = depGetPred__ st (n,p)
+    where st = initPredCompSt_ {
+          predGraph = g
+        , predCache = c}
 
 portPred :: PredBuild -> PG.PGNode -> PG.NPort -> PredExpr
 portPred bld (_,fnode@(FNode {})) port = portPred_ bld fnode port
@@ -720,43 +729,37 @@ predFnodePort :: PredBuild -> PredExpr -> (PG.PGNode, PG.NPort) -> PredExpr
 predFnodePort bld in_pred (node,port) = (buildAND bld) [dep_pred, in_pred]
     where dep_pred = portPred bld node port
 
-predOnodePort :: PredBuild -> [PredExpr] -> (PG.PGNode, PG.NPort) -> PredExpr
-predOnodePort bld truePreds ((_, ONode {nOperator = op}), port) = expr
+opPred :: PredBuild -> [PredExpr] -> (NOperator, String) -> PredExpr
+opPred bld preds (op, port) = expr
     where expr = case (port, op) of
-            ("true", NOpAnd)  -> bldAND truePreds
-            ("true", NOpOr)   -> bldOR truePreds
+            ("true", NOpAnd)  -> bldAND preds
+            ("true", NOpOr)   -> bldOR preds
             ("true", _)       -> error "port NYI"
-            ("false", NOpAnd) -> bldOR  $ map bldNOT truePreds
-            ("false", NOpOr)  -> bldAND $ map bldNOT truePreds
+            ("false", NOpAnd) -> bldOR  $ map bldNOT preds
+            ("false", NOpOr)  -> bldAND $ map bldNOT preds
             ("false", _)      -> error "port NYI"
             (_, _)            -> error $ "Expecting true/false, not:" ++ port
           bldAND  = buildAND bld
           bldOR   = buildOR  bld
           bldNOT  = buildNOT bld
 
-
-predNodePort :: PredBuild -> [PredExpr] -> (PG.PGNode, PG.NPort) -> PredExpr
-predNodePort bld in_preds (node, port) =
-    case node of
-      (_,FNode {}) -> case length in_preds of
-                    1 -> predFnodePort bld (head in_preds) (node, port)
-                    _ -> error "Fnodes should have a single dependency"
-      (_,ONode {}) -> predOnodePort bld in_preds (node, port)
+-- get the predicate expression for a particular node port (dependency)
+depGetPred__ :: PredCompSt -> (PG.PGNode, PG.NPort) -> PredExpr
+-- dependency is an FNode
+depGetPred__ st (dep_node@(_, fnode@(FNode {})), dep_port) = ret'
+    where ret'       = ret --tr ret $ "getting predicate of dependency node: " ++ ((PG.nLabel . snd) dep_node) ++ " port:" ++ dep_port
+          ret        = predFnodePort (predBld st) rec_pred (dep_node, dep_port)
+          rec_pred   = computePred $ st {predDst = dep_node, predInPort = Just dep_port}
+-- dependency is an ONode
+depGetPred__ st (dep_node@(_, ONode {}), dep_port) = ret
+    where ret' = tr ret $  "getting predicate of dependency node: " ++ ( (PG.nLabel . snd) dep_node )
+          ret = computePred newst
+          newst    = st {predDst = dep_node, predInPort = Just dep_port}
 
 -- get the predicate expression for a dependency
 depGetPred :: PredCompSt -> (PG.PGNode,  PG.PGEdge) -> PredExpr
--- dependency is an FNode
-depGetPred st (dep_node@(_, fnode@(FNode {})), dep_edge) = ret'
-    where ret'       = ret --tr ret $ "getting predicate of dependency node: " ++ ((PG.nLabel . snd) dep_node) ++ " port:" ++ dep_port
-          ret        = predFnodePort (predBld st) rec_pred (dep_node, dep_port)
-          dep_port   = edgePort dep_edge
-          rec_pred   = computePred $ st {predDst = dep_node, predInPort = Just dep_port}
--- dependency is an ONode
-depGetPred st (dep_node@(_, ONode {}), dep_edge) = ret
-    where ret' = tr ret $  "getting predicate of dependency node: " ++ ( (PG.nLabel . snd) dep_node )
-          ret = computePred newst
-          dep_port = edgePort dep_edge
-          newst    = st {predDst = dep_node, predInPort = Just dep_port}
+depGetPred st (node, edge) = depGetPred__ st (node, port)
+    where port = edgePort edge
 
 -- Compute a predicate expression for packets that reach predDst in predGraph
 --  We assume that the graph is acyclic
@@ -796,26 +799,52 @@ computePred st@(PredCompSt { predDst = (nid, FNode {}), compStop = stopfn})
 
 -- compute predicate of src->dst, where dst is an ONode:
 --  OP (e.g., AND) [ predicate of src -> pre ] for each pre in pre(dst)
-computePred st@(PredCompSt {predDst = node@(_, ONode {nLabel = lbl })}) = ret
-    where ret = predOnodePort (predBld st) exprargs (node, inport)
+computePred st@(PredCompSt {predDst = (_, ONode {nLabel=lbl, nOperator=op })})
+    = ret
+    where 
           inport = fromJust $ predInPort st
           -- predecessors (i.e., dependencies) of destination (going backwards)
           deps :: [(PG.PGNode, PG.PGEdge)]
           deps = edgeDeps (predGraph st) (predDst st)
           -- We calculate the dependencies based on the true port. That is, we
           -- assume that the false port is the (NOT true port) of the same node
-          true_deps = trueONodeDeps deps
+          (true_deps, false_deps) = onodeDepsTF deps
           -- get predicates for all predecessors
-          exprargs_ :: [PredExpr]
-          exprargs_ = case length true_deps of
-                            0 -> error $ "No true dependencies for node " ++ lbl
-                            _ -> map (depGetPred st) true_deps
-          exprargs = exprargs_ --tr exprargs_ $ "Visiting node:" ++ lbl ++ " (expragrs=" ++ (show exprargs_) ++ ")"
+          t_preds_ :: [PredExpr]
+          t_preds_ = case length true_deps of
+                         0 -> error $ "No true dependencies for node " ++ lbl
+                         _ -> map (depGetPred st) true_deps
+          f_preds_ :: [PredExpr]
+          f_preds_ = case length false_deps of
+                         0 -> error $ "No false dependencies for node " ++ lbl
+                         _ -> map (depGetPred st) false_deps
+          t_preds = t_preds_ --tr t_preds_ $ "Visiting node:" ++ lbl ++ " (expragrs=" ++ (show t_preds_) ++ ")"
+          f_preds = f_preds_ --tr f_preds_ $ "Visiting node:" ++ lbl ++ " (expragrs=" ++ (show f_preds_) ++ ")"
+          ret = case inport of
+            "true"  -> opPred (predBld st) t_preds (op, "true")
+            "false" -> opPred (predBld st) f_preds (opNot op, "true")
 
 depPortName :: (PG.PGNode, PG.PGEdge) -> PG.NPort
 depPortName (_, (_, _, Edge { ePort = eport })) = eport
 
-trueONodeDeps :: [(PG.PGNode, PGEdge)] -> [(PG.PGNode,PG.PGEdge)]
+isTFPort s = (isTruePort s ||) (isFalsePort s)
+
+opNot :: PG.NOperator -> PG.NOperator
+opNot PG.NOpAnd = PG.NOpOr
+opNot PG.NOpOr  = PG.NOpAnd
+
+onodeDepsTF :: [(PGNode, PGEdge)] -> ([(PGNode, PGEdge)], [(PGNode, PGEdge)])
+onodeDepsTF deps = ret
+ where
+    true_deps  = filter (isTruePort  .    depPortName) deps
+    false_deps = filter (isFalsePort .    depPortName) deps
+    other_deps = filter (not . isTFPort . depPortName) deps
+    ret = case length other_deps of
+        0 -> (true_deps, false_deps)
+        _ -> error "There are onode incomming edges which do not start from a true/false port"
+
+
+trueONodeDeps :: [(PGNode, PGEdge)] -> [(PG.PGNode,PG.PGEdge)]
 trueONodeDeps deps = true_deps
     where groups  = L.groupBy ((==) `on` depNodeId) deps
           depNodeId ((nid,_), _) = nid
@@ -823,8 +852,7 @@ trueONodeDeps deps = true_deps
           getTrueDep ds = case length depsl of
                             0 -> error $ "No true port for node: " ++ ( nLabel . snd . fst) (ds !! 0)
                             1 -> depsl !! 0
-               where depsl = filter ((L.isSuffixOf "true")  . depPortName) ds
-                     -- depsl = filter ((=="true")  . depPortName) ds
+               where depsl = filter (isTruePort  . depPortName) ds
 
 -- predicate constructors
 data PredBuild = PredBuild {
