@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Dragonet.Embedding(
     embeddingRxTx,
     embeddingRxTx2
