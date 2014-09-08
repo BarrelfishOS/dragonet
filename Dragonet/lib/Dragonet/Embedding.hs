@@ -102,8 +102,7 @@ embeddingRxTx prg lpg = embg'
 --  from the PRG Rx nodes we will not end up in the PRG Tx nodes
 
 -- TODO:
---  . predicates
---  . multiple queues
+--  . a newtype for LPG/PRG/Emb nodes might be useful
 
 embeddingRxTx2 :: PG.PGraph -> PG.PGraph -> PG.PGraph
 embeddingRxTx2 prg lpg = curEmb $ ST.execState (doEmbed embedRxTx) st0
@@ -153,12 +152,16 @@ data EmbedSt = EmbedSt {
     -- endpoints in the PRG. This typically happens only in the Rx side.
     , embNodeMap   :: M.Map DGI.Node [EmbNode]
 
+    -- embedded node id -> original lpg node id mapping
+    , embRevLpgMap :: M.Map DGI.Node DGI.Node
+
     -- prg out nodes (Rx)
     , embPrgRx      :: [PG.PGNode]
     , embPrgRxPreds :: [PR.PredExpr]
 
     -- prg in nodes (Tx)
     , embPrgTx :: [PG.PGNode]
+    , embPrgTxOuts :: [PG.PGNode]
     -- lpg Rx/Tx entry/out node
     , embLpgTx :: PG.PGNode
     , embLpgRx :: PG.PGNode
@@ -170,14 +173,14 @@ data EmbedSt = EmbedSt {
     , curDir       :: EmbDirection -- current direction
 }
 
--- start from Rx queue nodes and find the find the sink nodes
+-- start from Rx queue nodes and find the sink nodes
 prgRxNodes :: PG.PGraph -> [PG.PGNode]
 prgRxNodes prg = lnodes
     where start  = map fst $ GH.filterNodesByL isRxQueueNode prg
           nodes  = filter (PGU.isSink_ prg) (DFS.dfs start prg)
           lnodes = [(n, fromJust $ DGI.lab prg n) | n <- nodes]
 
--- Tx queue nodes (and make sure they are source nodes)
+-- Tx queue nodes (and make sure that they are source nodes)
 prgTxNodes :: PG.PGraph -> [PG.PGNode]
 prgTxNodes prg = nodes
     where nodes = map doCheck $ GH.filterNodesByL isTxQueueNode prg
@@ -185,6 +188,17 @@ prgTxNodes prg = nodes
           doCheck (nid,nlbl) = case PGU.isSource_ prg nid of
             True -> (nid,nlbl)
             alse -> error "PRG Tx Queue node is not a source node"
+
+-- Tx out nodes: start from prgTxNodes and for each, find the cooresponding out
+-- node
+prgTxOutNodes :: PG.PGraph -> [PG.PGNode]
+prgTxOutNodes prg = map getOutNode txNodes
+    where txNodes = prgTxNodes prg
+          getOutNode :: PG.PGNode -> PG.PGNode
+          getOutNode n = case filter (PGU.isSink_ prg) (DFS.dfs [fst n] prg) of
+                   []  -> error $ "Cannot find Tx OUT for " ++ (pgName n)
+                   [x] -> (x, fromJust $ DGI.lab prg x)
+                   _   -> error $ "More than one Tx OUT nodes for " ++ (pgName n)
 
 -- lpg should have a single Rx node
 lpgRxNode :: PG.PGraph -> PG.PGNode
@@ -211,9 +225,13 @@ initEmbedSt prg lpg = EmbedSt {
     , curLpg        = lpg
     , curEmb        = prg -- embedding starts with the PRG
     , embNodeMap    = M.empty
+    , embRevLpgMap  = M.empty
+    --
     , embPrgRxPreds = rxPreds
     , embPrgRx      = rxNodes
     , embPrgTx      = prgTxNodes prg
+    , embPrgTxOuts  = txOutNodes
+    --
     , embLpgRx      = lpgRxNode lpg
     , embLpgTx      = lpgTxNode lpg
     , lpgGrayNodes  = undefined
@@ -221,12 +239,81 @@ initEmbedSt prg lpg = EmbedSt {
 }
     where rxNodes = prgRxNodes prg
           rxPreds = map (PR.nodePred prg) rxNodes
+          txOutNodes = prgTxOutNodes prg
 
 -- number of duplicates for each LPG node
 dupsNr :: EmbedSt -> Int
 dupsNr st = case (curDir st) of
               EmbRx -> length $ embPrgRx st
               EmbTx -> length $ embPrgTx st
+
+embCleanup :: Embed ()
+embCleanup = do
+    emb  <- ST.gets curEmb
+    lpg  <- ST.gets origLpg
+    rmap <- ST.gets embRevLpgMap
+    -- TODO: finish cleanup where we check the LPG graph to determine whether a
+    -- node is a sink or a rouce.
+    let  --clEmb = PGU.cleanupGraphWith isSrc isSink emb
+         --isSrc (nid,nlbl) = case M.lookup nid rmap of
+         --     Just x  -> PGU.isSource_ lpg nid
+         --     Nothing -> True --error $ "reverse mapping for node " ++ (PG.nLabel nlbl) ++ " does not exist"
+         --isSink (nid,nlbl) = case M.lookup nid rmap of
+         --     Just x -> PGU.isSink_ lpg nid
+         --     Nothing -> True --error $ "reverse mapping for node " ++ (PG.nLabel nlbl) ++ " does not exist"
+         clEmb = PGU.cleanupGraph emb
+    ST.modify $ \s -> s { curEmb = clEmb }
+    return ()
+
+embOffloadTxNode_ :: PG.PGNode -> Int -> Embed ()
+embOffloadTxNode_ lpgN idx = do
+    nmap   <- ST.gets embNodeMap
+    txOuts <- ST.gets embPrgTxOuts
+    emb    <- ST.gets curEmb
+    let (lpgNid, lpgPGN) = tr lpgN $ "embOffloadTxNode_: " ++ (pgName lpgN) ++ "idx: " ++ (show idx)
+        outName  = show $ pgName txOut
+        offlName = show $ PG.nLabel lpgPGN
+        embN_ = case M.lookup lpgNid nmap of
+            Just xs -> xs !! idx
+            Nothing -> error $ "embOffloadTxNode_: mapping for node " ++ offlName ++ " does not exist"
+        embN  = tr embN_ $ "Trying to offload embedded node" ++ (show embN_)
+        embNid = case embNodeId embN of
+            Just x -> x
+            Nothing -> error $ "embOffloadTxNode_: node " ++ offlName ++ " is not mapped to a NID"
+        -- NB: the embedded graph is initially a copy of the PRG graph, so the
+        -- ides for the embedded PRG nodes remain the same
+        txOut       = txOuts !! idx
+        prOut       = PR.nodePred emb txOut
+        newPrOut    = PR.nodePred newEmb txOut
+        canOffload  = PR.predEquivHard prOut newPrOut
+        msg         = "   Trying to offload TX Node:" ++ offlName ++ "\n" ++
+                      "   predicate before on " ++ outName ++ ": " ++ (show prOut) ++ "\n" ++
+                      "   predicate after  on " ++ outName ++ ": " ++ (show newPrOut) ++ "\n" ++
+                      "   canOffload:" ++ (show canOffload)
+        newEmb      = DGI.delNode embNid emb
+
+    case tr canOffload msg of
+        True -> ST.modify $ \s -> s { curEmb = newEmb}
+        False -> return ()
+
+embOffloadTxNode :: PG.PGNode -> Embed ()
+embOffloadTxNode node = do
+    txOuts_ <- ST.gets embPrgTxOuts
+    let txOuts = tr txOuts_ $ "embOffloadTxNode: txOuts:" ++ (show txOuts_)
+    ST.forM_ [0..(length txOuts)-1] (embOffloadTxNode_ node)
+
+embOffloadTx :: Embed ()
+embOffloadTx = do
+    emb <- ST.gets curEmb
+    lpg <- ST.gets origLpg
+    let candidates = ["TxPCsum"]
+        getLpgN name = case GH.filterNodesByL (\x -> PG.nLabel x == name) lpg of
+            []  -> error $ "LPG node with name " ++ (show name) ++ " does not exist"
+            [x] -> x
+            _   -> error $ "more than one LPG nodes with name " ++ (show name) ++ " exist"
+        lpgNs_ = map getLpgN candidates
+        lpgNs = tr lpgNs_ $ "Offload LPG nodes:" ++ (show lpgNs_)
+    ST.forM_ lpgNs embOffloadTxNode
 
 -- main embedding function
 embedRxTx :: Embed ()
@@ -238,6 +325,8 @@ embedRxTx = do
         True -> return ()
         False -> error "Done, but LPG is not empty"
     embedSpawnEdges
+    embOffloadTx
+    embCleanup
 
 -- prepare state for embedding on the given direction
 initEmbedDir :: EmbDirection -> Embed ()
@@ -419,11 +508,11 @@ embGetNP st (nid, nport) idx = case embGetNodeMap st nid idx of
         True  -> Just (embId, embPort)
         False -> Nothing
 
-doEmbRx :: EmbedSt -> PG.PGContext -> Int -> EmbUpdate
 -- embedding an F-node for Rx
 -- We need to get:
 --  - the predicate for reaching this node
 --  - use it to calculate the incomming edge predicate
+doEmbRx :: EmbedSt -> PG.PGContext -> Int -> EmbUpdate
 doEmbRx st orig_ctx@(ins, nid, fnode@PG.FNode {}, outs) idx = tr ret ("    ret:" ++ (show $ fst ret) ++ " ctx:" ++ (mctxStr $ snd ret))
     where
           lpgN = (nid, fnode)
@@ -534,6 +623,7 @@ doEmb st orig_ctx@(ins,nid,nlbl,outs) idx
 edgePortName_ :: (DGI.Node, PG.Edge) -> PG.NPort
 edgePortName_ (_, PG.Edge { PG.ePort = eport }) = eport
 
+-- add ids to a lst of EmbNodes
 embMapFillIds :: [EmbNode] -> [DGI.Node] -> [EmbNode]
 embMapFillIds [] []                   = []
 embMapFillIds ((EmbNode _):ms) (x:xs) = (EmbNode x):(embMapFillIds ms xs)
@@ -543,12 +633,15 @@ embMapFillIds (m:ms) xs               = m:(embMapFillIds ms xs)
 
 -- update mappings and graph for new embedded nodes
 embUpdate :: PG.PGContext -> [EmbUpdate] -> Embed ()
-embUpdate lpgCtx@(_,nid,nlbl,_) embUpd_ = do
+embUpdate lpgCtx@(_,lpgNid,nlbl,_) embUpd_ = do
     emb  <- ST.gets curEmb
     nmap <- ST.gets embNodeMap
+    rmap <- ST.gets embRevLpgMap
     -- NB: get new node ids and update placeholders before changing state
     let embUpd   = tr embUpd_ $ "Update:" ++ (ppShow embUpd_)
+        -- new ctxs to be added to the embedded graph
         embCtxs  = catMaybes $ map snd embUpd
+        -- this should be a list of dummy ids.
         embNids  = catMaybes $ map (embNodeId . fst) embUpd
         embIds   = case length embNids == length embCtxs of
             True -> DGI.newNodes (length embCtxs) emb
@@ -556,12 +649,21 @@ embUpdate lpgCtx@(_,nid,nlbl,_) embUpd_ = do
         embCtxs' = [ (xins,xid,xlbl,xouts) | (xid,(xins,_,xlbl,xouts)) <- zip embIds embCtxs ]
         embMaps  = embMapFillIds (map fst embUpd) embIds
         newEmb   = foldl (flip (DGI.&)) emb embCtxs'
-        newNMap  = M.insertWith w nid embMaps nmap
-           where w _ _ = error $ "Embedded node: " ++ (PG.nLabel nlbl) ++ " already exists in the node map"
+
+        -- insert an entry to the reverse map. All entries have the same value:
+        -- the node id of the LPG node we are embedding
+        insRmap :: M.Map DGI.Node DGI.Node -> DGI.Node -> M.Map DGI.Node DGI.Node
+        insRmap m embNid = M.insertWith w embNid lpgNid m
+           where w _ _ = error $ "embedded node: " ++ (show embNid) ++ " already exists in the reverse map"
+        newRMap = foldl insRmap rmap embIds
+
+        newNMap  = M.insertWith w lpgNid embMaps nmap
+           where w _ _ = error $ "LPG node: " ++ (PG.nLabel nlbl) ++ " already exists in the node map"
         ndiff = (DGI.noNodes newEmb) - (DGI.noNodes emb)
         msg = "  Adding " ++ (show ndiff) ++ " nodes to the embedded graph"
               ++ "\n    embMaps =" ++ (show embMaps)
     ST.modify $ \s -> (tr s msg) { curEmb = newEmb,
+                                   embRevLpgMap = newRMap,
                                    embNodeMap = newNMap}
     return ()
 

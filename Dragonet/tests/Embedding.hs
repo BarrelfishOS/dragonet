@@ -8,7 +8,7 @@ import qualified Util.GraphHelpers              as GH
 import qualified Graphs.E10k                    as E10k
 import qualified Graphs.LPG                     as LPG
 
-import Dragonet.Embedding (embeddingRxTx, embeddingRxTx2)
+import Dragonet.Embedding
 import Dragonet.DotGenerator (toDot, toDotHighlight)
 import Dragonet.Predicate (PredExpr, nodePred)
 import qualified Dragonet.Predicate as PR
@@ -343,21 +343,31 @@ lpg4 = U.strToGraph [r|
 graph lpg4 {
 
 cluster Ap {
-    node ToSock1 { }
-    node ToSock2 { }
-    node ToSock3 { }
+    node ToSock1 {
+        attr "sink"
+    }
+    node ToSock2 {
+        attr "sink"
+    }
+
+    node ToSock3 {
+        attr "sink"
+    }
 
     node FromSock1 {
+        attr "source"
         port true[.TxP]
         predicate true "pred(prot,p)"
     }
 
     node FromSock2 {
+        attr "source"
         port true[.TxP]
         predicate true "pred(prot,p)"
     }
 
     node FromSock3 {
+        attr "source"
         port true[.TxP]
         predicate true "pred(prot,p)"
     }
@@ -412,17 +422,24 @@ cluster Rx {
         predicate other "and(not(pred(prot,i)),not(pred(prot,p)))"
     }
 
-    node Drop {}
+    node Drop {
+        attr "sink"
+    }
 
     node isPing {
         spawn respose .TxIpong [predicate "pred(prot,i)"]
     }
 
     boolean PCsum {
-        port true false[ToS1 ToS2 ToS3]
+        port true [ToS1 ToS2 ToS3]
+        port false[PCsumFailed]
 
         predicate true "pred(RxPCsum,valid)"
         predicate false "pred(RxPCsum,invalid)"
+    }
+
+    node PCsumFailed {
+        attr "sink"
     }
 
     // we use a true suffix for the AND node
@@ -487,11 +504,13 @@ cluster Tx {
 
     node Out {
         attr "software"
+        attr "sink"
     }
 }
 
 cluster Rx {
     node Queue {
+        attr "source"
         attr "software"
         port out[isP]
     }

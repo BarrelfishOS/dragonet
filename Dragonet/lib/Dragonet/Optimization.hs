@@ -76,10 +76,10 @@ makeGraph' helpers prgC lpg embed_fn implTransforms pla debug = do
     reduced <- doTimeIt "makeGraph.REDUCE" $ SS.reducePG emb helpers
     debug "reduced" $ DbgPGraph reduced
     -- Clean-up graph
-    let cleanedUp = cleanupGraph reduced
+    let cleanedUp = PGU.cleanupGraph reduced
     debug "cleanup" $ DbgPGraph cleanedUp
     -- Apply implementation transforms
-    let implGraph = cleanupGraph $ foldl (\g t -> t g) cleanedUp implTransforms
+    let implGraph = PGU.cleanupGraph $ foldl (\g t -> t g) cleanedUp implTransforms
     debug "implT" $ DbgPGraph implGraph
     -- Drop hardware nodes
     let nohwGraph = dropHardwareNodes implGraph
@@ -150,25 +150,6 @@ dbgDotfiles bdir cl gl d =
             Dir.createDirectoryIfMissing True parent
             writeFile path c
 
-
--- This does not really belong here...
---
--- Remove sources without "source" attribute and sinks without "sink" attribute
-cleanupGraph :: PG.PGraph -> PG.PGraph
-cleanupGraph g
-    | null badNodes = g
-    | otherwise = cleanupGraph g'
-    where
-        hasAttr a n = elem (PG.NAttrCustom a) $ PG.nAttributes n
-        srcs = filter (\(n,_) -> onlySpawnEs n $ DGI.lpre g n) $ DGI.labNodes g
-        snks = filter (\(n,_) -> onlySpawnEs n $ DGI.lsuc g n) $ DGI.labNodes g
-        badSrcs = filter (not . hasAttr "source" . snd) srcs
-        badSnks = filter (not . hasAttr "sink" . snd) snks
-        badNodes = L.nub $ map fst $ badSrcs ++ badSnks
-        g' = DGI.delNodes badNodes g
-        onlySpawnEs n = all isSpawnE
-            where isSpawnE (m,PG.ESpawn {}) = n == m
-                  isSpawnE _ = False
 
 dropHardwareNodes :: PG.PGraph -> PG.PGraph
 dropHardwareNodes pg = DGI.delNodes (S.toList dropNodes) pg

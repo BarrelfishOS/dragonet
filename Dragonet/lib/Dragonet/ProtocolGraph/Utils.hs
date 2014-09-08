@@ -10,7 +10,8 @@ module Dragonet.ProtocolGraph.Utils (
     spawnDeps, isSpawnTarget, edgeDeps, edgePort, edgeSucc,
     isSink_, isSource_,
     isSpawnEdge_, isSpawnEdge,
-    isNormalEdge_, isNormalEdge
+    isNormalEdge_, isNormalEdge,
+    cleanupGraph, cleanupGraphWith
 ) where
 
 import Dragonet.ProtocolGraph
@@ -19,6 +20,7 @@ import Data.Function
 import Data.Maybe
 import Data.List (sortBy, find, isPrefixOf)
 import qualified Data.Set as S
+import qualified Data.List as L
 import qualified Data.Graph.Inductive as DGI
 import qualified Util.GraphHelpers as GH
 import Data.Functor ((<$>))
@@ -121,3 +123,24 @@ edgeSucc gr pre = filter (isNormalEdge . snd) $ GH.labLSucc gr pre
 -- is the node a traget spawn edges
 isSpawnTarget :: PGraph -> PGNode -> Bool
 isSpawnTarget g n = not $ null $ spawnDeps g n
+
+cleanupGraphWith :: (PGNode -> Bool) -> (PGNode -> Bool) -> PGraph -> PGraph
+cleanupGraphWith isSource isSink g
+    | null badNodes = g
+    | otherwise = cleanupGraph g'
+    where
+        srcs = filter (\(n,_) -> onlySpawnEs n $ DGI.lpre g n) $ DGI.labNodes g
+        snks = filter (\(n,_) -> onlySpawnEs n $ DGI.lsuc g n) $ DGI.labNodes g
+        badSrcs = filter (not . isSource ) srcs
+        badSnks = filter (not . isSink   ) snks
+        badNodes = L.nub $ map fst $ badSrcs ++ badSnks
+        g' = DGI.delNodes badNodes g
+        onlySpawnEs n = all isSpawnE
+            where isSpawnE (m,ESpawn {}) = n == m
+                  isSpawnE _ = False
+
+-- Remove sources without "source" attribute and sinks without "sink" attribute
+cleanupGraph :: PGraph -> PGraph
+cleanupGraph = cleanupGraphWith (hasAttr "source" . snd) (hasAttr "sink" . snd)
+    where
+        hasAttr a n = elem (NAttrCustom a) $ nAttributes n
