@@ -35,7 +35,18 @@ trN = \x  _ -> x
 --------------------------------------------------------------------------------
 -- Embedding for both RX and TX path
 
-tagNodes :: String -> PG.PGraph -> PG.PGraph
+-- queue tag (queue identifier)
+type QTag = String
+
+qGetTag :: PG.Node -> QTag
+qGetTag qnode = if isTxQueueNode qnode      then txTag
+                else if isRxQueueNode qnode then rxTag
+                else error "qGetTag called on a non-queue node"
+    where name  = PG.nLabel qnode
+          txTag = qTag $ drop (length txQPref) name
+          rxTag = qTag $ drop (length rxQPref) name
+
+tagNodes :: QTag -> PG.PGraph -> PG.PGraph
 tagNodes tag = DGI.nmap tagN
     where tagN n = n { PG.nTag = tag }
 
@@ -158,10 +169,12 @@ data EmbedSt = EmbedSt {
     -- prg out nodes (Rx)
     , embPrgRx      :: [PG.PGNode]
     , embPrgRxPreds :: [PR.PredExpr]
+    , embPrgRxTags  :: [String]
 
     -- prg in nodes (Tx)
-    , embPrgTx :: [PG.PGNode]
+    , embPrgTx     :: [PG.PGNode]
     , embPrgTxOuts :: [PG.PGNode]
+    , embPrgTxTags :: [String]
 
     -- lpg Rx/Tx entry/out node
     , embLpgTx :: PG.PGNode
@@ -174,17 +187,26 @@ data EmbedSt = EmbedSt {
     , curDir       :: EmbDirection -- current direction
 }
 
+-- PRG Rx nodes (i.e., points where the LPG will connect to the PRG's RX side)
+-- detection along with their tags
 -- start from Rx queue nodes and find the sink nodes
-prgRxNodes :: PG.PGraph -> [PG.PGNode]
-prgRxNodes prg = lnodes
-    where start  = map fst $ GH.filterNodesByL isRxQueueNode prg
-          nodes  = filter (PGU.isSink_ prg) (DFS.dfs start prg)
-          lnodes = [(n, fromJust $ DGI.lab prg n) | n <- nodes]
+prgRxNodes :: PG.PGraph -> [(PG.PGNode, QTag)]
+prgRxNodes prg = L.concat $ map getQSinks rxQs
+    where rxQs  = GH.filterNodesByL isRxQueueNode prg
+          getN n = (n, fromJust $ DGI.lab prg n)
+          getQSinks :: PG.PGNode -> [(PG.PGNode, QTag)]
+          getQSinks qn =  [ (getN nid, qGetTag $ (snd  qn))
+                            | nid <- DFS.dfs [fst qn] prg
+                            , PGU.isSink_ prg nid ]
 
--- Tx queue nodes (and make sure that they are source nodes)
-prgTxNodes :: PG.PGraph -> [PG.PGNode]
-prgTxNodes prg = nodes
-    where nodes = map doCheck $ GH.filterNodesByL isTxQueueNode prg
+-- PRG Tx nodes (i.e., points where the LPG will connect to the PRG's TX side)
+-- detection along with their corresponding tags.
+--
+-- For now we assume that onlty TxQueue nodes fill that role.
+prgTxNodes :: PG.PGraph -> [(PG.PGNode, QTag)]
+prgTxNodes prg = zip nodes tags
+    where tags  = map (qGetTag . snd) nodes
+          nodes = map doCheck $ GH.filterNodesByL isTxQueueNode prg
           doCheck :: PG.PGNode -> PG.PGNode
           doCheck (nid,nlbl) = case PGU.isSource_ prg nid of
             True -> (nid,nlbl)
@@ -194,12 +216,20 @@ prgTxNodes prg = nodes
 -- node
 prgTxOutNodes :: PG.PGraph -> [PG.PGNode]
 prgTxOutNodes prg = map getOutNode txNodes
-    where txNodes = prgTxNodes prg
+    where txNodes = map fst $ prgTxNodes prg
           getOutNode :: PG.PGNode -> PG.PGNode
           getOutNode n = case filter (PGU.isSink_ prg) (DFS.dfs [fst n] prg) of
                    []  -> error $ "Cannot find Tx OUT for " ++ (pgName n)
                    [x] -> (x, fromJust $ DGI.lab prg x)
                    _   -> error $ "More than one Tx OUT nodes for " ++ (pgName n)
+
+qTagNodes :: PG.PGraph -> [(PG.PGNode, QTag)] -> PG.PGraph
+qTagNodes gr ntags = DGI.gmap mapfn gr
+    where ntags' = [ (nid, qtag) | ((nid,nlbl),qtag) <- ntags]
+          mapfn ctx@(ins,nid,nlbl,outs) = case L.lookup nid ntags' of
+            Just tag -> (ins, nid, nlbl { PG.nTag = tag }, outs)
+            Nothing  -> ctx
+
 
 -- lpg should have a single Rx node
 lpgRxNode :: PG.PGraph -> PG.PGNode
@@ -224,12 +254,14 @@ initEmbedSt prg lpg = EmbedSt {
       embPrg        = prg
     , origLpg       = lpg
     , curLpg        = lpg
-    , curEmb        = prg -- embedding starts with the PRG
+    , curEmb        = taggedPrg -- embedding starts with the PRG
     , embNodeMap    = M.empty
     , embRevLpgMap  = M.empty
     --
     , embPrgRx      = rxNodes
-    , embPrgTx      = prgTxNodes prg
+    , embPrgTx      = txNodes
+    , embPrgRxTags  = rxTags
+    , embPrgTxTags  = txTags
     , embPrgRxPreds = rxPreds
     , embPrgTxOuts  = txOutNodes
     --
@@ -238,9 +270,11 @@ initEmbedSt prg lpg = EmbedSt {
     , lpgGrayNodes  = undefined
     , curDir        = undefined
 }
-    where rxNodes = prgRxNodes prg
+    where (rxNodes, rxTags) = unzip $ prgRxNodes prg
+          (txNodes, txTags) = unzip $ prgTxNodes prg
           rxPreds = map (PR.nodePred prg) rxNodes
           txOutNodes = prgTxOutNodes prg
+          taggedPrg  = qTagNodes prg ((prgRxNodes prg) ++ (prgTxNodes prg))
 
 -- number of duplicates for each LPG node
 dupsNr :: EmbedSt -> Int
@@ -609,12 +643,16 @@ mkEmbCtx st ctx@(ins,nid,nlbl,outs) embN dir idx  = case embId of
     Nothing -> Nothing
     Just x  -> Just newCtx
     where newCtx = case dir of
-                     EmbTx -> ([],     embId', nlbl, embOuts)
-                     EmbRx -> (embIns, embId', nlbl, [])
+                     EmbTx -> ([],     embId', nlbl_tag, embOuts)
+                     EmbRx -> (embIns, embId', nlbl_tag, [])
           embOuts  = embAdj st idx $ filter (PGU.isNormalEdge_ . fst) outs
           embIns   = embAdj st idx $ filter (PGU.isNormalEdge_ . fst) ins
           embId    = embNodeId embN
           embId'   = fromJust embId
+          qtag     = case dir of
+                       EmbTx -> (embPrgTxTags st) !! idx
+                       EmbRx -> (embPrgRxTags st) !! idx
+          nlbl_tag = nlbl { PG.nTag = qtag }
 
 edgePortName_ :: (DGI.Node, PG.Edge) -> PG.NPort
 edgePortName_ (_, PG.Edge { PG.ePort = eport }) = eport
