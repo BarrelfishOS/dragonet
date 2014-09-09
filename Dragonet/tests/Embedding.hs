@@ -32,6 +32,8 @@ import Text.Printf (printf)
 
 import Test.HUnit
 
+embeddingX = embeddingRxTx2
+
 -- OneOf is a special case of the OR node
 --  only one incoming edge per node (interpreted as true)
 --  only outgoing edges on the true output
@@ -55,7 +57,7 @@ duplicateOR gr n@(_, onode@(PG.ONode { PG.nOperator = op }))
     where succ_edges = PGU.edgeSucc gr n
 
 ------------------------------------------------------------------------------
-t1 = embTest "multiple queues (prg1,lpg1)" prg1 lpg1 emb1
+t1 = embTest "multiple queues (prg1,lpg1)" prg1 lpg1 emb1 "1"
 ------------------------------------------------------------------------------
 
 myPrgCfg = [ ("RxQueues", PG.CVInt 2),
@@ -69,9 +71,11 @@ graph prg1 {
     config RxQueues {
         attr "software"
         spawn poll RxQueues
-        port out[] port drop[] port init[] }
+        port out[] }
 
-    config TxQueues { attr "software" }
+    config TxQueues {
+        attr "software"
+    }
 }
 |]
 
@@ -79,7 +83,7 @@ lpg1 :: PG.PGraph
 lpg1 = U.strToGraph [r|
 graph lpg1 {
     node TxA { port out[TxQueue] }
-    node RxQueue {}
+    node RxQueue { port out[] }
     node TxQueue {}
 }
 |]
@@ -107,9 +111,9 @@ nodeSet g = Set.fromList [nodeToTuple g n | n <- DGI.labNodes g]
                                    L.sort $ [nodeName x | (_,x) <- GH.labPre g pn],
                                    L.sort $ [nodeName x | (_,x) <- GH.labSuc g pn])
 
-embTest msg prg lpg expect =
+embTest msg prg lpg expect fname_suffix =
  TestLabel ("Embedding: " ++ msg) $ TestCase $ do
-    let emb      = embeddingRxTx prg lpg
+    let emb      = embeddingX prg lpg
         embSet   = nodeSet emb
         expectSet = nodeSet expect
         cond      = (DGI.noNodes emb) == (DGI.noNodes expect) && expectSet == embSet
@@ -118,6 +122,10 @@ embTest msg prg lpg expect =
                     "result:   \n" ++ (ppShow embSet) ++ "\n" ++
                     "expected: \n" ++ (ppShow expectSet) ++ "\n" ++
                     "embdump:   "
+
+    writeFile ("tests/lpg" ++ fname_suffix ++ ".dot") $ toDot lpg
+    writeFile ("tests/prg" ++ fname_suffix ++ ".dot") $ toDot prg
+    writeFile ("tests/emb" ++ fname_suffix ++ ".dot") $ toDot emb
 
     errmsg <- case cond of
         True  -> return "SUCCESS"
@@ -343,31 +351,21 @@ lpg4 = U.strToGraph [r|
 graph lpg4 {
 
 cluster Ap {
-    node ToSock1 {
-        attr "sink"
-    }
-    node ToSock2 {
-        attr "sink"
-    }
-
-    node ToSock3 {
-        attr "sink"
-    }
+    node ToSock1 {}
+    node ToSock2 {}
+    node ToSock3 {}
 
     node FromSock1 {
-        attr "source"
         port true[.TxP]
         predicate true "pred(prot,p)"
     }
 
     node FromSock2 {
-        attr "source"
         port true[.TxP]
         predicate true "pred(prot,p)"
     }
 
     node FromSock3 {
-        attr "source"
         port true[.TxP]
         predicate true "pred(prot,p)"
     }
@@ -422,9 +420,7 @@ cluster Rx {
         predicate other "and(not(pred(prot,i)),not(pred(prot,p)))"
     }
 
-    node Drop {
-        attr "sink"
-    }
+    node Drop {}
 
     node isPing {
         spawn respose .TxIpong [predicate "pred(prot,i)"]
@@ -439,7 +435,6 @@ cluster Rx {
     }
 
     node PCsumFailed {
-        attr "sink"
     }
 
     // we use a true suffix for the AND node
@@ -504,13 +499,11 @@ cluster Tx {
 
     node Out {
         attr "software"
-        attr "sink"
     }
 }
 
 cluster Rx {
     node Queue {
-        attr "source"
         attr "software"
         port out[isP]
     }
@@ -518,7 +511,7 @@ cluster Rx {
     node isP {
         attr "software"
         port p[PCsum]
-        port o[Out0]
+        port o[Out_]
 
         predicate p "pred(prot,p)"
         predicate o "not(pred(prot,p))"
@@ -538,7 +531,7 @@ cluster Rx {
         attr "software"
         port out[]
     }
-    node Out0 {
+    node Out_ {
         attr "software"
         port out[]
     }
@@ -555,9 +548,10 @@ t4 = embTests (prg4,lpg4) [] "prg4/lpg4 checks"
 
 tests =
  TestList [
-    --test0, test0',
-    --t1, t2, t3
-    t4
+      test0
+    , test0'
+    , t1 --, t2, t3
+    --t4
  ]
 
 lpgT = LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
@@ -582,11 +576,12 @@ prPred gr s = do
 
 
 main = do
-
+    {--
     writeFile "tests/prg4.dot" $ toDot prg4
     writeFile "tests/lpg4.dot" $ toDot lpg4
     let emb4 = embeddingRxTx2 prg4 lpg4
     writeFile "tests/emb4.dot" $ toDot emb4
+    --}
 
     --prPred emb4 "RxQueue"
     --prPred emb4 "RxisPing"
@@ -599,7 +594,7 @@ main = do
     --writeFile "tests/prg3.dot" $ toDot prg3
     --writeFile "tests/lpgYYY.dot" $ toDot lpgC
 
-    --runTestTT tests
+    runTestTT tests
 
     {--
     --prPred lpgC "TxL3ARPInitiateResponse"

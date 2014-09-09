@@ -29,7 +29,7 @@ import Control.Exception.Base (assert)
 import Debug.Trace (trace)
 import Text.Show.Pretty (ppShow)
 
-tr = flip $ trace
+tr = flip trace
 trN = \x  _ -> x
 
 --------------------------------------------------------------------------------
@@ -149,7 +149,7 @@ data EmbedSt = EmbedSt {
 
     -- We maintain a map from LPG nodes to a list of embedded nodes. There are
     -- more than one nodes when we duplicate nodes for dealing with multiple
-    -- endpoints in the PRG. This typically happens only in the Rx side.
+    -- endpoints in the PRG.
     , embNodeMap   :: M.Map DGI.Node [EmbNode]
 
     -- embedded node id -> original lpg node id mapping
@@ -162,6 +162,7 @@ data EmbedSt = EmbedSt {
     -- prg in nodes (Tx)
     , embPrgTx :: [PG.PGNode]
     , embPrgTxOuts :: [PG.PGNode]
+
     -- lpg Rx/Tx entry/out node
     , embLpgTx :: PG.PGNode
     , embLpgRx :: PG.PGNode
@@ -227,9 +228,9 @@ initEmbedSt prg lpg = EmbedSt {
     , embNodeMap    = M.empty
     , embRevLpgMap  = M.empty
     --
-    , embPrgRxPreds = rxPreds
     , embPrgRx      = rxNodes
     , embPrgTx      = prgTxNodes prg
+    , embPrgRxPreds = rxPreds
     , embPrgTxOuts  = txOutNodes
     --
     , embLpgRx      = lpgRxNode lpg
@@ -252,16 +253,19 @@ embCleanup = do
     emb  <- ST.gets curEmb
     lpg  <- ST.gets origLpg
     rmap <- ST.gets embRevLpgMap
-    -- TODO: finish cleanup where we check the LPG graph to determine whether a
-    -- node is a sink or a rouce.
-    let  --clEmb = PGU.cleanupGraphWith isSrc isSink emb
-         --isSrc (nid,nlbl) = case M.lookup nid rmap of
-         --     Just x  -> PGU.isSource_ lpg nid
-         --     Nothing -> True --error $ "reverse mapping for node " ++ (PG.nLabel nlbl) ++ " does not exist"
-         --isSink (nid,nlbl) = case M.lookup nid rmap of
-         --     Just x -> PGU.isSink_ lpg nid
-         --     Nothing -> True --error $ "reverse mapping for node " ++ (PG.nLabel nlbl) ++ " does not exist"
-         clEmb = PGU.cleanupGraph emb
+    -- We check the LPG graph to determine whether a node is a sink or a source.
+    -- If a reverse mapping does not exist, then this must be a  PRG node, so we
+    -- just return True so that cleanupGraphWith does not remove it
+    let  clEmb = PGU.cleanupGraphWith isSrc isSink emb
+         isSrc (nid,nlbl) = ret --tr ret ("Checking if " ++ (show $ PG.nLabel nlbl) ++ "(" ++ (show nid) ++ ") is a source node: " ++ (show ret))
+            where ret = case M.lookup nid rmap of
+                          Just x  -> PGU.isSource_ lpg x
+                          Nothing -> True
+         isSink (nid,nlbl) = ret --tr ret ("Checking if " ++ (show $ PG.nLabel nlbl) ++ "(" ++ (show nid) ++ ") is a sink node: " ++ (show ret))
+            where ret = case M.lookup nid rmap of
+                          Just x  -> PGU.isSink_ lpg x
+                          Nothing -> True
+         --clEmb = PGU.cleanupGraph emb
     ST.modify $ \s -> s { curEmb = clEmb }
     return ()
 
@@ -281,14 +285,14 @@ embOffloadTxNode_ lpgN idx = do
             Just x -> x
             Nothing -> error $ "embOffloadTxNode_: node " ++ offlName ++ " is not mapped to a NID"
         -- NB: the embedded graph is initially a copy of the PRG graph, so the
-        -- ides for the embedded PRG nodes remain the same
+        -- ids for the embedded PRG nodes remain the same
         txOut       = txOuts !! idx
         prOut       = PR.nodePred emb txOut
         newPrOut    = PR.nodePred newEmb txOut
         canOffload  = PR.predEquivHard prOut newPrOut
         msg         = "   Trying to offload TX Node:" ++ offlName ++ "\n" ++
-                      "   predicate before on " ++ outName ++ ": " ++ (show prOut) ++ "\n" ++
-                      "   predicate after  on " ++ outName ++ ": " ++ (show newPrOut) ++ "\n" ++
+                      --"   predicate before on " ++ outName ++ ": " ++ (show prOut) ++ "\n" ++
+                      --"   predicate after  on " ++ outName ++ ": " ++ (show newPrOut) ++ "\n" ++
                       "   canOffload:" ++ (show canOffload)
         newEmb      = DGI.delNode embNid emb
 
@@ -304,16 +308,23 @@ embOffloadTxNode node = do
 
 embOffloadTx :: Embed ()
 embOffloadTx = do
+    emb   <- ST.gets curEmb
+    lpg   <- ST.gets origLpg
+    prg   <- ST.gets embPrg
+    lpgTx <- ST.gets embLpgTx
+    let lpgTxNs = filter (not . isTxQueueNode . snd) $  PGU.pgRDfsNEs lpg [lpgTx]
+        prgNs = DGI.labNodes prg
+        -- NB: intersectBy keeps the element from the first list
+        candidates_ = L.intersectBy ((==) `on` pgName) lpgTxNs prgNs
+        candidates  = tr candidates_ ("===> Tx Offload candidates:" ++ (show $ map pgName candidates_))
+    ST.forM_ candidates embOffloadTxNode
+    return ()
+
+prEmbed :: String -> Embed ()
+prEmbed prefix = do
     emb <- ST.gets curEmb
-    lpg <- ST.gets origLpg
-    let candidates = ["TxPCsum"]
-        getLpgN name = case GH.filterNodesByL (\x -> PG.nLabel x == name) lpg of
-            []  -> error $ "LPG node with name " ++ (show name) ++ " does not exist"
-            [x] -> x
-            _   -> error $ "more than one LPG nodes with name " ++ (show name) ++ " exist"
-        lpgNs_ = map getLpgN candidates
-        lpgNs = tr lpgNs_ $ "Offload LPG nodes:" ++ (show lpgNs_)
-    ST.forM_ lpgNs embOffloadTxNode
+    let emb' = tr emb ("\n---" ++ prefix ++ ": Current Embedded Graph--\n" ++ (ppShow emb))
+    ST.modify $ \s ->  s { curEmb = emb' }
 
 -- main embedding function
 embedRxTx :: Embed ()
@@ -326,6 +337,7 @@ embedRxTx = do
         False -> error "Done, but LPG is not empty"
     embedSpawnEdges
     embOffloadTx
+    prEmbed "Before cleanup"
     embCleanup
 
 -- prepare state for embedding on the given direction
@@ -468,8 +480,6 @@ embNodePortActive (EmbNodePartial _ ps) port = port `elem` ps
 embNodeEdgeActive :: EmbNode -> PG.Edge -> Bool
 embNodeEdgeActive node (PG.Edge {PG.ePort = port}) = embNodePortActive node port
 
-type EmbUpdate = (EmbNode, Maybe PG.PGContext)
-
 embRxNode :: EmbedSt -> PG.PGNode -> Int -> (DGI.Node, PG.NPort) -> EmbNode
 embRxNode st node@(nid, fnode@(PG.FNode {})) idx (prevId, prevPort)
     | spawnTarget = EmbNode embIdDummy
@@ -512,8 +522,8 @@ embGetNP st (nid, nport) idx = case embGetNodeMap st nid idx of
 -- We need to get:
 --  - the predicate for reaching this node
 --  - use it to calculate the incomming edge predicate
-doEmbRx :: EmbedSt -> PG.PGContext -> Int -> EmbUpdate
-doEmbRx st orig_ctx@(ins, nid, fnode@PG.FNode {}, outs) idx = tr ret ("    ret:" ++ (show $ fst ret) ++ " ctx:" ++ (mctxStr $ snd ret))
+doEmbRx :: EmbedSt -> PG.PGContext -> Int -> EmbNode
+doEmbRx st orig_ctx@(ins, nid, fnode@PG.FNode {}, outs) idx = ret
     where
           lpgN = (nid, fnode)
           -- get previous  node id, label, and label from the LPG
@@ -532,17 +542,8 @@ doEmbRx st orig_ctx@(ins, nid, fnode@PG.FNode {}, outs) idx = tr ret ("    ret:"
           portActive_ = embNodePortActive prevEmb prevPort
           portActive = tr portActive_ ("\n    portactive: " ++ (show portActive_))
           ret = case portActive of
-              False -> emptyRet
-              True  -> case embN of
-                  EmbNodeRemoved      -> error "This is not supposed to happen"
-                  EmbNode _           -> (embN, Just newCtxRx)
-                  EmbNodePartial _ _  -> (embN, Just newCtxRx)
-                  EmbNodeRedundant _ _ -> (embN, Nothing)
-
-          emptyRet = (EmbNodeRemoved, Nothing)
-          embId = embIdDummy
-          newCtxRx = (embIns, embId, fnode, [])
-          embIns = embAdj st idx $ filter (PGU.isNormalEdge_ . fst) ins
+              False -> EmbNodeRemoved
+              True  -> embN
 
 -- embedding an O-node for Rx
 doEmbRx st orig_ctx@(ins, nid, onode@PG.ONode { PG.nOperator = op}, outs) idx = ret
@@ -562,8 +563,8 @@ doEmbRx st orig_ctx@(ins, nid, onode@PG.ONode { PG.nOperator = op}, outs) idx = 
    predCache = embRxPredCache st idx
 
    getDepPred :: (DGI.Node, PG.Edge) -> PR.PredExpr
-   getDepPred (nid, PG.Edge { PG.ePort = port }) = ret
-       where ret  = PR.depPredCache (origLpg st) ((nid,node), port) predCache
+   getDepPred (nid, PG.Edge { PG.ePort = port }) = p
+       where p  = PR.depPredCache (origLpg st) ((nid,node), port) predCache
              node = fromJust $ DGI.lab (origLpg st) nid
    t_preds = map getDepPred t_prevs
    f_preds = map getDepPred f_prevs
@@ -576,49 +577,44 @@ doEmbRx st orig_ctx@(ins, nid, onode@PG.ONode { PG.nOperator = op}, outs) idx = 
          "    pred_port_f=" ++ (show pred_port_f) ++ "\n" ++
          "    t_preds=" ++ (show t_preds) ++ "\n" ++
          "    f_preds=" ++ (show f_preds) ++ "\n" ++
-         "    embNode=" ++ (show $ fst ret_) ++ "\n"
+         "    embNode=" ++ (show $ ret_) ++ "\n"
 
    ret = tr ret_ msg
-   ret_ = if all_inactive then emptyRet
-          else if t_port_false && f_port_false then emptyRet
+   ret_ = if all_inactive then EmbNodeRemoved
+          else if t_port_false && f_port_false then EmbNodeRemoved
           else if f_port_false then trueRet
           else if t_port_false then falseRet
-          else fullRet
+          else EmbNode embId
 
    -- only the true (false) port is active
    t_prevX = L.find ((PR.predEquivHard pred_port_t) . snd)  (zip t_prevs t_preds)
    trueRet  = case t_prevX of
-              Just x  -> ((EmbNodeRedundant "true" np'), Nothing)
+              Just x  -> EmbNodeRedundant "true" np'
                  where n = (fst . fst) x
                        p = edgePortName_ $ (fst x)
                        np' = fromJust $ embGetNP st (n, p) idx
-              Nothing -> (EmbNodePartial embId ["true"], Just newCtxRx)
-   falseRet = (EmbNodePartial embId ["false"], Just newCtxRx)
+              Nothing -> EmbNodePartial embId ["true"]
+   falseRet = EmbNodePartial embId ["false"]
    -- node will not be enabled
    emptyRet = (EmbNodeRemoved, Nothing)
-
-   fullRet  = (EmbNode embId, Just newCtxRx)
-   newCtxRx = (embIns, embId, onode, [])
    embId    = embIdDummy
-   embIns   = embAdj st idx $ filter (PGU.isNormalEdge_ . fst) ins
 
 embGetNodeMap :: EmbedSt -> DGI.Node -> Int -> EmbNode
 embGetNodeMap st nid idx = case M.lookup nid (embNodeMap st) of
     Just ids -> ids !! idx
     Nothing  -> error "Map does not exist"
 
-doEmb :: EmbedSt -> PG.PGContext -> Int -> EmbUpdate
-doEmb st orig_ctx@(ins,nid,nlbl,outs) idx
-    -- One the Tx side, we always embed the node
-    | (curDir st) == EmbTx = (EmbNode embId, Just newCtxTx)
-    -- Rx
-    | (curDir st) == EmbRx = doEmbRx st orig_ctx idx
-    -- | (curDir st) == EmbRx = (EmbNode embId, Just newCtxRx)
-    where embId    = embIdDummy
-          newCtxTx = ([]    , embId, nlbl, embOuts)
-          newCtxRx = (embIns, embId, nlbl, [])
+mkEmbCtx :: EmbedSt -> PG.PGContext -> EmbNode -> EmbDirection -> Int -> Maybe PG.PGContext
+mkEmbCtx st ctx@(ins,nid,nlbl,outs) embN dir idx  = case embId of
+    Nothing -> Nothing
+    Just x  -> Just newCtx
+    where newCtx = case dir of
+                     EmbTx -> ([],     embId', nlbl, embOuts)
+                     EmbRx -> (embIns, embId', nlbl, [])
           embOuts  = embAdj st idx $ filter (PGU.isNormalEdge_ . fst) outs
           embIns   = embAdj st idx $ filter (PGU.isNormalEdge_ . fst) ins
+          embId    = embNodeId embN
+          embId'   = fromJust embId
 
 edgePortName_ :: (DGI.Node, PG.Edge) -> PG.NPort
 edgePortName_ (_, PG.Edge { PG.ePort = eport }) = eport
@@ -630,26 +626,20 @@ embMapFillIds ((EmbNode _):ms) (x:xs) = (EmbNode x):(embMapFillIds ms xs)
 embMapFillIds ((EmbNodePartial _ ps):ms) (x:xs) = (EmbNodePartial x ps):(embMapFillIds ms xs)
 embMapFillIds (m:ms) xs               = m:(embMapFillIds ms xs)
 
-
 -- update mappings and graph for new embedded nodes
-embUpdate :: PG.PGContext -> [EmbUpdate] -> Embed ()
-embUpdate lpgCtx@(_,lpgNid,nlbl,_) embUpd_ = do
+embUpdate :: PG.PGContext -> [EmbNode] -> Embed ()
+embUpdate lpgCtx@(_,lpgNid,nlbl,_) embNs_ = do
+    st   <- ST.get
+    dir  <- ST.gets curDir
     emb  <- ST.gets curEmb
     nmap <- ST.gets embNodeMap
     rmap <- ST.gets embRevLpgMap
-    -- NB: get new node ids and update placeholders before changing state
-    let embUpd   = tr embUpd_ $ "Update:" ++ (ppShow embUpd_)
-        -- new ctxs to be added to the embedded graph
-        embCtxs  = catMaybes $ map snd embUpd
-        -- this should be a list of dummy ids.
-        embNids  = catMaybes $ map (embNodeId . fst) embUpd
-        embIds   = case length embNids == length embCtxs of
-            True -> DGI.newNodes (length embCtxs) emb
-            False -> error "length of new ctxes does not match length of new ids"
-        embCtxs' = [ (xins,xid,xlbl,xouts) | (xid,(xins,_,xlbl,xouts)) <- zip embIds embCtxs ]
-        embMaps  = embMapFillIds (map fst embUpd) embIds
-        newEmb   = foldl (flip (DGI.&)) emb embCtxs'
-
+    let -- allocate ids for the embedded graph
+        embIds   = DGI.newNodes (length $ catMaybes $ map embNodeId embNs_) emb
+        -- update embedded nodes
+        embNs   = embMapFillIds embNs_ embIds
+        embCtxs = catMaybes [ mkEmbCtx st lpgCtx embN dir idx | (idx, embN) <- zip [0..] embNs ]
+        newEmb   = foldl (flip (DGI.&)) emb embCtxs
         -- insert an entry to the reverse map. All entries have the same value:
         -- the node id of the LPG node we are embedding
         insRmap :: M.Map DGI.Node DGI.Node -> DGI.Node -> M.Map DGI.Node DGI.Node
@@ -657,11 +647,11 @@ embUpdate lpgCtx@(_,lpgNid,nlbl,_) embUpd_ = do
            where w _ _ = error $ "embedded node: " ++ (show embNid) ++ " already exists in the reverse map"
         newRMap = foldl insRmap rmap embIds
 
-        newNMap  = M.insertWith w lpgNid embMaps nmap
+        newNMap  = M.insertWith w lpgNid embNs nmap
            where w _ _ = error $ "LPG node: " ++ (PG.nLabel nlbl) ++ " already exists in the node map"
         ndiff = (DGI.noNodes newEmb) - (DGI.noNodes emb)
         msg = "  Adding " ++ (show ndiff) ++ " nodes to the embedded graph"
-              ++ "\n    embMaps =" ++ (show embMaps)
+              -- ++ "\n    embMaps =" ++ (show embMaps)
     ST.modify $ \s -> (tr s msg) { curEmb = newEmb,
                                    embRevLpgMap = newRMap,
                                    embNodeMap = newNMap}
@@ -669,11 +659,16 @@ embUpdate lpgCtx@(_,lpgNid,nlbl,_) embUpd_ = do
 
 embedNode :: PG.PGContext -> Embed ()
 embedNode ctx = do
-    st <- ST.get
+    st  <- ST.get
     len <- ST.gets dupsNr
-    let u = [doEmb st ctx idx | idx <-  [0..len-1]]
-    embUpdate ctx u
-    return ()
+    embUpdate ctx [doEmb st ctx idx | idx <- [0..len-1]]
+
+doEmb :: EmbedSt -> PG.PGContext -> Int -> EmbNode
+doEmb st orig_ctx@(ins,nid,nlbl,outs) idx
+    -- One the Tx side, we always embed the node
+    | (curDir st) == EmbTx = EmbNode embIdDummy
+    -- Rx
+    | (curDir st) == EmbRx = doEmbRx st orig_ctx idx
 
 embIsQueueNode :: EmbDirection -> PG.Node -> Bool
 embIsQueueNode EmbRx = isRxQueueNode

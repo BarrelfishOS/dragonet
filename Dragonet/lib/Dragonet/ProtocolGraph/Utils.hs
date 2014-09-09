@@ -11,7 +11,8 @@ module Dragonet.ProtocolGraph.Utils (
     isSink_, isSource_,
     isSpawnEdge_, isSpawnEdge,
     isNormalEdge_, isNormalEdge,
-    cleanupGraph, cleanupGraphWith
+    cleanupGraph, cleanupGraphWith,
+    pgDfsNEs, pgRDfsNEs
 ) where
 
 import Dragonet.ProtocolGraph
@@ -22,8 +23,13 @@ import Data.List (sortBy, find, isPrefixOf)
 import qualified Data.Set as S
 import qualified Data.List as L
 import qualified Data.Graph.Inductive as DGI
+import qualified Data.Graph.Inductive.Query.DFS as DFS
 import qualified Util.GraphHelpers as GH
 import Data.Functor ((<$>))
+
+import Debug.Trace (trace)
+tr = flip trace
+trN = \x  _ -> x
 
 -- Remove all spawn edges from the graph
 dropSpawnEdges :: PGraph -> PGraph
@@ -127,7 +133,7 @@ isSpawnTarget g n = not $ null $ spawnDeps g n
 cleanupGraphWith :: (PGNode -> Bool) -> (PGNode -> Bool) -> PGraph -> PGraph
 cleanupGraphWith isSource isSink g
     | null badNodes = g
-    | otherwise = cleanupGraph g'
+    | otherwise = cleanupGraphWith isSource isSink g'
     where
         srcs = filter (\(n,_) -> onlySpawnEs n $ DGI.lpre g n) $ DGI.labNodes g
         snks = filter (\(n,_) -> onlySpawnEs n $ DGI.lsuc g n) $ DGI.labNodes g
@@ -144,3 +150,23 @@ cleanupGraph :: PGraph -> PGraph
 cleanupGraph = cleanupGraphWith (hasAttr "source" . snd) (hasAttr "sink" . snd)
     where
         hasAttr a n = elem (NAttrCustom a) $ nAttributes n
+
+-- DFS but only considering normal edges
+pgDfsNEs :: PGraph -> [PGNode] -> [PGNode]
+pgDfsNEs graph start = DFS.xdfsWith getNext getResult start' graph
+    where start' = map fst start
+          getNext :: PGContext -> [DGI.Node]
+          getNext ctx@(_, _, _, outs) = map snd outs'
+              where outs' = filter (isNormalEdge_ . fst) outs
+          getResult :: PGContext -> PGNode
+          getResult ctx@(_, nid, nlbl, _) = (nid,nlbl)
+--
+-- reversed DFS but only considering normal edges
+pgRDfsNEs :: PGraph -> [PGNode] -> [PGNode]
+pgRDfsNEs graph start = DFS.xdfsWith getNext getResult start' graph
+    where start' = map fst start
+          getNext :: PGContext -> [DGI.Node]
+          getNext ctx@(ins, _, _, _) = map snd ins'
+              where ins' = filter (isNormalEdge_ . fst) ins
+          getResult :: PGContext -> PGNode
+          getResult ctx@(_, nid, nlbl, _) = (nid,nlbl)
