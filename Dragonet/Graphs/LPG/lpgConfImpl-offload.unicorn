@@ -8,7 +8,11 @@ graph lpg {
             attr "source"
             port out[L2EtherClassified]
             port drop[]
-            port init[.TxL3ARPSendGratuitous]
+            port init[Init]
+        }
+
+        node Init {
+            spawn init .TxL3ARPSendGratuitous
         }
 
         /*******************************************/
@@ -83,18 +87,30 @@ graph lpg {
                 port true false[NeedsResponse] }
 
             and NeedsResponse {
-                port true[..TxL3ARPInitiateResponse]
+                port true[InitResponse]
                 port false[] }
 
+            node InitResponse {
+                spawn responose ..TxL3ARPInitiateResponse
+            }
+
             boolean ValidResponse {
-                port true false[ValidPendingResponse IsPending] }
+                port true[IsPending]
+                port false[]
+            }
 
             boolean IsPending {
                 port true false[ValidPendingResponse] }
 
             and ValidPendingResponse {
-                port true[..TxL3ARPProcessPendingResponse]
+                port true[ProcessPendingResponse]
                 port false[] }
+
+            // for now we hard-code that the restart operation will result in an IPv4 packet
+            node ProcessPendingResponse {
+                spawn restart ..TxL3ARPLookupRequestIn [predicate "pred(EthType,IPv4)"]
+                port out [] }
+
 
         }
 
@@ -127,11 +143,9 @@ graph lpg {
                 port true false[Valid] }
 
             node Classify {
-                port tcp[.L4TCPValidHeaderLength]
                 port udp[.L4UDPValidHeaderLength]
                 port icmp[.L3ICMPValidHeaderLength]
                 port drop[]
-                semantics tcp { (= L4P.TCP (L4.Proto pkt)) }
                 semantics udp { (= L4P.UDP (L4.Proto pkt)) }
                 semantics icmp { (= L4P.ICMP (L4.Proto pkt)) } }
 
@@ -153,7 +167,7 @@ graph lpg {
             port true false[L3IPAndBelowValid] }
 
         and L3IPAndBelowValid {
-            port true false[L3ICMPValid L4TCPValid L4UDPValid] }
+            port true false[L3ICMPValid L4UDPValid] }
 
 
         /*******************************************/
@@ -168,10 +182,10 @@ graph lpg {
                 port true false[Valid] }
 
             and Valid {
-                port true false[NeedsResponse] }
+                port true false[NeedsResponse_] }
 
             boolean IsTypeRequest {
-                port true false[NeedsResponse] }
+                port true false[NeedsResponse_] }
 
             and NeedsResponse_ {
                 port true[NeedsResponse]
@@ -218,156 +232,6 @@ graph lpg {
 
         }
 
-
-        /*******************************************/
-        /* TCP RX                                  */
-
-        cluster L4TCP {
-            boolean ValidHeaderLength {
-                port true false[Valid] }
-
-            and Valid {
-                port true[PortClassifyType]
-                port false[] }
-
-            node PortClassifyType {
-                port static[PortClassifyStatic]
-                port dynamic[PortClassifyDynamic]
-            }
-
-            node PortClassifyStatic {
-//                port appEchoTCP [.EchoAppTCP]
-                port toSocket [SocketClassify]
-                port noSocket [ClosedPortAction]
-            }
-
-            node PortClassifyDynamic {
-            }
-
-            node ClosedPortAction {
-                port out[]
-            }
-
-            cluster Socket {
-
-            node Classify{
-                port srvSocket[ServerSide]
-                port cliSocket[ClientSide]
-//                port closedSocket[...PacketDrop]
-            }
-
-            node ServerSide {
-                // Selects the next edge based on the current state
-                // of socket and without consulting the packet
-
-                port isListen       [IsValidSyn]
-                port isSynRecv      [IsValidSynAckS] // for simultaneous open
-                port isEstablished  [IsDataPacket IsFinSet] // [IsDataPacket IsValidAck IsFin]
-                port isCloseWait    [IsValidFinAck] // FIXME: This transition is pretty much invalid,
-                                            // and should not happen
-                port isLastAck      [IsValidFinAck2]
-                port isClosed       [InClosed] //
-
-            }
-
-            node InClosed {
-            // To handle err condition of packets coming in closed state socket
-                port out[]
-            }
-
-            node ClientSide {
-                port out []
-            }
-
-            boolean IsValidSyn{
-                port true[AddHalfOpenConn]
-                port false[]
-            }
-
-            node AddHalfOpenConn{
-                port success[SendSyn]
-                port failure[] // [SendRst]
-            }
-
-           boolean SendSyn{
-                port true[TCPOutMerge]
-                port false[]
-           }
-
-           boolean IsValidSynAckS {
-                port true[SChangeEstablished]
-                port false[]
-           }
-
-
-           boolean IsValidFinAck {
-                port true[SChangeToClosed]
-                port false[]
-           }
-
-           boolean IsValidFinAck2 {
-                port true[SChangeToClosed2]
-                port false[]
-           }
-
-           boolean SChangeEstablished{
-                //port true[TCPOutMerge]
-                port true[]
-                port false[]
-           }
-
-           boolean IsDataPacket { // FIXME: complete the Implementation
-                port true[CopyData] // [.TxSendAck ]
-                port false[]
-           }
-
-           boolean IsFinSet{ // FIXME: Implement
-                // Copy the data into application buffer
-                port true[SChangeLastAck] // [..NotifyApp]
-                port false[]
-           }
-
-/*           boolean SChangeCloseWait {
-                port true[TCPOutMerge]
-                port false[]
-           }
-*/
-
-           boolean SChangeLastAck{
-                port true[TCPOutMerge]
-                port false[]
-           }
-
-
-           boolean SChangeToClosed{
-                port true[TCPOutMerge]
-                port false[]
-           }
-
-           boolean SChangeToClosed2{
-                port true[]
-                port false[]
-           }
-
-
-           boolean CopyData{
-                // Copy the data into application buffer
-                port true[TCPOutMerge] // [..NotifyApp]
-                port false[]
-           }
-
-            or TCPOutMerge_ {
-                port true[TCPOutMerge]
-                port false[] }
-
-            node TCPOutMerge {
-                spawn response ...TxL4TCPInitiateResponse   [predicate "and(pred(EthType,IPv4),pred(IpProt,TCP))"]
-            }
-
-           } // end cluster: Socket
-
-
-        } // end cluster: L4TCP
     } // end cluster: Rx
 
 
@@ -390,18 +254,6 @@ graph lpg {
             node FillChecksum { port true[Done] }
 
             and Done { port true false[.UDPv4Done] }
-        }
-
-        cluster L4TCP {
-            node InitiateResponse {
-                port out[AllocateHeader]
-                port drop[] }
-
-            node AllocateHeader {
-                port true[FillHeader .L3IPv4Prepare] }
-
-            boolean FillHeader {
-                port true false[.TCPv4Done] }
         }
 
         cluster L3ICMP {
@@ -433,8 +285,8 @@ graph lpg {
             boolean Routing {
                 port true false[.L3ARPLookup] }
 
-            and Done { // UDPv4Done, TCPv4Done
-                    port true false [.UDPv4Done .TCPv4Done]
+            and Done { // UDPv4Done
+                    port true false [.UDPv4Done]
             }
         }
 
@@ -445,11 +297,6 @@ graph lpg {
 
                 predicate true "pred(EthType,ARP)"
             }
-
-            // for now we hard-code that the restart operation will result in an IPv4 packet
-            node ProcessPendingResponse {
-                spawn restart LookupRequestIn [predicate "pred(EthType,IPv4)"]
-                port out [] }
 
             node InitiateResponse {
                 port false true[Prepare]
@@ -495,11 +342,6 @@ graph lpg {
                 port false[]
         }
 
-        and TCPv4Done {
-                port true[L3_AND_L4Done]
-                port false[]
-        }
-
         // L4 and L3 done
         // ICMP/ARP are not technically L4, but ICMP_OR_TCP_OR_UDP_OR_ARP__DONE is probably a more confusing name
         or L3_AND_L4Done {
@@ -525,6 +367,9 @@ graph lpg {
                 port false[]
         }
 
-        node Queue { attr "sink" }
+        node Queue {
+            attr "sink"
+            port out[]
+        }
     }
 }

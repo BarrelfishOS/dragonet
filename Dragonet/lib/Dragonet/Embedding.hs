@@ -252,9 +252,9 @@ lpgTxNode lpg = txnode
 -- initialize embedding state
 initEmbedSt prg lpg = EmbedSt {
       embPrg        = prg
-    , origLpg       = lpg
-    , curLpg        = lpg
-    , curEmb        = taggedPrg -- embedding starts with the PRG
+    , origLpg       = lpg'
+    , curLpg        = lpg'
+    , curEmb        = setOrigin "PRG" taggedPrg -- embedding starts with the PRG
     , embNodeMap    = M.empty
     , embRevLpgMap  = M.empty
     --
@@ -275,6 +275,7 @@ initEmbedSt prg lpg = EmbedSt {
           rxPreds = map (PR.nodePred prg) rxNodes
           txOutNodes = prgTxOutNodes prg
           taggedPrg  = qTagNodes prg ((prgRxNodes prg) ++ (prgTxNodes prg))
+          lpg'       = setOrigin "LPG" lpg
 
 -- number of duplicates for each LPG node
 dupsNr :: EmbedSt -> Int
@@ -314,7 +315,7 @@ embOffloadTxNode_ lpgN idx = do
         embN_ = case M.lookup lpgNid nmap of
             Just xs -> xs !! idx
             Nothing -> error $ "embOffloadTxNode_: mapping for node " ++ offlName ++ " does not exist"
-        embN  = tr embN_ $ "Trying to offload embedded node" ++ (show embN_)
+        embN  = tr embN_ $ "Trying to offload embedded node: " ++ (show embN_)
         embNid = case embNodeId embN of
             Just x -> x
             Nothing -> error $ "embOffloadTxNode_: node " ++ offlName ++ " is not mapped to a NID"
@@ -325,8 +326,8 @@ embOffloadTxNode_ lpgN idx = do
         newPrOut    = PR.nodePred newEmb txOut
         canOffload  = PR.predEquivHard prOut newPrOut
         msg         = "   Trying to offload TX Node:" ++ offlName ++ "\n" ++
-                      --"   predicate before on " ++ outName ++ ": " ++ (show prOut) ++ "\n" ++
-                      --"   predicate after  on " ++ outName ++ ": " ++ (show newPrOut) ++ "\n" ++
+                      "   predicate before on " ++ outName ++ ": " ++ (show prOut) ++ "\n" ++
+                      "   predicate after  on " ++ outName ++ ": " ++ (show newPrOut) ++ "\n" ++
                       "   canOffload:" ++ (show canOffload)
         newEmb      = DGI.delNode embNid emb
 
@@ -371,7 +372,7 @@ embedRxTx = do
         False -> error "Done, but LPG is not empty"
     embedSpawnEdges
     embOffloadTx
-    prEmbed "Before cleanup"
+    --prEmbed "Before cleanup"
     embCleanup
 
 -- prepare state for embedding on the given direction
@@ -408,14 +409,14 @@ embedDir = do
 -- get a list of previous nodes (based on the embedding order)
 embGetPrev_ :: EmbedSt -> DGI.Node -> [DGI.Node]
 embGetPrev_ st = case (curDir st) of
-    EmbRx -> DGI.pre lpg
-    EmbTx -> DGI.suc lpg
+    EmbRx -> PGU.preNE lpg
+    EmbTx -> PGU.sucNE lpg
     where lpg = origLpg st
 
 embGetPrevL_ :: EmbedSt -> DGI.Node -> [(DGI.Node, PG.Edge)]
 embGetPrevL_ st = case (curDir st) of
-    EmbRx -> DGI.lpre lpg
-    EmbTx -> DGI.lsuc lpg
+    EmbRx -> PGU.lpreNE lpg
+    EmbTx -> PGU.lsucNE lpg
     where lpg = origLpg st
 
 embGetPrev :: EmbedSt -> PG.PGNode -> [PG.PGNode]
@@ -425,8 +426,8 @@ embGetPrev st (nid,_) = [ (pid, fromJust $ DGI.lab lpg pid) | pid <- embGetPrev_
 -- get a list of the next nodes (based on the embedding order)
 embGetNext_ :: EmbedSt -> DGI.Node -> [DGI.Node]
 embGetNext_ st = case (curDir st) of
-    EmbRx -> DGI.suc lpg
-    EmbTx -> DGI.pre lpg
+    EmbRx -> PGU.sucNE lpg
+    EmbTx -> PGU.preNE lpg
     where lpg = origLpg st
 
 -- check if a node is ready for embedding
@@ -537,7 +538,7 @@ embRxPredCache :: EmbedSt -> Int -> PR.PredCache
 embRxPredCache st idx = M.singleton (fst $ embLpgRx st) ((embPrgRxPreds st) !! idx)
 
 embRxPred :: EmbedSt -> PG.PGNode -> Int -> PR.PredExpr
-embRxPred st node idx = tr pred ("    Pred: Idx:" ++ (show idx) ++ " node:" ++ (pgName node) ++ " pred:" ++ (show pred))
+embRxPred st node idx = trN pred ("    Pred: Idx:" ++ (show idx) ++ " node:" ++ (pgName node) ++ " pred:" ++ (show pred))
     where predCache = embRxPredCache st idx
           pred = PR.nodePredCache (origLpg st) node predCache
 
@@ -563,7 +564,8 @@ doEmbRx st orig_ctx@(ins, nid, fnode@PG.FNode {}, outs) idx = ret
           -- get previous  node id, label, and label from the LPG
           (prevId, PG.Edge {PG.ePort = prevPort}) = case embGetPrevL_ st nid of
               [x] -> x
-              otherwise -> error "This is unexpected. Giving up!"
+              []  -> error $ "Node " ++ (pgName lpgN) ++ " has zero predecessors"
+              otherwise -> error $ "Node " ++ (pgName lpgN) ++ " has more than one predecessors"
           prevNode = (prevId, fromJust $ DGI.lab (origLpg st) prevId)
 
           -- get the embedded graph node mapping of the previous node
@@ -607,10 +609,10 @@ doEmbRx st orig_ctx@(ins, nid, onode@PG.ONode { PG.nOperator = op}, outs) idx = 
    t_port_false = pred_port_t == PR.PredFalse
    f_port_false = pred_port_f == PR.PredFalse
 
-   msg = "    pred_port_t=" ++ (show pred_port_t) ++ "\n" ++
-         "    pred_port_f=" ++ (show pred_port_f) ++ "\n" ++
-         "    t_preds=" ++ (show t_preds) ++ "\n" ++
-         "    f_preds=" ++ (show f_preds) ++ "\n" ++
+   msg = --"    pred_port_t=" ++ (show pred_port_t) ++ "\n" ++
+         --"    pred_port_f=" ++ (show pred_port_f) ++ "\n" ++
+         --"    t_preds=" ++ (show t_preds) ++ "\n" ++
+         --"    f_preds=" ++ (show f_preds) ++ "\n" ++
          "    embNode=" ++ (show $ ret_) ++ "\n"
 
    ret = tr ret_ msg

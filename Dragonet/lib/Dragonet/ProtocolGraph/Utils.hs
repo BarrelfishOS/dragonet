@@ -12,7 +12,8 @@ module Dragonet.ProtocolGraph.Utils (
     isSpawnEdge_, isSpawnEdge,
     isNormalEdge_, isNormalEdge,
     cleanupGraph, cleanupGraphWith,
-    pgDfsNEs, pgRDfsNEs
+    pgDfsNEs, pgRDfsNEs,
+    sucNE, preNE, lpreNE, lsucNE
 ) where
 
 import Dragonet.ProtocolGraph
@@ -121,6 +122,35 @@ isSink_ gr nid = null $ filter (isNormalEdge_ . snd) (DGI.lsuc gr nid)
 
 isSource_ :: PGraph -> DGI.Node -> Bool
 isSource_ gr nid = null $ filter (isNormalEdge_ . snd) (DGI.lpre gr nid)
+
+-- pre (but only considering normal edges)
+preNE :: PGraph -> DGI.Node -> [DGI.Node]
+preNE gr n = map mapFn $ filter filtFn $ DGI.inn gr n
+    where filtFn (src,dst,edge) = isNormalEdge_ edge
+          mapFn  (src,dst,edge) = case dst == n of
+                   True -> src
+                   False -> error "I'm doing something wrong!"
+
+lpreNE :: PGraph -> DGI.Node -> [(DGI.Node, Edge)]
+lpreNE gr n = map mapFn $ filter filtFn $ DGI.inn gr n
+    where filtFn (src,dst,edge) = isNormalEdge_ edge
+          mapFn  (src,dst,edge) = case dst == n of
+                   True -> (src,edge)
+                   False -> error "I'm doing something wrong!"
+
+sucNE :: PGraph -> DGI.Node -> [DGI.Node]
+sucNE gr n = map mapFn $ filter filtFn $ DGI.out gr n
+    where filtFn (src,dst,edge) = isNormalEdge_ edge
+          mapFn  (src,dst,edge) = case src == n of
+                    True -> dst
+                    False -> error "I'm doing something wrong!"
+
+lsucNE :: PGraph -> DGI.Node -> [(DGI.Node, Edge)]
+lsucNE gr n = map mapFn $ filter filtFn $ DGI.out gr n
+    where filtFn (src,dst,edge) = isNormalEdge_ edge
+          mapFn  (src,dst,edge) = case src == n of
+                    True -> (dst,edge)
+                    False -> error "I'm doing something wrong!"
 
 -- normal (i.e., not spawn) sucessor nodes
 edgeSucc :: PGraph -> PGNode -> [(PGNode, PGEdge)]

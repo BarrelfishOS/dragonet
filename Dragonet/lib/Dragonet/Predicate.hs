@@ -721,7 +721,10 @@ portPred_ bld fnode@(FNode {}) port = pred
                    Nothing -> atom
           atom  = case length (nPorts fnode) of
                     0 -> error $ "We expect a port named `" ++ port ++ "' in node:\n" ++ (ppShow fnode)
-                    1 -> PredAtom (PG.nLabel fnode) port --PredTrue
+                    -- add single port predicates
+                    -- 1 -> PredAtom (PG.nLabel fnode) port
+                    -- ignore single port predicates
+                    1 -> PredTrue
                     _ -> PredAtom (PG.nLabel fnode) port
 
 
@@ -734,11 +737,13 @@ opPred bld preds (op, port) = expr
     where expr = case (port, op) of
             ("true", NOpAnd)  -> bldAND preds
             ("true", NOpOr)   -> bldOR preds
-            ("true", _)       -> error "port NYI"
+            ("true", NOpNOr)  -> bldNOT $ bldOR preds
+            ("true", NOpNAnd) -> bldNOT $ bldAND preds
+            --("true", _)       -> error  $ "opPred for true/operator " ++ (show op) ++ " NYI"
             ("false", NOpAnd) -> bldOR  $ map bldNOT preds
             ("false", NOpOr)  -> bldAND $ map bldNOT preds
-            ("false", _)      -> error "port NYI"
-            (_, _)            -> error $ "Expecting true/false, not:" ++ port
+            ("false", _)      -> error  $ "opPred for false/operator " ++ (show op) ++ " NYI"
+            (_, _)            -> error  $ "Expecting true/false, not:" ++ port
           bldAND  = buildAND bld
           bldOR   = buildOR  bld
           bldNOT  = buildNOT bld
@@ -774,7 +779,7 @@ computePred st@(PredCompSt { predDst = (nid, FNode {}), compStop = stopfn})
     | ndeps == 0 = case spawn_pred of
         Just e  -> e        -- there *is* a spawn predicate
         Nothing -> PredTrue -- this should probably be false, but it currently breaks some cases
-    | ndeps > 1   = error $ "F-nodes have at most one incomming edge. Offending node:`" ++ (nLabel $ snd dst) ++ "'"
+    | ndeps > 1   = error $ "F-nodes have at most one incoming edge. Offending node:`" ++ (nLabel $ snd dst) ++ "'"
     -- ndeps == 1
     | stopfn $ fst dep0    = PredTrue
     -- | isSpawnTarget gr dst = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat it as an OR?)
@@ -830,8 +835,11 @@ depPortName (_, (_, _, Edge { ePort = eport })) = eport
 isTFPort s = (isTruePort s ||) (isFalsePort s)
 
 opNot :: PG.NOperator -> PG.NOperator
-opNot PG.NOpAnd = PG.NOpOr
-opNot PG.NOpOr  = PG.NOpAnd
+opNot PG.NOpAnd  = PG.NOpOr
+opNot PG.NOpOr   = PG.NOpAnd
+--
+opNot PG.NOpNOr   = PG.NOpNAnd
+opNot PG.NOpNAnd  = PG.NOpNOr
 
 onodeDepsTF :: [(PGNode, PGEdge)] -> ([(PGNode, PGEdge)], [(PGNode, PGEdge)])
 onodeDepsTF deps = ret
@@ -841,7 +849,7 @@ onodeDepsTF deps = ret
     other_deps = filter (not . isTFPort . depPortName) deps
     ret = case length other_deps of
         0 -> (true_deps, false_deps)
-        _ -> error "There are onode incomming edges which do not start from a true/false port"
+        _ -> error $ "There are onode incoming edges which do not start from a true/false port in node:" ++ (ppShow other_deps)
 
 
 trueONodeDeps :: [(PGNode, PGEdge)] -> [(PG.PGNode,PG.PGEdge)]

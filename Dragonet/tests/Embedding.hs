@@ -130,8 +130,8 @@ embTest msg prg lpg expect fname_suffix =
     errmsg <- case cond of
         True  -> return "SUCCESS"
         False -> do
-            dumpf <- dumpRandFname ("tests/", "emb-test-.dot") (toDot emb)
-            return (errmsg_ ++ dumpf ++ "\n")
+            --dumpf <- dumpRandFname ("tests/", "emb-test-.dot") (toDot emb)
+            return (errmsg_ ++ "\n")
 
     assertBool errmsg cond
 
@@ -144,16 +144,16 @@ graph prg2 {
 
     cluster Tx {
 
-        node Queue { port o[L4Prot] }
+        node Queue { port out[L4Prot] }
 
         node L4Prot {
             port UDP[L4UDPFillChecksum]
-            port Other[_Out]
+            port Other_true[_Out]
 
             predicate UDP "and(pred(EthType,IPv4),pred(IpProt,UDP))"
         }
 
-        node L4UDPFillChecksum { port o[_Out] }
+        node L4UDPFillChecksum { port o_true[_Out] }
 
        or _Out {
             port true[Out]
@@ -188,33 +188,37 @@ dumpRandFname (dirname,ftmpl) d = do
     hClose tmph
     return tmpf
 
-embTests_ (prg, lpg) doCheck errmsg = do
-    let emb = embeddingRxTx prg lpg
-        embout  = "tests/emb.dot"
+embTests_ (prg, lpg) doCheck errmsg fnameSuffix = do
+    let emb = embeddingX prg lpg
+        embout  = "tests/emb" ++ fnameSuffix ++ ".dot"
+        lpgout  = "tests/lpg" ++ fnameSuffix ++ ".dot"
+        prgout  = "tests/prg" ++ fnameSuffix ++ ".dot"
         errmsg' = --"prg:      \n" ++ (ppShow $ prg) ++ "\n" ++
                   --"lpg:      \n" ++ (ppShow $ lpgC) ++ "\n" ++
                   --"result:   \n" ++ (ppShow $ emb) ++ "\n" ++
                   "dump:      " ++ embout  ++ "\n" ++
                   "MSG: " ++ errmsg
-        dump    = True
 
-    --writeFile "tests/XXXlpg.dot" $ toDot lpgC
-    --writeFile "tests/XXXprg.dot" $ toDot prg
-    writeFile "tests/XXXemb.dot" $ toDot emb
+    writeFile lpgout $ toDot lpg
+    writeFile prgout $ toDot prg
+    writeFile embout $ toDot emb
+
     check <- or <$> sequence [ fn emb | fn <- doCheck ]
-    case (check, dump) of
-        (False, True) -> do writeFile "tests/emb.dot" $ toDot emb
-        _ ->             do return ()
     assertBool errmsg' check
 
-embTests :: (PG.PGraph, PG.PGraph) -> [(PG.PGraph -> IO Bool)] -> String -> Test
-embTests (prg, lpg) doCheck errmsg = TestCase $ embTests_ (prg, lpg) doCheck errmsg
+embTests :: (PG.PGraph, PG.PGraph)
+         -> [(PG.PGraph -> IO Bool)]
+         -> String
+         -> String
+         -> Test
+embTests (prg, lpg) doCheck errmsg fnameSuffix =
+    TestCase $ embTests_ (prg, lpg) doCheck errmsg fnameSuffix
 
-lpgTest :: PG.PGraph -> [(PG.PGraph -> IO Bool)] -> String -> Test
-lpgTest prg doCheck errmsg = TestCase $ do
+lpgTest :: PG.PGraph -> [(PG.PGraph -> IO Bool)] -> String -> String -> Test
+lpgTest prg doCheck errmsg fname_suffix = TestCase $ do
     (lpgU,lpgH) <- LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
     let lpgC    = C.applyConfig lpgCfg lpgU
-    embTests_ (prg,lpgC) doCheck errmsg
+    embTests_ (prg,lpgC) doCheck errmsg fname_suffix
 
 
 nodeExistsOnce :: String -> PG.PGraph -> IO Bool
@@ -230,7 +234,8 @@ nodeOffloaded l g = do
                        1 -> case PG.nOrigin $ snd (nodes !! 0) of
                            "PRG" -> (True,  "node " ++ l ++ " was offloaded")
                            "LPG" -> (False, "node " ++ l ++ " is unique, but an LPG node")
-                           _     -> (False, "node " ++ l ++ " cannot be found")
+                           x     -> (False, "node " ++ l ++ " cannot identifiy origin -->"++ (show x) ++"<--")
+                       0 -> (False, "node " ++ l ++ " cannot be found")
                        x -> (False, "node " ++ l ++ " was found " ++ (show x) ++ " times")
     --putStrLn $ "\n" ++ msg ++ "\n"
     return ret
@@ -248,7 +253,7 @@ nLabelPredicate :: PG.PGraph -> String -> [(String, PredExpr)]
 nLabelPredicate g l = [ (nodeName n, nodePred g n) | n <- nodes ]
     where nodes = GH.filterNodesByL (\x -> (PG.nLabel x) == l) g
 
-t2 = lpgTest prg2 [nodeOffloaded "TxL4UDPFillChecksum"] "TX UDP Checksum was not offloaded (prg2)"
+t2 = lpgTest prg2 [nodeOffloaded "TxL4UDPFillChecksum"] "TX UDP Checksum was not offloaded (prg2)" "2"
 
 ------------------------------------------------------------------------------
 -- t3: closer to the Intel NIC
@@ -259,14 +264,14 @@ graph prg3 {
     cluster Tx {
         node Queue {
             attr "software"
-            port o[L3Prot] }
+            port out[L3Prot] }
 
         // NB: maybe we want to have the convention for ports named `other' that
         // their predicate is NOT all the other ports of the node
         node L3Prot {
             attr "software"
             port IPv4[L4ProtV4 L3IPv4FillChecksum]
-            port other[L4Done L3Done]
+            port other_true[L4Done L3Done]
 
             predicate IPv4 "pred(EthType,IPv4)"
             predicate other "not(pred(EthType,IPv4))"
@@ -286,7 +291,7 @@ graph prg3 {
         // only set up IPv4 checksum
         node CtxIPv4 {
             attr "software"
-            port out[L4Done]
+            port out_true[L4Done]
         }
 
         // set up IPv4 checksum and UDP checksum
@@ -301,9 +306,9 @@ graph prg3 {
             port out[L4UTCPFillChecksum]
         }
 
-        node L3IPv4FillChecksum { port out[L3Done] }
-        node L4UDPFillChecksum  { port out[L4Done] }
-        node L4UTCPFillChecksum { port out[L4Done] }
+        node L3IPv4FillChecksum { port out_true[L3Done] }
+        node L4UDPFillChecksum  { port out_true[L4Done] }
+        node L4UTCPFillChecksum { port out_true[L4Done] }
 
         or L4Done {
             port true[Done]
@@ -341,6 +346,7 @@ graph prg3 {
 t3 = lpgTest prg3 [nodeOffloaded "TxL4UDPFillChecksum",
                    nodeOffloaded "TxL3IPv4FillChecksum"]
              "TX UDP and IPv4 Checksum was not offloaded (prg3)"
+             "3"
 
 ------------------------------------------------------------------------------
 -- t4: putting it all together (first attempt)
@@ -541,7 +547,7 @@ cluster Rx {
 }
 |]
 
-t4 = embTests (prg4,lpg4) [] "prg4/lpg4 checks"
+--t4 = embTests (prg4,lpg4) [] "prg4/lpg4 checks"
 
 ------------------------------------------------------------------------------
 ------------------------------------------------------------------------------
@@ -550,8 +556,10 @@ tests =
  TestList [
       test0
     , test0'
-    , t1 --, t2, t3
-    --t4
+    , t1
+    , t2
+    , t3
+    --, t4
  ]
 
 lpgT = LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
