@@ -132,7 +132,7 @@ executable stack-sf
                         ../openonload-201310-u2/src/include/
     CC-options:         -Wall -Wno-unused-function
     extra-lib-dirs:     ../openonload-201310-u2/build/gnu_x86_64/lib/ciul/
-    extra-libraries:    ciul
+--    extra-libraries:    ciul
     x-helpers-files:    llvm-dyn-helpers.bc,
                         llvm-helpers-sf.bc
     x-helpers-makefile: Makefile.llvm-helpers
@@ -166,6 +166,27 @@ executable stack-e10k
                         lib/Dragonet/Pipelines,
                         ../external/bulktransfer/lib/include,
                         c_impl/e10k/include
+    default-language:   Haskell2010
+
+executable stack-null
+    hs-source-dirs:     ., stack
+    main-is:            stack-null.hs
+    build-depends:      Dragonet, base, smtLib, fgl, containers, mtl, directory,
+                        llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
+                        transformers
+    ghc-options:        -threaded
+    C-sources:          stack/Runner/dyn_remote_client.c,
+                        c_impl/null/dragonet_ctrl.c
+    Include-dirs:       c_impl/include,
+                        c_impl/null/include
+    CC-options:         -Wall -Wno-unused-function
+    x-helpers-files:    llvm-dyn-helpers.bc,
+                        llvm-helpers-null.bc
+    x-helpers-makefile: Makefile.llvm-helpers
+    x-helpers-includes: c_impl/include,
+                        lib/Dragonet/Pipelines,
+                        ../external/bulktransfer/lib/include,
+                        c_impl/null/include
     default-language:   Haskell2010
 
 

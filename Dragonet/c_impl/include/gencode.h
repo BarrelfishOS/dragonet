@@ -91,6 +91,23 @@ enum out_ports {
     P_SFRxQueue3_out = 0,
     P_SFRxQueue3_drop = 1,
     P_SFRxQueue3_init = 2,
+
+
+
+    P_NullRxQueue0_out = 0,
+    P_NullRxQueue0_drop = 1,
+    P_NullRxQueue0_init = 2,
+    P_NullRxQueue1_out = 0,
+    P_NullRxQueue1_drop = 1,
+    P_NullRxQueue1_init = 2,
+    P_NullRxQueue2_out = 0,
+    P_NullRxQueue2_drop = 1,
+    P_NullRxQueue2_init = 2,
+    P_NullRxQueue3_out = 0,
+    P_NullRxQueue3_drop = 1,
+    P_NullRxQueue3_init = 2,
+
+
 };
 
 
@@ -115,6 +132,18 @@ enum out_spawns {
     S_SFRxQueue1_poll = 0,
     S_SFRxQueue2_poll = 0,
     S_SFRxQueue3_poll = 0,
+
+
+
+    S_NullInit_q0 = 0,
+    S_NullInit_q1 = 1,
+    S_NullInit_q2 = 2,
+    S_NullInit_q3 = 3,
+    S_NullRxQueue0_poll = 0,
+    S_NullRxQueue1_poll = 0,
+    S_NullRxQueue2_poll = 0,
+    S_NullRxQueue3_poll = 0,
+
 
 };
 
@@ -539,6 +568,62 @@ struct ctx_E10kTxQueue3 {
     struct ctx_generic generic;
 };
 
+
+
+
+
+
+
+
+struct ctx_NullInit {
+    struct ctx_generic generic;
+};
+
+struct ctx_NullRxQueue0 {
+    struct ctx_generic generic;
+};
+
+struct ctx_NullRxQueue1 {
+    struct ctx_generic generic;
+};
+
+struct ctx_NullRxQueue2 {
+    struct ctx_generic generic;
+};
+
+struct ctx_NullRxQueue3 {
+    struct ctx_generic generic;
+};
+
+struct ctx_NullL3IPv4Classified {
+    struct ctx_generic generic;
+};
+
+struct ctx_NullL3IPv4ValidChecksum {
+    struct ctx_generic generic;
+};
+
+struct ctx_NullTxQueue0 {
+    struct ctx_generic generic;
+};
+
+struct ctx_NullTxQueue1 {
+    struct ctx_generic generic;
+};
+
+struct ctx_NullTxQueue2 {
+    struct ctx_generic generic;
+};
+
+struct ctx_NullTxQueue3 {
+    struct ctx_generic generic;
+};
+
+
+
+
+
+
 struct ctx_TapRxQueue {
     struct ctx_generic generic;
 };
@@ -702,6 +787,16 @@ node_out_t do_pg__SFTxQueue1(struct ctx_SFTxQueue1 *context, struct state *state
 node_out_t do_pg__SFTxQueue2(struct ctx_SFTxQueue2 *context, struct state *state, struct input **in);
 node_out_t do_pg__SFTxQueue3(struct ctx_SFTxQueue3 *context, struct state *state, struct input **in);
 
-
+node_out_t do_pg__NullInit(struct ctx_NullInit *context, struct state *state, struct input **in);
+node_out_t do_pg__NullRxQueue0(struct ctx_NullRxQueue0 *context, struct state *state, struct input **in);
+node_out_t do_pg__NullRxQueue1(struct ctx_NullRxQueue1 *context, struct state *state, struct input **in);
+node_out_t do_pg__NullRxQueue2(struct ctx_NullRxQueue2 *context, struct state *state, struct input **in);
+node_out_t do_pg__NullRxQueue3(struct ctx_NullRxQueue3 *context, struct state *state, struct input **in);
+node_out_t do_pg__NullL3IPv4Classified(struct ctx_NullL3IPv4Classified *context, struct state *state, struct input **in);
+node_out_t do_pg__NullL3IPv4ValidChecksum(struct ctx_NullL3IPv4ValidChecksum *context, struct state *state, struct input **in);
+node_out_t do_pg__NullTxQueue0(struct ctx_NullTxQueue0 *context, struct state *state, struct input **in);
+node_out_t do_pg__NullTxQueue1(struct ctx_NullTxQueue1 *context, struct state *state, struct input **in);
+node_out_t do_pg__NullTxQueue2(struct ctx_NullTxQueue2 *context, struct state *state, struct input **in);
+node_out_t do_pg__NullTxQueue3(struct ctx_NullTxQueue3 *context, struct state *state, struct input **in);
 #endif // GENERATEDCODE_H_
 
