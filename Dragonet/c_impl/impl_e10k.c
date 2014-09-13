@@ -64,7 +64,8 @@ extern pipeline_handle_t pipeline_handle;
 static bool e10k_pci_init(struct e10k_card *c, struct usp_pci_desc *pci)
 {
     struct usp_uio_desc *uio;
-    if (pci->vendor != E10K_PCI_VENDOR || pci->device != E10K_PCI_DEVID) {
+    if (pci->vendor != E10K_PCI_VENDOR ||
+        (pci->device != E10K_PCI_DEVID_82599ES && pci->device != E10K_PCI_DEVID_X520)) {
         fprintf(stderr, "e10k_pci_init: unsupported PCI vendor or device id\n");
         return false;
     }

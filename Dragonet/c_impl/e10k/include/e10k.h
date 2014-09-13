@@ -16,7 +16,8 @@
 #include <dev/e10k_dev.h>
 
 #define E10K_PCI_VENDOR 0x8086
-#define E10K_PCI_DEVID  0x10FB
+#define E10K_PCI_DEVID_82599ES 0x10FB
+#define E10K_PCI_DEVID_X520    0x154D
 #define E10K_PCI_UIODRV "igb_uio"
 
 #define E10K_NQUEUES    128
