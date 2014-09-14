@@ -264,7 +264,10 @@ graph lpg {
                 port true[FillHeader .L3IPv4Prepare] }
 
             boolean FillHeader {
-                port true false[.L3_AND_L4Done] } // we are sending ICMP, no need to wait for anything else
+                port true false[Done] }
+
+            and Done {
+                port true false[.L3_AND_L4Done] }
         }
 
         cluster L3IPv4 {
@@ -286,7 +289,7 @@ graph lpg {
                 port true false[.L3ARPLookup] }
 
             and Done { // UDPv4Done
-                    port true false [.UDPv4Done]
+                    port true false [.UDPv4Done .L3ICMPDone]
             }
         }
 

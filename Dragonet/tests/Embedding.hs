@@ -223,14 +223,17 @@ lpgEmbTest prg doCheck errmsg fname_suffix = TestCase $ do
 
 lpgPredNodeTest :: String -> [String] -> Test
 lpgPredNodeTest name preds = TestCase $ do
+
     lpg <- lpgC
+    writeFile "tests/lpg.dot" $ toDot lpg
+
     let nodePred = nLabelSinglePred lpg name
         checkPreds = map PR.parseStrDNF preds
 
         doCheck p = case PR.predTrueUnder_ p nodePred of
             Nothing  -> Nothing
             Just as -> Just $ "p=\n" ++ (ppShow p) ++ "\nis not true for nodePred=\n" ++ (ppShow nodePred)
-                                     ++ "first failed assignment\n" ++ (ppShow $ head as)
+                                     ++ "\nfirst failed assignment:\n" ++ (ppShow $ head as)
 
         results = map doCheck checkPreds
         ok  = and (map isNothing results)
