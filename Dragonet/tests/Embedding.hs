@@ -203,7 +203,7 @@ embTests_ (prg, lpg) doCheck errmsg fnameSuffix = do
     writeFile prgout $ toDot prg
     writeFile embout $ toDot emb
 
-    check <- or <$> sequence [ fn emb | fn <- doCheck ]
+    check <- and <$> sequence [ fn emb | fn <- doCheck ]
     assertBool errmsg' check
 
 embTests :: (PG.PGraph, PG.PGraph)
@@ -214,11 +214,29 @@ embTests :: (PG.PGraph, PG.PGraph)
 embTests (prg, lpg) doCheck errmsg fnameSuffix =
     TestCase $ embTests_ (prg, lpg) doCheck errmsg fnameSuffix
 
-lpgTest :: PG.PGraph -> [(PG.PGraph -> IO Bool)] -> String -> String -> Test
-lpgTest prg doCheck errmsg fname_suffix = TestCase $ do
+lpgEmbTest :: PG.PGraph -> [PG.PGraph -> IO Bool] -> String -> String -> Test
+lpgEmbTest prg doCheck errmsg fname_suffix = TestCase $ do
     (lpgU,lpgH) <- LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
     let lpgC    = C.applyConfig lpgCfg lpgU
     embTests_ (prg,lpgC) doCheck errmsg fname_suffix
+
+
+lpgPredNodeTest :: String -> [String] -> Test
+lpgPredNodeTest name preds = TestCase $ do
+    lpg <- lpgC
+    let nodePred = nLabelSinglePred lpg name
+        checkPreds = map PR.parseStrDNF preds
+
+        doCheck p = case PR.predTrueUnder_ p nodePred of
+            Nothing  -> Nothing
+            Just as -> Just $ "p=\n" ++ (ppShow p) ++ "\nis not true for nodePred=\n" ++ (ppShow nodePred)
+                                     ++ "first failed assignment\n" ++ (ppShow $ head as)
+
+        results = map doCheck checkPreds
+        ok  = and (map isNothing results)
+        errmsg = L.intercalate "\n" $ catMaybes results
+
+    assertBool errmsg ok
 
 
 nodeExistsOnce :: String -> PG.PGraph -> IO Bool
@@ -249,11 +267,17 @@ nodeName (_, n) = ret''
           ori   = PG.nOrigin n
           ret'' = if ori == "" then ret' else (ret' ++ ":" ++ ori)
 
-nLabelPredicate :: PG.PGraph -> String -> [(String, PredExpr)]
-nLabelPredicate g l = [ (nodeName n, nodePred g n) | n <- nodes ]
+nLabelPred :: PG.PGraph -> String -> [(String, PredExpr)]
+nLabelPred g l = [ (nodeName n, nodePred g n) | n <- nodes ]
     where nodes = GH.filterNodesByL (\x -> (PG.nLabel x) == l) g
 
-t2 = lpgTest prg2 [nodeOffloaded "TxL4UDPFillChecksum"] "TX UDP Checksum was not offloaded (prg2)" "2"
+nLabelSinglePred :: PG.PGraph -> String -> PredExpr
+nLabelSinglePred g l = case nLabelPred g l of
+    [x] -> snd x
+    []  -> error "nLabelSinglePred: no node found"
+    _   -> error "more than one nodes found"
+
+t2 = lpgEmbTest prg2 [nodeOffloaded "TxL4UDPFillChecksum"] "TX UDP Checksum was not offloaded (prg2)" "2"
 
 ------------------------------------------------------------------------------
 -- t3: closer to the Intel NIC
@@ -274,13 +298,12 @@ graph prg3 {
             port other_true[L4Done L3Done]
 
             predicate IPv4 "pred(EthType,IPv4)"
-            predicate other "not(pred(EthType,IPv4))"
+            predicate other_true "not(pred(EthType,IPv4))"
         }
 
         node L4ProtV4 {
-            attr "software"
-            port UDP[CtxUDPv4]
             port TCP[CtxTCPv4]
+            port UDP[CtxUDPv4]
             port other[CtxIPv4]
 
             predicate UDP "pred(IpProt,UDP)"
@@ -297,7 +320,7 @@ graph prg3 {
         // set up IPv4 checksum and UDP checksum
         node CtxUDPv4 {
             attr "software"
-            port out[L4UDPFillChecksum]
+            port out[L4UDPFillChecksum2]
         }
 
         // set up IPv4 checksum and TCP checksum
@@ -306,21 +329,28 @@ graph prg3 {
             port out[L4UTCPFillChecksum]
         }
 
-        node L3IPv4FillChecksum { port out_true[L3Done] }
-        node L4UDPFillChecksum  { port out_true[L4Done] }
+        node L3IPv4FillChecksum {
+            port true[L3Done]
+        }
+
+        node L4UDPFillChecksum  {
+            port out_true[L3Done]
+            //predicate out_true "pred(FOO,YEAHHHHHHHHHHHHHHHHHHHHHHHHHHH)"
+        }
+
         node L4UTCPFillChecksum { port out_true[L4Done] }
 
         or L4Done {
-            port true[Done]
+            port true[PrgDone]
             port false[]
         }
 
         or L3Done {
-            port true[Done]
+            port true[PrgDone]
             port false[]
         }
 
-        and Done {
+        and PrgDone {
             port true[Out]
             port false[]
         }
@@ -343,10 +373,10 @@ graph prg3 {
 }
 |]
 
-t3 = lpgTest prg3 [nodeOffloaded "TxL4UDPFillChecksum",
-                   nodeOffloaded "TxL3IPv4FillChecksum"]
-             "TX UDP and IPv4 Checksum was not offloaded (prg3)"
-             "3"
+t3 = lpgEmbTest prg3 [nodeOffloaded "TxL4UDPFillChecksum",
+                      nodeOffloaded "TxL3IPv4FillChecksum"]
+                      "TX UDP and IPv4 Checksum was not offloaded (prg3)"
+                       "3"
 
 ------------------------------------------------------------------------------
 -- t4: putting it all together (first attempt)
@@ -556,10 +586,12 @@ tests =
  TestList [
       test0
     , test0'
-    , t1
-    , t2
-    , t3
+    --, t1
+    --, t2
+    --, t3
     --, t4
+   , lpgPredNodeTest "TxQueue" ["or(not(and(pred(IpProt,UDP),pred(EthType,IPv4))),pred(TxL4UDPFillChecksum,true))"]
+   , lpgPredNodeTest "TxQueue" ["or(not(pred(EthType,IPv4)),pred(TxL3IPv4FillChecksum,true))"]
  ]
 
 lpgT = LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
@@ -579,7 +611,7 @@ remPrefix prefix str = case L.stripPrefix prefix str of
 prPred :: PG.PGraph -> String -> IO ()
 prPred gr s = do
     putStrLn $ "------>" ++ s
-    putStrLn $ ppShow $ nLabelPredicate gr s
+    putStrLn $ ppShow $ nLabelPred gr s
     putStrLn $ "<-------"
 
 
@@ -607,7 +639,7 @@ main = do
     {--
     --prPred lpgC "TxL3ARPInitiateResponse"
     prPred lpgC "TxQueue"
-    let txQueuePred  = snd $ (nLabelPredicate lpgC "TxQueue") !! 0
+    let txQueuePred  = snd $ (nLabelPred lpgC "TxQueue") !! 0
         txQueueAnds  = PR.dnfGetANDs txQueuePred
         txQueueAnds' = [ L.sortBy (compare `on` fst) $ PR.predGetAtoms $ PR.PredAnd l | l <- txQueueAnds ]
 

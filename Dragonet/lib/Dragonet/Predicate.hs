@@ -1,7 +1,9 @@
 module Dragonet.Predicate (
     PredExpr(..),
-    predEval, predEquiv, predEquivHard,
+    predEval, predEquiv,
+    predEquivHard, predEquivHard_,
     predEquivUnder,
+    predTrueUnder, predTrueUnder_,
     --
     isDNF,
     --
@@ -18,6 +20,7 @@ module Dragonet.Predicate (
     --
     predParser,
     parseStr, parseStr_,
+    parseStrDNF,
     parseFile, predGetAtoms,
     --
     PredAssignment,
@@ -26,6 +29,8 @@ module Dragonet.Predicate (
     -- exposed for the testing module:
     PredBuild(..),
     getAllAssigns,
+    --
+    dnetPrShow
 ) where
 
 import Dragonet.ProtocolGraph        as PG
@@ -55,6 +60,7 @@ traceMessages = False
 xtrace = if traceMessages then trace else \a b -> b
 
 tr = flip $ trace
+trN a b = a
 
 -- The code here essentially provides means to express and reason with boolean
 -- expressions. It's somewhat similar to https://github.com/beastaugh/hatt.
@@ -614,6 +620,34 @@ getAllAssigns atoms = map concat $ sequence $ map getAssigns grouped
           getAssigns (lbl, ports) = allf:[ [(lbl, p, PredTrue)] | p <- ports ]
               where allf = [ (lbl, p, PredFalse) | p <- ports ]
 
+andErr :: [a] -> (a -> Bool) -> Maybe a
+andErr [] _ = Nothing
+andErr (x:xs) pred = case pred x of
+    True  -> andErr xs pred
+    False -> Just x
+
+-- Just x: assighment for which the two expressions are not equivalent
+-- Nothing: expressions are equivalent
+predEquivHard_ :: PredExpr -> PredExpr -> Maybe [PredAssignment]
+predEquivHard_ expr1 expr2 = ret
+    where atoms1 = predGetAtoms expr1
+          atoms2 = predGetAtoms expr2
+          atoms  = L.nub $ atoms1 ++ atoms2
+          all_assigns = getAllAssigns atoms
+          ret = case length atoms of
+            0 -> andErr [[]] checkAssignment
+            _ -> andErr all_assigns checkAssignment
+          checkAssignment :: [PredAssignment] -> Bool
+          checkAssignment a = eval1 == eval2
+            where eval1 = predEval expr1 a
+                  eval2 = predEval expr2 a
+
+predEquivHard :: PredExpr -> PredExpr -> Bool
+predEquivHard expr1 expr2 = case predEquivHard_ expr1 expr2 of
+    Just _ -> False
+    Nothing -> True
+
+{-
 predEquivHard :: PredExpr -> PredExpr -> Bool
 predEquivHard expr1 expr2 = ret
     where atoms1 = predGetAtoms expr1
@@ -636,20 +670,32 @@ predEquivHard expr1 expr2 = ret
                           " expr1:" ++ (show expr1) ++ " eval1:" ++ (show eval1) ++ "\n" ++
                           " expr2:" ++ (show expr2) ++ " eval2:" ++ (show eval1) ++ "\n" ++
                           "\n---\n"
+-}
 
-predEquivUnder_ :: PredExpr -> PredExpr -> [PredAssignment] -> Bool
-predEquivUnder_ expr1 expr2 a = predEquivHard e1 e2
+predEquivUnder__ :: PredExpr -> PredExpr -> [PredAssignment] -> Bool
+predEquivUnder__ expr1 expr2 a = predEquivHard e1 e2
     where e1 = predEval expr1 a
           e2 = predEval expr2 a
 
-predEquivUnder :: (PredExpr, PredExpr) -> PredExpr -> Bool
-predEquivUnder (expr1, expr2) expr_cond = ret
+predEquivUnder_ :: (PredExpr, PredExpr) -> PredExpr -> Maybe [[PredAssignment]]
+predEquivUnder_ (expr1, expr2) expr_cond = ret
     where assigns_ = dnfSAT expr_cond
           assigns = case assigns_ of
             Just x  -> x
             Nothing -> error "NYI: condition is unsatisfiable"
-          ret = and [ predEquivUnder_  expr1 expr2 a  | a <- assigns ]
+          results = [ predEquivUnder__  expr1 expr2 a  | a <- assigns  ]
+          ret = case and results of
+                  True -> Nothing
+                  False -> Just [ a | (r,a) <- zip results assigns,  r == False ]
 
+predEquivUnder :: (PredExpr, PredExpr) -> PredExpr -> Bool
+predEquivUnder (e1,e2) c = isNothing $ predEquivUnder_ (e1,e2) c
+
+predTrueUnder :: PredExpr -> PredExpr -> Bool
+predTrueUnder expr1 expr2 = predEquivUnder (expr1, PredTrue) expr2
+
+predTrueUnder_ :: PredExpr -> PredExpr -> Maybe [[PredAssignment]]
+predTrueUnder_ expr1 expr2 = predEquivUnder_ (expr1, PredTrue) expr2
 
 --
 ------- Computing predicate epxressions -----
@@ -711,7 +757,7 @@ portPred bld (_,fnode@(FNode {})) port = portPred_ bld fnode port
 
 portPred_ :: PredBuild -> PG.Node -> PG.NPort -> PredExpr
 portPred_ bld fnode@(FNode {}) port = pred
-    where pred' = tr pred ("node:" ++ (PG.nLabel fnode) ++ " port:" ++ port ++ " port pred:" ++ (show pred))
+    where pred' = trN pred ("node:" ++ (PG.nLabel fnode) ++ " port:" ++ port ++ " port pred:" ++ (show pred))
           -- NB: In our current semantics, if predicates are defined for a
           -- particular port, then the port selection predicates are ignored.
           -- Note that, if needed, they can be added in the port predicates
@@ -722,9 +768,9 @@ portPred_ bld fnode@(FNode {}) port = pred
           atom  = case length (nPorts fnode) of
                     0 -> error $ "We expect a port named `" ++ port ++ "' in node:\n" ++ (ppShow fnode)
                     -- add single port predicates
-                    -- 1 -> PredAtom (PG.nLabel fnode) port
+                    1 -> PredAtom (PG.nLabel fnode) port
                     -- ignore single port predicates
-                    1 -> PredTrue
+                    -- 1 -> PredTrue
                     _ -> PredAtom (PG.nLabel fnode) port
 
 
@@ -752,12 +798,12 @@ opPred bld preds (op, port) = expr
 depGetPred__ :: PredCompSt -> (PG.PGNode, PG.NPort) -> PredExpr
 -- dependency is an FNode
 depGetPred__ st (dep_node@(_, fnode@(FNode {})), dep_port) = ret'
-    where ret'       = ret --tr ret $ "getting predicate of dependency node: " ++ ((PG.nLabel . snd) dep_node) ++ " port:" ++ dep_port
+    where ret'       = trN ret $ "getting predicate of dependency node: " ++ ((PG.nLabel . snd) dep_node) ++ " port:" ++ dep_port ++ " RET:" ++ (ppShow ret)
           ret        = predFnodePort (predBld st) rec_pred (dep_node, dep_port)
           rec_pred   = computePred $ st {predDst = dep_node, predInPort = Just dep_port}
 -- dependency is an ONode
 depGetPred__ st (dep_node@(_, ONode {}), dep_port) = ret
-    where ret' = tr ret $  "getting predicate of dependency node: " ++ ( (PG.nLabel . snd) dep_node )
+    where ret' = trN ret $  "getting predicate of dependency node: " ++ ( (PG.nLabel . snd) dep_node )
           ret = computePred newst
           newst    = st {predDst = dep_node, predInPort = Just dep_port}
 
@@ -806,7 +852,7 @@ computePred st@(PredCompSt { predDst = (nid, FNode {}), compStop = stopfn})
 --  OP (e.g., AND) [ predicate of src -> pre ] for each pre in pre(dst)
 computePred st@(PredCompSt {predDst = (_, ONode {nLabel=lbl, nOperator=op })})
     = ret
-    where 
+    where
           inport = fromJust $ predInPort st
           -- predecessors (i.e., dependencies) of destination (going backwards)
           deps :: [(PG.PGNode, PG.PGEdge)]
@@ -823,7 +869,7 @@ computePred st@(PredCompSt {predDst = (_, ONode {nLabel=lbl, nOperator=op })})
           f_preds_ = case length false_deps of
                          0 -> error $ "No false dependencies for node " ++ lbl
                          _ -> map (depGetPred st) false_deps
-          t_preds = t_preds_ --tr t_preds_ $ "Visiting node:" ++ lbl ++ " (expragrs=" ++ (show t_preds_) ++ ")"
+          t_preds = trN t_preds_ $ "Visiting node:" ++ lbl ++ " (t_preds_=" ++ (ppShow t_preds_) ++ ")"
           f_preds = f_preds_ --tr f_preds_ $ "Visiting node:" ++ lbl ++ " (expragrs=" ++ (show f_preds_) ++ ")"
           ret = case inport of
             "true"  -> opPred (predBld st) t_preds (op, "true")
@@ -861,6 +907,33 @@ trueONodeDeps deps = true_deps
                             0 -> error $ "No true port for node: " ++ ( nLabel . snd . fst) (ds !! 0)
                             1 -> depsl !! 0
                where depsl = filter (isTruePort  . depPortName) ds
+
+partitionMany :: [a] -> [a -> Bool] -> [[a]]
+partitionMany xs [] = [xs]
+partitionMany xs (f:fs) = xs_f:(partitionMany xs_rest fs)
+    where (xs_f,xs_rest) = L.partition f xs
+
+-- helper function for printing dragonet predicates
+dnetPrShow :: PredExpr -> String
+dnetPrShow expr = assert (isDNF expr) ret
+    where ret = ret_
+          ret_ = "OR\n" ++ (L.intercalate "\n" $ [ "  " ++ x | x <- ands_str ])
+          ands_str = map showAndL (dnfGetANDs expr)
+          showAndL :: [PredExpr] -> String
+          showAndL es_ = "AND \n" ++ (L.intercalate "\n" $ [ "    " ++ (show x) | x <- es ])
+            where es = L.concat parts
+                  parts = [ L.sortBy (compare `on` fAtomName) x | x <- partitionMany es_ fns ]
+                  fns = [f_fs, f_ethT, f_ipP, f_tx, f_rx]
+                  f_ethT = (== "EthType") . fAtomName
+                  f_ipP  = (== "IpProt")  . fAtomName
+                  f_tx  = (L.isPrefixOf "Tx")  . fAtomName
+                  f_rx  = (L.isPrefixOf "Rx")  . fAtomName
+                  f_fs  = (L.isPrefixOf "FromSock")  . fAtomName
+
+                  fAtomName :: PredExpr -> String
+                  fAtomName (PredAtom n _) = n
+                  fAtomName (PredNot (PredAtom n _)) = n
+
 
 -- predicate constructors
 data PredBuild = PredBuild {
@@ -992,6 +1065,9 @@ parseStr_ builders input = case P.runParser predParser builders "(top level)" in
 
 parseStr :: String -> PredExpr
 parseStr = parseStr_ predBuildFold
+
+parseStrDNF :: String -> PredExpr
+parseStrDNF = parseStr_ predBuildDNF
 
 parseFile :: FilePath -> IO (PredExpr)
 parseFile fname = readFile fname >>= return . parseStr

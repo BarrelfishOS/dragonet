@@ -324,11 +324,17 @@ embOffloadTxNode_ lpgN idx = do
         txOut       = txOuts !! idx
         prOut       = PR.nodePred emb txOut
         newPrOut    = PR.nodePred newEmb txOut
-        canOffload  = PR.predEquivHard prOut newPrOut
+        equiv       = PR.predEquivHard_ prOut newPrOut
+        canOffload  = isNothing equiv
         msg         = "   Trying to offload TX Node:" ++ offlName ++ "\n" ++
-                      "   predicate before on " ++ outName ++ ": " ++ (show prOut) ++ "\n" ++
-                      "   predicate after  on " ++ outName ++ ": " ++ (show newPrOut) ++ "\n" ++
-                      "   canOffload:" ++ (show canOffload)
+                      "   predicate before on " ++ outName ++ ": " ++ (ppShow prOut) ++ "\n" ++
+                      "   predicate after  on " ++ outName ++ ": " ++ (ppShow newPrOut) ++ "\n"
+                      --msg_res
+
+        msg_res     = case equiv of
+            Nothing -> "canOffload: YES"
+            Just x  -> "canOffload: NO (offending assignment:\n" ++ (ppShow $ L.sortBy (compare `on` (\(p,_,_)-> p)) x)
+
         newEmb      = DGI.delNode embNid emb
 
     case tr canOffload msg of
