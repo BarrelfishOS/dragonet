@@ -309,7 +309,7 @@ embOffloadTxNode_ lpgN idx = do
     nmap   <- ST.gets embNodeMap
     txOuts <- ST.gets embPrgTxOuts
     emb    <- ST.gets curEmb
-    let (lpgNid, lpgPGN) = tr lpgN $ "embOffloadTxNode_: " ++ (pgName lpgN) ++ "idx: " ++ (show idx)
+    let (lpgNid, lpgPGN) = trN lpgN $ "embOffloadTxNode_: " ++ (pgName lpgN) ++ "idx: " ++ (show idx)
         outName  = show $ pgName txOut
         offlName = show $ PG.nLabel lpgPGN
         embN_ = case M.lookup lpgNid nmap of
@@ -324,16 +324,18 @@ embOffloadTxNode_ lpgN idx = do
         txOut       = txOuts !! idx
         prOut       = PR.nodePred emb txOut
         newPrOut    = PR.nodePred newEmb txOut
-        equiv       = PR.predEquivHard_ prOut newPrOut
+        --equiv       = PR.predEquivHard_ prOut newPrOut
+        equiv       = PR.dnfEquiv_ prOut newPrOut
         canOffload  = isNothing equiv
         msg         = "   Trying to offload TX Node:" ++ offlName ++ "\n" ++
-                      "   predicate before on " ++ outName ++ ": " ++ (ppShow prOut) ++ "\n" ++
-                      "   predicate after  on " ++ outName ++ ": " ++ (ppShow newPrOut) ++ "\n"
+                      "   predicate before on " ++ outName ++ ": " ++ (PR.dnetPrShow prOut) ++ "\n\n" ++
+                      "   predicate after  on " ++ outName ++ ": " ++ (PR.dnetPrShow newPrOut) ++ "\n"
                       --msg_res
 
         msg_res     = case equiv of
             Nothing -> "canOffload: YES"
-            Just x  -> "canOffload: NO (offending assignment:\n" ++ (ppShow $ L.sortBy (compare `on` (\(p,_,_)-> p)) x)
+            --Just x  -> "canOffload: NO (offending assignment:\n" ++ (ppShow $ L.sortBy (compare `on` (\(p,_,_)-> p)) x)
+            Just x  -> "canOffload: NO (" ++ x ++ ")"
 
         newEmb      = DGI.delNode embNid emb
 
@@ -364,7 +366,7 @@ embOffloadTx = do
 prEmbed :: String -> Embed ()
 prEmbed prefix = do
     emb <- ST.gets curEmb
-    let emb' = tr emb ("\n---" ++ prefix ++ ": Current Embedded Graph--\n" ++ (ppShow emb))
+    let emb' = trN emb ("\n---" ++ prefix ++ ": Current Embedded Graph--\n" ++ (ppShow emb))
     ST.modify $ \s ->  s { curEmb = emb' }
 
 -- main embedding function
@@ -472,7 +474,7 @@ embCtxAddGrays lpg_ctx@(ins,nid,_,outs) = do
         msg = "   oldgrays: " ++ (show (map pgName oldGrays)) ++ "\n" ++
               "   newgrays: " ++ (show (map pgName newGrays)) ++ "\n" ++
               "   result  : " ++ (show (map pgName grays))
-    ST.modify $ \s -> (tr s msg) {lpgGrayNodes = grays}
+    ST.modify $ \s -> (trN s msg) {lpgGrayNodes = grays}
 
 -- embed adjacency list
 -- PG.PGAdj -> [(PG.Edge, DGI.Node)]

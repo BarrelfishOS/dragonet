@@ -148,12 +148,18 @@ graph prg2 {
 
         node L4Prot {
             port UDP[L4UDPFillChecksum]
-            port Other_true[_Out]
+            port Other_true[tmp1]
 
             predicate UDP "and(pred(EthType,IPv4),pred(IpProt,UDP))"
+            predicate Other_true "not(and(pred(EthType,IPv4),pred(IpProt,UDP)))"
         }
 
-        node L4UDPFillChecksum { port o_true[_Out] }
+        node tmp1 {port true[_Out]}
+
+        node L4UDPFillChecksum {
+            port true[_Out]
+            // predicate o_true "pred(FOO,YEAHHHHHHHHHHHHHHHHHHHHHHHHHHH)"
+        }
 
        or _Out {
             port true[Out]
@@ -323,7 +329,7 @@ graph prg3 {
         // set up IPv4 checksum and UDP checksum
         node CtxUDPv4 {
             attr "software"
-            port out[L4UDPFillChecksum2]
+            port out[L4UDPFillChecksum]
         }
 
         // set up IPv4 checksum and TCP checksum
@@ -589,12 +595,12 @@ tests =
  TestList [
       test0
     , test0'
-    --, t1
-    --, t2
-    --, t3
-    --, t4
    , lpgPredNodeTest "TxQueue" ["or(not(and(pred(IpProt,UDP),pred(EthType,IPv4))),pred(TxL4UDPFillChecksum,true))"]
    , lpgPredNodeTest "TxQueue" ["or(not(pred(EthType,IPv4)),pred(TxL3IPv4FillChecksum,true))"]
+   , t1
+   , t2
+   , t3
+   --, t4
  ]
 
 lpgT = LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
@@ -619,11 +625,11 @@ prPred gr s = do
 
 
 main = do
-    {--
     writeFile "tests/prg4.dot" $ toDot prg4
     writeFile "tests/lpg4.dot" $ toDot lpg4
     let emb4 = embeddingRxTx2 prg4 lpg4
     writeFile "tests/emb4.dot" $ toDot emb4
+    {--
     --}
 
     --prPred emb4 "RxQueue"

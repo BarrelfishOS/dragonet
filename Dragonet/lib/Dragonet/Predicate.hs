@@ -26,6 +26,7 @@ module Dragonet.Predicate (
     PredAssignment,
     --
     dnfGetANDs,
+    dnfEquiv_, dnfEquiv,
     -- exposed for the testing module:
     PredBuild(..),
     getAllAssigns,
@@ -381,6 +382,37 @@ dnfTermAssign :: PredExpr -> PredAssignment
 dnfTermAssign (PredAtom l p)               = (l, p, PredTrue)
 dnfTermAssign ((PredNot (PredAtom l p)))   = (l, p, PredFalse)
 
+-- arbitrary ordering for atoms
+dnfAtomCmp :: PredExpr -> PredExpr -> Ordering
+dnfAtomCmp (PredAtom l1 p1) (PredAtom l2 p2) = (l1,p1) `compare` (l2,p2)
+dnfAtomCmp (PredNot (PredAtom l1 p1)) (PredNot (PredAtom l2 p2)) = (l1,p1) `compare` (l2, p2)
+dnfAtomCmp (PredNot _) (PredAtom _ _) = LT
+dnfAtomCmp (PredAtom _ _) (PredNot _) = GT
+
+--
+dnfAndlEq :: [PredExpr] -> [PredExpr] -> Bool
+dnfAndlEq l1 l2 = l1' == l2'
+    where l1' = L.sortBy dnfAtomCmp l1
+          l2' = L.sortBy dnfAtomCmp l2
+
+dnfEquiv_ :: PredExpr -> PredExpr -> Maybe String
+dnfEquiv_ expr1 expr2 = ret
+    where a1 = dnfGetANDs expr1
+          a2 = dnfGetANDs expr2
+
+          ret = case length a1 == length a2 of
+            True ->  eqAndLs a1 a2
+            False -> Just "dnfEquiv_: list lengths are different"
+
+          eqAndLs :: [[PredExpr]] -> [[PredExpr]] -> Maybe String
+          eqAndLs (a:as) bs  = case L.find (dnfAndlEq a) bs of
+                                  Just _  -> eqAndLs as bs -- recurse
+                                  Nothing -> Just $ "Could not find match for: " ++ (ppShow  a)
+          eqAndLs [] bs = Nothing
+
+dnfEquiv e1 e2 = isNothing $ dnfEquiv_ e1 e2
+
+
 -- first level (only terms, and)
 dnfSAT1 :: PredExpr -> [PredAssignment]
 dnfSAT1 (PredAtom l p)             = [(l, p, PredTrue)]
@@ -610,7 +642,7 @@ predEquiv a b =  a == b
 --    . just one of the atoms is true (and subsequently all others are false)
 --    . all of them are false
 -- The latter is because we have now way of knowing whether our list of atoms
--- expresses the whole range of assignments for a partocular atom
+-- expresses the whole range of assignments for a partocular label
 getAllAssigns :: [(NLabel, NPort)] -> [[PredAssignment]]
 getAllAssigns atoms = map concat $ sequence $ map getAssigns grouped
     where grouped :: [(NLabel, [NPort])]
@@ -633,12 +665,12 @@ predEquivHard_ expr1 expr2 = ret
     where atoms1 = predGetAtoms expr1
           atoms2 = predGetAtoms expr2
           atoms  = L.nub $ atoms1 ++ atoms2
-          all_assigns = getAllAssigns atoms
+          all_assigns = getAllAssigns (tr atoms ("ATOMS: " ++ (ppShow atoms)))
           ret = case length atoms of
             0 -> andErr [[]] checkAssignment
             _ -> andErr all_assigns checkAssignment
           checkAssignment :: [PredAssignment] -> Bool
-          checkAssignment a = eval1 == eval2
+          checkAssignment a = trN (eval1 == eval2) $ "Checking assignment a:" ++ (ppShow a)
             where eval1 = predEval expr1 a
                   eval2 = predEval expr2 a
 
@@ -757,7 +789,7 @@ portPred bld (_,fnode@(FNode {})) port = portPred_ bld fnode port
 
 portPred_ :: PredBuild -> PG.Node -> PG.NPort -> PredExpr
 portPred_ bld fnode@(FNode {}) port = pred
-    where pred' = trN pred ("node:" ++ (PG.nLabel fnode) ++ " port:" ++ port ++ " port pred:" ++ (show pred))
+    where pred' = tr pred ("node:" ++ (PG.nLabel fnode) ++ " port:" ++ port ++ " port pred:" ++ (show pred))
           -- NB: In our current semantics, if predicates are defined for a
           -- particular port, then the port selection predicates are ignored.
           -- Note that, if needed, they can be added in the port predicates
@@ -798,12 +830,12 @@ opPred bld preds (op, port) = expr
 depGetPred__ :: PredCompSt -> (PG.PGNode, PG.NPort) -> PredExpr
 -- dependency is an FNode
 depGetPred__ st (dep_node@(_, fnode@(FNode {})), dep_port) = ret'
-    where ret'       = trN ret $ "getting predicate of dependency node: " ++ ((PG.nLabel . snd) dep_node) ++ " port:" ++ dep_port ++ " RET:" ++ (ppShow ret)
+    where ret'       = tr ret $ "getting predicate of dependency node: " ++ ((PG.nLabel . snd) dep_node) ++ " port:" ++ dep_port ++ " RET:" ++ (ppShow ret)
           ret        = predFnodePort (predBld st) rec_pred (dep_node, dep_port)
           rec_pred   = computePred $ st {predDst = dep_node, predInPort = Just dep_port}
 -- dependency is an ONode
 depGetPred__ st (dep_node@(_, ONode {}), dep_port) = ret
-    where ret' = trN ret $  "getting predicate of dependency node: " ++ ( (PG.nLabel . snd) dep_node )
+    where ret' = tr ret $  "getting predicate of dependency node: " ++ ( (PG.nLabel . snd) dep_node )
           ret = computePred newst
           newst    = st {predDst = dep_node, predInPort = Just dep_port}
 
@@ -869,7 +901,7 @@ computePred st@(PredCompSt {predDst = (_, ONode {nLabel=lbl, nOperator=op })})
           f_preds_ = case length false_deps of
                          0 -> error $ "No false dependencies for node " ++ lbl
                          _ -> map (depGetPred st) false_deps
-          t_preds = trN t_preds_ $ "Visiting node:" ++ lbl ++ " (t_preds_=" ++ (ppShow t_preds_) ++ ")"
+          t_preds = tr t_preds_ $ "Visiting node:" ++ lbl ++ " (t_preds_=" ++ (ppShow t_preds_) ++ ")"
           f_preds = f_preds_ --tr f_preds_ $ "Visiting node:" ++ lbl ++ " (expragrs=" ++ (show f_preds_) ++ ")"
           ret = case inport of
             "true"  -> opPred (predBld st) t_preds (op, "true")
