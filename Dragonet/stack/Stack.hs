@@ -53,7 +53,7 @@ data EndpointDesc = EndpointUDPIPv4 {
 }
 
 data StackState = StackState {
-    ssNextAppId :: PLA.AppId,
+    ssNextAppId :: PLA.AppId,  -- This ID will be given to the next app that tries to connect
     ssNextSocketId :: PLA.SocketId,
     ssNextEndpointId :: EndpointId,
     ssApplications :: M.Map PLA.AppId AppDesc,
@@ -271,9 +271,13 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
                 -- Transformations to be applied to graph before implementing it
                 implTransforms = [IT.coupleTxSockets, IT.mergeSockets]
 
+                -- LPG config is essentially all flows in network stack
             putStrLn $ "LPG config: " ++ show lpgCfg
             (plg,(_,pCfg)) <- O.optimize helpers prgU lpgC implTransforms
                     (plAssign cfgPLA ss) dbg (costFun ss) pCfgs
+
+            putStrLn $ "Optimization done!"
+
             -- apply PRG confuguration
             cfgImpl sharedState pCfg
             let createPL pl@('A':'p':'p':aids) = do

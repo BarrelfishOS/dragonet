@@ -85,19 +85,65 @@ run_for_1_cores() {
     sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0  -p 888 -t -q t0
 }
 
+run_for_1_cores_null() {
+    echo fancyEcho running on ${SERVERIP} with single application thread and two sockets for null testing
+    sudo ./dist/build/bench-fancyecho/bench-fancyecho \
+    -a t0 -p 111 \
+    -a t1 -p 222 \
+    -a t2 -p 333 \
+    -a t3 -p 444 \
+    -t -q t0 -q t1 -q t2 -q t3
+}
+
+
+if [ -z $1 ] ; then
+    echo "ERROR: provide the stack name"
+    echo "USAGE: $0 <stackname>"
+    echo "EXAMPLE: $0 tap"
+    echo "EXAMPLE: $0 sf"
+    echo "EXAMPLE: $0 e10k"
+    echo "EXAMPLE: $0 null"
+    exit 1
+fi
+
+
+STACKNAME=stack-"${1}"
+
 # For Solarflare
-STACKNAME="stack-sf"
-SERVERIP="10.113.4.195"
+if [ "$STACKNAME" ==  "stack-sf" ] ; then
+    SERVERIP="10.113.4.195"
+else
 
+    # For intel
+    if [ "$STACKNAME" ==  "stack-e10k" ] ; then
+        SERVERIP="10.113.4.95"
+    else
 
-# For intel
-STACKNAME="stack-e10k"
-SERVERIP="10.113.4.95"
+        if [ "$STACKNAME" ==  "stack-tap" ] ; then
+            SERVERIP="192.168.123.1"
+        else
+
+            if [ "$STACKNAME" ==  "stack-null" ] ; then
+                SERVERIP="127.0.0.1"
+            else
+                print "Invalid stack type $STACKNAME"
+                exit 1
+            fi
+        fi
+    fi
+fi
 
 
 ./scripts/pravin/wait_for_dragonet.sh 4 ${STACKNAME}
 
-run_for_2_cores_SP
+run_for_1_cores_null
+
+# for quick cleanup
+sudo killall ${STACKNAME}
+
+exit 0
+
+#run_for_2_cores_SP
 
 #run_for_4_cores
 

@@ -39,7 +39,7 @@ data DbgAction a =
 type DbgFunSingle a = String -> DbgAction a -> IO ()
 type DbgFunction a = String -> DbgFunSingle a
 
-type CostFunction a = PL.PLGraph -> a
+type CostFunction a = PL.PLGraph -> (a, String)
 
 makeGraph ::
        Sem.Helpers           -- | Semantics helpers combined
@@ -87,7 +87,7 @@ makeGraph' helpers prgC lpg embed_fn implTransforms pla debug = do
     debug "pipelines" $ DbgPLGraph plg
     return plg
 
-optimize :: Ord a =>
+optimize :: Ord a => Show a =>
        Sem.Helpers                     -- | Semantics helpers combined
     -> PG.PGraph                       -- | Unconfigured PRG
     -> PG.PGraph                       -- | Configured LPG
@@ -100,11 +100,15 @@ optimize :: Ord a =>
 optimize hs prg lpg implTransforms pla dbg cf cfgs = do
     evald <- forM cfgs $ \(lbl,cfg) -> do
         plg <- makeGraph hs prg lpg implTransforms (pla lbl) (dbg lbl) cfg
-        let cost = cf plg
+        let (cost, dbgmsg) = cf plg
         dbg lbl lbl $ DbgEvaluated plg cost
+        putStrLn $ "Cost function returned value "  ++ " with msg " ++ dbgmsg
         return (cost, plg, (lbl,cfg))
     let fst3 (a,_,_) = a
-        (_,minPlg,lcfg) = L.minimumBy (compare `on` fst3) evald
+        (minCost,minPlg,lcfg) = L.minimumBy (compare `on` fst3) evald
+        (selectedConfName, _) = lcfg
+    putStrLn $ "Selected PRG conf is " ++ (show selectedConfName)
+            ++ " with cost " ++ (show minCost)
     return (minPlg, lcfg)
 
 dbgDummy :: DbgFunction a
@@ -114,15 +118,20 @@ dbgDotfiles :: Show a => String -> DbgFunction a
 dbgDotfiles bdir cl gl d =
     case d of
         DbgPGraph pg ->
-            writeF (gl ++ ".dot") $ toDot pg
+                do
+                    --putStrLn $ cl ++ " -> pg type " ++ (show bdir)
+                    writeF (gl ++ ".dot") $ toDot pg
         DbgPLGraph plg -> do
+            --putStrLn $ cl ++ " -> plg type " ++ (show bdir)
             let linkMap pl = gl FP.</> PL.plLabel pl ++ ".svg"
             writeF (gl ++ ".dot") $ pipelinesDot (Just linkMap) plg
             forM_ (DGI.labNodes plg) $ \(_,pl) ->
                 writeF (gl FP.</> PL.plLabel pl  ++ ".dot") $
                     toDot $ PL.plGraph pl
         DbgEvaluated _ cost ->
-            putStrLn $ cl ++ " -> " ++ show cost
+                do
+                    putStrLn $ cl ++ " -> dbgEval type " ++ (show bdir)
+                            ++ ", cost -> " ++ show cost
     where
         writeF f c = do
             let path = bdir FP.</> cl FP.</> f
