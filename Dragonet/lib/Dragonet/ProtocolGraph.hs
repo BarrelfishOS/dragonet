@@ -140,7 +140,8 @@ type NSpawnHandle = String
 type ConfMonad a = ST.State (Int,[PGNode]) a
 
 type ConfFunction =
-    Node ->
+    PGraph ->
+    PGNode ->
     [(PGNode, Edge)] ->
     [(PGNode, Edge)] ->
     ConfValue ->

@@ -1,0 +1,149 @@
+graph e10kPRG {
+    cluster Rx {
+        cluster L2Ether {
+            boolean Classified {
+                attr "source"
+                spawn poll Classified
+                port true[ValidLength]
+                port false[] }
+
+            boolean ValidLength {
+                port true[ValidCRC]
+                port false[] }
+
+            boolean ValidCRC {
+                port true[ClassifyL3_]
+                port false[] }
+
+            node ClassifyL3_ {
+                port ipv4[.L3IPv4Classified .L3IPv4Checksum_]
+                port other[.C5TupleFilter] }
+
+        }
+
+        cluster L3IPv4 {
+
+            boolean Classified {
+                implementation E10kL3IPv4Classified
+                attr "software"
+                port true false[]
+                constraint true "IPv4"
+                constraint false "!IPv4" }
+
+            node Checksum_ {
+                port out[ValidChecksum .C5TupleFilter] }
+
+            boolean ValidChecksum {
+                implementation E10kL3IPv4ValidChecksum
+                attr "software"
+                port true false[] }
+        }
+
+        config C5TupleFilter {
+            type { (sip:   <UInt 32>,
+                    dip:   <UInt 32>,
+                    proto: <Enum (TCP,UDP,SCP,OTHER)>,
+                    sport: <UInt 16>,
+                    dport: <UInt 16>,
+                    prio:  Int 1 7,
+                    queue: UInt 2) } <,128>
+            function config5tuple
+            port queues[Queues]
+            port default[CFDirFilter] }
+
+        config CFDirFilter {
+            type { (sip:   UInt 32,
+                    dip:   UInt 32,
+                    proto: Enum (TCP,UDP,SCP,OTHER),
+                    sport: UInt 16,
+                    dport: UInt 16,
+                    queue: UInt 2) }
+            function configFDir
+            port queues[Queues]
+            port default[Queues] }
+
+        config Queues {
+            //implementation E10kRxQueue
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queues
+            port out[]
+            port drop[]
+            port init[]
+        }
+
+        /*
+        or Q0Valid {
+            port true[Queue0]
+            port false[] }
+        node Queue0 {
+            implementation E10kRxQueue0
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue0
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q1Valid {
+            port true[Queue1]
+            port false[] }
+        node Queue1 {
+            implementation E10kRxQueue1
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue1
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q2Valid {
+            port true[Queue2]
+            port false[] }
+        node Queue2 {
+            implementation E10kRxQueue2
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue2
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q3Valid {
+            port true[Queue3]
+            port false[] }
+        node Queue3 {
+            implementation E10kRxQueue3
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue3
+            port out[]
+            port drop[]
+            port init[] }
+    */
+    }
+
+    cluster Tx {
+        node Queue0 {
+            implementation E10kTxQueue0
+            attr "sink"
+            attr "software" }
+        node Queue1 {
+            implementation E10kTxQueue1
+            attr "sink"
+            attr "software" }
+        node Queue2 {
+            implementation E10kTxQueue2
+            attr "sink"
+            attr "software" }
+        node Queue3 {
+            implementation E10kTxQueue3
+            attr "sink"
+            attr "software" }
+    }
+}

@@ -11,7 +11,7 @@ module Graphs.E10k (
     parseFDirCFG, cFDtString,
 
     flowQueue,
-    graphH
+    graphH, graphH_
 ) where
 
 import Dragonet.ProtocolGraph
@@ -22,6 +22,9 @@ import Dragonet.Configuration
 import Dragonet.Implementation.IPv4 as IP4
 import qualified Dragonet.Semantics as SEM
 import Dragonet.Flows (Flow (..))
+
+import qualified Data.Graph.Inductive as DGI
+import qualified Data.Graph.Inductive.Query.DFS as DFS
 
 import Data.Word
 import Data.Maybe
@@ -44,6 +47,8 @@ import qualified Util.GraphHelpers as GH
 import Control.Exception (assert)
 import Text.Show.Pretty (ppShow)
 
+tr = flip trace
+trN = \x  _ -> x
 
 type QueueID = Int
 
@@ -57,7 +62,8 @@ addCfgFun :: Node -> ConfFunction
 addCfgFun n
     | l == "RxC5TupleFilter" = config5tuple
     | l == "RxCFDirFilter"   = configFDir
-    | l == "RxQueues" || l == "TxQueues" = configQueues -- not a real configuration, but helpful for building PRGs
+    | l == "RxQueues"        = configRxQueues
+    | l == "TxQueues"        = configTxQueues -- not a real configuration, but helpful for building PRGs
     | otherwise = error $ "Unknown LPG CNode: '" ++ l ++ "'"
     where l = nLabel n
 
@@ -214,7 +220,7 @@ nodeL5Tuple c = (baseFNode (c5tString c) bports) {
             ]
 
 config5tuple :: ConfFunction
-config5tuple _ inE outE cfg = do
+config5tuple _ _ inE outE cfg = do
     ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
     let lastEdge = (endN,defaultN,endP)
     return (edges ++ [lastEdge])
@@ -304,7 +310,7 @@ parseFDT (CVTuple
         convInt (CVInt i) = fromIntegral i
 
 configFDir :: ConfFunction
-configFDir _ inE outE cfg = do
+configFDir _ _ inE outE cfg = do
     ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
     let lastEdge = (endN,defaultN,endP)
     return (edges ++ [lastEdge])
@@ -332,33 +338,133 @@ configFDir _ inE outE cfg = do
             let fEdge = (n,queue $ cfdtQueue c,Edge "false")
             return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
 
-configQueues :: ConfFunction
-configQueues cfgn inE outE (CVInt qs) = do
-    ret <- foldM addNode [] [1..qs]
-    return ret
-    where addNode prev n = do
-            let name = case (nLabel cfgn) of
-                         "RxQueues" -> "RxQueue" ++ (show n)
-                         "TxQueues" -> "TxQueue" ++ (show n)
+duplicateDFS :: PGraph -> PGNode -> DGI.Node -> (String -> String) -> ConfMonad [PGEdge]
+duplicateDFS g (nid,nlbl) nid' dupname = do
+    let dfs = DFS.dfsWith getPgN [nid] g
+        getPgN ctx@(ins,nid,nlbl,outs) = ((nid,nlbl),outs)
+        nodes    = map fst dfs
+        nodesDup = drop 1 nodes -- nodes to be duplicated (do not include first node)
+        oEdges = map snd dfs
+
+        dupNode :: Node -> Node
+        dupNode n = n { nLabel = (dupname $ nLabel n) }
+
+    dupNodes <- forM (map (dupNode . snd) nodesDup) confMNewNode
+
+    let nodeMap :: [(DGI.Node,  DGI.Node)]
+        nodeMap_ = [(nid, dupNid) | ((nid,_), (dupNid,_)) <- zip nodesDup dupNodes]
+        nodeMap  = (nid,nid'):nodeMap_
+
+        getOutEs ctx@(ins,nid,nlbl,outs) = outs
+
+        mapOutNodeEdges :: DGI.Node -> PGAdj -> [(DGI.Node, DGI.Node, Edge)]
+        mapOutNodeEdges nid adjs = [ (getDup nid, getDup nid_o, e) | (e,nid_o) <- adjs ]
+            where getDup :: DGI.Node -> DGI.Node
+                  getDup nid = case L.lookup nid nodeMap of
+                    Just x -> x
+                    Nothing -> error "duplicateDFS: this is not supposed to happen"
+
+        outEdges = L.concat [mapOutNodeEdges nid adjs | ((nid,_),adjs) <- dfs]
+        -- filter self edges to the first node
+        f_fn (nid1, nid2, _) = not (nid1 == nid' && nid2 == nid')
+        outEdges' = filter f_fn outEdges
+
+    return outEdges'
+
+
+-- Add an OR node in front of each Queue
+-- All nodes (and edges) after the queue are duplicated for each queue
+-- Incomming edges to the configuration queue node
+configRxQueues :: ConfFunction
+configRxQueues g (cfgnid,cfgn) inE outE (CVInt qs) = do
+
+    -- first (default) queue
+    ret <- forM [0..qs-1] addNode
+
+    return $ concat $ map snd ret
+
+    where addNode n = do
+            -- first create queue copies
+            let name = "RxQueue" ++ (show n)
                 attrs = nAttributes cfgn
                 ports = nPorts cfgn
-                node = (baseFNode name []) { nAttributes = attrs
-                                           , nPorts = ports }
+                qimpl = NImplFunction "E10kRxQueue"
+                node = (baseFNode name ports) { nAttributes = attrs,
+                                                nImplementation = qimpl}
+                oname = "RxQ" ++ (show n) ++ "Valid"
+                onode = baseONode oname ["true","false"] NOpOr {}
+                defQ = 0
 
-            (nid, _) <- confMNewNode node
+            (q_nid, _) <- confMNewNode node
+            (o_nid, _) <- confMNewNode onode
 
+            let edge_to_self :: (PGNode, Edge) -> Bool
+                edge_to_self ((_, CNode {nLabel = x}), _) = x == nLabel cfgn
+                edge_to_self _ = False
+
+                edge_default :: (PGNode, Edge) -> Bool
+
+                (inSelf, inOther)   = L.partition edge_to_self inE
+                (outSelf, outOther) = L.partition edge_to_self outE
+
+                self :: [Edge] -- self edges
+                self_in  = L.sort $ [ e | (_, e) <- inSelf ]
+                self_out = L.sort $ [ e | (_, e) <- outSelf ]
+                self = case (self_in == self_out) of
+                    True -> self_in
+                    False -> error "in and out self edges do not match"
+
+                edge_default (_, Edge { ePort = p }) = L.isPrefixOf "default" p
+                (inDef, inQueues) = L.partition edge_default inOther
+
+                -- default edges are included only in queue 1
+                iE    = case n == defQ of
+                    True  -> [ (fst x, o_nid, e) | (x, e) <- inOther]
+                    False -> [ (fst x, o_nid, e)  | (x, e) <- inQueues]
+                -- out Edges
+                oE =  [ (q_nid, fst x, e)  | (x, e) <- outOther]
+                -- self edges
+                sE  = [ (q_nid, q_nid, e)    | e <- self ]
+                -- or edges (just the true port)
+                orE = [ (o_nid, q_nid, Edge { ePort = "true" }) ]
+
+            -- duplciate all the nodes after the queue for all the queues but
+            -- the first onde
+            dupEs  <- case n == defQ of
+                       True  -> return oE
+                       False -> duplicateDFS g (cfgnid,cfgn) q_nid (++ (show n))
+
+            let newEdges = iE ++ sE ++ orE ++ dupEs
+            return ((q_nid,o_nid),newEdges)
+
+configTxQueues :: ConfFunction
+configTxQueues _ (_,cfgn) inE outE (CVInt qs) = do
+    ret <- foldM addNode [] [0..qs-1]
+    return ret
+    where addNode prev n = do
+            -- first create queue copies
+            let name = "TxQueue" ++ (show n)
+                attrs = nAttributes cfgn
+                ports = nPorts cfgn
+                node = (baseFNode name ports) { nAttributes = attrs }
+                onode = baseONode name ["true","false"] NOpOr {}
+
+            (q_nid, _) <- confMNewNode node
             let edge_to_self :: (PGNode, Edge) -> Bool
                 edge_to_self ((_, CNode { nLabel = xlbl }), _) = xlbl == nLabel cfgn
                 edge_to_self _ = False
-                self :: [Edge]
+                self :: [Edge] -- self edges
                 self_in  = L.sort $ [ e | (_, e) <- filter edge_to_self inE]
                 self_out = L.sort $ [ e | (_, e) <- filter edge_to_self outE]
                 self = case (self_in == self_out) of
                     True -> self_in
                     False -> error "incomming and outgoing self edges do not match"
-                iE  = [ (fst x, nid, e)  | (x, e) <- filter (not . edge_to_self) inE]
-                oE  = [ (nid, fst x, e)  | (x, e) <- filter (not . edge_to_self) outE]
-                sE  = [ (nid, nid, e)    | e <- self ]
+                -- in edges
+                iE  = [ (fst x, q_nid, e)  | (x, e) <- filter (not . edge_to_self) inE]
+                -- out edges
+                oE  = [ (q_nid, fst x, e)  | (x, e) <- filter (not . edge_to_self) outE]
+                -- self edges
+                sE  = [ (q_nid, q_nid, e)    | e <- self ]
             return $ prev ++ iE ++ oE ++ sE
 
 
@@ -443,9 +549,12 @@ flowQueue prgC flow = ret
             _   -> error $ "More than one connection matches for node:"
                            ++ node0_ ++ " port:" ++ port0
 
-graphH :: IO (PGraph,SEM.Helpers)
-graphH = do
-    (pg,helpers) <- parseGraph "Graphs/E10k/prgE10kImpl.unicorn"
+graphH_ :: FilePath -> IO (PGraph, SEM.Helpers)
+graphH_ fname = do
+    (pg, helpers) <- parseGraph fname
     let pg' = prepareConf pg
-    return (pg',helpers)
+    return (pg', helpers)
+
+graphH :: IO (PGraph,SEM.Helpers)
+graphH = graphH_ "Graphs/E10k/prgE10kImpl.unicorn"
 

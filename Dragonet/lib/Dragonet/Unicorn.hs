@@ -169,7 +169,7 @@ clusterMap Cluster {
 -- Helper functions
 
 unicornSimpleConfig :: PG.ConfFunction
-unicornSimpleConfig n inE outE cval =
+unicornSimpleConfig _ (_,n) inE outE cval =
     return $ concatMap edge inE
     where
         -- Port name to use

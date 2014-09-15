@@ -48,14 +48,12 @@ confMRun g m = addEdges $ addNodes g
         -- Add new edges
         addEdges g' = foldl (flip DGI.insEdge) g' newEdges
 
-
 -- Apply configuration for a single CNode
-applyCNode :: Configuration -> PGraph -> PGContext -> PGraph
-applyCNode config g ctx = confMRun g' newEM
+doApplyCNode :: ConfValue -> PGraph -> PGContext -> PGraph
+doApplyCNode conf g ctx@(_,nid,node,_) = confMRun g' newEM
     where
         node = DGI.lab' ctx
         fun = nConfFunction node
-        conf = fromJust $ lookup (nLabel node) config
 
         -- Remove configuration node
         g' = DGI.delNode (DGI.node' ctx) g
@@ -65,9 +63,18 @@ applyCNode config g ctx = confMRun g' newEM
         inE = map lblPair $ DGI.lpre g n
         outE = map lblPair $ DGI.lsuc g n
         -- Get new edges (in conf monad)
-        newEM = fun node inE outE conf
+        newEM = fun g (nid,node) inE outE conf
 
         lblPair (m,a) = ((m,fromJust $ DGI.lab g m), a)
+
+-- Apply configuration for a single CNode
+applyCNode :: Configuration -> PGraph -> PGContext -> PGraph
+applyCNode config g ctx@(_,nid,node,_) = ret
+    where
+        conf = lookup (nLabel node) config
+        ret = case conf of
+            Just x -> doApplyCNode x g ctx
+            Nothing -> g
 
 
 -- Apply specified configuration to graph

@@ -23,7 +23,7 @@ import Util.Misc (mapT2)
 import Graphs.Helpers
 
 configLPGUDPSockets :: PG.ConfFunction
-configLPGUDPSockets _ inE outE cfg = concat <$> mapM addEndpoint tuples
+configLPGUDPSockets _ _ inE outE cfg = concat <$> mapM addEndpoint tuples
     where
         esa_attrs = [PG.ESAttrPredicate "and(pred(EthType,IPv4),pred(IpProt,UDP))"] -- spawn edge attributes
         PG.CVList tuples = cfg

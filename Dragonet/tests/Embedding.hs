@@ -12,7 +12,7 @@ import Dragonet.Embedding
 import Dragonet.DotGenerator (toDot, toDotHighlight)
 import Dragonet.Predicate (PredExpr, nodePred)
 import qualified Dragonet.Predicate as PR
-import Graphs.Cfg (lpgCfg)
+import Graphs.Cfg (lpgCfg,prgCfg)
 
 import Data.Maybe
 import Data.Function (on)
@@ -68,13 +68,20 @@ prg1 :: PG.PGraph
 prg1 = prgConfig $ U.strToGraph [r|
 graph prg1 {
 
+    node Foo {
+        port queues[RxQueues]
+        port default[RxQueues]
+    }
+
     config RxQueues {
         attr "software"
         spawn poll RxQueues
-        port out[] }
+        port out[Bar] }
 
     config TxQueues {
-        attr "software"
+        attr "software" }
+
+    node Bar {
     }
 }
 |]
@@ -608,9 +615,20 @@ lpgU = fst <$> lpgT
 lpgH = snd <$> lpgT
 lpgC = C.applyConfig lpgCfg <$> lpgU
 
-e10kT = E10k.graphH
+e10kT = E10k.graphH_ "Graphs/E10k/prgE10kImpl.unicorn"
 e10kU = fst <$> e10kT
 e10kH = snd <$> e10kT
+
+e10kC = (C.applyConfig prgCfg) <$> e10kU
+
+e10kOffloadU = do
+    (e10kU, e10kH) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl-offload.unicorn"
+    let nQueues = 4
+        prgQConf = [("RxQueues", PG.CVInt nQueues), ("TxQueues", PG.CVInt nQueues)]
+        ret = C.applyConfig prgQConf $  E10k.prepareConf e10kU
+    return ret
+
+
 
 remPrefix :: String -> String -> String
 remPrefix prefix str = case L.stripPrefix prefix str of
@@ -625,12 +643,20 @@ prPred gr s = do
 
 
 main = do
+
+    e10k_prg  <- e10kU
+    e10k_prg2 <- e10kOffloadU
+    writeFile "tests/prgE10k.dot"   $ toDot e10k_prg
+    writeFile "tests/prgE10k-2.dot" $ toDot e10k_prg2
+    --writeFile "tests/prg1.dot" $ toDot prg1
+
+    {--
     writeFile "tests/prg4.dot" $ toDot prg4
     writeFile "tests/lpg4.dot" $ toDot lpg4
     let emb4 = embeddingRxTx2 prg4 lpg4
     writeFile "tests/emb4.dot" $ toDot emb4
-    {--
     --}
+    --runTestTT tests
 
     --prPred emb4 "RxQueue"
     --prPred emb4 "RxisPing"
@@ -643,7 +669,6 @@ main = do
     --writeFile "tests/prg3.dot" $ toDot prg3
     --writeFile "tests/lpgYYY.dot" $ toDot lpgC
 
-    runTestTT tests
 
     {--
     --prPred lpgC "TxL3ARPInitiateResponse"
