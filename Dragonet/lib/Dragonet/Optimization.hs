@@ -87,6 +87,10 @@ makeGraph' helpers prgC lpg embed_fn implTransforms pla debug = do
     debug "pipelines" $ DbgPLGraph plg
     return plg
 
+-- optimize function
+-- STEP: this is important step, see if it applies the partial configuration
+-- given unconfigured prg, lpg, configurations and cost function, it will
+--      pick best configuration, apply it, and return the configured prg
 optimize :: Ord a => Show a =>
        Sem.Helpers                     -- | Semantics helpers combined
     -> PG.PGraph                       -- | Unconfigured PRG
@@ -96,20 +100,24 @@ optimize :: Ord a => Show a =>
     -> DbgFunction a                   -- | Debugging function
     -> CostFunction a                  -- | Cost function
     -> [(String,C.Configuration)]      -- | Configurations to evaluate
-    -> IO (PL.PLGraph, (String,C.Configuration))
+    -> IO (PL.PLGraph, (String,C.Configuration), PG.PGraph)
+
 optimize hs prg lpg implTransforms pla dbg cf cfgs = do
     evald <- forM cfgs $ \(lbl,cfg) -> do
-        plg <- makeGraph hs prg lpg implTransforms (pla lbl) (dbg lbl) cfg
+        let prgC  = C.applyConfig cfg prg
+        --(dbg lbl) "prg_c" $ DbgPGraph prgC
+        plg <- makeGraph' hs prgC lpg Emb.embeddingRxTx implTransforms (pla lbl) (dbg lbl)
+        --plg <- makeGraph hs prg lpg implTransforms (pla lbl) (dbg lbl) cfg
         let (cost, dbgmsg) = cf plg
         dbg lbl lbl $ DbgEvaluated plg cost
         putStrLn $ "Cost function returned value "  ++ " with msg " ++ dbgmsg
-        return (cost, plg, (lbl,cfg))
-    let fst3 (a,_,_) = a
-        (minCost,minPlg,lcfg) = L.minimumBy (compare `on` fst3) evald
+        return (cost, plg, (lbl,cfg), prgC)
+    let fst3 (a,_,_,_) = a
+        (minCost,minPlg,lcfg, prgpc) = L.minimumBy (compare `on` fst3) evald
         (selectedConfName, _) = lcfg
     putStrLn $ "Selected PRG conf is " ++ (show selectedConfName)
             ++ " with cost " ++ (show minCost)
-    return (minPlg, lcfg)
+    return ( minPlg, lcfg, prgpc)
 
 dbgDummy :: DbgFunction a
 dbgDummy _ _ _ = return ()

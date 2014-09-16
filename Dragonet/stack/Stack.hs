@@ -1,5 +1,6 @@
 module Stack (
     instantiate,
+    instantiateGreedy,
     startStack,
 
     StackState(..),
@@ -16,6 +17,8 @@ import qualified Dragonet.Pipelines.Implementation as PLI
 import qualified Dragonet.Pipelines.Applications as PLA
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.Semantics as Sem
+
+import qualified Data.Maybe as MB
 
 import qualified Data.Graph.Inductive as DGI
 import Control.Applicative ((<$>))
@@ -214,12 +217,13 @@ eventHandler sstv ch ev = do
 --------------------------------------------------------------------------------
 -- Main
 
--- generates the necessary LPG configuration based on the stack state
--- (specifically on the state's endpoints and sockets)
-lpgConfig :: StackState -> C.Configuration
-lpgConfig ss = [("RxL4UDPCUDPSockets", PG.CVList $ cUdpSockets)]
+-- generates the necessary LPG configuration based on the limited number of
+--      endpoints in socket state
+lpgConfig' :: [EndpointDesc] -> StackState -> C.Configuration
+lpgConfig' ll ss = [("RxL4UDPCUDPSockets", PG.CVList $ cUdpSockets)]
     where
-        cUdpSockets = map (PG.CVTuple . cUdpSocket) $ M.elems $ ssEndpoints ss
+        allEps = ll
+        cUdpSockets = map (PG.CVTuple . cUdpSocket) $ allEps
         cUdpSocket ed = [ PG.CVList $ map (buildSock) sids,
                           PG.CVMaybe msIP,
                           PG.CVMaybe msPort,
@@ -237,11 +241,20 @@ lpgConfig ss = [("RxL4UDPCUDPSockets", PG.CVList $ cUdpSockets)]
                 Just sd = M.lookup sid $ ssSockets ss
                 aid = sdAppId sd
 
+
+-- generates the necessary LPG configuration based on the stack state
+-- (specifically on the state's endpoints and sockets)
+lpgConfig :: StackState -> C.Configuration
+lpgConfig ss = lpgConfig' allEps ss
+    where
+        allEps = M.elems $ ssEndpoints ss
+
+
 instantiate :: (Ord a, Show a) =>
            (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
         -> String                                      -- | Name of llvm-helpers
-        -> (StackState -> O.CostFunction a)            -- | Cost Function
-        -> (PG.PGraph -> StackState -> [(String,C.Configuration)]) -- | Oracle
+        -> (StackState -> [EndpointDesc] -> O.CostFunction a) -- | Cost Function
+        -> (PG.PGraph -> [EndpointDesc] -> StackState -> [(String,C.Configuration)]) -- | Oracle
         -> (PLI.StateHandle -> C.Configuration -> IO ()) -- | Implement PRG conf
         -> (StackState -> String -> PG.PGNode -> String) -- | Assign nodes to PL
         -> IO ()
@@ -262,19 +275,33 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
                 let ss' = ss { ssVersion = ssVersion ss + 1 }
                 STM.writeTVar sstv ss'
                 return ss'
-            let lpgCfg = lpgConfig ss
+
+            -- STEP: we need to create incremantal ss with adding one flow at a time
+            let allEps = M.elems $ ssEndpoints ss  -- FIXME: this list should return one flow at a time
+                lpgCfg = lpgConfig' allEps ss
                 -- Configure LPG
                 lpgC = C.applyConfig lpgCfg lpgU
                 dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
-                -- Generate PRG configurations
-                pCfgs = cfgOracle lpgC ss
+                -- STEP: Generate PRG configurations using ORACLE
+                pCfgs = cfgOracle lpgC allEps ss
                 -- Transformations to be applied to graph before implementing it
                 implTransforms = [IT.coupleTxSockets, IT.mergeSockets]
 
                 -- LPG config is essentially all flows in network stack
             putStrLn $ "LPG config: " ++ show lpgCfg
-            (plg,(_,pCfg)) <- O.optimize helpers prgU lpgC implTransforms
-                    (plAssign cfgPLA ss) dbg (costFun ss) pCfgs
+
+            (plg,(_,pCfg), prgpc) <- O.optimize
+                    helpers                    -- | Semantics helpers combined
+                    prgU                       -- | Unconfigured PRG
+                    lpgC                       -- | Configured LPG
+                    implTransforms             -- | Implementation transforms
+                    (plAssign cfgPLA ss)       -- | Assign nodes to pipelines
+                    dbg                        -- | Debugging function
+                    (costFun ss allEps)        -- | Cost function
+                    pCfgs                      -- | Configurations to evaluate
+
+
+
 
             putStrLn $ "Optimization done!"
 
@@ -391,3 +418,194 @@ startStack (lpgU, lpgH) (prgC, prgH) embed_fn llvmH cfgPLA = do
     updateGraph sstv
     putStrLn "Starting interface thread"
     PLA.interfaceThread stackname (eventHandler sstv)
+
+
+
+
+{-
+oneStepGreedy eps ss = do
+(prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
+        putStrLn "starting greedy step "
+        let
+            lpgCfg = lpgConfig' eps ss
+            -- Configure LPG
+            lpgC = C.applyConfig lpgCfg lpgU
+
+            -- FIXME: proper way to save incremental graphs
+            dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
+
+            -- STEP: Generate PRG configurations using ORACLE
+            pCfgs = cfgOracle lpgC eps ss
+
+            -- Transformations to be applied to graph before implementing it
+            implTransforms = [IT.mergeSockets]
+
+        -- LPG config is essentially all flows in network stack
+        putStrLn $ "LPG config: " ++ show lpgCfg
+
+        (plg,(_,pCfg)) <- O.optimize
+                helpers                    -- | Semantics helpers combined
+                prgU                       -- | Unconfigured PRG
+                lpgC                       -- | Configured LPG
+                implTransforms             -- | Implementation transforms
+                (plAssign cfgPLA ss)       -- | Assign nodes to pipelines
+                dbg                        -- | Debugging function
+                (costFun ss eps)        -- | Cost function
+                pCfgs                      -- | Configurations to evaluate
+-}
+
+-- ##################### gready search ####################
+
+-- Calls greedy search step resursively, till all endpoint descriptors are applied
+oneStepGreedy' :: (Ord a, Show a) =>
+        [EndpointDesc]                                  -- | endpoints under current consideration
+        -> StackState                                   -- | current full stackstate
+        -> (PG.PGraph,Sem.Helpers)                      -- | Unconf PRG + helpers
+        -> String                                       -- | Name of llvm-helpers
+        -> (StackState -> [EndpointDesc]
+                -> O.CostFunction a)                    -- | Cost Function
+        -> (PG.PGraph -> [EndpointDesc] -> StackState
+                -> [(String,C.Configuration)])          -- | Oracle
+        -> (PLI.StateHandle -> C.Configuration
+                -> IO ())                               -- | Implement PRG conf
+        -> (StackState -> String -> PG.PGNode
+                -> String)                              -- | Assign nodes to PL
+        -> IO (PL.PLGraph, (String,C.Configuration), PG.PGraph)
+
+oneStepGreedy' [] ss  (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
+    oneStepGreedy [] ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
+
+oneStepGreedy' (x:[]) ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
+    oneStepGreedy [x] ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
+
+oneStepGreedy' (x:xs) ss  (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
+    (plg,(_,pCfg), prgpc) <- oneStepGreedy [x] ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
+    oneStepGreedy' xs ss (prgpc,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
+
+
+-- ##################### gready search ####################
+oneStepGreedy :: (Ord a, Show a) =>
+        [EndpointDesc]                                 -- | endpoints under current consideration
+        -> StackState                                  -- | current full stackstate
+        -> (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
+        -> String                                      -- | Name of llvm-helpers
+        -> (StackState -> [EndpointDesc]
+                -> O.CostFunction a)            -- | Cost Function
+        -> (PG.PGraph -> [EndpointDesc] -> StackState
+                -> [(String,C.Configuration)])  -- | Oracle
+        -> (PLI.StateHandle -> C.Configuration
+                -> IO ())                       -- | Implement PRG conf
+        -> (StackState -> String -> PG.PGNode
+                -> String)                      -- | Assign nodes to PL
+        -> IO (PL.PLGraph, (String,C.Configuration), PG.PGraph)
+
+oneStepGreedy eps ss  (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
+    -- Prepare graphs and so on
+    (lpgU,lpgHelp) <- LPG.graphH
+    let helpers = prgHelp `Sem.mergeHelpers` lpgHelp
+        stackname = "dragonet"
+        lpgCfg = lpgConfig' eps ss
+        -- Configure LPG
+        lpgC = C.applyConfig lpgCfg lpgU
+
+        -- FIXME: proper way to save incremental graphs
+        dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
+
+        -- STEP: Generate PRG configurations using ORACLE
+        pCfgs = cfgOracle lpgC eps ss
+
+        -- Transformations to be applied to graph before implementing it
+        implTransforms = [IT.mergeSockets]
+
+    -- LPG config is essentially all flows in network stack
+    putStrLn $ "LPG config: " ++ show lpgCfg
+
+    --(plg,(_,pCfg), prgpc) <- O.optimize
+    O.optimize
+                helpers                    -- | Semantics helpers combined
+                prgU                       -- | Unconfigured PRG
+                lpgC                       -- | Configured LPG
+                implTransforms             -- | Implementation transforms
+                (plAssign cfgPLA ss)       -- | Assign nodes to pipelines
+                dbg                        -- | Debugging function
+                (costFun ss eps)        -- | Cost function
+                pCfgs                      -- | Configurations to evaluate
+
+
+
+-- ##################### gready search ####################
+instantiateGreedy :: (Ord a, Show a) =>
+           (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
+        -> String                                      -- | Name of llvm-helpers
+        -> (StackState -> [EndpointDesc] -> O.CostFunction a)            -- | Cost Function
+        -> (PG.PGraph -> [EndpointDesc] -> StackState -> [(String,C.Configuration)]) -- | Oracle
+        -> (PLI.StateHandle -> C.Configuration -> IO ()) -- | Implement PRG conf
+        -> (StackState -> String -> PG.PGNode -> String) -- | Assign nodes to PL
+        -> IO ()
+instantiateGreedy (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
+    -- Prepare graphs and so on
+    (lpgU,lpgHelp) <- LPG.graphH
+    let helpers = prgHelp `Sem.mergeHelpers` lpgHelp
+        stackname = "dragonet"
+    ctx <- PLD.initialContext stackname
+    stackhandle <- PLD.ctxState ctx
+    sharedState <- PLI.stackState stackhandle
+
+
+    -- Function to adapt graph to current stack state
+    let updateGraph sstv = do
+            putStrLn "updateGraph entry"
+            ss <- STM.atomically $ do
+                ss <- STM.readTVar sstv
+                let ss' = ss { ssVersion = ssVersion ss + 1 }
+                STM.writeTVar sstv ss'
+                return ss'
+
+            -- STEP: TODO: we need to create incremantal ss with adding one flow at a time
+
+            let allEps' = M.elems $ ssEndpoints ss
+                allEps = allEps' -- FIXME: this list should return one flow at a time
+
+
+            putStrLn $ "Starting iterations!"
+            (plg,(_,pCfg), prgpc) <- oneStepGreedy' allEps ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
+
+            putStrLn $ "Optimization done!"
+
+            -- apply PRG confuguration
+            cfgImpl sharedState pCfg
+            let createPL pl@('A':'p':'p':aids) = do
+                    putStrLn $ "Creating App pipeline: " ++ pl
+                    createPipelineClient agh pl
+                    where
+                        aid = read aids
+                        Just app = M.lookup aid $ ssApplications ss
+                        agh = adGraphHandle app
+                createPL pl = do
+                    putStrLn $ "Creating local pipeline: ##### " ++ pl
+                    createPipeline plg stackname llvmH pl
+            PLD.run ctx plConnect createPL $ addMuxIds plg
+            putStrLn "updateGraph exit"
+            -- FIXME: Create file here.
+            putStrLn "################### calling appendFile with app ready notice"
+            appendFile("allAppslist.appready") $ "Application is ready!\n"
+
+        initSS = StackState {
+                ssNextAppId = 1,
+                ssNextSocketId = 1,
+                ssNextEndpointId = 1,
+                ssApplications = M.empty,
+                ssAppChans = M.empty,
+                ssSockets = M.empty,
+                ssEndpoints = M.empty,
+                ssUpdateGraphs = updateGraph,
+                ssVersion = 0
+            }
+
+    putStrLn "Let's fire her up!"
+    sstv <- STM.atomically $ STM.newTVar $ initSS
+    updateGraph sstv
+    putStrLn "Starting interface thread"
+    PLA.interfaceThread stackname (eventHandler sstv)
+
+

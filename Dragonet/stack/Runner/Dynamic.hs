@@ -226,6 +226,19 @@ hOutQRemove tds pl = runDynMWithTDS tds $ do
     Just qh <- dmDSGets $ M.lookup pl . dsInQs
     rmOutQueue pl qh
 
+
+{-
+hOutQRemove :: TDynState -> PL.PLabel -> IO ()
+hOutQRemove tds pl = runDynMWithTDS tds $ do
+    dmDebugPrint "hOutQRemove"
+    ans <- dmDSGets $ M.lookup pl . dsInQs
+    case ans of
+        Just qh -> dmDSGets $ M.lookup pl . dsInQs
+        Nothing -> error "Remove not supported " ++ (show ans)
+    let Just aa = ans
+    rmOutQueue pl (Just ans)
+-}
+
 hSetGraph :: TDynState -> PG.PGraph -> IO ()
 hSetGraph tds pg = runDynMWithTDS tds $ do
     dmDebugPrint "hSetGraph"

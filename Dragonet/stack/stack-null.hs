@@ -33,8 +33,8 @@ localIP = MD.asiagoIP_Intel
 --------------------------------------------------
 
 -- Start out with a dummy configuration for null device
-oracleHardcoded :: PG.PGraph -> StackState -> [(String,C.Configuration)]
-oracleHardcoded _ ss = [("default",[
+oracleHardcoded :: PG.PGraph  -> [EndpointDesc] -> StackState -> [(String,C.Configuration)]
+oracleHardcoded _ eps ss = [("default",[
                 ("RxCFDirFilter", PG.CVList []),
                 ("RxC5TupleFilter", PG.CVList [
  -- ############# For only 1 core #############
@@ -49,43 +49,41 @@ oracleHardcoded _ ss = [("default",[
 
                 ])])]
 
--- [NA] This should return multiple tuples and not just one tuple list
-oracle :: PG.PGraph -> StackState -> [(String,C.Configuration)]
-oracle _ ss = [
+-- This should return multiple tuples and not just one tuple list
+oracle :: PG.PGraph -> [EndpointDesc] -> StackState -> [(String,C.Configuration)]
+oracle _ eps ss = [
                 ("defaultOracle", -- Most stupid configuration, only default queue and default filters
                     [ ("RxCFDirFilter", PG.CVList []),
                       ("RxC5TupleFilter", PG.CVList [])
                     ]
                 )
-
                 , ("OracleOneQueueManyFilters",  -- oracle giving only queue 0 for everything, but adding filters
                     [ ("RxCFDirFilter", PG.CVList []),
                       ("RxC5TupleFilter", PG.CVList fiveTupleCAlt)
                     ]
                 )
 
-                , ("MultiQueueOracle", -- name of configuration
+                , ("MultiQueueOracle", -- separate queue  for each flow
                     [ ("RxCFDirFilter", PG.CVList []),
                       ("RxC5TupleFilter", PG.CVList fiveTupleC)
                     ]
                 )
             ]
+
     where
         queues = [1..(numQueues-1)] ++ [0]
         -- returns 128 five-tuple endpoints from stack-state
-        --
+        epss = M.elems $ ssEndpoints ss -- use in case you want to look into all flows in stack
 
         fiveTupleCAlt = map mkEp5T  -- make endpoint
                     $ zip (cycle [0])  -- use only queue 0
                     $ take 128 -- take top 128 endpoints
-                    $ M.elems  -- converts endpoint map into list
-                    $ ssEndpoints ss -- get all endpoints from stack-state
+                    $ eps -- use only specified endpoints
 
         fiveTupleC = map mkEp5T  -- make endpoint
                     $ zip (cycle queues)  -- make tuple of cycled queue-id and endpoint
                     $ take 128 -- take top 128 endpoints
-                    $ M.elems  -- converts endpoint map into list
-                    $ ssEndpoints ss -- get all endpoints from stack-state
+                    $ eps -- use only specified endpoints
         mkEp5T (queue,ep) = PG.CVTuple [
                                 cvMInt sIP, cvMInt dIP,
                                 PG.CVMaybe $ Just $ PG.CVEnum 1,
@@ -102,11 +100,6 @@ oracle _ ss = [
                 cvMInt :: Integral a => Maybe a -> PG.ConfValue
                 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
                 prio = (1 +) $ sum [nJust sIP, nJust dIP, nJust sP, nJust dP]
-{- Explanation of what is happening in above function:
- -
- -
- -}
-
 
 data CfgAction =
     CfgASet5Tuple Word8 CTRL.FTuple |
@@ -229,7 +222,6 @@ main = do
     -- Prepare graphs and so on
     prgH <- Null.graphH
     --instantiate prgH "llvm-helpers-null" F.fitnessFunction oracle
-    instantiate prgH "llvm-helpers-null" F.priorityFitness oracle
+    instantiateGreedy prgH "llvm-helpers-null" F.priorityFitness oracle
         (implCfg tcstate chan) plAssign
-
 

@@ -33,9 +33,9 @@ import qualified FitnessHelpers as FH
 -- [NA] How well balanced are the flows across HW queues?
 --fitnessFunction :: StackState -> O.CostFunction Int
 --fitnessFunction ss plg = (ans, dbg)
-fitnessFunction :: SS.StackState -> O.CostFunction Float
+fitnessFunction :: SS.StackState -> [SS.EndpointDesc] -> O.CostFunction Float
 --fitnessFunction ss plg = ((sum qcount), dbg2)
-fitnessFunction ss plg = (ans2, dbg2)
+fitnessFunction ss eps plg = (ans2, dbg2)
     where
         dbg = "cost: " ++ (show ans2) ++ ", DEBUGINFO: [[" ++ (show msg) ++ "]]\n"
         dbg2 = "cost: " ++ (show qcount) ++ " = " ++ (show ans2) ++  ", DEBUGINFO: [[" ++ (show dbgMsg) ++ "]]\n"
@@ -55,9 +55,10 @@ fitnessFunction ss plg = (ans2, dbg2)
         dbgMsg = map snd flowsPerQueue
         ans2 = FH.stdDev qcount
 --        msg = show ele
-        endpoints =  length $ M.elems  -- converts endpoint map into list
-                    $ SS.ssEndpoints ss -- get all endpoints from stack-state
+        endpoints = length $ eps
 
+        --endpoints =  length $ M.elems  -- converts endpoint map into list
+        --            $ SS.ssEndpoints ss -- get all endpoints from stack-state
 
 
 
@@ -81,14 +82,13 @@ areFlowsMixed plg = ans
 -- get flows going through each HWQ
 maxFlowsPerGoldQueue = 1
 
-priorityFitness :: SS.StackState -> O.CostFunction Float
-priorityFitness ss plg = fv
+priorityFitness :: SS.StackState -> [SS.EndpointDesc] -> O.CostFunction Float
+priorityFitness ss eps plg = fv
     where
 
         stdDevAllQueues     = FH.getStdDev $ FH.findRXQueuesPerPL plg
         stdDevGoldQueues    = FH.getStdDev $ FH.findGoldRXQueuesPerPL plg
 
-        --gFlows = FH.getGoldFlowsS ss
         aFlows = FH.getFlowsG plg
         gFlows = FH.getGoldFlowsG plg
         queues = FH.getRXQueueCount plg
