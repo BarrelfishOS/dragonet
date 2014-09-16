@@ -57,13 +57,32 @@ isFlowNode n =  "RxL4UDP(" `L.isPrefixOf` l
 
 -- FIXME: TODO: Implement this function, currently it is only a placeholder
 toPriorityClass :: PG.Node -> Int
-toPriorityClass n = 1
+toPriorityClass n = ans
+    where
+    ans
+        | isGoldFlow n  = 2
+        | otherwise     = 0
+
+
+
+isFnode :: PG.Node -> Bool
+isFnode (PG.ONode _ _ _ _ _)   = False
+isFnode (PG.CNode _ _ _ _ _ _) = False
+isFnode (PG.FNode label tag attr ports semantics impl origin) = True
+
 
 -- FIXME: implement this function correctly
 isGoldFlow :: PG.Node -> Bool
 isGoldFlow (PG.ONode _ _ _ _ _)   = False
 isGoldFlow (PG.CNode _ _ _ _ _ _) = False
-isGoldFlow (PG.FNode label tag attr ports semantics impl origin) = True
+isGoldFlow (PG.FNode label tag attr ports semantics impl origin) = ans
+    where
+        lab = drop 1 $ takeWhile (/= ')') $ dropWhile (\x-> x /= '(') label
+        lport =  drop 1 $ dropWhile (/= ':') $ drop 1 $ dropWhile (/= ':') lab
+        ans
+            | length lab == 0 = False
+            | lport == "222" = True
+            | otherwise = False
 
 
 findNodesPGraph :: (PG.Node -> Bool) -> PG.PGraph -> [PG.Node]
@@ -140,10 +159,11 @@ getFlowsG plg =  sum flows
 
 -- FIXME: Complete the implementation
 getGoldFlowsG :: PL.PLGraph -> Int
-getGoldFlowsG plg =  (getFlowsG plg) `div` 2
---    where
---        flowsPerQueue = findFlowQueues plg
---        flows = map fst flowsPerQueue
+getGoldFlowsG plg =  sum flows
+    where
+        flowsPerQueue = findGoldRXQueuesPerPL plg
+        flows = map length flowsPerQueue
+
 
 
 getRXQueueCount :: PL.PLGraph -> Int

@@ -6,7 +6,8 @@ module Stack (
     StackState(..),
     EndpointDesc(..),
     SocketDesc(..),
-    AppDesc(..)
+    AppDesc(..),
+    OracleArgs(..)
 ) where
 
 import qualified Dragonet.Configuration as C
@@ -47,13 +48,15 @@ data SocketDesc = SocketDesc {
     sdEpId  :: EndpointId
 }
 
+
+
 data EndpointDesc = EndpointUDPIPv4 {
     edSockets :: [PLA.SocketId],
     edIP4Src :: Maybe PLA.IPv4Addr,
     edIP4Dst :: Maybe PLA.IPv4Addr,
     edUDPSrc :: Maybe PLA.UDPPort,
     edUDPDst :: Maybe PLA.UDPPort
-}
+} deriving (Show)
 
 data StackState = StackState {
     ssNextAppId :: PLA.AppId,  -- This ID will be given to the next app that tries to connect
@@ -67,6 +70,22 @@ data StackState = StackState {
     ssVersion :: Int
 }
 
+
+-- Oracle related
+data OracleArgs =  OracleArgs {
+        oracleOldConf           :: (String,C.Configuration)
+        , oraclePrg             :: PG.PGraph
+        , oracleNewConns        :: [EndpointDesc]
+        , oracleSS              :: StackState
+    } deriving ()
+
+initOracleArgs :: PG.PGraph -> [EndpointDesc] -> StackState -> OracleArgs
+initOracleArgs prg endps ss = OracleArgs  {
+    oracleOldConf = getEmptyConf,
+    oraclePrg  = prg,
+    oracleNewConns  = endps,
+    oracleSS = ss
+}
 
 -- Force socket nodes in their respective pipeline, for the rest use the
 -- function f
@@ -222,8 +241,9 @@ eventHandler sstv ch ev = do
 lpgConfig' :: [EndpointDesc] -> StackState -> C.Configuration
 lpgConfig' ll ss = [("RxL4UDPCUDPSockets", PG.CVList $ cUdpSockets)]
     where
-        allEps = ll
-        cUdpSockets = map (PG.CVTuple . cUdpSocket) $ allEps
+        --eps = ll
+        eps = M.elems $ ssEndpoints ss
+        cUdpSockets = map (PG.CVTuple . cUdpSocket) $ eps
         cUdpSocket ed = [ PG.CVList $ map (buildSock) sids,
                           PG.CVMaybe msIP,
                           PG.CVMaybe msPort,
@@ -254,7 +274,7 @@ instantiate :: (Ord a, Show a) =>
            (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
         -> String                                      -- | Name of llvm-helpers
         -> (StackState -> [EndpointDesc] -> O.CostFunction a) -- | Cost Function
-        -> (PG.PGraph -> [EndpointDesc] -> StackState -> [(String,C.Configuration)]) -- | Oracle
+        -> (OracleArgs -> [(String,C.Configuration)]) -- | Oracle
         -> (PLI.StateHandle -> C.Configuration -> IO ()) -- | Implement PRG conf
         -> (StackState -> String -> PG.PGNode -> String) -- | Assign nodes to PL
         -> IO ()
@@ -281,9 +301,12 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
                 lpgCfg = lpgConfig' allEps ss
                 -- Configure LPG
                 lpgC = C.applyConfig lpgCfg lpgU
-                dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
+                --dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
+                dbg = O.dbgDummy
+
                 -- STEP: Generate PRG configurations using ORACLE
-                pCfgs = cfgOracle lpgC allEps ss
+                pCfgs = cfgOracle $ initOracleArgs lpgC allEps ss
+
                 -- Transformations to be applied to graph before implementing it
                 implTransforms = [IT.coupleTxSockets, IT.mergeSockets]
 
@@ -458,48 +481,48 @@ oneStepGreedy eps ss = do
 
 -- Calls greedy search step resursively, till all endpoint descriptors are applied
 oneStepGreedy' :: (Ord a, Show a) =>
-        [EndpointDesc]                                  -- | endpoints under current consideration
+        (String,C.Configuration)                       -- | Current configuration of PRG which should not be touched
+        -> [EndpointDesc]                                  -- | endpoints under current consideration
         -> StackState                                   -- | current full stackstate
         -> (PG.PGraph,Sem.Helpers)                      -- | Unconf PRG + helpers
         -> String                                       -- | Name of llvm-helpers
         -> (StackState -> [EndpointDesc]
                 -> O.CostFunction a)                    -- | Cost Function
-        -> (PG.PGraph -> [EndpointDesc] -> StackState
-                -> [(String,C.Configuration)])          -- | Oracle
+        -> (OracleArgs -> [(String,C.Configuration)])          -- | Oracle
         -> (PLI.StateHandle -> C.Configuration
                 -> IO ())                               -- | Implement PRG conf
         -> (StackState -> String -> PG.PGNode
                 -> String)                              -- | Assign nodes to PL
         -> IO (PL.PLGraph, (String,C.Configuration), PG.PGraph)
 
-oneStepGreedy' [] ss  (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
-    oneStepGreedy [] ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
+oneStepGreedy' curr_pconf [] ss  (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
+    oneStepGreedy  curr_pconf  [] ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
 
-oneStepGreedy' (x:[]) ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
-    oneStepGreedy [x] ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
+oneStepGreedy' curr_pconf (x:[]) ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
+    oneStepGreedy curr_pconf [x] ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
 
-oneStepGreedy' (x:xs) ss  (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
-    (plg,(_,pCfg), prgpc) <- oneStepGreedy [x] ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
-    oneStepGreedy' xs ss (prgpc,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
+oneStepGreedy'  curr_pconf (x:xs) ss  (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
+    (plg, prgConf, prgpc) <- oneStepGreedy curr_pconf [x] ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
+    oneStepGreedy' prgConf xs ss (prgpc,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
 
 
 -- ##################### gready search ####################
 oneStepGreedy :: (Ord a, Show a) =>
-        [EndpointDesc]                                 -- | endpoints under current consideration
+        (String,C.Configuration)                       -- | Current configuration of PRG which should not be touched
+        -> [EndpointDesc]                              -- | endpoints under current consideration
         -> StackState                                  -- | current full stackstate
         -> (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
         -> String                                      -- | Name of llvm-helpers
         -> (StackState -> [EndpointDesc]
                 -> O.CostFunction a)            -- | Cost Function
-        -> (PG.PGraph -> [EndpointDesc] -> StackState
-                -> [(String,C.Configuration)])  -- | Oracle
+        -> (OracleArgs -> [(String,C.Configuration)])          -- | Oracle
         -> (PLI.StateHandle -> C.Configuration
                 -> IO ())                       -- | Implement PRG conf
         -> (StackState -> String -> PG.PGNode
                 -> String)                      -- | Assign nodes to PL
         -> IO (PL.PLGraph, (String,C.Configuration), PG.PGraph)
 
-oneStepGreedy eps ss  (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
+oneStepGreedy  current_prg_conf eps ss  (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
     -- Prepare graphs and so on
     (lpgU,lpgHelp) <- LPG.graphH
     let helpers = prgHelp `Sem.mergeHelpers` lpgHelp
@@ -512,7 +535,13 @@ oneStepGreedy eps ss  (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
         dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
 
         -- STEP: Generate PRG configurations using ORACLE
-        pCfgs = cfgOracle lpgC eps ss
+        pCfgs = cfgOracle $  OracleArgs {
+                                    oracleOldConf       = current_prg_conf
+                                    , oraclePrg         = lpgC
+                                    , oracleNewConns    = eps
+                                    , oracleSS          = ss
+                             }
+
 
         -- Transformations to be applied to graph before implementing it
         implTransforms = [IT.mergeSockets]
@@ -533,12 +562,19 @@ oneStepGreedy eps ss  (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
 
 
 
+
+getEmptyConf = ("EmptyCOnf",
+                    [ ("RxCFDirFilter", PG.CVList []),
+                      ("RxC5TupleFilter", PG.CVList [])
+                    ]
+                )
+
 -- ##################### gready search ####################
 instantiateGreedy :: (Ord a, Show a) =>
            (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
         -> String                                      -- | Name of llvm-helpers
         -> (StackState -> [EndpointDesc] -> O.CostFunction a)            -- | Cost Function
-        -> (PG.PGraph -> [EndpointDesc] -> StackState -> [(String,C.Configuration)]) -- | Oracle
+        -> (OracleArgs -> [(String,C.Configuration)]) -- | Oracle
         -> (PLI.StateHandle -> C.Configuration -> IO ()) -- | Implement PRG conf
         -> (StackState -> String -> PG.PGNode -> String) -- | Assign nodes to PL
         -> IO ()
@@ -568,7 +604,7 @@ instantiateGreedy (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
 
 
             putStrLn $ "Starting iterations!"
-            (plg,(_,pCfg), prgpc) <- oneStepGreedy' allEps ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
+            (plg,(_,pCfg), prgpc) <- oneStepGreedy' (getEmptyConf) allEps ss (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA
 
             putStrLn $ "Optimization done!"
 

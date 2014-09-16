@@ -11,6 +11,7 @@ import qualified Graphs.Null as Null
 import qualified Runner.NullControl as CTRL
 
 import Stack
+import qualified Stack as SS
 
 import Control.Monad (forever, forM_)
 import Control.Applicative ((<$>))
@@ -18,11 +19,16 @@ import Control.Concurrent(forkIO, ThreadId)
 import qualified Control.Concurrent.STM as STM
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.List as L
 import Data.Word
 
 import qualified MachineDetails as MD
 import qualified Fitness as F
 
+import Debug.Trace (trace)
+import Text.Show.Pretty (ppShow)
+
+tr = flip . trace
 
 numQueues :: Integer
 numQueues = 3
@@ -33,11 +39,12 @@ localIP = MD.asiagoIP_Intel
 --------------------------------------------------
 
 -- Start out with a dummy configuration for null device
-oracleHardcoded :: PG.PGraph  -> [EndpointDesc] -> StackState -> [(String,C.Configuration)]
-oracleHardcoded _ eps ss = [("default",[
+oracleHardcoded ::  SS.OracleArgs -> [(String,C.Configuration)]
+oracleHardcoded  args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,
+        SS.oraclePrg = oPrg, SS.oracleNewConns = eps , SS.oracleSS = ss}) = [
+                ("default",[
                 ("RxCFDirFilter", PG.CVList []),
                 ("RxC5TupleFilter", PG.CVList [
- -- ############# For only 1 core #############
                      PG.CVTuple [
                         PG.CVMaybe Nothing, -- $ Just $ PG.CVInt $ fromIntegral MD.ziger2IP, -- srcAddr,
                         PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
@@ -50,8 +57,8 @@ oracleHardcoded _ eps ss = [("default",[
                 ])])]
 
 -- This should return multiple tuples and not just one tuple list
-oracle :: PG.PGraph -> [EndpointDesc] -> StackState -> [(String,C.Configuration)]
-oracle _ eps ss = [
+oracle_ ::  SS.OracleArgs -> [(String,C.Configuration)]
+oracle_ args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,  SS.oraclePrg = oPrg, SS.oracleNewConns = eps , SS.oracleSS = ss}) = [
                 ("defaultOracle", -- Most stupid configuration, only default queue and default filters
                     [ ("RxCFDirFilter", PG.CVList []),
                       ("RxC5TupleFilter", PG.CVList [])
@@ -68,8 +75,8 @@ oracle _ eps ss = [
                       ("RxC5TupleFilter", PG.CVList fiveTupleC)
                     ]
                 )
-            ]
 
+            ]
     where
         queues = [1..(numQueues-1)] ++ [0]
         -- returns 128 five-tuple endpoints from stack-state
@@ -100,6 +107,55 @@ oracle _ eps ss = [
                 cvMInt :: Integral a => Maybe a -> PG.ConfValue
                 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
                 prio = (1 +) $ sum [nJust sIP, nJust dIP, nJust sP, nJust dP]
+
+oracle ::  SS.OracleArgs -> [(String, C.Configuration)]
+oracle args@(SS.OracleArgs {SS.oracleOldConf = (oldconfname,oldconf), SS.oracleNewConns = eps}) = ret
+    where ret_ = [ ("ORACLECONF", c) | c <- epsAllConfs eps oldconf ]
+          ret  = trace ("---\n"
+                        ++ "NEWCONF:  " ++ (ppShow ret_)
+                        ++ "\nOLDCONF:" ++ (ppShow oldconf)
+                        ++ "\nEPS: " ++ (ppShow eps)
+                        ++ "---\n") ret_
+
+epsAllConfs :: [EndpointDesc] -> C.Configuration -> [C.Configuration]
+epsAllConfs [] c = [c]
+epsAllConfs (e:es) c = L.concat [epsAllConfs es newc | newc <- cs]
+    where cs = epAllConfs e c
+
+epAllConfs :: EndpointDesc -> C.Configuration -> [C.Configuration]
+epAllConfs ep oldConf = [ add5TupleToConf oldConf ep q |  q <- queues]
+    where
+        queues = [1..(numQueues-1)] ++ [0]
+
+mk5TupleFromEP :: EndpointDesc -> Integer -> PG.ConfValue
+mk5TupleFromEP ep q = PG.CVTuple [ cvMInt sIP, cvMInt dIP,
+                                   PG.CVMaybe $ Just $ PG.CVEnum 1,
+                                   cvMInt sP, cvMInt dP,
+                                   PG.CVInt 0,
+                                   PG.CVInt q]
+            where
+                sIP = edIP4Src ep
+                dIP = edIP4Dst ep
+                sP = edUDPSrc ep
+                dP = edUDPDst ep
+                cvMInt :: Integral a => Maybe a -> PG.ConfValue
+                cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
+
+
+add5TupleToConf :: C.Configuration -> EndpointDesc -> Integer -> C.Configuration
+add5TupleToConf conf ep q = ("RxC5TupleFilter", new5t):rest
+    where new5t :: PG.ConfValue
+          new5t  = addToCVL old5t (mk5TupleFromEP ep q)
+          old5t :: PG.ConfValue
+          old5t = case L.lookup "RxC5TupleFilter" conf of
+                    Just l -> l
+                    Nothing -> error "add5TupleToConf: Did not find RxC5TupleFilter"
+
+          rest :: C.Configuration
+          rest  = filter ((/="RxC5TupleFilter") . fst) conf
+
+addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
+addToCVL (PG.CVList l) v = PG.CVList $ v:l
 
 data CfgAction =
     CfgASet5Tuple Word8 CTRL.FTuple |
@@ -222,6 +278,7 @@ main = do
     -- Prepare graphs and so on
     prgH <- Null.graphH
     --instantiate prgH "llvm-helpers-null" F.fitnessFunction oracle
+    --instantiate prgH "llvm-helpers-null" F.priorityFitness  oracle
     instantiateGreedy prgH "llvm-helpers-null" F.priorityFitness oracle
         (implCfg tcstate chan) plAssign
 

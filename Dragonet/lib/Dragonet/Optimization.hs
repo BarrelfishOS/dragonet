@@ -115,7 +115,7 @@ optimize hs prg lpg implTransforms pla dbg cf cfgs = do
     let fst3 (a,_,_,_) = a
         (minCost,minPlg,lcfg, prgpc) = L.minimumBy (compare `on` fst3) evald
         (selectedConfName, _) = lcfg
-    putStrLn $ "Selected PRG conf is " ++ (show selectedConfName)
+    putStrLn $ "Selected PRG conf is " ++ (show lcfg)
             ++ " with cost " ++ (show minCost)
     return ( minPlg, lcfg, prgpc)
 
