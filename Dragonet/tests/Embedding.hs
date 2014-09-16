@@ -12,7 +12,7 @@ import Dragonet.Embedding
 import Dragonet.DotGenerator (toDot, toDotHighlight)
 import Dragonet.Predicate (PredExpr, nodePred)
 import qualified Dragonet.Predicate as PR
-import Graphs.Cfg (lpgCfg,prgCfg)
+import Graphs.Cfg (lpgCfg,prgCfg,prgCfgEmpty)
 
 import Data.Maybe
 import Data.Function (on)
@@ -29,8 +29,12 @@ import System.IO (hPutStr,hClose)
 import Text.RawString.QQ (r)
 import Text.Show.Pretty (ppShow)
 import Text.Printf (printf)
+import Debug.Trace (trace)
 
 import Test.HUnit
+
+tr = flip trace
+trN = \x  _ -> x
 
 embeddingX = embeddingRxTx2
 
@@ -623,10 +627,14 @@ e10kC = (C.applyConfig prgCfg) <$> e10kU
 
 e10kOffloadU = do
     (e10kU, e10kH) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl-offload.unicorn"
-    let nQueues = 4
+    let nQueues = 1
+        prgConf = prgCfgEmpty --prgCfgEmpty
         prgQConf = [("RxQueues", PG.CVInt nQueues), ("TxQueues", PG.CVInt nQueues)]
         ret = C.applyConfig prgQConf $  E10k.prepareConf e10kU
-    return ret
+        ret' = C.applyConfig prgConf ret
+        -- since some queues might not be used, clean up the PRG graph
+        ret'' = PGU.cleanupGraph ret'
+    return ret'
 
 
 
@@ -646,8 +654,11 @@ main = do
 
     e10k_prg  <- e10kU
     e10k_prg2 <- e10kOffloadU
+    lpg <- lpgC
+    let emb_e10k = embeddingX e10k_prg2 lpg
     writeFile "tests/prgE10k.dot"   $ toDot e10k_prg
     writeFile "tests/prgE10k-2.dot" $ toDot e10k_prg2
+    writeFile "tests/embE10k.dot" $ toDot emb_e10k
     --writeFile "tests/prg1.dot" $ toDot prg1
 
     {--

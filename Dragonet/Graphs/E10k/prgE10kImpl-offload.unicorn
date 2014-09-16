@@ -12,15 +12,19 @@ graph e10kPRG {
                 port false[] }
 
             boolean ValidCRC {
-                port true[ClassifyL3_]
+                port true[.C5TupleFilter]
                 port false[] }
 
+            /*
             node ClassifyL3_ {
                 port ipv4[.L3IPv4Classified .L3IPv4Checksum_]
                 port other[.C5TupleFilter] }
+             */
 
         }
 
+        /*
+         * This happens after the queues now
         cluster L3IPv4 {
 
             boolean Classified {
@@ -38,6 +42,7 @@ graph e10kPRG {
                 attr "software"
                 port true false[] }
         }
+        */
 
         config C5TupleFilter {
             type { (sip:   <UInt 32>,
@@ -67,83 +72,60 @@ graph e10kPRG {
             attr "unproductive"
             attr "software"
             attr "init"
+            attr "sink"
             spawn poll Queues
+            port out[isIPv4]
+            port drop[]
+            port init[]
+        }
+
+        node isIPv4 {
+            attr "software"
+            port true[E10kIPv4Csum]
+            port false[noIPv4Out]
+
+            predicate true "pred(EthType, IPv4)"
+            predicate false "not(pred(EthType,IPv4))"
+        }
+
+        node noIPv4Out {
+            attr "software"
             port out[]
             port drop[]
             port init[]
         }
 
+        node E10kIPv4Csum {
+            attr "software"
+            port out[]
+            port drop[]
+            port init[]
+            /*
+            port valid[E10kIPv4CsumValid]
+            port invalid[E10kIPv4CsumInvalid]
+            */
+        }
+
         /*
-        or Q0Valid {
-            port true[Queue0]
-            port false[] }
-        node Queue0 {
-            implementation E10kRxQueue0
-            attr "unproductive"
+        node E10kIPv4CsumValid {
             attr "software"
-            attr "init"
-            spawn poll Queue0
             port out[]
-            port drop[]
-            port init[] }
+        }
 
-        or Q1Valid {
-            port true[Queue1]
-            port false[] }
-        node Queue1 {
-            implementation E10kRxQueue1
-            attr "unproductive"
+        node E10kIPv4CsumInvalid {
             attr "software"
-            attr "init"
-            spawn poll Queue1
             port out[]
-            port drop[]
-            port init[] }
+        }
+        */
 
-        or Q2Valid {
-            port true[Queue2]
-            port false[] }
-        node Queue2 {
-            implementation E10kRxQueue2
-            attr "unproductive"
-            attr "software"
-            attr "init"
-            spawn poll Queue2
-            port out[]
-            port drop[]
-            port init[] }
-
-        or Q3Valid {
-            port true[Queue3]
-            port false[] }
-        node Queue3 {
-            implementation E10kRxQueue3
-            attr "unproductive"
-            attr "software"
-            attr "init"
-            spawn poll Queue3
-            port out[]
-            port drop[]
-            port init[] }
-    */
     }
 
     cluster Tx {
-        node Queue0 {
-            implementation E10kTxQueue0
+        config Queues {
+            // implementation E10kTxQueue0
             attr "sink"
-            attr "software" }
-        node Queue1 {
-            implementation E10kTxQueue1
-            attr "sink"
-            attr "software" }
-        node Queue2 {
-            implementation E10kTxQueue2
-            attr "sink"
-            attr "software" }
-        node Queue3 {
-            implementation E10kTxQueue3
-            attr "sink"
-            attr "software" }
+            attr "source"
+            attr "software"
+            port out[] }
     }
 }

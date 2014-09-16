@@ -830,14 +830,17 @@ opPred bld preds (op, port) = expr
 depGetPred__ :: PredCompSt -> (PG.PGNode, PG.NPort) -> PredExpr
 -- dependency is an FNode
 depGetPred__ st (dep_node@(_, fnode@(FNode {})), dep_port) = ret'
-    where ret'       = tr ret $ "getting predicate of dependency node: " ++ ((PG.nLabel . snd) dep_node) ++ " port:" ++ dep_port ++ " RET:" ++ (ppShow ret)
+    where ret'       = trN ret $ "getting predicate of dependency node: " ++ ((PG.nLabel . snd) dep_node) ++ " port:" ++ dep_port ++ " RET:" ++ (ppShow ret)
           ret        = predFnodePort (predBld st) rec_pred (dep_node, dep_port)
           rec_pred   = computePred $ st {predDst = dep_node, predInPort = Just dep_port}
 -- dependency is an ONode
 depGetPred__ st (dep_node@(_, ONode {}), dep_port) = ret
-    where ret' = tr ret $  "getting predicate of dependency node: " ++ ( (PG.nLabel . snd) dep_node )
+    where ret' = trN ret $  "getting predicate of dependency node: " ++ ( (PG.nLabel . snd) dep_node )
           ret = computePred newst
           newst    = st {predDst = dep_node, predInPort = Just dep_port}
+
+depGetPred__ st (dep_node@(_, CNode {}), dep_port) =
+    error "depGetPred__ not defined for Cnodes"
 
 -- get the predicate expression for a dependency
 depGetPred :: PredCompSt -> (PG.PGNode,  PG.PGEdge) -> PredExpr
@@ -895,13 +898,13 @@ computePred st@(PredCompSt {predDst = (_, ONode {nLabel=lbl, nOperator=op })})
           -- get predicates for all predecessors
           t_preds_ :: [PredExpr]
           t_preds_ = case length true_deps of
-                         0 -> error $ "No true dependencies for node " ++ lbl
+                         0 -> [PredFalse] --error $ "No true dependencies for node " ++ lbl
                          _ -> map (depGetPred st) true_deps
           f_preds_ :: [PredExpr]
           f_preds_ = case length false_deps of
                          0 -> error $ "No false dependencies for node " ++ lbl
                          _ -> map (depGetPred st) false_deps
-          t_preds = tr t_preds_ $ "Visiting node:" ++ lbl ++ " (t_preds_=" ++ (ppShow t_preds_) ++ ")"
+          t_preds = trN t_preds_ $ "Visiting node:" ++ lbl ++ " (t_preds_=" ++ (ppShow t_preds_) ++ ")"
           f_preds = f_preds_ --tr f_preds_ $ "Visiting node:" ++ lbl ++ " (expragrs=" ++ (show f_preds_) ++ ")"
           ret = case inport of
             "true"  -> opPred (predBld st) t_preds (op, "true")
@@ -922,12 +925,29 @@ opNot PG.NOpNAnd  = PG.NOpNOr
 onodeDepsTF :: [(PGNode, PGEdge)] -> ([(PGNode, PGEdge)], [(PGNode, PGEdge)])
 onodeDepsTF deps = ret
  where
+    -- true/false/all other ports
     true_deps  = filter (isTruePort  .    depPortName) deps
     false_deps = filter (isFalsePort .    depPortName) deps
     other_deps = filter (not . isTFPort . depPortName) deps
-    ret = case length other_deps of
-        0 -> (true_deps, false_deps)
-        _ -> error $ "There are onode incoming edges which do not start from a true/false port in node:" ++ (ppShow other_deps)
+
+    -- We assume all other ports to be True for now. This is *stupid*, and
+    -- should be fixed by having proper edge labels about the in port on Onodes.
+    isOtherDepTrue :: (PGNode, PGEdge) -> Bool
+    isOtherDepTrue dep@(n,(_,_,PG.Edge { ePort = p })) = case length nodeDeps of
+                           0 -> error "onodeDepsTF: not supposed to happen"
+                           _ -> tr True $ "NOTE: port:" ++ p ++ " on node "
+                                          ++ ((PG.nLabel . snd) n)
+                                          ++ " is assumed a true port"
+        where nodeDeps = [ d | d <- deps,  depNodeId d == xId ]
+              depNodeId ((nid,_), _) = nid
+              xId = depNodeId dep
+
+    (true_deps2, unknown_deps) = L.partition isOtherDepTrue other_deps
+
+    ret = case length unknown_deps of
+        0 -> (true_deps ++ true_deps2, false_deps)
+        _ -> error $ "There are onode incoming edges which cannot be calssified as a true/false port:\n"
+                      ++ (ppShow other_deps)
 
 
 trueONodeDeps :: [(PGNode, PGEdge)] -> [(PG.PGNode,PG.PGEdge)]

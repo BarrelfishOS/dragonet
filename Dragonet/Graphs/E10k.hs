@@ -446,7 +446,9 @@ configTxQueues _ (_,cfgn) inE outE (CVInt qs) = do
             let name = "TxQueue" ++ (show n)
                 attrs = nAttributes cfgn
                 ports = nPorts cfgn
-                node = (baseFNode name ports) { nAttributes = attrs }
+                qimpl = NImplFunction "E10kTxQueue0"
+                node = (baseFNode name ports) { nAttributes = attrs,
+                                                nImplementation = qimpl}
                 onode = baseONode name ["true","false"] NOpOr {}
 
             (q_nid, _) <- confMNewNode node

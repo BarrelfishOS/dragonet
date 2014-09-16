@@ -63,7 +63,11 @@ graph lpg {
                 port drop[]
                 semantics ipv4 { (= L3P.IP4 (L3.Proto pkt)) }
                 semantics ipv6 { (= L3P.IP6 (L3.Proto pkt)) }
-                semantics arp { (= L3P.ARP (L3.Proto pkt)) } }
+                semantics arp { (= L3P.ARP (L3.Proto pkt)) }
+
+                predicate ipv4 "pred(EthType, IPv4)"
+                predicate arp  "pred(EthType, ARP)"
+            }
         }
 
 

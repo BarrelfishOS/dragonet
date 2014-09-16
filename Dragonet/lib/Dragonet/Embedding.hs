@@ -539,7 +539,8 @@ embRxNode st node@(nid, fnode@(PG.FNode {})) idx (prevId, prevPort)
     ports = PG.nPorts fnode
     portsExpr' = zip portsExpr ports
     (deadPs,restPs) = L.partition ((==PR.PredFalse) . fst) portsExpr'
-    redundant = length restPs == 1 && PR.predEquivHard (fst restP0) pred
+    --redundant = length restPs == 1 && PR.predEquivHard (fst restP0) pred
+    redundant = length restPs == 1 && PR.dnfEquiv (fst restP0) pred
     restP0 = head restPs
 
 embRxPredCache :: EmbedSt -> Int -> PR.PredCache
@@ -584,7 +585,11 @@ doEmbRx st orig_ctx@(ins, nid, fnode@PG.FNode {}, outs) idx = ret
           -- the embedding node
           embN = embRxNode st lpgN  idx (fromJust $ embGetNP st (prevId, prevPort) idx)
           portActive_ = embNodePortActive prevEmb prevPort
-          portActive = tr portActive_ ("\n    portactive: " ++ (show portActive_))
+          portActive = tr portActive_ ("\n    previous node port:"
+                                              ++ prevPort
+                                              ++ " is active: "
+                                              ++ (show portActive_)
+                                              )
           ret = case portActive of
               False -> EmbNodeRemoved
               True  -> embN
@@ -631,7 +636,8 @@ doEmbRx st orig_ctx@(ins, nid, onode@PG.ONode { PG.nOperator = op}, outs) idx = 
           else EmbNode embId
 
    -- only the true (false) port is active
-   t_prevX = L.find ((PR.predEquivHard pred_port_t) . snd)  (zip t_prevs t_preds)
+   --t_prevX = L.find ((PR.predEquivHard pred_port_t) . snd)  (zip t_prevs t_preds)
+   t_prevX = L.find ((PR.dnfEquiv pred_port_t) . snd)  (zip t_prevs t_preds)
    trueRet  = case t_prevX of
               Just x  -> EmbNodeRedundant "true" np'
                  where n = (fst . fst) x
@@ -766,8 +772,8 @@ mctxStr (Just ctx) = "Just " ++ (ctxStr ctx)
 mctxStr Nothing = "NOCTX"
 
 ctxStr :: PG.PGContext -> String
-ctxStr (ins,nid,nlbl,outs) = show $ (ins,nid, PG.nLabel nlbl, outs)
---ctxStr (ins,nid,nlbl,outs) = show $ PG.nLabel nlbl
+--ctxStr (ins,nid,nlbl,outs) = show $ (ins,nid, PG.nLabel nlbl, outs)
+ctxStr (ins,nid,nlbl,outs) = show $ PG.nLabel nlbl
 
 ctxNode :: PG.PGContext -> PG.Node
 ctxNode (_,_,n,_) = n
@@ -799,10 +805,26 @@ getSpawnEdges = (filter PGU.isSpawnEdge) . DGI.labEdges
 -- particular pair of Tx/Rx queues, though.
 embSpawnEdges ::  EmbedSt -> PG.PGEdge -> [PG.PGEdge]
 embSpawnEdges st (srcId, dstId, lbl) = ret
-    where ret = [(x, y, lbl) | x <- catMaybes embSrcs, y <- catMaybes embDsts]
+    where ret = [(x, y, lbl) | x <- catMaybes embSrcs, y <- catMaybes embDsts,
+                               validSrcDst(x,y) ]
+
+          getEmbL :: DGI.Node -> PG.Node
+          getEmbL nid = case DGI.lab (curEmb st) nid of
+                         Just l  -> l
+                         Nothing -> error "embSpawnEdges: cannot find label"
+
+          -- create a spawn edge only for nodes that have the same queue tag
+          validSrcDst :: (DGI.Node, DGI.Node) -> Bool
+          validSrcDst (srcId, dstId) = PG.nTag src == PG.nTag dst
+                where src = getEmbL srcId
+                      dst = getEmbL dstId
+
+          embSrcs :: [Maybe DGI.Node]
           embSrcs = case M.lookup srcId (embNodeMap st) of
                        Nothing -> error $ "source spawn edge mapping does not exist"
                        Just x  -> map embNodeId x
+
+          embDsts :: [Maybe DGI.Node]
           embDsts = case M.lookup dstId (embNodeMap st) of
                        Nothing -> error $ "destination spawn edge mapping does not exist"
                        Just x  -> map embNodeId x
