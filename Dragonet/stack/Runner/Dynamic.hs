@@ -210,8 +210,11 @@ hInQAdd tds pl (PI.PIQueue iq) = do
 hInQRemove :: TDynState -> PL.PLabel -> IO ()
 hInQRemove tds pl = runDynMWithTDS tds $ do
     dmDebugPrint "hInQRemove"
-    Just qh <- dmDSGets $ M.lookup pl . dsOutQs
-    rmInQueue pl qh
+    ans <- dmDSGets $ M.lookup pl . dsOutQs
+    case (ans) of
+        Just qh -> rmInQueue pl qh
+            -- XXX: not sure if we need to do anything here
+        Nothing ->  return ()
 
 hOutQAdd :: TDynState -> PL.PLabel -> PI.POutput -> IO ()
 hOutQAdd tds pl (PI.POQueue oq) = do
@@ -223,8 +226,11 @@ hOutQAdd tds pl (PI.POQueue oq) = do
 hOutQRemove :: TDynState -> PL.PLabel -> IO ()
 hOutQRemove tds pl = runDynMWithTDS tds $ do
     dmDebugPrint "hOutQRemove"
-    Just qh <- dmDSGets $ M.lookup pl . dsInQs
-    rmOutQueue pl qh
+    ans <- dmDSGets $ M.lookup pl . dsInQs
+    case (ans) of
+        Just qh -> rmOutQueue pl qh
+            -- XXX: not sure if we need to do anything here
+        Nothing ->  return ()
 
 
 {-

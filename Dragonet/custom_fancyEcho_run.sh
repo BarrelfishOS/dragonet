@@ -88,8 +88,8 @@ run_for_1_cores() {
 run_for_1_cores_null() {
     echo fancyEcho running on ${SERVERIP} with single application thread and two sockets for null testing
     sudo ./dist/build/bench-fancyecho/bench-fancyecho \
-    -a t0 -p 111 \
-    -a t1 -p 222 \
+    -a t0 -p 222 \
+    -a t1 -p 111 \
     -a t2 -p 333 \
     -a t3 -p 444 \
     -t -q t0 -q t1 -q t2 -q t3

@@ -63,27 +63,87 @@ fitnessFunction ss eps plg = (ans2, dbg2)
 
 
 -- check if flows going to each pipeline are mixed, or belong to separate classs
-areFlowsMixed :: PL.PLGraph -> Bool
-areFlowsMixed plg = ans
+areFlowsIsolated :: PL.PLGraph -> Bool
+areFlowsIsolated plg = ans
     where
         flowsPerPL = FH.findRXQueuesPerPL plg
-        isPlGood = map validateFlows flowsPerPL
-        anss = filter (\x -> if x then False else True) isPlGood
+        isPlGood = L.nub $ map validateFlows flowsPerPL
+
         ans
-            | anss == [] = True
+            | (length isPlGood == 1) = head isPlGood
             | otherwise = False
+
         validateFlows flow
-              | (length flow) == 0  = False
-              | (length flow) == 1  = False
-              | (length $ L.nub $ map FH.toPriorityClass flow) > 1 =  False
+              | (length flow) == 0  = True
+              | (length flow) == 1  = True
+              | (length $ L.nub $ map FH.isGoldFlow flow) == 1 = True
+              | otherwise  = False
+
+
+-- check if flows going to each pipeline are mixed, or belong to separate classs
+areFlowsIsolatedLabel :: [(Int, [FH.FlowDetails])] -> Bool
+areFlowsIsolatedLabel epsQueuesMaping = ans
+    where
+        flowsPerPL = map snd epsQueuesMaping
+
+        isPlGood = L.nub $ map validateFlows flowsPerPL
+
+        ans
+            | (length isPlGood == 1) = head isPlGood
+            | otherwise = False
+
+        validateFlows flow
+              | (length flow) <= 1  = True
+              | (length $ L.nub $ map FH.isGoldFlowLabel flow) == 1 = True
               | otherwise  = False
 
 
 -- get flows going through each HWQ
 maxFlowsPerGoldQueue = 1
 
+costFn :: [(Int, [FH.FlowDetails])] -> (Float, [Char])
+costFn epsQueuesMaping = fv -- 0.0
+    where
+
+        queues = length $ L.nub $ map fst epsQueuesMaping
+        flows  = map snd epsQueuesMaping
+        goldFlows = map (\(x, ll) -> (x, (filter FH.isGoldFlowLabel ll))) epsQueuesMaping
+
+        stdDevAllQueues     = FH.getStdDev $ map snd epsQueuesMaping
+        stdDevGoldQueues    = FH.getStdDev $ map snd goldFlows
+
+        aFlows = sum $ map (\(qid, ff) -> length ff) epsQueuesMaping
+        gFlows = sum $ map (\(qid, ff) -> length ff) goldFlows
+
+        minGQueues
+            | (gFlows `mod` maxFlowsPerGoldQueue) > 0 = (gFlows `div` maxFlowsPerGoldQueue) + 1
+            | otherwise  = (gFlows `div` maxFlowsPerGoldQueue)
+
+        dbgMsg = " HW Queues: " ++ (show queues) ++
+                    ", gold flows: " ++ (show gFlows) ++
+                    ", goldQueusNeeded: " ++ (show minGQueues) ++
+                    ", AllFlows: " ++ (show aFlows) ++
+                    " "
+        fv
+            | (queues - 1)  < minGQueues                = (0.0, ("WARNING: Not enough HW queues (" ++
+                           dbgMsg ++ ")"))
+            | not $ areFlowsIsolatedLabel epsQueuesMaping = (0.0, "WARNING: gold and normal flows are mixed (" ++
+                           dbgMsg ++ ")")
+            | otherwise                                 =
+                                    (
+                                        (stdDevGoldQueues + 100 + (stdDevAllQueues + 10))
+                                        , ("Acceptable conf (" ++
+                                                dbgMsg ++ ")")
+                                    )
+
+
 priorityFitness :: SS.StackState -> [SS.EndpointDesc] -> O.CostFunction Float
-priorityFitness ss eps plg = fv
+priorityFitness ss eps plg = costFn $ FH.getPLwithRxQueuesFlows plg
+
+
+
+priorityFitness' :: SS.StackState -> [SS.EndpointDesc] -> O.CostFunction Float
+priorityFitness' ss eps plg = fv
     where
 
         stdDevAllQueues     = FH.getStdDev $ FH.findRXQueuesPerPL plg
@@ -92,6 +152,7 @@ priorityFitness ss eps plg = fv
         aFlows = FH.getFlowsG plg
         gFlows = FH.getGoldFlowsG plg
         queues = FH.getRXQueueCount plg
+
         minGQueues
             | (gFlows `mod` maxFlowsPerGoldQueue) > 0 = (gFlows `div` maxFlowsPerGoldQueue) + 1
             | otherwise  = (gFlows `div` maxFlowsPerGoldQueue)
@@ -104,11 +165,11 @@ priorityFitness ss eps plg = fv
         fv
             | (queues - 1)  < minGQueues   = (0.0, ("WARNING: Not enough HW queues (" ++
                            dbgMsg ++ ")"))
-            | areFlowsMixed plg             = (0.0, "WARNING: gold and normal flows are mixed (" ++
+            | not $ areFlowsIsolated plg             = (0.0, "WARNING: gold and normal flows are mixed (" ++
                            dbgMsg ++ ")")
             | otherwise                     =
                                     (
-                                        (stdDevGoldQueues * 100 + (stdDevGoldQueues * 10))
+                                        (stdDevGoldQueues * 100 + (stdDevAllQueues * 10))
                                         , ("Acceptable conf (" ++
                                                 dbgMsg ++ ")")
                                     )

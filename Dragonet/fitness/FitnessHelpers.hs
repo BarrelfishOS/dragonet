@@ -12,7 +12,11 @@ module FitnessHelpers (
     , findNodesPerPL
     , findRXQueuesPerPL
     , findGoldRXQueuesPerPL
-    , toPriorityClass
+    , getPLwithRxQueuesFlows
+    , getPLwithRXQueueIDs
+    , FlowDetails
+    , isGoldFlow
+    , isGoldFlowLabel
 ) where
 
 
@@ -27,6 +31,8 @@ import qualified Data.Map as M
 import Dragonet.Conventions (rxQPref, txQPref, qTag)
 
 import Stack as SS
+
+type FlowDetails = String
 
 isQueueNode :: PG.Node -> Bool
 isQueueNode (PG.ONode _ _ _ _ _)   = False
@@ -71,18 +77,39 @@ isFnode (PG.CNode _ _ _ _ _ _) = False
 isFnode (PG.FNode label tag attr ports semantics impl origin) = True
 
 
--- FIXME: implement this function correctly
-isGoldFlow :: PG.Node -> Bool
-isGoldFlow (PG.ONode _ _ _ _ _)   = False
-isGoldFlow (PG.CNode _ _ _ _ _ _) = False
-isGoldFlow (PG.FNode label tag attr ports semantics impl origin) = ans
+strToInt :: [Char] -> Int
+strToInt n = read n :: Int
+
+
+
+isGoldFlowLabel :: String -> Bool
+isGoldFlowLabel [] = False
+isGoldFlowLabel label = ans
     where
         lab = drop 1 $ takeWhile (/= ')') $ dropWhile (\x-> x /= '(') label
         lport =  drop 1 $ dropWhile (/= ':') $ drop 1 $ dropWhile (/= ':') lab
         ans
             | length lab == 0 = False
-            | lport == "222" = True
+            | strToInt lport == 222 = True
             | otherwise = False
+
+
+-- FIXME: implement this function correctly
+isGoldFlow :: PG.Node -> Bool
+isGoldFlow (PG.ONode _ _ _ _ _)   = False
+isGoldFlow (PG.CNode _ _ _ _ _ _) = False
+isGoldFlow (PG.FNode label tag attr ports semantics impl origin) =
+    isGoldFlowLabel  label
+
+
+getQueueLabel :: PG.Node -> [Char]
+getQueueLabel (PG.ONode _ _ _ _ _)   = []
+getQueueLabel (PG.CNode _ _ _ _ _ _) = []
+getQueueLabel (PG.FNode label tag attr ports semantics impl origin) = ans
+    where
+        ans
+            | rxQPref  `L.isPrefixOf` label = drop (length rxQPref) label
+            | otherwise = []
 
 
 findNodesPGraph :: (PG.Node -> Bool) -> PG.PGraph -> [PG.Node]
@@ -177,6 +204,8 @@ getRXQueueCount plg = sum qs
 findPipelines :: PL.PLGraph -> [PG.PGraph]
 findPipelines plg = map (PL.plGraph . snd) $ DGI.labNodes plg
 
+
+
 -- Get all flows in each pipeline, grouped by pipeline
 findNodesPerPL :: (PG.Node -> Bool) -> PL.PLGraph -> [[PG.Node]]
 findNodesPerPL selector plg = nodesPerPipeline
@@ -199,6 +228,30 @@ getPLwithRxQueues plg = plWithRx
                 filter
                 (\x -> (length $ findNodesPGraph isRXQueueNode x) == 1)
                 $ pls
+
+
+getPLwithRxQueuesFlows :: PL.PLGraph -> [(Int, [FlowDetails])]
+getPLwithRxQueuesFlows plg = toFlows
+    where
+        pls = getPLwithRXQueueIDs plg
+        toFlows = map
+            (\(qid, graph) ->
+                (qid,
+                (map (show . PG.nLabel) $ findNodesPGraph isFlowNode graph))
+            )
+            pls
+
+
+getPLwithRXQueueIDs :: PL.PLGraph -> [(Int, PG.PGraph)]
+getPLwithRXQueueIDs plg = toQid
+    where
+        pls = getPLwithRxQueues plg
+        toQid = map
+            (\x ->
+                ((strToInt $ getQueueLabel $ head $ findNodesPGraph isRXQueueNode x)
+                , x)
+            )
+            pls
 
 {-
 getRXqueues :: PL.PLGraph -> [PG.Node]
