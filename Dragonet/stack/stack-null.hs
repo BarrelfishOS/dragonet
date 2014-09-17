@@ -131,15 +131,18 @@ mk5TupleFromEP :: EndpointDesc -> Integer -> PG.ConfValue
 mk5TupleFromEP ep q = PG.CVTuple [ cvMInt sIP, cvMInt dIP,
                                    PG.CVMaybe $ Just $ PG.CVEnum 1,
                                    cvMInt sP, cvMInt dP,
-                                   PG.CVInt 0,
+                                   PG.CVInt prio,
                                    PG.CVInt q]
             where
                 sIP = edIP4Src ep
                 dIP = edIP4Dst ep
                 sP = edUDPSrc ep
                 dP = edUDPDst ep
+                nJust Nothing = 0
+                nJust (Just _) = 1
                 cvMInt :: Integral a => Maybe a -> PG.ConfValue
                 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
+                prio = (1 +) $ sum [nJust sIP, nJust dIP, nJust sP, nJust dP]
 
 
 add5TupleToConf :: C.Configuration -> EndpointDesc -> Integer -> C.Configuration
@@ -156,6 +159,9 @@ add5TupleToConf conf ep q = ("RxC5TupleFilter", new5t):rest
 
 addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
 addToCVL (PG.CVList l) v = PG.CVList $ v:l
+
+
+--------------------------------------------------
 
 data CfgAction =
     CfgASet5Tuple Word8 CTRL.FTuple |

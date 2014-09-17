@@ -117,6 +117,7 @@ else
     # For intel
     if [ "$STACKNAME" ==  "stack-e10k" ] ; then
         SERVERIP="10.113.4.95"
+        SERVERIP="10.113.4.96"
     else
 
         if [ "$STACKNAME" ==  "stack-tap" ] ; then
@@ -137,6 +138,8 @@ fi
 ./scripts/pravin/wait_for_dragonet.sh 4 ${STACKNAME}
 
 run_for_1_cores_null
+
+#run_for_4_cores_with_wildcards
 
 # for quick cleanup
 sudo killall ${STACKNAME}
