@@ -36,6 +36,7 @@ numQueues = 3
 localIP :: Word32
 localIP = MD.asiagoIP_Intel
 
+
 --------------------------------------------------
 
 -- Start out with a dummy configuration for null device
@@ -109,7 +110,7 @@ oracle_ args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,  SS.oraclePrg = oPrg, S
                 prio = (1 +) $ sum [nJust sIP, nJust dIP, nJust sP, nJust dP]
 
 oracle ::  SS.OracleArgs -> [(String, C.Configuration)]
-oracle args@(SS.OracleArgs {SS.oracleOldConf = (oldconfname,oldconf), SS.oracleNewConns = eps}) = ret
+oracle args@(SS.OracleArgs {SS.oracleOldConf = (oldconfname,oldconf), SS.oracleNewConns = eps}) = ret_
     where ret_ = [ ("ORACLECONF", c) | c <- epsAllConfs eps oldconf ]
           ret  = trace ("---\n"
                         ++ "NEWCONF:  " ++ (ppShow ret_)

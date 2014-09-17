@@ -36,6 +36,8 @@ import qualified Control.Concurrent.STM as STM
 import Control.Concurrent (threadDelay)
 import qualified Data.Map as M
 
+import Util.XTimeIt (doTimeIt,dontTimeIt)
+
 type EndpointId = Int
 
 data AppDesc = AppDesc {
@@ -288,7 +290,8 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
     sharedState <- PLI.stackState stackhandle
 
     -- Function to adapt graph to current stack state
-    let updateGraph sstv = do
+    let updateGraphT x = doTimeIt "updateGraph"  $ updateGraph x
+        updateGraph sstv = do
             putStrLn "updateGraph entry"
             ss <- STM.atomically $ do
                 ss <- STM.readTVar sstv
@@ -301,8 +304,8 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
                 lpgCfg = lpgConfig' allEps ss
                 -- Configure LPG
                 lpgC = C.applyConfig lpgCfg lpgU
-                --dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
-                dbg = O.dbgDummy
+                dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
+                --dbg = O.dbgDummy
 
                 -- STEP: Generate PRG configurations using ORACLE
                 pCfgs = cfgOracle $ initOracleArgs lpgC allEps ss
@@ -532,7 +535,8 @@ oneStepGreedy  current_prg_conf eps ss  (prgU,prgHelp) llvmH costFun cfgOracle c
         lpgC = C.applyConfig lpgCfg lpgU
 
         -- FIXME: proper way to save incremental graphs
-        dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
+        --dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
+        dbg = O.dbgDummy
 
         -- STEP: Generate PRG configurations using ORACLE
         pCfgs = cfgOracle $  OracleArgs {
@@ -550,7 +554,7 @@ oneStepGreedy  current_prg_conf eps ss  (prgU,prgHelp) llvmH costFun cfgOracle c
     putStrLn $ "LPG config: " ++ show lpgCfg
 
     --(plg,(_,pCfg), prgpc) <- O.optimize
-    O.optimize
+    doTimeIt "OPTIMIZE" $ O.optimize
                 helpers                    -- | Semantics helpers combined
                 prgU                       -- | Unconfigured PRG
                 lpgC                       -- | Configured LPG
@@ -589,7 +593,8 @@ instantiateGreedy (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
 
 
     -- Function to adapt graph to current stack state
-    let updateGraph sstv = do
+    let updateGraphT x = doTimeIt "updateGraph"  $ updateGraph x
+        updateGraph sstv = do
             putStrLn "updateGraph entry"
             ss <- STM.atomically $ do
                 ss <- STM.readTVar sstv
@@ -620,7 +625,7 @@ instantiateGreedy (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
                 createPL pl = do
                     putStrLn $ "Creating local pipeline: ##### " ++ pl
                     createPipeline plg stackname llvmH pl
-            PLD.run ctx plConnect createPL $ addMuxIds plg
+            doTimeIt "PLD.run" $ PLD.run ctx plConnect createPL $ addMuxIds plg
             putStrLn "updateGraph exit"
             -- FIXME: Create file here.
             putStrLn "################### calling appendFile with app ready notice"
@@ -634,7 +639,7 @@ instantiateGreedy (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
                 ssAppChans = M.empty,
                 ssSockets = M.empty,
                 ssEndpoints = M.empty,
-                ssUpdateGraphs = updateGraph,
+                ssUpdateGraphs = updateGraphT,
                 ssVersion = 0
             }
 

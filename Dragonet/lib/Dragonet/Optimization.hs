@@ -31,6 +31,8 @@ import qualified Data.Set as S
 import qualified System.FilePath as FP
 import qualified System.Directory as Dir
 
+import Util.XTimeIt (doTimeIt,dontTimeIt)
+
 data DbgAction a =
     DbgPGraph PG.PGraph |
     DbgPLGraph PL.PLGraph |
@@ -71,7 +73,7 @@ makeGraph' helpers prgC lpg embed_fn implTransforms pla debug = do
     let emb = embed_fn prgC lpg
     debug "embed" $ DbgPGraph emb
     -- Reduce graph
-    reduced <- SS.reducePG emb helpers
+    reduced <- doTimeIt "makeGraph.REDUCE" $ SS.reducePG emb helpers
     debug "reduced" $ DbgPGraph reduced
     -- Clean-up graph
     let cleanedUp = cleanupGraph reduced
@@ -106,7 +108,7 @@ optimize hs prg lpg implTransforms pla dbg cf cfgs = do
     evald <- forM cfgs $ \(lbl,cfg) -> do
         let prgC  = C.applyConfig cfg prg
         --(dbg lbl) "prg_c" $ DbgPGraph prgC
-        plg <- makeGraph' hs prgC lpg Emb.embeddingRxTx implTransforms (pla lbl) (dbg lbl)
+        plg <- doTimeIt "makeGraph'" $ makeGraph' hs prgC lpg Emb.embeddingRxTx implTransforms (pla lbl) (dbg lbl)
         --plg <- makeGraph hs prg lpg implTransforms (pla lbl) (dbg lbl) cfg
         let (cost, dbgmsg) = cf plg
         dbg lbl lbl $ DbgEvaluated plg cost
