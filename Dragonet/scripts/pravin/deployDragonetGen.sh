@@ -20,18 +20,18 @@ if [ -z $2 ] ; then
     show_usage
     exit 1
 fi
-hwQcount=${2}
+HWQUEUES=${2}
 
 SCRIPTDIR="./scripts/pravin/"
 ${SCRIPTDIR}/deployPrepare.sh
 
-nohup sudo ./dist/build/${APPNAME}/${APPNAME} $@ > some.log 2>&1 < /dev/null  &
+nohup sudo ./dist/build/${APPNAME}/${APPNAME} ${HWQUEUES} > some.log 2>&1 < /dev/null  &
 
 echo "Waiting for Dragonet to start"
 sleep 4
 
 echo "Waiting for Dragonet to be ready"
-${SCRIPTDIR}/wait_for_dragonet.sh  ${hwQcount} ${APPNAME}
+${SCRIPTDIR}/wait_for_dragonet.sh  ${HWQUEUES} ${APPNAME}
 #ls *.ready
 sleep 10
 echo "Dragonet is ready"

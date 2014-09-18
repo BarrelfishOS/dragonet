@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleInstances, UndecidableInstances,
+               OverlappingInstances, ScopedTypeVariables #-}
+
 import qualified Dragonet.Configuration as C
 import qualified Dragonet.Optimization as O
 import qualified Dragonet.Pipelines as PL
@@ -7,6 +10,8 @@ import qualified Dragonet.ProtocolGraph.Utils as PGU
 
 import qualified Graphs.E10k as E10k
 import qualified Runner.E10KControl as CTRL
+
+import qualified ReadArgs as RA
 
 import Stack
 import qualified Search
@@ -28,9 +33,6 @@ import Debug.Trace (trace)
 import Text.Show.Pretty (ppShow)
 
 tr = flip . trace
-
-numQueues :: Integer
-numQueues = 10
 
 localIP :: Word32
 --localIP = MD.asiagoIP_Intel
@@ -57,8 +59,8 @@ oracleHardcoded  args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,
                 ])])]
 
 -- This should return multiple tuples and not just one tuple list
-oracleMultiQueue ::  SS.OracleArgs -> [(String,C.Configuration)]
-oracleMultiQueue args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,  SS.oraclePrg = oPrg, SS.oracleNewConns = eps , SS.oracleSS = ss}) = [
+oracleMultiQueue ::  Int -> SS.OracleArgs -> [(String,C.Configuration)]
+oracleMultiQueue nq args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,  SS.oraclePrg = oPrg, SS.oracleNewConns = eps , SS.oracleSS = ss}) = [
 {-
                 ("defaultOracle", -- Most stupid configuration, only default queue and default filters
                     [ ("RxCFDirFilter", PG.CVList []),
@@ -78,7 +80,7 @@ oracleMultiQueue args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,  SS.oraclePrg 
                 )
             ]
     where
-        queues = [1..(numQueues-1)] ++ [0]
+        queues = [1..(nq-1)] ++ [0]
         -- returns 128 five-tuple endpoints from stack-state
         epss = M.elems $ ssEndpoints ss -- use in case you want to look into all flows in stack
 
@@ -88,7 +90,7 @@ oracleMultiQueue args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,  SS.oraclePrg 
                     $ eps -- use only specified endpoints
 
         fiveTupleC = map mkEp5T  -- make endpoint
-                    $ zip (cycle queues)  -- make tuple of cycled queue-id and endpoint
+                    $ zip (cycle (map toInteger queues))  -- make tuple of cycled queue-id and endpoint
                     $ take 128 -- take top 128 endpoints
                     $ eps -- use only specified endpoints
         mkEp5T (queue,ep) = PG.CVTuple [
@@ -108,24 +110,24 @@ oracleMultiQueue args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,  SS.oraclePrg 
                 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
                 prio = (1 +) $ sum [nJust sIP, nJust dIP, nJust sP, nJust dP]
 
-oracle ::  SS.OracleArgs -> [(String, C.Configuration)]
-oracle args@(SS.OracleArgs {SS.oracleOldConf = (oldconfname,oldconf), SS.oracleNewConns = eps}) = ret
-    where ret_ = [ ("ORACLECONF", c) | c <- epsAllConfs eps oldconf ]
+oracle ::  Int -> SS.OracleArgs -> [(String, C.Configuration)]
+oracle nq args@(SS.OracleArgs {SS.oracleOldConf = (oldconfname,oldconf), SS.oracleNewConns = eps}) = ret
+    where ret_ = [ ("ORACLECONF", c) | c <- epsAllConfs nq eps oldconf ]
           ret  = trace ("---\n"
                         ++ "NEWCONF:  " ++ (ppShow ret_)
                         ++ "\nOLDCONF:" ++ (ppShow oldconf)
                         ++ "\nEPS: " ++ (ppShow eps)
                         ++ "---\n") ret_
 
-epsAllConfs :: [EndpointDesc] -> C.Configuration -> [C.Configuration]
-epsAllConfs [] c = [c]
-epsAllConfs (e:es) c = L.concat [epsAllConfs es newc | newc <- cs]
-    where cs = epAllConfs e c
+epsAllConfs :: Int -> [EndpointDesc] -> C.Configuration -> [C.Configuration]
+epsAllConfs nq [] c = [c]
+epsAllConfs nq (e:es) c = L.concat [epsAllConfs nq es newc | newc <- cs]
+    where cs = epAllConfs nq e c
 
-epAllConfs :: EndpointDesc -> C.Configuration -> [C.Configuration]
-epAllConfs ep oldConf = [ add5TupleToConf oldConf ep q |  q <- queues]
+epAllConfs :: Int -> EndpointDesc -> C.Configuration -> [C.Configuration]
+epAllConfs nq ep oldConf = [ add5TupleToConf oldConf ep q |  q <- queues]
     where
-        queues = [1..(numQueues-1)] ++ [0]
+        queues = [1..( (toInteger nq)-1)] ++ [0]
 
 mk5TupleFromEP :: EndpointDesc -> Integer -> PG.ConfValue
 mk5TupleFromEP ep q = PG.CVTuple [ cvMInt sIP, cvMInt dIP,
@@ -280,26 +282,32 @@ plAssignMerged _ _ (_,n) = PG.nTag n
 
 
 main = do
+
+    (nq :: Int) <- RA.readArgs
+    print $ "Number of queues used: " ++ show nq
+
     let state = CfgState {
                     csThread = Nothing,
                     cs5Tuples = M.empty,
                     cs5TUnused = [0..127]
                 }
+
     -- Channel and MVar with thread id of control thread
     tcstate <- STM.newTVarIO state
     chan <- STM.newTChanIO
     -- Prepare graphs and so on
     prgH@(prgU,_) <- E10k.graphH
-    let costFn   = Search.e10kCost prgU Search.balanceCost
-        searchFn = Search.searchGreedyE10k costFn
+    let costFn   = Search.e10kCost prgU (Search.balanceCost nq)
+        searchFn = Search.searchGreedyE10k nq costFn
 
-    --instantiate prgH "llvm-helpers-e10k" costFunction oracle
+
+    --instantiate prgH "llvm-helpers-e10k" costFunction (oracle nq)
     --    (implCfg tcstate chan) plAssignMerged
-    --instantiate prgH "llvm-helpers-e10k" F.fitnessFunction oracle
-    --instantiate prgH "llvm-helpers-e10k" F.priorityFitness  oracle
-    --instantiateGreedy prgH "llvm-helpers-e10k" F.priorityFitness oracle
+    --instantiate prgH "llvm-helpers-e10k" F.fitnessFunction (oracle nq)
+    --instantiate prgH "llvm-helpers-e10k" F.priorityFitness  (oracle nq)
+    --instantiateGreedy prgH "llvm-helpers-e10k" F.priorityFitness (oracle nq)
     --    (implCfg tcstate chan) plAssign
---    instantiate prgH "llvm-helpers-e10k" F.dummyFitness oracleMultiQueue
+--    instantiate prgH "llvm-helpers-e10k" F.dummyFitness (oracleMultiQueue nq)
 --        (implCfg tcstate chan) plAssign
     instantiateKK searchFn prgH "llvm-helpers-e10k" (implCfg tcstate chan) plAssignMerged
 

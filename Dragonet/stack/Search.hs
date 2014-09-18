@@ -32,8 +32,7 @@ import Debug.Trace (trace)
 tr a b  = trace b a
 trN a b = a
 
-numQueues = 10
-allQueues = [1..(numQueues-1)] ++ [0] :: [QueueId]
+allQueues nq = [1..(nq-1)] ++ [0] :: [QueueId]
 
 --
 -- NB that due to the ordering, costOK will always have the smaller value, and
@@ -71,8 +70,8 @@ e10kCost prgU costQFn = retFn
                     ret = trN ret_ $ "conf:" ++ (e10kCfgStr conf)
                                     ++ "\ncost:" ++ (show ret_)
 
-balanceCost :: [(Flow, QueueId)] -> Cost
-balanceCost qmap = ret
+balanceCost :: Int -> [(Flow, QueueId)] -> Cost
+balanceCost nq qmap = ret
     where qLoad :: M.Map QueueId Integer
           qList  =  [qId | (_,qId) <- qmap]
           qLoad = L.foldl foldFn M.empty qList
@@ -81,7 +80,7 @@ balanceCost qmap = ret
 
           getQLoad :: QueueId -> Integer
           getQLoad q = M.findWithDefault 0 q qLoad
-          load    = map getQLoad allQueues
+          load    = map getQLoad (allQueues nq)
           maxLoad = maximum load
           minLoad = minimum load
           ret_     =  CostVal $ fromIntegral $ maxLoad - minLoad
@@ -93,18 +92,18 @@ priorityCost = error "NYI!"
 
 -- simple greedy search
 
-searchGreedyE10k :: CostFn -> [Flow] -> C.Configuration
-searchGreedyE10k fn flows = searchGreedy_ fn (e10kCfgEmpty,[]) flows
+searchGreedyE10k :: Int -> CostFn -> [Flow] -> C.Configuration
+searchGreedyE10k nq fn flows = searchGreedy_ nq fn (e10kCfgEmpty,[]) flows
 
-searchGreedy_ :: CostFn -> (C.Configuration, [Flow]) -> [Flow] -> C.Configuration
-searchGreedy_ costF (cnf,_)        []     = tr cnf $ "searchGreedy_: " ++ (e10kCfgStr cnf)
-searchGreedy_ costF (curCnf,curFs) (f:fs) = recurse
-    where confs      = flAllConfs f curCnf
+searchGreedy_ :: Int -> CostFn -> (C.Configuration, [Flow]) -> [Flow] -> C.Configuration
+searchGreedy_ nq costF (cnf,_)        []     = tr cnf $ "searchGreedy_: " ++ (e10kCfgStr cnf)
+searchGreedy_ nq costF (curCnf,curFs) (f:fs) = recurse
+    where confs      = flAllConfs nq f curCnf
           newCurFs   = f:curFs
           conf_costs = [(cnf,costF newCurFs cnf) | cnf <- confs]
           best_cnf_  = fst $ L.minimumBy (compare `on` snd) conf_costs
           best_cnf   = trN best_cnf_ $ "SELECTED " ++ (e10kCfgStr best_cnf_)
-          recurse    = searchGreedy_ costF (best_cnf, newCurFs) fs
+          recurse    = searchGreedy_ nq costF (best_cnf, newCurFs) fs
 
 -- greedy back-track search. Nothing is returned if no suitable configuration is
 -- found
@@ -125,10 +124,11 @@ searchGBSt0 fn = SearchGBSt {
 
 -- greedy back-track search. Nothing is returned if no suitable configuration is
 -- found
---searchGBaddFL :: SearchGBSt
+--searchGBaddFL :: Int
+--              -> SearchGBSt
 --              -> [Flow]
 --              -> Maybe (SearchGBSt, C.Configuration)
---searchGBaddFL st (f:fs) = error "foo"
+--searchGBaddFL nq st (f:fs) = error "foo"
 --    where ret = case best_cost of
 --                CostReject -> backtrack
 --                _          -> onward
@@ -138,7 +138,7 @@ searchGBSt0 fn = SearchGBSt {
 --          curConf = case length path of
 --                      0 -> []
 --                      _ -> snd $ head path
---          confs = flsAllConfs curConf [f]
+--          confs = flsAllConfs nq curConf [f]
 --          conf_costs = [(cnf,costF cnf) | cnf <- confs]
 --          (best_cnf,best_cost) = L.minimumBy (compare `on` snd) conf_costs
 --
@@ -164,13 +164,13 @@ searchGBSt0 fn = SearchGBSt {
 
 -- generate all possible configurations given an existing configuration and a
 -- set of endpoints
-flsAllConfs :: C.Configuration -> [Flow] -> [C.Configuration]
-flsAllConfs c [] = [c]
-flsAllConfs c (e:fs) = L.concat [ flsAllConfs newc fs | newc <- cs]
-    where cs = flAllConfs e c
+flsAllConfs :: Int -> C.Configuration -> [Flow] -> [C.Configuration]
+flsAllConfs nq c [] = [c]
+flsAllConfs nq c (e:fs) = L.concat [ flsAllConfs nq newc fs | newc <- cs]
+    where cs = flAllConfs nq e c
 
-flAllConfs :: Flow -> C.Configuration -> [C.Configuration]
-flAllConfs fl oldConf = [ add5TupleToConf oldConf fl q |  q <- allQueues]
+flAllConfs :: Int -> Flow -> C.Configuration -> [C.Configuration]
+flAllConfs nq fl oldConf = [ add5TupleToConf oldConf fl q |  q <- (allQueues nq)]
 
 mk5TupleFromFl :: Flow -> QueueId -> PG.ConfValue
 mk5TupleFromFl fl@(FlowUDPv4Conn {}) q =
@@ -240,10 +240,11 @@ fs = [ FlowUDPv4List {
 
 test :: IO ()
 test = do
+    let nq = 4
     --e10k <- e10kC
     --writeFile "tests/e10kC.dot" $ toDot e10k
     prgU <- e10kU
-    let balFn = e10kCost prgU balanceCost
-        conf  = searchGreedyE10k balFn fs
+    let balFn = e10kCost prgU (balanceCost nq)
+        conf  = searchGreedyE10k nq balFn fs
     putStrLn $ e10kCfgStr conf
     return ()
