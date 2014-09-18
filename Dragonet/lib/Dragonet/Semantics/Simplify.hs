@@ -31,6 +31,9 @@ import qualified Control.Concurrent.STM.TVar as TV
 import qualified Control.Monad.STM as STM
 import Control.Monad.IO.Class (liftIO)
 
+import Debug.Trace (trace)
+
+traceN x y = y
 
 addIn :: Ord k => k -> a -> M.Map k [a] -> M.Map k [a]
 addIn k v = M.insertWith (++) k [v]
@@ -49,7 +52,8 @@ processNode  st@(g,eM,_) n
     | not ready = do
         return st -- we'll try again later
     | PG.FNode { PG.nPorts = ports,
-                 PG.nSemantics = sems } <- nL = do
+                 PG.nSemantics = sems,
+                 PG.nLabel = name} <- nL = do
         -- Get input semantics
         inE <- S.exprOrL [s | (_,s) <- ins]
         let portAdd st' p = do
@@ -99,11 +103,15 @@ processNode  st@(g,eM,_) n
             false <- S.exprFalse
             -- Check expression for satisfiability
             sat <- S.checkSat e
+            let msg = "-------| Node=" ++ (PG.nLabel nL)
+                      ++ " Tag=" ++ (PG.nTag nL)
+                      ++ " Port=" ++ p
+                      ++ " Sat=" ++ (show sat)
             let outEs = [(n,n',edg) |
                          (n',edg@PG.Edge { PG.ePort = ep }) <- DGI.lsuc g n,
                          ep == p]
             -- Remove edges if unsatisfiable and simplify fw expr to false
-            (fwe,g'') <- case sat of
+            (fwe,g'') <- case traceN msg sat of
                 S.Unsatisfiable -> return (false, GH.delLEdges outEs g')
                 _ -> return (e, g')
             -- Add forward expressions
@@ -173,6 +181,8 @@ reducePG' graph helpers = do
             | Just (PG.ONode {}) <- DGI.lab graph n = False
             | otherwise = True
         entries = filter (\n -> isSrc n && notONode n) $ DGI.nodes noSeG
+        entriesL = [ fromJust $ DGI.lab noSeG x | x <- entries ]
+        --msg      = "reducePG' ENTRIES" ++ (show
     -- Prepare iteration state
     true <- S.exprTrue
     let ist = M.fromList $ zip entries $ repeat [(Nothing,true)]

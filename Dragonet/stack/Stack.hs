@@ -1,6 +1,7 @@
 module Stack (
     instantiate,
     instantiateGreedy,
+    instantiateKK,
     startStack,
 
     StackState(..),
@@ -18,6 +19,9 @@ import qualified Dragonet.Pipelines.Implementation as PLI
 import qualified Dragonet.Pipelines.Applications as PLA
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.Semantics as Sem
+import Dragonet.Flows  (Flow(..))
+
+import Graphs.Cfg (e10kCfgEmpty)
 
 import qualified Data.Maybe as MB
 
@@ -35,8 +39,10 @@ import Runner.Dynamic (createPipeline, createPipelineClient)
 import qualified Control.Concurrent.STM as STM
 import Control.Concurrent (threadDelay)
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Util.XTimeIt (doTimeIt,dontTimeIt)
+import Text.Show.Pretty (ppShow)
 
 type EndpointId = Int
 
@@ -50,15 +56,32 @@ data SocketDesc = SocketDesc {
     sdEpId  :: EndpointId
 }
 
-
-
 data EndpointDesc = EndpointUDPIPv4 {
     edSockets :: [PLA.SocketId],
     edIP4Src :: Maybe PLA.IPv4Addr,
     edIP4Dst :: Maybe PLA.IPv4Addr,
     edUDPSrc :: Maybe PLA.UDPPort,
     edUDPDst :: Maybe PLA.UDPPort
-} deriving (Show)
+} deriving (Show, Eq, Ord)
+
+epToFlow ::  EndpointDesc -> Flow
+epToFlow EndpointUDPIPv4 {edIP4Src = Nothing,
+                          edUDPSrc = Nothing,
+                          edIP4Dst = dstIp,
+                          edUDPDst = Just port }
+  = FlowUDPv4List {
+        flIp = dstIp,
+        flPort = port}
+
+epToFlow EndpointUDPIPv4 {edIP4Src = Just srcIp,
+                          edUDPSrc = Just srcPort,
+                          edIP4Dst = Just dstIp,
+                          edUDPDst = Just dstPort }
+   = FlowUDPv4Conn {
+          flSrcIp = srcIp,
+          flDstIp = dstIp,
+          flDstPort  = dstPort,
+          flSrcPort  = srcPort }
 
 data StackState = StackState {
     ssNextAppId :: PLA.AppId,  -- This ID will be given to the next app that tries to connect
@@ -68,6 +91,10 @@ data StackState = StackState {
     ssAppChans :: M.Map PLA.ChanHandle PLA.AppId,
     ssSockets :: M.Map PLA.SocketId SocketDesc,
     ssEndpoints :: M.Map EndpointId EndpointDesc,
+    -- quick hack to maintain the previous endpoints so that we can find the
+    -- difference between the current and the old state. It is probably better
+    -- to actually track the changes from the event handlers though.
+    ssPrevEndpoints :: M.Map EndpointId EndpointDesc,
     ssUpdateGraphs :: STM.TVar StackState -> IO (),
     ssVersion :: Int
 }
@@ -357,6 +384,7 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
                 ssAppChans = M.empty,
                 ssSockets = M.empty,
                 ssEndpoints = M.empty,
+                ssPrevEndpoints = M.empty,
                 ssUpdateGraphs = updateGraph,
                 ssVersion = 0
             }
@@ -378,6 +406,7 @@ initStackSt = StackState {
     ssAppChans = M.empty,
     ssSockets = M.empty,
     ssEndpoints = M.empty,
+    ssPrevEndpoints = M.empty,
     ssUpdateGraphs = undefined,
     ssVersion = 0
 }
@@ -639,6 +668,7 @@ instantiateGreedy (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
                 ssAppChans = M.empty,
                 ssSockets = M.empty,
                 ssEndpoints = M.empty,
+                ssPrevEndpoints = M.empty,
                 ssUpdateGraphs = updateGraphT,
                 ssVersion = 0
             }
@@ -650,3 +680,98 @@ instantiateGreedy (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
     PLA.interfaceThread stackname (eventHandler sstv)
 
 
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+-- an update graph is executed:
+--  bump the version number
+--  update the prevEndpoints
+--  return : new stack state, endpoints added, endpoints removed
+ssExecUpd :: STM.TVar StackState -> IO (StackState, M.Map EndpointId EndpointDesc)
+ssExecUpd sstv = STM.atomically $ do
+    ss <- STM.readTVar sstv
+    let prevEps = ssPrevEndpoints ss
+        newEps  = ssEndpoints ss
+        ss' = ss { ssVersion = ssVersion ss + 1, ssPrevEndpoints = newEps }
+    STM.writeTVar sstv ss'
+    return (ss', prevEps)
+
+epsDiff :: [EndpointDesc] -> [EndpointDesc] -> [EndpointDesc]
+epsDiff es1 es2 = S.toList $ S.difference (S.fromList es1) (S.fromList es2)
+
+
+instantiateKK ::
+           ([Flow] -> C.Configuration)  -- | get configuration
+        -> (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
+        -> String                                      -- | Name of llvm-helpers
+        -> (PLI.StateHandle -> C.Configuration -> IO ()) -- | Implement PRG conf
+        -> (StackState -> String -> PG.PGNode -> String) -- | Assign nodes to PL
+        -> IO ()
+instantiateKK getConf (prgU,prgHelp) llvmH cfgImpl cfgPLA = do
+    -- Prepare graphs and so on
+    (lpgU,lpgHelp) <- LPG.graphH
+    let mergeH = prgHelp `Sem.mergeHelpers` lpgHelp
+        stackname = "dragonet"
+    ctx <- PLD.initialContext stackname
+    stackhandle <- PLD.ctxState ctx
+    sharedState <- PLI.stackState stackhandle
+
+    -- Function to adapt graph to current stack state
+    let initSS = initStackSt { ssUpdateGraphs = updateGraph }
+        updateGraphT x = doTimeIt "updateGraphKK"  $ updateGraph x
+        updateGraph sstv = do
+            putStrLn "updateGraphKK entry"
+            (ss, prevEpsM) <- ssExecUpd sstv
+            -- STEP: we need to create incremantal ss with adding one flow at a time
+            let allEps = M.elems $ ssEndpoints ss  -- FIXME: this list should return one flow at a time
+
+                prevEps = M.elems prevEpsM
+                newEps = epsDiff allEps prevEps
+                rmEps = epsDiff prevEps allEps
+
+                lpgCfg = lpgConfig' allEps ss
+                -- Configure LPG
+                lpgC = C.applyConfig lpgCfg lpgU
+                lbl = "kk"
+                debug :: O.DbgFunction ()
+                debug = O.dbgDotfiles $ "out/graphs-xxx/" ++ (show $ ssVersion ss)
+                dbg = debug lbl
+                --dbg = O.dbgDummy
+                --
+                -- Transformations to be applied to graph before implementing it
+                implTransforms = [IT.coupleTxSockets, IT.mergeSockets]
+                pla = (plAssign cfgPLA ss)
+
+                -- LPG config is essentially all flows in network stack
+            putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
+            putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
+            putStrLn $ "LPG config: " ++ show lpgCfg
+
+            let prgConf = getConf $ map epToFlow allEps
+
+            plg <- O.makeGraph mergeH prgU lpgC implTransforms (pla lbl) dbg prgConf
+
+            -- apply PRG confuguration
+            cfgImpl sharedState prgConf
+            let createPL pl@('A':'p':'p':aids) = do
+                    putStrLn $ "Creating App pipeline: " ++ pl
+                    createPipelineClient agh pl
+                    where
+                        aid = read aids
+                        Just app = M.lookup aid $ ssApplications ss
+                        agh = adGraphHandle app
+                createPL pl = do
+                    putStrLn $ "Creating local pipeline: ##### " ++ pl
+                    createPipeline plg stackname llvmH pl
+            PLD.run ctx plConnect createPL $ addMuxIds plg
+            putStrLn "updateGraph exit"
+            -- FIXME: Create file here.
+            putStrLn "################### calling appendFile with app ready notice"
+            appendFile("allAppslist.appready") $ "Application is ready!\n"
+
+
+    putStrLn "Let's fire her up!"
+    sstv <- STM.atomically $ STM.newTVar $ initSS
+    updateGraph sstv
+    putStrLn "Starting interface thread"
+    PLA.interfaceThread stackname (eventHandler sstv)

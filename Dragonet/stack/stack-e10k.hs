@@ -9,6 +9,7 @@ import qualified Graphs.E10k as E10k
 import qualified Runner.E10KControl as CTRL
 
 import Stack
+import qualified Search
 import qualified Stack as SS
 
 import Control.Monad (forever, forM_)
@@ -288,10 +289,14 @@ main = do
     tcstate <- STM.newTVarIO state
     chan <- STM.newTChanIO
     -- Prepare graphs and so on
-    prgH <- E10k.graphH
+    prgH@(prgU,_) <- E10k.graphH
+    let costFn   = Search.e10kCost prgU Search.balanceCost
+        searchFn = Search.searchGreedyE10k costFn
+ 
     --instantiate prgH "llvm-helpers-e10k" costFunction oracle
     --    (implCfg tcstate chan) plAssignMerged
     --instantiate prgH "llvm-helpers-e10k" F.fitnessFunction oracle
     --instantiate prgH "llvm-helpers-e10k" F.priorityFitness  oracle
-    instantiateGreedy prgH "llvm-helpers-e10k" F.priorityFitness oracle
-        (implCfg tcstate chan) plAssign
+    --instantiateGreedy prgH "llvm-helpers-e10k" F.priorityFitness oracle
+    --    (implCfg tcstate chan) plAssign
+    instantiateKK searchFn prgH "llvm-helpers-null" (implCfg tcstate chan) plAssign

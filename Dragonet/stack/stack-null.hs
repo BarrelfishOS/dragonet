@@ -10,6 +10,8 @@ import qualified Data.Graph.Inductive as DGI
 import qualified Graphs.Null as Null
 import qualified Runner.NullControl as CTRL
 
+import qualified Search
+
 import Stack
 import qualified Stack as SS
 
@@ -272,20 +274,23 @@ plAssign _ _ (_,n)
         lbl = PG.nLabel n
         tag = PG.nTag n
 
-
 main = do
     let state = CfgState {
                     csThread = Nothing,
                     cs5Tuples = M.empty,
                     cs5TUnused = [0..127]
                 }
+
+
     -- Channel and MVar with thread id of control thread
     tcstate <- STM.newTVarIO state
     chan <- STM.newTChanIO
     -- Prepare graphs and so on
-    prgH <- Null.graphH
+    prgH@(prgU,_) <- Null.graphH
+
+    let costFn   = Search.e10kCost prgU Search.balanceCost
+        searchFn = Search.searchGreedyE10k costFn
+
     --instantiate prgH "llvm-helpers-null" F.fitnessFunction oracle
     --instantiate prgH "llvm-helpers-null" F.priorityFitness  oracle
-    instantiateGreedy prgH "llvm-helpers-null" F.priorityFitness oracle
-        (implCfg tcstate chan) plAssign
-
+    instantiateKK searchFn prgH "llvm-helpers-null" (implCfg tcstate chan) plAssign

@@ -7,7 +7,7 @@ module Dragonet.ProtocolGraph.Utils (
     getFNodeByName',
     getFNodeByNameTag',
     getPGNAttr,
-    spawnDeps, isSpawnTarget, edgeDeps, edgePort
+    spawnDeps, isSpawnTarget, edgeDeps, edgePort, edgeSucc,
 ) where
 
 import Dragonet.ProtocolGraph
@@ -98,6 +98,11 @@ edgePort pedge = case pedge of
 -- normal incoming dependencies (label of connected node, edge)
 edgeDeps :: PGraph -> PGNode -> [(PGNode, PGEdge)]
 edgeDeps gr dst = filter (isNormalEdge . snd) $ GH.labLPre gr dst
+
+
+-- normal (i.e., not spawn) sucessor nodes
+edgeSucc :: PGraph -> PGNode -> [(PGNode, PGEdge)]
+edgeSucc gr pre = filter (isNormalEdge . snd) $ GH.labLSucc gr pre
 
 -- is the node a traget spawn edges
 isSpawnTarget :: PGraph -> PGNode -> Bool

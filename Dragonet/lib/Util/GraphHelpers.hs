@@ -195,7 +195,7 @@ labLPre graph node = map mapfn $ inn graph (fst node)
 -- labaled node sucessors on a graph
 labLSucc :: Graph gr => gr a b -> LNode a -> [(LNode a, LEdge b)]
 labLSucc graph node = map mapfn $ out graph (fst node)
-    where mapfn edge@(src, _, _) = (nodeToLNode graph src, edge)
+    where mapfn edge@(_, dst, _) = (nodeToLNode graph dst, edge)
 
 -- DFS.reachable on labled nodes
 labReachable :: Graph gr => gr a b -> LNode a -> [LNode a]
