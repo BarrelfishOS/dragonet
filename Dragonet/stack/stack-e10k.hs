@@ -301,5 +301,5 @@ main = do
     --    (implCfg tcstate chan) plAssign
 --    instantiate prgH "llvm-helpers-e10k" F.dummyFitness oracleMultiQueue
 --        (implCfg tcstate chan) plAssign
-    instantiateKK searchFn prgH "llvm-helpers-e10k" (implCfg tcstate chan) plAssign
+    instantiateKK searchFn prgH "llvm-helpers-e10k" (implCfg tcstate chan) plAssignMerged
 
