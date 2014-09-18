@@ -53,9 +53,9 @@ bool e10k_ctrl_5tuple_set(struct state *state,
     f.dst_port = dst_port;
     f.mask     = mask;
     f.l4_type  = l4_type;
-    printf("### %s:%s:%d:  [#### IMP ####]"
+    printf("\n\n### %s:%s:%d:  [#### IMP ####]"
             "Priority: %"PRIu8", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
-            "srcIP: %"PRIu32", srcPort: %"PRIu16",  dstIP: %"PRIu32", dstPort: %"PRIu16"\n",
+            "srcIP: %"PRIu32", srcPort: %"PRIu16",  dstIP: %"PRIu32", dstPort: %"PRIu16"\n\n",
             __FILE__, __FUNCTION__, __LINE__,
             f.priority,
             f.queue,

@@ -544,6 +544,36 @@ struct ctx_E10kRxQueue3 {
     struct ctx_generic generic;
 };
 
+struct ctx_E10kRxQueue4 {
+    struct ctx_generic generic;
+};
+
+struct ctx_E10kRxQueue5 {
+    struct ctx_generic generic;
+};
+
+struct ctx_E10kRxQueue6 {
+    struct ctx_generic generic;
+};
+
+struct ctx_E10kRxQueue7 {
+    struct ctx_generic generic;
+};
+
+struct ctx_E10kRxQueue8 {
+    struct ctx_generic generic;
+};
+
+struct ctx_E10kRxQueue9 {
+    struct ctx_generic generic;
+};
+
+struct ctx_E10kRxQueue10 {
+    struct ctx_generic generic;
+};
+
+
+
 struct ctx_E10kL3IPv4Classified {
     struct ctx_generic generic;
 };
@@ -568,11 +598,33 @@ struct ctx_E10kTxQueue3 {
     struct ctx_generic generic;
 };
 
+struct ctx_E10kTxQueue4 {
+    struct ctx_generic generic;
+};
 
+struct ctx_E10kTxQueue5 {
+    struct ctx_generic generic;
+};
 
+struct ctx_E10kTxQueue6 {
+    struct ctx_generic generic;
+};
 
+struct ctx_E10kTxQueue7 {
+    struct ctx_generic generic;
+};
 
+struct ctx_E10kTxQueue8 {
+    struct ctx_generic generic;
+};
 
+struct ctx_E10kTxQueue9 {
+    struct ctx_generic generic;
+};
+
+struct ctx_E10kTxQueue10 {
+    struct ctx_generic generic;
+};
 
 
 struct ctx_NullInit {
@@ -764,12 +816,26 @@ node_out_t do_pg__E10kRxQueue0(struct ctx_E10kRxQueue0 *context, struct state *s
 node_out_t do_pg__E10kRxQueue1(struct ctx_E10kRxQueue1 *context, struct state *state, struct input **in);
 node_out_t do_pg__E10kRxQueue2(struct ctx_E10kRxQueue2 *context, struct state *state, struct input **in);
 node_out_t do_pg__E10kRxQueue3(struct ctx_E10kRxQueue3 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kRxQueue4(struct ctx_E10kRxQueue4 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kRxQueue5(struct ctx_E10kRxQueue5 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kRxQueue6(struct ctx_E10kRxQueue6 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kRxQueue7(struct ctx_E10kRxQueue7 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kRxQueue8(struct ctx_E10kRxQueue8 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kRxQueue9(struct ctx_E10kRxQueue9 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kRxQueue10(struct ctx_E10kRxQueue10 *context, struct state *state, struct input **in);
 node_out_t do_pg__E10kL3IPv4Classified(struct ctx_E10kL3IPv4Classified *context, struct state *state, struct input **in);
 node_out_t do_pg__E10kL3IPv4ValidChecksum(struct ctx_E10kL3IPv4ValidChecksum *context, struct state *state, struct input **in);
 node_out_t do_pg__E10kTxQueue0(struct ctx_E10kTxQueue0 *context, struct state *state, struct input **in);
 node_out_t do_pg__E10kTxQueue1(struct ctx_E10kTxQueue1 *context, struct state *state, struct input **in);
 node_out_t do_pg__E10kTxQueue2(struct ctx_E10kTxQueue2 *context, struct state *state, struct input **in);
 node_out_t do_pg__E10kTxQueue3(struct ctx_E10kTxQueue3 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kTxQueue4(struct ctx_E10kTxQueue4 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kTxQueue5(struct ctx_E10kTxQueue5 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kTxQueue6(struct ctx_E10kTxQueue6 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kTxQueue7(struct ctx_E10kTxQueue7 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kTxQueue8(struct ctx_E10kTxQueue8 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kTxQueue9(struct ctx_E10kTxQueue9 *context, struct state *state, struct input **in);
+node_out_t do_pg__E10kTxQueue10(struct ctx_E10kTxQueue10 *context, struct state *state, struct input **in);
 node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context, struct state *state, struct input **in);
 node_out_t do_pg__TapTxQueue(struct ctx_TapTxQueue *context, struct state *state, struct input **in);
 

@@ -48,7 +48,7 @@ graph e10kPRG {
                     prio:  Int 1 7,
                     queue: UInt 2) } <,128>
             function config5tuple
-            port queues[Q0Valid Q1Valid Q2Valid Q3Valid]
+            port queues[Q0Valid Q1Valid Q2Valid Q3Valid Q4Valid Q5Valid Q6Valid Q7Valid Q8Valid Q9Valid Q10Valid]
             port default[CFDirFilter] }
 
         config CFDirFilter {
@@ -59,7 +59,7 @@ graph e10kPRG {
                     dport: UInt 16,
                     queue: UInt 2) }
             function configFDir
-            port queues[Q0Valid Q1Valid Q2Valid Q3Valid]
+            port queues[Q0Valid Q1Valid Q2Valid Q3Valid Q4Valid Q5Valid Q6Valid Q7Valid Q8Valid Q9Valid Q10Valid]
             port default[ToDefaultQueue] }
 
         boolean ToDefaultQueue {
@@ -107,6 +107,7 @@ graph e10kPRG {
         or Q3Valid {
             port true[Queue3]
             port false[] }
+
         node Queue3 {
             implementation E10kRxQueue3
             attr "unproductive"
@@ -116,6 +117,109 @@ graph e10kPRG {
             port out[]
             port drop[]
             port init[] }
+
+
+        or Q4Valid {
+            port true[Queue4]
+            port false[] }
+
+        node Queue4 {
+            implementation E10kRxQueue4
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue4
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q5Valid {
+            port true[Queue5]
+            port false[] }
+
+        node Queue5 {
+            implementation E10kRxQueue5
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue5
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q6Valid {
+            port true[Queue6]
+            port false[] }
+
+        node Queue6 {
+            implementation E10kRxQueue6
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue6
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q7Valid {
+            port true[Queue7]
+            port false[] }
+
+        node Queue7 {
+            implementation E10kRxQueue7
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue7
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q8Valid {
+            port true[Queue8]
+            port false[] }
+
+        node Queue8 {
+            implementation E10kRxQueue8
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue8
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q9Valid {
+            port true[Queue9]
+            port false[] }
+
+        node Queue9 {
+            implementation E10kRxQueue9
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue9
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q10Valid {
+            port true[Queue10]
+            port false[] }
+
+        node Queue10 {
+            implementation E10kRxQueue10
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue10
+            port out[]
+            port drop[]
+            port init[] }
+
+
+
+
     }
 
     cluster Tx {
@@ -135,5 +239,38 @@ graph e10kPRG {
             implementation E10kTxQueue3
             attr "sink"
             attr "software" }
+        node Queue4 {
+            implementation E10kTxQueue4
+            attr "sink"
+            attr "software" }
+        node Queue5 {
+            implementation E10kTxQueue5
+            attr "sink"
+            attr "software" }
+        node Queue6 {
+            implementation E10kTxQueue6
+            attr "sink"
+            attr "software" }
+        node Queue7 {
+            implementation E10kTxQueue7
+            attr "sink"
+            attr "software" }
+        node Queue3 {
+            implementation E10kTxQueue3
+            attr "sink"
+            attr "software" }
+        node Queue8 {
+            implementation E10kTxQueue8
+            attr "sink"
+            attr "software" }
+        node Queue9 {
+            implementation E10kTxQueue9
+            attr "sink"
+            attr "software" }
+        node Queue10 {
+            implementation E10kTxQueue10
+            attr "sink"
+            attr "software" }
+
     }
 }

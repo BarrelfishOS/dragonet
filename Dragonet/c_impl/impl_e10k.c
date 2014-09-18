@@ -34,6 +34,8 @@
 #define NUM_RXBUFS 256
 #endif // USE_LOT_OF_MEM
 
+// For collecting stats per queue
+#define MAX_QUEUES                     128
 
 //#define CONFIG_PCI_ADDR "0000:81:00.0"
 //#define CONFIG_LOCAL_IP 0x0a160427 // "10.22.4.39"
@@ -49,7 +51,6 @@
 //  For burrata, connected over switch
 #define CONFIG_PCI_ADDR "0000:04:00.0"
 #define CONFIG_LOCAL_IP  0x0a710460 //   "10.113.4.96" , eth2
-
 
 // NOTE: Moved to c_impl/include/implementation.h
 //#define SHOW_INTERVAL_STATS  1
@@ -283,7 +284,6 @@ out_err:
     return false;
 }
 
-#define MAX_QUEUES                     128
 static uint64_t qstat[MAX_QUEUES] = {0, 0};
 
 static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
@@ -364,6 +364,7 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
 
 
 #if SHOW_INTERVAL_STATS
+
     //printf("e10k: Yay, we got a full packet!\n");
     if (qstat[qi] % INTERVAL_STAT_FREQUENCY == 0) {
         printf
@@ -420,7 +421,7 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
 node_out_t do_pg__E10kRxQueue0(struct ctx_E10kRxQueue0 *context,
         struct state *state, struct input **in)
 {
-    return rx_queue(context, state, in, 0);
+    return rx_queue((struct ctx_E10kRxQueue0 *) context, state, in, 0);
 }
 
 node_out_t do_pg__E10kRxQueue1(struct ctx_E10kRxQueue1 *context,
@@ -440,6 +441,56 @@ node_out_t do_pg__E10kRxQueue3(struct ctx_E10kRxQueue3 *context,
 {
     return rx_queue((struct ctx_E10kRxQueue0 *) context, state, in, 3);
 }
+
+
+node_out_t do_pg__E10kRxQueue4(struct ctx_E10kRxQueue4 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_E10kRxQueue0 *) context, state, in, 4);
+}
+
+node_out_t do_pg__E10kRxQueue5(struct ctx_E10kRxQueue5 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_E10kRxQueue0 *) context, state, in, 5);
+}
+
+node_out_t do_pg__E10kRxQueue6(struct ctx_E10kRxQueue6 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_E10kRxQueue0 *) context, state, in, 6);
+}
+
+node_out_t do_pg__E10kRxQueue7(struct ctx_E10kRxQueue7 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_E10kRxQueue0 *) context, state, in, 7);
+}
+
+
+node_out_t do_pg__E10kRxQueue8(struct ctx_E10kRxQueue8 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_E10kRxQueue0 *) context, state, in, 8);
+}
+
+
+node_out_t do_pg__E10kRxQueue9(struct ctx_E10kRxQueue9 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_E10kRxQueue0 *) context, state, in, 9);
+}
+
+
+node_out_t do_pg__E10kRxQueue10(struct ctx_E10kRxQueue10 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_E10kRxQueue0 *) context, state, in, 10);
+}
+
+
+
+
 
 
 node_out_t do_pg__E10kTxQueue0(struct ctx_E10kTxQueue0 *context,
@@ -465,6 +516,48 @@ node_out_t do_pg__E10kTxQueue3(struct ctx_E10kTxQueue3 *context,
         struct state *state, struct input **in)
 {
     return tx_queue(state, in, 3);
+}
+
+node_out_t do_pg__E10kTxQueue4(struct ctx_E10kTxQueue4 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 4);
+}
+
+node_out_t do_pg__E10kTxQueue5(struct ctx_E10kTxQueue5 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 5);
+}
+
+node_out_t do_pg__E10kTxQueue6(struct ctx_E10kTxQueue6 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 6);
+}
+
+node_out_t do_pg__E10kTxQueue7(struct ctx_E10kTxQueue7 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 7);
+}
+
+node_out_t do_pg__E10kTxQueue8(struct ctx_E10kTxQueue8 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 8);
+}
+
+node_out_t do_pg__E10kTxQueue9(struct ctx_E10kTxQueue9 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 9);
+}
+
+node_out_t do_pg__E10kTxQueue10(struct ctx_E10kTxQueue10 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 10);
 }
 
 

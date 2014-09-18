@@ -30,7 +30,7 @@ import Text.Show.Pretty (ppShow)
 tr = flip . trace
 
 numQueues :: Integer
-numQueues = 4
+numQueues = 10
 
 localIP :: Word32
 --localIP = MD.asiagoIP_Intel
@@ -57,8 +57,9 @@ oracleHardcoded  args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,
                 ])])]
 
 -- This should return multiple tuples and not just one tuple list
-oracle_ ::  SS.OracleArgs -> [(String,C.Configuration)]
-oracle_ args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,  SS.oraclePrg = oPrg, SS.oracleNewConns = eps , SS.oracleSS = ss}) = [
+oracleMultiQueue ::  SS.OracleArgs -> [(String,C.Configuration)]
+oracleMultiQueue args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,  SS.oraclePrg = oPrg, SS.oracleNewConns = eps , SS.oracleSS = ss}) = [
+{-
                 ("defaultOracle", -- Most stupid configuration, only default queue and default filters
                     [ ("RxCFDirFilter", PG.CVList []),
                       ("RxC5TupleFilter", PG.CVList [])
@@ -68,14 +69,13 @@ oracle_ args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,  SS.oraclePrg = oPrg, S
                     [ ("RxCFDirFilter", PG.CVList []),
                       ("RxC5TupleFilter", PG.CVList fiveTupleCAlt)
                     ]
-                )
-
-                , ("MultiQueueOracle", -- separate queue  for each flow
+                ),
+-}
+                ("MultiQueueOracle", -- separate queue  for each flow
                     [ ("RxCFDirFilter", PG.CVList []),
                       ("RxC5TupleFilter", PG.CVList fiveTupleC)
                     ]
                 )
-
             ]
     where
         queues = [1..(numQueues-1)] ++ [0]
@@ -292,11 +292,14 @@ main = do
     prgH@(prgU,_) <- E10k.graphH
     let costFn   = Search.e10kCost prgU Search.balanceCost
         searchFn = Search.searchGreedyE10k costFn
- 
+
     --instantiate prgH "llvm-helpers-e10k" costFunction oracle
     --    (implCfg tcstate chan) plAssignMerged
     --instantiate prgH "llvm-helpers-e10k" F.fitnessFunction oracle
     --instantiate prgH "llvm-helpers-e10k" F.priorityFitness  oracle
     --instantiateGreedy prgH "llvm-helpers-e10k" F.priorityFitness oracle
     --    (implCfg tcstate chan) plAssign
-    instantiateKK searchFn prgH "llvm-helpers-null" (implCfg tcstate chan) plAssign
+--    instantiate prgH "llvm-helpers-e10k" F.dummyFitness oracleMultiQueue
+--        (implCfg tcstate chan) plAssign
+    instantiateKK searchFn prgH "llvm-helpers-e10k" (implCfg tcstate chan) plAssign
+

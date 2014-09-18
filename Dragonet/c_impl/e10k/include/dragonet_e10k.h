@@ -7,7 +7,7 @@
 #include <e10k_queue.h>
 #include <linux_pci_uio.h>
 
-#define QUEUES 4
+#define QUEUES 10
 #define QUEUE_INDEX(q) ((q) - (q)->e10k->queues)
 
 struct dragonet_e10k;

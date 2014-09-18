@@ -32,7 +32,7 @@ import Debug.Trace (trace)
 tr a b  = trace b a
 trN a b = a
 
-numQueues = 3
+numQueues = 10
 allQueues = [1..(numQueues-1)] ++ [0] :: [QueueId]
 
 --
