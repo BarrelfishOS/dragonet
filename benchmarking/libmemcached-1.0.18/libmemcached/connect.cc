@@ -63,6 +63,18 @@
 #ifndef TCP_KEEPIDLE
 # define TCP_KEEPIDLE 0
 #endif
+//
+// XXX
+// gettid
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
+static inline long gettid(void)
+{
+	return syscall(SYS_gettid);
+}
+
+
 
 static memcached_return_t connect_poll(memcached_instance_st* server, const int connection_error)
 {
@@ -509,6 +521,7 @@ static memcached_return_t unix_socket_connect(memcached_instance_st* server)
 static memcached_return_t network_connect(memcached_instance_st* server)
 {
   bool timeout_error_occured= false;
+  static int xx_client_port = 6000;
 
   WATCHPOINT_ASSERT(server->fd == INVALID_SOCKET);
   WATCHPOINT_ASSERT(server->cursor_active_ == 0);
@@ -552,9 +565,26 @@ static memcached_return_t network_connect(memcached_instance_st* server)
       type|= SOCK_NONBLOCK;
     }
 
+    // XXX
+    printf("CONNECTING HERE!\n");
     server->fd= socket(server->address_info_next->ai_family,
                        type,
                        server->address_info_next->ai_protocol);
+
+    if (server->fd > 0) {
+        struct sockaddr_in xaddr;
+        int xport = xx_client_port++;
+
+        memset((char *)&xaddr, 0, sizeof(xaddr));
+        xaddr.sin_family = AF_INET;
+        xaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+        printf("thread: %lu Binding to port: %d!\n", gettid(), xport);
+        xaddr.sin_port = htons(xport);
+        if (bind(server->fd, (struct sockaddr *)&xaddr, sizeof(xaddr)) < 0) {
+          perror("bind failed\n");
+          exit(0);
+        }
+    }
 
     if (int(server->fd) == SOCKET_ERROR)
     {
