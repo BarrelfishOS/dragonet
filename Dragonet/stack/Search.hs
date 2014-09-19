@@ -279,12 +279,12 @@ flAllConfs :: Int -> Flow -> C.Configuration -> [C.Configuration]
 flAllConfs nq fl oldConf = [ add5TupleToConf oldConf fl q |  q <- (allQueues nq)]
 
 mk5TupleFromFl :: Flow -> QueueId -> PG.ConfValue
-mk5TupleFromFl fl@(FlowUDPv4Conn {}) q =
-    PG.CVTuple [ cvMInt $ Just sIP,
-    cvMInt $ Just dIP,
+mk5TupleFromFl fl@(FlowUDPv4 {}) q =
+    PG.CVTuple [ cvMInt $ sIP,
+    cvMInt $ dIP,
     PG.CVMaybe $ Just $ PG.CVEnum 1,
-    cvMInt $ Just sP,
-    cvMInt $ Just dP,
+    cvMInt $ sP,
+    cvMInt $ dP,
     PG.CVInt prio,
     PG.CVInt $ fromIntegral q]
     where
@@ -293,20 +293,6 @@ mk5TupleFromFl fl@(FlowUDPv4Conn {}) q =
        sP   = flSrcPort fl
        dP   = flDstPort fl
        prio = 1
-
-mk5TupleFromFl fl@(FlowUDPv4List {}) q =
-    PG.CVTuple [ cvMInt $ Nothing,
-    cvMInt $ Nothing,
-    PG.CVMaybe $ Just $ PG.CVEnum 1,
-    cvMInt $ Nothing,
-    cvMInt $ Just dP,
-    PG.CVInt prio,
-    PG.CVInt $ fromIntegral q]
-    where
-       dIP  = flIp   fl
-       dP   = flPort fl
-       prio = 1
-
 
 add5TupleToConf :: C.Configuration -> Flow -> QueueId -> C.Configuration
 add5TupleToConf conf fl q = ("RxC5TupleFilter", new5t):rest
@@ -340,11 +326,13 @@ e10kC = (C.applyConfig prgCfg) <$> e10kU
 -- connectiong going away, we can add a property to the endpoint description
 -- about wheter a connection was added or removed so that the oracle can act
 -- accordingly.
-fs = [ FlowUDPv4List {
-     flIp    = Just 127
-   , flPort  = fromIntegral $ 1000 + i} | i <- [1..40] ]
+fs = [ FlowUDPv4 {
+     flDstIp    = Just 127
+   , flDstPort  = Just $ fromIntegral $ 1000 + i
+   , flSrcIp    = Nothing
+   , flSrcPort  = Nothing } | i <- [1..40] ]
 
-isGoldFl FlowUDPv4List {flPort = port} = isJust $ L.find (==port) [1001,1002]
+isGoldFl FlowUDPv4 {flDstPort = Just port} = isJust $ L.find (==port) [1001,1002]
 goldFlPerQ = 1
 priorityCost' = priorityCost isGoldFl goldFlPerQ
 
@@ -364,5 +352,4 @@ test = do
 
     putStrLn $ e10kCfgStr conf
     putStrLn $ "Cost:" ++ (show $ costFn fs conf)
-
     return (prgU, conf)

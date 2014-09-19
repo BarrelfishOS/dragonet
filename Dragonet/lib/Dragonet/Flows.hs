@@ -10,16 +10,10 @@ type IPv4Addr = Word32
 type UDPPort  = Word16
 
 data Flow =
-  -- UDP connection
-  FlowUDPv4Conn {
-    flSrcIp    :: IPv4Addr,
-    flDstIp    :: IPv4Addr,
-    flDstPort  :: UDPPort,
-    flSrcPort  :: UDPPort
-  } |
-  -- UDP listen socket
-  FlowUDPv4List {
-    flIp     :: Maybe IPv4Addr,
-    flPort   :: UDPPort
-  }
-  deriving (Show, Eq, Ord)
+  -- UDP flow (Nothing is wildcards)
+  FlowUDPv4 {
+    flSrcIp    :: Maybe IPv4Addr,
+    flDstIp    :: Maybe IPv4Addr,
+    flDstPort  :: Maybe UDPPort,
+    flSrcPort  :: Maybe UDPPort
+  } deriving (Show, Eq, Ord)

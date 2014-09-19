@@ -64,20 +64,11 @@ data EndpointDesc = EndpointUDPIPv4 {
     edUDPDst :: Maybe PLA.UDPPort
 } deriving (Show, Eq, Ord)
 
-epToFlow ::  EndpointDesc -> Flow
-epToFlow EndpointUDPIPv4 {edIP4Src = Nothing,
-                          edUDPSrc = Nothing,
+epToFlow EndpointUDPIPv4 {edIP4Src = srcIp,
+                          edUDPSrc = srcPort,
                           edIP4Dst = dstIp,
-                          edUDPDst = Just port }
-  = FlowUDPv4List {
-        flIp = dstIp,
-        flPort = port}
-
-epToFlow EndpointUDPIPv4 {edIP4Src = Just srcIp,
-                          edUDPSrc = Just srcPort,
-                          edIP4Dst = Just dstIp,
-                          edUDPDst = Just dstPort }
-   = FlowUDPv4Conn {
+                          edUDPDst = dstPort }
+   = FlowUDPv4 {
           flSrcIp = srcIp,
           flDstIp = dstIp,
           flDstPort  = dstPort,

@@ -370,35 +370,28 @@ prepareConf = replaceConfFunctions addCfgFun
 -- Very quick-n-dirty for the moment
 --
 
+maybeMatch Nothing _ = True
+maybeMatch _ Nothing = True
+maybeMatch (Just x1) (Just x2) = x1 == x2
+
 flowMatches5TF :: Flow -> C5Tuple -> Bool
-flowMatches5TF (FlowUDPv4Conn {flSrcIp = srcIp,
-                               flDstIp = dstIp,
-                               flSrcPort = srcPort,
-                               flDstPort = dstPort })
+flowMatches5TF (FlowUDPv4 {flSrcIp = srcIp,
+                           flDstIp = dstIp,
+                           flSrcPort = srcPort,
+                           flDstPort = dstPort })
                 (C5Tuple {c5tL4Proto = cProt,
                           c5tL3Src   = cSrcIp,
                           c5tL3Dst   = cDstIp,
                           c5tL4Src   = cSrcPort,
                           c5tL4Dst   = cDstPort}) = ret
  where maybeT = maybe True
-       ret =  (maybeT (== C5TPL4UDP) cProt)
-           && (maybeT (== srcIp)     cSrcIp)
-           && (maybeT (== dstIp)     cDstIp)
-           && (maybeT (== srcPort)   cSrcPort)
-           && (maybeT (== dstPort)   cDstPort)
-
-flowMatches5TF (FlowUDPv4List {flIp   = ip,
-                               flPort = port })
-                (C5Tuple {c5tL4Proto = cProt,
-                          c5tL3Dst   = cDstIp,
-                          c5tL4Dst   = cDstPort}) = ret
- where maybeT = maybe True
        ip_match Nothing _ = True
        ip_match _ Nothing = True
        ip_match (Just ip1) (Just ip2) = ip1 == ip2
-       ret =  ip_match ip cDstIp 
-              && (maybeT (== C5TPL4UDP) cProt)
-              && (maybeT (== port)     cDstPort)
+       ret =   maybeMatch srcIp cSrcIp
+            && maybeMatch dstIp cDstIp
+            && maybeMatch srcPort cSrcPort
+            && maybeMatch dstPort cDstPort
 
 flowGetPort :: Flow -> PG.PGNode -> PG.NPort
 flowGetPort fl (_, nlbl)
