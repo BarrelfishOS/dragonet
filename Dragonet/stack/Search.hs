@@ -356,10 +356,13 @@ test = do
 
     let priFn = e10kCost prgU (priorityCost' nq)
         balFn = e10kCost prgU (balanceCost nq)
-        --conf  = searchGreedyConfE10k nq priFn fs
-        --conf  = searchGreedyConfE10k nq balFn fs
-        conf  = searchGreedyFlowsE10k nq priFn fs
-        --conf  = searchGreedyFlowsE10k nq balFn fs
+
+        costFn = priFn
+
+        conf  = searchGreedyConfE10k nq costFn fs
+        --conf  = searchGreedyFlowsE10k nq costFn fs
 
     putStrLn $ e10kCfgStr conf
+    putStrLn $ "Cost:" ++ (show $ costFn fs conf)
+
     return (prgU, conf)
