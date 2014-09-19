@@ -742,6 +742,7 @@ static int ms_new_socket(struct addrinfo *ai)
     if (bind(sfd, (struct sockaddr *)&xaddr, sizeof(xaddr)) < 0) {
       perror("bind failed\n");
       exit(0);
+    }
   }
 
   return sfd;
