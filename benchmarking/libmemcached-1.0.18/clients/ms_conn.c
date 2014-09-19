@@ -730,10 +730,12 @@ static int ms_new_socket(struct addrinfo *ai)
     return -1;
   }
 
-  if (sfd > 0) {
+  if (sfd > 0 && ms_setting.sports > 0) {
     struct sockaddr_in xaddr;
-    int xport = xx_client_port++;
 
+    //int xport = xx_client_port++;
+    int xport = ms_setting.sports++;
+//ms_setting.sports
     memset((char *)&xaddr, 0, sizeof(xaddr));
     xaddr.sin_family = AF_INET;
     xaddr.sin_addr.s_addr = htonl(INADDR_ANY);

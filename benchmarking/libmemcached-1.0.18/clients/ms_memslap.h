@@ -40,6 +40,7 @@ typedef enum
   OPT_EXECUTE_NUMBER= 'x',
   OPT_THREAD_NUMBER= 'T',
   OPT_CONCURRENCY= 'c',
+  OPT_SPORTS= 'z',
   OPT_FIXED_LTH= 'X',
   OPT_VERIFY= 'v',
   OPT_GETS_DIVISION= 'd',
