@@ -2,7 +2,8 @@
 module Search (
   e10kCost,
   balanceCost,
-  searchGreedyE10k
+  searchGreedyE10k,
+  test
 ) where
 
 
@@ -13,7 +14,9 @@ import Dragonet.Flows (Flow(..))
 
 import qualified Data.List as L
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 import Data.Word
+import Data.Maybe
 import Data.Int
 import Data.Function (on)
 
@@ -32,6 +35,7 @@ import Debug.Trace (trace)
 tr a b  = trace b a
 trN a b = a
 
+allQueues :: Int -> [QueueId]
 allQueues nq = [1..(nq-1)] ++ [0] :: [QueueId]
 
 --
@@ -43,7 +47,7 @@ allQueues nq = [1..(nq-1)] ++ [0] :: [QueueId]
 -- will never return
 data Cost = CostOK         |
             CostVal Float  |
-            CostReject
+            CostReject Float -- small hack to rate rejected solutions
     deriving (Eq, Ord, Show)
 
 -- the basic form of a cost function for the search algorithms
@@ -70,8 +74,14 @@ e10kCost prgU costQFn = retFn
                     ret = trN ret_ $ "conf:" ++ (e10kCfgStr conf)
                                     ++ "\ncost:" ++ (show ret_)
 
-balanceCost :: Int -> [(Flow, QueueId)] -> Cost
-balanceCost nq qmap = ret
+-- http://rosettacode.org/wiki/Standard_deviation#Haskell
+sd :: RealFloat a => [a] -> a
+sd l = sqrt $ sum (map ((^2) . subtract mean) l) / n
+  where n = L.genericLength l
+        mean = sum l / n
+
+balanceCost_ :: [QueueId] -> [(Flow, QueueId)] -> Cost
+balanceCost_ allQs qmap = ret
     where qLoad :: M.Map QueueId Integer
           qList  =  [qId | (_,qId) <- qmap]
           qLoad = L.foldl foldFn M.empty qList
@@ -80,30 +90,117 @@ balanceCost nq qmap = ret
 
           getQLoad :: QueueId -> Integer
           getQLoad q = M.findWithDefault 0 q qLoad
-          load    = map getQLoad (allQueues nq)
-          maxLoad = maximum load
-          minLoad = minimum load
-          ret_     =  CostVal $ fromIntegral $ maxLoad - minLoad
+          load    = map getQLoad allQs
+          --maxLoad = maximum load
+          --minLoad = minimum load
+          --ret_     =  CostVal $ fromIntegral $ maxLoad - minLoad
+          ret_ = CostVal $ sd $ map fromIntegral load
           ret = trN ret_ ("\nqlist" ++ (ppShow qList) ++ "\nLOAD:" ++ ppShow (load))
 
-priorityCost :: (Flow -> Bool) -> [(Flow, QueueId)] -> Cost
-priorityCost = error "NYI!"
+balanceCost :: Int -> [(Flow, QueueId)] -> Cost
+balanceCost nq fls = balanceCost_ (allQueues nq) fls
 
+-- gold/best-effort priorities
+priorityCost :: (Flow -> Bool) -> Integer -> Int -> [(Flow, QueueId)] -> Cost
+priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
+    where (goldFls, beFls) = L.partition (isGold . fst) qmap
+          goldQs = S.fromList $ [qid | (_,qid) <- goldFls]
+          beQs   = S.fromList $ [qid | (_,qid) <- beFls]
+          allQs  = S.fromList (allQueues nq)
+          restQs = allQs `S.difference` goldQs
+          goldQsExcl = goldQs `S.difference` beQs
+          beQsExcl   = beQs `S.difference` goldQs
+          msg = "qmap:\n" ++ (ppShow qmap)
+                ++ "\ngoldQs:" ++ (ppShow goldQs)
+                ++ "\ngoldQsExcl:" ++ (ppShow goldQsExcl)
+                ++ "\ngoldNQs:" ++ (ppShow goldNQs)
+                ++ "\nbeQs:" ++ (ppShow beQs)
+                ++ "\ncost" ++ (ppShow cost)
+          cost
+            -- no gold flows: just balance best-effort across all queues
+            | length goldFls == 0 = balanceCost_ (allQueues nq) beFls
+            -- no best effort flows: just balance gold across all queues
+            | length beFls   == 0 = balanceCost_ (allQueues nq) goldFls
+            -- we should have enough queues for the gold class
+            | goldNeeded > 0 = CostReject $ 100*(fromIntegral goldNeeded)
+            -- we should have enough queues for the best effort class
+            | beNeeded > 0 = CostReject $ (fromIntegral beNeeded)
+            -- if all is OK, it depends on how well the classes are balanced
+            | otherwise               = CostVal $ balGold + balBe
 
--- simple greedy search
+          -- determine number of gold queues
+          goldNQs = (min $ nq -1)
+                   $ ceiling
+                   $ (toRational $ length goldFls) / (toRational goldFlowsPerQ)
+          goldNeeded = goldNQs - (S.size goldQsExcl)
+          -- number of best efforst queues
+          beNQs = nq - goldNQs
+          beNeeded = beNQs - (S.size beQsExcl)
+
+          CostVal balGold = balanceCost_ (S.toList goldQs) goldFls
+          CostVal balBe   = balanceCost_ (S.toList restQs) beFls
+
+-- greedy search
+--  searchGreedyFlowsE10k: examine one flow at a time. Depends on the ordering
+--  of flows. We can use that as a heuristic
+--  searchGreedyConfE10k: examines all flows, and determines a single
+--  configuration value. Removes the flow that is paired with the configuration
+--  values and moves on. This can avoid some problems of the previous one
+--  (it really depends on the cost function), but is more expensive.
 
 searchGreedyE10k :: Int -> CostFn -> [Flow] -> C.Configuration
-searchGreedyE10k nq fn flows = searchGreedy_ nq fn (e10kCfgEmpty,[]) flows
+searchGreedyE10k = searchGreedyFlowsE10k
 
-searchGreedy_ :: Int -> CostFn -> (C.Configuration, [Flow]) -> [Flow] -> C.Configuration
-searchGreedy_ nq costF (cnf,_)        []     = tr cnf $ "searchGreedy_: " ++ (e10kCfgStr cnf)
-searchGreedy_ nq costF (curCnf,curFs) (f:fs) = recurse
-    where confs      = flAllConfs nq f curCnf
-          newCurFs   = f:curFs
+searchGreedyFlowsE10k :: Int -> CostFn -> [Flow] -> C.Configuration
+searchGreedyFlowsE10k nq fn flows =
+    searchGreedyFlows_ nq fn (e10kCfgEmpty,[]) flows
+
+
+searchGreedyFlows_ :: Int
+                   -> CostFn
+                   -> (C.Configuration, [Flow])
+                   -> [Flow]
+                   -> C.Configuration
+searchGreedyFlows_ nq costF (cnf,_) []= trN cnf $ "searchGreedyFlows_:"
+                                              ++ (e10kCfgStr cnf)
+searchGreedyFlows_ nq costF (curCnf,curFs) (f:fs) = trN recurse msg
+    where confs  = flAllConfs nq f curCnf
+          newCurFs = f:curFs
           conf_costs = [(cnf,costF newCurFs cnf) | cnf <- confs]
-          best_cnf_  = fst $ L.minimumBy (compare `on` snd) conf_costs
-          best_cnf   = trN best_cnf_ $ "SELECTED " ++ (e10kCfgStr best_cnf_)
-          recurse    = searchGreedy_ nq costF (best_cnf, newCurFs) fs
+          (best_cnf, lower_cost)  = L.minimumBy (compare `on` snd) conf_costs
+          recurse  = searchGreedyFlows_ nq costF (best_cnf, newCurFs) fs
+          msg = "searchGreedyConf_: step:"
+                ++ (show $ length curFs)
+                ++ " cost is " ++ (show lower_cost)
+                ++ "\nSELECTED " ++ (e10kCfgStr best_cnf)
+                -- ++ "\nALL CONFS" ++ (L.intercalate "--\n--" $ map (e10kCfgStr . fst) confs)
+
+searchGreedyConfE10k :: Int -> CostFn -> [Flow] -> C.Configuration
+searchGreedyConfE10k nq fn flows
+    = searchGreedyConf_ nq fn (e10kCfgEmpty,[]) flows
+
+
+searchGreedyConf_ :: Int
+                  -> CostFn
+                  -> (C.Configuration, [Flow])
+                  -> [Flow]
+                  -> C.Configuration
+searchGreedyConf_ nq costF (cnf,_) [] = trN cnf $ "searchGreedyConf_: "
+                                              ++ (e10kCfgStr cnf)
+searchGreedyConf_ nq costF (curCnf, curFs) flows = trN recurse msg
+    where confs :: [(C.Configuration, Flow)]
+          confs = flsAllSingleConfs nq curCnf flows
+          all_flows = curFs ++ flows
+          costs = [ ((fl, cnf), costF all_flows cnf) | (cnf,fl) <- confs ]
+          ((xFl, xCnf), xCost) = L.minimumBy (compare `on` snd) costs
+          xFlows = L.delete xFl flows
+          recurse = searchGreedyConf_ nq costF (xCnf, xFl:curFs) xFlows
+
+          msg = "searchGreedyConf_: step:"
+                ++ (show $ length curFs)
+                ++ " cost is " ++ (show xCost)
+                ++ "\nSELECTED " ++ (e10kCfgStr xCnf)
+                ++ "\nALL CONFS" ++ (L.intercalate "--\n--" $ map (e10kCfgStr . fst) confs)
 
 -- greedy back-track search. Nothing is returned if no suitable configuration is
 -- found
@@ -162,6 +259,8 @@ searchGBSt0 fn = SearchGBSt {
 --          same_order  = backEs == backEsReord
 
 
+-- TODO: add the empty configuration in the functions below
+
 -- generate all possible configurations given an existing configuration and a
 -- set of endpoints
 flsAllConfs :: Int -> C.Configuration -> [Flow] -> [C.Configuration]
@@ -169,6 +268,13 @@ flsAllConfs nq c [] = [c]
 flsAllConfs nq c (e:fs) = L.concat [ flsAllConfs nq newc fs | newc <- cs]
     where cs = flAllConfs nq e c
 
+-- generate all posible configurations that consist of a single change
+-- configurations are paired with the correpoding flow
+flsAllSingleConfs :: Int -> C.Configuration -> [Flow] -> [(C.Configuration,Flow)]
+flsAllSingleConfs nq c0 fls =
+    L.concat [[(c,f) | c <- flAllConfs nq f c0] | f <- fls]
+
+-- generate all possible configurations based on a single flow
 flAllConfs :: Int -> Flow -> C.Configuration -> [C.Configuration]
 flAllConfs nq fl oldConf = [ add5TupleToConf oldConf fl q |  q <- (allQueues nq)]
 
@@ -236,15 +342,24 @@ e10kC = (C.applyConfig prgCfg) <$> e10kU
 -- accordingly.
 fs = [ FlowUDPv4List {
      flIp    = Just 127
-   , flPort  = fromIntegral $ 1000 + i} | i <- [1..20] ]
+   , flPort  = fromIntegral $ 1000 + i} | i <- [1..40] ]
 
-test :: IO ()
+isGoldFl FlowUDPv4List {flPort = port} = isJust $ L.find (==port) [1001,1002]
+goldFlPerQ = 1
+priorityCost' = priorityCost isGoldFl goldFlPerQ
+
 test = do
-    let nq = 4
+    let nq = 10
     --e10k <- e10kC
     --writeFile "tests/e10kC.dot" $ toDot e10k
     prgU <- e10kU
-    let balFn = e10kCost prgU (balanceCost nq)
-        conf  = searchGreedyE10k nq balFn fs
+
+    let priFn = e10kCost prgU (priorityCost' nq)
+        balFn = e10kCost prgU (balanceCost nq)
+        --conf  = searchGreedyConfE10k nq priFn fs
+        --conf  = searchGreedyConfE10k nq balFn fs
+        conf  = searchGreedyFlowsE10k nq priFn fs
+        --conf  = searchGreedyFlowsE10k nq balFn fs
+
     putStrLn $ e10kCfgStr conf
-    return ()
+    return (prgU, conf)
