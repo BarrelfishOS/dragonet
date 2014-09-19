@@ -33,6 +33,17 @@
 #include "ms_thread.h"
 #include "ms_atomic.h"
 
+//
+// XXX
+// gettid
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
+static inline long gettid(void)
+{
+	return syscall(SYS_gettid);
+}
+
 #ifdef linux
 /* /usr/include/netinet/in.h defines macros from ntohs() to _bswap_nn to
  * optimize the conversion functions, but the prototypes generate warnings
@@ -711,11 +722,26 @@ static void ms_conn_close(ms_conn_t *c)
 static int ms_new_socket(struct addrinfo *ai)
 {
   int sfd;
+  static int xx_client_port = 6000;
 
   if ((sfd= socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) == -1)
   {
     fprintf(stderr, "socket() error: %s.\n", strerror(errno));
     return -1;
+  }
+
+  if (sfd > 0) {
+    struct sockaddr_in xaddr;
+    int xport = xx_client_port++;
+
+    memset((char *)&xaddr, 0, sizeof(xaddr));
+    xaddr.sin_family = AF_INET;
+    xaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    printf("thread: %lu Binding to port: %d!\n", gettid(), xport);
+    xaddr.sin_port = htons(xport);
+    if (bind(sfd, (struct sockaddr *)&xaddr, sizeof(xaddr)) < 0) {
+      perror("bind failed\n");
+      exit(0);
   }
 
   return sfd;
