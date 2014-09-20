@@ -41,6 +41,7 @@ typedef enum
   OPT_THREAD_NUMBER= 'T',
   OPT_CONCURRENCY= 'c',
   OPT_SPORTS= 'z',
+  OPT_BATCH= 'C',
   OPT_FIXED_LTH= 'X',
   OPT_VERIFY= 'v',
   OPT_GETS_DIVISION= 'd',

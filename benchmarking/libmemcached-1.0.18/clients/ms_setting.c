@@ -846,6 +846,7 @@ static void ms_print_setting()
   fprintf(stdout, "servers : %s\n", ms_setting.srv_str);
   fprintf(stdout, "threads count: %d\n", ms_setting.nthreads);
   fprintf(stdout, "concurrency: %d\n", ms_setting.nconns);
+  fprintf(stdout, "batch-size: %d\n", ms_setting.request_batch);
   fprintf(stdout, "sports: %d:%d\n", ms_setting.sports, (ms_setting.sports
                     + ms_setting.nconns));
   if (ms_setting.run_time > 0)
@@ -905,6 +906,7 @@ void ms_setting_init_pre()
   ms_setting.nconns= DEFAULT_CONNS_NUM;
   ms_setting.run_time= DEFAULT_RUN_TIME;
   ms_setting.sports= 0;
+  ms_setting.request_batch = 1;
   ms_setting.total_srv_cnt= MCD_SRVS_NUM_INIT;
   ms_setting.servers= (ms_mcd_server_t *)malloc(
     (size_t)ms_setting.total_srv_cnt

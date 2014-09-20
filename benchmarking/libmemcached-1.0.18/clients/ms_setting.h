@@ -127,6 +127,9 @@ typedef struct setting
   uint32_t total_srv_cnt;                    /* total servers count of the servers array */
   uint32_t srv_cnt;                          /* servers count */
   uint32_t sports;                          /* servers count */
+  int request_batch;                        /* number of requests to be sent together for batching */
+                                            /* separate from multikey */
+
 
   ms_key_distr_t *key_distr;            /* array of key distribution */
   int total_key_rng_cnt;                /* total key range count of the array */
