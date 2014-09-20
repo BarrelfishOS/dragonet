@@ -244,7 +244,7 @@ static int add_msghdr(conn *c)
 {
     struct msghdr *msg;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     if (c->msgsize == c->msgused) {
         msg = realloc(c->msglist, c->msgsize * 2 * sizeof(struct msghdr));
@@ -441,7 +441,7 @@ conn *conn_new(const int sfd, enum conn_states init_state,
         } else {
             fprintf(stderr, "<%d new unknown (%d) client connection\n",
                 sfd, c->protocol);
-            assert(false);
+            myAssert(false);
         }
     }
 
@@ -506,7 +506,7 @@ conn *conn_new(const int sfd, enum conn_states init_state,
 }
 
 static void conn_release_items(conn *c) {
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     if (c->item) {
         item_remove(c->item);
@@ -515,7 +515,7 @@ static void conn_release_items(conn *c) {
 
     while (c->ileft > 0) {
         item *it = *(c->icurr);
-        assert((it->it_flags & ITEM_SLABBED) == 0);
+        myAssert((it->it_flags & ITEM_SLABBED) == 0);
         item_remove(it);
         c->icurr++;
         c->ileft--;
@@ -532,7 +532,7 @@ static void conn_release_items(conn *c) {
 }
 
 static void conn_cleanup(conn *c) {
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     conn_release_items(c);
 
@@ -542,7 +542,7 @@ static void conn_cleanup(conn *c) {
     }
 
     if (c->sasl_conn) {
-        assert(settings.sasl);
+        myAssert(settings.sasl);
         sasl_dispose(&c->sasl_conn);
         c->sasl_conn = NULL;
     }
@@ -577,7 +577,7 @@ void conn_free(conn *c) {
 }
 
 static void conn_close(conn *c) {
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     /* delete the event, the socket and the conn */
     event_del(&c->event);
@@ -613,7 +613,7 @@ static void conn_close(conn *c) {
  * buffers!
  */
 static void conn_shrink(conn *c) {
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     if (IS_UDP(c->transport))
         return;
@@ -685,8 +685,8 @@ static const char *state_text(enum conn_states state) {
  * happen here.
  */
 static void conn_set_state(conn *c, enum conn_states state) {
-    assert(c != NULL);
-    assert(state >= conn_listening && state < conn_max_state);
+    myAssert(c != NULL);
+    myAssert(state >= conn_listening && state < conn_max_state);
 
     if (state != c->state) {
         if (settings.verbose > 2) {
@@ -709,7 +709,7 @@ static void conn_set_state(conn *c, enum conn_states state) {
  * Returns 0 on success, -1 on out-of-memory.
  */
 static int ensure_iov_space(conn *c) {
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     if (c->iovused >= c->iovsize) {
         int i, iovnum;
@@ -747,7 +747,7 @@ static int add_iov(conn *c, const void *buf, int len) {
     int leftover;
     bool limit_to_mtu;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     do {
         m = &c->msglist[c->msgused - 1];
@@ -799,7 +799,7 @@ static int build_udp_headers(conn *c) {
     int i;
     unsigned char *hdr;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     if (c->msgused > c->hdrsize) {
         void *new_hdrbuf;
@@ -831,7 +831,7 @@ static int build_udp_headers(conn *c) {
         *hdr++ = c->msgused % 256;
         *hdr++ = 0;
         *hdr++ = 0;
-        assert((void *) hdr == (caddr_t)c->msglist[i].msg_iov[0].iov_base + UDP_HEADER_SIZE);
+        myAssert((void *) hdr == (caddr_t)c->msglist[i].msg_iov[0].iov_base + UDP_HEADER_SIZE);
     }
 
     return 0;
@@ -841,7 +841,7 @@ static int build_udp_headers(conn *c) {
 static void out_string(conn *c, const char *str) {
     size_t len;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     if (c->noreply) {
         if (settings.verbose > 1)
@@ -901,7 +901,7 @@ static void out_of_memory(conn *c, char *ascii_error) {
  * has been stored in c->cmd, and the item is ready in c->item.
  */
 static void complete_nread_ascii(conn *c) {
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     item *it = c->item;
     int comm = c->cmd;
@@ -977,7 +977,7 @@ static void* binary_get_request(conn *c) {
     ret -= (sizeof(c->binary_header) + c->binary_header.request.keylen +
             c->binary_header.request.extlen);
 
-    assert(ret >= c->rbuf);
+    myAssert(ret >= c->rbuf);
     return ret;
 }
 
@@ -991,7 +991,7 @@ static char* binary_get_key(conn *c) {
 static void add_bin_header(conn *c, uint16_t err, uint8_t hdr_len, uint16_t key_len, uint32_t body_len) {
     protocol_binary_response_header* header;
 
-    assert(c);
+    myAssert(c);
 
     c->msgcurr = 0;
     c->msgused = 0;
@@ -1072,7 +1072,7 @@ static void write_bin_error(conn *c, protocol_binary_response_status err,
             errstr = "Auth failure.";
             break;
         default:
-            assert(false);
+            myAssert(false);
             errstr = "UNHANDLED ERROR";
             fprintf(stderr, ">%d UNHANDLED ERROR: %d\n", c->sfd, err);
         }
@@ -1122,8 +1122,8 @@ static void complete_incr_bin(conn *c) {
     protocol_binary_response_incr* rsp = (protocol_binary_response_incr*)c->wbuf;
     protocol_binary_request_incr* req = binary_get_request(c);
 
-    assert(c != NULL);
-    assert(c->wsize >= sizeof(*rsp));
+    myAssert(c != NULL);
+    myAssert(c->wsize >= sizeof(*rsp));
 
     /* fix byteorder in the request */
     req->message.body.delta = ntohll(req->message.body.delta);
@@ -1213,7 +1213,7 @@ static void complete_incr_bin(conn *c) {
 static void complete_update_bin(conn *c) {
     protocol_binary_response_status eno = PROTOCOL_BINARY_RESPONSE_EINVAL;
     enum store_item_type ret = NOT_STORED;
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     item *it = c->item;
 
@@ -1459,7 +1459,7 @@ static bool grow_stats_buf(conn *c, size_t needed) {
     }
 
     while (needed > available) {
-        assert(nsize > 0);
+        myAssert(nsize > 0);
         nsize = nsize << 1;
         available = nsize - c->stats.offset;
     }
@@ -1505,7 +1505,7 @@ static void append_stats(const char *key, const uint16_t klen,
         append_ascii_stats(key, klen, val, vlen, c);
     }
 
-    assert(c->stats.offset <= c->stats.size);
+    myAssert(c->stats.offset <= c->stats.size);
 }
 
 static void process_bin_stat(conn *c) {
@@ -1575,7 +1575,7 @@ static void process_bin_stat(conn *c) {
 }
 
 static void bin_read_key(conn *c, enum bin_substates next_substate, int extra) {
-    assert(c);
+    myAssert(c);
     c->substate = next_substate;
     c->rlbytes = c->keylen + extra;
 
@@ -1637,7 +1637,7 @@ static void handle_binary_protocol_error(conn *c) {
 }
 
 static void init_sasl_conn(conn *c) {
-    assert(c);
+    myAssert(c);
     /* should something else be returned? */
     if (!settings.sasl)
         return;
@@ -1697,7 +1697,7 @@ static void process_bin_sasl_auth(conn *c) {
         return;
     }
 
-    assert(c->binary_header.request.extlen == 0);
+    myAssert(c->binary_header.request.extlen == 0);
 
     int nkey = c->binary_header.request.keylen;
     int vlen = c->binary_header.request.bodylen - nkey;
@@ -1709,7 +1709,7 @@ static void process_bin_sasl_auth(conn *c) {
     }
 
     char *key = binary_get_key(c);
-    assert(key);
+    myAssert(key);
 
     item *it = item_alloc(key, nkey, 0, 0, vlen);
 
@@ -1727,11 +1727,11 @@ static void process_bin_sasl_auth(conn *c) {
 }
 
 static void process_bin_complete_sasl_auth(conn *c) {
-    assert(settings.sasl);
+    myAssert(settings.sasl);
     const char *out = NULL;
     unsigned int outlen = 0;
 
-    assert(c->item);
+    myAssert(c->item);
     init_sasl_conn(c);
 
     int nkey = c->binary_header.request.keylen;
@@ -1760,7 +1760,7 @@ static void process_bin_complete_sasl_auth(conn *c) {
                                   &out, &outlen);
         break;
     default:
-        assert(false); /* CMD should be one of the above */
+        myAssert(false); /* CMD should be one of the above */
         /* This code is pretty much impossible, but makes the compiler
            happier */
         if (settings.verbose) {
@@ -1804,7 +1804,7 @@ static void process_bin_complete_sasl_auth(conn *c) {
 }
 
 static bool authenticated(conn *c) {
-    assert(settings.sasl);
+    myAssert(settings.sasl);
     bool rv = false;
 
     switch (c->cmd) {
@@ -2019,7 +2019,7 @@ static void process_bin_update(conn *c) {
     item *it;
     protocol_binary_request_set* req = binary_get_request(c);
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     key = binary_get_key(c);
     nkey = c->binary_header.request.keylen;
@@ -2089,7 +2089,7 @@ static void process_bin_update(conn *c) {
             c->cmd = NREAD_REPLACE;
             break;
         default:
-            assert(0);
+            myAssert(0);
     }
 
     if (ITEM_get_cas(it) != 0) {
@@ -2109,7 +2109,7 @@ static void process_bin_append_prepend(conn *c) {
     int vlen;
     item *it;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     key = binary_get_key(c);
     nkey = c->binary_header.request.keylen;
@@ -2146,7 +2146,7 @@ static void process_bin_append_prepend(conn *c) {
             c->cmd = NREAD_PREPEND;
             break;
         default:
-            assert(0);
+            myAssert(0);
     }
 
     c->item = it;
@@ -2192,7 +2192,7 @@ static void process_bin_delete(conn *c) {
     char* key = binary_get_key(c);
     size_t nkey = c->binary_header.request.keylen;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     if (settings.verbose > 1) {
         int ii;
@@ -2230,8 +2230,8 @@ static void process_bin_delete(conn *c) {
 }
 
 static void complete_nread_binary(conn *c) {
-    assert(c != NULL);
-    assert(c->cmd >= 0);
+    myAssert(c != NULL);
+    myAssert(c->cmd >= 0);
 
     switch(c->substate) {
     case bin_reading_set_header:
@@ -2269,7 +2269,7 @@ static void complete_nread_binary(conn *c) {
         break;
     default:
         fprintf(stderr, "Not handling substate %d\n", c->substate);
-        assert(0);
+        myAssert(0);
     }
 }
 
@@ -2289,8 +2289,8 @@ static void reset_cmd_handler(conn *c) {
 }
 
 static void complete_nread(conn *c) {
-    assert(c != NULL);
-    assert(c->protocol == ascii_prot
+    myAssert(c != NULL);
+    myAssert(c->protocol == ascii_prot
            || c->protocol == binary_prot);
 
     if (c->protocol == ascii_prot) {
@@ -2457,7 +2457,7 @@ static size_t tokenize_command(char *command, token_t *tokens, const size_t max_
     size_t len = strlen(command);
     unsigned int i = 0;
 
-    assert(command != NULL && tokens != NULL && max_tokens > 1);
+    myAssert(command != NULL && tokens != NULL && max_tokens > 1);
 
     s = e = command;
     for (i = 0; i < len; i++) {
@@ -2532,10 +2532,10 @@ void append_stat(const char *name, ADD_STAT add_stats, conn *c,
     int vlen;
     va_list ap;
 
-    assert(name);
-    assert(add_stats);
-    assert(c);
-    assert(fmt);
+    myAssert(name);
+    myAssert(add_stats);
+    myAssert(c);
+    myAssert(fmt);
 
     va_start(ap, fmt);
     vlen = vsnprintf(val_str, sizeof(val_str) - 1, fmt, ap);
@@ -2545,7 +2545,7 @@ void append_stat(const char *name, ADD_STAT add_stats, conn *c,
 }
 
 inline static void process_stats_detail(conn *c, const char *command) {
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     if (strcmp(command, "on") == 0) {
         settings.detail_enabled = 1;
@@ -2644,7 +2644,7 @@ static void server_stats(ADD_STAT add_stats, conn *c) {
 }
 
 static void process_stat_settings(ADD_STAT add_stats, void *c) {
-    assert(add_stats);
+    myAssert(add_stats);
     APPEND_STAT("maxbytes", "%llu", (unsigned long long)settings.maxbytes);
     APPEND_STAT("maxconns", "%d", settings.maxconns);
     APPEND_STAT("tcpport", "%d", settings.port);
@@ -2680,7 +2680,7 @@ static void process_stat_settings(ADD_STAT add_stats, void *c) {
 
 static void process_stat(conn *c, token_t *tokens, const size_t ntokens) {
     const char *subcommand = tokens[SUBCOMMAND_TOKEN].value;
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     if (ntokens < 2) {
         out_string(c, "CLIENT_ERROR bad command line");
@@ -2762,7 +2762,7 @@ static inline void process_get_command(conn *c, token_t *tokens, size_t ntokens,
     item *it;
     token_t *key_token = &tokens[KEY_TOKEN];
     char *suffix;
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     do {
         while(key_token->length != 0) {
@@ -2940,7 +2940,7 @@ static void process_update_command(conn *c, token_t *tokens, const size_t ntoken
     uint64_t req_cas_id=0;
     item *it;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     set_noreply_maybe(c, tokens, ntokens);
 
@@ -3024,7 +3024,7 @@ static void process_touch_command(conn *c, token_t *tokens, const size_t ntokens
     int32_t exptime_int = 0;
     item *it;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     set_noreply_maybe(c, tokens, ntokens);
 
@@ -3067,7 +3067,7 @@ static void process_arithmetic_command(conn *c, token_t *tokens, const size_t nt
     char *key;
     size_t nkey;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     set_noreply_maybe(c, tokens, ntokens);
 
@@ -3219,7 +3219,7 @@ static void process_delete_command(conn *c, token_t *tokens, const size_t ntoken
     size_t nkey;
     item *it;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     if (ntokens > 3) {
         bool hold_is_zero = strcmp(tokens[KEY_TOKEN+1].value, "0") == 0;
@@ -3269,7 +3269,7 @@ static void process_delete_command(conn *c, token_t *tokens, const size_t ntoken
 static void process_verbosity_command(conn *c, token_t *tokens, const size_t ntokens) {
     unsigned int level;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     set_noreply_maybe(c, tokens, ntokens);
 
@@ -3282,7 +3282,7 @@ static void process_verbosity_command(conn *c, token_t *tokens, const size_t nto
 static void process_slabs_automove_command(conn *c, token_t *tokens, const size_t ntokens) {
     unsigned int level;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     set_noreply_maybe(c, tokens, ntokens);
 
@@ -3305,7 +3305,7 @@ static void process_command(conn *c, char *command) {
     size_t ntokens;
     int comm;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     MEMCACHED_PROCESS_COMMAND_START(c->sfd, c->rcurr, c->rbytes);
 
@@ -3482,9 +3482,9 @@ static void process_command(conn *c, char *command) {
  * if we have a complete line in the buffer, process it.
  */
 static int try_read_command(conn *c) {
-    assert(c != NULL);
-    assert(c->rcurr <= (c->rbuf + c->rsize));
-    assert(c->rbytes > 0);
+    myAssert(c != NULL);
+    myAssert(c->rcurr <= (c->rbuf + c->rsize));
+    myAssert(c->rbytes > 0);
 
     if (c->protocol == negotiating_prot || c->transport == udp_transport)  {
         if ((unsigned char)c->rbuf[0] == (unsigned char)PROTOCOL_BINARY_REQ) {
@@ -3599,14 +3599,14 @@ static int try_read_command(conn *c) {
         }
         *el = '\0';
 
-        assert(cont <= (c->rcurr + c->rbytes));
+        myAssert(cont <= (c->rcurr + c->rbytes));
 
         process_command(c, c->rcurr);
 
         c->rbytes -= (cont - c->rcurr);
         c->rcurr = cont;
 
-        assert(c->rcurr <= (c->rbuf + c->rsize));
+        myAssert(c->rcurr <= (c->rbuf + c->rsize));
     }
 
     return 1;
@@ -3618,7 +3618,7 @@ static int try_read_command(conn *c) {
 static enum try_read_result try_read_udp(conn *c) {
     int res;
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     c->request_addr_size = sizeof(c->request_addr);
 #ifdef DRAGONET
@@ -3636,8 +3636,8 @@ static enum try_read_result try_read_udp(conn *c) {
     if (res > 8) {
         unsigned char *buf = (unsigned char *)c->rbuf;
 
-        assert(&c->thread != NULL);
-        assert(&c->thread->stats.mutex != NULL);
+        myAssert(&c->thread != NULL);
+        myAssert(&c->thread->stats.mutex != NULL);
         pthread_mutex_lock(&c->thread->stats.mutex);
         c->thread->stats.bytes_read += res;
         pthread_mutex_unlock(&c->thread->stats.mutex);
@@ -3678,7 +3678,7 @@ static enum try_read_result try_read_network(conn *c) {
     enum try_read_result gotdata = READ_NO_DATA_RECEIVED;
     int res;
     int num_allocs = 0;
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     if (c->rcurr != c->rbuf) {
         if (c->rbytes != 0) /* otherwise there's nothing to copy */
@@ -3737,7 +3737,7 @@ static enum try_read_result try_read_network(conn *c) {
 }
 
 static bool update_event(conn *c, const int new_flags) {
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     struct event_base *base = c->event.ev_base;
     if (c->ev_flags == new_flags)
@@ -3805,7 +3805,7 @@ void do_accept_new_conns(const bool do_accept) {
  *   TRANSMIT_HARD_ERROR Can't write (c->state is set to conn_closing)
  */
 static enum transmit_result transmit(conn *c) {
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
     if (c->msgcurr < c->msgused &&
@@ -3907,7 +3907,7 @@ static void drive_machine(conn *c) {
     static int  use_accept4 = 0;
 #endif
 
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     while (!stop) {
 
@@ -4222,7 +4222,7 @@ static void drive_machine(conn *c) {
             break;
 
         case conn_max_state:
-            assert(false);
+            myAssert(false);
             break;
         }
     }
@@ -4237,7 +4237,7 @@ void event_handler(const int fd, const short which, void *arg) {
 
     mprint("event_handler called\n");
     c = (conn *)arg;
-    assert(c != NULL);
+    myAssert(c != NULL);
 
     c->which = which;
 
@@ -4576,7 +4576,7 @@ static int server_socket_unix(const char *path, int access_mask) {
 
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
-    assert(strcmp(addr.sun_path, path) == 0);
+    myAssert(strcmp(addr.sun_path, path) == 0);
     old_umask = umask( ~(access_mask&0777));
     if (bind(sfd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
         perror("bind()");
@@ -4950,7 +4950,6 @@ int main (int argc, char **argv) {
     int retval = EXIT_SUCCESS;
     /* listening sockets */
     static int *l_socket = NULL;
-
     /* udp socket */
     static int *u_socket = NULL;
     bool protocol_specified = false;
@@ -4989,7 +4988,7 @@ int main (int argc, char **argv) {
     setbuf(stderr, NULL);
 
     /* process arguments */
-    while (-1 != (c = getopt(argc, argv,
+    while (-1 != (c = getopt(argc , argv,
           "a:"  /* access mask for unix socket */
           "A"  /* enable admin shutdown commannd */
           "p:"  /* TCP port number to listen on */
@@ -5297,7 +5296,6 @@ int main (int argc, char **argv) {
         }
     } // end while: parsing cmdline options
 
-
 #ifdef DRAGONET
     if (use_dragonet_stack) {
 
@@ -5307,7 +5305,6 @@ int main (int argc, char **argv) {
                    "only works with UDP. Please specify UDP port with -U option");
             exit(1);
         }
-
 
     parse_client_list(use_dragonet_stack_portmap, settings.num_threads);
 

@@ -183,7 +183,7 @@ void switch_item_lock_type(enum item_lock_types type) {
             break;
         default:
             fprintf(stderr, "Unknown lock type: %d\n", type);
-            assert(1 == 0);
+            myAssert(1 == 0);
             break;
     }
 
@@ -484,9 +484,6 @@ static void thread_libevent_process(int fd, short which, void *arg) {
     register_thread_initialized();
         break;
     }
-
-
-
 }
 
 /* Which thread we assigned a connection to most recently. */

@@ -8,6 +8,12 @@
 
 #ifdef DRAGONET
 
+#define IDLE_BEFORE_YIELD 100
+
+#define MAX_EPS         256
+#define MAX_THREAD_COUNT         256
+#define THREAD_NAME_LEN         256         // maximum thread name length
+
 
 struct cfg_udpep {
     uint32_t             l_ip;
@@ -16,13 +22,37 @@ struct cfg_udpep {
     uint16_t             r_port;
     struct sockaddr_in   si;
     struct sockaddr_in   si_r;
+    int                  primary_thread;
+    int                  state;  // is it initilized, etc..
+    dnal_sockh_t  orig_socket;
+    pthread_mutex_t      ep_lock; // to protect initilization and spawning
 };
+
+struct cfg_thread {
+    int                 tid; // index in thread_list array
+    int                 local_tid; // pthead-thread id for this guy (for debug showing)
+    char                tname[THREAD_NAME_LEN];  // name passed for thread from cmdline
+    uint64_t            packet_count;       // packets received by this thread
+    int                 thread_specific_filters;       // filters registered for this thread
+    struct cfg_udpep    *eplist[MAX_EPS];   // pointer to those filters in
+    int                 eplist_owner[MAX_EPS]; // flag telling if you are owner of the endpoint
+    int                 eplist_idx[MAX_EPS]; // index in client_list array of the particular ep
+    int                 thread_done;
+    pthread_mutex_t     thread_init_lock; // to protect initilization and spawning
+};
+
+
+
+// We have a thread list, and every thread gets client list
 
 int use_dragonet_stack = 0;
 char *use_dragonet_stack_portmap = NULL;
 static struct cfg_udpep *client_list = NULL;
 static int filter_count = 0;    // number of filters detected
 
+
+static struct cfg_thread thread_list[MAX_THREAD_COUNT];
+static int thread_blk_count = 0;    // number thread blocks detected
 /*
 bool ip_from_string(const char *ip, uint32_t *dst)
 {
@@ -118,41 +148,53 @@ parse_client_list(char *client_list_str, int thread_count)
 
     client_list = (struct cfg_udpep *)calloc
         ((filter_count + 1), sizeof(struct cfg_udpep));
-    assert(client_list != NULL);
+    printf("before my myAssert\n");
+    myAssert(client_list != NULL);
+    printf("after my myAssert\n");
 
-// p[7777]f[10.113.4.195:7777/10.113.4.20:9000]
+// |t1|p[7777]|t2|f[10.113.4.195:7777/10.113.4.20:9000]
 //
-    struct cfg_udpep *udp;
-    int tid = 0;
-
+    struct cfg_udpep *udp = NULL; // current filter
+    struct cfg_thread  *ctb = NULL; // current_thread_block
+    int fid = 0; // fiter count
+    int tid = 0; // thread count
     char *str1, *str2, *token, *subtoken;
     char *saveptr1, *saveptr2;
     int j;
 
     char f_type, *f_data;
 
-    udp = &client_list[tid];
+    int first_thread = 1; // flag to manage first thread specially
+
+    // cleanup the struct
+    memset(&thread_list[tid], 0, sizeof(struct cfg_thread));
+    thread_list[tid].tid = tid;
+
+    udp = &client_list[fid];
+    ctb = &thread_list[tid];
 
     for (j = 1, str1 = client_list_str ;  ; j++, str1 = NULL) {
         token = strtok_r(str1, "]" , &saveptr1);
         if (token == NULL)
             break;
-        printf("[fid:%d]: %d: %s\n", tid, j, token);
+        printf("[tid:%d][fid:%d]: %d: %s\n", tid, fid, j, token);
 
-        assert(tid < filter_count);
-        if (tid >= filter_count) {
+        myAssert(fid < filter_count);
+        if (fid >= filter_count) {
            printf("%s:%s:%d: ERROR: Too many filters (%d) reported, instead of %d\n",
                    __FILE__, __FUNCTION__, __LINE__,
-                   tid, filter_count);
+                   fid, filter_count);
            exit(1);
         }
-        assert(tid < thread_count);
-        if (tid >= thread_count) {
+/*
+        myAssert(fid < thread_count);
+        if (fid >= thread_count) {
            printf("%s:%s:%d: ERROR:  More filters (%d) reported than threads %d\n",
                    __FILE__, __FUNCTION__, __LINE__,
-                   tid, thread_count);
+                   fid, thread_count);
            exit(1);
         }
+*/
 
         f_type = '\0';
         f_data = NULL;
@@ -166,13 +208,51 @@ parse_client_list(char *client_list_str, int thread_count)
             printf(" --> %s\n", subtoken);
 
             if (f_type == '\0') {
-                assert(strlen(subtoken) == 1);
-                f_type = subtoken[0];
+                char *tmpptr = &subtoken[0];
+
+                if (strlen(subtoken) > 1) {
+                    myAssert(subtoken[0] == 'T');
+                    // assuming this is start of new thread block
+                    // example: t3.f -> type flow, thread 3
+                    // example: t2.p -> type listen, thread 2
+                    // example: t12.p -> type listen, thread 12
+                    int ii;
+
+                    // ** setup the thread DS
+
+                    // cleanup the struct
+                    if (first_thread == 0) {
+                        ++tid;
+                    }
+                    first_thread = 0;
+
+                    printf("Thread block %d detected, parsing [%s]\n", tid,
+                            subtoken);
+                    ctb = &thread_list[tid];
+                    thread_list[tid].tid = tid;
+
+                    for (ii = 0; subtoken[ii] != '.'; ++ii) {
+                        myAssert(subtoken[ii] != '\0');
+                        thread_list[tid].tname[ii] = subtoken[ii];
+                        myAssert(ii < THREAD_NAME_LEN);
+                    }
+                    thread_list[tid].tname[ii] = '\0';
+
+                    ctb->thread_done = 0;
+                    pthread_mutex_init(&ctb->thread_init_lock, NULL);//        = PTHREAD_MUTEX_INITIALIZER;
+
+                    // adjust the pointer for parsing out filter type
+                    tmpptr = &subtoken[ii + 1];
+                } // end if : if new tid start
+
+                // assuming first char is filter type
+                myAssert(strlen(tmpptr) == 1);
+                f_type = tmpptr[0];
             } else {
                 f_data = strdup(subtoken);
             }
         }
-        assert(f_type != '\0' && f_data != NULL);
+        myAssert(f_type != '\0' && f_data != NULL);
 
         printf("Parsing [%c-->%s]\n", f_type, f_data);
         switch(f_type) {
@@ -182,16 +262,39 @@ parse_client_list(char *client_list_str, int thread_count)
                 udp->l_port = atoi(f_data);
                 udp->r_ip = 0;
                 udp->r_port = 0;
-                printf("Listen port: %"PRIu16"\n", udp->l_port);
-                ++tid;
-                udp = &client_list[tid];
+                udp->primary_thread = tid;
+                udp->state          = 0;
+                pthread_mutex_init(&udp->ep_lock, NULL);//        = PTHREAD_MUTEX_INITIALIZER;
+                printf("flowid: %d: Listen port: %"PRIu16" -> to thread %d:%s\n",
+                        fid, udp->l_port, tid, ctb->tname);
+                ctb->eplist[ctb->thread_specific_filters] = udp;
+                ctb->eplist_owner[ctb->thread_specific_filters] = 1;
+                ctb->eplist_idx[ctb->thread_specific_filters] = fid;
+                ctb->thread_specific_filters++;
+                ++fid;
+
+                udp = &client_list[fid];
                 break;
 
             case 'f':
                 memset(udp, 0, sizeof(struct cfg_udpep));
                 parse_flow(udp, f_data);
-                ++tid;
-                udp = &client_list[tid];
+                udp->primary_thread = tid;
+                udp->state          = 0;
+                pthread_mutex_init(&udp->ep_lock, NULL);//        = PTHREAD_MUTEX_INITIALIZER;
+                printf("flowid: %d: connect lIP: %"PRIu32", lPort: %"PRIu32","
+                        " rIP: %"PRIu32", rPort: %"PRIu32" -> to thread %d:%s\n",
+                    fid, udp->l_ip, udp->l_port, udp->r_ip, udp->r_port,
+                    tid, ctb->tname);
+
+                ctb->eplist[ctb->thread_specific_filters] = udp;
+                ctb->eplist_owner[ctb->thread_specific_filters] = 1;
+                ctb->eplist_idx[ctb->thread_specific_filters] = fid;
+                ctb->thread_specific_filters++;
+
+                ++fid;
+                udp = &client_list[fid];
+
                 break;
 
             default:
@@ -201,10 +304,17 @@ parse_client_list(char *client_list_str, int thread_count)
             } // end switch:
 
     } // end for: tokenizing the client str
+    thread_blk_count = tid + 1;
+    printf("Total %d thread-blocks found, and system is running with %d threads\n",
+            thread_blk_count, thread_count);
+    myAssert(thread_count >= thread_blk_count);
+    if (thread_count < thread_blk_count)  {
+        printf("ERROR: not enough threads to support all threadblocks\n");
+        exit(1);
+    }
     return client_list;
 } // end function: parse_client_list
 
-static dnal_sockh_t dsh_connected_socket_list[MAX_THREADS];
 
 // Lock to protect dragonet initialization
 static pthread_mutex_t dn_init_lock = PTHREAD_MUTEX_INITIALIZER; // dragonet lock
@@ -218,7 +328,7 @@ int register_callback_dn(void *dn_state, event_handler_fun_ptr fun, int fd,
         short which, void *arg)
 {
 
-    assert(dn_state != NULL);
+    myAssert(dn_state != NULL);
     struct dn_thread_state *dnt_state = (struct dn_thread_state *)dn_state;
 
     // every thread register one
@@ -238,17 +348,16 @@ int register_callback_dn(void *dn_state, event_handler_fun_ptr fun, int fd,
 
 
 static void handle_single_event(struct dn_thread_state *dnt_state,
-        struct dnal_aq_event *event)
+        struct dnal_aq_event *event, int socket_number)
 {
     struct input *in;
 
-    assert(event->type == DNAL_AQET_INPACKET);
+    myAssert(event->type == DNAL_AQET_INPACKET);
     in = event->data.inpacket.buffer;
-    assert(in != NULL);
+    myAssert(in != NULL);
 
     mprint("debug: %s:%s:%d: [TID:%d], new packet arrived\n",
             __FILE__, __FUNCTION__, __LINE__, dnt_state->tindex);
-
 
 
    dnt_state->current_packet = in;
@@ -276,15 +385,68 @@ static void handle_single_event(struct dn_thread_state *dnt_state,
 
 void event_handle_loop_dn(void *dn_state)
 {
-    assert(dn_state != NULL);
+    unsigned int idle = 0;
+    myAssert(dn_state != NULL);
     struct dn_thread_state *dnt_state = (struct dn_thread_state *)dn_state;
-    assert(dnt_state->callback_memcached_fn);
+    myAssert(dnt_state->callback_memcached_fn);
+
+    mprint("debug: %s:%s:%d: [TID:%d], looping for incoming packets\n",
+            __FILE__, __FUNCTION__, __LINE__, dnt_state->tindex);
+
+    while (true) {
+        for (int i = 0; i < dnt_state->socket_count; i++) {
+
+            /*
+            if (caq->num_threads > 1) {
+                pthread_mutex_lock(&caq->mutex);
+                locked = true;
+            } else {
+                locked = false;
+            }
+            */
+
+            errval_t err = dnal_aq_poll(dnt_state->daq, &dnt_state->event);
+            if (err == SYS_ERR_OK) {
+                // This needs to be inside the critical section, since we'll
+                // send out data through the AQ
+                dnt_state->current_socket = i;
+                mprint("%s:%s:%d: [TID:%d, socket:%d], new event arrived\n",
+                    __FILE__, __func__, __LINE__, dnt_state->tindex, i);
+                handle_single_event(dnt_state, &dnt_state->event, i);
+                idle = 0;
+
+            } else {
+                idle++;
+            }
+
+            /*
+            if (locked) {
+                pthread_mutex_unlock(&caq->mutex);
+            }
+            */
+
+            if (idle >= IDLE_BEFORE_YIELD) {
+                sched_yield();
+                idle = 0;
+            }
+
+        }
+    }
+}
+
+#if 0
+void event_handle_loop_dn(void *dn_state)
+{
+    myAssert(dn_state != NULL);
+    struct dn_thread_state *dnt_state = (struct dn_thread_state *)dn_state;
+    myAssert(dnt_state->callback_memcached_fn);
 
     // Each thread will call this with its own dn_state structure.
 
     mprint("debug: %s:%s:%d: [TID:%d], looping for incoming packets\n",
             __FILE__, __FUNCTION__, __LINE__, dnt_state->tindex);
 //    pthread_mutex_lock(&dnt_state->dn_lock);
+
 
     while (1) {
         //mprint("waiting for next event\n");
@@ -300,12 +462,12 @@ void event_handle_loop_dn(void *dn_state)
 //                __FILE__, __func__, __LINE__, dnt_state->tindex);
     } // end while: infinite
 } // end function: event_handle_loop_dn
-
+#endif // 0
 
 int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
 {
-    assert(buff != NULL);
-    assert(dn_state != NULL);
+    myAssert(buff != NULL);
+    myAssert(dn_state != NULL);
     struct dn_thread_state *dnt_state = (struct dn_thread_state *)dn_state;
 
     struct input *in = dnt_state->current_packet;
@@ -316,14 +478,14 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
 
     int len = in->len - in->attr->offset_l5;
 
-    mprint("debug: %s:%s:%d: [TID:%d] packet len [%d] = in->len [%"PRIu16"] "
+    mprint("debug: %s:%s:%d: [TID:%d] [SID:%d] packet len [%d] = in->len [%"PRIu16"] "
             " - in->->attr->offset_l5 [%"PRIu16"], read bufsize = %d, "
             "formal payload len = %"PRIu16", %"PRIu16",\n",
             __FILE__, __FUNCTION__, __LINE__,
-            dnt_state->tindex,
+            dnt_state->tindex, dnt_state->current_socket,
             len, in->len,  in->attr->offset_l5, bufsize,
             udp_payload_length(in),
-            in->attr->payload_len
+            len
             );
 
 
@@ -339,7 +501,7 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
     dnt_state->dest.data.ip4udp.port_local = in->attr->udp_dport;
     dnt_state->dest.data.ip4udp.port_remote = in->attr->udp_sport;
 
-    assert(len <= bufsize);
+    myAssert(len <= bufsize);
 
     mprint("debug: %s:%s:%d,[#### IMP ####] [TID:%d], sport = %"PRIx16", dport=%"PRIx16", "
             "srcip = %"PRIx32" dstip = %"PRIx32", len = %d \n",
@@ -360,7 +522,7 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
     if((dnt_state->pkt_count) % INTERVAL_STAT_FREQUENCY == 0) {
         //mprint
         printf
-            ("[TID:%d], [pkt_count:%"PRIu64"], sport = %"PRIx16", dport=%"PRIx16", "
+            ("[TID:%d], [pkt_count:%"PRIu64"], sport = %"PRIu16", dport=%"PRIu16", "
             "srcip = %"PRIx32" dstip = %"PRIx32", len = %d \n",
             dnt_state->tindex, dnt_state->pkt_count,
             in->attr->udp_sport, in->attr->udp_dport, in->attr->ip4_src,
@@ -383,9 +545,9 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
 
 int send_dn(void *dn_state, uint8_t *buff, int bufsize)
 {
-    assert(buff != NULL);
-    assert(bufsize <= 1410);
-    assert(dn_state != NULL);
+    myAssert(buff != NULL);
+    myAssert(bufsize <= 1410);
+    myAssert(dn_state != NULL);
 
     struct dn_thread_state *dnt_state = (struct dn_thread_state *)dn_state;
 
@@ -398,12 +560,13 @@ int send_dn(void *dn_state, uint8_t *buff, int bufsize)
                 "allocate buffer\n",
                 __FILE__, __FUNCTION__, __LINE__, dnt_state->tindex);
     }
-    assert(in != NULL);
+    myAssert(in != NULL);
     pkt_prepend(in, bufsize);
     memcpy(in->data, buff, bufsize);
 
     // This is implementation of send call
-    dnal_socket_send(dnt_state->dsh, in, &dnt_state->dest);
+    dnal_socket_send(dnt_state->dshList[dnt_state->current_socket],
+            in, &dnt_state->dest);
     return bufsize;
 }
 
@@ -443,7 +606,7 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
     int ret = 0;
     char appName[50];
 
-    assert(dn_tstate != NULL);
+    myAssert(dn_tstate != NULL);
 
     mprint("%s:%s:%d:[state:%p], trying to grab locks\n",
             __FILE__, __FUNCTION__, __LINE__, dn_tstate);
@@ -477,9 +640,6 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
 
     //pthread_mutex_lock(&dn_init_lock);  // FIXME: temararily disabled
 
-    // create a socket
-    ret = dnal_socket_create(dn_tstate->daq, &dn_tstate->dsh);
-    err_expect_ok(ret);
 
     mprint("%s:%s:%d: [TID:%d], [appName:%s] \n", __FILE__, __FUNCTION__, __LINE__,
             dn_tstate->tindex, dn_tstate->app_slot);
@@ -487,52 +647,109 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
     mprint("%s:%s:%d: [TID:%d], \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
 
     // If this is first thread then bind, else span
-    if (dn_tstate->tindex < filter_count) {
-    //if (dn_tstate->tindex == 0) {
+    //if (dn_tstate->tindex < filter_count) {
+    if (dn_tstate->tindex < thread_blk_count) {
 
         mprint("debug: %s:%s:%d: [TID:%d], directing specified flow to this thread\n",
                 __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
 
-        struct cfg_udpep *udp = &client_list[dn_tstate->tindex];
-        mprint("lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
-            udp->l_ip, udp->l_port, udp->r_ip, udp->r_port);
+        struct cfg_thread *sel_thread = &thread_list[dn_tstate->tindex];
+        myAssert(sel_thread != NULL);
+
+        pthread_mutex_lock(&sel_thread->thread_init_lock);
+        for (int i = 0 ; i < sel_thread->thread_specific_filters; ++i) {
+
+            struct cfg_udpep *udp = sel_thread->eplist[i];
+            pthread_mutex_lock(&udp->ep_lock);
+
+            mprint("lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+                    udp->l_ip, udp->l_port, udp->r_ip, udp->r_port);
+
+            // create a socket
+            ret = dnal_socket_create(dn_tstate->daq, &dn_tstate->dshList[i]);
+            err_expect_ok(ret);
 
 
-        dn_tstate->dnd.type = DNAL_NETDSTT_IP4UDP;
-        dn_tstate->dnd.data.ip4udp.ip_remote = udp->r_ip;
-        dn_tstate->dnd.data.ip4udp.port_remote = udp->r_port;
-        // FIXME: get the actual listen IP address
-        dn_tstate->dnd.data.ip4udp.ip_local = udp->l_ip;
+            dn_tstate->dndList[i].type = DNAL_NETDSTT_IP4UDP;
+            dn_tstate->dndList[i].data.ip4udp.ip_remote = udp->r_ip;
+            dn_tstate->dndList[i].data.ip4udp.port_remote = udp->r_port;
 
-        // FIXME: get the actual specified port number
-        dn_tstate->dnd.data.ip4udp.port_local = udp->l_port;
+            // FIXME: get the actual listen IP address
+            dn_tstate->dndList[i].data.ip4udp.ip_local = udp->l_ip;
 
-        mprint("debug: %s:%s:%d: [TID:%d],  Binding, using listen port %"PRIu16"\n",
-                __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex,
-                dn_tstate->dnd.data.ip4udp.port_local
-                );
-        //print_socket_details(dn_tstate->dsh);
-        err_expect_ok(dnal_socket_bind(dn_tstate->dsh, &dn_tstate->dnd));
+            // FIXME: get the actual specified port number
+            dn_tstate->dndList[i].data.ip4udp.port_local = udp->l_port;
 
-        // FIXME: maybe I should have lock around this as well.
-        dsh_connected_socket_list[dn_tstate->tindex] = dn_tstate->dsh;
+            mprint("debug: %s:%s:%d: [TID:%d],  Binding, using listen port %"PRIu16"\n",
+                    __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex,
+                    dn_tstate->dndList[i].data.ip4udp.port_local
+                  );
+            //print_socket_details(dn_tstate->dsh);
+            err_expect_ok(dnal_socket_bind(dn_tstate->dshList[i],
+                        &dn_tstate->dndList[i]));
+
+            ++dn_tstate->socket_count;
+
+            // FIXME: maybe I should have lock around this as well.
+            //dsh_connected_socket_list[dn_tstate->tindex] = dn_tstate->dsh;
+            udp->orig_socket = dn_tstate->dshList[i];
+            // mark that socket is set and ready
+            udp->state = 1;
+            pthread_mutex_unlock(&udp->ep_lock);
+
+        } // end for : for each filter in thread block
+
+        // marking that this thread is done
+        sel_thread->thread_done = 1;
+        pthread_mutex_unlock(&sel_thread->thread_init_lock);
+
 
     } else {
-        int socket_index = dn_tstate->tindex % filter_count;
+        // These are extra threads which don't have any explicit work
+        // So, we just send them to same filter set again in round robin fashion
 
-        if (dsh_connected_socket_list[socket_index] == NULL) {
+        int td_owner_index = dn_tstate->tindex % thread_blk_count;
+        struct cfg_thread *owner_thread = &thread_list[td_owner_index];
+
+        pthread_mutex_lock(&owner_thread->thread_init_lock);
+
+        if (thread_list[td_owner_index].thread_done < 1) {
             printf("%s:%s:%d: ERROR: Prolem in initialization order.\n"
-                    "This socket-id %d should have been already set.\n",
-                   __FILE__, __FUNCTION__, __LINE__, socket_index);
+                    "This thread %d should have been already set.\n",
+                   __FILE__, __FUNCTION__, __LINE__, td_owner_index);
             exit(1);
         }
 
         mprint("debug: %s:%s:%d: [TID:%d], This is not first thread, "
                 "so using existing socket for spanning\n",
                 __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
-        err_expect_ok(dnal_socket_span(dsh_connected_socket_list[socket_index],
-                    dn_tstate->daq, dn_tstate->dsh));
-    }
+
+        for (int i = 0 ; i < owner_thread->thread_specific_filters; ++i) {
+
+            // create a socket
+            ret = dnal_socket_create(dn_tstate->daq, &dn_tstate->dshList[i]);
+            err_expect_ok(ret);
+
+
+            struct cfg_udpep *udp = owner_thread->eplist[i];
+
+            pthread_mutex_lock(&udp->ep_lock);
+            myAssert(udp->state > 0);
+
+            err_expect_ok(dnal_socket_span(udp->orig_socket,
+                        dn_tstate->daq, dn_tstate->dshList[i]));
+
+            ++udp->state;
+
+            ++dn_tstate->socket_count;
+            pthread_mutex_unlock(&udp->ep_lock);
+        } // end for: for each filter in orginal thread block
+
+        ++owner_thread->thread_done;
+        pthread_mutex_unlock(&owner_thread->thread_init_lock);
+
+    } // end for:  each non-orginal thread
+
     pthread_mutex_unlock(&dn_init_lock);
 
     mprint("%s:%s:%d: [TID:%d], releasing locks \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);

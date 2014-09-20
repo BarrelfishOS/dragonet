@@ -38,6 +38,8 @@
  * Plus a few for spaces, \r\n, \0 */
 #define SUFFIX_SIZE 24
 
+#define MAX_THREADS     32
+
 /** Initial size of list of items being returned by "get". */
 #define ITEM_LIST_INITIAL 200
 
@@ -120,6 +122,8 @@
 /** Common APPEND_NUM_FMT_STAT format. */
 #define APPEND_NUM_STAT(num, name, fmt, val) \
     APPEND_NUM_FMT_STAT("%d:%s", num, name, fmt, val)
+
+
 
 #include "dnet_interface.h"
 

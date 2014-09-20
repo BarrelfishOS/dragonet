@@ -1,6 +1,7 @@
 #ifndef _DNET_INTERFACE_H
 #define _DNET_INTERFACE_H
 
+
 #ifdef ENABLE_DRAGONET
 // If not enabled, enable DRAGONET
 #ifndef DRAGONET
@@ -18,6 +19,7 @@
 #include <udpproto.h>
 
 //#define MYDEBUG     1
+
 #ifdef MYDEBUG
 
 static uint64_t get_tsc(void);
@@ -41,6 +43,7 @@ get_tsc(void) {
 #define mprint(x...)   ((void)0)
 #endif // MYDEBUG
 
+#define MAX_SOCKETS_APP             (256)
 // Shows packet classification after every 'INTERVAL_STAT_FREQUENCY' packet.
 //  This is for debugging purpose to show where exactly packets are going
 //  Currently supported by E10k queues,  sf queues, fancyecho
@@ -48,9 +51,8 @@ get_tsc(void) {
 
 //#define SHOW_INTERVAL_STAT      1
 #define INTERVAL_STAT_FREQUENCY     (1000)
+//#define INTERVAL_STAT_FREQUENCY     (1)
 
-
-#define MAX_THREADS     32
 
 typedef void (*event_handler_fun_ptr)(const int fd, const short which, void *arg);
 
@@ -60,19 +62,21 @@ struct dn_thread_state {
 //    struct stack_handle *stack;
 //    socket_handle_t sh;
 
-    dnal_appq_t daq;    // application queue handle with network stack
-    dnal_sockh_t dsh;   // Socket handle
-    struct dnal_net_destination dnd;    // listen address for binding
+    dnal_appq_t                 daq;                        // dragonet application endpoint
+    dnal_sockh_t                dshList[MAX_SOCKETS_APP];   // Socket handle list
+    int                         socket_count;               // 0
+    struct dnal_net_destination dndList[MAX_SOCKETS_APP];    // listen address for binding
     struct dnal_net_destination dest;   // destination for currently processing packet
-    struct dnal_aq_event event;     // event handle to be used in polling
-    event_handler_fun_ptr callback_memcached_fn;  // callback function ptr
-    char app_slot[255];     // Name of application slot for this thread
+    struct dnal_aq_event        event;     // event handle to be used in polling
+    event_handler_fun_ptr       callback_memcached_fn;  // callback function ptr
+    char                        app_slot[255];     // Name of application slot for this thread
 
     uint16_t listen_port_udp;
     int callback_memcached_fd;
     short callback_memcached_which;
     void *callback_memcached_arg;
     struct input *current_packet;
+    int current_socket;     // idx of the socket currently active
     uint32_t ip4_src;
     uint32_t ip4_dst;
     uint16_t udp_sport;
@@ -97,6 +101,8 @@ void event_handle_loop_dn(void *dn_state);
 void *parse_client_list(char *client_list_str, int thread_count);
 #endif // DRAGONET
 
+
+#define myAssert(x)     do{if (!((long)(x))) { printf("myAssert: %s:%s:%d: assert failed! value (%ld)\n", __FILE__, __FUNCTION__, __LINE__, (long)(x)); exit(1);} }while(0)
 
 #endif // _DNET_INTERFACE_H
 

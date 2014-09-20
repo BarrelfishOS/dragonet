@@ -146,8 +146,9 @@ fi
 
 
 ./scripts/pravin/wait_for_dragonet.sh 10 ${STACKNAME}
+run_for_2_cores_SP
 
-run_for_10_cores
+#run_for_10_cores
 #run_for_8_cores
 #run_for_4_cores
 #run_for_1_cores_null
