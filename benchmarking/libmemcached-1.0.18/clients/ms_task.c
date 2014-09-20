@@ -60,7 +60,7 @@ static void ms_task_expire_verify_init(ms_task_t *task);
 
 
 /* select a new task to do */
-static ms_task_t *ms_get_task(ms_conn_t *c, bool warmup);
+ms_task_t *ms_get_task(ms_conn_t *c, bool warmup);
 
 
 /* run the selected task */
@@ -85,7 +85,7 @@ static int ms_run_getset_task(ms_conn_t *c);
  */
 static ms_task_item_t *ms_get_cur_opt_item(ms_conn_t *c)
 {
-  return c->curr_task.item;
+  return c->curr_task[c->tail_ctask].item;
 }
 
 
@@ -478,9 +478,9 @@ static void ms_task_expire_verify_init(ms_task_t *task)
  * @return ms_task_t*, pointer of current task in the
  *         concurrency
  */
-static ms_task_t *ms_get_task(ms_conn_t *c, bool warmup)
+ms_task_t *ms_get_task(ms_conn_t *c, bool warmup)
 {
-  ms_task_t *task= &c->curr_task;
+  ms_task_t *task= &c->curr_task[c->tail_ctask];
 
   while (1)
   {
@@ -618,10 +618,12 @@ static void ms_single_getset_task_sch(ms_conn_t *c)
     item= task->item;
     if (task->cmd == CMD_SET)
     {
+//        printf("%s:%s:%d:setting up SET task\n", __FILE__, __FUNCTION__, __LINE__);
       ms_mcd_set(c, item);
     }
     else if (task->cmd == CMD_GET)
     {
+//        printf("%s:%s:%d:setting up GET task\n", __FILE__, __FUNCTION__, __LINE__);
       assert(task->cmd == CMD_GET);
       ms_mcd_get(c, item);
     }
@@ -831,14 +833,14 @@ static void ms_update_single_get_result(ms_conn_t *c, ms_task_item_t *item)
   orignkey= &ms_setting.char_block[item->key_suffix_offset];
 
   /* update get miss counter */
-  if ((c->precmd.cmd == CMD_GET) && c->curr_task.get_miss)
+  if ((c->precmd.cmd == CMD_GET) && c->curr_task[c->tail_ctask].get_miss)
   {
     atomic_add_size(&ms_stats.get_misses, 1);
   }
 
   /* get nothing from server for this task item */
-  if ((c->precmd.cmd == CMD_GET) && c->curr_task.verify
-      && ! c->curr_task.finish_verify)
+  if ((c->precmd.cmd == CMD_GET) && c->curr_task[c->tail_ctask].verify
+      && ! c->curr_task[c->tail_ctask].finish_verify)
   {
     /* verify expire time if necessary */
     if (item->exp_time > 0)
@@ -943,8 +945,8 @@ static void ms_update_set_result(ms_conn_t *c, ms_task_item_t *item)
 
       /* set successes, update counter */
       c->set_cursor++;
-      c->curr_task.set_opt++;
-      c->curr_task.cycle_undo_set--;
+      c->curr_task[c->tail_ctask].set_opt++;
+      c->curr_task[c->tail_ctask].cycle_undo_set--;
       break;
 
     case MCD_SERVER_ERROR:
@@ -982,7 +984,7 @@ static void ms_update_stat_result(ms_conn_t *c)
     break;
 
   case CMD_GET:
-    if (c->curr_task.get_miss)
+    if (c->curr_task[c->tail_ctask].get_miss)
     {
       get_miss= true;
     }
@@ -1053,6 +1055,10 @@ static void ms_update_task_result(ms_conn_t *c)
  */
 static int ms_run_getset_task(ms_conn_t *c)
 {
+
+    int ii = 0;
+    int ret = 0;
+    ms_task_t *task;
   /**
    * extra one loop to get the last command return state. get the
    * last command return state.
@@ -1071,8 +1077,16 @@ static int ms_run_getset_task(ms_conn_t *c)
   }
   else
   {
+    task= ms_get_task(c, false);
+        if (task->cmd == CMD_GET) {
+            // If it is get request, repeat it x times
+//            for (ii = 0; ii < ms_setting.request_batch; ++ii)   {
+                ms_single_getset_task_sch(c);
+//            }
+        } else {
+            ms_single_getset_task_sch(c);
+        }
     /* operate next task item */
-    ms_single_getset_task_sch(c);
   }
 
   /* no task to do, exit */

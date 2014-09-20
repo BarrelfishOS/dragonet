@@ -56,6 +56,8 @@ static struct option long_options[]=
     OPT_CONCURRENCY        },
   { (OPTIONSTRING)"sports",         required_argument,            NULL,
     OPT_SPORTS             },
+  { (OPTIONSTRING)"batch",         required_argument,            NULL,
+    OPT_BATCH},
   { (OPTIONSTRING)"conn_sock",      required_argument,            NULL,
     OPT_SOCK_PER_CONN      },
   { (OPTIONSTRING)"execute_number", required_argument,            NULL,
@@ -266,6 +268,8 @@ static const char *ms_lookup_help(ms_options_t option)
   case OPT_SPORTS:
     return "Starting port to be used by client connections. Defualt 0, means pick any";
 
+  case OPT_BATCH:
+    return "Number of requests in flight at given time. Defualt 1";
 
   case OPT_FIXED_LTH:
     return "Fixed length of value.";
@@ -424,7 +428,7 @@ static void ms_options_parse(int argc, char *argv[])
   int option_index= 0;
   int option_rv;
 
-  while ((option_rv= getopt_long(argc, argv, "VhURbaBs:x:T:c:z:X:v:d:"
+  while ((option_rv= getopt_long(argc, argv, "VhURbaBs:x:T:c:z:C:X:v:d:"
                                              "t:S:F:w:e:o:n:P:p:",
                                  long_options, &option_index)) != -1)
   {
@@ -464,6 +468,17 @@ static void ms_options_parse(int argc, char *argv[])
         exit(1);
       }
       break;
+
+    case OPT_BATCH:       /* --batch or -C */
+      errno= 0;
+      ms_setting.request_batch = (uint32_t)strtoul(optarg, (char **) NULL, 10);
+      if (ms_setting.request_batch <= 0 || errno != 0)
+      {
+        fprintf(stderr, "batchsize should be non-zero positive number :-)\n");
+        exit(1);
+      }
+      break;
+
 
 
     case OPT_EXECUTE_NUMBER:        /* --execute_number or -x */
@@ -776,6 +791,10 @@ static void ms_print_memslap_stats(struct timeval *start_time,
                  sizeof(buf) - (size_t)(pos -buf),
                  "read_bytes: %lu\n",
                  (unsigned long) ms_stats.bytes_read);
+  pos+= snprintf(pos,
+                 sizeof(buf) - (size_t)(pos -buf),
+                 "read_responses: %lu\n",
+                 (unsigned long) ms_stats.bytes_read/1024);
   pos+= snprintf(pos,
                  sizeof(buf) - (size_t)(pos -buf),
                  "object_bytes: %lu\n",
