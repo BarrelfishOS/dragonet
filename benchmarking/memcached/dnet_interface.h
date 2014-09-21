@@ -10,13 +10,6 @@
 #endif // ENABLE_DRAGONET
 
 
-#ifdef DRAGONET
-
-#include <pthread.h>  // for using pthread_mutex_locks
-#include <assert.h>
-#include <helpers.h>
-#include <dragonet/app_lowlevel.h>
-#include <udpproto.h>
 
 //#define MYDEBUG     1
 
@@ -36,12 +29,22 @@ get_tsc(void) {
     return (uint64_t)hi << 32 | lo;
 }
 
-#define mprint(x...)    do { printf("TID:%d:Cycle:%"PRIu64":", (int)pthread_self(), get_tsc()); printf(":debug:" x); } while(0)
+#define mmprint(x...)    do { printf("TID:%d:Cycle:%"PRIu64":", (int)pthread_self(), get_tsc()); printf(":debug:" x); } while(0)
 //#define dprint(x...)    do { printf("TID:%d:", (int)pthread_self()); printf(":debug:" x); } while(0)
-//#define mprint(x...)    printf("debug:" x)
+//#define mmprint(x...)    printf("debug:" x)
 #else
-#define mprint(x...)   ((void)0)
+#define mmprint(x...)   ((void)0)
 #endif // MYDEBUG
+
+
+
+#ifdef DRAGONET
+
+#include <pthread.h>  // for using pthread_mutex_locks
+#include <assert.h>
+#include <helpers.h>
+#include <dragonet/app_lowlevel.h>
+#include <udpproto.h>
 
 #define MAX_SOCKETS_APP             (256)
 // Shows packet classification after every 'INTERVAL_STAT_FREQUENCY' packet.
@@ -50,7 +53,7 @@ get_tsc(void) {
 //  memecached has its own copy of these variables in dnet_interface.h
 
 //#define SHOW_INTERVAL_STAT      1
-#define INTERVAL_STAT_FREQUENCY     (1000)
+//#define INTERVAL_STAT_FREQUENCY     (1000)
 //#define INTERVAL_STAT_FREQUENCY     (1)
 
 

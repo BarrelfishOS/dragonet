@@ -18,6 +18,8 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#include "dnet_interface.h"
+
 #include "protocol_binary.h"
 #include "cache.h"
 
@@ -125,7 +127,6 @@
 
 
 
-#include "dnet_interface.h"
 
 /**
  * Callback for any function producing stats.

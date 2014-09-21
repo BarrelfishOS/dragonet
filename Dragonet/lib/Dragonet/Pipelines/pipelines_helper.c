@@ -24,15 +24,15 @@
 #include <implementation.h>
 
 #define SHARED_STATE_SIZE 8192
-#define QUEUE_SLOTS 5120
-//#define QUEUE_SLOTS    (5120  * 2)
+//#define QUEUE_SLOTS 5120
+#define QUEUE_SLOTS    (5120  * 2)
 #define BULK_BUFFERSZ 2048
-#define BULK_BUFFERNUM 1024
-//#define BULK_BUFFERNUM (1024 * 2)
+//#define BULK_BUFFERNUM 1024
+#define BULK_BUFFERNUM (1024 * 8)
 
 // Size of full input and input struct allocation caches
-#define IN_FULL_POOL_MAX 16
-#define IN_STRUCT_POOL_MAX 16
+#define IN_FULL_POOL_MAX 128
+#define IN_STRUCT_POOL_MAX 128
 
 
 //#define dprintf printf

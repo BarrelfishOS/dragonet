@@ -4,7 +4,7 @@
 #include <netinet/in.h>
 //#include <pthread.h>
 #include <assert.h>
-
+#include <errno.h>
 
 #ifdef DRAGONET
 
@@ -341,7 +341,7 @@ int register_callback_dn(void *dn_state, event_handler_fun_ptr fun, int fd,
     dnt_state->callback_memcached_fd = fd;
     dnt_state->callback_memcached_which = which;
     dnt_state->callback_memcached_arg = arg;
-    mprint("debug: %s:%s:%d: [TID:%d], callback registered\n",
+    mmprint("debug: %s:%s:%d: [TID:%d], callback registered\n",
                 __FILE__, __FUNCTION__, __LINE__, dnt_state->tindex);
     return 0;
 }
@@ -356,13 +356,13 @@ static void handle_single_event(struct dn_thread_state *dnt_state,
     in = event->data.inpacket.buffer;
     myAssert(in != NULL);
 
-    mprint("debug: %s:%s:%d: [TID:%d], new packet arrived\n",
+    mmprint("debug: %s:%s:%d: [TID:%d], new packet arrived\n",
             __FILE__, __FUNCTION__, __LINE__, dnt_state->tindex);
 
 
    dnt_state->current_packet = in;
 
-    mprint("debug: %s:%s:%d: [TID:%d] [%p] packet len [%d] = in->len [%"PRIu16"] "
+    mmprint("debug: %s:%s:%d: [TID:%d] [%p] packet len [%d] = in->len [%"PRIu16"] "
             " - in->->attr->offset_l5 [%"PRIu16"] "
             "formal payload len = %"PRIu16"\n",
             __FILE__, __FUNCTION__, __LINE__,
@@ -390,7 +390,7 @@ void event_handle_loop_dn(void *dn_state)
     struct dn_thread_state *dnt_state = (struct dn_thread_state *)dn_state;
     myAssert(dnt_state->callback_memcached_fn);
 
-    mprint("debug: %s:%s:%d: [TID:%d], looping for incoming packets\n",
+    mmprint("debug: %s:%s:%d: [TID:%d], looping for incoming packets\n",
             __FILE__, __FUNCTION__, __LINE__, dnt_state->tindex);
 
     while (true) {
@@ -410,7 +410,7 @@ void event_handle_loop_dn(void *dn_state)
                 // This needs to be inside the critical section, since we'll
                 // send out data through the AQ
                 dnt_state->current_socket = i;
-                mprint("%s:%s:%d: [TID:%d, socket:%d], new event arrived\n",
+                mmprint("%s:%s:%d: [TID:%d, socket:%d], new event arrived\n",
                     __FILE__, __func__, __LINE__, dnt_state->tindex, i);
                 handle_single_event(dnt_state, &dnt_state->event, i);
                 idle = 0;
@@ -425,12 +425,12 @@ void event_handle_loop_dn(void *dn_state)
             }
             */
 
-            if (idle >= IDLE_BEFORE_YIELD) {
-                sched_yield();
-                idle = 0;
-            }
+            //if (idle >= IDLE_BEFORE_YIELD) {
+            //    sched_yield();
+            //    idle = 0;
+            //}
 
-        }
+        } // end for: for each socket in the thread
     }
 }
 
@@ -443,22 +443,22 @@ void event_handle_loop_dn(void *dn_state)
 
     // Each thread will call this with its own dn_state structure.
 
-    mprint("debug: %s:%s:%d: [TID:%d], looping for incoming packets\n",
+    mmprint("debug: %s:%s:%d: [TID:%d], looping for incoming packets\n",
             __FILE__, __FUNCTION__, __LINE__, dnt_state->tindex);
 //    pthread_mutex_lock(&dnt_state->dn_lock);
 
 
     while (1) {
-        //mprint("waiting for next event\n");
+        //mmprint("waiting for next event\n");
         errval_t err = dnal_aq_poll(dnt_state->daq, &dnt_state->event);
         if (err == SYS_ERR_OK) {
-            mprint("%s:%s:%d: [TID:%d], new event arrived\n",
+            mmprint("%s:%s:%d: [TID:%d], new event arrived\n",
                 __FILE__, __func__, __LINE__, dnt_state->tindex);
             handle_single_event(dnt_state, &dnt_state->event);
         }
 
         //stack_process_event(dnt_state->stack);
-//        mprint("%s:%s:%d: [TID:%d], stack_process_event done! looping back\n",
+//        mmprint("%s:%s:%d: [TID:%d], stack_process_event done! looping back\n",
 //                __FILE__, __func__, __LINE__, dnt_state->tindex);
     } // end while: infinite
 } // end function: event_handle_loop_dn
@@ -472,13 +472,13 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
 
     struct input *in = dnt_state->current_packet;
 
-    mprint("debug: %s:%s:%d: [TID:%d] [in=%p]\n",
+    mmprint("debug: %s:%s:%d: [TID:%d] [in=%p]\n",
             __FILE__, __FUNCTION__, __LINE__, dnt_state->tindex, in);
 
 
     int len = in->len - in->attr->offset_l5;
 
-    mprint("debug: %s:%s:%d: [TID:%d] [SID:%d] packet len [%d] = in->len [%"PRIu16"] "
+    mmprint("debug: %s:%s:%d: [TID:%d] [SID:%d] packet len [%d] = in->len [%"PRIu16"] "
             " - in->->attr->offset_l5 [%"PRIu16"], read bufsize = %d, "
             "formal payload len = %"PRIu16", %"PRIu16",\n",
             __FILE__, __FUNCTION__, __LINE__,
@@ -503,7 +503,7 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
 
     myAssert(len <= bufsize);
 
-    mprint("debug: %s:%s:%d,[#### IMP ####] [TID:%d], sport = %"PRIx16", dport=%"PRIx16", "
+    mmprint("debug: %s:%s:%d,[#### IMP ####] [TID:%d], sport = %"PRIx16", dport=%"PRIx16", "
             "srcip = %"PRIx32" dstip = %"PRIx32", len = %d \n",
             __FILE__,__FILE__, __LINE__, dnt_state->tindex,
             in->attr->udp_sport, in->attr->udp_dport, in->attr->ip4_src,
@@ -511,7 +511,7 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
 
     memcpy(buff, (uint8_t *)in->data + in->attr->offset_l5, len);
 
-    mprint("debug: %s:%s:%d: [TID:%d], copying data of len %d, %d, %d at "
+    mmprint("debug: %s:%s:%d: [TID:%d], copying data of len %d, %d, %d at "
             "location %p of size %d\n",
      __FILE__, __FILE__, __LINE__, dnt_state->tindex, len, in->len,
      in->attr->offset_l5,
@@ -520,7 +520,7 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
 #ifdef SHOW_INTERVAL_STAT
 
     if((dnt_state->pkt_count) % INTERVAL_STAT_FREQUENCY == 0) {
-        //mprint
+        //mmprint
         printf
             ("[TID:%d], [pkt_count:%"PRIu64"], sport = %"PRIu16", dport=%"PRIu16", "
             "srcip = %"PRIx32" dstip = %"PRIx32", len = %d \n",
@@ -560,7 +560,10 @@ int send_dn(void *dn_state, uint8_t *buff, int bufsize)
                 "allocate buffer\n",
                 __FILE__, __FUNCTION__, __LINE__, dnt_state->tindex);
     }
-    myAssert(in != NULL);
+    if (in == 0) {
+        //errno = EAGAIN;
+        return -1;
+    }
     pkt_prepend(in, bufsize);
     memcpy(in->data, buff, bufsize);
 
@@ -608,12 +611,12 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
 
     myAssert(dn_tstate != NULL);
 
-    mprint("%s:%s:%d:[state:%p], trying to grab locks\n",
+    mmprint("%s:%s:%d:[state:%p], trying to grab locks\n",
             __FILE__, __FUNCTION__, __LINE__, dn_tstate);
 
     // lock to protect global dn state
     pthread_mutex_lock(&dn_init_lock);
-    mprint("%s:%s:%d:[state:%p], critical section: picking up tid\n",
+    mmprint("%s:%s:%d:[state:%p], critical section: picking up tid\n",
             __FILE__, __FUNCTION__, __LINE__, dn_tstate);
     // thread level dragonet-stack specific lock
     dn_tstate->tindex = threads_initialized_count;
@@ -622,35 +625,35 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
 
 
     pthread_mutex_lock(&dn_tstate->dn_lock);
-    mprint("%s:%s:%d: [TID:%d], thread local lock grabbed\n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
+    mmprint("%s:%s:%d: [TID:%d], thread local lock grabbed\n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
 
 
     // figure out the application slot name to connect with
     ret = snprintf(appName, sizeof(appName), "t%d", dn_tstate->tindex);
     strncpy(dn_tstate->app_slot, appName, ret);
-    mprint("%s:%s:%d: [TID:%d], connecting with slotname [%s]\n",
+    mmprint("%s:%s:%d: [TID:%d], connecting with slotname [%s]\n",
             __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex,
             dn_tstate->app_slot);
 
     // create an application queue with application slot
     ret = dnal_aq_create("dragonet", dn_tstate->app_slot, &dn_tstate->daq);
     err_expect_ok(ret);
-    mprint("%s:%s:%d: [TID:%d], \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
+    mmprint("%s:%s:%d: [TID:%d], \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
 
 
     //pthread_mutex_lock(&dn_init_lock);  // FIXME: temararily disabled
 
 
-    mprint("%s:%s:%d: [TID:%d], [appName:%s] \n", __FILE__, __FUNCTION__, __LINE__,
+    mmprint("%s:%s:%d: [TID:%d], [appName:%s] \n", __FILE__, __FUNCTION__, __LINE__,
             dn_tstate->tindex, dn_tstate->app_slot);
 
-    mprint("%s:%s:%d: [TID:%d], \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
+    mmprint("%s:%s:%d: [TID:%d], \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
 
     // If this is first thread then bind, else span
     //if (dn_tstate->tindex < filter_count) {
     if (dn_tstate->tindex < thread_blk_count) {
 
-        mprint("debug: %s:%s:%d: [TID:%d], directing specified flow to this thread\n",
+        mmprint("debug: %s:%s:%d: [TID:%d], directing specified flow to this thread\n",
                 __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
 
         struct cfg_thread *sel_thread = &thread_list[dn_tstate->tindex];
@@ -662,7 +665,7 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
             struct cfg_udpep *udp = sel_thread->eplist[i];
             pthread_mutex_lock(&udp->ep_lock);
 
-            mprint("lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+            mmprint("lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
                     udp->l_ip, udp->l_port, udp->r_ip, udp->r_port);
 
             // create a socket
@@ -680,7 +683,7 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
             // FIXME: get the actual specified port number
             dn_tstate->dndList[i].data.ip4udp.port_local = udp->l_port;
 
-            mprint("debug: %s:%s:%d: [TID:%d],  Binding, using listen port %"PRIu16"\n",
+            mmprint("debug: %s:%s:%d: [TID:%d],  Binding, using listen port %"PRIu16"\n",
                     __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex,
                     dn_tstate->dndList[i].data.ip4udp.port_local
                   );
@@ -720,7 +723,7 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
             exit(1);
         }
 
-        mprint("debug: %s:%s:%d: [TID:%d], This is not first thread, "
+        mmprint("debug: %s:%s:%d: [TID:%d], This is not first thread, "
                 "so using existing socket for spanning\n",
                 __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
 
@@ -752,11 +755,11 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
 
     pthread_mutex_unlock(&dn_init_lock);
 
-    mprint("%s:%s:%d: [TID:%d], releasing locks \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
+    mmprint("%s:%s:%d: [TID:%d], releasing locks \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
     pthread_mutex_unlock(&dn_tstate->dn_lock);
 
 
-    mprint("%s:%s:%d: [TID:%d], \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
+    mmprint("%s:%s:%d: [TID:%d], \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
     return ret;
 }
 

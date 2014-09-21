@@ -3807,7 +3807,7 @@ void do_accept_new_conns(const bool do_accept) {
 static enum transmit_result transmit(conn *c) {
     myAssert(c != NULL);
 
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+    mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
     if (c->msgcurr < c->msgused &&
             c->msglist[c->msgcurr].msg_iovlen == 0) {
         /* Finished writing the current msg; advance to the next. */
@@ -3817,7 +3817,7 @@ static enum transmit_result transmit(conn *c) {
         ssize_t res = 0;
         struct msghdr *m = &c->msglist[c->msgcurr];
 
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+    mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
 
 #ifdef DRAGONET
         if ((use_dragonet_stack == 1) && (c->is_dragonet == 1)) {
@@ -3827,11 +3827,11 @@ static enum transmit_result transmit(conn *c) {
             for(ii = 0; ii < m->msg_iovlen; ++ii)  {
                 memcpy(buff + bufsize, m->msg_iov[ii].iov_base,  m->msg_iov[ii].iov_len);
                 bufsize = bufsize + m->msg_iov[ii].iov_len;
-                mprint("%s:%s:%d: %d, copying data of size %d\n",
+                mmprint("%s:%s:%d: %d, copying data of size %d\n",
                     __FILE__, __func__, __LINE__, ii,  bufsize);
             }
 
-            mprint("%s:%s:%d: sending data of size %d\n",
+            mmprint("%s:%s:%d: sending data of size %d\n",
                     __FILE__, __func__, __LINE__, bufsize);
             res = send_dn(&c->thread->dn_tstate, buff, bufsize);
         } else {
@@ -3840,10 +3840,10 @@ static enum transmit_result transmit(conn *c) {
 #else // DRAGONET
         res = sendmsg(c->sfd, m, 0);
 #endif // DRAGONET
-    mprint("%s:%s:%d: sendmsg ret = %zu\n",
+    mmprint("%s:%s:%d: sendmsg ret = %zu\n",
             __FILE__, __func__, __LINE__, res);
         if (res > 0) {
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+    mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
             pthread_mutex_lock(&c->thread->stats.mutex);
             c->thread->stats.bytes_written += res;
             pthread_mutex_unlock(&c->thread->stats.mutex);
@@ -3862,7 +3862,7 @@ static enum transmit_result transmit(conn *c) {
                 m->msg_iov->iov_base = (caddr_t)m->msg_iov->iov_base + res;
                 m->msg_iov->iov_len -= res;
             }
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+    mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
             return TRANSMIT_INCOMPLETE;
         }
         if (res == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
@@ -3870,10 +3870,10 @@ static enum transmit_result transmit(conn *c) {
                 if (settings.verbose > 0)
                     fprintf(stderr, "Couldn't update event\n");
                 conn_set_state(c, conn_closing);
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+    mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
                 return TRANSMIT_HARD_ERROR;
             }
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+    mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
             return TRANSMIT_SOFT_ERROR;
         }
         /* if res == 0 or res == -1 and error is not EAGAIN or EWOULDBLOCK,
@@ -3885,10 +3885,10 @@ static enum transmit_result transmit(conn *c) {
             conn_set_state(c, conn_read);
         else
             conn_set_state(c, conn_closing);
-        mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+        mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
         return TRANSMIT_HARD_ERROR;
     } else {
-        mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+        mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
         return TRANSMIT_COMPLETE;
     }
 }
@@ -4164,7 +4164,7 @@ static void drive_machine(conn *c) {
                 }
             }
 
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+    mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
             /* fall through... */
 
         case conn_mwrite:
@@ -4174,23 +4174,23 @@ static void drive_machine(conn *c) {
             conn_set_state(c, conn_closing);
             break;
           }
-          mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+          mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
             switch (transmit(c)) {
             case TRANSMIT_COMPLETE:
 
-                mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+                mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
                 if (c->state == conn_mwrite) {
-                    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+                    mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
                     conn_release_items(c);
                     /* XXX:  I don't know why this wasn't the general case */
                     if(c->protocol == binary_prot) {
                         conn_set_state(c, c->write_and_go);
                     } else {
-                        mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+                        mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
                         conn_set_state(c, conn_new_cmd);
                     }
                 } else if (c->state == conn_write) {
-                    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+                    mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
                     if (c->write_and_free) {
                         free(c->write_and_free);
                         c->write_and_free = 0;
@@ -4227,7 +4227,7 @@ static void drive_machine(conn *c) {
         }
     }
 
-    mprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
+    mmprint("%s:%s:%d: \n", __FILE__, __func__, __LINE__);
     return;
 }
 
@@ -4235,7 +4235,7 @@ static void drive_machine(conn *c) {
 void event_handler(const int fd, const short which, void *arg) {
     conn *c;
 
-    mprint("event_handler called\n");
+    mmprint("event_handler called\n");
     c = (conn *)arg;
     myAssert(c != NULL);
 
@@ -4250,7 +4250,7 @@ void event_handler(const int fd, const short which, void *arg) {
     }
     drive_machine(c);
 
-    mprint("%s:%s:%d: event_handler done \n", __FILE__, __func__, __LINE__);
+    mmprint("%s:%s:%d: event_handler done \n", __FILE__, __func__, __LINE__);
     /* wait for next event */
     return;
 }
