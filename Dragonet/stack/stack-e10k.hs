@@ -35,8 +35,8 @@ import Text.Show.Pretty (ppShow)
 tr = flip . trace
 
 localIP :: Word32
---localIP = MD.asiagoIP_Intel
-localIP = MD.burrataIP
+localIP = MD.asiagoIP_Intel
+--localIP = MD.burrataIP
 
 --------------------------------------------------
 

@@ -45,12 +45,12 @@
 //#define CONFIG_LOCAL_IP  0x0a16040b //   "10.22.4.11"
 
 //  For asigao, connected over switch
-//#define CONFIG_PCI_ADDR "0000:04:00.1"
-//#define CONFIG_LOCAL_IP  0x0a71045f //   "10.113.4.95"
+#define CONFIG_PCI_ADDR "0000:04:00.1"
+#define CONFIG_LOCAL_IP  0x0a71045f //   "10.113.4.95"
 
 //  For burrata, connected over switch
-#define CONFIG_PCI_ADDR "0000:04:00.0"
-#define CONFIG_LOCAL_IP  0x0a710460 //   "10.113.4.96" , eth2
+//#define CONFIG_PCI_ADDR "0000:04:00.0"
+//#define CONFIG_LOCAL_IP  0x0a710460 //   "10.113.4.96" , eth2
 
 // NOTE: Moved to c_impl/include/implementation.h
 //#define SHOW_INTERVAL_STATS  1

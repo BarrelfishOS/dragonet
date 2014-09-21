@@ -25,7 +25,7 @@ numQueues :: Integer
 numQueues = 4
 
 localIP :: Word32
-localIP = MD.asiagoIP_Intel
+localIP = MD.asiagoIP_SF
 
 
 -- Does not really matter as we only have one config

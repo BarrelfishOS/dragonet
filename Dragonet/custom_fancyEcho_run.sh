@@ -1,8 +1,23 @@
 #!/bin/bash
 
-#sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0 -p 888  -a t1  -f ${SERVERIP}:888/10.113.4.71:9000  -f ${SERVERIP}:888/10.113.4.71:9001  -f ${SERVERIP}:888/10.113.4.71:9002  -f ${SERVERIP}:888/10.113.4.71:9003  -a t2  -f ${SERVERIP}:888/10.113.4.57:9000  -f ${SERVERIP}:888/10.113.4.57:9001  -f ${SERVERIP}:888/10.113.4.57:9002  -f ${SERVERIP}:888/10.113.4.57:9003  -a t3  -f ${SERVERIP}:888/10.113.4.29:9000  -f ${SERVERIP}:888/10.113.4.29:9001  -f ${SERVERIP}:888/10.113.4.29:9002  -f ${SERVERIP}:888/10.113.4.29:9003  -t -q t0  -t -q t1 -t -q t2 -t -q t3
-#sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0 -p 888  -a t1  -f ${SERVERIP}:888/10.113.4.71:0   -a t2  -f ${SERVERIP}:888/10.113.4.57:0  -a t3  -f ${SERVERIP}:888/10.113.4.29:0 -t -q t0  -t -q t1 -t -q t2 -t -q t3
-#sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t1  -f ${SERVERIP}:888/10.113.4.71:0   -a t2  -f ${SERVERIP}:888/10.113.4.57:0  -a t3  -f ${SERVERIP}:888/10.113.4.29:0  -t -q t1 -t -q t2 -t -q t3
+### for memcached
+#sudo ../benchmarking/memcached/memcached -N f[${SERVERIP}:7777/10.113.4.71:0]f[${SERVERIP}:7777/10.113.4.29:0]f[${SERVERIP}:7777/10.113.4.51:0]f[${SERVERIP}:7777/10.113.4.57:0] -c 64000 -m 64000 -u root -p 0 -U  7777 -t 8 -l ${SERVERIP}
+
+#sudo ../benchmarking/memcached/memcached -N p[7777] -c 64000 -m 64000 -u root -p 0 -U  7777 -t 1 -l ${SERVERIP}
+#sudo ../benchmarking/memcached/memcached -N T0.f[${SERVERIP}:7777/10.113.4.51:8000]T1.f[${SERVERIP}:7777/10.113.4.51:8001]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 2 -l ${SERVERIP}
+
+run_memcached_for_8_cores() {
+sudo ../benchmarking/memcached/memcached -N T0.f[${SERVERIP}:7777/10.113.4.71:8000]T1.f[${SERVERIP}:7777/10.113.4.29:8000]T2.f[${SERVERIP}:7777/10.113.4.51:8000]T3.f[${SERVERIP}:7777/10.113.4.57:8000]T4.f[${SERVERIP}:7777/10.113.4.51:8001]T5.f[${SERVERIP}:7777/10.113.4.57:8001]T6.f[${SERVERIP}:7777/10.113.4.71:8001]T7.f[${SERVERIP}:7777/10.113.4.29:8001] -c 64000 -m 64000 -u root -p 0 -U  7777 -t 8 -l ${SERVERIP}
+}
+
+run_memcached_single_core() {
+sudo ../benchmarking/memcached/memcached -N p[7777] -c 64000 -m 64000 -u root -p 0 -U  7777 -t 1 -l ${SERVERIP}
+}
+run_memcached_single_core_linux() {
+sudo ../benchmarking/memcached/memcached -c 64000 -m 64000 -u root -p 0 -U  7777 -t 2 -l 10.110.4.96
+}
+
+
 
 
 run_for_16_cores() {
@@ -126,8 +141,10 @@ else
 
     # For intel
     if [ "$STACKNAME" ==  "stack-e10k" ] ; then
-        SERVERIP="10.113.4.95"
-        SERVERIP="10.113.4.96"
+        SERVERIP="10.113.4.96"  # For burrata as server
+        SERVERIP="10.113.4.195"  # for asiago as server on solarflare
+        SERVERIP="10.113.4.95"  # for asiago as server
+        echo "NOTE: using ${SERVERIP} as server-IP address"
     else
 
         if [ "$STACKNAME" ==  "stack-tap" ] ; then
@@ -180,7 +197,7 @@ exit 0
 #       new Dragonet stack.
 
 # 10.113.4.51  # Burrata # 175178848 -- old
-# 10.113.4.96  # Burrata #
+# 10.113.4.96  # Burrata #  Also works as server
 
 # 10.113.4.20  # gruyere # 175178772
 # 10.113.4.57  # ziger2  # 175178809
