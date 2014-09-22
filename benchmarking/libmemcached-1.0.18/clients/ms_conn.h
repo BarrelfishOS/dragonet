@@ -38,7 +38,7 @@ extern "C" {
 #define IOV_LIST_INITIAL             400
 
 /* Initial number of sendmsg() argument structures to allocate. */
-#define MSG_LIST_INITIAL             512
+#define MSG_LIST_INITIAL             10
 
 /* High water marks for buffer shrinking */
 #define READ_BUFFER_HIGHWAT          (2 * DATA_BUFFER_SIZE)
@@ -141,7 +141,6 @@ typedef struct conn
   int rbytes;               /* how much data, starting from rcur, do we have unparsed */
 
   bool readval;             /* read value state, read known data size */
-                            /* marked true by ms_ascii_process_line */
   int rvbytes;              /* total value size need to read */
 
   char *wbuf;               /* buffer to write commands out */
@@ -183,10 +182,7 @@ typedef struct conn
   ms_task_item_t *item_win;         /* task sequence */
   int win_size;                     /* current task window size */
   uint64_t set_cursor;              /* current set item index in the item window */
-  ms_task_t *curr_task;              /* current running task */
-  int head_ctask;                   /* location where next curr task will be stored -- for sending */
-  int tail_ctask;                   /* location of last curr task  -- for receiving */
-  int ctask_size;                   /* location of last curr task  -- for receiving */
+  ms_task_t curr_task;              /* current running task */
   ms_mlget_task_t mlget_task;       /* multi-get task */
 
   int warmup_num;                   /* to run how many warm up operations*/

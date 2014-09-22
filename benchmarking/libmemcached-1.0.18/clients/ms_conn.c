@@ -83,7 +83,7 @@ static uint32_t ms_get_udp_request_id(void);
 
 
 /* connect initialize */
-static void ms_task_init(ms_conn_t *c, int ii);
+static void ms_task_init(ms_conn_t *c);
 static int ms_conn_udp_init(ms_conn_t *c, const bool is_udp);
 static int ms_conn_sock_init(ms_conn_t *c);
 static int ms_conn_event_init(ms_conn_t *c);
@@ -211,21 +211,20 @@ static uint32_t ms_get_udp_request_id(void)
  *
  * @param c, pointer of the concurrency
  */
-static void ms_task_init(ms_conn_t *c, int ii)
+static void ms_task_init(ms_conn_t *c)
 {
+  c->curr_task.cmd= CMD_NULL;
+  c->curr_task.item= 0;
+  c->curr_task.verify= false;
+  c->curr_task.finish_verify= true;
+  c->curr_task.get_miss= true;
 
-  c->curr_task[ii].cmd= CMD_NULL;
-  c->curr_task[ii].item= 0;
-  c->curr_task[ii].verify= false;
-  c->curr_task[ii].finish_verify= true;
-  c->curr_task[ii].get_miss= true;
-
-  c->curr_task[ii].get_opt= 0;
-  c->curr_task[ii].set_opt= 0;
-  c->curr_task[ii].cycle_undo_get= 0;
-  c->curr_task[ii].cycle_undo_set= 0;
-  c->curr_task[ii].verified_get= 0;
-  c->curr_task[ii].overwrite_set= 0;
+  c->curr_task.get_opt= 0;
+  c->curr_task.set_opt= 0;
+  c->curr_task.cycle_undo_get= 0;
+  c->curr_task.cycle_undo_set= 0;
+  c->curr_task.verified_get= 0;
+  c->curr_task.overwrite_set= 0;
 } /* ms_task_init */
 
 
@@ -290,7 +289,6 @@ static int ms_conn_init(ms_conn_t *c,
                         const int read_buffer_size,
                         const bool is_udp)
 {
-  int ii = 0;
   assert(c != NULL);
 
   c->rbuf= c->wbuf= 0;
@@ -385,20 +383,8 @@ static int ms_conn_init(ms_conn_t *c,
     return -1;
   }
 
-
-  c->curr_task = (ms_task_t *) malloc (sizeof(ms_task_t) * (ms_setting.request_batch + 10));
-  if (c->curr_task == NULL) {
-      printf("%s:%s:%d: ERROR: malloc failed\n", __FILE__, __FUNCTION__, __LINE__);
-    return -1;
-  }
-  memset(c->curr_task, 0, (sizeof(ms_task_t) * (ms_setting.request_batch + 10)));
   /* initialize task */
-  for (ii = 0; ii < (ms_setting.request_batch + 10); ++ii) {
-    ms_task_init(c, ii);
-  }
-  c->head_ctask = 0;
-  c->tail_ctask = 0;
-  c->ctask_size = ms_setting.request_batch;
+  ms_task_init(c);
 
   if (! (ms_setting.facebook_test && is_udp))
   {
@@ -1311,13 +1297,10 @@ static int ms_ascii_process_line(ms_conn_t *c, char *command)
     break;
   } /* switch */
 
-//        printf("%s:%s:%d:processline\n", __FILE__, __FUNCTION__, __LINE__);
   return ret;
 } /* ms_ascii_process_line */
 
 
-ms_task_t *ms_get_task(ms_conn_t *c, bool warmup);
-static int repeat_state = 0;
 /**
  * after one operation completes, reset the concurrency
  *
@@ -1348,35 +1331,9 @@ void ms_reset_conn(ms_conn_t *c, bool timeout)
   c->msgcurr = 0;
   c->msgused = 0;
   c->iovused = 0;
+  ms_conn_set_state(c, conn_write);
+  memcpy(&c->precmd, &c->currcmd, sizeof(ms_cmdstat_t));    /* replicate command state */
 
-
-
-  if (c->state == conn_read) {
-        ++repeat_state;
-
-        if (repeat_state < ms_setting.request_batch) {
-
-            ms_task_t *task;
-            task= ms_get_task(c, false);
-            if (task->cmd == CMD_GET) {
-//                printf("%s:%s:%d: going to read again %d\n", __FILE__, __FUNCTION__, __LINE__, repeat_state);
-            } else {
-//                printf("%s:%s:%d: SET command read, not reading again  %d\n", __FILE__, __FUNCTION__, __LINE__, repeat_state);
-//                ms_conn_set_state(c, conn_write);
-//                memcpy(&c->precmd, &c->currcmd, sizeof(ms_cmdstat_t));    /* replicate command state */
-//                repeat_state = 0;
-            }
-        } else {
-            ms_conn_set_state(c, conn_write);
-            memcpy(&c->precmd, &c->currcmd, sizeof(ms_cmdstat_t));    /* replicate command state */
-            repeat_state = 0;
-        }
-  } else {
-    ms_conn_set_state(c, conn_write);
-    memcpy(&c->precmd, &c->currcmd, sizeof(ms_cmdstat_t));    /* replicate command state */
-    repeat_state = 0;
-  }
-//  printf("%s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);
   if (timeout)
   {
     ms_drive_machine(c);
@@ -1393,7 +1350,6 @@ void ms_reset_conn(ms_conn_t *c, bool timeout)
  */
 static int ms_try_read_line(ms_conn_t *c)
 {
-//  printf("%s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);
   if (c->protocol == binary_prot)
   {
     /* Do we have the complete packet header? */
@@ -1438,7 +1394,6 @@ static int ms_try_read_line(ms_conn_t *c)
       {
         /* current operation completed */
         ms_reset_conn(c, false);
-//        printf("%s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);
         return -1;
       }
       else
@@ -1474,7 +1429,6 @@ static int ms_try_read_line(ms_conn_t *c)
     /* process this complete line */
     if (ms_ascii_process_line(c, c->rcurr) == 0)
     {
-//        printf("%s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);
       /* current operation completed */
       ms_reset_conn(c, false);
       return -1;
@@ -1489,7 +1443,6 @@ static int ms_try_read_line(ms_conn_t *c)
     assert(c->rcurr <= (c->rbuf + c->rsize));
   }
 
-//        printf("%s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);
   return -1;
 } /* ms_try_read_line */
 
@@ -1650,7 +1603,6 @@ static int ms_udp_read(ms_conn_t *c, char *buf, int len)
 
   assert(c->udp);
 
-//  printf("%s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);
   while (1)
   {
     if (c->rudpbytes + UDP_MAX_PAYLOAD_SIZE > c->rudpsize)
@@ -1709,7 +1661,6 @@ static int ms_udp_read(ms_conn_t *c, char *buf, int len)
     atomic_add_size(&ms_stats.pkt_disorder, 1);
   }
 
-//  printf("%s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);
   return copybytes;
 } /* ms_udp_read */
 
@@ -1740,7 +1691,6 @@ static int ms_try_read_network(ms_conn_t *c)
   int res;
   int64_t avail;
 
-//  printf("%s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);
   assert(c != NULL);
 
   if ((c->rcurr != c->rbuf)
@@ -1798,9 +1748,8 @@ static int ms_try_read_network(ms_conn_t *c)
       {
         break;
       }
-    } // end if : res > 0
-
-    if (res == 0) // error or problem
+    }
+    if (res == 0)
     {
       /* connection closed */
       ms_conn_set_state(c, conn_closing);
@@ -1814,7 +1763,7 @@ static int ms_try_read_network(ms_conn_t *c)
       ms_conn_set_state(c, conn_closing);
       return -1;
     }
-  } // end while: 1
+  }
 
   return gotdata;
 } /* ms_try_read_network */
@@ -1834,22 +1783,22 @@ static void ms_verify_value(ms_conn_t *c,
                             char *value,
                             int vlen)
 {
-  if (c->curr_task[c->tail_ctask].verify)
+  if (c->curr_task.verify)
   {
-    assert(c->curr_task[c->tail_ctask].item->value_offset != INVALID_OFFSET);
-    char *orignval= &ms_setting.char_block[c->curr_task[c->tail_ctask].item->value_offset];
+    assert(c->curr_task.item->value_offset != INVALID_OFFSET);
+    char *orignval= &ms_setting.char_block[c->curr_task.item->value_offset];
     char *orignkey=
-      &ms_setting.char_block[c->curr_task[c->tail_ctask].item->key_suffix_offset];
+      &ms_setting.char_block[c->curr_task.item->key_suffix_offset];
 
     /* verify expire time if necessary */
-    if (c->curr_task[c->tail_ctask].item->exp_time > 0)
+    if (c->curr_task.item->exp_time > 0)
     {
       struct timeval curr_time;
       gettimeofday(&curr_time, NULL);
 
       /* object expired but get it now */
-      if (curr_time.tv_sec - c->curr_task[c->tail_ctask].item->client_time
-          > c->curr_task[c->tail_ctask].item->exp_time + EXPIRE_TIME_ERROR)
+      if (curr_time.tv_sec - c->curr_task.item->client_time
+          > c->curr_task.item->exp_time + EXPIRE_TIME_ERROR)
       {
         atomic_add_size(&ms_stats.exp_get, 1);
 
@@ -1858,7 +1807,7 @@ static void ms_verify_value(ms_conn_t *c,
           char set_time[64];
           char cur_time[64];
           strftime(set_time, 64, "%Y-%m-%d %H:%M:%S",
-                   localtime(&c->curr_task[c->tail_ctask].item->client_time));
+                   localtime(&c->curr_task.item->client_time));
           strftime(cur_time, 64, "%Y-%m-%d %H:%M:%S",
                    localtime(&curr_time.tv_sec));
           fprintf(stderr,
@@ -1872,14 +1821,14 @@ static void ms_verify_value(ms_conn_t *c,
                   "\treceived data len: %d\n"
                   "\treceived data: %.*s\n",
                   c->sfd,
-                  c->curr_task[c->tail_ctask].item->key_size,
-                  c->curr_task[c->tail_ctask].item->key_prefix,
-                  c->curr_task[c->tail_ctask].item->key_size - (int)KEY_PREFIX_SIZE,
+                  c->curr_task.item->key_size,
+                  c->curr_task.item->key_prefix,
+                  c->curr_task.item->key_size - (int)KEY_PREFIX_SIZE,
                   orignkey,
                   set_time,
                   cur_time,
-                  (int)(curr_time.tv_sec - c->curr_task[c->tail_ctask].item->client_time),
-                  c->curr_task[c->tail_ctask].item->exp_time,
+                  (int)(curr_time.tv_sec - c->curr_task.item->client_time),
+                  c->curr_task.item->exp_time,
                   vlen,
                   vlen,
                   value);
@@ -1889,7 +1838,7 @@ static void ms_verify_value(ms_conn_t *c,
     }
     else
     {
-      if ((c->curr_task[c->tail_ctask].item->value_size != vlen)
+      if ((c->curr_task.item->value_size != vlen)
           || (memcmp(orignval, value, (size_t)vlen) != 0))
       {
         atomic_add_size(&ms_stats.vef_failed, 1);
@@ -1905,12 +1854,12 @@ static void ms_verify_value(ms_conn_t *c,
                   "\treceived data len: %d\n"
                   "\treceived data: %.*s\n",
                   c->sfd,
-                  c->curr_task[c->tail_ctask].item->key_size,
-                  c->curr_task[c->tail_ctask].item->key_prefix,
-                  c->curr_task[c->tail_ctask].item->key_size - (int)KEY_PREFIX_SIZE,
+                  c->curr_task.item->key_size,
+                  c->curr_task.item->key_prefix,
+                  c->curr_task.item->key_size - (int)KEY_PREFIX_SIZE,
                   orignkey,
-                  c->curr_task[c->tail_ctask].item->value_size,
-                  c->curr_task[c->tail_ctask].item->value_size,
+                  c->curr_task.item->value_size,
+                  c->curr_task.item->value_size,
                   orignval,
                   vlen,
                   vlen,
@@ -1920,7 +1869,7 @@ static void ms_verify_value(ms_conn_t *c,
       }
     }
 
-    c->curr_task[c->tail_ctask].finish_verify= true;
+    c->curr_task.finish_verify= true;
 
     if (mlget_item != NULL)
     {
@@ -1938,7 +1887,6 @@ static void ms_verify_value(ms_conn_t *c,
  */
 static void ms_ascii_complete_nread(ms_conn_t *c)
 {
-//  printf("%s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);
   assert(c != NULL);
   assert(c->rbytes >= c->rvbytes);
   assert(c->protocol == ascii_prot);
@@ -1959,9 +1907,9 @@ static void ms_ascii_complete_nread(ms_conn_t *c)
 
     if (mlget_item->item->key_prefix == c->currcmd.key_prefix)
     {
-      c->curr_task[c->tail_ctask].item= mlget_item->item;
-      c->curr_task[c->tail_ctask].verify= mlget_item->verify;
-      c->curr_task[c->tail_ctask].finish_verify= mlget_item->finish_verify;
+      c->curr_task.item= mlget_item->item;
+      c->curr_task.verify= mlget_item->verify;
+      c->curr_task.finish_verify= mlget_item->finish_verify;
       mlget_item->get_miss= false;
     }
     else
@@ -1972,9 +1920,9 @@ static void ms_ascii_complete_nread(ms_conn_t *c)
         mlget_item= &c->mlget_task.mlget_item[i];
         if (mlget_item->item->key_prefix == c->currcmd.key_prefix)
         {
-          c->curr_task[c->tail_ctask].item= mlget_item->item;
-          c->curr_task[c->tail_ctask].verify= mlget_item->verify;
-          c->curr_task[c->tail_ctask].finish_verify= mlget_item->finish_verify;
+          c->curr_task.item= mlget_item->item;
+          c->curr_task.verify= mlget_item->verify;
+          c->curr_task.finish_verify= mlget_item->finish_verify;
           mlget_item->get_miss= false;
 
           break;
@@ -1985,7 +1933,7 @@ static void ms_ascii_complete_nread(ms_conn_t *c)
 
   ms_verify_value(c, mlget_item, c->rcurr, c->rvbytes - 2);
 
-  c->curr_task[c->tail_ctask].get_miss= false;
+  c->curr_task.get_miss= false;
   c->rbytes-= c->rvbytes;
   c->rcurr= c->rcurr + c->rvbytes;
   assert(c->rcurr <= (c->rbuf + c->rsize));
@@ -2019,7 +1967,7 @@ static void ms_bin_complete_nread(ms_conn_t *c)
     if (c->binary_header.response.opcode == PROTOCOL_BINARY_CMD_GET)
     {
       c->currcmd.retstat= MCD_END;
-      c->curr_task[c->tail_ctask].get_miss= true;
+      c->curr_task.get_miss= true;
     }
 
     c->readval= false;
@@ -2037,9 +1985,9 @@ static void ms_bin_complete_nread(ms_conn_t *c)
     c->mlget_task.value_index++;
     mlget_item= &c->mlget_task.mlget_item[c->mlget_task.value_index];
 
-    c->curr_task[c->tail_ctask].item= mlget_item->item;
-    c->curr_task[c->tail_ctask].verify= mlget_item->verify;
-    c->curr_task[c->tail_ctask].finish_verify= mlget_item->finish_verify;
+    c->curr_task.item= mlget_item->item;
+    c->curr_task.verify= mlget_item->verify;
+    c->curr_task.finish_verify= mlget_item->finish_verify;
     mlget_item->get_miss= false;
   }
 
@@ -2049,7 +1997,7 @@ static void ms_bin_complete_nread(ms_conn_t *c)
                   c->rvbytes - extlen - keylen);
 
   c->currcmd.retstat= MCD_END;
-  c->curr_task[c->tail_ctask].get_miss= false;
+  c->curr_task.get_miss= false;
   c->rbytes-= c->rvbytes;
   c->rcurr= c->rcurr + c->rvbytes;
   assert(c->rcurr <= (c->rbuf + c->rsize));
@@ -2327,7 +2275,6 @@ static int ms_transmit(ms_conn_t *c)
 {
   assert(c != NULL);
 
-//  printf("%s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);
   if ((c->msgcurr < c->msgused)
       && (c->msglist[c->msgcurr].msg_iovlen == 0))
   {
@@ -2340,16 +2287,7 @@ static int ms_transmit(ms_conn_t *c)
     ssize_t res;
     struct msghdr *m= &c->msglist[c->msgcurr];
 
-    ms_task_t *task;
-    task= ms_get_task(c, false);
-    //if (task->cmd == CMD_GET) {
-        for (int ii = 0; ii < ms_setting.request_batch; ++ii)   {
-            res = sendmsg(c->sfd, m, 0);
-        }
-    //} else {
-    //    res = sendmsg(c->sfd, m, 0);
-    //}
-
+    res= sendmsg(c->sfd, m, 0);
     if (res > 0)
     {
       atomic_add_size(&ms_stats.bytes_written, res);
@@ -2484,7 +2422,6 @@ static void ms_conn_set_state(ms_conn_t *c, int state)
 {
   assert(c != NULL);
 
-//  printf("%s:%s:%d: state %d\n", __FILE__, __FUNCTION__, __LINE__, state);
   if (state != c->state)
   {
     if (state == conn_read)
@@ -2559,7 +2496,7 @@ static bool ms_need_yield(ms_conn_t *c)
   int64_t tps= 0;
   int64_t time_diff= 0;
   struct timeval curr_time;
-  ms_task_t *task= &c->curr_task[c->tail_ctask];
+  ms_task_t *task= &c->curr_task;
 
   if (ms_setting.expected_tps > 0)
   {
@@ -2591,7 +2528,7 @@ static bool ms_need_yield(ms_conn_t *c)
  */
 static void ms_update_start_time(ms_conn_t *c)
 {
-  ms_task_item_t *item= c->curr_task[c->tail_ctask].item;
+  ms_task_item_t *item= c->curr_task.item;
 
   if ((ms_setting.stat_freq > 0) || c->udp
       || ((c->currcmd.cmd == CMD_SET) && (item->exp_time > 0)))
@@ -2622,8 +2559,6 @@ static void ms_drive_machine(ms_conn_t *c)
     switch (c->state)
     {
     case conn_read:
-      // ########################################
-      // * this should loop for every command
       if (c->readval)
       {
         if (c->rbytes >= c->rvbytes)
@@ -2636,7 +2571,6 @@ static void ms_drive_machine(ms_conn_t *c)
       {
         if (ms_try_read_line(c) != 0)
         {
-//            printf("%s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);
           break;
         }
       }
@@ -2645,8 +2579,6 @@ static void ms_drive_machine(ms_conn_t *c)
       {
         break;
       }
-
-//      printf("done with handling incoming req here\n");
 
       /* doesn't read all the response data, wait event wake up */
       if (! c->currcmd.isfinish)
@@ -2662,7 +2594,6 @@ static void ms_drive_machine(ms_conn_t *c)
       }
 
       /* we have no command line and no data to read from network, next write */
-//      printf("%s:%s:%d:\n", __FILE__, __FUNCTION__, __LINE__);
       ms_conn_set_state(c, conn_write);
       memcpy(&c->precmd, &c->currcmd, sizeof(ms_cmdstat_t));        /* replicate command state */
 
@@ -2720,7 +2651,6 @@ static void ms_drive_machine(ms_conn_t *c)
         break;
       }
 
-//      printf("Calling transmit here\n");
       switch (ms_transmit(c))
       {
       case TRANSMIT_COMPLETE:
