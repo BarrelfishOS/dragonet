@@ -15,6 +15,8 @@ from matplotlib.lines import Line2D
 
 ax2 = None
 
+#import matplotlib
+#matplotlib.use('Agg')
 
 linestyles = ['-', '--', ':', '-.' ]
 markers = []
@@ -180,32 +182,16 @@ class SkData:
         if self.d:
             print 'Not supported'
             sys.exit(1)
-#            print 'Parsing Dictionary data'
-#            for key, data in self.d.iteritems():
-#                print key
-#                print data
-#                self.x.append(key)
-#
-#                if isinstance(data, list):
-#                    (mean, std, _, _, _) = do_stat(data)
-#                else:
-#                    (mean, std, _, _, _) = data
-#
-#                self.v.append(mean)
-#                self.err.append(std)
-#
-#                print "Adding %d with value %f" % (key, mean)
-
         if not self.v:
             print 'No data to plot, exiting'
             sys.exit(1)
 
         if self.x:
             if self.err:
-                print 'Plotting with x-coordinates given (%s)' % self.plot_label
-                print self.x
-                print self.v
-                print self.err
+                print 'Plotting (%s)' % self.plot_label
+                #print self.x
+                #print self.v
+                #print self.err
                 if idx < len(linestyles):
                     plt.errorbar(self.x, self.v, linestyle=linestyles[idx], yerr=self.err, label=self.plot_label)
                 else:
@@ -214,22 +200,6 @@ class SkData:
 
             else:
                 plt.plot(self.x, self.v, 'yo-')
-                # plt.bar(self.x, self.v)
-                # val = [
-                #     "NORMAL",
-                #     "RANDOM",
-                #     "SEQUENTIAL",
-                #     "WILLNEED",
-                #     "DONTNEED",
-                #     "FREE",
-                #     "ACCESS_DEFAULT",
-                #     "ACCESS_LWP",
-                #     "ACCESS_MANY",
-                #     "ACCESS_MANY_PSET",
-                #     ]
-                # plt.xticks(range(len(val)), val)
-                # locs, labels = plt.xticks()
-                # plt.setp(labels, rotation=45)
         else:
             if self.err:
                 print 'Plotting with implicit x-coordinates and error bars'
@@ -281,7 +251,13 @@ class SkPlot:
             plt.ylim(ymin=0, ymax=y1_max)
         plt.xlabel(x)
         plt.ylabel(y)
-        plt.legend(loc=1,prop={'size':10})
+
+        # plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05),
+        #   ncol=3, fancybox=True, shadow=True, prop={'size':10}
+
+        #loc='upper center', bbox_to_anchor=(0.5, -0.05)
+
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10), ncol=3, prop={'size':10})
         #plt.legend()
 
         if y2_max != None:
@@ -315,8 +291,8 @@ class SkPlot:
         pkt_size = int(self.args.psize)
         max_val =  max(max_y_axis_val) * 1.1
         max_val_y2 = max_val * (pkt_size * 8)
-        print "max value %f: 110 percent  =  %f, BW = %f, %f" % (max(max_y_axis_val),
-                max_val, max_val_y2, max_val_y2/ (10 ** 9))
+        #print "max value %f: 110 percent  =  %f, BW = %f, %f" % (max(max_y_axis_val),
+        #        max_val, max_val_y2, max_val_y2/ (10 ** 9))
         self.args.title = self.args.title + ", Request size: %dB" % (pkt_size)
         SkPlot.plot_header(self.args.title, self.args.x, self.args.y, "Gbps",
                 max_val, (max_val_y2/ (10 ** 9))
