@@ -13,6 +13,7 @@ QUEUES = 4
 
 
 SERVER_INITIAL_PORT = 7777
+CLIENT_INITIAL_PORT = 8000
 
 APPS = SERVERS_INSTANCES * SERVER_CORES
 def toCoreList2(clist, separator=",", prefix=""):
@@ -24,6 +25,81 @@ def toCoreList2(clist, separator=",", prefix=""):
             ret = "%s%s%s%d" % (ret, separator, prefix, c)
     print "toCoreList2 %s" % (ret)
     return ret
+
+
+def getClientPortList(clientList, startPort, noPorts=1) :
+    portList = []
+    for cl in range(0, len(clientList)):
+        prev_entries = [i for i, x in enumerate(clientList[:cl]) if x == clientList[cl]]
+        portList.append(startPort + len(prev_entries))
+    return portList
+
+ENDPOINTS_TO_WAIT = 0
+
+def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True):
+    ret = ""
+    # socket info per slot
+    appID = 0
+    portNo = SERVER_INITIAL_PORT
+    unique_clients = list(set(CLIENTS))
+    sorted_clients = sorted(CLIENTS)
+    sorted_clients_port_mapping = getClientPortList(sorted_clients, CLIENT_INITIAL_PORT, noPorts)
+    #    print "Sorted clients are %s" % ( sorted_clients )
+    #print "Sorted clients port mapping %s" % (sorted_clients_port_mapping)
+
+
+    # Make sure that number of unique clients is more than threadsPerPort
+    if createDedicatedFlows and len(sorted_clients ) < threadsPerPort :
+        raise Exception("Not enough unique clients (%d) for load balancing per threads %d" % (
+            len(sorted_clients),  threadsPerPort))
+    if noPorts > 1:
+        raise Exception("Multiport setup requested, which needs some more hacking  noPorts = %d" % (
+                noPorts))
+        sys.exit()
+
+#    assert(len(unique_clients) >= 4)
+    clientsPerThread = len(CLIENTS) / threadsPerPort
+
+    if threadsPerPort == 1 :
+        ret = ret + (" -a t%d -p %d " % (appID, SERVER_INITIAL_PORT))
+        ENDPOINTS_TO_WAIT = 1
+    else :
+        ENDPOINTS_TO_WAIT = len(CLIENTS)
+        alreadyCovered = 0
+        for kk in range(0, threadsPerPort):
+            ret = ret + (" -a t%d " % (kk))
+            if createDedicatedFlows :
+                for ii in range(alreadyCovered, alreadyCovered + clientsPerThread):
+                    if (ii >= len(sorted_clients)) :
+                       break
+                    ret = ret + ("f[%s:%d/%s:%d]" % (
+                            TARGET, SERVER_INITIAL_PORT,
+                            MINFO_CLIENT[sorted_clients[ii]]["EGRESS_INFO"]["src"],
+                            sorted_clients_port_mapping[ii]
+                        ))
+                alreadyCovered = alreadyCovered + clientsPerThread
+
+                # Handling case where number of clients cant equally balanced between threads
+                if kk < (len(CLIENTS) % threadsPerPort) :
+                    ret = ret + ("f[%s:%d/%s:%d]" % (
+                            TARGET, SERVER_INITIAL_PORT,
+                            MINFO_CLIENT[sorted_clients[alreadyCovered]]["EGRESS_INFO"]["src"],
+                            sorted_clients_port_mapping[alreadyCovered]
+                        ))
+                    alreadyCovered = alreadyCovered + 1
+
+
+            else: # createDedicatedFlows
+                print "don't create dedicated flows %s" % (ret)
+                ret = ret + ("p[%d]" % (SERVER_INITIAL_PORT))
+                #ret = ret + (" -a t%d -p %d " % (kk, SERVER_INITIAL_PORT))
+
+    for kk in range(0, threadsPerPort):
+        ret = ret + (" -t -q t%d " % (kk))
+    print "FancyEcho Parameters (updated) : %s" % (ret)
+    sys.exit()
+    return ret
+
 
 
 
@@ -39,9 +115,9 @@ def genMemcachedParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
     # Make sure that number of unique clients is more than threadsPerPort
     #if createDedicatedFlows and len(unique_clients) < threadsPerPort :
     #if createDedicatedFlows and len(CLIENTS) < threadsPerPort :
-    if createDedicatedFlows and len(unique_clients) < HWQUEUES:
-        raise Exception("Not enough unique clients (%d) for load balancing per HW queue %d" % (
-            len(CLIENTS),  threadsPerPort))
+    #if createDedicatedFlows and len(unique_clients) < HWQUEUES:
+        #raise Exception("Not enough unique clients (%d) for load balancing per HW queue %d" % (
+        #    len(CLIENTS),  threadsPerPort))
     if noPorts > 1:
         raise Exception("Multiport setup requested, which needs some more hacking  noPorts = %d" % (
                 noPorts))
@@ -75,6 +151,7 @@ def genMemcachedParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
 
             appID = appID + 1
     print "memcached dragonet Parameters: %s" % (ret)
+    sys.exit(0)
     return ret
 
 def genMemcachedParameters2(noPorts, threadsPerPort, createDedicatedFlows = True):
@@ -102,16 +179,19 @@ def genMemcachedParameters2(noPorts, threadsPerPort, createDedicatedFlows = True
 
     ret = ("%s %d -t %d -l %s " % ( active_proto,
                         SERVER_INITIAL_PORT, threadsPerPort, TARGET))
-    print "memecached arguments: %s" % (ret)
+    print "memecached arguments################: %s" % (ret)
+    sys.exit(0)
     return ret
 
 
 def SRV_CMDS(name):
 
+
     dragonet_container = {
-                "llvmSF":   ["./scripts/pravin/deployDragonetSF.sh", "stack-sf" ],
-                "llvmE10k": ["./scripts/pravin/deployDragonetE10k.sh", "stack-e10k" ],
+                "llvmSF":   ["./scripts/pravin/deployDragonetGen.sh", "stack-sf" , "sf"],
+                "llvmE10k": ["./scripts/pravin/deployDragonetGen.sh", "stack-e10k", "e10k"],
                 }
+
     dragonet_filter_selector = {
                 "llvmSF":   False,
                 "llvmE10k": True,
@@ -135,22 +215,42 @@ def SRV_CMDS(name):
     if name in  dragonet_container.keys() :
         return {
 
-                    "init_cmd_special" : [
+                    "init_cmd_special_corepinning" : [
 
-                      "cd dragonet/Dragonet/ ; sudo taskset -c %s %s %d %s" % (
-                          toCoreList2(range(20 - (HWQUEUES * 2), 20)),
+                      "cd dragonet/Dragonet/ ; sudo taskset -c %s %s %s %d %s" % (
+                          toCoreList2(range(20 - (HWQUEUES), 20)),
                           dragonet_container[name][0],
+                          dragonet_container[name][2],
                           HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
                             ),
                       "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
                         toCoreList2(range((0 + SERVER_CORESHIFT), (SERVER_CORESHIFT + (SERVERS_INSTANCES*SERVER_CORES)))))
                         + " ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log  "
                         + " ../benchmarking/memcached/memcached -N %s -c 64000 -m 64000 -u root %s %d -t %d -l %s " % (
-                            genMemcachedParameters(SERVERS_INSTANCES, SERVER_CORES, dragonet_filter_selector[name]),
+                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, dragonet_filter_selector[name]),
                             "-p 0 -U ",
                             SERVER_INITIAL_PORT, SERVER_CORES, TARGET),
                        "sleep 4",
                                     ],
+
+
+
+                    "init_cmd_special" : [
+
+                      "cd dragonet/Dragonet/ ; sudo %s %s %d " % (
+                          dragonet_container[name][0],
+                          dragonet_container[name][2],
+                          HWQUEUES
+                            ),
+                      "cd dragonet/Dragonet/ ; "
+                        + " sudo ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log  "
+                        + " ../benchmarking/memcached/memcached -N %s -c 64000 -m 64000 -u root %s %d -t %d -l %s " % (
+                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, dragonet_filter_selector[name]),
+                            "-p 0 -U ",
+                            SERVER_INITIAL_PORT, SERVER_CORES, TARGET),
+                       "sleep 4",
+                                    ],
+
 
                     "is_ready_cmd_special" : [
                       "cd dragonet/Dragonet/ ; ./scripts/pravin/wait_for_dn_app.sh %d %d %s %s" % (

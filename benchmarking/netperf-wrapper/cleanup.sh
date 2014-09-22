@@ -19,8 +19,8 @@ clean_machine() {
 
 ssh asiago "sudo rm -rf tempResult*"
 #clean_machine asiago
+#clean_machine burrata
 clean_machine sbrinz2
 clean_machine ziger2
 clean_machine gruyere
-clean_machine burrata
 

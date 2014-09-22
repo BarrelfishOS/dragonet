@@ -71,7 +71,7 @@ DEFAULT_SETTINGS = {
     'RUN_CONF': {},
     'SERVERS_CORECOUNT': {},
     'SERVERS_INSTANCES': 1,
-    'SERVER_CORESHIFT' : 4,
+    'SERVER_CORESHIFT' : 0,
     'CLIENTS': [],
     'CLIENTS_IF': {},
     'CLIENTS_CORECOUNT': {},
@@ -778,6 +778,7 @@ def load():
     if not settings.HOSTS and not results[0]:
         raise RuntimeError("Must specify host (-H option).")
 
+    print "Running experiment for time of %d" % (settings.TOTAL_LENGTH)
     return settings, results
 
 def list_tests():

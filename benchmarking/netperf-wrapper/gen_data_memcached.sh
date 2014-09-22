@@ -1,5 +1,66 @@
 #!/bin/bash
 
+get_x_entries() {
+    local total_entries=${1}
+    local clist=${2}
+    local done=1
+
+    local -i attempt_num=1
+
+while [ ${done} == 1 ] ;
+do
+    for x in `echo "${clist}" | tr ' ' '\n'` ; do
+        selectedList="${selectedList} ${x}"
+        if [ ${attempt_num} == ${total_entries} ] ; then
+            done=0
+            break
+        fi
+        ((attempt_num++))
+    done
+done
+
+echo ${selectedList}
+}
+
+
+
+clean_machine() {
+    local mname=$1
+    local commands_to_kill=""
+    commands_to_kill="${commands_to_kill} memaslap"
+    commands_to_kill="${commands_to_kill} netperf"
+    commands_to_kill="${commands_to_kill} netserver"
+    commands_to_kill="${commands_to_kill} memcached"
+    commands_to_kill="${commands_to_kill} bench-fancyecho"
+    commands_to_kill="${commands_to_kill} stack-sf"
+    commands_to_kill="${commands_to_kill} stack-tap"
+    commands_to_kill="${commands_to_kill} stack-e10k"
+    commands_to_kill="${commands_to_kill} fancyEchoLinux"
+    echo "ssh ${mname} sudo killall ${commands_to_kill}"
+    ssh ${mname} "sudo killall ${commands_to_kill}"
+    ssh ${mname} "sudo rm -rf tempResult*"
+}
+
+cleanup_machines() {
+    local allClients=$1
+
+    for x in `echo "${allClients}" | tr ' ' '\n'` ; do
+        echo "cleaning machine $x"
+        clean_machine ${x} 2> /dev/null
+    done
+}
+
+convert_clients_to_cmdline() {
+    local allClients=$1
+    local answer=""
+    for x in `echo "${allClients}" | tr ' ' '\n'` ; do
+        answer="${answer} -C ${x}"
+    done
+
+    echo "${answer} "
+}
+
+
 # Retries a command on failure.
 # $1 - the max number of attempts
 # $2... - the command to run
@@ -19,7 +80,7 @@ retry() {
             return 1
         else
             echo "Attempt $attempt_num failed! Trying again in $attempt_num seconds..."
-            ./cleanup.sh 2> /dev/null
+            cleanup_machines "${ClientListUnique}"
             sleep 5
             sleep $(( attempt_num++ ))
         fi
@@ -31,6 +92,8 @@ get_per_queue_packets() {
     ifname=`ssh ${srvName} "cat minfo/used_if.log | grep ${SELTARGET} | cut -d, -f1"`
     ssh ${srvName} "ethtool -S ${ifname} | tee bm_ethtool_log.${SUFFIX}" > "${OUTDIR}/bm_ethtool_log.${SUFFIX}"
 }
+
+
 
 
 run_npf_w_rr()
@@ -79,6 +142,7 @@ run_bm_tp_rr() {
     LBRUST=16
     CBRUST=16
     NBRUST=16
+    local clientCmdline=$(convert_clients_to_cmdline  "${ClientList}")
 
 
     if [ ${ONLYBEST} -ne 1 ] ; then
@@ -102,7 +166,7 @@ run_bm_tp_rr() {
         echo "running for ${title}"
 
         retry 2 ./netperf-wrapper -d ${DELAY} -I 1 -l ${SHORTRUN} -c noServer --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
-        -H ${srvName} ${cliName6} \
+        -H ${srvName} ${clientCmdline} \
         --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
         --concurrency ${CBRUST} -t "${title}" -o "${ALLRESULTS}" -L "${MYTMPDIR}/${title}.log" 2>&1 | tee ${TMPFILE}
@@ -121,7 +185,7 @@ run_bm_tp_rr() {
             echo "System si not running atall for given configuration. So, assuming that last was the best run: ${LBRUST}"
             cat ${TMPFILE} >>  ${MYTMPDIR}/${title}.log
             cat ${TMPFILE} >>  ${MYTMPDIR}/${title}.error
-            ./cleanup.sh 2> /dev/null
+            cleanup_machines "${ClientListUnique}"
             break
         fi
 
@@ -135,7 +199,7 @@ run_bm_tp_rr() {
         cat ${TMPFILE} >> ${FINALRESULT}
         cat ${TMPFILE} >>  ${MYTMPDIR}/${title}.log
         rm -f ${TMPFILE}
-        ./cleanup.sh 2> /dev/null
+        cleanup_machines "${ClientListUnique}"
         #sleep 3
     done
     fi
@@ -149,7 +213,7 @@ run_bm_tp_rr() {
     echo "running for ${title}"
 
     retry 4 ./netperf-wrapper -d ${DELAY} -I ${ITERATIONS} -l ${DURATION} -c noServer  --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
-        -H ${srvName} ${cliName6} \
+        -H ${srvName} ${clientCmdline} \
         --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
         --concurrency ${LBRUST} -t "${title}" -o "${ALLRESULTS}" -L "${MYTMPDIR}/${title}.log" 2>&1 | tee ${TMPFILE}
@@ -159,7 +223,7 @@ run_bm_tp_rr() {
     #cat ${SAMARRYFILE} >> ${FINALRESULT}
     cat ${TMPFILE} >>  ${MYTMPDIR}/${title}.log
     rm -f ${SAMARRYFILE}
-    ./cleanup.sh 2> /dev/null
+    cleanup_machines "${ClientListUnique}"
 }
 
 reset_and_warmup_stack()
@@ -178,7 +242,10 @@ reset_and_warmup_stack()
     while [ 1 ]; do
 
     let iterations=iterations+1
-    ./cleanupServer.sh
+    cleanup_machines "${ClientListUnique}"
+    cleanup_machines "${srvName}"
+
+    local clientCmdline=$(convert_clients_to_cmdline  "${ClientList}")
 
     echo "###################################################################"
     echo "#### Resetting the stack ${ECHO_SERVER} Iteration: ${iterations} ##"
@@ -193,7 +260,7 @@ reset_and_warmup_stack()
     echo "running for ${title}"
 
     retry 2 ./netperf-wrapper -d 2 -l ${SHORTRUN} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
-        -H ${srvName} ${cliName6} \
+        -H ${srvName} ${clientCmdline} \
         --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
         --concurrency ${brust} -t "${title}" -o "${ALLRESULTS}" -L "${MYTMPDIR}/${title}.log" 2>&1 | tee ${TMPFILE}
@@ -210,7 +277,7 @@ reset_and_warmup_stack()
     echo "Seems that only few clients are stuck, so retyring quickly without restarting whole stack"
 
         retry 2 ./netperf-wrapper -d 2 -l ${SHORTRUN} -c noServer --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
-        -H ${srvName} ${cliName6} \
+        -H ${srvName} ${clientCmdline} \
         --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
         --concurrency ${brust} -t "${title}" -o "${ALLRESULTS}" -L "${MYTMPDIR}/${title}.log" 2>&1 | tee ${TMPFILE}
@@ -230,7 +297,7 @@ reset_and_warmup_stack()
 
     done
     cat ${TMPFILE} >>  ${MYTMPDIR}/${title}.log
-    ./cleanup.sh 2> /dev/null
+    cleanup_machines "${ClientListUnique}"
 }
 
 
@@ -246,7 +313,6 @@ get_best_latency()
     get_per_queue_packets "start"
     run_npf_w_rr ${SELTARGET} ${SELTARGET_T} ${OUTDIR}
     get_per_queue_packets "end"
-    #./cleanup.sh
     cat "${OUTDIR}/bm_ethtool_log.start" | grep rx | grep packets | grep -v ': 0$'   > "${OUTDIR}/bm_ethtool_pkts.start"
     cat "${OUTDIR}/bm_ethtool_log.end" | grep rx | grep packets | grep -v ': 0$'   > "${OUTDIR}/bm_ethtool_pkts.end"
     diff "${OUTDIR}/bm_ethtool_log.start" "${OUTDIR}/bm_ethtool_log.end" | tee  "${OUTDIR}/bm_ethtool_log.diff"
@@ -263,12 +329,13 @@ find_best_tp()
     SERVERINSTANCES=$1
     SERVERCORES=$2
 
-    if [  "$SERVERINSTANCES" -gt "1" ]; then
-        cliName6=${cliName6Short}
-    else
-        cliName6=${cliName6Long}
-    fi
-    echo "using client list ${cliName6}"
+#    if [  "$SERVERINSTANCES" -gt "1" ]; then
+#        ClientList=${cliName6Short}
+#    else
+#        ClientList=${cliName6Long}
+#    fi
+
+    echo "using client list ${ClientList}"
     #CLIENTCORES="2"
     CLIENTCORES="1"
     OUTDIR="${OUTDIRP}/TP_MAX/P_${SERVERCORES}/T_${SERVERCORES}/"
@@ -277,6 +344,10 @@ find_best_tp()
     run_bm_tp_rr  ${SELTARGET} ${SELTARGET_T} ${OUTDIR} ${FOR_BEST_RUN}
 }
 
+################################################################
+#                  diff order of calling benchmark
+################################################################
+
 get_scalability_linux_rss() {
 
     HWQUEUES=1
@@ -284,111 +355,73 @@ get_scalability_linux_rss() {
     find_best_tp 1 2
 }
 
+get_main_scalability_dragonet() {
 
+ClientList=$(get_x_entries 4 "${ClientListUnique}")
+get_scalability_only_one_para 1
 
-get_scalability_linux_sp() {
+ClientList=$(get_x_entries 8 "${ClientListUnique}")
+get_scalability_only_one_para 4
+get_scalability_only_one_para 8
 
-    HWQUEUES=1
-    setup_output_location
+ClientList=$(get_x_entries 10 "${ClientListUnique}")
+get_scalability_only_one_para 10
 
-    find_best_tp 8 1
-    find_best_tp 16 1
-    find_best_tp 10 1
-    find_best_tp 12 1
-    find_best_tp 14 1
+ClientList=$(get_x_entries 16 "${ClientListUnique}")
+get_scalability_only_one_para 16
 }
+
+get_all_scalability_dragonet() {
+
+ClientList=$(get_x_entries 4 "${ClientListUnique}")
+get_scalability_only_one_para 1
+get_scalability_only_one_para 2
+
+ClientList=$(get_x_entries 8 "${ClientListUnique}")
+get_scalability_only_one_para 4
+get_scalability_only_one_para 6
+get_scalability_only_one_para 8
+
+ClientList=$(get_x_entries 10 "${ClientListUnique}")
+get_scalability_only_one_para 10
+
+ClientList=$(get_x_entries 12 "${ClientListUnique}")
+get_scalability_only_one_para 12
+
+ClientList=$(get_x_entries 16 "${ClientListUnique}")
+get_scalability_only_one_para 16
+}
+
+get_all_loadbalancing_dragonet() {
+
+MAIN_OUTPUT_DIR_CP="${MAIN_OUTPUT_DIR}"
+MAIN_OUTPUT_DIR="${MAIN_OUTPUT_DIR_CP}/F_10/"
+setup_output_location
+ClientList=$(get_x_entries 10 "${ClientListUnique}")
+get_scalability_only_one_para 10
+
+
+MAIN_OUTPUT_DIR="${MAIN_OUTPUT_DIR_CP}/F_20/"
+setup_output_location
+ClientList=$(get_x_entries 20 "${ClientListUnique}")
+get_scalability_only_one_para 10
+
+MAIN_OUTPUT_DIR="${MAIN_OUTPUT_DIR_CP}/F_30/"
+setup_output_location
+ClientList=$(get_x_entries 30 "${ClientListUnique}")
+get_scalability_only_one_para 10
+
+MAIN_OUTPUT_DIR="${MAIN_OUTPUT_DIR_CP}/F_40/"
+setup_output_location
+ClientList=$(get_x_entries 40 "${ClientListUnique}")
+get_scalability_only_one_para 10
+}
+
 
 
 get_scalability_only_one_para() {
     threads=${1}
     find_best_tp 1 ${threads}
-}
-
-
-
-get_scalability_only_one() {
-    find_best_tp 1 4
-}
-
-get_scalability_all() {
-
-    find_best_tp 1 6
-
-#    setup_output_location
-    find_best_tp 1 1
-    find_best_tp 1 2
-    find_best_tp 1 4
-    find_best_tp 1 6
-    find_best_tp 1 8
-    find_best_tp 1 10
-}
-
-get_scalability_all_v2() {
-    find_best_tp 1 10
-    find_best_tp 1 12
-    find_best_tp 1 14
-    find_best_tp 1 16
-    find_best_tp 1 18
-}
-
-
-
-get_scalability_linux() {
-
-    HWQUEUES=1
-    setup_output_location
-    find_best_tp 1 1
-    find_best_tp 1 2
-    find_best_tp 1 4
-    find_best_tp 1 6
-    find_best_tp 1 8
-    find_best_tp 1 16
-    find_best_tp 1 10
-    find_best_tp 1 12
-    find_best_tp 1 14
-    find_best_tp 1 18
-}
-
-get_scalability_linux_multiport() {
-    find_best_tp 2 1
-    find_best_tp 4 1
-    find_best_tp 6 1
-    find_best_tp 8 1
-    find_best_tp 16 1
-}
-
-get_scalability_remaining() {
-
-    HWQUEUES=1
-    setup_output_location
-
-    find_best_tp 1 6
-    find_best_tp 1 10
-    find_best_tp 1 12
-    find_best_tp 1 14
-    find_best_tp 1 18
-
-    find_best_tp 6 1
-    find_best_tp 10 1
-    find_best_tp 12 1
-    find_best_tp 14 1
-    find_best_tp 18 1
-
-    fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
-    ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
-    echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
-}
-
-gen_graph() {
-    pdir=${1}
-    fname="scalability-TPS-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
-    fnameNet="scalability-BW-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
-    graphGenFile="${pdir}/graphGen.sh"
-    ./netperf-wrapper -p bbox -o ${pdir}/${fname} -i `find ${pdir} -name '*BEST.json*' | sort`
-    ./netperf-wrapper -p bboxNet -o ${pdir}/${fnameNet} -i `find ${pdir} -name '*BEST.json*' | sort`
-
-    echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" > ${graphGenFile}
-    echo "./netperf-wrapper -p bboxNet -o ${OUTDIRP}/TP_MAX/${fnameNet} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${graphGenFile}
 }
 
 get_scalability_dn() {
@@ -411,54 +444,12 @@ get_scalability_dn() {
     find_best_tp 1 4
     find_best_tp 4 1
 
-#    fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
-#    ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
-#    echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
 }
 
+################################################################
+################################################################
 
 
-get_scalability_special() {
-#    find_best_tp 1 4
-    find_best_tp 4 1
-    #find_best_tp 1 1
-    fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
-    ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
-    echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
-}
-
-
-get_scalability_instances() {
-    find_best_tp 1 1
-    find_best_tp 2 1
-    find_best_tp 4 1
-    find_best_tp 8 1
-#    find_best_tp 10 1
-#    find_best_tp 12 1
-#    find_best_tp 14 1
-    find_best_tp 16 1
-#    find_best_tp 18 1
-
-    fname="scalability-instances-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
-    ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
-    echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
-}
-
-get_scalability_threads() {
-    find_best_tp 1 1
-#    find_best_tp 1 2
-    find_best_tp 1 4
-    find_best_tp 1 8
-#    find_best_tp 1 10
-#    find_best_tp 1 12
-#    find_best_tp 1 14
-#    find_best_tp 1 16
-#    find_best_tp 1 18
-
-    fname="scalability-${SELTARGET_T}-${ECHO_SERVER}-${USE_PROTO}.png"
-    ./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i `find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort`
-    echo "./netperf-wrapper -p bbox -o ${OUTDIRP}/TP_MAX/${fname} -i \`find ${OUTDIRP}/TP_MAX/ -name '*.json*' | grep -i 'best' | sort\`" >> ${GRAPH_GEN_CMDS}
-}
 
 setup_output_location() {
     OUTDIRPP="${MAIN_OUTPUT_DIR}/${SELTARGET_T}/"
@@ -497,8 +488,10 @@ select_sf_nic() {
 use_burrata_server_intel_switched() {
     srvName="burrata"
     INTEL_S_T="10.113.4.96" # for burrata
-    cliName6="-C ziger2 -C sbrinz2 -C ziger2 -C sbrinz2"
-    cliName1="-C ziger2"
+
+    #ClientList="ziger2 sbrinz2 ziger2 sbrinz2"
+    ClientList="ziger1 ziger2 sbrinz2 appenzeller-e1000"
+    ClientListUnique="ziger1 ziger2 sbrinz2 appenzeller-e1000"
     SELTARGET=${INTEL_S_T}
     SELTARGET_T="Intel_S"
 }
@@ -506,8 +499,7 @@ use_burrata_server_intel_switched() {
 use_sbrinz2_server_intel_switched() {
     srvName="sbrinz2"
     INTEL_S_T="10.113.4.29"
-    cliName6="-C ziger2 -C ziger2 "
-    cliName1="-C ziger2"
+    ClientList="ziger2 ziger2"
 }
 
 use_asiago_server() {
@@ -521,15 +513,9 @@ use_asiago_server() {
     SF_T="10.23.4.195"
     SF_S_T="10.113.4.195"
 
-    cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere  -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata"
-    cliName6Long="-C burrata -C gruyere -C  ziger2 -C sbrinz2 -C burrata -C gruyere -C  ziger2 -C sbrinz2  -C burrata -C gruyere -C  ziger2 -C sbrinz2 -C burrata -C gruyere -C  ziger2 -C sbrinz2"
-    #cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
-    cliName6Short="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
-#    cliName6Long="-C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata"
-    cliName6="-C ziger2 -C sbrinz2 -C gruyere -C burrata"
-    cliName1="-C ziger2"
-    cliName1="-C sbrinz2 -C sbrinz2"
-    cliName6=${cliName6Short}
+    ClientList="ziger1 ziger2 sbrinz2 appenzeller-e1000"
+    ClientListUnique="ziger1 ziger2 sbrinz2 appenzeller-e1000"
+    ClientList=${cliName6Short}
 }
 
 use_asiago_server_sf_switched() {
@@ -544,366 +530,88 @@ use_asiago_server_intel_switched() {
     SELTARGET_T="Intel_S"
 }
 
-
-
 #########################################
 ## Main starts here
 #########################################
 
-PLOTTYPE="bbest"
-PLOTTYPE="lbest"
-UDP_TEST_NAME="memcached_rr"
 
+PLOTTYPE="bbest"
 
 ECHO_SERVER="memcached"
 
-ITERATIONS=1
-ITERATIONS=5
 ITERATIONS=3
 
 DURATION=10
 CORESHIFT=0
 SERVERINSTANCES=1
-
-DELAY=5
+FOR_BEST_RUN=1
 DELAY=2
-HWQUEUES=1
-HWQUEUES=4
+
+HWQUEUES=10
 USE_PROTO="tcp"
 USE_PROTO="udp"
+PACKET_SIZE=64
 PACKET_SIZE=1024
-
-ECHO_SERVER="memcached_poll"
-ECHO_SERVER="memcached_dragonet"
-ECHO_SERVER="memcached_onload"
-ECHO_SERVER="memcached"
 
 MAIN_OUTPUT_DIR="../netperfScaleResults/intelTest/${1}/"
 MAIN_OUTPUT_DIR="../netperfScaleResults/deleteme_smartOracle/${1}/"
 MAIN_OUTPUT_DIR="../netperfScaleResults/smartOracle/r1/${1}/"
-GRAPH_GEN_CMDS="${MAIN_OUTPUT_DIR}/graph_gen_cmds.sh"
+MAIN_OUTPUT_DIR="../netperfScaleResults/deletme_test/${1}/"
+MAIN_OUTPUT_DIR="../netperfScaleResults/deletme_test/${1}/"
 
+MAIN_OUTPUT_DIR="../echoServerResults/EchoP1024DP/dragonet_Intel_Q10/${1}/"
+MAIN_OUTPUT_DIR="../echoServerResults/EchoP64DP/dragonet_Intel_Q10/${1}/"
+MAIN_OUTPUT_DIR="../echoServerResults/loadBalacingP64/Dragonet_Intel_Q10/${1}/"
+MAIN_OUTPUT_DIR="../echoServerResults/MemcachedP1024DP/Dragonet_Intel_Q10/${1}/"
 
-./cleanup.sh 2> /dev/null
+MAIN_OUTPUT_DIR="../echoServerResults/EchoP1024DP/dragonet_SF_Q10/${1}/"
 
 #use_burrata_server_intel_switched
 #use_asiago_server_intel_switched
-#use_asiago_server_sf_switched
-
+use_asiago_server_sf_switched
 UDP_TEST_NAME="memcached_rr"
-
-
-#use_asiago_server_intel_switched
-#ECHO_SERVER="memcached"
-#ECHO_SERVER="memcached_poll"
-#ECHO_SERVER="llvmE10k"
-#use_asiago_server_intel_switched
-
-#use_asiago_server_sf_switched
-#ECHO_SERVER="memcached"
-#ECHO_SERVER="memcached_onload"
-#ECHO_SERVER="llvmSF"
-
-PACKET_SIZE=1024
-HWQUEUES=1
 UDP_TEST_NAME="udp_rr"
-UDP_TEST_NAME="memcached_rr"
-
-#use_asiago_server_sf_switched
-#ECHO_SERVER="memcached"
-#ECHO_SERVER="memcached_onload"
-ECHO_SERVER="llvmSF"
-MAIN_OUTPUT_DIR="../memcachedResults_v2/scalability/P1024/Dragonet_NRT_SF_Q1/"
-
-
-FOR_BEST_RUN=1
-HWQUEUES=4
-UDP_TEST_NAME="memcached_rr"
+ECHO_SERVER="llvmE10k"
 #ECHO_SERVER="noServer"
-#ECHO_SERVER="llvmSF"
-#use_asiago_server_sf_switched
-ECHO_SERVER="llvmE10k"
-use_asiago_server_intel_switched
-#MAIN_OUTPUT_DIR="../memcachedResults_v2/scalability/P1024/Dragonet_NRT_SF/"
-MAIN_OUTPUT_DIR="../memcachedResults_v2/scalability/P1024/Dragonet_NRT_Intel_N/"
-cliName6Long="-C burrata -C gruyere -C  ziger2 -C burrata -C gruyere -C  ziger2 -C sbrinz2 -C burrata -C gruyere -C  ziger2 -C sbrinz2"
+ECHO_SERVER="llvmSF"
 
+cleanup_machines "${ClientListUnique}"
 setup_output_location
-get_scalability_only_one_para 1
-get_scalability_only_one_para 2
-get_scalability_only_one_para 4
-get_scalability_only_one_para 6
-get_scalability_only_one_para 8
+get_main_scalability_dragonet
+exit 0
+get_all_scalability_dragonet
+
+ClientList="ziger1 ziger2 sbrinz2 appenzeller-e1000"
+ClientList=$(get_x_entries 12 "${ClientListUnique}")
 get_scalability_only_one_para 12
-get_scalability_only_one_para 14
-get_scalability_only_one_para 16
-get_scalability_only_one_para 18
-exit 0
-get_scalability_only_one_para 10
-
-#get_scalability_only_one_para 8
-
-#use_asiago_server_intel_switched
-#MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet_NRT_FLOWS_E10k_Q4/"
-
-
-#MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet_NRT_FLOWS_SF_Q4/"
-
-FOR_BEST_RUN=1
-MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet_NRT_FLOWS_SF_Q4_D/"
-
-#FOR_BEST_RUN=64
-#MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet_NRT_FLOWS_E10k_Q4_D/"
-
-cliName6Long="-C burrata -C gruyere -C  ziger2 -C sbrinz2 -C burrata -C gruyere -C  ziger2 -C sbrinz2 -C burrata -C gruyere -C  ziger2 -C sbrinz2  -C burrata -C gruyere -C  ziger2 -C sbrinz2"
-
-
-
-
-UDP_TEST_NAME="udp_rr"
-HWQUEUES=4
-#ECHO_SERVER="llvmE10k"
-ECHO_SERVER="noServer"
-use_asiago_server_intel_switched
-MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet_NRT_FLOWS_E10k_Q4/"
-setup_output_location
-get_scalability_only_one
 exit 0
 
 
-use_asiago_server_intel_switched
+get_all_scalability_dragonet
+
+get_all_loadbalancing_dragonet
+exit 0
+
+
+get_all_scalability_dragonet
+ClientList=$(get_x_entries 4 "${ClientListUnique}")
+get_scalability_only_one_para 4
+exit 0
+
+
 ECHO_SERVER="llvmE10k"
-
-MAIN_OUTPUT_DIR="../memcachedResults_v2/scalability/P1024/Dragonet_Intel_Q1/"
+use_asiago_server_intel_switched
+MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet_Intel_N/"
 setup_output_location
-get_scalability_only_one
-exit 0
+get_all_scalability_dragonet_special
 
-get_scalability_all
-
-get_scalability_only_one
-get_scalability_only_one
-
-#get_scalability_only_one
-
-UDP_TEST_NAME="udp_rr"
-
-PACKET_SIZE=64
-
-#ECHO_SERVER="netserver"
-ECHO_SERVER="llvmE10k"
-ECHO_SERVER="fancyEchoOnload"
-ECHO_SERVER="fancyEchoOnload"
-ECHO_SERVER="fancyEchoOnload"
-ECHO_SERVER="fancyEchoLinuxPoll"
-
-
-
-#ECHO_SERVER="llvmE10k"
-#use_asiago_server_intel_switched
 ECHO_SERVER="llvmSF"
 use_asiago_server_sf_switched
-
-PACKET_SIZE=1024
-MAIN_OUTPUT_DIR="../netperfScaleResults/Scalability/P1024/dragonet_SF_Q2/${1}/"
-HWQUEUES=2
+MAIN_OUTPUT_DIR="../netperfScaleNRTS/scalability/P1024/Dragonet_SF_N/"
 setup_output_location
-get_scalability_all
-exit 0
-
-
-##############################
-
-get_scalability_all
-get_scalability_linux_rss
-./graphGen.sh ${MAIN_OUTPUT_DIR}
-get_scalability_linux_sp
-exit 0
-
-##############################
-
-#get_scalability_linux
-get_scalability_dn
-
-MAIN_OUTPUT_DIR="../netperfScaleResults/dnIntelSp/${1}/"
-setup_output_location
-
-get_scalability_special22
-./graphGen.sh ${MAIN_OUTPUT_DIR}
-
-exit 0
-##############################
-
-
-MAIN_OUTPUT_DIR="../netperfScaleResults/smartOracle/rAll/${1}/"
-PACKET_SIZE=1024
-setup_output_location
-get_scalability_special22
-PACKET_SIZE=64
-setup_output_location
-get_scalability_special22
-PACKET_SIZE=512
-setup_output_location
-get_scalability_special22
-PACKET_SIZE=128
-setup_output_location
-get_scalability_special22
-exit 0
-
-get_scalability_special
-##############################
-
-ECHO_SERVER="memcached"
-setup_output_location
-get_scalability_instances
-exit 0
-##############################
-get_scalability_threads
-get_best_latency 1 1 1
-
-
-get_scalability_instances
-
-get_scalability_special
-
-get_scalability_threads
-./cleanup.sh 2> /dev/null
-sleep 10
-
-CORESHIFT=6
-setup_output_location
-get_scalability_threads
-
-exit 0
-##############################
-
-get_scalability_special
-
-get_best_latency 1 1 1
-get_scalability_special
-find_best_tp 1
-
-#exit 0
-
-#get_best_latency server-instances server-cores concurency
-#get_best_latency 2 1 1
-#exit 0
-
-############################## getting SF data ######
-#select_sf_nic
-starttime=`date`
-ECHO_SERVER="memcached"
-
-USE_PROTO="tcp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-ECHO_SERVER="memcached_onload"
-
-USE_PROTO="udp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-
-USE_PROTO="tcp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-ECHO_SERVER="memcached"
-
-USE_PROTO="udp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-
-
-############################## getting Intel data ######
-#select_intel_nic
-
-ECHO_SERVER="memcached"
-
-USE_PROTO="udp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-
-USE_PROTO="tcp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-ECHO_SERVER="memcached_poll"
-
-USE_PROTO="udp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-
-USE_PROTO="tcp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-endtime=`date`
-echo "BM start time  ${starttime}"
-echo "BM   end time  ${endtime}"
-exit 0
-
-
-######################################################################
-######################################################################
-
-USE_PROTO="udp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-USE_PROTO="tcp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-ECHO_SERVER="memcached_poll"
-
-USE_PROTO="udp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-
-USE_PROTO="tcp"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
+get_all_scalability_dragonet_special
+#get_all_scalability_dragonet
 
 exit 0
 
-ECHO_SERVER="memcached_onload"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-
-ECHO_SERVER="memcached_onload"
-echo "BM : ${ECHO_SERVER}, Target: ${SELTARGET}, USE_PROTO: [${USE_PROTO}] "
-setup_output_location
-get_scalability_threads
-
-exit 0
-
-get_best_latency 1 1 1
-echo "done with benchmarking"
-get_scalability_threads
-
-######################################################################
-######################################################################
-######################################################################
-######################################################################
-######################################################################
-######################################################################
+#####################################################################

@@ -46,5 +46,5 @@ do
 done
 set -e
 
-../plottingTools/plottingScript.py --title "${titleText}" --x "Application Cores" --y "Transactions per Second(TPS)" --psize ${pktSize}  --save "${outDir}/ScalabilityP${pktSize}.png"  `find ${outDir}/ -name '*.result' | sort -r`
+../plottingTools/plottingScript.py --title "${titleText}" --x "Application Cores" --y "Transactions per Second(TPS)" --psize ${pktSize}  --save "${outDir}/ScalabilityP${pktSize}.pdf"  `find ${outDir}/ -name '*.result' | sort -r`
 

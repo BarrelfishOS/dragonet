@@ -19,3 +19,4 @@ gunzip -d udp_demo-2014-03-31T123917.623880.json.gz
 ./netperf-wrapper -l 10 -c memcached -C ziger2 -C sbrinz2 -C gruyere  -T 10.113.4.95 -Q 2 -q 18  -H asiago -b 100 -L mylog3.log memcached_rr
 ./netperf-wrapper -I 1 -l 10 -c memcached -H asiago -C ziger2 -C sbrinz2 -C ziger2 -C sbrinz2  --serverInstances 4 --servercores 1 --clientcores 2 -T 10.113.4.95 memcached_rr --concurrency 64 -L deleteme_mylog6.log 
 ./netperf-wrapper  -c fancyEchoLinux -l 5  -T 10.113.4.95 -H asiago  -C ziger2 -C sbrinz2 -C gruyere --packet 1024 --udp  -L myRSSlog3.log udp_rr
+./plot_scale_data.sh ../echoServerResults/Dragonet_E10k/ ../echoServerResults/plots/ 1024 "Dragonet on E10k with 10 queues"
