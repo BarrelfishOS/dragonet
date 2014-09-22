@@ -136,13 +136,12 @@ STACKNAME=stack-"${1}"
 
 # For Solarflare
 if [ "$STACKNAME" ==  "stack-sf" ] ; then
-    SERVERIP="10.113.4.195"
+    SERVERIP="10.113.4.195"  # for asiago as server on solarflare
 else
 
     # For intel
     if [ "$STACKNAME" ==  "stack-e10k" ] ; then
         SERVERIP="10.113.4.96"  # For burrata as server
-        SERVERIP="10.113.4.195"  # for asiago as server on solarflare
         SERVERIP="10.113.4.95"  # for asiago as server
         echo "NOTE: using ${SERVERIP} as server-IP address"
     else
@@ -163,11 +162,14 @@ fi
 
 
 ./scripts/pravin/wait_for_dragonet.sh 10 ${STACKNAME}
-run_for_2_cores_SP
+#run_for_8_cores
+#run_for_4_cores
+run_for_1_cores
+
+#run_for_2_cores_SP
 
 #run_for_10_cores
 #run_for_8_cores
-#run_for_4_cores
 #run_for_1_cores_null
 
 #run_for_4_cores_with_wildcards

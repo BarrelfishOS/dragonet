@@ -12,7 +12,7 @@ if [ -z $1 ] ; then
     show_usage
     exit 1
 fi
-APPNAME=stack-"${1}"
+STACKNAME=stack-"${1}"
 
 if [ -z $2 ] ; then
     echo "ERROR: provide the number of HW queues"
@@ -21,12 +21,17 @@ if [ -z $2 ] ; then
 fi
 HWQUEUES=${2}
 
-
 SCRIPTDIR="./scripts/pravin/"
 sudo rm -rf ./out
 ${SCRIPTDIR}/deployPrepare.sh
+
+EXTRAENV=""
+if [ ${STACKNAME} == "stack-sf" ] ; then
+#sudo LD_PRELOAD=/lib/libciul.so.1.1.1 ./dist/build/${APPNAME}/${APPNAME} $@
+EXTRAENV="LD_PRELOAD=/lib/libciul.so.1.1.1"
+fi
 #sudo strace -fCrtT ./dist/build/${APPNAME}/${APPNAME} ${HWQUEUES}
-sudo ./dist/build/${APPNAME}/${APPNAME} ${HWQUEUES}
+sudo ${EXTRAENV} ./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES}
 
 # Initialized
 

@@ -1,8 +1,10 @@
 -- Simple search functions
 module Search (
   e10kCost,
+  sfCost,
   balanceCost,
   searchGreedyE10k,
+  searchGreedySF,
   test
 ) where
 
@@ -353,3 +355,12 @@ test = do
     putStrLn $ e10kCfgStr conf
     putStrLn $ "Cost:" ++ (show $ costFn fs conf)
     return (prgU, conf)
+
+
+-- Solarflare specific function
+--      Currently they just a copy of E10k functions
+sfCost = e10kCost
+
+searchGreedySF = searchGreedyE10k
+
+

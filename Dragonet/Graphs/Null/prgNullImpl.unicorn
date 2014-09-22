@@ -1,7 +1,10 @@
 graph nullPRG {
+
     cluster Rx {
         cluster L2Ether {
             boolean Classified {
+                attr "source"
+                spawn poll Classified
                 port true[ValidLength]
                 port false[] }
 
@@ -46,7 +49,7 @@ graph nullPRG {
                     prio:  Int 1 7,
                     queue: UInt 2) } <,128>
             function config5tuple
-            port queues[Q0Valid Q1Valid Q2Valid Q3Valid]
+            port queues[Q0Valid Q1Valid Q2Valid Q3Valid Q4Valid Q5Valid Q6Valid Q7Valid Q8Valid Q9Valid Q10Valid]
             port default[CFDirFilter] }
 
         config CFDirFilter {
@@ -57,7 +60,7 @@ graph nullPRG {
                     dport: UInt 16,
                     queue: UInt 2) }
             function configFDir
-            port queues[Q0Valid Q1Valid Q2Valid Q3Valid]
+            port queues[Q0Valid Q1Valid Q2Valid Q3Valid Q4Valid Q5Valid Q6Valid Q7Valid Q8Valid Q9Valid Q10Valid]
             port default[ToDefaultQueue] }
 
         boolean ToDefaultQueue {
@@ -68,8 +71,8 @@ graph nullPRG {
             port false[] }
         node Queue0 {
             implementation NullRxQueue0
+            attr "unproductive"
             attr "software"
-            attr "source"
             attr "init"
             spawn poll Queue0
             port out[]
@@ -81,8 +84,8 @@ graph nullPRG {
             port false[] }
         node Queue1 {
             implementation NullRxQueue1
+            attr "unproductive"
             attr "software"
-            attr "source"
             attr "init"
             spawn poll Queue1
             port out[]
@@ -94,8 +97,8 @@ graph nullPRG {
             port false[] }
         node Queue2 {
             implementation NullRxQueue2
+            attr "unproductive"
             attr "software"
-            attr "source"
             attr "init"
             spawn poll Queue2
             port out[]
@@ -105,15 +108,119 @@ graph nullPRG {
         or Q3Valid {
             port true[Queue3]
             port false[] }
+
         node Queue3 {
             implementation NullRxQueue3
+            attr "unproductive"
             attr "software"
-            attr "source"
             attr "init"
             spawn poll Queue3
             port out[]
             port drop[]
             port init[] }
+
+
+        or Q4Valid {
+            port true[Queue4]
+            port false[] }
+
+        node Queue4 {
+            implementation NullRxQueue4
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue4
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q5Valid {
+            port true[Queue5]
+            port false[] }
+
+        node Queue5 {
+            implementation NullRxQueue5
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue5
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q6Valid {
+            port true[Queue6]
+            port false[] }
+
+        node Queue6 {
+            implementation NullRxQueue6
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue6
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q7Valid {
+            port true[Queue7]
+            port false[] }
+
+        node Queue7 {
+            implementation NullRxQueue7
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue7
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q8Valid {
+            port true[Queue8]
+            port false[] }
+
+        node Queue8 {
+            implementation NullRxQueue8
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue8
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q9Valid {
+            port true[Queue9]
+            port false[] }
+
+        node Queue9 {
+            implementation NullRxQueue9
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue9
+            port out[]
+            port drop[]
+            port init[] }
+
+        or Q10Valid {
+            port true[Queue10]
+            port false[] }
+
+        node Queue10 {
+            implementation NullRxQueue10
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            spawn poll Queue10
+            port out[]
+            port drop[]
+            port init[] }
+
+
+
+
     }
 
     cluster Tx {
@@ -133,5 +240,39 @@ graph nullPRG {
             implementation NullTxQueue3
             attr "sink"
             attr "software" }
+        node Queue4 {
+            implementation NullTxQueue4
+            attr "sink"
+            attr "software" }
+        node Queue5 {
+            implementation NullTxQueue5
+            attr "sink"
+            attr "software" }
+        node Queue6 {
+            implementation NullTxQueue6
+            attr "sink"
+            attr "software" }
+        node Queue7 {
+            implementation NullTxQueue7
+            attr "sink"
+            attr "software" }
+        node Queue3 {
+            implementation NullTxQueue3
+            attr "sink"
+            attr "software" }
+        node Queue8 {
+            implementation NullTxQueue8
+            attr "sink"
+            attr "software" }
+        node Queue9 {
+            implementation NullTxQueue9
+            attr "sink"
+            attr "software" }
+        node Queue10 {
+            implementation NullTxQueue10
+            attr "sink"
+            attr "software" }
+
     }
 }
+

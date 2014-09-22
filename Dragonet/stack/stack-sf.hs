@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleInstances, UndecidableInstances,
+               OverlappingInstances, ScopedTypeVariables #-}
+
 import qualified Dragonet.Configuration as C
 import qualified Dragonet.Optimization as O
 import qualified Dragonet.Pipelines as PL
@@ -8,8 +11,11 @@ import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Graphs.SF as SF
 import qualified Runner.SFControl as CTRL
 
-import Stack
+import qualified ReadArgs as RA
 
+import Stack
+import qualified Search
+import qualified Stack as SS
 
 import Control.Monad (forever, forM_)
 import Control.Applicative ((<$>))
@@ -17,51 +23,76 @@ import Control.Concurrent(forkIO, ThreadId)
 import qualified Control.Concurrent.STM as STM
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.List as L
 import Data.Word
 
 import qualified MachineDetails as MD
+import qualified Fitness as F
 
-numQueues :: Integer
-numQueues = 4
+import Debug.Trace (trace)
+import Text.Show.Pretty (ppShow)
+
+tr = flip . trace
 
 localIP :: Word32
 localIP = MD.asiagoIP_SF
+--localIP = MD.burrataIP
 
+--------------------------------------------------
 
--- Does not really matter as we only have one config
-costFunction :: StackState -> O.CostFunction Int
-costFunction _ _ = 1
-
--- Start out with a dummy configuration for SF
-oracleHardcoded :: PG.PGraph -> StackState -> [(String,C.Configuration)]
-oracleHardcoded _ ss = [("default",[
+-- Start out with a dummy configuration for null device
+oracleHardcoded ::  SS.OracleArgs -> [(String,C.Configuration)]
+oracleHardcoded  args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,
+        SS.oraclePrg = oPrg, SS.oracleNewConns = eps , SS.oracleSS = ss}) = [
+                ("default",[
                 ("RxCFDirFilter", PG.CVList []),
                 ("RxC5TupleFilter", PG.CVList [
-
- -- ############# For only 1 core #############
                      PG.CVTuple [
-                        PG.CVMaybe Nothing, -- $ Just $ PG.CVInt $ fromIntegral 175178809, -- srcAddr,
-                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral 175178947, -- dstAddr,
+                        PG.CVMaybe Nothing, -- $ Just $ PG.CVInt $ fromIntegral MD.ziger2IP, -- srcAddr,
+                        PG.CVMaybe $ Just $ PG.CVInt $ fromIntegral localIP, -- dstAddr,
                         PG.CVMaybe $ Just $ PG.CVEnum 1,
                         PG.CVMaybe Nothing, --  src port
                         PG.CVMaybe $ Just $ PG.CVInt 888, -- dest port
                         PG.CVInt 1, -- priority
                         PG.CVInt 0 ]
 
-                    ])
-                ])]
+                ])])]
 
-
-
-oracle :: PG.PGraph -> StackState -> [(String,C.Configuration)]
-oracle _ ss = [("default",[
-                    ("RxCFDirFilter", PG.CVList []),
-                    ("RxC5TupleFilter", PG.CVList fiveTupleC)
-                    ])]
+-- This should return multiple tuples and not just one tuple list
+oracleMultiQueue ::  Int -> SS.OracleArgs -> [(String,C.Configuration)]
+oracleMultiQueue nq args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,  SS.oraclePrg = oPrg, SS.oracleNewConns = eps , SS.oracleSS = ss}) = [
+{-
+                ("defaultOracle", -- Most stupid configuration, only default queue and default filters
+                    [ ("RxCFDirFilter", PG.CVList []),
+                      ("RxC5TupleFilter", PG.CVList [])
+                    ]
+                )
+                , ("OracleOneQueueManyFilters",  -- oracle giving only queue 0 for everything, but adding filters
+                    [ ("RxCFDirFilter", PG.CVList []),
+                      ("RxC5TupleFilter", PG.CVList fiveTupleCAlt)
+                    ]
+                ),
+-}
+                ("MultiQueueOracle", -- separate queue  for each flow
+                    [ ("RxCFDirFilter", PG.CVList []),
+                      ("RxC5TupleFilter", PG.CVList fiveTupleC)
+                    ]
+                )
+            ]
     where
-        queues = [1..(numQueues-1)] ++ [0]
-        fiveTupleC = map mkEp5T $ zip (cycle queues) $ take 128 $
-                    M.elems $ ssEndpoints ss
+        queues = [1..(nq-1)] ++ [0]
+        -- returns 128 five-tuple endpoints from stack-state
+        epss = M.elems $ ssEndpoints ss -- use in case you want to look into all flows in stack
+
+        fiveTupleCAlt = map mkEp5T  -- make endpoint
+                    $ zip (cycle [0])  -- use only queue 0
+                    $ take 128 -- take top 128 endpoints
+                    $ eps -- use only specified endpoints
+
+        fiveTupleC = map mkEp5T  -- make endpoint
+                    $ zip (cycle (map toInteger queues))  -- make tuple of cycled queue-id and endpoint
+                    $ take 128 -- take top 128 endpoints
+                    $ eps -- use only specified endpoints
         mkEp5T (queue,ep) = PG.CVTuple [
                                 cvMInt sIP, cvMInt dIP,
                                 PG.CVMaybe $ Just $ PG.CVEnum 1,
@@ -79,6 +110,60 @@ oracle _ ss = [("default",[
                 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
                 prio = (1 +) $ sum [nJust sIP, nJust dIP, nJust sP, nJust dP]
 
+oracle ::  Int -> SS.OracleArgs -> [(String, C.Configuration)]
+oracle nq args@(SS.OracleArgs {SS.oracleOldConf = (oldconfname,oldconf), SS.oracleNewConns = eps}) = ret
+    where ret_ = [ ("ORACLECONF", c) | c <- epsAllConfs nq eps oldconf ]
+          ret  = trace ("---\n"
+                        ++ "NEWCONF:  " ++ (ppShow ret_)
+                        ++ "\nOLDCONF:" ++ (ppShow oldconf)
+                        ++ "\nEPS: " ++ (ppShow eps)
+                        ++ "---\n") ret_
+
+epsAllConfs :: Int -> [EndpointDesc] -> C.Configuration -> [C.Configuration]
+epsAllConfs nq [] c = [c]
+epsAllConfs nq (e:es) c = L.concat [epsAllConfs nq es newc | newc <- cs]
+    where cs = epAllConfs nq e c
+
+epAllConfs :: Int -> EndpointDesc -> C.Configuration -> [C.Configuration]
+epAllConfs nq ep oldConf = [ add5TupleToConf oldConf ep q |  q <- queues]
+    where
+        queues = [1..( (toInteger nq)-1)] ++ [0]
+
+mk5TupleFromEP :: EndpointDesc -> Integer -> PG.ConfValue
+mk5TupleFromEP ep q = PG.CVTuple [ cvMInt sIP, cvMInt dIP,
+                                   PG.CVMaybe $ Just $ PG.CVEnum 1,
+                                   cvMInt sP, cvMInt dP,
+                                   PG.CVInt prio,
+                                   PG.CVInt q]
+            where
+                sIP = edIP4Src ep
+                dIP = edIP4Dst ep
+                sP = edUDPSrc ep
+                dP = edUDPDst ep
+                nJust Nothing = 0
+                nJust (Just _) = 1
+                cvMInt :: Integral a => Maybe a -> PG.ConfValue
+                cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
+                prio = (1 +) $ sum [nJust sIP, nJust dIP, nJust sP, nJust dP]
+
+
+add5TupleToConf :: C.Configuration -> EndpointDesc -> Integer -> C.Configuration
+add5TupleToConf conf ep q = ("RxC5TupleFilter", new5t):rest
+    where new5t :: PG.ConfValue
+          new5t  = addToCVL old5t (mk5TupleFromEP ep q)
+          old5t :: PG.ConfValue
+          old5t = case L.lookup "RxC5TupleFilter" conf of
+                    Just l -> l
+                    Nothing -> error "add5TupleToConf: Did not find RxC5TupleFilter"
+
+          rest :: C.Configuration
+          rest  = filter ((/="RxC5TupleFilter") . fst) conf
+
+addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
+addToCVL (PG.CVList l) v = PG.CVList $ v:l
+
+
+--------------------------------------------------
 
 data CfgAction =
     CfgASet5Tuple Word8 CTRL.FTuple |
@@ -180,7 +265,9 @@ implCfg tcstate chan sh config = do
 
 
 
--- Assign all nodes to same pipeline
+
+
+-- Create separate pipelines for rx and tx per hardware queue
 plAssign :: StackState -> String -> PG.PGNode -> String
 plAssign _ _ (_,n)
     | take 2 lbl == "Tx" = "Tx" ++ tag
@@ -189,19 +276,39 @@ plAssign _ _ (_,n)
         lbl = PG.nLabel n
         tag = PG.nTag n
 
+-- Only create one pipeline per hardware queue
+plAssignMerged :: StackState -> String -> PG.PGNode -> String
+plAssignMerged _ _ (_,n) = PG.nTag n
+
 
 main = do
+
+    (nq :: Int) <- RA.readArgs
+    print $ "Number of queues used: " ++ show nq
+
     let state = CfgState {
                     csThread = Nothing,
                     cs5Tuples = M.empty,
                     cs5TUnused = [0..127]
                 }
+
     -- Channel and MVar with thread id of control thread
     tcstate <- STM.newTVarIO state
     chan <- STM.newTChanIO
-
     -- Prepare graphs and so on
-    prgH <- SF.graphH
-    instantiate prgH "llvm-helpers-sf" costFunction oracle
-        (implCfg tcstate chan) plAssign
+    prgH@(prgU,_) <- SF.graphH
+    let costFn   = Search.sfCost prgU (Search.balanceCost nq)
+        searchFn = Search.searchGreedySF nq costFn
+
+
+    --instantiate prgH "llvm-helpers-sf" costFunction (oracle nq)
+    --    (implCfg tcstate chan) plAssignMerged
+    --instantiate prgH "llvm-helpers-sf" F.fitnessFunction (oracle nq)
+    --instantiate prgH "llvm-helpers-sf" F.priorityFitness  (oracle nq)
+    --instantiateGreedy prgH "llvm-helpers-sf" F.priorityFitness (oracle nq)
+    --    (implCfg tcstate chan) plAssign
+--    instantiate prgH "llvm-helpers-sf" F.dummyFitness (oracleMultiQueue nq)
+--        (implCfg tcstate chan) plAssign
+    instantiateKK searchFn prgH "llvm-helpers-sf" (implCfg tcstate chan) plAssignMerged
+
 

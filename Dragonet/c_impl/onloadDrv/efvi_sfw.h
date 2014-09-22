@@ -298,7 +298,7 @@ int buf_details(struct pkt_buf* pkt_buf, char *buff, int l);
 
 
 // This value should be set based on the parameter to llvm-cgen-sf
-#define SF_MAX_QUEUES           (4)
+#define SF_MAX_QUEUES           (10)
 
 // this one is connected via switch on asiago
 #define IFNAME              "p801p1"

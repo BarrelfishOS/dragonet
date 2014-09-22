@@ -72,7 +72,9 @@
 #define LOGI(x)  do{}while(0)
 
 struct vi *alloc_queue(struct net_if *myif);
-size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
+
+size_t get_packet_nonblocking(struct dragonet_sf_queue *sfq,  struct input **in);
+size_t get_packet_blocking(struct dragonet_sf_queue *sfq, char *pkt_out,
     size_t buf_len);
 void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len,
         uint8_t qi);
@@ -104,8 +106,200 @@ int alloc_filter_default(struct dragonet_sf_queue *sfq)
 
 
 
+size_t get_packet_nonblocking(struct dragonet_sf_queue *sfq,  struct input **in)
+{
 
-size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
+    assert(sfq != NULL);
+    struct vi *vif = sfq->queue_handle;
+    if (vif == NULL) {
+        dprint("%s:%s:%d:ERROR: vif == NULL\n", __FILE__, __func__, __LINE__);
+        return 0;
+    }
+
+    struct vi* viff;
+    int i, j, n, n_ev = 0;
+    int idx = 0;
+    int pkt_buf_i = 0;
+    int len = 0;
+    int copylen = 0;
+    int pkt_received = 0;
+    struct pkt_buf* pkt_buf;
+//    char printbuf[PRINTBUFSIZE]; // = {'\0'};
+    int pkt_received_count = 0;
+
+//    while( 1 ) {
+        viff = vif;
+
+        // If there are already received packet,
+        // then pop one of them out and return.
+
+        if ( (sfq->evs_bufferd_rx_total - sfq->evs_bufferd_rx_last) > 0) {
+//            printf("Warning: returning already buffered packet: "
+//                    "%d from total %d packets\n",
+//                    sfq->evs_bufferd_rx_last, sfq->evs_bufferd_rx_total);
+
+
+            // allocate buffer to copy the packet
+            *in = input_alloc();
+            if ((*in) == NULL) {
+                printf("%s:%s:%d: sf driver is running out of buffers\n"
+                        " soon hardware will start dropping packets\n",
+                        __FILE__, __FUNCTION__, __LINE__);
+
+                // NOTE: If there is no buffer than we don't consume or drop the packet
+                // we just leave there, hoping that next call might be lucky
+                // and get buffer.  If not, hardware will eventually start dropping
+                // packet.
+                return 0;
+            }
+            // start working on RX space
+            pkt_prepend((*in), (*in)->space_before);
+
+
+            idx = sfq->evs_rx_buffered_indexes[sfq->evs_bufferd_rx_last];
+            ++sfq->evs_bufferd_rx_last;
+
+
+            /* This code does not handle jumbos. */
+            assert(EF_EVENT_RX_SOP(sfq->evs[idx]) != 0);
+            assert(EF_EVENT_RX_CONT(sfq->evs[idx]) == 0);
+
+            pkt_buf_i = EF_EVENT_RX_RQ_ID(sfq->evs[idx]);
+            pkt_buf = pkt_buf_from_id(viff, pkt_buf_i);
+            // Every incoming packet should have n_refs set to 1.
+            assert(pkt_buf->n_refs == 1);
+            assert(pkt_buf->is_tx == 0);
+            len = EF_EVENT_RX_BYTES(sfq->evs[idx]) - viff->frame_off;
+
+            copylen = len;
+            if (len >  (*in)->len) {
+                copylen = (*in)->len;
+                dprint("buffer too small to copy full packet."
+                        "Ignoring  %d byte data\n", (len - copylen));
+            }
+            dprint("RX event: trying to copy %d bytes at location %p\n",
+                    copylen, (*in)->data);
+
+            memcpy((*in)->data, RX_PKT_PTR(pkt_buf), copylen);
+            pkt_append(*in, -((*in)->len - copylen));
+
+            ++pkt_received_count;
+            pkt_buf_release(pkt_buf);
+
+            pkt_received = copylen;
+
+
+            ++sfq->refill_counter_local;
+            if (sfq->refill_counter_local >=  REFILL_BATCH_SIZE) {
+                vi_refill_rx_ring(viff, REFILL_BATCH_SIZE);
+                sfq->refill_counter_local = 0;
+            }
+
+            // FIXME: print the size of packet and qid
+            dprint
+                ("%s:%s:%d: [vq:%p], [qid:%"PRIu8"], packet received %d\n",
+                    __FILE__, __func__, __LINE__, sfq, sfq->qid,
+                    pkt_received);
+            return pkt_received;
+        } // end if: buffered packets
+
+        // OK, there are no bufferd packets, lets buffer some packets!
+        // starting new buffer cycle
+        sfq->evs_bufferd_rx_total = 0;
+        sfq->evs_bufferd_rx_last = 0;
+
+        //n_ev = ef_eventq_poll(&viff->vi, sfq->evs, sizeof(sfq->evs) / sizeof(sfq->evs[0]));
+        n_ev = ef_eventq_poll(&viff->vi, sfq->evs, EF_VI_RX_BATCH);
+        //++sfq->event_count;
+        if( n_ev <= 0 ) {
+            //++sfq->no_event_count;
+            return 0; // return no new packets!!!
+        }
+
+        //if (n_ev > 1) {
+        //    printf("WARNING: no. of events received = %d\n", n_ev);
+        //}
+
+        for( i = 0; i < n_ev; ++i ) {
+            switch( EF_EVENT_TYPE(sfq->evs[i]) ) {
+                case EF_EVENT_TYPE_RX:
+                    sfq->evs_rx_buffered_indexes[sfq->evs_bufferd_rx_total] = i;
+                    ++sfq->evs_bufferd_rx_total;
+                    assert(sfq->evs_bufferd_rx_total <= EF_VI_RX_BATCH);
+
+                    ++sfq->rx_event_count;
+
+                    dprint("status: %s:%s:%d: %d,RX event arrived, "
+                            "no events: %d, TX:%d, RX=%d, DROP=%d\n",
+                            __FILE__, __FUNCTION__, __LINE__,
+                            sfq->event_count, sfq->no_event_count,
+                            sfq->tx_event_count, sfq->rx_event_count,
+                            sfq->tx_discard_event_count);
+                    // NOTE: We are not returning packet in this call
+                    //      but it will be returned in the next call to this function
+                    break;
+
+                case EF_EVENT_TYPE_TX:
+                    ++sfq->tx_event_count;
+                    dprint("status: %s:%s:%d: %d, no events: %d, TX:%d, "
+                            "RX=%d, DROP=%d\n",
+                            __FILE__, __FUNCTION__, __LINE__,
+                            sfq->event_count, sfq->no_event_count,
+                            sfq->tx_event_count, sfq->rx_event_count,
+                            sfq->tx_discard_event_count);
+                    dprint("TX event arrived\n");
+                    n = ef_vi_transmit_unbundle(&viff->vi, &sfq->evs[i], sfq->ids);
+                    for( j = 0; j < n; ++j ) {
+                        pkt_buf = pkt_buf_from_id(viff, TX_RQ_ID_PB(sfq->ids[j]));
+                        assert(pkt_buf->is_tx == 1);
+                        if (pkt_buf->n_refs != 1) {
+                            printf("tx_packet with ref id %d, instead of 1\n", (int) pkt_buf->n_refs);
+                            if (pkt_buf->n_refs > 1) {
+                                pkt_buf_release(pkt_buf);
+                                printf("WARNING: couldn't this buffer, so letting it leak with ref_count = %d\n",
+                                        (int) pkt_buf->n_refs);
+                            }
+                        } else {
+                            pkt_buf_release(pkt_buf);
+                        }
+                    } // end for:
+                    break;
+
+                case EF_EVENT_TYPE_RX_DISCARD:
+                    ++sfq->tx_discard_event_count;
+                    if (sfq->tx_discard_event_count % 10 == 0) {
+                        dprint("status: %s:%s:%d: %d, no events: %d, TX:%d, RX=%d, DROP=%d\n",
+                            __FILE__, __FUNCTION__, __LINE__,
+                            sfq->event_count, sfq->no_event_count, sfq->tx_event_count, sfq->rx_event_count,
+                            sfq->tx_discard_event_count);
+                    }
+                    pkt_buf = pkt_buf_from_id(viff,
+                                    EF_EVENT_RX_DISCARD_RQ_ID(sfq->evs[i]));
+                        //buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                    printf("%s:%s:%d: RX_DISCARD, before released, ref = %d\n",
+                                __FILE__, __func__, __LINE__, pkt_buf->n_refs);
+
+                    assert(pkt_buf->n_refs == 1);
+                    pkt_buf_release(pkt_buf);
+                    break;
+
+                default:
+                    printf("ERROR: unexpected event type=%d\n",
+                            (int) EF_EVENT_TYPE(sfq->evs[i]));
+                    LOGE(fprintf(stderr, "ERROR: unexpected event type=%d\n",
+                                (int) EF_EVENT_TYPE(sfq->evs[i])));
+                    break;
+            } // end switch
+        } // end for : i
+
+//    } // end while: infinite
+    return 0; // no packet in this pass, but you may  get some in next pass!
+} // end function: get_packet_nonblocking
+
+
+
+// FIXME: get rid of this function eventually
+size_t get_packet_blocking(struct dragonet_sf_queue *sfq, char *pkt_out,
         size_t buf_len)
 {
 
@@ -270,7 +464,7 @@ size_t get_packet(struct dragonet_sf_queue *sfq, char *pkt_out,
 
     } // end while: infinite
     return 0;
-} // end function: get_packet
+} // end function: get_packet_blocking
 
 
 void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len,
@@ -419,9 +613,9 @@ init_onload_wrapper(char *dev_name)
 
 static
 pktoff_t onload_rx_wrapper(struct dragonet_sf_queue *selected_vqueue,
-        uint8_t *data, pktoff_t len)
+        struct input **in)
 {
-    return ((pktoff_t)get_packet(selected_vqueue, (char *)data, len));
+    return ((pktoff_t)get_packet_nonblocking(selected_vqueue, in));
 }
 
 static
@@ -452,13 +646,19 @@ static void tap_init(struct state *state, char *dev_name)
 #define MAX_QUEUES                     128
 static uint64_t qstat[MAX_QUEUES] = {0, 0};  // for per queue packets stats
 
+static struct input *rx_in_staging[MAX_QUEUES];
+
 static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
     struct state *state, struct input **in, uint8_t qi)
 {
-    node_out_t out_decision = P_RxQueue_drop;
+    node_out_t out_decision = P_SFRxQueue0_drop;
     assert(qi < MAX_QUEUES);
     struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
     struct dragonet_sf_queue *q;
+
+    // Respawn this node
+    // FIXME: shouldn't  value S_SFRxQueue0_poll should depend which queue-id?
+    spawn(context, NULL, S_SFRxQueue0_poll, SPAWNPRIO_LOW);
 
     //pktoff_t maxlen;
     if (sf_driver == NULL) {
@@ -469,8 +669,7 @@ static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
                 "initialization will be done on queue-0, returning\n",
               __FILE__,  __func__, __LINE__, qi);
 
-            out_decision =  P_RxQueue_drop;
-            goto spawn_and_return;
+            return P_SFRxQueue0_drop;
         }
         tap_init(state, IFNAME);
 
@@ -482,13 +681,13 @@ static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
         dprint("%s:%s:%d: ############## Initializing driver %p done\n",
               __FILE__,  __func__, __LINE__, state->tap_handler);
 
-        // FIXME: enable following line.  I don't know why it generates compiliation error
+        *in = input_alloc();  // I am not sure if this is needed,
+                // but keeping there as there is similar line in e10k init code
+
         declare_dragonet_initialized(DN_READY_FNAME, "SF driver started!\n");
-        *in = input_alloc();
         printf("Initialized\n");
 
-        out_decision = P_RxQueue_init;
-        goto spawn_and_return;
+        return P_RxQueue_init;
     }
 
 
@@ -497,31 +696,26 @@ static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
     assert(sf_driver != NULL);
     q = sf_driver->queues + qi;
     assert(q->queue_handle != NULL);
+
+    // try and receive a packet
+    ssize_t len = onload_rx_wrapper(q, in);
+
+    if (len == 0) {
+        // There are no new packets...
+        return P_SFRxQueue0_drop;
+    }
+
+    // We received new packet
     ++q->rx_pkts;
     dprint
     //printf
         ("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
             "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
-            "######## Trying to RX packet\n",
+            "######## received RX packet\n",
             __FILE__,  __func__, __LINE__, qi, q->rx_pkts,
             state->tap_handler, sf_driver->sfif,
             &sf_driver->queues[0], sf_driver->queues[0].queue_handle,
             qi, q, q->queue_handle);
-
-
-    *in = input_alloc();  // FIXME: uncomment this!!!
-
-    // start working on RX space
-    pkt_prepend(*in, (*in)->space_before);
-    ssize_t len = onload_rx_wrapper(q, (uint8_t *)(*in)->data, (*in)->len);
-    if (len == 0) {
-        dprint("%s:%d: [QID: %"PRIu8"], [pktid:%d], pkt with zero len\n",
-            __func__, __LINE__, qi, q->rx_pkts);
-        pkt_append(*in, -((*in)->len - len));
-
-        out_decision = P_RxQueue_drop;
-        goto spawn_and_return;
-    }
 
 #if SHOW_INTERVAL_STATS
     if (qstat[qi] % INTERVAL_STAT_FREQUENCY == 0) {
@@ -534,23 +728,13 @@ static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
     ++qstat[qi];
 
     (*in)->qid = qi;
-    pkt_append(*in, -((*in)->len - len));
-
-
 
     dprint
     //printf
         ("%s:%d: [QID:%"PRIu8"], [pktid:%d]: ############## pkt received, data: %p, len:%zu\n",
             __func__, __LINE__, qi, q->rx_pkts, (*in)->data, len);
 
-    out_decision = P_RxQueue_out;
-    goto spawn_and_return;
-
-spawn_and_return:
-    // Respawn this node
-    // FIXME: shouldn't  value S_SFRxQueue0_poll should depend which queue-id?
-    spawn(context, NULL, S_SFRxQueue0_poll, SPAWNPRIO_LOW);
-    return out_decision;
+    return P_RxQueue_out;
 } // end function: rx_queue_new_v1
 
 static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
@@ -591,7 +775,7 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
 node_out_t do_pg__SFRxQueue0(struct ctx_SFRxQueue0 *context,
         struct state *state, struct input **in)
 {
-    return rx_queue_new_v1(context, state, in, 0);
+    return rx_queue_new_v1((struct ctx_SFRxQueue0 *)context, state, in, 0);
 }
 
 node_out_t do_pg__SFRxQueue1(struct ctx_SFRxQueue1 *context,
@@ -611,6 +795,53 @@ node_out_t do_pg__SFRxQueue3(struct ctx_SFRxQueue3 *context,
 {
     return rx_queue_new_v1((struct ctx_SFRxQueue0 *) context, state, in, 3);
 }
+
+node_out_t do_pg__SFRxQueue4(struct ctx_SFRxQueue4 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue_new_v1((struct ctx_SFRxQueue0 *) context, state, in, 4);
+}
+
+node_out_t do_pg__SFRxQueue5(struct ctx_SFRxQueue5 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue_new_v1((struct ctx_SFRxQueue0 *) context, state, in, 5);
+}
+
+node_out_t do_pg__SFRxQueue6(struct ctx_SFRxQueue6 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue_new_v1((struct ctx_SFRxQueue0 *) context, state, in, 6);
+}
+
+node_out_t do_pg__SFRxQueue7(struct ctx_SFRxQueue7 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue_new_v1((struct ctx_SFRxQueue0 *) context, state, in, 7);
+}
+
+
+node_out_t do_pg__SFRxQueue8(struct ctx_SFRxQueue8 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue_new_v1((struct ctx_SFRxQueue0 *) context, state, in, 8);
+}
+
+
+node_out_t do_pg__SFRxQueue9(struct ctx_SFRxQueue9 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue_new_v1((struct ctx_SFRxQueue0 *) context, state, in, 9);
+}
+
+
+node_out_t do_pg__SFRxQueue10(struct ctx_SFRxQueue10 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue_new_v1((struct ctx_SFRxQueue0 *) context, state, in, 10);
+}
+
+
 
 
 node_out_t do_pg__SFTxQueue0(struct ctx_SFTxQueue0 *context,
@@ -636,4 +867,47 @@ node_out_t do_pg__SFTxQueue3(struct ctx_SFTxQueue3 *context,
 {
     return tx_queue(state, in, 3);
 }
+
+node_out_t do_pg__SFTxQueue4(struct ctx_SFTxQueue4 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 4);
+}
+
+node_out_t do_pg__SFTxQueue5(struct ctx_SFTxQueue5 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 5);
+}
+
+node_out_t do_pg__SFTxQueue6(struct ctx_SFTxQueue6 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 6);
+}
+
+node_out_t do_pg__SFTxQueue7(struct ctx_SFTxQueue7 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 7);
+}
+
+node_out_t do_pg__SFTxQueue8(struct ctx_SFTxQueue8 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 8);
+}
+
+node_out_t do_pg__SFTxQueue9(struct ctx_SFTxQueue9 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 9);
+}
+
+node_out_t do_pg__SFTxQueue10(struct ctx_SFTxQueue10 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 10);
+}
+
 

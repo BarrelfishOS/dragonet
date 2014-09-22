@@ -3,7 +3,7 @@ module MachineDetails (
     gruyereIP,
     ziger2IP,
     sbrinz2IP,
-    asiagoIP_Intel,
+    asiagoIP_E10K,
     asiagoIP_SF
 ) where
 
@@ -24,8 +24,8 @@ ziger2IP =   175178809
 sbrinz2IP :: Word32
 sbrinz2IP =   175178781
 
-asiagoIP_Intel :: Word32
-asiagoIP_Intel = 175178847  -- Intel
+asiagoIP_E10K :: Word32
+asiagoIP_E10K = 175178847  -- Intel
 
 asiagoIP_SF :: Word32
 asiagoIP_SF =  175178947  -- solarflare

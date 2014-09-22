@@ -22,6 +22,7 @@ rm -f *.ready
 rm -f *.failed
 rm -f *.appready
 rm -f stack.dnready
+rm -f *.dnready
 # FIXME: make sure that there are enough free HUGE pages
 cat /proc/meminfo | grep HugePages_Free
 

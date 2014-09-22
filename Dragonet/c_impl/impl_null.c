@@ -412,7 +412,7 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
 node_out_t do_pg__NullRxQueue0(struct ctx_NullRxQueue0 *context,
         struct state *state, struct input **in)
 {
-    return rx_queue(context, state, in, 0);
+    return rx_queue((struct ctx_NullRxQueue0 *) context, state, in, 0);
 }
 
 node_out_t do_pg__NullRxQueue1(struct ctx_NullRxQueue1 *context,
@@ -432,6 +432,53 @@ node_out_t do_pg__NullRxQueue3(struct ctx_NullRxQueue3 *context,
 {
     return rx_queue((struct ctx_NullRxQueue0 *) context, state, in, 3);
 }
+
+node_out_t do_pg__NullRxQueue4(struct ctx_NullRxQueue4 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_NullRxQueue0 *) context, state, in, 4);
+}
+
+node_out_t do_pg__NullRxQueue5(struct ctx_NullRxQueue5 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_NullRxQueue0 *) context, state, in, 5);
+}
+
+node_out_t do_pg__NullRxQueue6(struct ctx_NullRxQueue6 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_NullRxQueue0 *) context, state, in, 6);
+}
+
+node_out_t do_pg__NullRxQueue7(struct ctx_NullRxQueue7 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_NullRxQueue0 *) context, state, in, 7);
+}
+
+
+node_out_t do_pg__NullRxQueue8(struct ctx_NullRxQueue8 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_NullRxQueue0 *) context, state, in, 8);
+}
+
+
+node_out_t do_pg__NullRxQueue9(struct ctx_NullRxQueue9 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_NullRxQueue0 *) context, state, in, 9);
+}
+
+
+node_out_t do_pg__NullRxQueue10(struct ctx_NullRxQueue10 *context,
+        struct state *state, struct input **in)
+{
+    return rx_queue((struct ctx_NullRxQueue0 *) context, state, in, 10);
+}
+
+
 
 
 node_out_t do_pg__NullTxQueue0(struct ctx_NullTxQueue0 *context,
@@ -457,6 +504,48 @@ node_out_t do_pg__NullTxQueue3(struct ctx_NullTxQueue3 *context,
         struct state *state, struct input **in)
 {
     return tx_queue(state, in, 3);
+}
+
+node_out_t do_pg__NullTxQueue4(struct ctx_NullTxQueue4 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 4);
+}
+
+node_out_t do_pg__NullTxQueue5(struct ctx_NullTxQueue5 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 5);
+}
+
+node_out_t do_pg__NullTxQueue6(struct ctx_NullTxQueue6 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 6);
+}
+
+node_out_t do_pg__NullTxQueue7(struct ctx_NullTxQueue7 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 7);
+}
+
+node_out_t do_pg__NullTxQueue8(struct ctx_NullTxQueue8 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 8);
+}
+
+node_out_t do_pg__NullTxQueue9(struct ctx_NullTxQueue9 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 9);
+}
+
+node_out_t do_pg__NullTxQueue10(struct ctx_NullTxQueue10 *context,
+        struct state *state, struct input **in)
+{
+    return tx_queue(state, in, 10);
 }
 
 

@@ -13,7 +13,7 @@ if [ -z $1 ] ; then
     show_usage
     exit 1
 fi
-APPNAME=stack-"${1}"
+STACKNAME=stack-"${1}"
 
 if [ -z $2 ] ; then
     echo "ERROR: provide number of HW queues"
@@ -25,13 +25,19 @@ HWQUEUES=${2}
 SCRIPTDIR="./scripts/pravin/"
 ${SCRIPTDIR}/deployPrepare.sh
 
-nohup sudo ./dist/build/${APPNAME}/${APPNAME} ${HWQUEUES} > some.log 2>&1 < /dev/null  &
+EXTRAENV=""
+if [ ${STACKNAME} == "stack-sf" ] ; then
+#sudo LD_PRELOAD=/lib/libciul.so.1.1.1 ./dist/build/${APPNAME}/${APPNAME} $@
+EXTRAENV="LD_PRELOAD=/lib/libciul.so.1.1.1"
+fi
+
+nohup sudo ${EXTRAENV} ./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} > some.log 2>&1 < /dev/null  &
 
 echo "Waiting for Dragonet to start"
 sleep 4
 
 echo "Waiting for Dragonet to be ready"
-${SCRIPTDIR}/wait_for_dragonet.sh  ${HWQUEUES} ${APPNAME}
+${SCRIPTDIR}/wait_for_dragonet.sh  ${HWQUEUES} ${STACKNAME}
 #ls *.ready
 sleep 10
 echo "Dragonet is ready"

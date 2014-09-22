@@ -6,15 +6,22 @@ module Graphs.Null (
     C5Tuple(..),
     CFDirTuple(..),
     prepareConf,
+    parse5tCFG, c5tString, c5tFullString,
+    parseFDirCFG, cFDtString,
 
+    flowQueue,
     graphH
 ) where
 
+
 import Dragonet.ProtocolGraph
+import qualified Dragonet.ProtocolGraph as PG
+import qualified Dragonet.ProtocolGraph.Utils as PGU
 import Dragonet.Unicorn
 import Dragonet.Configuration
 import Dragonet.Implementation.IPv4 as IP4
 import qualified Dragonet.Semantics as SEM
+import Dragonet.Flows (Flow (..))
 
 import Data.Word
 import Data.Maybe
@@ -24,6 +31,7 @@ import Control.Monad
 import Data.Function (on)
 import Data.Functor ((<$>))
 import Data.String (fromString)
+import Data.Char (isDigit)
 import Debug.Trace (trace)
 
 import qualified SMTLib2 as SMT
@@ -31,7 +39,10 @@ import qualified SMTLib2.Core as SMTC
 import qualified SMTLib2.BitVector as SMTBV
 
 import Graphs.Helpers
+import qualified Util.GraphHelpers as GH
 
+import Control.Exception (assert)
+import Text.Show.Pretty (ppShow)
 
 
 type QueueID = Int
@@ -91,6 +102,48 @@ c5tString c = "5T("++l4p++","++l3s++","++l3d++","++l4s++","++l4d++")"
         l3d = maybe "*" showIP $ c5tL3Dst c
         l4s = fromMaybe "*" $ liftM show $ c5tL4Src c
         l4d = fromMaybe "*" $ liftM show $ c5tL4Dst c
+
+c5tFullString :: C5Tuple -> String
+c5tFullString c = (c5tString c) ++ " -> Q" ++ (show q)
+    where
+        q = c5tQueue c
+
+-- http://rosettacode.org/wiki/Tokenize_a_string#Haskell
+splitBy :: (a -> Bool) -> [a] -> [[a]]
+splitBy _ [] = []
+splitBy f list = first : splitBy f (dropWhile f rest) where
+  (first, rest) = break f list
+
+strToC5t :: String -> C5Tuple
+strToC5t str = assert (check1 && check2) ret
+    where check1 = (take 3 str) == "5T("
+          check2 = (L.last str) == ')'
+          len = length str
+          x = take (len -3 -1) $ drop 3 str
+          xl = splitBy (==',') x
+          ret = C5Tuple {
+                  -- we do not care about the priority and the queue, this
+                  -- infromation should be encoded in the grap
+                  c5tPriority  = 999 -- the priority should be encoded in the graph
+                , c5tQueue     = 999
+                , c5tL4Proto   = c5prot (xl !! 0)
+                , c5tL3Src     = c5Ip   (xl !! 1)
+                , c5tL3Dst     = c5Ip   (xl !! 2)
+                , c5tL4Src     = c5Port (xl !! 3)
+                , c5tL4Dst     = c5Port (xl !! 4)
+          }
+          c5prot :: String -> Maybe C5TL4Proto
+          c5prot s
+            | s == "*"   = Nothing
+            | s == "UDP" = Just C5TPL4UDP
+          c5Ip :: String -> Maybe C5TIP
+          c5Ip s
+            | s == "*"   = Nothing
+            | otherwise  = IP4.ipFromString s
+          c5Port :: String -> Maybe C5TPort
+          c5Port s
+            | s == "*"  = Nothing
+            | otherwise = Just $ read s
 
 c5tAttr :: C5Tuple -> [NAttribute]
 c5tAttr c =
@@ -312,9 +365,88 @@ configQueues cfgn inE outE (CVInt qs) = do
 prepareConf :: PGraph -> PGraph
 prepareConf = replaceConfFunctions addCfgFun
 
+----
+-- Try to figure out at  which queue a flow will end up.
+-- Very quick-n-dirty for the moment
+--
+
+maybeMatch Nothing _ = True
+maybeMatch _ Nothing = True
+maybeMatch (Just x1) (Just x2) = x1 == x2
+
+flowMatches5TF :: Flow -> C5Tuple -> Bool
+flowMatches5TF (FlowUDPv4 {flSrcIp = srcIp,
+                           flDstIp = dstIp,
+                           flSrcPort = srcPort,
+                           flDstPort = dstPort })
+                (C5Tuple {c5tL4Proto = cProt,
+                          c5tL3Src   = cSrcIp,
+                          c5tL3Dst   = cDstIp,
+                          c5tL4Src   = cSrcPort,
+                          c5tL4Dst   = cDstPort}) = ret
+ where maybeT = maybe True
+       ip_match Nothing _ = True
+       ip_match _ Nothing = True
+       ip_match (Just ip1) (Just ip2) = ip1 == ip2
+       ret =   maybeMatch srcIp cSrcIp
+            && maybeMatch dstIp cDstIp
+            && maybeMatch srcPort cSrcPort
+            && maybeMatch dstPort cDstPort
+
+flowGetPort :: Flow -> PG.PGNode -> PG.NPort
+flowGetPort fl (_, nlbl)
+    | (take 2 name) == "5T" = case flowMatches5TF fl (strToC5t name) of
+                                   True  -> "true"
+                                   False -> "false"
+    | otherwise = error $ "flowGetPort:"  ++ (PG.nLabel nlbl)
+    where name = nLabel nlbl
+
+reachedQueue :: PG.PGNode -> Maybe QueueID
+reachedQueue (_,PG.ONode {PG.nLabel = name}) = ret
+    where n = filter isDigit name
+          ret = case length n of
+                  0 -> Nothing
+                  _ -> case "RxQ" ++ n ++ "Valid" == name of
+                            True  -> Just $ read n
+                            False -> Nothing
+reachedQueue (_,PG.FNode {PG.nLabel = name})
+    | name == "RxToDefaultQueue" =  Just 0
+    | otherwise  = Nothing
+
+doFlowQueue :: PG.PGraph -> PG.PGNode -> Flow -> QueueID
+doFlowQueue g node fl
+    | Just q <- reachedQueue node = q
+    | otherwise = ret
+    where ret = doFlowQueue g next fl
+          port = flowGetPort fl node
+          isOnode (PG.ONode {}) = True
+          isOnode _             = False
+          next = case [ n | (n,e) <- PGU.edgeSucc g node,
+                        PGU.edgePort e == port,
+                        port == "true" || (not $ isOnode $ snd n)] of
+                   [x] -> x
+                   l  -> error $ "More than one connection matches for node:"
+                                 ++ (PG.nLabel . snd) node ++ "port:" ++ port
+                                 ++ (ppShow l)
+
+flowQueue :: PG.PGraph -> Flow -> QueueID
+flowQueue prgC flow = ret
+    where ret = doFlowQueue prgC node1 flow
+          node0_ = "RxL2EtherClassifyL3_"
+          port0 = "other"
+          node0 = case GH.filterNodesByL (\x -> (PG.nLabel x) == node0_) prgC of
+            [x] -> x
+            _   -> error $ "More than one matches for node:" ++ node0_
+          node1 = case [ n | (n,e) <- PGU.edgeSucc prgC node0,
+                          PGU.edgePort e == port0] of
+            [x] -> x
+            _   -> error $ "More than one connection matches for node:"
+                           ++ node0_ ++ " port:" ++ port0
+
 graphH :: IO (PGraph,SEM.Helpers)
 graphH = do
     (pg,helpers) <- parseGraph "Graphs/Null/prgNullImpl.unicorn"
     let pg' = prepareConf pg
     return (pg',helpers)
+
 
