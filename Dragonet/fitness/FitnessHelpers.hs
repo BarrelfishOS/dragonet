@@ -72,9 +72,9 @@ toPriorityClass n = ans
 
 
 isFnode :: PG.Node -> Bool
-isFnode (PG.ONode _ _ _ _ _)   = False
-isFnode (PG.CNode _ _ _ _ _ _) = False
-isFnode (PG.FNode label tag attr ports semantics impl origin) = True
+isFnode (PG.ONode {})   = False
+isFnode (PG.CNode {}) = False
+isFnode (PG.FNode {}) = True
 
 
 strToInt :: [Char] -> Int
@@ -98,14 +98,14 @@ isGoldFlowLabel label = ans
 isGoldFlow :: PG.Node -> Bool
 isGoldFlow (PG.ONode _ _ _ _ _)   = False
 isGoldFlow (PG.CNode _ _ _ _ _ _) = False
-isGoldFlow (PG.FNode label tag attr ports semantics impl origin) =
+isGoldFlow (PG.FNode {PG.nLabel = label}) =
     isGoldFlowLabel  label
 
 
 getQueueLabel :: PG.Node -> [Char]
 getQueueLabel (PG.ONode _ _ _ _ _)   = []
 getQueueLabel (PG.CNode _ _ _ _ _ _) = []
-getQueueLabel (PG.FNode label tag attr ports semantics impl origin) = ans
+getQueueLabel (PG.FNode {PG.nLabel = label}) = ans
     where
         ans
             | rxQPref  `L.isPrefixOf` label = drop (length rxQPref) label
