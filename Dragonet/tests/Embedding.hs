@@ -625,6 +625,11 @@ e10kH = snd <$> e10kT
 
 e10kC = (C.applyConfig prgCfg) <$> e10kU
 
+e10kT_simple = E10k.graphH_ "Graphs/E10k/prgE10kImpl-simple.unicorn"
+e10kU_simple = fst <$> e10kT_simple
+e10kH_simple = snd <$> e10kT_simple
+e10kC_simple = (C.applyConfig prgCfg) <$> e10kU_simple
+
 e10kOffloadU = do
     (e10kU, e10kH) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl-offload.unicorn"
     let nQueues = 1
@@ -652,13 +657,18 @@ prPred gr s = do
 
 main = do
 
-    e10k_prg  <- e10kU
-    e10k_prg2 <- e10kOffloadU
-    lpg <- lpgC
-    let emb_e10k = embeddingX e10k_prg2 lpg
+    e10k_prg  <- e10kC_simple
     writeFile "tests/prgE10k.dot"   $ toDot e10k_prg
-    writeFile "tests/prgE10k-2.dot" $ toDot e10k_prg2
-    writeFile "tests/embE10k.dot" $ toDot emb_e10k
+    prPred e10k_prg "RxQueue0"
+    prPred e10k_prg "RxQueue1"
+    prPred e10k_prg "RxQueue2"
+
+    --e10k_prg2 <- e10kOffloadU
+    --lpg <- lpgC
+    --let emb_e10k = embeddingX e10k_prg2 lpg
+    --writeFile "tests/prgE10k.dot"   $ toDot e10k_prg
+    --writeFile "tests/prgE10k-2.dot" $ toDot e10k_prg2
+    --writeFile "tests/embE10k.dot" $ toDot emb_e10k
     --writeFile "tests/prg1.dot" $ toDot prg1
 
     {--

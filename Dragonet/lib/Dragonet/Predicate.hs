@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Dragonet.Predicate (
     PredExpr(..),
     predEval, predEquiv,
@@ -8,7 +9,7 @@ module Dragonet.Predicate (
     isDNF,
     --
     initPredCompSt_, initPredCompSt, PredCompSt(..),
-    nodePred, computePred,
+    nodePred, computePred, computePredMany,
     --
     predBuildSimple, predBuildFold, predBuildDNF, predDoBuild,
     --
@@ -27,6 +28,7 @@ module Dragonet.Predicate (
     --
     dnfGetANDs,
     dnfEquiv_, dnfEquiv,
+    dnfSAT,
     -- exposed for the testing module:
     PredBuild(..),
     getAllAssigns,
@@ -41,12 +43,13 @@ import Dragonet.Conventions (isTruePort, isFalsePort)
 
 import qualified Data.Graph.Inductive as DGI
 import qualified Data.List as L
-import qualified Data.Map  as M
+import qualified Data.Map.Strict  as M
 import Data.Tuple (swap)
 import Data.Maybe
 import Data.Function (on)
 
 import Control.Applicative ((<$>))
+import qualified Control.Monad.State as ST
 import qualified Text.ParserCombinators.Parsec as P
 
 import Text.Show.Functions -- show instance for functions, so that ConfFunction
@@ -766,23 +769,42 @@ initPredCompSt gr node = initPredCompSt_ {
     , predDst   = getFNodeByName gr node
 }
 
+newtype PredComp a = PredComp {doPredComp :: ST.State PredCompSt a}
+    deriving (Monad, ST.MonadState PredCompSt, Functor)
+
+
+computePred st = ST.runState (doPredComp computePredM) st
+
+computePredMany :: PG.PGraph -> [PG.PGNode] -> [PredExpr]
+computePredMany gr nodes = ret
+    where (ret, st) = ST.runState (doPredComp $ cPred nodes) st0
+          st0 =  initPredCompSt_ { predGraph = gr }
+          cPred :: [PG.PGNode] -> PredComp ([PredExpr])
+          cPred nodes = do
+            ST.forM nodes $ \n -> do
+                ST.modify $ \s -> s { predDst = n }
+                computePredM
+
+
 -- simple helper for computing a predicate for reaching a particular node
 nodePred :: PG.PGraph -> PG.PGNode -> PredExpr
-nodePred g n = computePred $ initPredCompSt_ { predGraph = g, predDst = n }
+nodePred g n = fst $ computePred $ initPredCompSt_ { predGraph = g, predDst = n }
+
 
 -- same as above, but includes a cache
 -- TODO: update and return cache
 nodePredCache :: PG.PGraph -> PG.PGNode -> PredCache -> PredExpr
-nodePredCache g n c = computePred $ initPredCompSt_ {
+nodePredCache g n c = fst $ computePred $ initPredCompSt_ {
       predGraph = g
     , predDst   = n
     , predCache = c}
 
 depPredCache :: PG.PGraph -> (PG.PGNode, PG.NPort) -> PredCache -> PredExpr
-depPredCache g (n,p) c = depGetPred__ st (n,p)
+depPredCache g (n,p) c = fst ret
     where st = initPredCompSt_ {
-          predGraph = g
-        , predCache = c}
+                  predGraph = g
+                , predCache = c}
+          ret = ST.runState (doPredComp $ depGetPred__ (n,p)) st
 
 portPred :: PredBuild -> PG.PGNode -> PG.NPort -> PredExpr
 portPred bld (_,fnode@(FNode {})) port = portPred_ bld fnode port
@@ -827,88 +849,122 @@ opPred bld preds (op, port) = expr
           bldNOT  = buildNOT bld
 
 -- get the predicate expression for a particular node port (dependency)
-depGetPred__ :: PredCompSt -> (PG.PGNode, PG.NPort) -> PredExpr
+depGetPred__ :: (PG.PGNode, PG.NPort) -> PredComp (PredExpr)
 -- dependency is an FNode
-depGetPred__ st (dep_node@(_, fnode@(FNode {})), dep_port) = ret'
-    where ret'       = trN ret $ "getting predicate of dependency node: " ++ ((PG.nLabel . snd) dep_node) ++ " port:" ++ dep_port ++ " RET:" ++ (ppShow ret)
-          ret        = predFnodePort (predBld st) rec_pred (dep_node, dep_port)
-          rec_pred   = computePred $ st {predDst = dep_node, predInPort = Just dep_port}
+depGetPred__ (dep_node@(_, fnode@(FNode {})), dep_port) = do
+    bld <- ST.gets predBld
+    ST.modify $ \s ->  s { predDst = dep_node, predInPort = Just dep_port}
+    rec <- computePredM
+    let ret'= trN ret $ "getting predicate of dependency node: " ++ ((PG.nLabel . snd) dep_node) ++ " port:" ++ dep_port ++ " RET:" ++ (ppShow ret)
+        ret = predFnodePort bld rec (dep_node, dep_port)
+    return ret
 -- dependency is an ONode
-depGetPred__ st (dep_node@(_, ONode {}), dep_port) = ret
-    where ret' = trN ret $  "getting predicate of dependency node: " ++ ( (PG.nLabel . snd) dep_node )
-          ret = computePred newst
-          newst    = st {predDst = dep_node, predInPort = Just dep_port}
+depGetPred__ (dep_node@(_, ONode {}), dep_port) = do
+    ST.modify $ \s -> s {predDst = dep_node, predInPort = Just dep_port}
+    computePredM
 
-depGetPred__ st (dep_node@(_, CNode {}), dep_port) =
+depGetPred__ (dep_node@(_, CNode {}), dep_port) = do
     error "depGetPred__ not defined for Cnodes"
 
 -- get the predicate expression for a dependency
-depGetPred :: PredCompSt -> (PG.PGNode,  PG.PGEdge) -> PredExpr
-depGetPred st (node, edge) = depGetPred__ st (node, port)
+depGetPred :: (PG.PGNode,  PG.PGEdge) -> PredComp (PredExpr)
+depGetPred (node, edge) = depGetPred__ (node, port)
     where port = edgePort edge
+
+
+-- version with cache
+computePredM :: PredComp (PredExpr)
+computePredM = do
+    (nid, _) <- ST.gets predDst
+    cache    <- ST.gets predCache
+    case M.lookup nid cache of
+        Just pred -> return pred
+        Nothing -> do
+            pred <- computePred__
+            let cache' = M.insert nid pred cache
+            ST.modify $ \s -> s { predCache = cache' }
+            return pred
+
+computePred__ :: PredComp (PredExpr)
+computePred__ = do
+    (_,dst) <- ST.gets predDst
+    case dst of
+        (FNode {}) -> computePredFnode__
+        (ONode {}) -> computePredOnode__
 
 -- Compute a predicate expression for packets that reach predDst in predGraph
 --  We assume that the graph is acyclic
 --
-computePred :: PredCompSt -> PredExpr
+computePredFnode__ :: PredComp (PredExpr)
 -- compute predicate of src->dst, where dst is an FNode:
 --  predicate of pre(dst) AND predicate of src->pre(dst)
-computePred st@(PredCompSt { predDst = (nid, FNode {}), compStop = stopfn})
-    -- first check the cache
-    | Just dep <- M.lookup nid (predCache st) = dep
-    -- we reached an entry node
-    | ndeps == 0 = case spawn_pred of
-        Just e  -> e        -- there *is* a spawn predicate
-        Nothing -> PredTrue -- this should probably be false, but it currently breaks some cases
-    | ndeps > 1   = error $ "F-nodes have at most one incoming edge. Offending node:`" ++ (nLabel $ snd dst) ++ "'"
-    -- ndeps == 1
-    | stopfn $ fst dep0    = PredTrue
-    -- | isSpawnTarget gr dst = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat it as an OR?)
-    -- recurse
-    | otherwise   = ret_pred
-    where (dst_, gr) = (predDst st, predGraph st)
-          dst     = dst_ --tr dst_ ("Visiting node: " ++ dst_lbl)
-          dst_lbl = nLabel $ snd dst_
-          -- predecesors of destintation (going backwards)
-          -- (only consider normal edges)
-          deps       = edgeDeps gr dst
-          dep0       = deps !! 0
-          inport     = predInPort st
-          ndeps      = length deps
-          dep_pred   = depGetPred st dep0
-          spawn_pred = pgSpawnPreds (predBld st) gr dst
-          -- we check if there is also a spawn predicate for this node. If
-          -- that's the case, we OR it with the dependency predicate.
-          ret_pred   = case spawn_pred of
-                         Just x  -> (buildOR $ predBld st) [dep_pred, x]
-                         Nothing -> dep_pred
+computePredFnode__ = do
+    stopfn  <- ST.gets compStop
+    dst     <- ST.gets predDst
+    gr      <- ST.gets predGraph
+    inport  <- ST.gets predInPort
+    bld     <- ST.gets predBld
+
+    let deps = edgeDeps gr dst
+
+
+    let
+       -- predecesors of destintation (going backwards)
+        -- (only consider normal edges)
+        ndeps      = length deps
+        spawn_pred = pgSpawnPreds bld gr dst
+
+        ret
+         -- we reached an entry node
+         | ndeps == 0 = case spawn_pred of
+              Just e  -> return e         -- there *is* a spawn predicate
+              Nothing -> return PredTrue  -- this should probably be false, but it currently breaks some cases
+         | ndeps > 1   = error $ "F-nodes have at most one incoming edge. Offending node:`" ++ (nLabel $ snd dst) ++ "'"
+         -- | isSpawnTarget gr dst = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat it as an OR?)
+         -- recurse
+         | otherwise   = do
+              let dep0 = deps !! 0
+              dep_pred <- depGetPred dep0
+              -- we check if there is also a spawn predicate for this node. If
+              -- that's the case, we OR it with the dependency predicate.
+              let ret_pred   = case spawn_pred of
+                      Just x  -> (buildOR bld) [dep_pred, x]
+                      Nothing -> dep_pred
+              case (stopfn $ fst dep0) of
+                True  -> return PredTrue
+                False -> return ret_pred
+    ret
+
 
 -- compute predicate of src->dst, where dst is an ONode:
 --  OP (e.g., AND) [ predicate of src -> pre ] for each pre in pre(dst)
-computePred st@(PredCompSt {predDst = (_, ONode {nLabel=lbl, nOperator=op })})
-    = ret
-    where
-          inport = fromJust $ predInPort st
-          -- predecessors (i.e., dependencies) of destination (going backwards)
-          deps :: [(PG.PGNode, PG.PGEdge)]
-          deps = edgeDeps (predGraph st) (predDst st)
-          -- We calculate the dependencies based on the true port. That is, we
-          -- assume that the false port is the (NOT true port) of the same node
-          (true_deps, false_deps) = onodeDepsTF deps
-          -- get predicates for all predecessors
-          t_preds_ :: [PredExpr]
-          t_preds_ = case length true_deps of
-                         0 -> [PredFalse] --error $ "No true dependencies for node " ++ lbl
-                         _ -> map (depGetPred st) true_deps
-          f_preds_ :: [PredExpr]
-          f_preds_ = case length false_deps of
-                         0 -> error $ "No false dependencies for node " ++ lbl
-                         _ -> map (depGetPred st) false_deps
-          t_preds = trN t_preds_ $ "Visiting node:" ++ lbl ++ " (t_preds_=" ++ (ppShow t_preds_) ++ ")"
-          f_preds = f_preds_ --tr f_preds_ $ "Visiting node:" ++ lbl ++ " (expragrs=" ++ (show f_preds_) ++ ")"
-          ret = case inport of
-            "true"  -> opPred (predBld st) t_preds (op, "true")
-            "false" -> opPred (predBld st) f_preds (opNot op, "true")
+computePredOnode__ :: PredComp (PredExpr)
+computePredOnode__ = do
+   Just inport <- ST.gets predInPort
+   dst <- ST.gets predDst
+   g   <- ST.gets predGraph
+   bld <- ST.gets predBld
+   let op = PG.nOperator $ snd dst
+       lbl = PG.nLabel   $ snd dst
+       deps :: [(PG.PGNode, PG.PGEdge)]
+       deps = edgeDeps g dst
+       -- predecessors (i.e., dependencies) of destination (going backwards)
+       -- We calculate the dependencies based on the true port. That is, we
+       -- assume that the false port is the (NOT true port) of the same node
+       (true_deps, false_deps) = onodeDepsTF deps
+
+   t_preds_ <- case length true_deps of
+                 0 -> return [PredFalse] --error $ "No true dependencies for node " ++ lbl
+                 _ -> mapM depGetPred true_deps
+   f_preds_ <- case length false_deps of
+                 0 -> return [PredFalse]  --error $ "No false dependencies for node " ++ lbl
+                 _ -> mapM depGetPred false_deps
+   let t_preds = trN t_preds_ $ "Visiting node:" ++ lbl ++ " (t_preds_=" ++ (ppShow t_preds_) ++ ")"
+       f_preds = f_preds_ --tr f_preds_ $ "Visiting node:" ++ lbl ++ " (expragrs=" ++ (show f_preds_) ++ ")"
+       ret = case inport of
+         "true"  -> return $ opPred bld t_preds (op, "true")
+         "false" -> return $ opPred bld f_preds (opNot op, "true")
+   ret
 
 depPortName :: (PG.PGNode, PG.PGEdge) -> PG.NPort
 depPortName (_, (_, _, Edge { ePort = eport })) = eport

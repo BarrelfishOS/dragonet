@@ -13,6 +13,12 @@ import Dragonet.Configuration as C
 import Dragonet.ProtocolGraph as PG
 import Dragonet.DotGenerator (toDot)
 import Dragonet.Flows (Flow(..))
+import Dragonet.Conventions (rxQPref)
+import Dragonet.Conventions (isTruePort, isFalsePort)
+
+import qualified Util.GraphHelpers as GH
+import qualified Dragonet.Predicate as PR
+import qualified Dragonet.ProtocolGraph.Utils as PGU
 
 import qualified Data.List as L
 import qualified Data.Map.Strict as M
@@ -21,18 +27,20 @@ import Data.Word
 import Data.Maybe
 import Data.Int
 import Data.Function (on)
+import Data.Char (isDigit)
 
-import Dragonet.Flows (Flow (..))
+import Graphs.Cfg as CFG
 
-import Text.Show.Pretty (ppShow)
+import Dragonet.Flows (Flow (..), flowPred)
 
 import qualified Graphs.E10k as E10k
 import Graphs.Cfg (prgCfg, prgCfgEmpty, e10kCfgEmpty, e10kCfgStr)
 
 import Control.Applicative ((<$>))
+import Debug.Trace (trace)
 
 import Text.Show.Pretty (ppShow)
-import Debug.Trace (trace)
+
 
 tr a b  = trace b a
 trN a b = a
@@ -57,9 +65,85 @@ type CostFn  = [Flow] -> C.Configuration -> Cost
 
 -- cost functions
 
+--
+-- import Control.Parallel.Strategies as P
 -- cost functions based on how flows are mapped into queues
 type QueueId = Int
 type CostQueueFn = [(Flow, QueueId)] -> Cost
+
+nLabelNode :: PG.PGraph -> String -> PG.PGNode
+nLabelNode g l = case GH.filterNodesByL (\x -> (PG.nLabel x) == l) g of
+    []  -> error $ "nLabelnode: node" ++ l ++ "node found"
+    [x] -> x
+    _  -> error $ "nLabelnode: more that one " ++ l ++ "node found"
+
+nLabelPred :: PG.PGraph -> String -> [(PG.PGNode, PR.PredExpr)]
+nLabelPred g l = [ (n, PR.nodePred g n) | n <- nodes ]
+    where nodes = GH.filterNodesByL (\x -> (PG.nLabel x) == l) g
+
+nLabelSinglePred :: PG.PGraph -> String -> PR.PredExpr
+nLabelSinglePred g l = case nLabelPred g l of
+    [x] -> snd x
+    []  -> error "nLabelSinglePred: no node found"
+    _   -> error "more than one nodes found"
+
+xQmap :: PG.PGraph -> [Flow] -> [(Flow, QueueId)]
+xQmap gr fls = qmap
+    where flPreds = map flowPred fls
+          allQs  = allQueues nQueues
+          qNodes = [ nLabelNode gr $ rxQPref ++ (show i) | i <- allQs ]
+          qPreds = PR.computePredMany gr qNodes
+          --qPreds = map (nLabelSinglePred gr) qNodes
+          qmap   = [ (fl, qid) | (qid,qpred) <- zip allQs qPreds,
+                                 (fl,flpred) <- zip fls flPreds,
+                                  check (qid,qpred) (fl,flpred)]
+          nQueues = 10
+          bld = PR.predBuildDNF
+          check (qid,p1) (fl,p2) = trN sat msg
+            where expr = PR.buildAND bld $ [p1,p2]
+                  sat  = isJust sat_
+                  sat_  = PR.dnfSAT expr
+                  msg = "QID:    " ++ (ppShow qid) ++
+                        "\nQ pred: " ++ (ppShow p1) ++
+                        "\nFL:     " ++ (ppShow fl) ++
+                        "\nFL pred: " ++ (ppShow p2) ++
+                        "\nAND:     " ++ (ppShow expr) ++
+                        "\nSAT:"      ++ (ppShow $ sat_)
+
+-- This assumes that each flow is mapped on a single queue
+-- (xQmap does not)
+yQmap :: PG.PGraph -> [Flow] -> [(Flow, QueueId)]
+yQmap gr fls = qmap
+    where flPreds = map flowPred fls
+          allQs  = allQueues nQueues
+          --qNodes = [ rxQPref ++ (show i) | i <- allQs ]
+          --qPreds = map (nLabelSinglePred gr) qNodes
+          qNodes = [ nLabelNode gr $ rxQPref ++ (show i) | i <- allQs ]
+          qPreds = PR.computePredMany gr qNodes
+          qPreds' = zip allQs qPreds
+          qmap   =  map
+                   (\flt -> (fst flt, getQmap flt qPreds'))
+                   (zip fls flPreds)
+
+          getQmap :: (Flow, PR.PredExpr) -> [(QueueId, PR.PredExpr)] -> QueueId
+          getQmap f (q:qs)  = case check q f of
+                              True  -> fst q
+                              False -> getQmap f qs
+          getQmap f []      = error "yQmap: This is not supposed to happen"
+
+
+          nQueues = 10
+          bld = PR.predBuildDNF
+          check (qid,p1) (fl,p2) = trN sat msg
+            where expr = PR.buildAND bld $ [p1,p2]
+                  sat  = isJust sat_
+                  sat_  = PR.dnfSAT expr
+                  msg = "QID:    " ++ (ppShow qid) ++
+                        "\nQ pred: " ++ (ppShow p1) ++
+                        "\nFL:     " ++ (ppShow fl) ++
+                        "\nFL pred: " ++ (ppShow p2) ++
+                        "\nAND:     " ++ (ppShow expr) ++
+                        "\nSAT:"      ++ (ppShow $ sat_)
 
 --- Take a graph and a cost function using queue assignments and return a cost
 --function using flows and the current configuration.
@@ -68,11 +152,27 @@ e10kCost prgU costQFn = retFn
     where retFn :: [Flow] -> C.Configuration -> Cost
           retFn flows conf = ret
               where prgC = C.applyConfig conf prgU
-                    flowQ :: PG.PGraph -> Flow -> QueueId
-                    flowQ = E10k.flowQueue
+                    flowQ1 :: PG.PGraph -> Flow -> QueueId
+                    flowQ1 = E10k.flowQueue
+                    flowQ2 = flowQueue
                     --flowQ _ _ = 0
-                    qmap = [(fl, flowQ prgC fl) | fl <- flows]
-                    ret_ = costQFn qmap
+                    qmap :: [(Flow, QueueId)]
+                    qmap_ = [(fl, flowQ1 prgC fl) | fl <- flows]
+                    qmap2 = yQmap prgC flows
+                    qmap3 = [(fl, flowQ2 prgC fl) | fl <- flows]
+
+                    test  = (L.sort qmap_) == (L.sort qmap2)
+                    test3 = (L.sort qmap_) == (L.sort qmap3)
+                    qmap = case test3 of
+                            True -> qmap3
+                            False -> error msg
+                    msg = ("CHECKME ---->\n"
+                            ++ ppShow qmap_
+                            ++ "========"
+                            ++ ppShow qmap2
+                            ++ "<-----")
+
+                    ret_ = costQFn qmap3
                     ret = trN ret_ $ "conf:" ++ (e10kCfgStr conf)
                                     ++ "\ncost:" ++ (show ret_)
 
@@ -98,6 +198,9 @@ balanceCost_ allQs qmap = ret
           --ret_     =  CostVal $ fromIntegral $ maxLoad - minLoad
           ret_ = CostVal $ sd $ map fromIntegral load
           ret = trN ret_ ("\nqlist" ++ (ppShow qList) ++ "\nLOAD:" ++ ppShow (load))
+
+dummyCost :: Int -> [(Flow, QueueId)] -> Cost
+dummyCost _ _ = CostVal 1.0
 
 balanceCost :: Int -> [(Flow, QueueId)] -> Cost
 balanceCost nq fls = balanceCost_ (allQueues nq) fls
@@ -201,8 +304,10 @@ searchGreedyConf_ nq costF (curCnf, curFs) flows = trN recurse msg
           msg = "searchGreedyConf_: step:"
                 ++ (show $ length curFs)
                 ++ " cost is " ++ (show xCost)
-                ++ "\nSELECTED " ++ (e10kCfgStr xCnf)
-                ++ "\nALL CONFS" ++ (L.intercalate "--\n--" $ map (e10kCfgStr . fst) confs)
+                ++ "\nSELECTED "
+                ++ (e10kCfgStr xCnf)
+                ++ "\nALL CONFS"
+                ++ (L.intercalate "--\n--" $ map (e10kCfgStr . fst) confs)
 
 -- greedy back-track search. Nothing is returned if no suitable configuration is
 -- found
@@ -314,6 +419,74 @@ addToCVL (PG.CVList l) v = PG.CVList $ v:l
 cvMInt :: Integral a => Maybe a -> PG.ConfValue
 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
 
+---
+
+type FlowQSt = Int
+
+reachedQueue :: PG.PGNode -> Maybe QueueId
+reachedQueue (_,PG.ONode {PG.nLabel = name}) = ret
+    where n = filter isDigit name
+          ret = case length n of
+                  0 -> Nothing
+                  _ -> case "RxQ" ++ n ++ "Valid" == name of
+                            True  -> Just $ read n
+                            False -> Nothing
+reachedQueue (_,PG.FNode {PG.nLabel = name})
+    | name == "RxToDefaultQueue" =  Just 0
+    | otherwise  = Nothing
+
+doFlowQueueNextPort :: PR.PredExpr -> [(PG.NPort, String)] -> PG.NPort
+doFlowQueueNextPort flPred ((port,portPredStr):rest) = ret
+    where sat     = isJust $ PR.dnfSAT andExpr
+          andExpr = (PR.buildAND bld) [portPred,flPred]
+          portPred = PR.parseStr_ bld portPredStr
+          bld = PR.predBuildDNF
+          -- NB: we assuem that each flow is assigned exclusively to a singel
+          -- queue, so we return the first match
+          ret = case sat of
+                True  -> port
+                False -> doFlowQueueNextPort flPred rest
+
+doFlowQueue :: PG.PGraph -> PG.PGNode -> PG.NPort -> PR.PredExpr -> QueueId
+doFlowQueue g (nid,node@(PG.FNode {PG.nLabel = lbl})) inPort flPred
+    | Just q <- reachedQueue (nid,node) = q
+    | otherwise = nextNode
+    where nPreds = PG.nPredicates node
+          nPorts = PG.nPorts node
+          nextPort = doFlowQueueNextPort flPred nPreds
+          nextNodel = [ n | (n,e) <- PGU.edgeSucc g (nid,node),
+                            PGU.edgePort e == nextPort]
+          nextNode = case nextNodel of
+             [n] -> doFlowQueue g n nextPort flPred
+             []  -> error $ "doFlowQueue: port" ++ nextPort ++ "not found"
+             _  -> error $ "doFlowQueue: more than one edges " ++ nextPort ++ " found in F-node " ++ lbl
+
+doFlowQueue g (nid,node@(PG.ONode {PG.nLabel = lbl})) inPort flPred
+    | Just q <- reachedQueue (nid,node) = q
+    | otherwise = nextNode
+    where nextPort = "true" -- small hack because it's not trivial to determine the true port
+          nextNodel = [ n | (n,e) <- PGU.edgeSucc g (nid,node),
+                            PGU.edgePort e == nextPort]
+          nextNode = case nextNodel of
+             [n] -> doFlowQueue g n nextPort flPred
+             []  -> error $ "doFlowQueue: port" ++ nextPort ++ "not found"
+             _  -> error $ "doFlowQueue: more than one edges " ++ nextPort ++ " found in O-node " ++ lbl
+
+flowQueue :: PG.PGraph -> Flow ->  QueueId
+flowQueue prgC flow = ret
+    where ret = doFlowQueue prgC node1 port0 flPred
+          flPred = flowPred flow
+          node0_ = "RxL2EtherClassifyL3_"
+          port0 = "other"
+          node0 = case GH.filterNodesByL (\x -> (PG.nLabel x) == node0_) prgC of
+            [x] -> x
+            []  -> error $ "No matches for node:" ++ node0_
+            _   -> error $ "More than one matches for node:" ++ node0_
+          node1 = case [ n | (n,e) <- PGU.edgeSucc prgC node0,
+                          PGU.edgePort e == port0] of
+            [x] -> x
+            _   -> error $ "More than one connection matches for node:"
+                           ++ node0_ ++ " port:" ++ port0
 
 
 -- Code for performing simple tests
@@ -323,6 +496,12 @@ e10kU = fst <$> e10kT
 e10kH = snd <$> e10kT
 
 e10kC = (C.applyConfig prgCfg) <$> e10kU
+
+e10kT_simple = E10k.graphH_ "Graphs/E10k/prgE10kImpl-simple.unicorn"
+e10kU_simple = fst <$> e10kT_simple
+e10kH_simple = snd <$> e10kT_simple
+
+e10kC_simple = (C.applyConfig prgCfg) <$> e10kU_simple
 
 -- Let us for now consider that only new connections apper. For handling
 -- connectiong going away, we can add a property to the endpoint description
@@ -340,17 +519,19 @@ priorityCost' = priorityCost isGoldFl goldFlPerQ
 
 test = do
     let nq = 10
-    --e10k <- e10kC
+    --e10k <- e10kC_simple
     --writeFile "tests/e10kC.dot" $ toDot e10k
-    prgU <- e10kU
+    --prgU <- e10kU
+    prgU <- e10kU_simple
 
     let priFn = e10kCost prgU (priorityCost' nq)
         balFn = e10kCost prgU (balanceCost nq)
+        dummyFn = e10kCost prgU (dummyCost nq)
 
         costFn = priFn
 
-        conf  = searchGreedyConfE10k nq costFn fs
-        --conf  = searchGreedyFlowsE10k nq costFn fs
+        --conf  = searchGreedyConfE10k nq costFn fs
+        conf  = searchGreedyFlowsE10k nq costFn fs
 
     putStrLn $ e10kCfgStr conf
     putStrLn $ "Cost:" ++ (show $ costFn fs conf)

@@ -271,6 +271,6 @@ main = do
         QC.maxSuccess = 100000,
         QC.maxSize = 7 -- keep the size small so that equivHard does not explode
     }
-    --QC.quickCheckWith args fold_prop
-    --QC.quickCheckWith args dnf_prop
+    QC.quickCheckWith args fold_prop
+    QC.quickCheckWith args dnf_prop
     return ()

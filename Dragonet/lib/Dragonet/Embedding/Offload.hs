@@ -241,7 +241,7 @@ tryEmbedTxMatchedNode lpg_node prg_node = do
     let prg_stopfn :: PG.PGNode -> Bool
         prg_stopfn (_,n@(PG.FNode {})) = PG.nOrigin n == "LPG" -- stop when we reach LPG nodes
         prg_stopfn _ = False
-        pred_prg = computePred $ initPredCompSt_ { predGraph = graph
+        pred_prg = fst $ computePred $ initPredCompSt_ { predGraph = graph
                                                  , predDst = prg_node
                                                  , compStop = prg_stopfn }
         pred_lpg' = PR.nodePred graph lpg_node

@@ -17,6 +17,7 @@ module Graphs.E10k (
 import Dragonet.ProtocolGraph
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.ProtocolGraph.Utils as PGU
+import qualified Dragonet.Predicate as PR
 import Dragonet.Unicorn
 import Dragonet.Configuration
 import Dragonet.Implementation.IPv4 as IP4
@@ -198,7 +199,11 @@ parse5t (CVTuple
 
 nodeL5Tuple c = (baseFNode (c5tString c) bports) {
                     nAttributes = c5tAttr c,
-                    nSemantics = [("true",tSems),("false",fSems)]
+                    nSemantics = [("true",tSems),("false",fSems)],
+                    nPredicates = [
+                        ("true",  (show $ c5TuplePredT c)),
+                        ("false", (show $ c5TuplePredF c))
+                    ]
                     }
     where
         bports = ["true","false"]
@@ -243,7 +248,8 @@ config5tuple _ _ inE outE cfg = do
             let inEdge = (iN,n,iE)
             let tEdge = (n,queue $ c5tQueue c,Edge "true")
             let fEdge = (n,queue $ c5tQueue c,Edge "false")
-            return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
+            --return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
+            return ((n,Edge "false"), es ++ [inEdge,tEdge])
 
 
 
@@ -482,6 +488,41 @@ maybeMatch Nothing _ = True
 maybeMatch _ Nothing = True
 maybeMatch (Just x1) (Just x2) = x1 == x2
 
+c5TL4ProtoPred :: C5TL4Proto -> PR.PredExpr
+c5TL4ProtoPred C5TPL4UDP = PR.PredAnd [PR.PredAtom "EthType" "IPv4",
+                                       PR.PredAtom "IpProt" "UDP"]
+
+c5TuplePredT :: C5Tuple -> PR.PredExpr
+c5TuplePredT (C5Tuple {c5tL4Proto = cProt,
+                      c5tL3Src   = cSrcIp,
+                      c5tL3Dst   = cDstIp,
+                      c5tL4Src   = cSrcPort,
+                      c5tL4Dst   = cDstPort})
+ | cProt == Just C5TPL4UDP = ret
+       where protPreds = [PR.PredAtom "EthType" "IPv4", PR.PredAtom "IpProt" "UDP"]
+             srcIpPred = maybe PR.PredTrue
+                               (\x -> (PR.PredAtom "SrcIp" ("p" ++ show x)))
+                               cSrcIp
+             dstIpPred = maybe PR.PredTrue
+                               (\x -> (PR.PredAtom "DstIp" ("p" ++ show x)))
+                               cDstIp
+             srcPortPred = maybe PR.PredTrue
+                               (\x -> (PR.PredAtom "SrcPort" ("p" ++ show x)))
+                               cSrcPort
+             dstPortPred = maybe PR.PredTrue
+                               (\x -> (PR.PredAtom "DstPort" ("p" ++ show x)))
+                               cDstPort
+             ret = xand $ protPreds ++
+                                [srcIpPred,dstIpPred,srcPortPred,dstPortPred]
+             bld = PR.predBuildFold
+             xand = (PR.buildAND bld)
+
+
+c5TuplePredF :: C5Tuple -> PR.PredExpr
+c5TuplePredF t5 = (PR.buildNOT bld) (c5TuplePredT t5)
+    where bld = PR.predBuildFold
+
+
 flowMatches5TF :: Flow -> C5Tuple -> Bool
 flowMatches5TF (FlowUDPv4 {flSrcIp = srcIp,
                            flDstIp = dstIp,
@@ -540,10 +581,13 @@ doFlowQueue g node fl
 flowQueue :: PG.PGraph -> Flow -> QueueID
 flowQueue prgC flow = ret
     where ret = doFlowQueue prgC node1 flow
+          --node0_ = "RxIn"
+          --port0 = "out"
           node0_ = "RxL2EtherClassifyL3_"
           port0 = "other"
           node0 = case GH.filterNodesByL (\x -> (PG.nLabel x) == node0_) prgC of
             [x] -> x
+            []  -> error $ "No matches for node:" ++ node0_
             _   -> error $ "More than one matches for node:" ++ node0_
           node1 = case [ n | (n,e) <- PGU.edgeSucc prgC node0,
                           PGU.edgePort e == port0] of
