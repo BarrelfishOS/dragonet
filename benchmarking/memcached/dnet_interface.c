@@ -405,14 +405,14 @@ void event_handle_loop_dn(void *dn_state)
             }
             */
 
-            errval_t err = dnal_aq_poll(dnt_state->daq, &dnt_state->event);
+            errval_t err = dnal_aq_poll(dnt_state->daq, &dnt_state->event[i]);
             if (err == SYS_ERR_OK) {
                 // This needs to be inside the critical section, since we'll
                 // send out data through the AQ
                 dnt_state->current_socket = i;
                 mmprint("%s:%s:%d: [TID:%d, socket:%d], new event arrived\n",
                     __FILE__, __func__, __LINE__, dnt_state->tindex, i);
-                handle_single_event(dnt_state, &dnt_state->event, i);
+                handle_single_event(dnt_state, &dnt_state->event[i], i);
                 idle = 0;
 
             } else {
@@ -568,7 +568,7 @@ int send_dn(void *dn_state, uint8_t *buff, int bufsize)
     memcpy(in->data, buff, bufsize);
 
     // This is implementation of send call
-    dnal_socket_send(dnt_state->dshList[dnt_state->current_socket],
+    dnal_socket_send(dnt_state->event[dnt_state->current_socket].data.inpacket.socket,
             in, &dnt_state->dest);
     return bufsize;
 }

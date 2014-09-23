@@ -70,7 +70,7 @@ struct dn_thread_state {
     int                         socket_count;               // 0
     struct dnal_net_destination dndList[MAX_SOCKETS_APP];    // listen address for binding
     struct dnal_net_destination dest;   // destination for currently processing packet
-    struct dnal_aq_event        event;     // event handle to be used in polling
+    struct dnal_aq_event        event[MAX_SOCKETS_APP];     // event handle to be used in polling
     event_handler_fun_ptr       callback_memcached_fn;  // callback function ptr
     char                        app_slot[255];     // Name of application slot for this thread
 
