@@ -30,6 +30,19 @@ except ImportError:
 
 from netperf_wrapper import util
 
+def get_client_real_name(m):
+    isMultiNICMachine =  m.find("--")
+    if isMultiNICMachine  == -1 :
+        return m
+    else :
+        return m[:isMultiNICMachine]
+
+def is_same_machine(m1, m2):
+    m1_real = get_client_real_name(m1)
+    m2_real = get_client_real_name(m2)
+    return (m1_real == m2_real)
+
+
 class CommandRunner(object):
 
     def __init__(self):
@@ -99,6 +112,9 @@ def record_machine_metadata(mname, targetMachine=None, ipv=4, forceRefresh=False
                     # return it
                     return m
                 else:
+                    if is_same_machine(mname, m['LOCAL_HOST']):
+                        return m
+
                     print "machine config file %s holds info for wrong machine (%s) insted of (%s)" % (
                         mconfig_path, m['LOCAL_HOST'], mname)
             else :

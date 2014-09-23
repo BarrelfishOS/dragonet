@@ -78,6 +78,7 @@ DEFAULT_SETTINGS = {
     'SERVER_CORES': 1,
     'CLIENT_CORES': 1,
     'HWQUEUES': 1,
+    'TOTAL_CLIENTS': 0,
     'BRUST_SIZE': 1,
     'CONCURRENCY' : 1,
     'TCONCURRENCY' : 1,
@@ -403,6 +404,9 @@ parser.add_option("--serverCoreShift", action="store", type="int", dest="SERVER_
 parser.add_option("--spClients", action="store", type="int", dest="SPECIAL_CLIENTS_COUNT",
                   help="Number of clients to be used as 'special' clients")
 
+parser.add_option("--totalClients", action="store", type="int", dest="TOTAL_CLIENTS",
+                  help="Number total clients to simulate from given clients (0 for whatever are on commandline -C)")
+
 parser.add_option("--concurrency", action="store", type="int", dest="CONCURRENCY",
                   help="Number concurrencies per client thread")
 
@@ -678,6 +682,17 @@ def load():
         settings.RESULT_LOCATION_BASE2 = '${HOME}/tempResult%s' % (timeStamped(t=settings.TIME).strip().replace(' ', ''))
         settings.SERVERS = settings.HOSTS
 
+        if settings.TOTAL_CLIENTS > 0 :
+            if len(settings.CLIENTS) >= settings.TOTAL_CLIENTS:
+                settings.CLIENTS = settings.CLIENTS[:settings.TOTAL_CLIENTS]
+            else:
+                client_count = len(settings.CLIENTS)
+                for i in range(0, (settings.TOTAL_CLIENTS - client_count)) :
+                    settings.CLIENTS.append(settings.CLIENTS[i % client_count])
+        else :
+            settings.TOTAL_CLIENTS = len(settings.CLIENTS)
+
+        print "Final client list is %s" % (settings.CLIENTS)
         for m in settings.SERVERS:
             settings.MINFO_SERVER[m] = record_machine_metadata(m, settings.TARGET)
             settings.SERVERS_IF[m] = settings.MINFO_SERVER[m]["EGRESS_INFO"]["iface"]
@@ -731,6 +746,7 @@ def load():
                             TCONCURRENCY = settings.TCONCURRENCY,
                             CLIENT_CORES=settings.CLIENT_CORES,
                             CLIENTS=settings.CLIENTS,
+                            TOTAL_CLIENTS=settings.TOTAL_CLIENTS,
                             CLIENTS_IF=settings.CLIENTS_IF,
                             CLIENTS_CORECOUNT=settings.CLIENTS_CORECOUNT,
                             SERVERS_IF=settings.SERVERS_IF,

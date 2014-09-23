@@ -18,7 +18,6 @@ do
         ((attempt_num++))
     done
 done
-
 echo ${selectedList}
 }
 
@@ -38,6 +37,7 @@ clean_machine() {
     commands_to_kill="${commands_to_kill} fancyEchoLinux"
     echo "ssh ${mname} sudo killall ${commands_to_kill}"
     ssh ${mname} "sudo killall ${commands_to_kill}"
+    ssh ${mname} "sudo killall -9 ${commands_to_kill}"
     ssh ${mname} "sudo rm -rf tempResult*"
 }
 
@@ -104,7 +104,7 @@ result="${3}/latency_${target_t}_${ECHO_SERVER}"
 plotpath="${result}.png"
 log="${result}.log"
 tmpfile="${result}.tmp"
-title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},,SRV_${SERVERCORES},C_${CONCURENCY}"
+title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},,SRV_${SERVERCORES},C_${CONCURENCY},CLC_${CLIENTCOUNT}"
 
    retry 1 ./netperf-wrapper -d ${DELAY} -l ${DURATION} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
         --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
@@ -135,6 +135,7 @@ run_bm_tp_rr() {
     rm -f ${SAMARRYFILE}
     SHORTRUN=5
 
+    CLIENTCORES=1
 #    set -x
 #    set -e
     CTP=0
@@ -151,8 +152,10 @@ run_bm_tp_rr() {
         let NBRUST=CBRUST+CBRUST
     else
 
+    WARMEDUP_STACK=${ECHO_SERVER}
     # Initial reset of stack
     reset_and_warmup_stack ${target} ${target_t} ${resultLocation}
+    WARMEDUP_STACK="noServer"
 
     while [  "$NTP" -gt "$CTP" ]; do
 #        set -x
@@ -161,11 +164,11 @@ run_bm_tp_rr() {
         let CBRUST=NBRUST
         let NBRUST=CBRUST+CBRUST
 
-        title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},Q_${HWQUEUES},P_${PACKET_SIZE},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},C_${CBRUST}"
+        title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},Q_${HWQUEUES},P_${PACKET_SIZE},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},CLC_${CLIENTCOUNT},C_${CBRUST}"
         echo "#################################################"
         echo "running for ${title}"
 
-        retry 2 ./netperf-wrapper -d ${DELAY} -I 1 -l ${SHORTRUN} -c noServer --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
+        retry 2 ./netperf-wrapper -d ${DELAY} -I 1 -l ${SHORTRUN} -c ${WARMEDUP_STACK} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
         -H ${srvName} ${clientCmdline} \
         --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
@@ -190,7 +193,7 @@ run_bm_tp_rr() {
         fi
 
         #GETMISSES=`cat ${TMPFILE} | grep "^total get_misses: " | head -n1 |cut -d'[' -f2 | cut -d']' -f1`
-        echo "TPITERATOR: ${title}, ${target}, ${SERVERCORES}, ${CBRUST}, ${NVTPS}, ${NTP}" >> ${SAMARRYFILE}
+        echo "TPITERATOR: ${title}, ${target}, ${SERVERCORES}, ${CLIENTCOUNT}, ${CBRUST}, ${NVTPS}, ${NTP}" >> ${SAMARRYFILE}
 
         echo "#################################################"
         echo "################### TP of [$NTP:$CBRUST]"
@@ -204,15 +207,18 @@ run_bm_tp_rr() {
     done
     fi
 
+    WARMEDUP_STACK=${ECHO_SERVER}
     reset_and_warmup_stack ${target} ${target_t} ${resultLocation}
+    WARMEDUP_STACK="noServer"
+
     set -x
     set -e
 
 #    sleep 5
-    title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},Q_${HWQUEUES},P_${PACKET_SIZE},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},C_${LBRUST},BEST"
+    title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},Q_${HWQUEUES},P_${PACKET_SIZE},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},CLC_${CLIENTCOUNT},C_${LBRUST},BEST"
     echo "running for ${title}"
 
-    retry 4 ./netperf-wrapper -d ${DELAY} -I ${ITERATIONS} -l ${DURATION} -c noServer  --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
+    retry 4 ./netperf-wrapper -d ${DELAY} -I ${ITERATIONS} -l ${DURATION} -c ${WARMEDUP_STACK} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
         -H ${srvName} ${clientCmdline} \
         --servercores ${SERVERCORES} --serverInstances ${SERVERINSTANCES} --hwqueues ${HWQUEUES} \
         --clientcores ${CLIENTCORES} -T ${target} ${UDP_TEST_NAME} --packet ${PACKET_SIZE} \
@@ -232,12 +238,13 @@ reset_and_warmup_stack()
     target=${1}
     target_t=${2}
     ALLRESULTS="${3}/maxTP_${target_t}_${PKTSIZE}/"
-
     brust=2
     SHORTRUN=5
 
     NTP=1
     iterations=0
+
+    WARMEDUP_STACK="noServer"
 
     while [ 1 ]; do
 
@@ -256,7 +263,7 @@ reset_and_warmup_stack()
     MYTMPDIR=${ALLRESULTS}
     TMPFILE="${MYTMPDIR}/warmup.txt"
 
-    title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},Q_${HWQUEUES},P_${PACKET_SIZE},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},C_${brust},warmup"
+    title="${ECHO_SERVER},${target_t},${USE_PROTO},${CORESHIFT},Q_${HWQUEUES},P_${PACKET_SIZE},,SRVI_${SERVERINSTANCES},SRV_${SERVERCORES},CLC_${CLIENTCOUNT},C_${brust},warmup"
     echo "running for ${title}"
 
     retry 2 ./netperf-wrapper -d 2 -l ${SHORTRUN} -c ${ECHO_SERVER} --${USE_PROTO}  --serverCoreShift ${CORESHIFT} \
@@ -357,18 +364,30 @@ get_scalability_linux_rss() {
 
 get_main_scalability_dragonet() {
 
-ClientList=$(get_x_entries 4 "${ClientListUnique}")
-get_scalability_only_one_para 1
+    cl4=$(get_x_entries 4 "${ClientListUnique}")
+    ClientList=$(get_x_entries 8 "${cl4}")
+    get_scalability_only_one_para 4
 
-ClientList=$(get_x_entries 8 "${ClientListUnique}")
-get_scalability_only_one_para 4
-get_scalability_only_one_para 8
+    ClientList=$(get_x_entries 16 "${ClientListUnique}")
+    get_scalability_only_one_para 8
 
-ClientList=$(get_x_entries 10 "${ClientListUnique}")
-get_scalability_only_one_para 10
+    ClientList=$(get_x_entries 16 "${ClientListUnique}")
+    get_scalability_only_one_para 10
 
-ClientList=$(get_x_entries 16 "${ClientListUnique}")
-get_scalability_only_one_para 16
+    ClientList=$(get_x_entries 16 "${ClientListUnique}")
+    get_scalability_only_one_para 14
+    get_scalability_only_one_para 16
+
+    ClientList=$(get_x_entries 18 "${ClientListUnique}")
+    get_scalability_only_one_para 18
+
+    ClientList=$(get_x_entries 4 "${ClientListUnique}")
+    get_scalability_only_one_para 1
+}
+
+
+get_main_scalability_dragonet_missing() {
+    echo "no entries"
 }
 
 get_all_scalability_dragonet() {
@@ -390,31 +409,54 @@ get_scalability_only_one_para 12
 
 ClientList=$(get_x_entries 16 "${ClientListUnique}")
 get_scalability_only_one_para 16
+
+ClientList=$(get_x_entries 18 "${ClientListUnique}")
+get_scalability_only_one_para 18
+
+
+}
+
+get_1_loadbalancing_dragonet() {
+    FOR_BEST_RUN=32
+    MAIN_OUTPUT_DIR_CP="${MAIN_OUTPUT_DIR}"
+
+    MAIN_OUTPUT_DIR="${MAIN_OUTPUT_DIR_CP}/F_50/"
+    setup_output_location
+    ClientList=$(get_x_entries 50 "${ClientListUnique}")
+    CLIENTCOUNT=50
+    get_scalability_only_one_para 10
 }
 
 get_all_loadbalancing_dragonet() {
 
+FOR_BEST_RUN=32
 MAIN_OUTPUT_DIR_CP="${MAIN_OUTPUT_DIR}"
+
+MAIN_OUTPUT_DIR="${MAIN_OUTPUT_DIR_CP}/F_40/"
+setup_output_location
+CLIENTCOUNT=40
+ClientList=$(get_x_entries 40 "${ClientListUnique}")
+get_scalability_only_one_para 10
+
 MAIN_OUTPUT_DIR="${MAIN_OUTPUT_DIR_CP}/F_10/"
 setup_output_location
 ClientList=$(get_x_entries 10 "${ClientListUnique}")
+CLIENTCOUNT=10
 get_scalability_only_one_para 10
-
 
 MAIN_OUTPUT_DIR="${MAIN_OUTPUT_DIR_CP}/F_20/"
 setup_output_location
 ClientList=$(get_x_entries 20 "${ClientListUnique}")
+CLIENTCOUNT=20
 get_scalability_only_one_para 10
 
 MAIN_OUTPUT_DIR="${MAIN_OUTPUT_DIR_CP}/F_30/"
 setup_output_location
+CLIENTCOUNT=30
 ClientList=$(get_x_entries 30 "${ClientListUnique}")
 get_scalability_only_one_para 10
 
-MAIN_OUTPUT_DIR="${MAIN_OUTPUT_DIR_CP}/F_40/"
-setup_output_location
-ClientList=$(get_x_entries 40 "${ClientListUnique}")
-get_scalability_only_one_para 10
+FOR_BEST_RUN=1
 }
 
 
@@ -491,7 +533,7 @@ use_burrata_server_intel_switched() {
 
     #ClientList="ziger2 sbrinz2 ziger2 sbrinz2"
     ClientList="ziger1 ziger2 sbrinz2 appenzeller-e1000"
-    ClientListUnique="ziger1 ziger2 sbrinz2 appenzeller-e1000"
+    ClientListUnique="ziger1 ziger2 sbrinz1 sbrinz2 gottardo appenzeller-e1000 gruyere"
     SELTARGET=${INTEL_S_T}
     SELTARGET_T="Intel_S"
 }
@@ -513,8 +555,8 @@ use_asiago_server() {
     SF_T="10.23.4.195"
     SF_S_T="10.113.4.195"
 
-    ClientList="ziger1 ziger2 sbrinz2 appenzeller-e1000"
-    ClientListUnique="ziger1 ziger2 sbrinz2 appenzeller-e1000"
+    ClientList="burrata ziger1 ziger2 sbrinz1 sbrinz2 gottardo appenzeller-e1000 "
+    ClientListUnique="burrata ziger1 ziger2 sbrinz1 sbrinz2 gottardo appenzeller-e1000 gruyere"
     ClientList=${cliName6Short}
 }
 
@@ -541,7 +583,7 @@ ECHO_SERVER="memcached"
 
 ITERATIONS=3
 
-DURATION=10
+DURATION=50
 CORESHIFT=0
 SERVERINSTANCES=1
 FOR_BEST_RUN=1
@@ -550,6 +592,8 @@ DELAY=2
 HWQUEUES=10
 USE_PROTO="tcp"
 USE_PROTO="udp"
+
+
 PACKET_SIZE=64
 PACKET_SIZE=1024
 
@@ -561,24 +605,63 @@ MAIN_OUTPUT_DIR="../netperfScaleResults/deletme_test/${1}/"
 
 MAIN_OUTPUT_DIR="../echoServerResults/EchoP1024DP/dragonet_Intel_Q10/${1}/"
 MAIN_OUTPUT_DIR="../echoServerResults/EchoP64DP/dragonet_Intel_Q10/${1}/"
-MAIN_OUTPUT_DIR="../echoServerResults/loadBalacingP64/Dragonet_Intel_Q10/${1}/"
 MAIN_OUTPUT_DIR="../echoServerResults/MemcachedP1024DP/Dragonet_Intel_Q10/${1}/"
 
-MAIN_OUTPUT_DIR="../echoServerResults/EchoP1024DP/dragonet_SF_Q10/${1}/"
+MAIN_OUTPUT_DIR="../echoServerResults/EchoP1024DP/dragonet_SF_Q10_R2/${1}/"
+MAIN_OUTPUT_DIR="../echoServerResults/EchoP64DP/dragonet_SF_Q10/${1}/"
 
+MAIN_OUTPUT_DIR="../echoServerResults/EchoP${PACKET_SIZE}DP/dragonet_SF_Q10/${1}/"
+MAIN_OUTPUT_DIR="../echoServerResults/loadBalacingP${PACKET_SIZE}/Dragonet_SF_Q10/${1}/"
+
+MAIN_OUTPUT_DIR="../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/${1}/"
+MAIN_OUTPUT_DIR="../echoServerResults/loadBalacingP${PACKET_SIZE}/Linux_SF_C10/${1}/"
 #use_burrata_server_intel_switched
-#use_asiago_server_intel_switched
-use_asiago_server_sf_switched
+use_asiago_server_intel_switched
 UDP_TEST_NAME="memcached_rr"
-UDP_TEST_NAME="udp_rr"
-ECHO_SERVER="llvmE10k"
+#use_asiago_server_sf_switched
 #ECHO_SERVER="noServer"
+MAIN_OUTPUT_DIR="../echoServerResults/MemcachedLoadBalacingP${PACKET_SIZE}/Dragonet_E10k_C10/${1}/"
+ECHO_SERVER="fancyEchoLinux"
 ECHO_SERVER="llvmSF"
 
+
+ECHO_SERVER="llvmE10k"
+UDP_TEST_NAME="udp_rr"
+ClientListUnique="burrata ziger1 ziger2 sbrinz2 gottardo appenzeller-e1000 sbrinz1 gruyere"
+ClientListUnique="burrata ziger1 ziger2 sbrinz2 appenzeller-e1000 sbrinz1 gruyere"
+
+MAIN_OUTPUT_DIR="../echoServerResults/EchoLoadBalacingP${PACKET_SIZE}/Dragonet_E10k_C10/${1}/"
 cleanup_machines "${ClientListUnique}"
-setup_output_location
-get_main_scalability_dragonet
+get_all_loadbalancing_dragonet
 exit 0
+
+get_1_loadbalancing_dragonet
+
+FOR_BEST_RUN=1
+get_all_loadbalancing_dragonet
+get_main_scalability_dragonet_missing
+get_all_loadbalancing_dragonet
+FOR_BEST_RUN=1
+
+./cleanupServer.sh
+
+sleep 20
+
+PACKET_SIZE=64
+MAIN_OUTPUT_DIR="../echoServerResults/EchoP${PACKET_SIZE}DP/dragonet_SF_Q10/${1}/"
+setup_output_location
+get_main_scalability_dragonet_missing
+
+exit 0
+
+get_main_scalability_dragonet_missing
+
+exit 0
+
+get_all_scalability_dragonet
+get_main_scalability_dragonet
+
+
 get_all_scalability_dragonet
 
 ClientList="ziger1 ziger2 sbrinz2 appenzeller-e1000"
@@ -589,7 +672,6 @@ exit 0
 
 get_all_scalability_dragonet
 
-get_all_loadbalancing_dragonet
 exit 0
 
 

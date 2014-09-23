@@ -54,6 +54,7 @@ def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
     clientsPerThread = len(CLIENTS) / threadsPerPort
 
     if threadsPerPort == 1 :
+
         ret = ret + (" -a t%d -p %d " % (appID, SERVER_INITIAL_PORT))
         ENDPOINTS_TO_WAIT = 1
     else :
@@ -84,7 +85,7 @@ def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
 
             else: # createDedicatedFlows
                 print "don't create dedicated flows %s" % (ret)
-                ret = ret + (" -a t%d -p %d " % (kk, SERVER_INITIAL_PORT))
+                ret = ret + (" -p %d " % (SERVER_INITIAL_PORT))
 
     for kk in range(0, threadsPerPort):
         ret = ret + (" -t -q t%d " % (kk))
@@ -176,7 +177,7 @@ def SRV_CMDS(name):
                     "init_cmd_special" : [
                       "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
                           toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))
-                      + " ./runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
+                      + " ./scripts/pravin/runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
                       + "./fancyEchoLinux %s " % (
                             genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, False)),
                         "sleep 2",
@@ -186,9 +187,9 @@ def SRV_CMDS(name):
                     "exec_cmd" : "echo 'fancyEchoLinux should be already running'",
                     "kill_cmd" : [
                                 "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_2"),
-                                "cd dragonet/Dragonet/ ; ./diff_stats.py %s %s " % (
+                                "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s " % (
                                     "./ethtool_out_1", "./ethtool_out_2"),
-                                "cd dragonet/Dragonet/ ; ./diff_stats.py %s %s 1000 | grep rx_packets " % (
+                                "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s 1000 | grep rx_packets " % (
                                     "./ethtool_out_1", "./ethtool_out_2"),
                                 "sudo killall fancyEchoLinux || true",
                                  ],
@@ -202,7 +203,7 @@ def SRV_CMDS(name):
                     "init_cmd_special" : [
                       "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
                           toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))
-                      + " ./runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
+                      + " ./scripts/pravin/runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
                       + "%s ./fancyEchoLinux %s " % (onload_prefix,
                             genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, False)),
                         "sleep 2",
@@ -225,7 +226,7 @@ def SRV_CMDS(name):
                       "echo 50 | sudo tee  /proc/sys/net/core/busy_read",
                       "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
                           toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))
-                      + " ./runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
+                      + " ./scripts/pravin/runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
                       + "./fancyEchoLinux %s " % (
                             genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, False)),
                         "sleep 2",
