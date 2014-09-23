@@ -1,0 +1,2550 @@
+logfile opened
+2014-09-22:03:20:02:Setting up machines
+2014-09-22:03:20:08: Start run
+echoServer0: The runner <netperf_wrapper.runners.MachineRunner object at 0x38b6a10>:  [ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; sudo taskset -c 0,1,2,3,4,5,6,7,8,9  echo 'test output' ']
+
+dstat: The runner <netperf_wrapper.runners.MachineRunner object at 0x38b6a10>:  [ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; ../dstat/dstat --nocolor -J ${HOME}/tempResult20140922032001_udp_rr_server0/dstat_out.json -ciny -C0,1,2,3,4,5,6,7,8,9 -N p801p1 -I 128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147, 1 7 > ${HOME}/tempResult20140922032001_udp_rr_server0/dstat_out.dstat ; cat ${HOME}/tempResult20140922032001_udp_rr_server0/dstat_out.json']
+
+netperf0: The runner <netperf_wrapper.runners.MachineRunner object at 0x38b6a50>:  [ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9000,888 -k all']
+
+netperf1: The runner <netperf_wrapper.runners.MachineRunner object at 0x38b6a90>:  [ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9000,888 -k all']
+
+netperf2: The runner <netperf_wrapper.runners.MachineRunner object at 0x38b6ad0>:  [ssh sbrinz2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9000,888 -k all']
+
+netperf3: The runner <netperf_wrapper.runners.MachineRunner object at 0x38b6b10>:  [ssh appenzeller-e1000 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9000,888 -k all']
+
+netperf4: The runner <netperf_wrapper.runners.MachineRunner object at 0x38b6b50>:  [ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9001,888 -k all']
+
+netperf5: The runner <netperf_wrapper.runners.MachineRunner object at 0x38b6b90>:  [ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9001,888 -k all']
+
+netperf6: The runner <netperf_wrapper.runners.MachineRunner object at 0x38b6bd0>:  [ssh sbrinz2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9001,888 -k all']
+
+netperf7: The runner <netperf_wrapper.runners.MachineRunner object at 0x38b6c10>:  [ssh appenzeller-e1000 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9001,888 -k all']
+
+netperf8: The runner <netperf_wrapper.runners.MachineRunner object at 0x38b6c50>:  [ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 2 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9002,888 -k all']
+
+netperf9: The runner <netperf_wrapper.runners.MachineRunner object at 0x38b6c90>:  [ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 2 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9002,888 -k all']
+
+2014-09-22:03:20:08: Starting server applications
+2014-09-22:03:20:08: Making sure that servers are up
+2014-09-22:03:20:08: Starting client applications
+
+2014-09-22:03:20:08: Benchmark running, for threads which are marked for waiting
+echoServer0: process id 26772 died/finished with status 0
+
+dstat: process id 26774 died/finished with status 0
+
+netperf6: process id 26788 died/finished with status 0
+
+netperf6: Bytes lost = 1791942656
+
+
+netperf2: process id 26780 died/finished with status 0
+
+netperf2: Bytes lost = 1790646272
+
+
+netperf3: process id 26782 died/finished with status 0
+
+netperf3: Bytes lost = 1787842560
+
+
+netperf7: process id 26790 died/finished with status 0
+
+netperf7: Bytes lost = 1649176576
+
+
+netperf0: process id 26776 died/finished with status 0
+
+netperf0: Bytes lost = 1547814912
+
+
+netperf4: process id 26784 died/finished with status 0
+
+netperf4: Bytes lost = 1549389824
+
+
+netperf8: process id 26792 died/finished with status 0
+
+netperf8: Bytes lost = 1548113920
+
+
+netperf1: process id 26778 died/finished with status 0
+
+netperf1: Bytes lost = 1500565504
+
+
+netperf5: process id 26786 died/finished with status 0
+
+netperf5: Bytes lost = 1555763200
+
+
+netperf9: process id 26794 died/finished with status 0
+
+netperf9: Bytes lost = 1557729280
+
+
+2014-09-22:03:20:18: Benchmark done (runtime = 9.836150 secs), killing other threads
+2014-09-22:03:20:18: Waiting for kill cleanup
+2014-09-22:03:20:18: Processing results
+Runner: echoServer0 - ProcessRunner
+
+Command: ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; sudo taskset -c 0,1,2,3,4,5,6,7,8,9  echo 'test output' '
+Returncode: 0
+
+Program stdout:
+
+  test output
+
+Program stderr:
+
+  
+
+Runner: dstat - DstatJsonRunner
+
+Command: ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; ../dstat/dstat --nocolor -J ${HOME}/tempResult20140922032001_udp_rr_server0/dstat_out.json -ciny -C0,1,2,3,4,5,6,7,8,9 -N p801p1 -I 128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147, 1 7 > ${HOME}/tempResult20140922032001_udp_rr_server0/dstat_out.dstat ; cat ${HOME}/tempResult20140922032001_udp_rr_server0/dstat_out.json'
+Returncode: 0
+
+Program stdout:
+
+  {
+      "dstat_outlist": {
+          "cpu7 usage": {
+              "sys": [
+                  1.3719870969528318, 
+                  47.0, 
+                  35.0, 
+                  42.0, 
+                  39.0, 
+                  40.0, 
+                  36.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  95.85251591315469, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  2.7712904005631507, 
+                  53.0, 
+                  65.0, 
+                  58.0, 
+                  61.0, 
+                  60.0, 
+                  64.0
+              ], 
+              "wai": [
+                  0.004206589329320567, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu9 usage": {
+              "sys": [
+                  0.6112476922810712, 
+                  37.0, 
+                  39.0, 
+                  41.0, 
+                  37.62376237623762, 
+                  41.41414141414141, 
+                  44.554455445544555
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  96.42888232530218, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  2.9499935443767527, 
+                  63.0, 
+                  61.0, 
+                  59.0, 
+                  62.37623762376238, 
+                  58.58585858585859, 
+                  55.445544554455445
+              ], 
+              "wai": [
+                  0.009876438039992918, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu5 usage": {
+              "sys": [
+                  1.6908397119308147, 
+                  43.0, 
+                  39.0, 
+                  36.0, 
+                  31.0, 
+                  34.0, 
+                  39.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  95.71186798506248, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  2.5943105510623687, 
+                  57.0, 
+                  61.0, 
+                  64.0, 
+                  69.0, 
+                  66.0, 
+                  61.0
+              ], 
+              "wai": [
+                  0.0029817519443285615, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu4 usage": {
+              "sys": [
+                  1.4897577160243203, 
+                  41.0, 
+                  43.0, 
+                  41.0, 
+                  41.0, 
+                  44.0, 
+                  40.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  96.2473845508323, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  2.2601687359077243, 
+                  59.0, 
+                  57.0, 
+                  59.0, 
+                  59.0, 
+                  56.0, 
+                  60.0
+              ], 
+              "wai": [
+                  0.0026889972356575944, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "interrupts": {
+              "146": [
+                  0.00013308111799850258, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "147": [
+                  0.0002129297887976041, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "144": [
+                  0.00013308111799850258, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "145": [
+                  0.00013308111799850258, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "142": [
+                  0.00013308111799850258, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "143": [
+                  0.00023954601239730463, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "140": [
+                  0.00013308111799850258, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "141": [
+                  0.00013308111799850258, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "133": [
+                  0.00010646489439880205, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "132": [
+                  0.00010646489439880205, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "131": [
+                  0.00047909202479460926, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "130": [
+                  0.00010646489439880205, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "137": [
+                  0.00013308111799850258, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "136": [
+                  0.00010646489439880205, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "135": [
+                  0.00013308111799850258, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "134": [
+                  0.00013308111799850258, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "128": [
+                  0.533948061633592, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0
+              ], 
+              "129": [
+                  0.00010646489439880205, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "139": [
+                  0.00013308111799850258, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "138": [
+                  0.00013308111799850258, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "system": {
+              "ctxt": [
+                  826.6799694552218, 
+                  6919.0, 
+                  7254.0, 
+                  6958.0, 
+                  6916.0, 
+                  7407.0, 
+                  7539.0
+              ], 
+              "intr": [
+                  539.6592111962742, 
+                  5451.0, 
+                  5452.0, 
+                  5441.0, 
+                  5352.0, 
+                  5453.0, 
+                  5496.0
+              ]
+          }, 
+          "cpu0 usage": {
+              "sys": [
+                  2.3018141997298285, 
+                  36.36363636363637, 
+                  37.0, 
+                  36.633663366336634, 
+                  37.37373737373738, 
+                  38.613861386138616, 
+                  41.41414141414141
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  94.75139681922215, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  2.9427124270949623, 
+                  63.63636363636363, 
+                  63.0, 
+                  63.366336633663366, 
+                  62.62626262626262, 
+                  61.386138613861384, 
+                  58.58585858585859
+              ], 
+              "wai": [
+                  0.004076553953058348, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu8 usage": {
+              "sys": [
+                  0.6231091886642366, 
+                  40.0, 
+                  39.603960396039604, 
+                  41.0, 
+                  38.0, 
+                  45.45454545454545, 
+                  34.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  93.89429665811575, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  5.468937184332342, 
+                  60.0, 
+                  60.396039603960396, 
+                  59.0, 
+                  62.0, 
+                  54.54545454545455, 
+                  66.0
+              ], 
+              "wai": [
+                  0.013656968887667837, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu3 usage": {
+              "sys": [
+                  1.7505809573794169, 
+                  40.4040404040404, 
+                  37.0, 
+                  40.0, 
+                  36.0, 
+                  35.0, 
+                  36.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  95.82453609285093, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  2.421873980645139, 
+                  59.5959595959596, 
+                  63.0, 
+                  60.0, 
+                  64.0, 
+                  65.0, 
+                  64.0
+              ], 
+              "wai": [
+                  0.0030089691245151367, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu6 usage": {
+              "sys": [
+                  1.3116546085348997, 
+                  40.4040404040404, 
+                  39.603960396039604, 
+                  33.333333333333336, 
+                  42.57425742574257, 
+                  41.41414141414141, 
+                  40.59405940594059
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  96.44147564271582, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  2.244234140024833, 
+                  59.5959595959596, 
+                  60.396039603960396, 
+                  66.66666666666667, 
+                  57.42574257425743, 
+                  58.58585858585859, 
+                  59.40594059405941
+              ], 
+              "wai": [
+                  0.0026356087244505688, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu1 usage": {
+              "sys": [
+                  2.039072302368282, 
+                  43.43434343434343, 
+                  41.584158415841586, 
+                  34.0, 
+                  38.0, 
+                  40.0, 
+                  38.38383838383838
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  93.79290662777699, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  4.163495299987994, 
+                  56.56565656565657, 
+                  58.415841584158414, 
+                  66.0, 
+                  62.0, 
+                  60.0, 
+                  61.61616161616162
+              ], 
+              "wai": [
+                  0.0045257698667320505, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu2 usage": {
+              "sys": [
+                  2.5027989185058765, 
+                  45.0, 
+                  40.0, 
+                  41.0, 
+                  38.613861386138616, 
+                  42.42424242424242, 
+                  47.524752475247524
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  92.44876414934843, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  5.045401719687479, 
+                  55.0, 
+                  60.0, 
+                  59.0, 
+                  61.386138613861384, 
+                  57.57575757575758, 
+                  52.475247524752476
+              ], 
+              "wai": [
+                  0.0030352124582159073, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "net/p801p1": {
+              "recv": [
+                  0, 
+                  355201603.0, 
+                  1214593380.0, 
+                  1214712273.0, 
+                  1214470330.0, 
+                  1214518603.0, 
+                  1214575254.0
+              ], 
+              "send": [
+                  0, 
+                  354928630.0, 
+                  1214591240.0, 
+                  1214591240.0, 
+                  1214590170.0, 
+                  1214592310.0, 
+                  1214589164.0
+              ]
+          }
+      }
+  }
+
+Program stderr:
+
+  
+
+Runner: netperf0 - NetperfSumaryRunner
+
+Command: ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9000,888 -k all'
+Returncode: 0
+
+Program stdout:
+
+  SOCKET_TYPE=Datagram
+  PROTOCOL=UDP
+  DIRECTION=Send|Recv
+  ELAPSED_TIME=7.00
+  THROUGHPUT=0.88
+  THROUGHPUT_UNITS=10^9bits/s
+  LSS_SIZE_REQ=-1
+  LSS_SIZE=212992
+  LSS_SIZE_END=212992
+  LSR_SIZE_REQ=-1
+  LSR_SIZE=212992
+  LSR_SIZE_END=212992
+  RSS_SIZE_REQ=-1
+  RSS_SIZE=0
+  RSS_SIZE_END=-1
+  RSR_SIZE_REQ=-1
+  RSR_SIZE=0
+  RSR_SIZE_END=-1
+  LOCAL_SEND_SIZE=0
+  LOCAL_RECV_SIZE=0
+  REMOTE_SEND_SIZE=-1
+  REMOTE_RECV_SIZE=-1
+  REQUEST_SIZE=1024
+  RESPONSE_SIZE=1024
+  LOCAL_CPU_UTIL=-1.00
+  LOCAL_CPU_METHOD=U
+  LOCAL_SD=-1.000
+  REMOTE_CPU_UTIL=-1.00
+  REMOTE_CPU_METHOD=
+  REMOTE_SD=-1.000
+  SD_UNITS=usec/KB
+  CONFIDENCE_LEVEL=0
+  CONFIDENCE_INTERVAL=-1.000000
+  CONFIDENCE_ITERATION=1
+  THROUGHPUT_CONFID=-1.000
+  LOCAL_CPU_CONFID=-1.000
+  REMOTE_CPU_CONFID=-1.000
+  TRANSACTION_RATE=107965.301
+  RT_LATENCY=602.045
+  BURST_SIZE=64
+  LOCAL_TRANSPORT_RETRANS=-1
+  REMOTE_TRANSPORT_RETRANS=-2
+  TRANSPORT_MSS=-1
+  LOCAL_SEND_THROUGHPUT=0.88
+  LOCAL_RECV_THROUGHPUT=0.88
+  REMOTE_SEND_THROUGHPUT=0.00
+  REMOTE_RECV_THROUGHPUT=0.00
+  LOCAL_CPU_BIND=-1
+  LOCAL_CPU_COUNT=0
+  LOCAL_CPU_PEAK_UTIL=-1.00
+  LOCAL_CPU_PEAK_ID=-1
+  LOCAL_CPU_MODEL=Six-Core AMD Opteron(tm) Processor 8431
+  LOCAL_CPU_FREQUENCY=2400
+  REMOTE_CPU_BIND=-1
+  REMOTE_CPU_COUNT=0
+  REMOTE_CPU_PEAK_UTIL=-1.00
+  REMOTE_CPU_PEAK_ID=-1
+  REMOTE_CPU_MODEL=Unknown CPU Model
+  REMOTE_CPU_FREQUENCY=-1
+  SOURCE_PORT=9000
+  SOURCE_ADDR=0.0.0.0
+  SOURCE_FAMILY=0
+  DEST_PORT=888
+  DEST_ADDR=10.113.4.195
+  DEST_FAMILY=0
+  LOCAL_SEND_CALLS=755833
+  LOCAL_RECV_CALLS=755769
+  LOCAL_BYTES_PER_RECV=1024.00
+  LOCAL_BYTES_PER_SEND=1023.91
+  LOCAL_BYTES_SENT=773907456
+  LOCAL_BYTES_RECVD=773907456
+  LOCAL_BYTES_XFERD=1547814912
+  LOCAL_SEND_OFFSET=0
+  LOCAL_RECV_OFFSET=0
+  LOCAL_SEND_ALIGN=8
+  LOCAL_RECV_ALIGN=8
+  LOCAL_SEND_WIDTH=1
+  LOCAL_RECV_WIDTH=1
+  LOCAL_SEND_DIRTY_COUNT=-1
+  LOCAL_RECV_DIRTY_COUNT=-1
+  LOCAL_RECV_CLEAN_COUNT=-1
+  LOCAL_NODELAY=0
+  LOCAL_CORK=0
+  REMOTE_SEND_CALLS=0
+  REMOTE_RECV_CALLS=0
+  REMOTE_BYTES_PER_RECV=0.00
+  REMOTE_BYTES_PER_SEND=0.00
+  REMOTE_BYTES_SENT=0
+  REMOTE_BYTES_RECVD=0
+  REMOTE_BYTES_XFERD=773907456
+  REMOTE_SEND_OFFSET=-1
+  REMOTE_RECV_OFFSET=-1
+  REMOTE_SEND_ALIGN=-1
+  REMOTE_RECV_ALIGN=-1
+  REMOTE_SEND_WIDTH=0
+  REMOTE_RECV_WIDTH=0
+  REMOTE_SEND_DIRTY_COUNT=-1
+  REMOTE_RECV_DIRTY_COUNT=-1
+  REMOTE_RECV_CLEAN_COUNT=-1
+  REMOTE_NODELAY=-1
+  REMOTE_CORK=0
+  LOCAL_SYSNAME=Linux
+  LOCAL_SYSTEM_MODEL=Teach Me SMBIOS
+  LOCAL_RELEASE=3.13.0+
+  LOCAL_VERSION=#1 SMP Sat Mar 22 16:41:20 CET 2014
+  LOCAL_MACHINE=x86_64
+  REMOTE_SYSTEM_MODEL=Unknown System Model
+  LOCAL_INTERFACE_NAME=eth3
+  LOCAL_INTERFACE_VENDOR=0x8086
+  LOCAL_INTERFACE_DEVICE=0x10fb
+  LOCAL_INTERFACE_SUBVENDOR=0x8086
+  LOCAL_INTERFACE_SUBDEVICE=0x0003
+  LOCAL_DRIVER_NAME=ixgbe
+  LOCAL_DRIVER_VERSION=3.15.1-k
+  LOCAL_DRIVER_FIRMWARE=0x18f60001
+  LOCAL_DRIVER_BUS=0000:81:00.1
+  LOCAL_INTERFACE_SLOT=not found
+  REMOTE_INTERFACE_VENDOR=0x0000
+  REMOTE_INTERFACE_DEVICE=0x0000
+  REMOTE_INTERFACE_SUBVENDOR=0x0000
+  REMOTE_INTERFACE_SUBDEVICE=0x0000
+  REMOTE_DRIVER_NAME=
+  REMOTE_DRIVER_VERSION=
+  REMOTE_DRIVER_FIRMWARE=
+  REMOTE_DRIVER_BUS=
+  LOCAL_INTERVAL_USECS=0
+  LOCAL_INTERVAL_BURST=0
+  REMOTE_INTERVAL_USECS=0
+  REMOTE_INTERVAL_BURST=0
+  LOCAL_SECURITY_TYPE_ID=-1
+  LOCAL_SECURITY_TYPE=Unknown
+  LOCAL_SECURITY_ENABLED_NUM=-1
+  LOCAL_SECURITY_ENABLED=Unknown
+  LOCAL_SECURITY_SPECIFIC=unknown
+  REMOTE_SECURITY_TYPE_ID=0
+  REMOTE_SECURITY_ENABLED_NUM=0
+  UUID=376bbff8-4204-11e4-8887-1b06c325a6d0
+  MIN_LATENCY=76
+  MAX_LATENCY=841
+  P50_LATENCY=601
+  P90_LATENCY=639
+  P99_LATENCY=677
+  MEAN_LATENCY=601.05
+  STDDEV_LATENCY=32.46
+  LOCAL_SOCKET_PRIO=-1
+  REMOTE_SOCKET_PRIO=-1
+  LOCAL_SOCKET_TOS=0xffffffff
+  REMOTE_SOCKET_TOS=0xffffffff
+  LOCAL_CONG_CONTROL=
+  REMOTE_CONG_CONTROL=
+  LOCAL_FILL_FILE=
+  REMOTE_FILL_FILE=
+  COMMAND_LINE="../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9000,888 -k all"
+
+Program stderr:
+
+  
+
+Runner: netperf1 - NetperfSumaryRunner
+
+Command: ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9000,888 -k all'
+Returncode: 0
+
+Program stdout:
+
+  SOCKET_TYPE=Datagram
+  PROTOCOL=UDP
+  DIRECTION=Send|Recv
+  ELAPSED_TIME=7.00
+  THROUGHPUT=0.86
+  THROUGHPUT_UNITS=10^9bits/s
+  LSS_SIZE_REQ=-1
+  LSS_SIZE=212992
+  LSS_SIZE_END=212992
+  LSR_SIZE_REQ=-1
+  LSR_SIZE=212992
+  LSR_SIZE_END=212992
+  RSS_SIZE_REQ=-1
+  RSS_SIZE=0
+  RSS_SIZE_END=-1
+  RSR_SIZE_REQ=-1
+  RSR_SIZE=0
+  RSR_SIZE_END=-1
+  LOCAL_SEND_SIZE=0
+  LOCAL_RECV_SIZE=0
+  REMOTE_SEND_SIZE=-1
+  REMOTE_RECV_SIZE=-1
+  REQUEST_SIZE=1024
+  RESPONSE_SIZE=1024
+  LOCAL_CPU_UTIL=-1.00
+  LOCAL_CPU_METHOD=U
+  LOCAL_SD=-1.000
+  REMOTE_CPU_UTIL=-1.00
+  REMOTE_CPU_METHOD=
+  REMOTE_SD=-1.000
+  SD_UNITS=usec/KB
+  CONFIDENCE_LEVEL=0
+  CONFIDENCE_INTERVAL=-1.000000
+  CONFIDENCE_ITERATION=1
+  THROUGHPUT_CONFID=-1.000
+  LOCAL_CPU_CONFID=-1.000
+  REMOTE_CPU_CONFID=-1.000
+  TRANSACTION_RATE=104667.571
+  RT_LATENCY=621.014
+  BURST_SIZE=64
+  LOCAL_TRANSPORT_RETRANS=-1
+  REMOTE_TRANSPORT_RETRANS=-2
+  TRANSPORT_MSS=-1
+  LOCAL_SEND_THROUGHPUT=0.86
+  LOCAL_RECV_THROUGHPUT=0.86
+  REMOTE_SEND_THROUGHPUT=0.00
+  REMOTE_RECV_THROUGHPUT=0.00
+  LOCAL_CPU_BIND=-1
+  LOCAL_CPU_COUNT=0
+  LOCAL_CPU_PEAK_UTIL=-1.00
+  LOCAL_CPU_PEAK_ID=-1
+  LOCAL_CPU_MODEL=Six-Core AMD Opteron(tm) Processor 8431
+  LOCAL_CPU_FREQUENCY=2400
+  REMOTE_CPU_BIND=-1
+  REMOTE_CPU_COUNT=0
+  REMOTE_CPU_PEAK_UTIL=-1.00
+  REMOTE_CPU_PEAK_ID=-1
+  REMOTE_CPU_MODEL=Unknown CPU Model
+  REMOTE_CPU_FREQUENCY=-1
+  SOURCE_PORT=9000
+  SOURCE_ADDR=0.0.0.0
+  SOURCE_FAMILY=0
+  DEST_PORT=888
+  DEST_ADDR=10.113.4.195
+  DEST_FAMILY=0
+  LOCAL_SEND_CALLS=732762
+  LOCAL_RECV_CALLS=732698
+  LOCAL_BYTES_PER_RECV=1024.00
+  LOCAL_BYTES_PER_SEND=1023.91
+  LOCAL_BYTES_SENT=750282752
+  LOCAL_BYTES_RECVD=750282752
+  LOCAL_BYTES_XFERD=1500565504
+  LOCAL_SEND_OFFSET=0
+  LOCAL_RECV_OFFSET=0
+  LOCAL_SEND_ALIGN=8
+  LOCAL_RECV_ALIGN=8
+  LOCAL_SEND_WIDTH=1
+  LOCAL_RECV_WIDTH=1
+  LOCAL_SEND_DIRTY_COUNT=-1
+  LOCAL_RECV_DIRTY_COUNT=-1
+  LOCAL_RECV_CLEAN_COUNT=-1
+  LOCAL_NODELAY=0
+  LOCAL_CORK=0
+  REMOTE_SEND_CALLS=0
+  REMOTE_RECV_CALLS=0
+  REMOTE_BYTES_PER_RECV=0.00
+  REMOTE_BYTES_PER_SEND=0.00
+  REMOTE_BYTES_SENT=0
+  REMOTE_BYTES_RECVD=0
+  REMOTE_BYTES_XFERD=750282752
+  REMOTE_SEND_OFFSET=-1
+  REMOTE_RECV_OFFSET=-1
+  REMOTE_SEND_ALIGN=-1
+  REMOTE_RECV_ALIGN=-1
+  REMOTE_SEND_WIDTH=0
+  REMOTE_RECV_WIDTH=0
+  REMOTE_SEND_DIRTY_COUNT=-1
+  REMOTE_RECV_DIRTY_COUNT=-1
+  REMOTE_RECV_CLEAN_COUNT=-1
+  REMOTE_NODELAY=-1
+  REMOTE_CORK=0
+  LOCAL_SYSNAME=Linux
+  LOCAL_SYSTEM_MODEL=Teach Me SMBIOS
+  LOCAL_RELEASE=3.13.0+
+  LOCAL_VERSION=#1 SMP Sat Mar 22 16:41:20 CET 2014
+  LOCAL_MACHINE=x86_64
+  REMOTE_SYSTEM_MODEL=Unknown System Model
+  LOCAL_INTERFACE_NAME=eth1
+  LOCAL_INTERFACE_VENDOR=0x1924
+  LOCAL_INTERFACE_DEVICE=0x0803
+  LOCAL_INTERFACE_SUBVENDOR=0x1924
+  LOCAL_INTERFACE_SUBDEVICE=0x6206
+  LOCAL_DRIVER_NAME=sfc
+  LOCAL_DRIVER_VERSION=4.0.2.6645
+  LOCAL_DRIVER_FIRMWARE=3.0.5.2189
+  LOCAL_DRIVER_BUS=0000:81:00.0
+  LOCAL_INTERFACE_SLOT=not found
+  REMOTE_INTERFACE_VENDOR=0x0000
+  REMOTE_INTERFACE_DEVICE=0x0000
+  REMOTE_INTERFACE_SUBVENDOR=0x0000
+  REMOTE_INTERFACE_SUBDEVICE=0x0000
+  REMOTE_DRIVER_NAME=
+  REMOTE_DRIVER_VERSION=
+  REMOTE_DRIVER_FIRMWARE=
+  REMOTE_DRIVER_BUS=
+  LOCAL_INTERVAL_USECS=0
+  LOCAL_INTERVAL_BURST=0
+  REMOTE_INTERVAL_USECS=0
+  REMOTE_INTERVAL_BURST=0
+  LOCAL_SECURITY_TYPE_ID=-1
+  LOCAL_SECURITY_TYPE=Unknown
+  LOCAL_SECURITY_ENABLED_NUM=-1
+  LOCAL_SECURITY_ENABLED=Unknown
+  LOCAL_SECURITY_SPECIFIC=unknown
+  REMOTE_SECURITY_TYPE_ID=0
+  REMOTE_SECURITY_ENABLED_NUM=0
+  UUID=c6882a74-4203-11e4-8eab-c3ff96affdfd
+  MIN_LATENCY=46
+  MAX_LATENCY=902
+  P50_LATENCY=601
+  P90_LATENCY=727
+  P99_LATENCY=781
+  MEAN_LATENCY=620.01
+  STDDEV_LATENCY=72.14
+  LOCAL_SOCKET_PRIO=-1
+  REMOTE_SOCKET_PRIO=-1
+  LOCAL_SOCKET_TOS=0xffffffff
+  REMOTE_SOCKET_TOS=0xffffffff
+  LOCAL_CONG_CONTROL=
+  REMOTE_CONG_CONTROL=
+  LOCAL_FILL_FILE=
+  REMOTE_FILL_FILE=
+  COMMAND_LINE="../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9000,888 -k all"
+
+Program stderr:
+
+  
+
+Runner: netperf2 - NetperfSumaryRunner
+
+Command: ssh sbrinz2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9000,888 -k all'
+Returncode: 0
+
+Program stdout:
+
+  SOCKET_TYPE=Datagram
+  PROTOCOL=UDP
+  DIRECTION=Send|Recv
+  ELAPSED_TIME=7.00
+  THROUGHPUT=1.02
+  THROUGHPUT_UNITS=10^9bits/s
+  LSS_SIZE_REQ=-1
+  LSS_SIZE=212992
+  LSS_SIZE_END=212992
+  LSR_SIZE_REQ=-1
+  LSR_SIZE=212992
+  LSR_SIZE_END=212992
+  RSS_SIZE_REQ=-1
+  RSS_SIZE=0
+  RSS_SIZE_END=-1
+  RSR_SIZE_REQ=-1
+  RSR_SIZE=0
+  RSR_SIZE_END=-1
+  LOCAL_SEND_SIZE=0
+  LOCAL_RECV_SIZE=0
+  REMOTE_SEND_SIZE=-1
+  REMOTE_RECV_SIZE=-1
+  REQUEST_SIZE=1024
+  RESPONSE_SIZE=1024
+  LOCAL_CPU_UTIL=-1.00
+  LOCAL_CPU_METHOD=U
+  LOCAL_SD=-1.000
+  REMOTE_CPU_UTIL=-1.00
+  REMOTE_CPU_METHOD=
+  REMOTE_SD=-1.000
+  SD_UNITS=usec/KB
+  CONFIDENCE_LEVEL=0
+  CONFIDENCE_INTERVAL=-1.000000
+  CONFIDENCE_ITERATION=1
+  THROUGHPUT_CONFID=-1.000
+  LOCAL_CPU_CONFID=-1.000
+  REMOTE_CPU_CONFID=-1.000
+  TRANSACTION_RATE=124903.087
+  RT_LATENCY=520.403
+  BURST_SIZE=64
+  LOCAL_TRANSPORT_RETRANS=-1
+  REMOTE_TRANSPORT_RETRANS=-2
+  TRANSPORT_MSS=-1
+  LOCAL_SEND_THROUGHPUT=1.02
+  LOCAL_RECV_THROUGHPUT=1.02
+  REMOTE_SEND_THROUGHPUT=0.00
+  REMOTE_RECV_THROUGHPUT=0.00
+  LOCAL_CPU_BIND=-1
+  LOCAL_CPU_COUNT=0
+  LOCAL_CPU_PEAK_UTIL=-1.00
+  LOCAL_CPU_PEAK_ID=-1
+  LOCAL_CPU_MODEL=Quad-Core AMD Opteron(tm) Processor 8380
+  LOCAL_CPU_FREQUENCY=2500
+  REMOTE_CPU_BIND=-1
+  REMOTE_CPU_COUNT=0
+  REMOTE_CPU_PEAK_UTIL=-1.00
+  REMOTE_CPU_PEAK_ID=-1
+  REMOTE_CPU_MODEL=Unknown CPU Model
+  REMOTE_CPU_FREQUENCY=-1
+  SOURCE_PORT=9000
+  SOURCE_ADDR=0.0.0.0
+  SOURCE_FAMILY=0
+  DEST_PORT=888
+  DEST_ADDR=10.113.4.195
+  DEST_FAMILY=0
+  LOCAL_SEND_CALLS=874403
+  LOCAL_RECV_CALLS=874339
+  LOCAL_BYTES_PER_RECV=1024.00
+  LOCAL_BYTES_PER_SEND=1023.93
+  LOCAL_BYTES_SENT=895323136
+  LOCAL_BYTES_RECVD=895323136
+  LOCAL_BYTES_XFERD=1790646272
+  LOCAL_SEND_OFFSET=0
+  LOCAL_RECV_OFFSET=0
+  LOCAL_SEND_ALIGN=8
+  LOCAL_RECV_ALIGN=8
+  LOCAL_SEND_WIDTH=1
+  LOCAL_RECV_WIDTH=1
+  LOCAL_SEND_DIRTY_COUNT=-1
+  LOCAL_RECV_DIRTY_COUNT=-1
+  LOCAL_RECV_CLEAN_COUNT=-1
+  LOCAL_NODELAY=0
+  LOCAL_CORK=0
+  REMOTE_SEND_CALLS=0
+  REMOTE_RECV_CALLS=0
+  REMOTE_BYTES_PER_RECV=0.00
+  REMOTE_BYTES_PER_SEND=0.00
+  REMOTE_BYTES_SENT=0
+  REMOTE_BYTES_RECVD=0
+  REMOTE_BYTES_XFERD=895323136
+  REMOTE_SEND_OFFSET=-1
+  REMOTE_RECV_OFFSET=-1
+  REMOTE_SEND_ALIGN=-1
+  REMOTE_RECV_ALIGN=-1
+  REMOTE_SEND_WIDTH=0
+  REMOTE_RECV_WIDTH=0
+  REMOTE_SEND_DIRTY_COUNT=-1
+  REMOTE_RECV_DIRTY_COUNT=-1
+  REMOTE_RECV_CLEAN_COUNT=-1
+  REMOTE_NODELAY=-1
+  REMOTE_CORK=0
+  LOCAL_SYSNAME=Linux
+  LOCAL_SYSTEM_MODEL=Teach Me SMBIOS
+  LOCAL_RELEASE=3.13.0+
+  LOCAL_VERSION=#1 SMP Sat Mar 22 16:41:20 CET 2014
+  LOCAL_MACHINE=x86_64
+  REMOTE_SYSTEM_MODEL=Unknown System Model
+  LOCAL_INTERFACE_NAME=eth4
+  LOCAL_INTERFACE_VENDOR=0x8086
+  LOCAL_INTERFACE_DEVICE=0x10fb
+  LOCAL_INTERFACE_SUBVENDOR=0x8086
+  LOCAL_INTERFACE_SUBDEVICE=0x0003
+  LOCAL_DRIVER_NAME=ixgbe
+  LOCAL_DRIVER_VERSION=3.15.1-k
+  LOCAL_DRIVER_FIRMWARE=0x61c10001
+  LOCAL_DRIVER_BUS=0000:85:00.1
+  LOCAL_INTERFACE_SLOT=not found
+  REMOTE_INTERFACE_VENDOR=0x0000
+  REMOTE_INTERFACE_DEVICE=0x0000
+  REMOTE_INTERFACE_SUBVENDOR=0x0000
+  REMOTE_INTERFACE_SUBDEVICE=0x0000
+  REMOTE_DRIVER_NAME=
+  REMOTE_DRIVER_VERSION=
+  REMOTE_DRIVER_FIRMWARE=
+  REMOTE_DRIVER_BUS=
+  LOCAL_INTERVAL_USECS=0
+  LOCAL_INTERVAL_BURST=0
+  REMOTE_INTERVAL_USECS=0
+  REMOTE_INTERVAL_BURST=0
+  LOCAL_SECURITY_TYPE_ID=-1
+  LOCAL_SECURITY_TYPE=Unknown
+  LOCAL_SECURITY_ENABLED_NUM=-1
+  LOCAL_SECURITY_ENABLED=Unknown
+  LOCAL_SECURITY_SPECIFIC=unknown
+  REMOTE_SECURITY_TYPE_ID=0
+  REMOTE_SECURITY_ENABLED_NUM=0
+  UUID=01f580ce-420f-11e4-a015-d563493a56d1
+  MIN_LATENCY=75
+  MAX_LATENCY=634
+  P50_LATENCY=529
+  P90_LATENCY=576
+  P99_LATENCY=604
+  MEAN_LATENCY=519.60
+  STDDEV_LATENCY=47.84
+  LOCAL_SOCKET_PRIO=-1
+  REMOTE_SOCKET_PRIO=-1
+  LOCAL_SOCKET_TOS=0xffffffff
+  REMOTE_SOCKET_TOS=0xffffffff
+  LOCAL_CONG_CONTROL=
+  REMOTE_CONG_CONTROL=
+  LOCAL_FILL_FILE=
+  REMOTE_FILL_FILE=
+  COMMAND_LINE="../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9000,888 -k all"
+
+Program stderr:
+
+  
+
+Runner: netperf3 - NetperfSumaryRunner
+
+Command: ssh appenzeller-e1000 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9000,888 -k all'
+Returncode: 0
+
+Program stdout:
+
+  SOCKET_TYPE=Datagram
+  PROTOCOL=UDP
+  DIRECTION=Send|Recv
+  ELAPSED_TIME=7.00
+  THROUGHPUT=1.02
+  THROUGHPUT_UNITS=10^9bits/s
+  LSS_SIZE_REQ=-1
+  LSS_SIZE=212992
+  LSS_SIZE_END=212992
+  LSR_SIZE_REQ=-1
+  LSR_SIZE=212992
+  LSR_SIZE_END=212992
+  RSS_SIZE_REQ=-1
+  RSS_SIZE=0
+  RSS_SIZE_END=-1
+  RSR_SIZE_REQ=-1
+  RSR_SIZE=0
+  RSR_SIZE_END=-1
+  LOCAL_SEND_SIZE=0
+  LOCAL_RECV_SIZE=0
+  REMOTE_SEND_SIZE=-1
+  REMOTE_RECV_SIZE=-1
+  REQUEST_SIZE=1024
+  RESPONSE_SIZE=1024
+  LOCAL_CPU_UTIL=-1.00
+  LOCAL_CPU_METHOD=U
+  LOCAL_SD=-1.000
+  REMOTE_CPU_UTIL=-1.00
+  REMOTE_CPU_METHOD=
+  REMOTE_SD=-1.000
+  SD_UNITS=usec/KB
+  CONFIDENCE_LEVEL=0
+  CONFIDENCE_INTERVAL=-1.000000
+  CONFIDENCE_ITERATION=1
+  THROUGHPUT_CONFID=-1.000
+  LOCAL_CPU_CONFID=-1.000
+  REMOTE_CPU_CONFID=-1.000
+  TRANSACTION_RATE=124707.290
+  RT_LATENCY=521.221
+  BURST_SIZE=64
+  LOCAL_TRANSPORT_RETRANS=-1
+  REMOTE_TRANSPORT_RETRANS=-2
+  TRANSPORT_MSS=-1
+  LOCAL_SEND_THROUGHPUT=1.02
+  LOCAL_RECV_THROUGHPUT=1.02
+  REMOTE_SEND_THROUGHPUT=0.00
+  REMOTE_RECV_THROUGHPUT=0.00
+  LOCAL_CPU_BIND=-1
+  LOCAL_CPU_COUNT=0
+  LOCAL_CPU_PEAK_UTIL=-1.00
+  LOCAL_CPU_PEAK_ID=-1
+  LOCAL_CPU_MODEL=AMD Opteron(tm) Processor 6174
+  LOCAL_CPU_FREQUENCY=2200
+  REMOTE_CPU_BIND=-1
+  REMOTE_CPU_COUNT=0
+  REMOTE_CPU_PEAK_UTIL=-1.00
+  REMOTE_CPU_PEAK_ID=-1
+  REMOTE_CPU_MODEL=Unknown CPU Model
+  REMOTE_CPU_FREQUENCY=-1
+  SOURCE_PORT=9000
+  SOURCE_ADDR=0.0.0.0
+  SOURCE_FAMILY=0
+  DEST_PORT=888
+  DEST_ADDR=10.113.4.195
+  DEST_FAMILY=0
+  LOCAL_SEND_CALLS=873034
+  LOCAL_RECV_CALLS=872970
+  LOCAL_BYTES_PER_RECV=1024.00
+  LOCAL_BYTES_PER_SEND=1023.92
+  LOCAL_BYTES_SENT=893921280
+  LOCAL_BYTES_RECVD=893921280
+  LOCAL_BYTES_XFERD=1787842560
+  LOCAL_SEND_OFFSET=0
+  LOCAL_RECV_OFFSET=0
+  LOCAL_SEND_ALIGN=8
+  LOCAL_RECV_ALIGN=8
+  LOCAL_SEND_WIDTH=1
+  LOCAL_RECV_WIDTH=1
+  LOCAL_SEND_DIRTY_COUNT=-1
+  LOCAL_RECV_DIRTY_COUNT=-1
+  LOCAL_RECV_CLEAN_COUNT=-1
+  LOCAL_NODELAY=0
+  LOCAL_CORK=0
+  REMOTE_SEND_CALLS=0
+  REMOTE_RECV_CALLS=0
+  REMOTE_BYTES_PER_RECV=0.00
+  REMOTE_BYTES_PER_SEND=0.00
+  REMOTE_BYTES_SENT=0
+  REMOTE_BYTES_RECVD=0
+  REMOTE_BYTES_XFERD=893921280
+  REMOTE_SEND_OFFSET=-1
+  REMOTE_RECV_OFFSET=-1
+  REMOTE_SEND_ALIGN=-1
+  REMOTE_RECV_ALIGN=-1
+  REMOTE_SEND_WIDTH=0
+  REMOTE_RECV_WIDTH=0
+  REMOTE_SEND_DIRTY_COUNT=-1
+  REMOTE_RECV_DIRTY_COUNT=-1
+  REMOTE_RECV_CLEAN_COUNT=-1
+  REMOTE_NODELAY=-1
+  REMOTE_CORK=0
+  LOCAL_SYSNAME=Linux
+  LOCAL_SYSTEM_MODEL=Teach Me SMBIOS
+  LOCAL_RELEASE=3.13.0+
+  LOCAL_VERSION=#1 SMP Sat Mar 22 16:41:20 CET 2014
+  LOCAL_MACHINE=x86_64
+  REMOTE_SYSTEM_MODEL=Unknown System Model
+  LOCAL_INTERFACE_NAME=eth6
+  LOCAL_INTERFACE_VENDOR=0x1924
+  LOCAL_INTERFACE_DEVICE=0x0803
+  LOCAL_INTERFACE_SUBVENDOR=0x1924
+  LOCAL_INTERFACE_SUBDEVICE=0x6206
+  LOCAL_DRIVER_NAME=sfc
+  LOCAL_DRIVER_VERSION=4.0
+  LOCAL_DRIVER_FIRMWARE=3.0.5.2189
+  LOCAL_DRIVER_BUS=0000:22:00.1
+  LOCAL_INTERFACE_SLOT=not found
+  REMOTE_INTERFACE_VENDOR=0x0000
+  REMOTE_INTERFACE_DEVICE=0x0000
+  REMOTE_INTERFACE_SUBVENDOR=0x0000
+  REMOTE_INTERFACE_SUBDEVICE=0x0000
+  REMOTE_DRIVER_NAME=
+  REMOTE_DRIVER_VERSION=
+  REMOTE_DRIVER_FIRMWARE=
+  REMOTE_DRIVER_BUS=
+  LOCAL_INTERVAL_USECS=0
+  LOCAL_INTERVAL_BURST=0
+  REMOTE_INTERVAL_USECS=0
+  REMOTE_INTERVAL_BURST=0
+  LOCAL_SECURITY_TYPE_ID=-1
+  LOCAL_SECURITY_TYPE=Unknown
+  LOCAL_SECURITY_ENABLED_NUM=-1
+  LOCAL_SECURITY_ENABLED=Unknown
+  LOCAL_SECURITY_SPECIFIC=unknown
+  REMOTE_SECURITY_TYPE_ID=0
+  REMOTE_SECURITY_ENABLED_NUM=0
+  UUID=7e4ac6ec-4215-11e4-8666-53f1c2d76e1f
+  MIN_LATENCY=39
+  MAX_LATENCY=738
+  P50_LATENCY=525
+  P90_LATENCY=577
+  P99_LATENCY=611
+  MEAN_LATENCY=520.53
+  STDDEV_LATENCY=45.69
+  LOCAL_SOCKET_PRIO=-1
+  REMOTE_SOCKET_PRIO=-1
+  LOCAL_SOCKET_TOS=0xffffffff
+  REMOTE_SOCKET_TOS=0xffffffff
+  LOCAL_CONG_CONTROL=
+  REMOTE_CONG_CONTROL=
+  LOCAL_FILL_FILE=
+  REMOTE_FILL_FILE=
+  COMMAND_LINE="../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9000,888 -k all"
+
+Program stderr:
+
+  
+
+Runner: netperf4 - NetperfSumaryRunner
+
+Command: ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9001,888 -k all'
+Returncode: 0
+
+Program stdout:
+
+  SOCKET_TYPE=Datagram
+  PROTOCOL=UDP
+  DIRECTION=Send|Recv
+  ELAPSED_TIME=7.00
+  THROUGHPUT=0.89
+  THROUGHPUT_UNITS=10^9bits/s
+  LSS_SIZE_REQ=-1
+  LSS_SIZE=212992
+  LSS_SIZE_END=212992
+  LSR_SIZE_REQ=-1
+  LSR_SIZE=212992
+  LSR_SIZE_END=212992
+  RSS_SIZE_REQ=-1
+  RSS_SIZE=0
+  RSS_SIZE_END=-1
+  RSR_SIZE_REQ=-1
+  RSR_SIZE=0
+  RSR_SIZE_END=-1
+  LOCAL_SEND_SIZE=0
+  LOCAL_RECV_SIZE=0
+  REMOTE_SEND_SIZE=-1
+  REMOTE_RECV_SIZE=-1
+  REQUEST_SIZE=1024
+  RESPONSE_SIZE=1024
+  LOCAL_CPU_UTIL=-1.00
+  LOCAL_CPU_METHOD=U
+  LOCAL_SD=-1.000
+  REMOTE_CPU_UTIL=-1.00
+  REMOTE_CPU_METHOD=
+  REMOTE_SD=-1.000
+  SD_UNITS=usec/KB
+  CONFIDENCE_LEVEL=0
+  CONFIDENCE_INTERVAL=-1.000000
+  CONFIDENCE_ITERATION=1
+  THROUGHPUT_CONFID=-1.000
+  LOCAL_CPU_CONFID=-1.000
+  REMOTE_CPU_CONFID=-1.000
+  TRANSACTION_RATE=108075.237
+  RT_LATENCY=601.433
+  BURST_SIZE=64
+  LOCAL_TRANSPORT_RETRANS=-1
+  REMOTE_TRANSPORT_RETRANS=-2
+  TRANSPORT_MSS=-1
+  LOCAL_SEND_THROUGHPUT=0.89
+  LOCAL_RECV_THROUGHPUT=0.89
+  REMOTE_SEND_THROUGHPUT=0.00
+  REMOTE_RECV_THROUGHPUT=0.00
+  LOCAL_CPU_BIND=-1
+  LOCAL_CPU_COUNT=0
+  LOCAL_CPU_PEAK_UTIL=-1.00
+  LOCAL_CPU_PEAK_ID=-1
+  LOCAL_CPU_MODEL=Six-Core AMD Opteron(tm) Processor 8431
+  LOCAL_CPU_FREQUENCY=2400
+  REMOTE_CPU_BIND=-1
+  REMOTE_CPU_COUNT=0
+  REMOTE_CPU_PEAK_UTIL=-1.00
+  REMOTE_CPU_PEAK_ID=-1
+  REMOTE_CPU_MODEL=Unknown CPU Model
+  REMOTE_CPU_FREQUENCY=-1
+  SOURCE_PORT=9001
+  SOURCE_ADDR=0.0.0.0
+  SOURCE_FAMILY=0
+  DEST_PORT=888
+  DEST_ADDR=10.113.4.195
+  DEST_FAMILY=0
+  LOCAL_SEND_CALLS=756602
+  LOCAL_RECV_CALLS=756538
+  LOCAL_BYTES_PER_RECV=1024.00
+  LOCAL_BYTES_PER_SEND=1023.91
+  LOCAL_BYTES_SENT=774694912
+  LOCAL_BYTES_RECVD=774694912
+  LOCAL_BYTES_XFERD=1549389824
+  LOCAL_SEND_OFFSET=0
+  LOCAL_RECV_OFFSET=0
+  LOCAL_SEND_ALIGN=8
+  LOCAL_RECV_ALIGN=8
+  LOCAL_SEND_WIDTH=1
+  LOCAL_RECV_WIDTH=1
+  LOCAL_SEND_DIRTY_COUNT=-1
+  LOCAL_RECV_DIRTY_COUNT=-1
+  LOCAL_RECV_CLEAN_COUNT=-1
+  LOCAL_NODELAY=0
+  LOCAL_CORK=0
+  REMOTE_SEND_CALLS=0
+  REMOTE_RECV_CALLS=0
+  REMOTE_BYTES_PER_RECV=0.00
+  REMOTE_BYTES_PER_SEND=0.00
+  REMOTE_BYTES_SENT=0
+  REMOTE_BYTES_RECVD=0
+  REMOTE_BYTES_XFERD=774694912
+  REMOTE_SEND_OFFSET=-1
+  REMOTE_RECV_OFFSET=-1
+  REMOTE_SEND_ALIGN=-1
+  REMOTE_RECV_ALIGN=-1
+  REMOTE_SEND_WIDTH=0
+  REMOTE_RECV_WIDTH=0
+  REMOTE_SEND_DIRTY_COUNT=-1
+  REMOTE_RECV_DIRTY_COUNT=-1
+  REMOTE_RECV_CLEAN_COUNT=-1
+  REMOTE_NODELAY=-1
+  REMOTE_CORK=0
+  LOCAL_SYSNAME=Linux
+  LOCAL_SYSTEM_MODEL=Teach Me SMBIOS
+  LOCAL_RELEASE=3.13.0+
+  LOCAL_VERSION=#1 SMP Sat Mar 22 16:41:20 CET 2014
+  LOCAL_MACHINE=x86_64
+  REMOTE_SYSTEM_MODEL=Unknown System Model
+  LOCAL_INTERFACE_NAME=eth3
+  LOCAL_INTERFACE_VENDOR=0x8086
+  LOCAL_INTERFACE_DEVICE=0x10fb
+  LOCAL_INTERFACE_SUBVENDOR=0x8086
+  LOCAL_INTERFACE_SUBDEVICE=0x0003
+  LOCAL_DRIVER_NAME=ixgbe
+  LOCAL_DRIVER_VERSION=3.15.1-k
+  LOCAL_DRIVER_FIRMWARE=0x18f60001
+  LOCAL_DRIVER_BUS=0000:81:00.1
+  LOCAL_INTERFACE_SLOT=not found
+  REMOTE_INTERFACE_VENDOR=0x0000
+  REMOTE_INTERFACE_DEVICE=0x0000
+  REMOTE_INTERFACE_SUBVENDOR=0x0000
+  REMOTE_INTERFACE_SUBDEVICE=0x0000
+  REMOTE_DRIVER_NAME=
+  REMOTE_DRIVER_VERSION=
+  REMOTE_DRIVER_FIRMWARE=
+  REMOTE_DRIVER_BUS=
+  LOCAL_INTERVAL_USECS=0
+  LOCAL_INTERVAL_BURST=0
+  REMOTE_INTERVAL_USECS=0
+  REMOTE_INTERVAL_BURST=0
+  LOCAL_SECURITY_TYPE_ID=-1
+  LOCAL_SECURITY_TYPE=Unknown
+  LOCAL_SECURITY_ENABLED_NUM=-1
+  LOCAL_SECURITY_ENABLED=Unknown
+  LOCAL_SECURITY_SPECIFIC=unknown
+  REMOTE_SECURITY_TYPE_ID=0
+  REMOTE_SECURITY_ENABLED_NUM=0
+  UUID=376be5b4-4204-11e4-8b4e-5bcf01feb85c
+  MIN_LATENCY=41
+  MAX_LATENCY=840
+  P50_LATENCY=601
+  P90_LATENCY=639
+  P99_LATENCY=676
+  MEAN_LATENCY=600.58
+  STDDEV_LATENCY=33.31
+  LOCAL_SOCKET_PRIO=-1
+  REMOTE_SOCKET_PRIO=-1
+  LOCAL_SOCKET_TOS=0xffffffff
+  REMOTE_SOCKET_TOS=0xffffffff
+  LOCAL_CONG_CONTROL=
+  REMOTE_CONG_CONTROL=
+  LOCAL_FILL_FILE=
+  REMOTE_FILL_FILE=
+  COMMAND_LINE="../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9001,888 -k all"
+
+Program stderr:
+
+  
+
+Runner: netperf5 - NetperfSumaryRunner
+
+Command: ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9001,888 -k all'
+Returncode: 0
+
+Program stdout:
+
+  SOCKET_TYPE=Datagram
+  PROTOCOL=UDP
+  DIRECTION=Send|Recv
+  ELAPSED_TIME=7.00
+  THROUGHPUT=0.89
+  THROUGHPUT_UNITS=10^9bits/s
+  LSS_SIZE_REQ=-1
+  LSS_SIZE=212992
+  LSS_SIZE_END=212992
+  LSR_SIZE_REQ=-1
+  LSR_SIZE=212992
+  LSR_SIZE_END=212992
+  RSS_SIZE_REQ=-1
+  RSS_SIZE=0
+  RSS_SIZE_END=-1
+  RSR_SIZE_REQ=-1
+  RSR_SIZE=0
+  RSR_SIZE_END=-1
+  LOCAL_SEND_SIZE=0
+  LOCAL_RECV_SIZE=0
+  REMOTE_SEND_SIZE=-1
+  REMOTE_RECV_SIZE=-1
+  REQUEST_SIZE=1024
+  RESPONSE_SIZE=1024
+  LOCAL_CPU_UTIL=-1.00
+  LOCAL_CPU_METHOD=U
+  LOCAL_SD=-1.000
+  REMOTE_CPU_UTIL=-1.00
+  REMOTE_CPU_METHOD=
+  REMOTE_SD=-1.000
+  SD_UNITS=usec/KB
+  CONFIDENCE_LEVEL=0
+  CONFIDENCE_INTERVAL=-1.000000
+  CONFIDENCE_ITERATION=1
+  THROUGHPUT_CONFID=-1.000
+  LOCAL_CPU_CONFID=-1.000
+  REMOTE_CPU_CONFID=-1.000
+  TRANSACTION_RATE=108519.026
+  RT_LATENCY=598.973
+  BURST_SIZE=64
+  LOCAL_TRANSPORT_RETRANS=-1
+  REMOTE_TRANSPORT_RETRANS=-2
+  TRANSPORT_MSS=-1
+  LOCAL_SEND_THROUGHPUT=0.89
+  LOCAL_RECV_THROUGHPUT=0.89
+  REMOTE_SEND_THROUGHPUT=0.00
+  REMOTE_RECV_THROUGHPUT=0.00
+  LOCAL_CPU_BIND=-1
+  LOCAL_CPU_COUNT=0
+  LOCAL_CPU_PEAK_UTIL=-1.00
+  LOCAL_CPU_PEAK_ID=-1
+  LOCAL_CPU_MODEL=Six-Core AMD Opteron(tm) Processor 8431
+  LOCAL_CPU_FREQUENCY=2400
+  REMOTE_CPU_BIND=-1
+  REMOTE_CPU_COUNT=0
+  REMOTE_CPU_PEAK_UTIL=-1.00
+  REMOTE_CPU_PEAK_ID=-1
+  REMOTE_CPU_MODEL=Unknown CPU Model
+  REMOTE_CPU_FREQUENCY=-1
+  SOURCE_PORT=9001
+  SOURCE_ADDR=0.0.0.0
+  SOURCE_FAMILY=0
+  DEST_PORT=888
+  DEST_ADDR=10.113.4.195
+  DEST_FAMILY=0
+  LOCAL_SEND_CALLS=759714
+  LOCAL_RECV_CALLS=759650
+  LOCAL_BYTES_PER_RECV=1024.00
+  LOCAL_BYTES_PER_SEND=1023.91
+  LOCAL_BYTES_SENT=777881600
+  LOCAL_BYTES_RECVD=777881600
+  LOCAL_BYTES_XFERD=1555763200
+  LOCAL_SEND_OFFSET=0
+  LOCAL_RECV_OFFSET=0
+  LOCAL_SEND_ALIGN=8
+  LOCAL_RECV_ALIGN=8
+  LOCAL_SEND_WIDTH=1
+  LOCAL_RECV_WIDTH=1
+  LOCAL_SEND_DIRTY_COUNT=-1
+  LOCAL_RECV_DIRTY_COUNT=-1
+  LOCAL_RECV_CLEAN_COUNT=-1
+  LOCAL_NODELAY=0
+  LOCAL_CORK=0
+  REMOTE_SEND_CALLS=0
+  REMOTE_RECV_CALLS=0
+  REMOTE_BYTES_PER_RECV=0.00
+  REMOTE_BYTES_PER_SEND=0.00
+  REMOTE_BYTES_SENT=0
+  REMOTE_BYTES_RECVD=0
+  REMOTE_BYTES_XFERD=777881600
+  REMOTE_SEND_OFFSET=-1
+  REMOTE_RECV_OFFSET=-1
+  REMOTE_SEND_ALIGN=-1
+  REMOTE_RECV_ALIGN=-1
+  REMOTE_SEND_WIDTH=0
+  REMOTE_RECV_WIDTH=0
+  REMOTE_SEND_DIRTY_COUNT=-1
+  REMOTE_RECV_DIRTY_COUNT=-1
+  REMOTE_RECV_CLEAN_COUNT=-1
+  REMOTE_NODELAY=-1
+  REMOTE_CORK=0
+  LOCAL_SYSNAME=Linux
+  LOCAL_SYSTEM_MODEL=Teach Me SMBIOS
+  LOCAL_RELEASE=3.13.0+
+  LOCAL_VERSION=#1 SMP Sat Mar 22 16:41:20 CET 2014
+  LOCAL_MACHINE=x86_64
+  REMOTE_SYSTEM_MODEL=Unknown System Model
+  LOCAL_INTERFACE_NAME=eth1
+  LOCAL_INTERFACE_VENDOR=0x1924
+  LOCAL_INTERFACE_DEVICE=0x0803
+  LOCAL_INTERFACE_SUBVENDOR=0x1924
+  LOCAL_INTERFACE_SUBDEVICE=0x6206
+  LOCAL_DRIVER_NAME=sfc
+  LOCAL_DRIVER_VERSION=4.0.2.6645
+  LOCAL_DRIVER_FIRMWARE=3.0.5.2189
+  LOCAL_DRIVER_BUS=0000:81:00.0
+  LOCAL_INTERFACE_SLOT=not found
+  REMOTE_INTERFACE_VENDOR=0x0000
+  REMOTE_INTERFACE_DEVICE=0x0000
+  REMOTE_INTERFACE_SUBVENDOR=0x0000
+  REMOTE_INTERFACE_SUBDEVICE=0x0000
+  REMOTE_DRIVER_NAME=
+  REMOTE_DRIVER_VERSION=
+  REMOTE_DRIVER_FIRMWARE=
+  REMOTE_DRIVER_BUS=
+  LOCAL_INTERVAL_USECS=0
+  LOCAL_INTERVAL_BURST=0
+  REMOTE_INTERVAL_USECS=0
+  REMOTE_INTERVAL_BURST=0
+  LOCAL_SECURITY_TYPE_ID=-1
+  LOCAL_SECURITY_TYPE=Unknown
+  LOCAL_SECURITY_ENABLED_NUM=-1
+  LOCAL_SECURITY_ENABLED=Unknown
+  LOCAL_SECURITY_SPECIFIC=unknown
+  REMOTE_SECURITY_TYPE_ID=0
+  REMOTE_SECURITY_ENABLED_NUM=0
+  UUID=c68a5c40-4203-11e4-8a2d-59ef14d946e2
+  MIN_LATENCY=61
+  MAX_LATENCY=895
+  P50_LATENCY=580
+  P90_LATENCY=721
+  P99_LATENCY=777
+  MEAN_LATENCY=597.53
+  STDDEV_LATENCY=90.12
+  LOCAL_SOCKET_PRIO=-1
+  REMOTE_SOCKET_PRIO=-1
+  LOCAL_SOCKET_TOS=0xffffffff
+  REMOTE_SOCKET_TOS=0xffffffff
+  LOCAL_CONG_CONTROL=
+  REMOTE_CONG_CONTROL=
+  LOCAL_FILL_FILE=
+  REMOTE_FILL_FILE=
+  COMMAND_LINE="../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9001,888 -k all"
+
+Program stderr:
+
+  
+
+Runner: netperf6 - NetperfSumaryRunner
+
+Command: ssh sbrinz2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9001,888 -k all'
+Returncode: 0
+
+Program stdout:
+
+  SOCKET_TYPE=Datagram
+  PROTOCOL=UDP
+  DIRECTION=Send|Recv
+  ELAPSED_TIME=7.00
+  THROUGHPUT=1.02
+  THROUGHPUT_UNITS=10^9bits/s
+  LSS_SIZE_REQ=-1
+  LSS_SIZE=212992
+  LSS_SIZE_END=212992
+  LSR_SIZE_REQ=-1
+  LSR_SIZE=212992
+  LSR_SIZE_END=212992
+  RSS_SIZE_REQ=-1
+  RSS_SIZE=0
+  RSS_SIZE_END=-1
+  RSR_SIZE_REQ=-1
+  RSR_SIZE=0
+  RSR_SIZE_END=-1
+  LOCAL_SEND_SIZE=0
+  LOCAL_RECV_SIZE=0
+  REMOTE_SEND_SIZE=-1
+  REMOTE_RECV_SIZE=-1
+  REQUEST_SIZE=1024
+  RESPONSE_SIZE=1024
+  LOCAL_CPU_UTIL=-1.00
+  LOCAL_CPU_METHOD=U
+  LOCAL_SD=-1.000
+  REMOTE_CPU_UTIL=-1.00
+  REMOTE_CPU_METHOD=
+  REMOTE_SD=-1.000
+  SD_UNITS=usec/KB
+  CONFIDENCE_LEVEL=0
+  CONFIDENCE_INTERVAL=-1.000000
+  CONFIDENCE_ITERATION=1
+  THROUGHPUT_CONFID=-1.000
+  LOCAL_CPU_CONFID=-1.000
+  REMOTE_CPU_CONFID=-1.000
+  TRANSACTION_RATE=124994.076
+  RT_LATENCY=520.025
+  BURST_SIZE=64
+  LOCAL_TRANSPORT_RETRANS=-1
+  REMOTE_TRANSPORT_RETRANS=-2
+  TRANSPORT_MSS=-1
+  LOCAL_SEND_THROUGHPUT=1.02
+  LOCAL_RECV_THROUGHPUT=1.02
+  REMOTE_SEND_THROUGHPUT=0.00
+  REMOTE_RECV_THROUGHPUT=0.00
+  LOCAL_CPU_BIND=-1
+  LOCAL_CPU_COUNT=0
+  LOCAL_CPU_PEAK_UTIL=-1.00
+  LOCAL_CPU_PEAK_ID=-1
+  LOCAL_CPU_MODEL=Quad-Core AMD Opteron(tm) Processor 8380
+  LOCAL_CPU_FREQUENCY=2500
+  REMOTE_CPU_BIND=-1
+  REMOTE_CPU_COUNT=0
+  REMOTE_CPU_PEAK_UTIL=-1.00
+  REMOTE_CPU_PEAK_ID=-1
+  REMOTE_CPU_MODEL=Unknown CPU Model
+  REMOTE_CPU_FREQUENCY=-1
+  SOURCE_PORT=9001
+  SOURCE_ADDR=0.0.0.0
+  SOURCE_FAMILY=0
+  DEST_PORT=888
+  DEST_ADDR=10.113.4.195
+  DEST_FAMILY=0
+  LOCAL_SEND_CALLS=875036
+  LOCAL_RECV_CALLS=874972
+  LOCAL_BYTES_PER_RECV=1024.00
+  LOCAL_BYTES_PER_SEND=1023.93
+  LOCAL_BYTES_SENT=895971328
+  LOCAL_BYTES_RECVD=895971328
+  LOCAL_BYTES_XFERD=1791942656
+  LOCAL_SEND_OFFSET=0
+  LOCAL_RECV_OFFSET=0
+  LOCAL_SEND_ALIGN=8
+  LOCAL_RECV_ALIGN=8
+  LOCAL_SEND_WIDTH=1
+  LOCAL_RECV_WIDTH=1
+  LOCAL_SEND_DIRTY_COUNT=-1
+  LOCAL_RECV_DIRTY_COUNT=-1
+  LOCAL_RECV_CLEAN_COUNT=-1
+  LOCAL_NODELAY=0
+  LOCAL_CORK=0
+  REMOTE_SEND_CALLS=0
+  REMOTE_RECV_CALLS=0
+  REMOTE_BYTES_PER_RECV=0.00
+  REMOTE_BYTES_PER_SEND=0.00
+  REMOTE_BYTES_SENT=0
+  REMOTE_BYTES_RECVD=0
+  REMOTE_BYTES_XFERD=895971328
+  REMOTE_SEND_OFFSET=-1
+  REMOTE_RECV_OFFSET=-1
+  REMOTE_SEND_ALIGN=-1
+  REMOTE_RECV_ALIGN=-1
+  REMOTE_SEND_WIDTH=0
+  REMOTE_RECV_WIDTH=0
+  REMOTE_SEND_DIRTY_COUNT=-1
+  REMOTE_RECV_DIRTY_COUNT=-1
+  REMOTE_RECV_CLEAN_COUNT=-1
+  REMOTE_NODELAY=-1
+  REMOTE_CORK=0
+  LOCAL_SYSNAME=Linux
+  LOCAL_SYSTEM_MODEL=Teach Me SMBIOS
+  LOCAL_RELEASE=3.13.0+
+  LOCAL_VERSION=#1 SMP Sat Mar 22 16:41:20 CET 2014
+  LOCAL_MACHINE=x86_64
+  REMOTE_SYSTEM_MODEL=Unknown System Model
+  LOCAL_INTERFACE_NAME=eth4
+  LOCAL_INTERFACE_VENDOR=0x8086
+  LOCAL_INTERFACE_DEVICE=0x10fb
+  LOCAL_INTERFACE_SUBVENDOR=0x8086
+  LOCAL_INTERFACE_SUBDEVICE=0x0003
+  LOCAL_DRIVER_NAME=ixgbe
+  LOCAL_DRIVER_VERSION=3.15.1-k
+  LOCAL_DRIVER_FIRMWARE=0x61c10001
+  LOCAL_DRIVER_BUS=0000:85:00.1
+  LOCAL_INTERFACE_SLOT=not found
+  REMOTE_INTERFACE_VENDOR=0x0000
+  REMOTE_INTERFACE_DEVICE=0x0000
+  REMOTE_INTERFACE_SUBVENDOR=0x0000
+  REMOTE_INTERFACE_SUBDEVICE=0x0000
+  REMOTE_DRIVER_NAME=
+  REMOTE_DRIVER_VERSION=
+  REMOTE_DRIVER_FIRMWARE=
+  REMOTE_DRIVER_BUS=
+  LOCAL_INTERVAL_USECS=0
+  LOCAL_INTERVAL_BURST=0
+  REMOTE_INTERVAL_USECS=0
+  REMOTE_INTERVAL_BURST=0
+  LOCAL_SECURITY_TYPE_ID=-1
+  LOCAL_SECURITY_TYPE=Unknown
+  LOCAL_SECURITY_ENABLED_NUM=-1
+  LOCAL_SECURITY_ENABLED=Unknown
+  LOCAL_SECURITY_SPECIFIC=unknown
+  REMOTE_SECURITY_TYPE_ID=0
+  REMOTE_SECURITY_ENABLED_NUM=0
+  UUID=01f324fa-420f-11e4-a0c2-4f437d83f7ff
+  MIN_LATENCY=50
+  MAX_LATENCY=1708
+  P50_LATENCY=529
+  P90_LATENCY=576
+  P99_LATENCY=604
+  MEAN_LATENCY=519.44
+  STDDEV_LATENCY=48.97
+  LOCAL_SOCKET_PRIO=-1
+  REMOTE_SOCKET_PRIO=-1
+  LOCAL_SOCKET_TOS=0xffffffff
+  REMOTE_SOCKET_TOS=0xffffffff
+  LOCAL_CONG_CONTROL=
+  REMOTE_CONG_CONTROL=
+  LOCAL_FILL_FILE=
+  REMOTE_FILL_FILE=
+  COMMAND_LINE="../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9001,888 -k all"
+
+Program stderr:
+
+  
+
+Runner: netperf7 - NetperfSumaryRunner
+
+Command: ssh appenzeller-e1000 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9001,888 -k all'
+Returncode: 0
+
+Program stdout:
+
+  SOCKET_TYPE=Datagram
+  PROTOCOL=UDP
+  DIRECTION=Send|Recv
+  ELAPSED_TIME=7.00
+  THROUGHPUT=0.94
+  THROUGHPUT_UNITS=10^9bits/s
+  LSS_SIZE_REQ=-1
+  LSS_SIZE=212992
+  LSS_SIZE_END=212992
+  LSR_SIZE_REQ=-1
+  LSR_SIZE=212992
+  LSR_SIZE_END=212992
+  RSS_SIZE_REQ=-1
+  RSS_SIZE=0
+  RSS_SIZE_END=-1
+  RSR_SIZE_REQ=-1
+  RSR_SIZE=0
+  RSR_SIZE_END=-1
+  LOCAL_SEND_SIZE=0
+  LOCAL_RECV_SIZE=0
+  REMOTE_SEND_SIZE=-1
+  REMOTE_RECV_SIZE=-1
+  REQUEST_SIZE=1024
+  RESPONSE_SIZE=1024
+  LOCAL_CPU_UTIL=-1.00
+  LOCAL_CPU_METHOD=U
+  LOCAL_SD=-1.000
+  REMOTE_CPU_UTIL=-1.00
+  REMOTE_CPU_METHOD=
+  REMOTE_SD=-1.000
+  SD_UNITS=usec/KB
+  CONFIDENCE_LEVEL=0
+  CONFIDENCE_INTERVAL=-1.000000
+  CONFIDENCE_ITERATION=1
+  THROUGHPUT_CONFID=-1.000
+  LOCAL_CPU_CONFID=-1.000
+  REMOTE_CPU_CONFID=-1.000
+  TRANSACTION_RATE=115033.777
+  RT_LATENCY=565.051
+  BURST_SIZE=64
+  LOCAL_TRANSPORT_RETRANS=-1
+  REMOTE_TRANSPORT_RETRANS=-2
+  TRANSPORT_MSS=-1
+  LOCAL_SEND_THROUGHPUT=0.94
+  LOCAL_RECV_THROUGHPUT=0.94
+  REMOTE_SEND_THROUGHPUT=0.00
+  REMOTE_RECV_THROUGHPUT=0.00
+  LOCAL_CPU_BIND=-1
+  LOCAL_CPU_COUNT=0
+  LOCAL_CPU_PEAK_UTIL=-1.00
+  LOCAL_CPU_PEAK_ID=-1
+  LOCAL_CPU_MODEL=AMD Opteron(tm) Processor 6174
+  LOCAL_CPU_FREQUENCY=2200
+  REMOTE_CPU_BIND=-1
+  REMOTE_CPU_COUNT=0
+  REMOTE_CPU_PEAK_UTIL=-1.00
+  REMOTE_CPU_PEAK_ID=-1
+  REMOTE_CPU_MODEL=Unknown CPU Model
+  REMOTE_CPU_FREQUENCY=-1
+  SOURCE_PORT=9001
+  SOURCE_ADDR=0.0.0.0
+  SOURCE_FAMILY=0
+  DEST_PORT=888
+  DEST_ADDR=10.113.4.195
+  DEST_FAMILY=0
+  LOCAL_SEND_CALLS=805326
+  LOCAL_RECV_CALLS=805262
+  LOCAL_BYTES_PER_RECV=1024.00
+  LOCAL_BYTES_PER_SEND=1023.92
+  LOCAL_BYTES_SENT=824588288
+  LOCAL_BYTES_RECVD=824588288
+  LOCAL_BYTES_XFERD=1649176576
+  LOCAL_SEND_OFFSET=0
+  LOCAL_RECV_OFFSET=0
+  LOCAL_SEND_ALIGN=8
+  LOCAL_RECV_ALIGN=8
+  LOCAL_SEND_WIDTH=1
+  LOCAL_RECV_WIDTH=1
+  LOCAL_SEND_DIRTY_COUNT=-1
+  LOCAL_RECV_DIRTY_COUNT=-1
+  LOCAL_RECV_CLEAN_COUNT=-1
+  LOCAL_NODELAY=0
+  LOCAL_CORK=0
+  REMOTE_SEND_CALLS=0
+  REMOTE_RECV_CALLS=0
+  REMOTE_BYTES_PER_RECV=0.00
+  REMOTE_BYTES_PER_SEND=0.00
+  REMOTE_BYTES_SENT=0
+  REMOTE_BYTES_RECVD=0
+  REMOTE_BYTES_XFERD=824588288
+  REMOTE_SEND_OFFSET=-1
+  REMOTE_RECV_OFFSET=-1
+  REMOTE_SEND_ALIGN=-1
+  REMOTE_RECV_ALIGN=-1
+  REMOTE_SEND_WIDTH=0
+  REMOTE_RECV_WIDTH=0
+  REMOTE_SEND_DIRTY_COUNT=-1
+  REMOTE_RECV_DIRTY_COUNT=-1
+  REMOTE_RECV_CLEAN_COUNT=-1
+  REMOTE_NODELAY=-1
+  REMOTE_CORK=0
+  LOCAL_SYSNAME=Linux
+  LOCAL_SYSTEM_MODEL=Teach Me SMBIOS
+  LOCAL_RELEASE=3.13.0+
+  LOCAL_VERSION=#1 SMP Sat Mar 22 16:41:20 CET 2014
+  LOCAL_MACHINE=x86_64
+  REMOTE_SYSTEM_MODEL=Unknown System Model
+  LOCAL_INTERFACE_NAME=eth6
+  LOCAL_INTERFACE_VENDOR=0x1924
+  LOCAL_INTERFACE_DEVICE=0x0803
+  LOCAL_INTERFACE_SUBVENDOR=0x1924
+  LOCAL_INTERFACE_SUBDEVICE=0x6206
+  LOCAL_DRIVER_NAME=sfc
+  LOCAL_DRIVER_VERSION=4.0
+  LOCAL_DRIVER_FIRMWARE=3.0.5.2189
+  LOCAL_DRIVER_BUS=0000:22:00.1
+  LOCAL_INTERFACE_SLOT=not found
+  REMOTE_INTERFACE_VENDOR=0x0000
+  REMOTE_INTERFACE_DEVICE=0x0000
+  REMOTE_INTERFACE_SUBVENDOR=0x0000
+  REMOTE_INTERFACE_SUBDEVICE=0x0000
+  REMOTE_DRIVER_NAME=
+  REMOTE_DRIVER_VERSION=
+  REMOTE_DRIVER_FIRMWARE=
+  REMOTE_DRIVER_BUS=
+  LOCAL_INTERVAL_USECS=0
+  LOCAL_INTERVAL_BURST=0
+  REMOTE_INTERVAL_USECS=0
+  REMOTE_INTERVAL_BURST=0
+  LOCAL_SECURITY_TYPE_ID=-1
+  LOCAL_SECURITY_TYPE=Unknown
+  LOCAL_SECURITY_ENABLED_NUM=-1
+  LOCAL_SECURITY_ENABLED=Unknown
+  LOCAL_SECURITY_SPECIFIC=unknown
+  REMOTE_SECURITY_TYPE_ID=0
+  REMOTE_SECURITY_ENABLED_NUM=0
+  UUID=7e4b1eee-4215-11e4-8e01-913d01c69ee7
+  MIN_LATENCY=46
+  MAX_LATENCY=869
+  P50_LATENCY=568
+  P90_LATENCY=665
+  P99_LATENCY=722
+  MEAN_LATENCY=564.30
+  STDDEV_LATENCY=72.47
+  LOCAL_SOCKET_PRIO=-1
+  REMOTE_SOCKET_PRIO=-1
+  LOCAL_SOCKET_TOS=0xffffffff
+  REMOTE_SOCKET_TOS=0xffffffff
+  LOCAL_CONG_CONTROL=
+  REMOTE_CONG_CONTROL=
+  LOCAL_FILL_FILE=
+  REMOTE_FILL_FILE=
+  COMMAND_LINE="../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9001,888 -k all"
+
+Program stderr:
+
+  
+
+Runner: netperf8 - NetperfSumaryRunner
+
+Command: ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 2 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9002,888 -k all'
+Returncode: 0
+
+Program stdout:
+
+  SOCKET_TYPE=Datagram
+  PROTOCOL=UDP
+  DIRECTION=Send|Recv
+  ELAPSED_TIME=7.00
+  THROUGHPUT=0.88
+  THROUGHPUT_UNITS=10^9bits/s
+  LSS_SIZE_REQ=-1
+  LSS_SIZE=212992
+  LSS_SIZE_END=212992
+  LSR_SIZE_REQ=-1
+  LSR_SIZE=212992
+  LSR_SIZE_END=212992
+  RSS_SIZE_REQ=-1
+  RSS_SIZE=0
+  RSS_SIZE_END=-1
+  RSR_SIZE_REQ=-1
+  RSR_SIZE=0
+  RSR_SIZE_END=-1
+  LOCAL_SEND_SIZE=0
+  LOCAL_RECV_SIZE=0
+  REMOTE_SEND_SIZE=-1
+  REMOTE_RECV_SIZE=-1
+  REQUEST_SIZE=1024
+  RESPONSE_SIZE=1024
+  LOCAL_CPU_UTIL=-1.00
+  LOCAL_CPU_METHOD=U
+  LOCAL_SD=-1.000
+  REMOTE_CPU_UTIL=-1.00
+  REMOTE_CPU_METHOD=
+  REMOTE_SD=-1.000
+  SD_UNITS=usec/KB
+  CONFIDENCE_LEVEL=0
+  CONFIDENCE_INTERVAL=-1.000000
+  CONFIDENCE_ITERATION=1
+  THROUGHPUT_CONFID=-1.000
+  LOCAL_CPU_CONFID=-1.000
+  REMOTE_CPU_CONFID=-1.000
+  TRANSACTION_RATE=107985.989
+  RT_LATENCY=601.930
+  BURST_SIZE=64
+  LOCAL_TRANSPORT_RETRANS=-1
+  REMOTE_TRANSPORT_RETRANS=-2
+  TRANSPORT_MSS=-1
+  LOCAL_SEND_THROUGHPUT=0.88
+  LOCAL_RECV_THROUGHPUT=0.88
+  REMOTE_SEND_THROUGHPUT=0.00
+  REMOTE_RECV_THROUGHPUT=0.00
+  LOCAL_CPU_BIND=-1
+  LOCAL_CPU_COUNT=0
+  LOCAL_CPU_PEAK_UTIL=-1.00
+  LOCAL_CPU_PEAK_ID=-1
+  LOCAL_CPU_MODEL=Six-Core AMD Opteron(tm) Processor 8431
+  LOCAL_CPU_FREQUENCY=2400
+  REMOTE_CPU_BIND=-1
+  REMOTE_CPU_COUNT=0
+  REMOTE_CPU_PEAK_UTIL=-1.00
+  REMOTE_CPU_PEAK_ID=-1
+  REMOTE_CPU_MODEL=Unknown CPU Model
+  REMOTE_CPU_FREQUENCY=-1
+  SOURCE_PORT=9002
+  SOURCE_ADDR=0.0.0.0
+  SOURCE_FAMILY=0
+  DEST_PORT=888
+  DEST_ADDR=10.113.4.195
+  DEST_FAMILY=0
+  LOCAL_SEND_CALLS=755979
+  LOCAL_RECV_CALLS=755915
+  LOCAL_BYTES_PER_RECV=1024.00
+  LOCAL_BYTES_PER_SEND=1023.91
+  LOCAL_BYTES_SENT=774056960
+  LOCAL_BYTES_RECVD=774056960
+  LOCAL_BYTES_XFERD=1548113920
+  LOCAL_SEND_OFFSET=0
+  LOCAL_RECV_OFFSET=0
+  LOCAL_SEND_ALIGN=8
+  LOCAL_RECV_ALIGN=8
+  LOCAL_SEND_WIDTH=1
+  LOCAL_RECV_WIDTH=1
+  LOCAL_SEND_DIRTY_COUNT=-1
+  LOCAL_RECV_DIRTY_COUNT=-1
+  LOCAL_RECV_CLEAN_COUNT=-1
+  LOCAL_NODELAY=0
+  LOCAL_CORK=0
+  REMOTE_SEND_CALLS=0
+  REMOTE_RECV_CALLS=0
+  REMOTE_BYTES_PER_RECV=0.00
+  REMOTE_BYTES_PER_SEND=0.00
+  REMOTE_BYTES_SENT=0
+  REMOTE_BYTES_RECVD=0
+  REMOTE_BYTES_XFERD=774056960
+  REMOTE_SEND_OFFSET=-1
+  REMOTE_RECV_OFFSET=-1
+  REMOTE_SEND_ALIGN=-1
+  REMOTE_RECV_ALIGN=-1
+  REMOTE_SEND_WIDTH=0
+  REMOTE_RECV_WIDTH=0
+  REMOTE_SEND_DIRTY_COUNT=-1
+  REMOTE_RECV_DIRTY_COUNT=-1
+  REMOTE_RECV_CLEAN_COUNT=-1
+  REMOTE_NODELAY=-1
+  REMOTE_CORK=0
+  LOCAL_SYSNAME=Linux
+  LOCAL_SYSTEM_MODEL=Teach Me SMBIOS
+  LOCAL_RELEASE=3.13.0+
+  LOCAL_VERSION=#1 SMP Sat Mar 22 16:41:20 CET 2014
+  LOCAL_MACHINE=x86_64
+  REMOTE_SYSTEM_MODEL=Unknown System Model
+  LOCAL_INTERFACE_NAME=eth3
+  LOCAL_INTERFACE_VENDOR=0x8086
+  LOCAL_INTERFACE_DEVICE=0x10fb
+  LOCAL_INTERFACE_SUBVENDOR=0x8086
+  LOCAL_INTERFACE_SUBDEVICE=0x0003
+  LOCAL_DRIVER_NAME=ixgbe
+  LOCAL_DRIVER_VERSION=3.15.1-k
+  LOCAL_DRIVER_FIRMWARE=0x18f60001
+  LOCAL_DRIVER_BUS=0000:81:00.1
+  LOCAL_INTERFACE_SLOT=not found
+  REMOTE_INTERFACE_VENDOR=0x0000
+  REMOTE_INTERFACE_DEVICE=0x0000
+  REMOTE_INTERFACE_SUBVENDOR=0x0000
+  REMOTE_INTERFACE_SUBDEVICE=0x0000
+  REMOTE_DRIVER_NAME=
+  REMOTE_DRIVER_VERSION=
+  REMOTE_DRIVER_FIRMWARE=
+  REMOTE_DRIVER_BUS=
+  LOCAL_INTERVAL_USECS=0
+  LOCAL_INTERVAL_BURST=0
+  REMOTE_INTERVAL_USECS=0
+  REMOTE_INTERVAL_BURST=0
+  LOCAL_SECURITY_TYPE_ID=-1
+  LOCAL_SECURITY_TYPE=Unknown
+  LOCAL_SECURITY_ENABLED_NUM=-1
+  LOCAL_SECURITY_ENABLED=Unknown
+  LOCAL_SECURITY_SPECIFIC=unknown
+  REMOTE_SECURITY_TYPE_ID=0
+  REMOTE_SECURITY_ENABLED_NUM=0
+  UUID=376e12bc-4204-11e4-bcca-a9d69f51fe05
+  MIN_LATENCY=283
+  MAX_LATENCY=880
+  P50_LATENCY=601
+  P90_LATENCY=639
+  P99_LATENCY=675
+  MEAN_LATENCY=600.19
+  STDDEV_LATENCY=35.21
+  LOCAL_SOCKET_PRIO=-1
+  REMOTE_SOCKET_PRIO=-1
+  LOCAL_SOCKET_TOS=0xffffffff
+  REMOTE_SOCKET_TOS=0xffffffff
+  LOCAL_CONG_CONTROL=
+  REMOTE_CONG_CONTROL=
+  LOCAL_FILL_FILE=
+  REMOTE_FILL_FILE=
+  COMMAND_LINE="../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9002,888 -k all"
+
+Program stderr:
+
+  
+
+Runner: netperf9 - NetperfSumaryRunner
+
+Command: ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 2 ../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9002,888 -k all'
+Returncode: 0
+
+Program stdout:
+
+  SOCKET_TYPE=Datagram
+  PROTOCOL=UDP
+  DIRECTION=Send|Recv
+  ELAPSED_TIME=7.00
+  THROUGHPUT=0.89
+  THROUGHPUT_UNITS=10^9bits/s
+  LSS_SIZE_REQ=-1
+  LSS_SIZE=212992
+  LSS_SIZE_END=212992
+  LSR_SIZE_REQ=-1
+  LSR_SIZE=212992
+  LSR_SIZE_END=212992
+  RSS_SIZE_REQ=-1
+  RSS_SIZE=0
+  RSS_SIZE_END=-1
+  RSR_SIZE_REQ=-1
+  RSR_SIZE=0
+  RSR_SIZE_END=-1
+  LOCAL_SEND_SIZE=0
+  LOCAL_RECV_SIZE=0
+  REMOTE_SEND_SIZE=-1
+  REMOTE_RECV_SIZE=-1
+  REQUEST_SIZE=1024
+  RESPONSE_SIZE=1024
+  LOCAL_CPU_UTIL=-1.00
+  LOCAL_CPU_METHOD=U
+  LOCAL_SD=-1.000
+  REMOTE_CPU_UTIL=-1.00
+  REMOTE_CPU_METHOD=
+  REMOTE_SD=-1.000
+  SD_UNITS=usec/KB
+  CONFIDENCE_LEVEL=0
+  CONFIDENCE_INTERVAL=-1.000000
+  CONFIDENCE_ITERATION=1
+  THROUGHPUT_CONFID=-1.000
+  LOCAL_CPU_CONFID=-1.000
+  REMOTE_CPU_CONFID=-1.000
+  TRANSACTION_RATE=108656.010
+  RT_LATENCY=598.218
+  BURST_SIZE=64
+  LOCAL_TRANSPORT_RETRANS=-1
+  REMOTE_TRANSPORT_RETRANS=-2
+  TRANSPORT_MSS=-1
+  LOCAL_SEND_THROUGHPUT=0.89
+  LOCAL_RECV_THROUGHPUT=0.89
+  REMOTE_SEND_THROUGHPUT=0.00
+  REMOTE_RECV_THROUGHPUT=0.00
+  LOCAL_CPU_BIND=-1
+  LOCAL_CPU_COUNT=0
+  LOCAL_CPU_PEAK_UTIL=-1.00
+  LOCAL_CPU_PEAK_ID=-1
+  LOCAL_CPU_MODEL=Six-Core AMD Opteron(tm) Processor 8431
+  LOCAL_CPU_FREQUENCY=2400
+  REMOTE_CPU_BIND=-1
+  REMOTE_CPU_COUNT=0
+  REMOTE_CPU_PEAK_UTIL=-1.00
+  REMOTE_CPU_PEAK_ID=-1
+  REMOTE_CPU_MODEL=Unknown CPU Model
+  REMOTE_CPU_FREQUENCY=-1
+  SOURCE_PORT=9002
+  SOURCE_ADDR=0.0.0.0
+  SOURCE_FAMILY=0
+  DEST_PORT=888
+  DEST_ADDR=10.113.4.195
+  DEST_FAMILY=0
+  LOCAL_SEND_CALLS=760674
+  LOCAL_RECV_CALLS=760610
+  LOCAL_BYTES_PER_RECV=1024.00
+  LOCAL_BYTES_PER_SEND=1023.91
+  LOCAL_BYTES_SENT=778864640
+  LOCAL_BYTES_RECVD=778864640
+  LOCAL_BYTES_XFERD=1557729280
+  LOCAL_SEND_OFFSET=0
+  LOCAL_RECV_OFFSET=0
+  LOCAL_SEND_ALIGN=8
+  LOCAL_RECV_ALIGN=8
+  LOCAL_SEND_WIDTH=1
+  LOCAL_RECV_WIDTH=1
+  LOCAL_SEND_DIRTY_COUNT=-1
+  LOCAL_RECV_DIRTY_COUNT=-1
+  LOCAL_RECV_CLEAN_COUNT=-1
+  LOCAL_NODELAY=0
+  LOCAL_CORK=0
+  REMOTE_SEND_CALLS=0
+  REMOTE_RECV_CALLS=0
+  REMOTE_BYTES_PER_RECV=0.00
+  REMOTE_BYTES_PER_SEND=0.00
+  REMOTE_BYTES_SENT=0
+  REMOTE_BYTES_RECVD=0
+  REMOTE_BYTES_XFERD=778864640
+  REMOTE_SEND_OFFSET=-1
+  REMOTE_RECV_OFFSET=-1
+  REMOTE_SEND_ALIGN=-1
+  REMOTE_RECV_ALIGN=-1
+  REMOTE_SEND_WIDTH=0
+  REMOTE_RECV_WIDTH=0
+  REMOTE_SEND_DIRTY_COUNT=-1
+  REMOTE_RECV_DIRTY_COUNT=-1
+  REMOTE_RECV_CLEAN_COUNT=-1
+  REMOTE_NODELAY=-1
+  REMOTE_CORK=0
+  LOCAL_SYSNAME=Linux
+  LOCAL_SYSTEM_MODEL=Teach Me SMBIOS
+  LOCAL_RELEASE=3.13.0+
+  LOCAL_VERSION=#1 SMP Sat Mar 22 16:41:20 CET 2014
+  LOCAL_MACHINE=x86_64
+  REMOTE_SYSTEM_MODEL=Unknown System Model
+  LOCAL_INTERFACE_NAME=eth1
+  LOCAL_INTERFACE_VENDOR=0x1924
+  LOCAL_INTERFACE_DEVICE=0x0803
+  LOCAL_INTERFACE_SUBVENDOR=0x1924
+  LOCAL_INTERFACE_SUBDEVICE=0x6206
+  LOCAL_DRIVER_NAME=sfc
+  LOCAL_DRIVER_VERSION=4.0.2.6645
+  LOCAL_DRIVER_FIRMWARE=3.0.5.2189
+  LOCAL_DRIVER_BUS=0000:81:00.0
+  LOCAL_INTERFACE_SLOT=not found
+  REMOTE_INTERFACE_VENDOR=0x0000
+  REMOTE_INTERFACE_DEVICE=0x0000
+  REMOTE_INTERFACE_SUBVENDOR=0x0000
+  REMOTE_INTERFACE_SUBDEVICE=0x0000
+  REMOTE_DRIVER_NAME=
+  REMOTE_DRIVER_VERSION=
+  REMOTE_DRIVER_FIRMWARE=
+  REMOTE_DRIVER_BUS=
+  LOCAL_INTERVAL_USECS=0
+  LOCAL_INTERVAL_BURST=0
+  REMOTE_INTERVAL_USECS=0
+  REMOTE_INTERVAL_BURST=0
+  LOCAL_SECURITY_TYPE_ID=-1
+  LOCAL_SECURITY_TYPE=Unknown
+  LOCAL_SECURITY_ENABLED_NUM=-1
+  LOCAL_SECURITY_ENABLED=Unknown
+  LOCAL_SECURITY_SPECIFIC=unknown
+  REMOTE_SECURITY_TYPE_ID=0
+  REMOTE_SECURITY_ENABLED_NUM=0
+  UUID=c68a88dc-4203-11e4-b9ef-894f7f858e87
+  MIN_LATENCY=265
+  MAX_LATENCY=898
+  P50_LATENCY=580
+  P90_LATENCY=721
+  P99_LATENCY=777
+  MEAN_LATENCY=596.54
+  STDDEV_LATENCY=92.08
+  LOCAL_SOCKET_PRIO=-1
+  REMOTE_SOCKET_PRIO=-1
+  LOCAL_SOCKET_TOS=0xffffffff
+  REMOTE_SOCKET_TOS=0xffffffff
+  LOCAL_CONG_CONTROL=
+  REMOTE_CONG_CONTROL=
+  LOCAL_FILL_FILE=
+  REMOTE_FILL_FILE=
+  COMMAND_LINE="../netperf-2.6.0/src/netperf -fg -4 -N -P 0 -H 10.113.4.195 -t udp_rr -l 7 -- -r 1024 -b 64 -P 9002,888 -k all"
+
+Program stderr:
+
+  
+
+2014-09-22:03:20:18: cleaning up server applications
+
+2014-09-22:03:20:18: Done with collecting data
+
+./netperf-wrapper -d 2 -I 1 -l 5 -c noServer --udp --serverCoreShift 0 -H asiago -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 --servercores 10 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.195 udp_rr --packet 1024 --concurrency 64 -t llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64 -o ../echoServerResults/results/dragonet_SF_Q10/runSF_Q10//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/ -L ../echoServerResults/results/dragonet_SF_Q10/runSF_Q10//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_//llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64.log
+generating data for machine asiago
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002]
+Running experiment for time of 7
+Actually running the benchmark to collect data
+2014-09-22:03:20:02:Setting up machines
+
+2014-09-22:03:20:08: Start run
+
+2014-09-22:03:20:08: Starting server applications
+
+2014-09-22:03:20:08: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:03:20:08: Starting client applications
+
+
+2014-09-22:03:20:08: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:03:20:18: Benchmark done (runtime = 9.836150 secs), killing other threads
+
+2014-09-22:03:20:18: Waiting for kill cleanup
+
+2014-09-22:03:20:18: Processing results
+
+2014-09-22:03:20:18: cleaning up server applications
+
+
+2014-09-22:03:20:18: Done with collecting data
+
+
+generating filename with title llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+using ../echoServerResults/results/dragonet_SF_Q10/runSF_Q10//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/udp_rr-2014-09-22T032001.912975.llvmSF_SF_S_udp_0_Q_10_P_1024__SRVI_1_SRV_10_C_64.json.gz as dump file
+Test data is in [../echoServerResults/results/dragonet_SF_Q10/runSF_Q10//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/udp_rr-2014-09-22T032001.912975.llvmSF_SF_S_udp_0_Q_10_P_1024__SRVI_1_SRV_10_C_64.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+HWQUEUES: 10: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+CORES: 10: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+UDP Ports: 1: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+Threads/Port: 10: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+TARGET: SF: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+Server: noServer: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+CLIENTS: 10: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+TCONCURRENCY: 640: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+CONCURRENCY: 64: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+total TPS: [1135507.364]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+vtotal TPS: [1135507.364]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+Net_rate: [9.290000000000001]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+avg TPS: [113550.73640000001]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+MIN TPS: [104667.571]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+get_min: [98.2]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+MIN_LATENCY: [98.2]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+RT_LATENCY: [575.0313]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+P50_LATENCY: [571.5]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+P90_LATENCY: [648.0]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+P99_LATENCY: [690.4]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+MAX_LATENCY: [920.5]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+USE_TCP: False: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+TITLE: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64
+meta titles: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+graph title: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+graph title: HWQUEUES:10, CORES:10, UDP Ports:1, Threads/Port:10, TARGET:SF, Server:noServer, USE_TCP:False
+graph x_axis: []
+graph x_axis_main: ['CORES']
+graph x_axis_other: []
+sort order keys: ['CORES', 'HWQUEUES', 'CORES', 'UDP Ports', 'Threads/PortNo output formatter selected.
+Test data is in ../echoServerResults/results/dragonet_SF_Q10/runSF_Q10//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/udp_rr-2014-09-22T032001.912975.llvmSF_SF_S_udp_0_Q_10_P_1024__SRVI_1_SRV_10_C_64.json.gz (use with -i to format).
+', 'TARGET', 'Server', 'USE_TCP']
+[(10, 10, 10, 1, 10, 0)]
+[0]
+|  HWQUEUES  |     CORES  | UDP Ports  | Threads/P  |    TARGET  |    Server  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  | vtotal TP  |  Net_rate  |   avg TPS  |   MIN TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+|        10  |        10  |         1  |        10  |        SF  |  noServer  |        10  |       640  |        64  | [1135507.  | [1135507.  | [9.290000  | [113550.7  | [104667.5  |    [98.2]  |    [98.2]  | [575.0313  |   [571.5]  |   [648.0]  |   [690.4]  |   [920.5]  |     False  |llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_64  |

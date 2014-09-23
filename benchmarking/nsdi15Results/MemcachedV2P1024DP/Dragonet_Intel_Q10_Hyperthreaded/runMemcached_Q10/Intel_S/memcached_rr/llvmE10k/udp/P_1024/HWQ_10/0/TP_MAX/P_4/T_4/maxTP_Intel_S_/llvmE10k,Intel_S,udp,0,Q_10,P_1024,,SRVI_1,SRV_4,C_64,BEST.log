@@ -1,0 +1,3792 @@
+logfile opened
+2014-09-22:14:19:13:Setting up machines
+2014-09-22:14:19:18: Start run
+memcached0: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f79d0>:  [ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; sudo taskset -c 0,1,2,3 echo 'test output' -p 0 -U 7777 -t 4 -l 10.113.4.95']
+
+dstat: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f79d0>:  [ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; ../dstat/dstat --nocolor -J ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.json -ciny -C0,1,2,3 -N p801p1 -I 128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147, 1 12 > ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.dstat ; cat ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.json']
+
+memaslap0: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7a10>:  [ssh burrata 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap1: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7a50>:  [ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap2: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7ad0>:  [ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap3: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7a90>:  [ssh sbrinz1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap4: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7b10>:  [ssh burrata 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap5: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7b50>:  [ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap6: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7b90>:  [ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap7: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7bd0>:  [ssh sbrinz1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+2014-09-22:14:19:18: Starting server applications
+2014-09-22:14:19:18: Making sure that servers are up
+2014-09-22:14:19:18: Starting client applications
+
+2014-09-22:14:19:18: Benchmark running, for threads which are marked for waiting
+memcached0: process id 22271 died/finished with status 0
+
+dstat: process id 22273 died/finished with status 0
+
+memaslap0: process id 22275 died/finished with status 0
+
+memaslap4: process id 22283 died/finished with status 0
+
+memaslap3: process id 22281 died/finished with status 0
+
+memaslap7: process id 22289 died/finished with status 0
+
+memaslap1: process id 22277 died/finished with status 0
+
+memaslap6: process id 22287 died/finished with status 0
+
+memaslap5: process id 22285 died/finished with status 0
+
+memaslap2: process id 22279 died/finished with status 0
+
+2014-09-22:14:19:34: Benchmark done (runtime = 15.912071 secs), killing other threads
+2014-09-22:14:19:34: Waiting for kill cleanup
+2014-09-22:14:19:34: Processing results
+Runner: memcached0 - ProcessRunner
+
+Command: ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; sudo taskset -c 0,1,2,3 echo 'test output' -p 0 -U 7777 -t 4 -l 10.113.4.95'
+Returncode: 0
+
+Program stdout:
+
+  test output -p 0 -U 7777 -t 4 -l 10.113.4.95
+
+Program stderr:
+
+  
+
+Runner: dstat - DstatJsonRunner
+
+Command: ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; ../dstat/dstat --nocolor -J ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.json -ciny -C0,1,2,3 -N p801p1 -I 128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147, 1 12 > ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.dstat ; cat ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.json'
+Returncode: 0
+
+Program stdout:
+
+  {
+      "dstat_outlist": {
+          "interrupts": {
+              "146": [
+                  0.00010373626920806694, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "147": [
+                  0.0012189011631947866, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "144": [
+                  0.00010373626920806694, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "145": [
+                  7.396707203342798, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "142": [
+                  6.483516825504184e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "143": [
+                  0.0024118682590875567, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "140": [
+                  9.076923555705858e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "141": [
+                  256.47545133057326, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "133": [
+                  5.186813460403347e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "132": [
+                  5.186813460403347e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "131": [
+                  0.00025934067302016737, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "130": [
+                  0.00010373626920806694, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "137": [
+                  6.483516825504184e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "136": [
+                  5.186813460403347e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "135": [
+                  6.5238702342261226, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "134": [
+                  0.0005575824469933598, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "128": [
+                  13.796988639841159, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0
+              ], 
+              "129": [
+                  5.186813460403347e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "139": [
+                  6.483516825504184e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "138": [
+                  6.483516825504184e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu0 usage": {
+              "sys": [
+                  13.637463299052726, 
+                  22.0, 
+                  7.070707070707071, 
+                  9.0, 
+                  12.0, 
+                  9.0, 
+                  7.0, 
+                  7.070707070707071, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  69.66996857300903, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  21.21212121212121, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0
+              ], 
+              "usr": [
+                  16.690569384810228, 
+                  78.0, 
+                  92.92929292929293, 
+                  91.0, 
+                  88.0, 
+                  91.0, 
+                  93.0, 
+                  71.71717171717172, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "wai": [
+                  0.0019987431280226124, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "system": {
+              "ctxt": [
+                  58463.91449589879, 
+                  3746.0, 
+                  4492.0, 
+                  4422.0, 
+                  4337.0, 
+                  4196.0, 
+                  4739.0, 
+                  4461.0, 
+                  4259.0, 
+                  4351.0, 
+                  4073.0, 
+                  4069.0
+              ], 
+              "intr": [
+                  2957.9097349227113, 
+                  3149.0, 
+                  3262.0, 
+                  3325.0, 
+                  3168.0, 
+                  3190.0, 
+                  3409.0, 
+                  3354.0, 
+                  3490.0, 
+                  3600.0, 
+                  3457.0, 
+                  3489.0
+              ]
+          }, 
+          "cpu3 usage": {
+              "sys": [
+                  12.231956318000144, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  6.0, 
+                  9.0, 
+                  11.0, 
+                  11.0, 
+                  11.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  72.29789758061419, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  34.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  15.46865415891289, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  60.0, 
+                  91.0, 
+                  89.0, 
+                  89.0, 
+                  89.0
+              ], 
+              "wai": [
+                  0.001491942472773996, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu2 usage": {
+              "sys": [
+                  12.807525203570167, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  1.0, 
+                  2.0, 
+                  0.0, 
+                  0.0, 
+                  1.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  70.4823420290186, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  35.35353535353536, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.9900990099009901, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  16.707602776969406, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  64.64646464646465, 
+                  100.0, 
+                  99.0, 
+                  98.0, 
+                  99.00990099009901, 
+                  100.0, 
+                  99.0
+              ], 
+              "wai": [
+                  0.002529990441825854, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu1 usage": {
+              "sys": [
+                  12.930105877305522, 
+                  2.0202020202020203, 
+                  2.0, 
+                  0.0, 
+                  1.0, 
+                  1.0, 
+                  0.0, 
+                  6.0, 
+                  5.9405940594059405, 
+                  6.0606060606060606, 
+                  9.0, 
+                  6.0606060606060606
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  70.57389051712406, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  36.0, 
+                  100.0, 
+                  34.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  16.492928907134118, 
+                  97.97979797979798, 
+                  98.0, 
+                  100.0, 
+                  99.0, 
+                  63.0, 
+                  0.0, 
+                  60.0, 
+                  94.05940594059406, 
+                  93.93939393939394, 
+                  91.0, 
+                  93.93939393939394
+              ], 
+              "wai": [
+                  0.003074698436301784, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "net/p801p1": {
+              "recv": [
+                  0, 
+                  0.0, 
+                  123.0, 
+                  0.0, 
+                  123.0, 
+                  0.0, 
+                  123.0, 
+                  0.0, 
+                  123.0, 
+                  0.0, 
+                  123.0, 
+                  0.0
+              ], 
+              "send": [
+                  0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }
+      }
+  }
+
+Program stderr:
+
+  
+
+Runner: memaslap0 - MemaslapSumaryRunner
+
+Command: ssh burrata 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1028864 events)
+     Min:       383
+     Max:      6683
+     Avg:       669
+     Geo:    660.39
+     Std:    126.45
+     Log2 Dist:
+         8:        0    25862   980937    22019
+        12:       19       27
+  
+  Set Statistics (114365 events)
+     Min:       391
+     Max:      6597
+     Avg:       682
+     Geo:    673.53
+     Std:    126.37
+     Log2 Dist:
+         8:        0     3026   108542     2791
+        12:        3        3
+  
+  Total Statistics (1143229 events)
+     Min:       383
+     Max:      6683
+     Avg:       671
+     Geo:    661.69
+     Std:    122.74
+     Log2 Dist:
+         8:        0    28888   1089479    24810
+        12:       22       30
+  
+  cmd_get: 1028926
+  cmd_set: 114367
+  get_misses: 0
+  written_bytes: 207539637
+  read_bytes: 1152099792
+  object_bytes: 124431296
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1143293 TPS: 95269 Net_rate: 108.0M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap1 - MemaslapSumaryRunner
+
+Command: ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1188860 events)
+     Min:       198
+     Max:      6392
+     Avg:       581
+     Geo:    577.47
+     Std:     80.35
+     Log2 Dist:
+         8:       14    54091   1131939     2770
+        12:       21       25
+  
+  Set Statistics (132140 events)
+     Min:       292
+     Max:      1127
+     Avg:       574
+     Geo:    570.00
+     Std:     78.00
+     Log2 Dist:
+         0:        0        0        0        0
+         4:        0        0        0        0
+         8:        0    13313   118623      204
+  
+  Total Statistics (1321000 events)
+     Min:       198
+     Max:      6392
+     Avg:       580
+     Geo:    576.72
+     Std:     82.29
+     Log2 Dist:
+         8:       14    67404   1250562     2974
+        12:       21       25
+  
+  cmd_get: 1188922
+  cmd_set: 132142
+  get_misses: 0
+  written_bytes: 239802900
+  read_bytes: 1331259720
+  object_bytes: 143770496
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1321064 TPS: 110082 Net_rate: 124.8M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap2 - MemaslapSumaryRunner
+
+Command: ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1015749 events)
+     Min:       224
+     Max:      6416
+     Avg:       679
+     Geo:    669.63
+     Std:    123.13
+     Log2 Dist:
+         8:        3    63161   927479    25063
+        12:       21       22
+  
+  Set Statistics (112896 events)
+     Min:       282
+     Max:      5847
+     Avg:       681
+     Geo:    671.80
+     Std:    124.55
+     Log2 Dist:
+         8:        0     7156   102651     3084
+        12:        2        3
+  
+  Total Statistics (1128645 events)
+     Min:       224
+     Max:      6416
+     Avg:       679
+     Geo:    669.85
+     Std:    124.37
+     Log2 Dist:
+         8:        3    70317   1030130    28147
+        12:       23       25
+  
+  cmd_get: 1015808
+  cmd_set: 112901
+  get_misses: 0
+  written_bytes: 204881670
+  read_bytes: 1137413718
+  object_bytes: 122836288
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1128709 TPS: 94053 Net_rate: 106.7M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap3 - MemaslapSumaryRunner
+
+Command: ssh sbrinz1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1165187 events)
+     Min:       210
+     Max:      6535
+     Avg:       592
+     Geo:    587.43
+     Std:     85.50
+     Log2 Dist:
+         8:       29    26425   1129307     9386
+        12:       16       24
+  
+  Set Statistics (129498 events)
+     Min:       253
+     Max:      6258
+     Avg:       597
+     Geo:    591.57
+     Std:    101.36
+     Log2 Dist:
+         8:        1     6228   121723     1541
+        12:        2        3
+  
+  Total Statistics (1294685 events)
+     Min:       210
+     Max:      6535
+     Avg:       592
+     Geo:    587.85
+     Std:     90.56
+     Log2 Dist:
+         8:       30    32653   1251030    10927
+        12:       18       27
+  
+  cmd_get: 1165245
+  cmd_set: 129504
+  get_misses: 0
+  written_bytes: 235015860
+  read_bytes: 1304751034
+  object_bytes: 140900352
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1294749 TPS: 107889 Net_rate: 122.4M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap4 - MemaslapSumaryRunner
+
+Command: ssh burrata 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1099831 events)
+     Min:       117
+     Max:      6515
+     Avg:       624
+     Geo:    614.04
+     Std:    121.90
+     Log2 Dist:
+         4:        0        0        0        5
+         8:        8   178314   904446    17009
+        12:       22       27
+  
+  Set Statistics (122240 events)
+     Min:       329
+     Max:      1319
+     Avg:       661
+     Geo:    647.96
+     Std:    147.26
+     Log2 Dist:
+         0:        0        0        0        0
+         4:        0        0        0        0
+         8:        0    14555   103824     3861
+  
+  Total Statistics (1222071 events)
+     Min:       117
+     Max:      6515
+     Avg:       627
+     Geo:    617.35
+     Std:    128.62
+     Log2 Dist:
+         4:        0        0        0        5
+         8:        8   192869   1008270    20870
+        12:       22       27
+  
+  cmd_get: 1099895
+  cmd_set: 122240
+  get_misses: 0
+  written_bytes: 221839938
+  read_bytes: 1231566898
+  object_bytes: 132997120
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1222135 TPS: 101839 Net_rate: 115.5M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap5 - MemaslapSumaryRunner
+
+Command: ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1168285 events)
+     Min:       216
+     Max:      6411
+     Avg:       592
+     Geo:    589.10
+     Std:     80.06
+     Log2 Dist:
+         8:       25    16969   1148141     3105
+        12:       18       27
+  
+  Set Statistics (129843 events)
+     Min:       232
+     Max:      3938
+     Avg:       574
+     Geo:    569.93
+     Std:     83.49
+     Log2 Dist:
+         8:        3    21289   108328      222
+        12:        1
+  
+  Total Statistics (1298128 events)
+     Min:       216
+     Max:      6411
+     Avg:       590
+     Geo:    587.15
+     Std:     82.04
+     Log2 Dist:
+         8:       28    38258   1256469     3327
+        12:       19       27
+  
+  cmd_get: 1168343
+  cmd_set: 129849
+  get_misses: 0
+  written_bytes: 235641489
+  read_bytes: 1308220118
+  object_bytes: 141275712
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1298192 TPS: 108176 Net_rate: 122.7M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap6 - MemaslapSumaryRunner
+
+Command: ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1022797 events)
+     Min:       242
+     Max:      6433
+     Avg:       675
+     Geo:    664.80
+     Std:    123.95
+     Log2 Dist:
+         8:       16    70853   927619    24265
+        12:       19       25
+  
+  Set Statistics (113675 events)
+     Min:       266
+     Max:      4526
+     Avg:       672
+     Geo:    661.92
+     Std:    124.52
+     Log2 Dist:
+         8:        0     7870   103131     2670
+        12:        3        1
+  
+  Total Statistics (1136472 events)
+     Min:       242
+     Max:      6433
+     Avg:       675
+     Geo:    664.52
+     Std:    122.37
+     Log2 Dist:
+         8:       16    78723   1030750    26935
+        12:       22       26
+  
+  cmd_get: 1022856
+  cmd_set: 113680
+  get_misses: 0
+  written_bytes: 206298441
+  read_bytes: 1145305846
+  object_bytes: 123683840
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1136536 TPS: 94705 Net_rate: 107.4M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap7 - MemaslapSumaryRunner
+
+Command: ssh sbrinz1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1164704 events)
+     Min:       239
+     Max:      6266
+     Avg:       591
+     Geo:    586.56
+     Std:     84.73
+     Log2 Dist:
+         8:       18    19507   1136073     9065
+        12:       18       23
+  
+  Set Statistics (129440 events)
+     Min:       242
+     Max:      5819
+     Avg:       608
+     Geo:    601.25
+     Std:    112.15
+     Log2 Dist:
+         8:        4    18918   108456     2057
+        12:        1        4
+  
+  Total Statistics (1294144 events)
+     Min:       239
+     Max:      6266
+     Avg:       592
+     Geo:    588.01
+     Std:     92.60
+     Log2 Dist:
+         8:       22    38425   1244529    11122
+        12:       19       27
+  
+  cmd_get: 1164763
+  cmd_set: 129445
+  get_misses: 0
+  written_bytes: 234913632
+  read_bytes: 1304210112
+  object_bytes: 140836160
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1294208 TPS: 107844 Net_rate: 122.3M/s
+
+Program stderr:
+
+  
+
+2014-09-22:14:19:34: cleaning up server applications
+
+2014-09-22:14:19:34: Done with collecting data
+
+2014-09-22:14:19:34:Setting up machines
+2014-09-22:14:19:39: Start run
+memcached0: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f79d0>:  [ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; sudo taskset -c 0,1,2,3 echo 'test output' -p 0 -U 7777 -t 4 -l 10.113.4.95']
+
+dstat: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f79d0>:  [ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; ../dstat/dstat --nocolor -J ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.json -ciny -C0,1,2,3 -N p801p1 -I 128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147, 1 12 > ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.dstat ; cat ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.json']
+
+memaslap0: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7a10>:  [ssh burrata 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap1: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7a50>:  [ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap2: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7ad0>:  [ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap3: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7a90>:  [ssh sbrinz1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap4: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7b10>:  [ssh burrata 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap5: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7b50>:  [ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap6: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7b90>:  [ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap7: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7bd0>:  [ssh sbrinz1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+2014-09-22:14:19:39: Starting server applications
+2014-09-22:14:19:39: Making sure that servers are up
+2014-09-22:14:19:39: Starting client applications
+
+2014-09-22:14:19:39: Benchmark running, for threads which are marked for waiting
+memcached0: process id 22715 died/finished with status 0
+
+dstat: process id 22717 died/finished with status 0
+
+memaslap4: process id 22727 died/finished with status 0
+
+memaslap0: process id 22719 died/finished with status 0
+
+memaslap3: process id 22725 died/finished with status 0
+
+memaslap7: process id 22733 died/finished with status 0
+
+memaslap2: process id 22723 died/finished with status 0
+
+memaslap5: process id 22729 died/finished with status 0
+
+memaslap6: process id 22731 died/finished with status 0
+
+memaslap1: process id 22721 died/finished with status 0
+
+2014-09-22:14:19:55: Benchmark done (runtime = 15.946411 secs), killing other threads
+2014-09-22:14:19:55: Waiting for kill cleanup
+2014-09-22:14:19:55: Processing results
+Runner: memcached0 - ProcessRunner
+
+Command: ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; sudo taskset -c 0,1,2,3 echo 'test output' -p 0 -U 7777 -t 4 -l 10.113.4.95'
+Returncode: 0
+
+Program stdout:
+
+  test output -p 0 -U 7777 -t 4 -l 10.113.4.95
+
+Program stderr:
+
+  
+
+Runner: dstat - DstatJsonRunner
+
+Command: ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; ../dstat/dstat --nocolor -J ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.json -ciny -C0,1,2,3 -N p801p1 -I 128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147, 1 12 > ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.dstat ; cat ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.json'
+Returncode: 0
+
+Program stdout:
+
+  {
+      "dstat_outlist": {
+          "interrupts": {
+              "146": [
+                  0.00010370782705008661, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "147": [
+                  0.0012185669678385176, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "144": [
+                  0.00010370782705008661, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "145": [
+                  7.394679192152326, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "142": [
+                  6.481739190630413e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "143": [
+                  0.0024112069789145136, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "140": [
+                  9.074434866882578e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "141": [
+                  256.40513151513636, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "133": [
+                  5.1853913525043304e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "132": [
+                  5.1853913525043304e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "131": [
+                  0.00025926956762521654, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "130": [
+                  0.00010370782705008661, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "137": [
+                  6.481739190630413e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "136": [
+                  5.1853913525043304e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "135": [
+                  6.522081535352897, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "134": [
+                  0.0005574295703942155, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "128": [
+                  13.793400267229144, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0
+              ], 
+              "129": [
+                  5.1853913525043304e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "139": [
+                  6.481739190630413e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "138": [
+                  6.481739190630413e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu0 usage": {
+              "sys": [
+                  13.634687462452701, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  69.6693865507816, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0
+              ], 
+              "usr": [
+                  16.693927789295525, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "wai": [
+                  0.0019981974701782004, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "system": {
+              "ctxt": [
+                  58448.82128924645, 
+                  3770.0, 
+                  5242.0, 
+                  5148.0, 
+                  5073.0, 
+                  5209.0, 
+                  5051.0, 
+                  4926.0, 
+                  4847.0, 
+                  5091.0, 
+                  4690.0, 
+                  4749.0
+              ], 
+              "intr": [
+                  2957.961747108723, 
+                  3364.0, 
+                  3864.0, 
+                  3816.0, 
+                  3812.0, 
+                  3851.0, 
+                  3813.0, 
+                  3769.0, 
+                  3755.0, 
+                  3812.0, 
+                  3676.0, 
+                  3716.0
+              ]
+          }, 
+          "cpu3 usage": {
+              "sys": [
+                  12.234698358768517, 
+                  27.0, 
+                  13.0, 
+                  10.0, 
+                  10.891089108910892, 
+                  11.0, 
+                  12.0, 
+                  9.090909090909092, 
+                  11.0, 
+                  15.0, 
+                  13.0, 
+                  7.070707070707071
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  72.28629763276787, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.9900990099009901, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  15.477512475055725, 
+                  73.0, 
+                  87.0, 
+                  90.0, 
+                  88.11881188118812, 
+                  89.0, 
+                  88.0, 
+                  90.9090909090909, 
+                  89.0, 
+                  85.0, 
+                  87.0, 
+                  92.92929292929293
+              ], 
+              "wai": [
+                  0.001491533407884064, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu2 usage": {
+              "sys": [
+                  12.804276094987957, 
+                  1.0, 
+                  3.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  3.0, 
+                  1.0, 
+                  0.9900990099009901, 
+                  1.0101010101010102, 
+                  2.0, 
+                  2.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  70.46866323780415, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  16.724531369837624, 
+                  99.0, 
+                  97.0, 
+                  100.0, 
+                  99.0, 
+                  100.0, 
+                  97.0, 
+                  99.0, 
+                  99.00990099009901, 
+                  98.98989898989899, 
+                  98.0, 
+                  98.0
+              ], 
+              "wai": [
+                  0.002529297370270068, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu1 usage": {
+              "sys": [
+                  12.932333928130916, 
+                  28.282828282828284, 
+                  11.0, 
+                  11.11111111111111, 
+                  12.0, 
+                  8.910891089108912, 
+                  11.0, 
+                  9.900990099009901, 
+                  8.080808080808081, 
+                  8.0, 
+                  9.0, 
+                  7.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  70.55674143269695, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.9900990099009901, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  16.507850783366315, 
+                  71.71717171717172, 
+                  89.0, 
+                  88.88888888888889, 
+                  88.0, 
+                  91.08910891089108, 
+                  89.0, 
+                  89.10891089108911, 
+                  91.91919191919192, 
+                  92.0, 
+                  91.0, 
+                  93.0
+              ], 
+              "wai": [
+                  0.003073855805813245, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "net/p801p1": {
+              "recv": [
+                  0, 
+                  123.0, 
+                  0.0, 
+                  123.0, 
+                  0.0, 
+                  123.0, 
+                  0.0, 
+                  123.0, 
+                  0.0, 
+                  123.0, 
+                  0.0, 
+                  123.0
+              ], 
+              "send": [
+                  0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }
+      }
+  }
+
+Program stderr:
+
+  
+
+Runner: memaslap0 - MemaslapSumaryRunner
+
+Command: ssh burrata 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1011672 events)
+     Min:         5
+     Max:      5839
+     Avg:       679
+     Geo:    663.35
+     Std:    120.81
+     Log2 Dist:
+         0:        0        0        0       62
+         4:      218      380     1478     6143
+         8:     6386     6489   972765    17707
+        12:       20       24
+  
+  Set Statistics (116048 events)
+     Min:         5
+     Max:      4882
+     Avg:       690
+     Geo:    661.21
+     Std:    160.12
+     Log2 Dist:
+         0:        0        0        0       10
+         4:       52      102      325     1483
+         8:     1517     1521   107365     3671
+        12:        0        2
+  
+  Total Statistics (1127720 events)
+     Min:         5
+     Max:      5839
+     Avg:       680
+     Geo:    663.13
+     Std:    126.18
+     Log2 Dist:
+         0:        0        0        0       72
+         4:      270      482     1803     7626
+         8:     7903     8010   1080130    21378
+        12:       20       26
+  
+  cmd_get: 1011735
+  cmd_set: 116049
+  get_misses: 3617
+  written_bytes: 208071840
+  read_bytes: 1132907166
+  object_bytes: 126261312
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1127784 TPS: 93976 Net_rate: 106.6M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap1 - MemaslapSumaryRunner
+
+Command: ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1306286 events)
+     Min:       186
+     Max:      6528
+     Avg:       529
+     Geo:    528.52
+     Std:     43.07
+     Log2 Dist:
+         8:       26   197591   1108618       10
+        12:       20       21
+  
+  Set Statistics (145169 events)
+     Min:       229
+     Max:      5981
+     Avg:       519
+     Geo:    517.86
+     Std:     41.68
+     Log2 Dist:
+         8:        4    57492    87664        5
+        12:        3        1
+  
+  Total Statistics (1451455 events)
+     Min:       186
+     Max:      6528
+     Avg:       528
+     Geo:    527.44
+     Std:     43.04
+     Log2 Dist:
+         8:       30   255083   1196282       15
+        12:       23       22
+  
+  cmd_get: 1306332
+  cmd_set: 145187
+  get_misses: 0
+  written_bytes: 263463405
+  read_bytes: 1462750452
+  object_bytes: 157963456
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1451519 TPS: 120952 Net_rate: 137.2M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap2 - MemaslapSumaryRunner
+
+Command: ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1060076 events)
+     Min:       254
+     Max:      6420
+     Avg:       651
+     Geo:    649.02
+     Std:     70.15
+     Log2 Dist:
+         8:        3      356   1051510     8159
+        12:       21       27
+  
+  Set Statistics (117821 events)
+     Min:       352
+     Max:      3720
+     Avg:       651
+     Geo:    648.30
+     Std:     66.63
+     Log2 Dist:
+         8:        0       57   116936      826
+        12:        2
+  
+  Total Statistics (1177897 events)
+     Min:       254
+     Max:      6420
+     Avg:       651
+     Geo:    648.94
+     Std:     69.81
+     Log2 Dist:
+         8:        3      413   1168446     8985
+        12:       23       27
+  
+  cmd_get: 1060140
+  cmd_set: 117821
+  get_misses: 0
+  written_bytes: 213820701
+  read_bytes: 1187050104
+  object_bytes: 128189248
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1177961 TPS: 98157 Net_rate: 111.3M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap3 - MemaslapSumaryRunner
+
+Command: ssh sbrinz1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1256777 events)
+     Min:       227
+     Max:      6442
+     Avg:       549
+     Geo:    546.34
+     Std:     76.98
+     Log2 Dist:
+         8:       15    67498   1185934     3284
+        12:       21       25
+  
+  Set Statistics (139672 events)
+     Min:       243
+     Max:      4197
+     Avg:       547
+     Geo:    544.12
+     Std:     74.34
+     Log2 Dist:
+         8:        3    16341   122976      349
+        12:        2        1
+  
+  Total Statistics (1396449 events)
+     Min:       227
+     Max:      6442
+     Avg:       549
+     Geo:    546.12
+     Std:     75.28
+     Log2 Dist:
+         8:       18    83839   1308910     3633
+        12:       23       26
+  
+  cmd_get: 1256831
+  cmd_set: 139682
+  get_misses: 0
+  written_bytes: 253483542
+  read_bytes: 1407311438
+  object_bytes: 151974016
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1396513 TPS: 116369 Net_rate: 132.0M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap4 - MemaslapSumaryRunner
+
+Command: ssh burrata 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1054982 events)
+     Min:       284
+     Max:  10998263
+     Avg:       648
+     Geo:    632.92
+     Std:  10707.65
+     Log2 Dist:
+         8:        0    24833   1017634    12468
+        12:       24       22        0        0
+        16:        0        0        0        0
+        20:        0        0        0        0
+        24:        1
+  
+  Set Statistics (117244 events)
+     Min:       308
+     Max:      1455
+     Avg:       699
+     Geo:    687.35
+     Std:    147.24
+     Log2 Dist:
+         0:        0        0        0        0
+         4:        0        0        0        0
+         8:        0     1935   110278     5031
+  
+  Total Statistics (1172226 events)
+     Min:       284
+     Max:  10998263
+     Avg:       653
+     Geo:    638.16
+     Std:  10158.19
+     Log2 Dist:
+         8:        0    26768   1127912    17499
+        12:       24       22        0        0
+        16:        0        0        0        0
+        20:        0        0        0        0
+        24:        1
+  
+  cmd_get: 1055046
+  cmd_set: 117244
+  get_misses: 1
+  written_bytes: 212781246
+  read_bytes: 1181344662
+  object_bytes: 127561472
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 1
+  
+  Run time: 12.0s Ops: 1172290 TPS: 97685 Net_rate: 110.8M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap5 - MemaslapSumaryRunner
+
+Command: ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1310972 events)
+     Min:       191
+     Max:      6391
+     Avg:       527
+     Geo:    526.19
+     Std:     37.43
+     Log2 Dist:
+         8:       33   331701   979176       22
+        12:       17       23
+  
+  Set Statistics (145692 events)
+     Min:       246
+     Max:      5753
+     Avg:       522
+     Geo:    521.52
+     Std:     42.81
+     Log2 Dist:
+         8:        1    53600    92085        1
+        12:        2        3
+  
+  Total Statistics (1456664 events)
+     Min:       191
+     Max:      6391
+     Avg:       526
+     Geo:    525.72
+     Std:     44.42
+     Log2 Dist:
+         8:       34   385301   1071261       23
+        12:       19       26
+  
+  cmd_get: 1311034
+  cmd_set: 145694
+  get_misses: 0
+  written_bytes: 264411012
+  read_bytes: 1467997768
+  object_bytes: 158515072
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1456728 TPS: 121387 Net_rate: 137.7M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap6 - MemaslapSumaryRunner
+
+Command: ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1057074 events)
+     Min:       215
+     Max:      6620
+     Avg:       652
+     Geo:    650.60
+     Std:     74.14
+     Log2 Dist:
+         8:       14     2004   1047075     7934
+        12:       23       24
+  
+  Set Statistics (117498 events)
+     Min:       390
+     Max:      1313
+     Avg:       655
+     Geo:    652.00
+     Std:     69.77
+     Log2 Dist:
+         0:        0        0        0        0
+         4:        0        0        0        0
+         8:        0      247   116284      967
+  
+  Total Statistics (1174572 events)
+     Min:       215
+     Max:      6620
+     Avg:       653
+     Geo:    650.74
+     Std:     67.24
+     Log2 Dist:
+         8:       14     2251   1163359     8901
+        12:       23       24
+  
+  cmd_get: 1057138
+  cmd_set: 117498
+  get_misses: 0
+  written_bytes: 213227046
+  read_bytes: 1183688700
+  object_bytes: 127837824
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1174636 TPS: 97880 Net_rate: 111.0M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap7 - MemaslapSumaryRunner
+
+Command: ssh sbrinz1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1261474 events)
+     Min:       193
+     Max:      6252
+     Avg:       547
+     Geo:    544.19
+     Std:     76.97
+     Log2 Dist:
+         8:       58   106040   1152439     2895
+        12:       21       21
+  
+  Set Statistics (140199 events)
+     Min:       197
+     Max:      6164
+     Avg:       544
+     Geo:    540.92
+     Std:     77.63
+     Log2 Dist:
+         8:        7    24909   114956      323
+        12:        3        1
+  
+  Total Statistics (1401673 events)
+     Min:       193
+     Max:      6252
+     Avg:       547
+     Geo:    543.87
+     Std:     74.88
+     Log2 Dist:
+         8:       65   130949   1267395     3218
+        12:       24       22
+  
+  cmd_get: 1261535
+  cmd_set: 140202
+  get_misses: 0
+  written_bytes: 254436459
+  read_bytes: 1412571116
+  object_bytes: 152539776
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1401737 TPS: 116804 Net_rate: 132.5M/s
+
+Program stderr:
+
+  
+
+2014-09-22:14:19:55: cleaning up server applications
+
+2014-09-22:14:19:55: Done with collecting data
+
+2014-09-22:14:19:55:Setting up machines
+2014-09-22:14:20:00: Start run
+memcached0: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f79d0>:  [ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; sudo taskset -c 0,1,2,3 echo 'test output' -p 0 -U 7777 -t 4 -l 10.113.4.95']
+
+dstat: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f79d0>:  [ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; ../dstat/dstat --nocolor -J ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.json -ciny -C0,1,2,3 -N p801p1 -I 128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147, 1 12 > ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.dstat ; cat ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.json']
+
+memaslap0: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7a10>:  [ssh burrata 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap1: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7a50>:  [ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap2: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7ad0>:  [ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap3: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7a90>:  [ssh sbrinz1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap4: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7b10>:  [ssh burrata 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap5: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7b50>:  [ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap6: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7b90>:  [ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+memaslap7: The runner <netperf_wrapper.runners.MachineRunner object at 0x20f7bd0>:  [ssh sbrinz1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 ']
+
+2014-09-22:14:20:00: Starting server applications
+2014-09-22:14:20:00: Making sure that servers are up
+2014-09-22:14:20:00: Starting client applications
+
+2014-09-22:14:20:00: Benchmark running, for threads which are marked for waiting
+memcached0: process id 23192 died/finished with status 0
+
+dstat: process id 23194 died/finished with status 0
+
+memaslap0: process id 23196 died/finished with status 0
+
+memaslap4: process id 23204 died/finished with status 0
+
+memaslap7: process id 23210 died/finished with status 0
+
+memaslap3: process id 23202 died/finished with status 0
+
+memaslap5: process id 23206 died/finished with status 0
+
+memaslap6: process id 23208 died/finished with status 0
+
+memaslap1: process id 23198 died/finished with status 0
+
+memaslap2: process id 23200 died/finished with status 0
+
+2014-09-22:14:20:16: Benchmark done (runtime = 15.946526 secs), killing other threads
+2014-09-22:14:20:16: Waiting for kill cleanup
+2014-09-22:14:20:16: Processing results
+Runner: memcached0 - ProcessRunner
+
+Command: ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; sudo taskset -c 0,1,2,3 echo 'test output' -p 0 -U 7777 -t 4 -l 10.113.4.95'
+Returncode: 0
+
+Program stdout:
+
+  test output -p 0 -U 7777 -t 4 -l 10.113.4.95
+
+Program stderr:
+
+  
+
+Runner: dstat - DstatJsonRunner
+
+Command: ssh asiago 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; ../dstat/dstat --nocolor -J ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.json -ciny -C0,1,2,3 -N p801p1 -I 128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147, 1 12 > ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.dstat ; cat ${HOME}/tempResult20140922141912_MEMCACHED_RR_server0/dstat_out.json'
+Returncode: 0
+
+Program stdout:
+
+  {
+      "dstat_outlist": {
+          "interrupts": {
+              "146": [
+                  0.00010367938704746378, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "147": [
+                  0.0012182327978076993, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "144": [
+                  0.00010367938704746378, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "145": [
+                  7.3926513346453095, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "142": [
+                  6.479961690466486e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "143": [
+                  0.002410545748853533, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "140": [
+                  9.071946366653081e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "141": [
+                  256.33481702856176, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "133": [
+                  5.183969352373189e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "132": [
+                  5.183969352373189e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "131": [
+                  0.00025919846761865943, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "130": [
+                  0.00010367938704746378, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "137": [
+                  6.479961690466486e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "136": [
+                  5.183969352373189e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "135": [
+                  6.520292972027949, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "134": [
+                  0.0005572767053801178, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "128": [
+                  13.789786154784254, 
+                  2.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0
+              ], 
+              "129": [
+                  5.183969352373189e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "139": [
+                  6.479961690466486e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "138": [
+                  6.479961690466486e-05, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu0 usage": {
+              "sys": [
+                  13.630973274773558, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  3.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  69.67757099905747, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  72.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0
+              ], 
+              "usr": [
+                  16.689458073022266, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  25.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "wai": [
+                  0.001997653146705831, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "system": {
+              "ctxt": [
+                  58433.82882144401, 
+                  3977.0, 
+                  5229.0, 
+                  5105.0, 
+                  5279.0, 
+                  4995.0, 
+                  4896.0, 
+                  4751.0, 
+                  4792.0, 
+                  4870.0, 
+                  4638.0, 
+                  4544.0
+              ], 
+              "intr": [
+                  2958.0750107405365, 
+                  3468.0, 
+                  3865.0, 
+                  3849.0, 
+                  3854.0, 
+                  3827.0, 
+                  3706.0, 
+                  3675.0, 
+                  3734.0, 
+                  3794.0, 
+                  3644.0, 
+                  3632.0
+              ]
+          }, 
+          "cpu3 usage": {
+              "sys": [
+                  12.233234642523076, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  72.27856222435273, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0
+              ], 
+              "usr": [
+                  15.486712008943632, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "wai": [
+                  0.0014911241805624312, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu2 usage": {
+              "sys": [
+                  12.80119235983042, 
+                  2.0, 
+                  1.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  0.0, 
+                  1.0, 
+                  1.0, 
+                  1.0, 
+                  1.0, 
+                  1.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  70.44933676670169, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "usr": [
+                  16.74694226977323, 
+                  98.0, 
+                  99.0, 
+                  99.0, 
+                  100.0, 
+                  99.0, 
+                  100.0, 
+                  99.0, 
+                  99.0, 
+                  99.0, 
+                  99.0, 
+                  99.0
+              ], 
+              "wai": [
+                  0.002528603694666047, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "cpu1 usage": {
+              "sys": [
+                  12.930474696264408, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "stl": [
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "idl": [
+                  70.54971927959234, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0, 
+                  100.0
+              ], 
+              "usr": [
+                  16.51673301090466, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ], 
+              "wai": [
+                  0.003073013238592897, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }, 
+          "net/p801p1": {
+              "recv": [
+                  0, 
+                  0.0, 
+                  324.0, 
+                  0.0, 
+                  123.0, 
+                  0.0, 
+                  123.0, 
+                  0.0, 
+                  123.0, 
+                  0.0, 
+                  123.0, 
+                  0.0
+              ], 
+              "send": [
+                  0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0, 
+                  0.0
+              ]
+          }
+      }
+  }
+
+Program stderr:
+
+  
+
+Runner: memaslap0 - MemaslapSumaryRunner
+
+Command: ssh burrata 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1182219 events)
+     Min:       130
+     Max:      8031
+     Avg:       584
+     Geo:    577.28
+     Std:    104.64
+     Log2 Dist:
+         8:      139   143365   1029527     9147
+        12:        8       33
+  
+  Set Statistics (131390 events)
+     Min:       267
+     Max:      7881
+     Avg:       582
+     Geo:    576.01
+     Std:    109.37
+     Log2 Dist:
+         8:        0    16984   113421      978
+        12:        4        3
+  
+  Total Statistics (1313609 events)
+     Min:       130
+     Max:      8031
+     Avg:       583
+     Geo:    577.16
+     Std:    109.47
+     Log2 Dist:
+         8:      139   160349   1142948    10125
+        12:       12       36
+  
+  cmd_get: 1182272
+  cmd_set: 131401
+  get_misses: 0
+  written_bytes: 238450152
+  read_bytes: 1323823082
+  object_bytes: 142964288
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1313673 TPS: 109466 Net_rate: 124.2M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap1 - MemaslapSumaryRunner
+
+Command: ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1266607 events)
+     Min:         5
+     Max:  10999506
+     Avg:       544
+     Geo:    520.05
+     Std:   9773.47
+     Log2 Dist:
+         0:        0        0        0      280
+         4:     1755     3686     6336     6087
+         8:     1049   224346   1020387     2633
+        12:       25       22        0        0
+        16:        0        0        0        0
+        20:        0        0        0        0
+        24:        1
+  
+  Set Statistics (145301 events)
+     Min:         5
+     Max:      1264
+     Avg:       529
+     Geo:    499.31
+     Std:    119.92
+     Log2 Dist:
+         0:        0        0        0       53
+         4:      437      901     1507     1378
+         8:      255    44879    95317      574
+  
+  Total Statistics (1411908 events)
+     Min:         5
+     Max:  10999506
+     Avg:       542
+     Geo:    517.88
+     Std:   9257.03
+     Log2 Dist:
+         0:        0        0        0      333
+         4:     2192     4587     7843     7465
+         8:     1304   269225   1115704     3207
+        12:       25       22        0        0
+        16:        0        0        0        0
+        20:        0        0        0        0
+        24:        1
+  
+  cmd_get: 1266658
+  cmd_set: 145314
+  get_misses: 4550
+  written_bytes: 260515437
+  read_bytes: 1418390324
+  object_bytes: 158101632
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 1
+  
+  Run time: 12.0s Ops: 1411972 TPS: 117657 Net_rate: 133.4M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap2 - MemaslapSumaryRunner
+
+Command: ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1046087 events)
+     Min:       268
+     Max:      5717
+     Avg:       656
+     Geo:    652.69
+     Std:     83.83
+     Log2 Dist:
+         8:        0      942   1034479    10628
+        12:       20       18
+  
+  Set Statistics (116282 events)
+     Min:       300
+     Max:      6709
+     Avg:       693
+     Geo:    683.46
+     Std:    141.18
+     Log2 Dist:
+         8:        0      116   111664     4493
+        12:        3        6
+  
+  Total Statistics (1162369 events)
+     Min:       268
+     Max:      6709
+     Avg:       660
+     Geo:    655.71
+     Std:     89.71
+     Log2 Dist:
+         8:        0     1058   1146143    15121
+        12:       23       24
+  
+  cmd_get: 1046149
+  cmd_set: 116284
+  get_misses: 0
+  written_bytes: 211016652
+  read_bytes: 1171385778
+  object_bytes: 126516992
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1162433 TPS: 96863 Net_rate: 109.9M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap3 - MemaslapSumaryRunner
+
+Command: ssh sbrinz1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 0 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1020791 events)
+     Min:       217
+     Max:      6192
+     Avg:       666
+     Geo:    660.18
+     Std:    108.03
+     Log2 Dist:
+         8:       31     9125   988960    22636
+        12:       19       20
+  
+  Set Statistics (113456 events)
+     Min:       217
+     Max:      5492
+     Avg:       765
+     Geo:    744.17
+     Std:    197.79
+     Log2 Dist:
+         8:        1     2252    98780    12413
+        12:        9        1
+  
+  Total Statistics (1134247 events)
+     Min:       217
+     Max:      6192
+     Avg:       676
+     Geo:    668.14
+     Std:    123.15
+     Log2 Dist:
+         8:       32    11377   1087740    35049
+        12:       28       21
+  
+  cmd_get: 1020852
+  cmd_set: 113459
+  get_misses: 0
+  written_bytes: 205898226
+  read_bytes: 1143059634
+  object_bytes: 123443392
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1134311 TPS: 94520 Net_rate: 107.2M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap4 - MemaslapSumaryRunner
+
+Command: ssh burrata 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1290958 events)
+     Min:       137
+     Max:      5826
+     Avg:       528
+     Geo:    523.95
+     Std:     87.61
+     Log2 Dist:
+         8:      215   832923   452789     4990
+        12:       24       17
+  
+  Set Statistics (143488 events)
+     Min:       252
+     Max:      4637
+     Avg:       590
+     Geo:    576.24
+     Std:    147.36
+     Log2 Dist:
+         8:        3    55679    84719     3082
+        12:        0        5
+  
+  Total Statistics (1434446 events)
+     Min:       137
+     Max:      5826
+     Avg:       534
+     Geo:    528.96
+     Std:     98.19
+     Log2 Dist:
+         8:      218   888602   537508     8072
+        12:       24       22
+  
+  cmd_get: 1291022
+  cmd_set: 143488
+  get_misses: 0
+  written_bytes: 260396868
+  read_bytes: 1445586852
+  object_bytes: 156114944
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1434510 TPS: 119536 Net_rate: 135.6M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap5 - MemaslapSumaryRunner
+
+Command: ssh ziger1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1269106 events)
+     Min:       211
+     Max:      6403
+     Avg:       544
+     Geo:    541.29
+     Std:     68.85
+     Log2 Dist:
+         8:       29   238458   1027581     2993
+        12:       21       24
+  
+  Set Statistics (141039 events)
+     Min:       398
+     Max:      4991
+     Avg:       541
+     Geo:    537.73
+     Std:     72.57
+     Log2 Dist:
+         8:        0    41316    99387      333
+        12:        2        1
+  
+  Total Statistics (1410145 events)
+     Min:       211
+     Max:      6403
+     Avg:       543
+     Geo:    540.93
+     Std:     74.53
+     Log2 Dist:
+         8:       29   279774   1126968     3326
+        12:       23       25
+  
+  cmd_get: 1269168
+  cmd_set: 141041
+  get_misses: 0
+  written_bytes: 255966675
+  read_bytes: 1421117132
+  object_bytes: 153452608
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1410209 TPS: 117510 Net_rate: 133.3M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap6 - MemaslapSumaryRunner
+
+Command: ssh ziger2 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1044472 events)
+     Min:       237
+     Max:      6453
+     Avg:       663
+     Geo:    659.26
+     Std:     96.70
+     Log2 Dist:
+         8:       27      119   1029618    14660
+        12:       21       27
+  
+  Set Statistics (116092 events)
+     Min:       256
+     Max:      3101
+     Avg:       637
+     Geo:    635.17
+     Std:     61.56
+     Log2 Dist:
+         8:        1       19   115638      433
+        12:        1
+  
+  Total Statistics (1160564 events)
+     Min:       237
+     Max:      6453
+     Avg:       661
+     Geo:    656.81
+     Std:     89.79
+     Log2 Dist:
+         8:       28      138   1145256    15093
+        12:       22       27
+  
+  cmd_get: 1044536
+  cmd_set: 116092
+  get_misses: 0
+  written_bytes: 210679212
+  read_bytes: 1169577168
+  object_bytes: 126308096
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1160628 TPS: 96713 Net_rate: 109.7M/s
+
+Program stderr:
+
+  
+
+Runner: memaslap7 - MemaslapSumaryRunner
+
+Command: ssh sbrinz1 'cd ${HOME}/dragonet/benchmarking/netperf-wrapper/ ; taskset -c 1 sudo ./runBetter.sh memaslap -t12s --cfg_cmd=../libmemcached-1.0.18/bmKey_64_val_1024.conf -S12m   --udp  -T1 -w 1k -c 64 -s 10.113.4.95:7777        -z 0 '
+Returncode: 0
+
+Program stdout:
+
+  servers : 10.113.4.95:7777
+  threads count: 1
+  concurrency: 64
+  sports: 0:64
+  run time: 12s
+  windows size: 1k
+  set proportion: set_prop=0.10
+  get proportion: get_prop=0.90
+  Get Statistics (1018551 events)
+     Min:       153
+     Max:      6213
+     Avg:       676
+     Geo:    669.15
+     Std:    122.68
+     Log2 Dist:
+         8:        7     6381   982430    29687
+        12:       20       26
+  
+  Set Statistics (113212 events)
+     Min:       359
+     Max:      3985
+     Avg:       688
+     Geo:    677.94
+     Std:    131.09
+     Log2 Dist:
+         8:        0     1149   107791     4268
+        12:        4
+  
+  Total Statistics (1131763 events)
+     Min:       153
+     Max:      6213
+     Avg:       678
+     Geo:    670.03
+     Std:    119.14
+     Log2 Dist:
+         8:        7     7530   1090221    33955
+        12:       24       26
+  
+  cmd_get: 1018615
+  cmd_set: 113212
+  get_misses: 0
+  written_bytes: 205451934
+  read_bytes: 1140551410
+  object_bytes: 123174656
+  packet_disorder: 0
+  packet_drop: 0
+  udp_timeout: 0
+  
+  Run time: 12.0s Ops: 1131827 TPS: 94313 Net_rate: 107.0M/s
+
+Program stderr:
+
+  
+
+2014-09-22:14:20:16: cleaning up server applications
+
+2014-09-22:14:20:16: Done with collecting data
+
++ local -r -i max_attempts=4
++ shift
++ local -r 'cmd=./netperf-wrapper -d 2 -I 3 -l 10 -c noServer --udp --serverCoreShift 0 -H asiago -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C burrata -C ziger1 -C ziger2 -C sbrinz1 --servercores 4 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.95 memcached_rr --packet 1024 --concurrency 64 -t llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST -o ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_4/T_4//maxTP_Intel_S_/ -L ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_4/T_4//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST.log'
++ local -i attempt_num=1
++ echo ./netperf-wrapper -d 2 -I 3 -l 10 -c noServer --udp --serverCoreShift 0 -H asiago -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C burrata -C ziger1 -C ziger2 -C sbrinz1 --servercores 4 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.95 memcached_rr --packet 1024 --concurrency 64 -t llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST -o ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_4/T_4//maxTP_Intel_S_/ -L ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_4/T_4//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST.log
+./netperf-wrapper -d 2 -I 3 -l 10 -c noServer --udp --serverCoreShift 0 -H asiago -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C burrata -C ziger1 -C ziger2 -C sbrinz1 --servercores 4 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.95 memcached_rr --packet 1024 --concurrency 64 -t llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST -o ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_4/T_4//maxTP_Intel_S_/ -L ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_4/T_4//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST.log
++ ./netperf-wrapper -d 2 -I 3 -l 10 -c noServer --udp --serverCoreShift 0 -H asiago -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C burrata -C ziger1 -C ziger2 -C sbrinz1 --servercores 4 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.95 memcached_rr --packet 1024 --concurrency 64 -t llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST -o ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_4/T_4//maxTP_Intel_S_/ -L ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_4/T_4//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST.log
+generating data for machine asiago
+generating data for machine burrata
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz1
+generating data for machine burrata
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz1
+Cores used by machine burrata: [0]
+Cores used by machine ziger1: [0]
+Cores used by machine ziger2: [0]
+Cores used by machine sbrinz1: [0]
+Cores used by machine burrata: [1]
+Cores used by machine ziger1: [1]
+Cores used by machine ziger2: [1]
+Cores used by machine sbrinz1: [1]
+Cores used by machine asiago: [0, 1, 2, 3]
+port_list_for_clients: [7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777]
+port_list_for_clients src: [8000, 8000, 8000, 8000, 8001, 8001, 8001, 8001]
+Running experiment for time of 12
+Actually running the benchmark to collect data
+2014-09-22:14:19:13:Setting up machines
+
+2014-09-22:14:19:18: Start run
+
+2014-09-22:14:19:18: Starting server applications
+
+2014-09-22:14:19:18: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:14:19:18: Starting client applications
+
+
+2014-09-22:14:19:18: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:14:19:34: Benchmark done (runtime = 15.912071 secs), killing other threads
+
+2014-09-22:14:19:34: Waiting for kill cleanup
+
+2014-09-22:14:19:34: Processing results
+
+2014-09-22:14:19:34: cleaning up server applications
+
+
+2014-09-22:14:19:34: Done with collecting data
+
+
+2014-09-22:14:19:34:Setting up machines
+
+2014-09-22:14:19:39: Start run
+
+2014-09-22:14:19:39: Starting server applications
+
+2014-09-22:14:19:39: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:14:19:39: Starting client applications
+
+
+2014-09-22:14:19:39: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:14:19:55: Benchmark done (runtime = 15.946411 secs), killing other threads
+
+2014-09-22:14:19:55: Waiting for kill cleanup
+
+2014-09-22:14:19:55: Processing results
+
+2014-09-22:14:19:55: cleaning up server applications
+
+
+2014-09-22:14:19:55: Done with collecting data
+
+
+2014-09-22:14:19:55:Setting up machines
+
+2014-09-22:14:20:00: Start run
+
+2014-09-22:14:20:00: Starting server applications
+
+2014-09-22:14:20:00: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:14:20:00: Starting client applications
+
+
+2014-09-22:14:20:00: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:14:20:16: Benchmark done (runtime = 15.946526 secs), killing other threads
+
+2014-09-22:14:20:16: Waiting for kill cleanup
+
+2014-09-22:14:20:16: Processing results
+
+2014-09-22:14:20:16: cleaning up server applications
+
+
+2014-09-22:14:20:16: Done with collecting data
+
+
+generating filename with title llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+using ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_4/T_4//maxTP_Intel_S_/memcached_rr-2014-09-22T141912.706882.llvmE10k_Intel_S_udp_0_Q_10_P_1024__SRVI_1_SRV_4_C_64_BEST.json.gz as dump file
+Test data is in [../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_4/T_4//maxTP_Intel_S_/memcached_rr-2014-09-22T141912.706882.llvmE10k_Intel_S_udp_0_Q_10_P_1024__SRVI_1_SRV_4_C_64_BEST.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+HWQUEUES: 10: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+CORES: 4: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+SERVERS_INSTANCES: 1: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+SERVER_CORES: 4: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+TARGET: InNo output formatter selected.
+Test data is in ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_4/T_4//maxTP_Intel_S_/memcached_rr-2014-09-22T141912.706882.llvmE10k_Intel_S_udp_0_Q_10_P_1024__SRVI_1_SRV_4_C_64_BEST.json.gz (use with -i to format).
+tel: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+Server: noServer: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+SERVER_CORESHIFT: 0: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+CLIENTS: 8: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+TCONCURRENCY: 512: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+S CPU: [65.65872301515866, 74.92927864214994, 26.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+total TPS: [819857.0, 862908.4166666666, 846198.75]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+MIN TPS: [94053.0, 93976.0, 94313.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+vtotal TPS: [819857.0, 862908.4166666666, 846198.75]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+Net_rate: [929.8, 979.0999999999999, 960.3]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+avg TPS: [102482.125, 107863.55208333333, 105774.84375]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+get_min: [285.875, 246.25, 256.75]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+get_avg: [631.125, 603.375, 628.125]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+get_max: [4428.875, 4183.125, 4757.5]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+get_misses total: [0.0, 3618.0, 4550.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+udp_timeout total: [0.0, 1.0, 1.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+packet_drop total: [0.0, 0.0, 0.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+USE_TCP: False: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+threads count: [1.0, 1.0, 1.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+concurrency: [64.0, 64.0, 64.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+TITLE: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+meta titles: ['HWQUEUES', 'CORES', 'SERVERS_INSTANCES', 'SERVER_CORES', 'TARGET', 'Server', 'SERVER_CORESHIFT', 'CLIENTS', 'TCONCURRENCY', 'USE_TCP', 'TITLE']
+graph title: ['HWQUEUES', 'CORES', 'SERVERS_INSTANCES', 'SERVER_CORES', 'TARGET', 'Server', 'SERVER_CORESHIFT', 'CLIENTS', 'TCONCURRENCY', 'USE_TCP', 'TITLE']
+graph title: HWQUEUES:10, CORES:4, SERVERS_INSTANCES:1, SERVER_CORES:4, TARGET:Intel, Server:noServer, SERVER_CORESHIFT:0, CLIENTS:8, TCONCURRENCY:512, USE_TCP:False, TITLE:llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST
+graph x_axis: []
+graph x_axis_main: ['CORES']
+graph x_axis_other: []
+sort order keys: ['CORES', 'HWQUEUES', 'CORES', 'SERVERS_INSTANCES', 'SERVER_CORES', 'TARGET', 'Server', 'SERVER_CORESHIFT', 'CLIENTS', 'TCONCURRENCY', 'USE_TCP', 'TITLE']
+[(4, 10, 4, 1, 4, 0)]
+[0]
+|  HWQUEUES  |     CORES  | SERVERS_I  | SERVER_CO  |    TARGET  |    Server  | SERVER_CO  |   CLIENTS  | TCONCURRE  |     S CPU  | total TPS  |   MIN TPS  | vtotal TP  |  Net_rate  |   avg TPS  |   get_min  |   get_avg  |   get_max  | get_misse  | udp_timeo  | packet_dr  |   USE_TCP  | threads c  | concurren  |     TITLE  |
+|        10  |         4  |         1  |         4  |     Intel  |  noServer  |         0  |         8  |       512  | [65.65872  | [819857.0  | [94053.0,  | [819857.0  | [929.8, 9  | [102482.1  | [285.875,  | [631.125,  | [4428.875  | [0.0, 361  | [0.0, 1.0  | [0.0, 0.0  |     False  | [1.0, 1.0  | [64.0, 64  |llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_4,C_64,BEST  |

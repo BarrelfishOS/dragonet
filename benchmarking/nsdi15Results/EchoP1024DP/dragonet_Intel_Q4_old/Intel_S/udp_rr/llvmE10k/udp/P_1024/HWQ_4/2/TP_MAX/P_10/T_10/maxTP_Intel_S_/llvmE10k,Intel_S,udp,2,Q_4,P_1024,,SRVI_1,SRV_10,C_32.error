@@ -1,0 +1,84 @@
+./netperf-wrapper -d 2 -I 1 -l 5 -c llvmE10k --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 10 --serverInstances 1 --hwqueues 4 --clientcores 1 -T 10.113.4.95 udp_rr --packet 1024 --concurrency 32 -t llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_10,C_32 -o ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_10/T_10//maxTP_Intel_S_/ -L ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_10/T_10//maxTP_Intel_S_//llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_10,C_32.log
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9 
+toCoreList2 0,1,2,3,4,5,6,7
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9 
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9 
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-22:08:34:53: Starting server applications
+
+2014-07-22:08:35:23: Starting client applications
+
+2014-07-22:08:35:23: Benchmark running, for threads which are marked for waiting
+
+2014-07-22:08:35:34: Benchmark done (runtime = 10.378461 secs), killing other threads
+
+2014-07-22:08:35:34: Waiting for kill cleanup
+
+2014-07-22:08:35:34: Processing results
+
+2014-07-22:08:35:34: cleaning up server applications
+
+Traceback (most recent call last):
+  File "./netperf-wrapper", line 64, in <module>
+    results[0] = agg.postprocess(agg.aggregate(results[0]))
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/aggregators.py", line 287, in aggregate
+    results.add_result(i+1, self.collect())
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/aggregators.py", line 229, in collect
+    self.m_instances[m]['machine'].threads[n].kill_explicit()
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 175, in kill_explicit
+    ans = self.machine_ref._exec_cmd_blocking(cmd)
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 74, in _exec_cmd_blocking
+    stderr=subprocess.STDOUT)
+  File "/usr/lib/python2.7/subprocess.py", line 544, in check_output
+    raise CalledProcessError(retcode, cmd, output=output)
+subprocess.CalledProcessError: Command 'ssh asiago 'sudo killall llvm-cgen-e10k'' returned non-zero exit status 1
+Attempt 1 failed! Trying again in 1 seconds...
+ssh asiago sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+ssh sbrinz2 sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+ssh ziger2 sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+ssh gruyere sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+ssh burrata sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9 
+toCoreList2 0,1,2,3,4,5,6,7
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9 
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9 
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-22:08:35:59: Starting server applications
+
+2014-07-22:08:36:29: Starting client applications
+
+2014-07-22:08:36:29: Benchmark running, for threads which are marked for waiting
+
+2014-07-22:08:36:39: Benchmark done (runtime = 10.346749 secs), killing other threads
+
+2014-07-22:08:36:39: Waiting for kill cleanup
+
+2014-07-22:08:36:39: Processing results
+
+2014-07-22:08:36:39: cleaning up server applications
+
+Traceback (most recent call last):
+  File "./netperf-wrapper", line 64, in <module>
+    results[0] = agg.postprocess(agg.aggregate(results[0]))
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/aggregators.py", line 287, in aggregate
+    results.add_result(i+1, self.collect())
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/aggregators.py", line 229, in collect
+    self.m_instances[m]['machine'].threads[n].kill_explicit()
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 175, in kill_explicit
+    ans = self.machine_ref._exec_cmd_blocking(cmd)
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 74, in _exec_cmd_blocking
+    stderr=subprocess.STDOUT)
+  File "/usr/lib/python2.7/subprocess.py", line 544, in check_output
+    raise CalledProcessError(retcode, cmd, output=output)
+subprocess.CalledProcessError: Command 'ssh asiago 'sudo killall llvm-cgen-e10k'' returned non-zero exit status 1
+Attempt 2 failed and there are no more attempts left!

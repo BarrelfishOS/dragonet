@@ -1,0 +1,619 @@
++ local -r -i max_attempts=4
++ shift
++ local -r 'cmd=./netperf-wrapper -d 2 -I 3 -l 10 -c fancyEchoLinux --udp --serverCoreShift 0 -H asiago -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 --servercores 10 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.195 udp_rr --packet 1024 --concurrency 32 -t fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST -o ../echoServerResults/loadBalacingP1024/Linux_SF_C10/runLinuxSF_Q10//F_30//SF_S//udp_rr/fancyEchoLinux/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/ -L ../echoServerResults/loadBalacingP1024/Linux_SF_C10/runLinuxSF_Q10//F_30//SF_S//udp_rr/fancyEchoLinux/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_//fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST.log'
++ local -i attempt_num=1
++ echo ./netperf-wrapper -d 2 -I 3 -l 10 -c fancyEchoLinux --udp --serverCoreShift 0 -H asiago -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 --servercores 10 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.195 udp_rr --packet 1024 --concurrency 32 -t fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST -o ../echoServerResults/loadBalacingP1024/Linux_SF_C10/runLinuxSF_Q10//F_30//SF_S//udp_rr/fancyEchoLinux/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/ -L ../echoServerResults/loadBalacingP1024/Linux_SF_C10/runLinuxSF_Q10//F_30//SF_S//udp_rr/fancyEchoLinux/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_//fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST.log
+./netperf-wrapper -d 2 -I 3 -l 10 -c fancyEchoLinux --udp --serverCoreShift 0 -H asiago -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 --servercores 10 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.195 udp_rr --packet 1024 --concurrency 32 -t fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST -o ../echoServerResults/loadBalacingP1024/Linux_SF_C10/runLinuxSF_Q10//F_30//SF_S//udp_rr/fancyEchoLinux/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/ -L ../echoServerResults/loadBalacingP1024/Linux_SF_C10/runLinuxSF_Q10//F_30//SF_S//udp_rr/fancyEchoLinux/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_//fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST.log
++ ./netperf-wrapper -d 2 -I 3 -l 10 -c fancyEchoLinux --udp --serverCoreShift 0 -H asiago -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 --servercores 10 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.195 udp_rr --packet 1024 --concurrency 32 -t fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST -o ../echoServerResults/loadBalacingP1024/Linux_SF_C10/runLinuxSF_Q10//F_30//SF_S//udp_rr/fancyEchoLinux/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/ -L ../echoServerResults/loadBalacingP1024/Linux_SF_C10/runLinuxSF_Q10//F_30//SF_S//udp_rr/fancyEchoLinux/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_//fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST.log
+generating data for machine asiago
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+don't create dedicated flows  -a t0 
+don't create dedicated flows  -a t0  -p 888  -a t1 
+don't create dedicated flows  -a t0  -p 888  -a t1  -p 888  -a t2 
+don't create dedicated flows  -a t0  -p 888  -a t1  -p 888  -a t2  -p 888  -a t3 
+don't create dedicated flows  -a t0  -p 888  -a t1  -p 888  -a t2  -p 888  -a t3  -p 888  -a t4 
+don't create dedicated flows  -a t0  -p 888  -a t1  -p 888  -a t2  -p 888  -a t3  -p 888  -a t4  -p 888  -a t5 
+don't create dedicated flows  -a t0  -p 888  -a t1  -p 888  -a t2  -p 888  -a t3  -p 888  -a t4  -p 888  -a t5  -p 888  -a t6 
+don't create dedicated flows  -a t0  -p 888  -a t1  -p 888  -a t2  -p 888  -a t3  -p 888  -a t4  -p 888  -a t5  -p 888  -a t6  -p 888  -a t7 
+don't create dedicated flows  -a t0  -p 888  -a t1  -p 888  -a t2  -p 888  -a t3  -p 888  -a t4  -p 888  -a t5  -p 888  -a t6  -p 888  -a t7  -p 888  -a t8 
+don't create dedicated flows  -a t0  -p 888  -a t1  -p 888  -a t2  -p 888  -a t3  -p 888  -a t4  -p 888  -a t5  -p 888  -a t6  -p 888  -a t7  -p 888  -a t8  -p 888  -a t9 
+FancyEcho Parameters (updated) :  -a t0  -p 888  -a t1  -p 888  -a t2  -p 888  -a t3  -p 888  -a t4  -p 888  -a t5  -p 888  -a t6  -p 888  -a t7  -p 888  -a t8  -p 888  -a t9  -p 888  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9 
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003, 9004, 9004, 9004, 9004, 9005, 9005, 9005, 9005, 9006, 9006, 9006, 9006, 9007, 9007]
+Running experiment for time of 12
+Actually running the benchmark to collect data
+2014-09-22:10:41:39:Setting up machines
+
+2014-09-22:10:41:58: Start run
+
+2014-09-22:10:41:58: Starting server applications
+
+echoServer0: INIT: Machine asiago: Executing init command [cd dragonet/Dragonet/ ; sudo taskset -c 0,1,2,3,4,5,6,7,8,9  ./scripts/pravin/runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  ./fancyEchoLinux  -a t0  -p 888  -a t1  -p 888  -a t2  -p 888  -a t3  -p 888  -a t4  -p 888  -a t5  -p 888  -a t6  -p 888  -a t7  -p 888  -a t8  -p 888  -a t9  -p 888  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  ]
+
+
+echoServer0: INIT: Machine asiago: the response of executing init command is 
+Done with lunching command [./fancyEchoLinux] in background
+
+
+
+echoServer0: INIT: Machine asiago: Executing init command [sleep 2]
+
+
+echoServer0: INIT: Machine asiago: the response of executing init command is 
+
+
+
+
+echoServer0: INIT: Machine asiago: Executing init command [cd dragonet/Dragonet/ ; ethtool -S p801p1 | tee ./ethtool_out_1]
+
+
+echoServer0: INIT: Machine asiago: the response of executing init command is 
+NIC statistics:
+     tx_bytes: 1397460892024
+     tx_good_bytes: 1397460892024
+     tx_bad_bytes: 0
+     tx_packets: 2161860580
+     tx_bad: 0
+     tx_pause: 0
+     tx_control: 0
+     tx_unicast: 2161859582
+     tx_multicast: 16
+     tx_broadcast: 982
+     tx_lt64: 0
+     tx_64: 9666
+     tx_65_to_127: 953874127
+     tx_128_to_255: 63
+     tx_256_to_511: 0
+     tx_512_to_1023: 72
+     tx_1024_to_15xx: 1207976652
+     tx_15xx_to_jumbo: 0
+     tx_gtjumbo: 0
+     tx_collision: 0
+     tx_single_collision: 0
+     tx_multiple_collision: 0
+     tx_excessive_collision: 0
+     tx_deferred: 0
+     tx_late_collision: 0
+     tx_excessive_deferred: 0
+     tx_non_tcpudp: 0
+     tx_mac_src_error: 0
+     tx_ip_src_error: 0
+     rx_bytes: 1397469337073
+     rx_good_bytes: 1397469337073
+     rx_bad_bytes: 0
+     rx_packets: 2161906448
+     rx_good: 2161906448
+     rx_bad: 0
+     rx_pause: 0
+     rx_control: 0
+     rx_unicast: 2161872920
+     rx_multicast: 33516
+     rx_broadcast: 12
+     rx_lt64: 0
+     rx_64: 9634
+     rx_65_to_127: 953913021
+     rx_128_to_255: 3204
+     rx_256_to_511: 0
+     rx_512_to_1023: 1940
+     rx_1024_to_15xx: 1207978649
+     rx_15xx_to_jumbo: 0
+     rx_gtjumbo: 0
+     rx_bad_gtjumbo: 0
+     rx_overflow: 0
+     rx_false_carrier: 0
+     rx_symbol_error: 0
+     rx_align_error: 0
+     rx_length_error: 0
+     rx_internal_error: 0
+     rx_nodesc_drop_cnt: 5970
+     rx_char_error_lane0: 0
+     rx_char_error_lane1: 0
+     rx_char_error_lane2: 0
+     rx_char_error_lane3: 0
+     rx_disp_error_lane0: 0
+     rx_disp_error_lane1: 0
+     rx_disp_error_lane2: 0
+     rx_disp_error_lane3: 0
+     rx_match_fault: 0
+     tx_merge_events: 2340035
+     tx_tso_bursts: 0
+     tx_tso_long_headers: 0
+     tx_tso_packets: 0
+     tx_pushes: 1751069
+     tx_pio_packets: 0
+     rx_reset: 0
+     rx_tobe_disc: 0
+     rx_ip_hdr_chksum_err: 0
+     rx_tcp_udp_chksum_err: 0
+     rx_eth_crc_err: 0
+     rx_mcast_mismatch: 33401
+     rx_frm_trunc: 0
+     rx_nodesc_trunc: 0
+     rx_merge_events: 0
+     rx_merge_packets: 0
+     tx-0.tx_packets: 0
+     tx-1.tx_packets: 0
+     tx-2.tx_packets: 0
+     tx-3.tx_packets: 16
+     tx-4.tx_packets: 0
+     tx-5.tx_packets: 0
+     tx-6.tx_packets: 0
+     tx-7.tx_packets: 0
+     tx-8.tx_packets: 0
+     tx-9.tx_packets: 0
+     tx-10.tx_packets: 0
+     tx-11.tx_packets: 0
+     tx-12.tx_packets: 0
+     tx-13.tx_packets: 24542671
+     tx-14.tx_packets: 0
+     tx-15.tx_packets: 112
+     tx-16.tx_packets: 0
+     tx-17.tx_packets: 0
+     tx-18.tx_packets: 0
+     tx-19.tx_packets: 158
+     rx-0.rx_packets: 9202461
+     rx-1.rx_packets: 0
+     rx-2.rx_packets: 0
+     rx-3.rx_packets: 0
+     rx-4.rx_packets: 0
+     rx-5.rx_packets: 0
+     rx-6.rx_packets: 0
+     rx-7.rx_packets: 7844092
+     rx-8.rx_packets: 0
+     rx-9.rx_packets: 0
+     rx-10.rx_packets: 0
+     rx-11.rx_packets: 0
+     rx-12.rx_packets: 0
+     rx-13.rx_packets: 0
+     rx-14.rx_packets: 0
+     rx-15.rx_packets: 0
+     rx-16.rx_packets: 0
+     rx-17.rx_packets: 7530122
+     rx-18.rx_packets: 0
+     rx-19.rx_packets: 0
+
+
+
+2014-09-22:10:42:03: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:10:42:03: Starting client applications
+
+
+2014-09-22:10:42:03: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:10:42:19: Benchmark done (runtime = 15.653922 secs), killing other threads
+
+2014-09-22:10:42:19: Waiting for kill cleanup
+
+2014-09-22:10:42:19: Processing results
+
+2014-09-22:10:42:19: cleaning up server applications
+
+
+2014-09-22:10:42:21: Done with collecting data
+
+
+2014-09-22:10:42:21:Setting up machines
+
+2014-09-22:10:42:40: Start run
+
+2014-09-22:10:42:40: Starting server applications
+
+echoServer0: INIT: Machine asiago: Executing init command [cd dragonet/Dragonet/ ; sudo taskset -c 0,1,2,3,4,5,6,7,8,9  ./scripts/pravin/runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  ./fancyEchoLinux  -a t0  -p 888  -a t1  -p 888  -a t2  -p 888  -a t3  -p 888  -a t4  -p 888  -a t5  -p 888  -a t6  -p 888  -a t7  -p 888  -a t8  -p 888  -a t9  -p 888  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  ]
+
+
+echoServer0: INIT: Machine asiago: the response of executing init command is 
+Done with lunching command [./fancyEchoLinux] in background
+
+
+
+echoServer0: INIT: Machine asiago: Executing init command [sleep 2]
+
+
+echoServer0: INIT: Machine asiago: the response of executing init command is 
+
+
+
+
+echoServer0: INIT: Machine asiago: Executing init command [cd dragonet/Dragonet/ ; ethtool -S p801p1 | tee ./ethtool_out_1]
+
+
+echoServer0: INIT: Machine asiago: the response of executing init command is 
+NIC statistics:
+     tx_bytes: 1401459850990
+     tx_good_bytes: 1401459850990
+     tx_bad_bytes: 0
+     tx_packets: 2165597985
+     tx_bad: 0
+     tx_pause: 0
+     tx_control: 0
+     tx_unicast: 2165596987
+     tx_multicast: 16
+     tx_broadcast: 982
+     tx_lt64: 0
+     tx_64: 9730
+     tx_65_to_127: 953874127
+     tx_128_to_255: 63
+     tx_256_to_511: 0
+     tx_512_to_1023: 72
+     tx_1024_to_15xx: 1211713993
+     tx_15xx_to_jumbo: 0
+     tx_gtjumbo: 0
+     tx_collision: 0
+     tx_single_collision: 0
+     tx_multiple_collision: 0
+     tx_excessive_collision: 0
+     tx_deferred: 0
+     tx_late_collision: 0
+     tx_excessive_deferred: 0
+     tx_non_tcpudp: 0
+     tx_mac_src_error: 0
+     tx_ip_src_error: 0
+     rx_bytes: 1401468312956
+     rx_good_bytes: 1401468312956
+     rx_bad_bytes: 0
+     rx_packets: 2165643898
+     rx_good: 2165643898
+     rx_bad: 0
+     rx_pause: 0
+     rx_control: 0
+     rx_unicast: 2165610349
+     rx_multicast: 33537
+     rx_broadcast: 12
+     rx_lt64: 0
+     rx_64: 9698
+     rx_65_to_127: 953913041
+     rx_128_to_255: 3205
+     rx_256_to_511: 0
+     rx_512_to_1023: 1964
+     rx_1024_to_15xx: 1211715990
+     rx_15xx_to_jumbo: 0
+     rx_gtjumbo: 0
+     rx_bad_gtjumbo: 0
+     rx_overflow: 0
+     rx_false_carrier: 0
+     rx_symbol_error: 0
+     rx_align_error: 0
+     rx_length_error: 0
+     rx_internal_error: 0
+     rx_nodesc_drop_cnt: 5970
+     rx_char_error_lane0: 0
+     rx_char_error_lane1: 0
+     rx_char_error_lane2: 0
+     rx_char_error_lane3: 0
+     rx_disp_error_lane0: 0
+     rx_disp_error_lane1: 0
+     rx_disp_error_lane2: 0
+     rx_disp_error_lane3: 0
+     rx_match_fault: 0
+     tx_merge_events: 2749054
+     tx_tso_bursts: 0
+     tx_tso_long_headers: 0
+     tx_tso_packets: 0
+     tx_pushes: 1875664
+     tx_pio_packets: 0
+     rx_reset: 0
+     rx_tobe_disc: 0
+     rx_ip_hdr_chksum_err: 0
+     rx_tcp_udp_chksum_err: 0
+     rx_eth_crc_err: 0
+     rx_mcast_mismatch: 33422
+     rx_frm_trunc: 0
+     rx_nodesc_trunc: 0
+     rx_merge_events: 0
+     rx_merge_packets: 0
+     tx-0.tx_packets: 0
+     tx-1.tx_packets: 0
+     tx-2.tx_packets: 0
+     tx-3.tx_packets: 16
+     tx-4.tx_packets: 0
+     tx-5.tx_packets: 0
+     tx-6.tx_packets: 0
+     tx-7.tx_packets: 0
+     tx-8.tx_packets: 0
+     tx-9.tx_packets: 0
+     tx-10.tx_packets: 0
+     tx-11.tx_packets: 0
+     tx-12.tx_packets: 0
+     tx-13.tx_packets: 28280068
+     tx-14.tx_packets: 0
+     tx-15.tx_packets: 120
+     tx-16.tx_packets: 0
+     tx-17.tx_packets: 0
+     tx-18.tx_packets: 0
+     tx-19.tx_packets: 158
+     rx-0.rx_packets: 10493565
+     rx-1.rx_packets: 0
+     rx-2.rx_packets: 0
+     rx-3.rx_packets: 0
+     rx-4.rx_packets: 0
+     rx-5.rx_packets: 0
+     rx-6.rx_packets: 0
+     rx-7.rx_packets: 9071638
+     rx-8.rx_packets: 0
+     rx-9.rx_packets: 0
+     rx-10.rx_packets: 0
+     rx-11.rx_packets: 0
+     rx-12.rx_packets: 0
+     rx-13.rx_packets: 0
+     rx-14.rx_packets: 0
+     rx-15.rx_packets: 0
+     rx-16.rx_packets: 0
+     rx-17.rx_packets: 8748922
+     rx-18.rx_packets: 0
+     rx-19.rx_packets: 0
+
+
+
+2014-09-22:10:42:44: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:10:42:44: Starting client applications
+
+
+2014-09-22:10:42:44: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:10:43:00: Benchmark done (runtime = 15.662273 secs), killing other threads
+
+2014-09-22:10:43:00: Waiting for kill cleanup
+
+2014-09-22:10:43:00: Processing results
+
+2014-09-22:10:43:00: cleaning up server applications
+
+
+2014-09-22:10:43:02: Done with collecting data
+
+
+2014-09-22:10:43:02:Setting up machines
+
+2014-09-22:10:43:21: Start run
+
+2014-09-22:10:43:21: Starting server applications
+
+echoServer0: INIT: Machine asiago: Executing init command [cd dragonet/Dragonet/ ; sudo taskset -c 0,1,2,3,4,5,6,7,8,9  ./scripts/pravin/runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  ./fancyEchoLinux  -a t0  -p 888  -a t1  -p 888  -a t2  -p 888  -a t3  -p 888  -a t4  -p 888  -a t5  -p 888  -a t6  -p 888  -a t7  -p 888  -a t8  -p 888  -a t9  -p 888  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  ]
+
+
+echoServer0: INIT: Machine asiago: the response of executing init command is 
+Done with lunching command [./fancyEchoLinux] in background
+
+
+
+echoServer0: INIT: Machine asiago: Executing init command [sleep 2]
+
+
+echoServer0: INIT: Machine asiago: the response of executing init command is 
+
+
+
+
+echoServer0: INIT: Machine asiago: Executing init command [cd dragonet/Dragonet/ ; ethtool -S p801p1 | tee ./ethtool_out_1]
+
+
+echoServer0: INIT: Machine asiago: the response of executing init command is 
+NIC statistics:
+     tx_bytes: 1405241351716
+     tx_good_bytes: 1405241351716
+     tx_bad_bytes: 0
+     tx_packets: 2169132158
+     tx_bad: 0
+     tx_pause: 0
+     tx_control: 0
+     tx_unicast: 2169131160
+     tx_multicast: 16
+     tx_broadcast: 982
+     tx_lt64: 0
+     tx_64: 9794
+     tx_65_to_127: 953874127
+     tx_128_to_255: 63
+     tx_256_to_511: 0
+     tx_512_to_1023: 72
+     tx_1024_to_15xx: 1215248102
+     tx_15xx_to_jumbo: 0
+     tx_gtjumbo: 0
+     tx_collision: 0
+     tx_single_collision: 0
+     tx_multiple_collision: 0
+     tx_excessive_collision: 0
+     tx_deferred: 0
+     tx_late_collision: 0
+     tx_excessive_deferred: 0
+     tx_non_tcpudp: 0
+     tx_mac_src_error: 0
+     tx_ip_src_error: 0
+     rx_bytes: 1405249830599
+     rx_good_bytes: 1405249830599
+     rx_bad_bytes: 0
+     rx_packets: 2169178116
+     rx_good: 2169178116
+     rx_bad: 0
+     rx_pause: 0
+     rx_control: 0
+     rx_unicast: 2169144546
+     rx_multicast: 33558
+     rx_broadcast: 12
+     rx_lt64: 0
+     rx_64: 9762
+     rx_65_to_127: 953913061
+     rx_128_to_255: 3206
+     rx_256_to_511: 0
+     rx_512_to_1023: 1988
+     rx_1024_to_15xx: 1215250099
+     rx_15xx_to_jumbo: 0
+     rx_gtjumbo: 0
+     rx_bad_gtjumbo: 0
+     rx_overflow: 0
+     rx_false_carrier: 0
+     rx_symbol_error: 0
+     rx_align_error: 0
+     rx_length_error: 0
+     rx_internal_error: 0
+     rx_nodesc_drop_cnt: 5970
+     rx_char_error_lane0: 0
+     rx_char_error_lane1: 0
+     rx_char_error_lane2: 0
+     rx_char_error_lane3: 0
+     rx_disp_error_lane0: 0
+     rx_disp_error_lane1: 0
+     rx_disp_error_lane2: 0
+     rx_disp_error_lane3: 0
+     rx_match_fault: 0
+     tx_merge_events: 3130628
+     tx_tso_bursts: 0
+     tx_tso_long_headers: 0
+     tx_tso_packets: 0
+     tx_pushes: 1981410
+     tx_pio_packets: 0
+     rx_reset: 0
+     rx_tobe_disc: 0
+     rx_ip_hdr_chksum_err: 0
+     rx_tcp_udp_chksum_err: 0
+     rx_eth_crc_err: 0
+     rx_mcast_mismatch: 33444
+     rx_frm_trunc: 0
+     rx_nodesc_trunc: 0
+     rx_merge_events: 0
+     rx_merge_packets: 0
+     tx-0.tx_packets: 0
+     tx-1.tx_packets: 0
+     tx-2.tx_packets: 0
+     tx-3.tx_packets: 16
+     tx-4.tx_packets: 0
+     tx-5.tx_packets: 0
+     tx-6.tx_packets: 0
+     tx-7.tx_packets: 0
+     tx-8.tx_packets: 0
+     tx-9.tx_packets: 0
+     tx-10.tx_packets: 0
+     tx-11.tx_packets: 0
+     tx-12.tx_packets: 0
+     tx-13.tx_packets: 31814237
+     tx-14.tx_packets: 0
+     tx-15.tx_packets: 124
+     tx-16.tx_packets: 0
+     tx-17.tx_packets: 0
+     tx-18.tx_packets: 0
+     tx-19.tx_packets: 158
+     rx-0.rx_packets: 11654219
+     rx-1.rx_packets: 0
+     rx-2.rx_packets: 0
+     rx-3.rx_packets: 0
+     rx-4.rx_packets: 0
+     rx-5.rx_packets: 0
+     rx-6.rx_packets: 0
+     rx-7.rx_packets: 10248740
+     rx-8.rx_packets: 0
+     rx-9.rx_packets: 0
+     rx-10.rx_packets: 0
+     rx-11.rx_packets: 0
+     rx-12.rx_packets: 0
+     rx-13.rx_packets: 0
+     rx-14.rx_packets: 0
+     rx-15.rx_packets: 0
+     rx-16.rx_packets: 0
+     rx-17.rx_packets: 9945385
+     rx-18.rx_packets: 0
+     rx-19.rx_packets: 0
+
+
+
+2014-09-22:10:43:26: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:10:43:26: Starting client applications
+
+
+2014-09-22:10:43:26: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:10:43:42: Benchmark done (runtime = 15.662140 secs), killing other threads
+
+2014-09-22:10:43:42: Waiting for kill cleanup
+
+2014-09-22:10:43:42: Processing results
+
+2014-09-22:10:43:42: cleaning up server applications
+
+
+2014-09-22:10:43:44: Done with collecting data
+
+
+generating filename with title fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+using ../echoServerResults/loadBalacingP1024/Linux_SF_C10/runLinuxSF_Q10//F_30//SF_S//udp_rr/fancyEchoLinux/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/udp_rr-2014-09-22T104139.098042.fancyEchoLinux_SF_S_udp_0_Q_10_P_1024__SRVI_1_SRV_10_C_32_BEST.json.gz as dump file
+Test data is in [../echoServerResults/loadBalacingP1024/Linux_SF_C10/runLinuxSF_Q10//F_30//SF_S//udp_rr/fancyEchoLinux/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/udp_rr-2014-09-22T104139.098042.fancyEchoLinux_SF_S_udp_0_Q_10_P_1024__SRVI_1_SRV_10_C_32_BEST.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+HWQUEUES: 10: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+CORES: 10: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+UDP Ports: 1: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+Threads/Port: 10: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+TARGET: SF: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+Server: fancyEchoLinux: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+CLIENTS: 30: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+TCONCURRENCY: 960: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+CONCURRENCY: 32: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+total TPS: [311356.32200000004, 294421.79500000004, 310648.36299999995]: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+vtotal TPS: [311356.32200000004, 294421.79500000004, 310648.36299999995]: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+Net_rate: [2.550000000000001, 2.3800000000000003, 2.560000000000001]: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+avg TPS: [10378.544066666667, 9814.059833333335, 10354.945433333332]: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+MIN TPS: [7055.543, 6385.145, 6992.597]: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+get_min: [510.43333333333334, 601.6333333333333, 582.9666666666667]: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+MIN_LATENCY: [510.43333333333334, 601.6333333333333, 582.9666666666667]: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+RT_LATENCY: [3522.1085666666672, 3820.762433333333, 3539.623233333333]: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+P50_LATENCY: [3588.2, 3859.1, 3601.0333333333333]: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+P90_LATENCY: [3690.4666666666667, 3962.9, 3724.9666666666667]: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+P99_LATENCY: [4172.566666666667, 4482.1, 4171.233333333334]: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+MAX_LATENCY: [4939.6, 4734.333333333333, 4504.9]: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+USE_TCP: False: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+TITLE: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST: fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+meta titles: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+graph title: ['HWQUEUES', 'CORNo output formatter selected.
+Test data is in ../echoServerResults/loadBalacingP1024/Linux_SF_C10/runLinuxSF_Q10//F_30//SF_S//udp_rr/fancyEchoLinux/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/udp_rr-2014-09-22T104139.098042.fancyEchoLinux_SF_S_udp_0_Q_10_P_1024__SRVI_1_SRV_10_C_32_BEST.json.gz (use with -i to format).
+ES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+graph title: HWQUEUES:10, CORES:10, UDP Ports:1, Threads/Port:10, TARGET:SF, Server:fancyEchoLinux, USE_TCP:False
+graph x_axis: []
+graph x_axis_main: ['CORES']
+graph x_axis_other: []
+sort order keys: ['CORES', 'HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+[(10, 10, 10, 1, 10, 0)]
+[0]
+|  HWQUEUES  |     CORES  | UDP Ports  | Threads/P  |    TARGET  |    Server  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  | vtotal TP  |  Net_rate  |   avg TPS  |   MIN TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+|        10  |        10  |         1  |        10  |        SF  | fancyEcho  |        30  |       960  |        32  | [311356.3  | [311356.3  | [2.550000  | [10378.54  | [7055.543  | [510.4333  | [510.4333  | [3522.108  | [3588.2,   | [3690.466  | [4172.566  | [4939.6,   |     False  |fancyEchoLinux,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST  |

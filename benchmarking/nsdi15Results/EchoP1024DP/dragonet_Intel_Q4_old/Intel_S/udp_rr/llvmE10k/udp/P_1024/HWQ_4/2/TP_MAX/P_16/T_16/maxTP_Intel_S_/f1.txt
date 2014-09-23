@@ -1,0 +1,105 @@
++ local -r -i max_attempts=4
++ shift
++ local -r 'cmd=./netperf-wrapper -d 2 -I 3 -l 10 -c llvmE10k --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 16 --serverInstances 1 --hwqueues 4 --clientcores 1 -T 10.113.4.95 udp_rr --packet 1024 --concurrency 64 -t llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST -o ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_16/T_16//maxTP_Intel_S_/ -L ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_16/T_16//maxTP_Intel_S_//llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST.log'
++ local -i attempt_num=1
++ echo ./netperf-wrapper -d 2 -I 3 -l 10 -c llvmE10k --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 16 --serverInstances 1 --hwqueues 4 --clientcores 1 -T 10.113.4.95 udp_rr --packet 1024 --concurrency 64 -t llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST -o ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_16/T_16//maxTP_Intel_S_/ -L ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_16/T_16//maxTP_Intel_S_//llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST.log
+./netperf-wrapper -d 2 -I 3 -l 10 -c llvmE10k --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 16 --serverInstances 1 --hwqueues 4 --clientcores 1 -T 10.113.4.95 udp_rr --packet 1024 --concurrency 64 -t llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST -o ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_16/T_16//maxTP_Intel_S_/ -L ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_16/T_16//maxTP_Intel_S_//llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST.log
++ ./netperf-wrapper -d 2 -I 3 -l 10 -c llvmE10k --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 16 --serverInstances 1 --hwqueues 4 --clientcores 1 -T 10.113.4.95 udp_rr --packet 1024 --concurrency 64 -t llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST -o ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_16/T_16//maxTP_Intel_S_/ -L ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_16/T_16//maxTP_Intel_S_//llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST.log
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -a t10  -f 10.113.4.95:888/10.113.4.20:9002  -a t11  -f 10.113.4.95:888/10.113.4.96:9002  -a t12  -f 10.113.4.95:888/10.113.4.57:9003  -a t13  -f 10.113.4.95:888/10.113.4.29:9003  -a t14  -f 10.113.4.95:888/10.113.4.20:9003  -a t15  -f 10.113.4.95:888/10.113.4.96:9003  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  -t -q t10  -t -q t11  -t -q t12  -t -q t13  -t -q t14  -t -q t15 
+toCoreList2 0,1,2,3,4,5,6,7
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -a t10  -f 10.113.4.95:888/10.113.4.20:9002  -a t11  -f 10.113.4.95:888/10.113.4.96:9002  -a t12  -f 10.113.4.95:888/10.113.4.57:9003  -a t13  -f 10.113.4.95:888/10.113.4.29:9003  -a t14  -f 10.113.4.95:888/10.113.4.20:9003  -a t15  -f 10.113.4.95:888/10.113.4.96:9003  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  -t -q t10  -t -q t11  -t -q t12  -t -q t13  -t -q t14  -t -q t15 
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -a t10  -f 10.113.4.95:888/10.113.4.20:9002  -a t11  -f 10.113.4.95:888/10.113.4.96:9002  -a t12  -f 10.113.4.95:888/10.113.4.57:9003  -a t13  -f 10.113.4.95:888/10.113.4.29:9003  -a t14  -f 10.113.4.95:888/10.113.4.20:9003  -a t15  -f 10.113.4.95:888/10.113.4.96:9003  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  -t -q t10  -t -q t11  -t -q t12  -t -q t13  -t -q t14  -t -q t15 
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-22:09:20:36: Starting server applications
+
+2014-07-22:09:21:08: Starting client applications
+
+2014-07-22:09:21:08: Benchmark running, for threads which are marked for waiting
+
+2014-07-22:09:21:24: Benchmark done (runtime = 15.411356 secs), killing other threads
+
+2014-07-22:09:21:24: Waiting for kill cleanup
+
+2014-07-22:09:21:24: Processing results
+
+2014-07-22:09:21:24: cleaning up server applications
+
+2014-07-22:09:21:26: Done with collecting data
+
+2014-07-22:09:21:37: Starting server applications
+
+2014-07-22:09:22:12: Starting client applications
+
+2014-07-22:09:22:12: Benchmark running, for threads which are marked for waiting
+
+2014-07-22:09:22:27: Benchmark done (runtime = 15.396410 secs), killing other threads
+
+2014-07-22:09:22:27: Waiting for kill cleanup
+
+2014-07-22:09:22:27: Processing results
+
+2014-07-22:09:22:27: cleaning up server applications
+
+2014-07-22:09:22:30: Done with collecting data
+
+2014-07-22:09:22:40: Starting server applications
+
+2014-07-22:09:23:15: Starting client applications
+
+2014-07-22:09:23:15: Benchmark running, for threads which are marked for waiting
+
+2014-07-22:09:23:31: Benchmark done (runtime = 15.281496 secs), killing other threads
+
+2014-07-22:09:23:31: Waiting for kill cleanup
+
+2014-07-22:09:23:31: Processing results
+
+2014-07-22:09:23:31: cleaning up server applications
+
+2014-07-22:09:23:33: Done with collecting data
+
+generating filename with title llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+using ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_16/T_16//maxTP_Intel_S_/udp_rr-2014-07-22T092025.879774.llvmE10k_Intel_S_udp_2_Q_4_P_1024__SRVI_1_SRV_16_C_64_BEST.json.gz as dump file
+Test data is in [../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_16/T_16//maxTP_Intel_S_/udp_rr-2014-07-22T092025.879774.llvmE10k_Intel_S_udp_2_Q_4_P_1024__SRVI_1_SRV_16_C_64_BEST.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+HWQUEUES: 4: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+CORES: 16: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+UDP Ports: 1: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+Threads/Port: 16: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+TARGET: Intel: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+Server: llvmE10k: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+CLIENTS: 16: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+TCONCURRENCY: 1024: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+CONCURRENCY: 64: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+total TPS: [224286.381, 250003.56, 260717.90600000002]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+vtotal TPS: [0, 0, 0]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+Net_rate: [1.83, 2.05, 2.1399999999999997]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+avg TPS: [14017.8988125, 15625.2225, 16294.869125000001]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+get_min: [5.6875, 6.5625, 6.9375]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+MIN_LATENCY: [5.6875, 6.5625, 6.9375]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+RT_LATENCY: [inf, inf, inf]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+P50_LATENCY: [45.5, 45.625, 45.625]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+P90_LATENCY: [89.3125, 56.9375, 57.5625]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+P99_LATENCY: [1498.6875, 1017.625, 517.875]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+MAX_LATENCY: [2252.375, 2456.0, 2029.1875]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+USE_TCP: False: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+TITLE: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST
+meta titles: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+graph title: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+graph title: HWQUEUES:4, CORES:16, UDP Ports:1, Threads/Port:16, TARGET:Intel, Server:llvmE10k, USE_TCP:False
+graph x_axis: []
+graph x_axis_main: []
+graph x_axis_other: []
+sort order keys: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+[(4, 16, 1, 16, 'Intel', 0)]
+[0]
+|  HWQUEUES  |     CORES  | UDP Ports  | Threads/P  |    TARGET  |    Server  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  | vtotal TP  |  Net_rate  |   avg TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+|         4  |        16  |         1  |        16  |     Intel  |  llvmE10k  |        16  |      1024  |        64  | [224286.3  | [0, 0, 0]  | [1.83, 2.  | [14017.89  | [5.6875,   | [5.6875,   | [inf, inf  | [45.5, 45  | [89.3125,  | [1498.687  | [2252.375  |     FalsNo output formatter selected.
+Test data is in ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_16/T_16//maxTP_Intel_S_/udp_rr-2014-07-22T092025.879774.llvmE10k_Intel_S_udp_2_Q_4_P_1024__SRVI_1_SRV_16_C_64_BEST.json.gz (use with -i to format).
+e  |llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_16,C_64,BEST  |

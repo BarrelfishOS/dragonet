@@ -1,0 +1,160 @@
++ local -r -i max_attempts=4
++ shift
++ local -r 'cmd=./netperf-wrapper -d 2 -I 3 -l 10 -c noServer --udp --serverCoreShift 0 -H asiago -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 --servercores 10 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.195 udp_rr --packet 1024 --concurrency 32 -t llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST -o ../echoServerResults/loadBalacingP1024/Dragonet_SF_Q10/runSF_Q10_morningRun//F_20//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/ -L ../echoServerResults/loadBalacingP1024/Dragonet_SF_Q10/runSF_Q10_morningRun//F_20//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_//llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST.log'
++ local -i attempt_num=1
++ echo ./netperf-wrapper -d 2 -I 3 -l 10 -c noServer --udp --serverCoreShift 0 -H asiago -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 --servercores 10 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.195 udp_rr --packet 1024 --concurrency 32 -t llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST -o ../echoServerResults/loadBalacingP1024/Dragonet_SF_Q10/runSF_Q10_morningRun//F_20//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/ -L ../echoServerResults/loadBalacingP1024/Dragonet_SF_Q10/runSF_Q10_morningRun//F_20//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_//llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST.log
+./netperf-wrapper -d 2 -I 3 -l 10 -c noServer --udp --serverCoreShift 0 -H asiago -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 --servercores 10 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.195 udp_rr --packet 1024 --concurrency 32 -t llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST -o ../echoServerResults/loadBalacingP1024/Dragonet_SF_Q10/runSF_Q10_morningRun//F_20//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/ -L ../echoServerResults/loadBalacingP1024/Dragonet_SF_Q10/runSF_Q10_morningRun//F_20//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_//llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST.log
++ ./netperf-wrapper -d 2 -I 3 -l 10 -c noServer --udp --serverCoreShift 0 -H asiago -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 --servercores 10 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.195 udp_rr --packet 1024 --concurrency 32 -t llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST -o ../echoServerResults/loadBalacingP1024/Dragonet_SF_Q10/runSF_Q10_morningRun//F_20//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/ -L ../echoServerResults/loadBalacingP1024/Dragonet_SF_Q10/runSF_Q10_morningRun//F_20//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_//llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST.log
+generating data for machine asiago
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003, 9004, 9004, 9004, 9004]
+Running experiment for time of 12
+Actually running the benchmark to collect data
+2014-09-22:06:54:55:Setting up machines
+
+2014-09-22:06:55:07: Start run
+
+2014-09-22:06:55:07: Starting server applications
+
+2014-09-22:06:55:07: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:06:55:07: Starting client applications
+
+
+2014-09-22:06:55:07: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:06:55:23: Benchmark done (runtime = 15.210427 secs), killing other threads
+
+2014-09-22:06:55:23: Waiting for kill cleanup
+
+2014-09-22:06:55:23: Processing results
+
+2014-09-22:06:55:23: cleaning up server applications
+
+
+2014-09-22:06:55:23: Done with collecting data
+
+
+2014-09-22:06:55:23:Setting up machines
+
+2014-09-22:06:55:35: Start run
+
+2014-09-22:06:55:35: Starting server applications
+
+2014-09-22:06:55:35: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:06:55:35: Starting client applications
+
+
+2014-09-22:06:55:35: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:06:55:51: Benchmark done (runtime = 15.211151 secs), killing other threads
+
+2014-09-22:06:55:51: Waiting for kill cleanup
+
+2014-09-22:06:55:51: Processing results
+
+2014-09-22:06:55:51: cleaning up server applications
+
+
+2014-09-22:06:55:51: Done with collecting data
+
+
+2014-09-22:06:55:51:Setting up machines
+
+2014-09-22:06:56:03: Start run
+
+2014-09-22:06:56:03: Starting server applications
+
+2014-09-22:06:56:03: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:06:56:03: Starting client applications
+
+
+2014-09-22:06:56:03: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:06:56:18: Benchmark done (runtime = 15.160855 secs), killing other threads
+
+2014-09-22:06:56:18: Waiting for kill cleanup
+
+2014-09-22:06:56:18: Processing results
+
+2014-09-22:06:56:18: cleaning up server applications
+
+
+2014-09-22:06:56:18: Done with collecting data
+
+
+generating filename with title llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+using ../echoServerResults/loadBalacingP1024/Dragonet_SF_Q10/runSF_Q10_morningRun//F_20//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/udp_rr-2014-09-22T065454.910838.llvmSF_SF_S_udp_0_Q_10_P_1024__SRVI_1_SRV_10_C_32_BEST.json.gz as dump file
+Test data is in [../echoServerResults/loadBalacingP1024/Dragonet_SF_Q10/runSF_Q10_morningRun//F_20//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/udp_rr-2014-09-22T065454.910838.llvmSF_SF_S_udp_0_Q_10_P_1024__SRVI_1_SRV_10_C_32_BEST.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+HWQUEUES: 10: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,CNo output formatter selected.
+Test data is in ../echoServerResults/loadBalacingP1024/Dragonet_SF_Q10/runSF_Q10_morningRun//F_20//SF_S//udp_rr/llvmSF/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_SF_S_/udp_rr-2014-09-22T065454.910838.llvmSF_SF_S_udp_0_Q_10_P_1024__SRVI_1_SRV_10_C_32_BEST.json.gz (use with -i to format).
+_32,BEST
+CORES: 10: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+UDP Ports: 1: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+Threads/Port: 10: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+TARGET: SF: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+Server: noServer: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+CLIENTS: 20: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+TCONCURRENCY: 640: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+CONCURRENCY: 32: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+total TPS: [1133407.5629999998, 1138104.527, 1123667.1710000003]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+vtotal TPS: [1133407.5629999998, 1138104.527, 1123667.1710000003]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+Net_rate: [9.31, 9.329999999999998, 9.229999999999999]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+avg TPS: [56670.37814999999, 56905.22635, 56183.35855000002]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+MIN TPS: [2077.978, 250.329, 833.37]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+get_min: [117.05, 112.9, 112.65]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+MIN_LATENCY: [117.05, 112.9, 112.65]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+RT_LATENCY: [1767.5508999999997, 8206.12575, 2950.3667]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+P50_LATENCY: [504.65, 470.15, 512.0]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+P90_LATENCY: [544.95, 26062.2, 566.45]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+P99_LATENCY: [39602.65, 65965.75, 40197.0]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+MAX_LATENCY: [42305.85, 69450.15, 42778.25]: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+USE_TCP: False: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+TITLE: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST: llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST
+meta titles: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+graph title: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+graph title: HWQUEUES:10, CORES:10, UDP Ports:1, Threads/Port:10, TARGET:SF, Server:noServer, USE_TCP:False
+graph x_axis: []
+graph x_axis_main: ['CORES']
+graph x_axis_other: []
+sort order keys: ['CORES', 'HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+[(10, 10, 10, 1, 10, 0)]
+[0]
+|  HWQUEUES  |     CORES  | UDP Ports  | Threads/P  |    TARGET  |    Server  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  | vtotal TP  |  Net_rate  |   avg TPS  |   MIN TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+|        10  |        10  |         1  |        10  |        SF  |  noServer  |        20  |       640  |        32  | [1133407.  | [1133407.  | [9.31, 9.  | [56670.37  | [2077.978  | [117.05,   | [117.05,   | [1767.550  | [504.65,   | [544.95,   | [39602.65  | [42305.85  |     False  |llvmSF,SF_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_32,BEST  |

@@ -1,0 +1,227 @@
++ local -r -i max_attempts=4
++ shift
++ local -r 'cmd=./netperf-wrapper -d 2 -I 3 -l 10 -c llvmE10k --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 12 --serverInstances 1 --hwqueues 4 --clientcores 1 -T 10.113.4.95 udp_rr --packet 1024 --concurrency 8 -t llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST -o ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_/ -L ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_//llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST.log'
++ local -i attempt_num=1
++ echo ./netperf-wrapper -d 2 -I 3 -l 10 -c llvmE10k --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 12 --serverInstances 1 --hwqueues 4 --clientcores 1 -T 10.113.4.95 udp_rr --packet 1024 --concurrency 8 -t llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST -o ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_/ -L ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_//llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST.log
+./netperf-wrapper -d 2 -I 3 -l 10 -c llvmE10k --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 12 --serverInstances 1 --hwqueues 4 --clientcores 1 -T 10.113.4.95 udp_rr --packet 1024 --concurrency 8 -t llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST -o ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_/ -L ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_//llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST.log
++ ./netperf-wrapper -d 2 -I 3 -l 10 -c llvmE10k --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 12 --serverInstances 1 --hwqueues 4 --clientcores 1 -T 10.113.4.95 udp_rr --packet 1024 --concurrency 8 -t llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST -o ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_/ -L ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_//llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST.log
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -a t10  -f 10.113.4.95:888/10.113.4.20:9002  -a t11  -f 10.113.4.95:888/10.113.4.96:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  -t -q t10  -t -q t11 
+toCoreList2 0,1,2,3,4,5,6,7
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -a t10  -f 10.113.4.95:888/10.113.4.20:9002  -a t11  -f 10.113.4.95:888/10.113.4.96:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  -t -q t10  -t -q t11 
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -a t10  -f 10.113.4.95:888/10.113.4.20:9002  -a t11  -f 10.113.4.95:888/10.113.4.96:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  -t -q t10  -t -q t11 
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-22:08:50:15: Starting server applications
+
+2014-07-22:08:50:43: Starting client applications
+
+2014-07-22:08:50:43: Benchmark running, for threads which are marked for waiting
+
+2014-07-22:08:50:59: Benchmark done (runtime = 15.397127 secs), killing other threads
+
+2014-07-22:08:50:59: Waiting for kill cleanup
+
+2014-07-22:08:50:59: Processing results
+
+2014-07-22:08:50:59: cleaning up server applications
+
+2014-07-22:08:51:01: Done with collecting data
+
+2014-07-22:08:51:12: Starting server applications
+
+2014-07-22:08:51:44: Starting client applications
+
+2014-07-22:08:51:44: Benchmark running, for threads which are marked for waiting
+
+2014-07-22:08:51:59: Benchmark done (runtime = 15.347025 secs), killing other threads
+
+2014-07-22:08:51:59: Waiting for kill cleanup
+
+2014-07-22:08:51:59: Processing results
+
+2014-07-22:08:51:59: cleaning up server applications
+
+2014-07-22:08:52:02: Done with collecting data
+
+2014-07-22:08:52:12: Starting server applications
+
+Traceback (most recent call last):
+  File "./netperf-wrapper", line 64, in <module>
+    results[0] = agg.postprocess(agg.aggregate(results[0]))
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/aggregators.py", line 287, in aggregate
+    results.add_result(i+1, self.collect())
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/aggregators.py", line 141, in collect
+    self.m_instances[m]['machine'].threads[n].start()
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 209, in start
+    self.fork()
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 144, in fork
+    ans = self.machine_ref._exec_cmd_blocking(cmd)
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 74, in _exec_cmd_blocking
+    stderr=subprocess.STDOUT)
+  File "/usr/lib/python2.7/subprocess.py", line 544, in check_output
+    raise CalledProcessError(retcode, cmd, output=output)
+subprocess.CalledProcessError: Command 'ssh asiago 'cd dragonet/Dragonet/ ; ./wait_for_dn_app.sh 4 12 '' returned non-zero exit status 1
++ ((  attempt_num == max_attempts  ))
++ echo 'Attempt 1 failed! Trying again in 1 seconds...'
+Attempt 1 failed! Trying again in 1 seconds...
++ ./cleanup.sh
+ssh asiago sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+ssh sbrinz2 sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+ssh ziger2 sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+ssh gruyere sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+ssh burrata sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
++ sleep 5
++ sleep 1
++ ./netperf-wrapper -d 2 -I 3 -l 10 -c llvmE10k --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 12 --serverInstances 1 --hwqueues 4 --clientcores 1 -T 10.113.4.95 udp_rr --packet 1024 --concurrency 8 -t llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST -o ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_/ -L ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_//llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST.log
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -a t10  -f 10.113.4.95:888/10.113.4.20:9002  -a t11  -f 10.113.4.95:888/10.113.4.96:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  -t -q t10  -t -q t11 
+toCoreList2 0,1,2,3,4,5,6,7
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -a t10  -f 10.113.4.95:888/10.113.4.20:9002  -a t11  -f 10.113.4.95:888/10.113.4.96:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  -t -q t10  -t -q t11 
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -a t10  -f 10.113.4.95:888/10.113.4.20:9002  -a t11  -f 10.113.4.95:888/10.113.4.96:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  -t -q t10  -t -q t11 
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-22:08:53:25: Starting server applications
+
+2014-07-22:08:53:57: Starting client applications
+
+2014-07-22:08:53:57: Benchmark running, for threads which are marked for waiting
+
+2014-07-22:08:54:12: Benchmark done (runtime = 15.247083 secs), killing other threads
+
+2014-07-22:08:54:12: Waiting for kill cleanup
+
+2014-07-22:08:54:12: Processing results
+
+2014-07-22:08:54:12: cleaning up server applications
+
+Traceback (most recent call last):
+  File "./netperf-wrapper", line 64, in <module>
+    results[0] = agg.postprocess(agg.aggregate(results[0]))
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/aggregators.py", line 287, in aggregate
+    results.add_result(i+1, self.collect())
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/aggregators.py", line 229, in collect
+    self.m_instances[m]['machine'].threads[n].kill_explicit()
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 175, in kill_explicit
+    ans = self.machine_ref._exec_cmd_blocking(cmd)
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 74, in _exec_cmd_blocking
+    stderr=subprocess.STDOUT)
+  File "/usr/lib/python2.7/subprocess.py", line 544, in check_output
+    raise CalledProcessError(retcode, cmd, output=output)
+subprocess.CalledProcessError: Command 'ssh asiago 'sudo killall llvm-cgen-e10k'' returned non-zero exit status 1
++ ((  attempt_num == max_attempts  ))
++ echo 'Attempt 2 failed! Trying again in 2 seconds...'
+Attempt 2 failed! Trying again in 2 seconds...
++ ./cleanup.sh
+ssh asiago sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+ssh sbrinz2 sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+ssh ziger2 sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+ssh gruyere sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
+ssh burrata sudo killall  memaslap netperf netserver memcached bench-fancyecho llvm-cgen-e10k fancyEchoLinux
++ sleep 5
++ sleep 2
++ ./netperf-wrapper -d 2 -I 3 -l 10 -c llvmE10k --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 12 --serverInstances 1 --hwqueues 4 --clientcores 1 -T 10.113.4.95 udp_rr --packet 1024 --concurrency 8 -t llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST -o ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_/ -L ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_//llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST.log
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -a t10  -f 10.113.4.95:888/10.113.4.20:9002  -a t11  -f 10.113.4.95:888/10.113.4.96:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  -t -q t10  -t -q t11 
+toCoreList2 0,1,2,3,4,5,6,7
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -a t10  -f 10.113.4.95:888/10.113.4.20:9002  -a t11  -f 10.113.4.95:888/10.113.4.96:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  -t -q t10  -t -q t11 
+FancyEcho Parameters:  -a t0 -p 888  -a t1  -f 10.113.4.95:888/10.113.4.29:9000  -a t2  -f 10.113.4.95:888/10.113.4.20:9000  -a t3  -f 10.113.4.95:888/10.113.4.96:9000  -a t4  -f 10.113.4.95:888/10.113.4.57:9001  -a t5  -f 10.113.4.95:888/10.113.4.29:9001  -a t6  -f 10.113.4.95:888/10.113.4.20:9001  -a t7  -f 10.113.4.95:888/10.113.4.96:9001  -a t8  -f 10.113.4.95:888/10.113.4.57:9002  -a t9  -f 10.113.4.95:888/10.113.4.29:9002  -a t10  -f 10.113.4.95:888/10.113.4.20:9002  -a t11  -f 10.113.4.95:888/10.113.4.96:9002  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9  -t -q t10  -t -q t11 
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-22:08:54:38: Starting server applications
+
+2014-07-22:08:55:07: Starting client applications
+
+2014-07-22:08:55:07: Benchmark running, for threads which are marked for waiting
+
+2014-07-22:08:55:22: Benchmark done (runtime = 15.128739 secs), killing other threads
+
+2014-07-22:08:55:22: Waiting for kill cleanup
+
+2014-07-22:08:55:22: Processing results
+
+2014-07-22:08:55:22: cleaning up server applications
+
+2014-07-22:08:55:24: Done with collecting data
+
+2014-07-22:08:55:35: Starting server applications
+
+2014-07-22:08:56:07: Starting client applications
+
+2014-07-22:08:56:07: Benchmark running, for threads which are marked for waiting
+
+2014-07-22:08:56:22: Benchmark done (runtime = 15.397851 secs), killing other threads
+
+2014-07-22:08:56:22: Waiting for kill cleanup
+
+2014-07-22:08:56:22: Processing results
+
+2014-07-22:08:56:22: cleaning up server applications
+
+2014-07-22:08:56:25: Done with collecting data
+
+2014-07-22:08:56:35: Starting server applications
+
+2014-07-22:08:57:07: Starting client applications
+
+2014-07-22:08:57:07: Benchmark running, for threads which are marked for waiting
+
+2014-07-22:08:57:23: Benchmark done (runtime = 15.447392 secs), killing other threads
+
+2014-07-22:08:57:23: Waiting for kill cleanup
+
+2014-07-22:08:57:23: Processing results
+
+2014-07-22:08:57:23: cleaning up server applications
+
+2014-07-22:08:57:25: Done with collecting data
+
+generating filename with title llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+using ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_/udp_rr-2014-07-22T085427.273618.llvmE10k_Intel_S_udp_2_Q_4_P_1024__SRVI_1_SRV_12_C_8_BENo output formatter selected.
+Test data is in ../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_/udp_rr-2014-07-22T085427.273618.llvmE10k_Intel_S_udp_2_Q_4_P_1024__SRVI_1_SRV_12_C_8_BEST.json.gz (use with -i to format).
+ST.json.gz as dump file
+Test data is in [../netperfScaleResults/Scalability/P1024/dragonet_Intel_Q4///Intel_S//udp_rr/llvmE10k/udp/P_1024/HWQ_4/2//TP_MAX/P_12/T_12//maxTP_Intel_S_/udp_rr-2014-07-22T085427.273618.llvmE10k_Intel_S_udp_2_Q_4_P_1024__SRVI_1_SRV_12_C_8_BEST.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+HWQUEUES: 4: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+CORES: 12: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+UDP Ports: 1: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+Threads/Port: 12: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+TARGET: Intel: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+Server: llvmE10k: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+CLIENTS: 16: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+TCONCURRENCY: 128: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+CONCURRENCY: 8: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+total TPS: [436312.34599999996, 447360.86899999995, 429923.63]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+vtotal TPS: [0, 0, 0]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+Net_rate: [3.5700000000000003, 3.67, 3.5199999999999996]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+avg TPS: [27269.521624999998, 27960.054312499997, 26870.226875]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+get_min: [19.125, 19.5, 18.0]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+MIN_LATENCY: [19.125, 19.5, 18.0]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+RT_LATENCY: [inf, inf, inf]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+P50_LATENCY: [45.3125, 45.1875, 46.3125]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+P90_LATENCY: [59.125, 49.8125, 56.4375]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+P99_LATENCY: [66.4375, 65.875, 68.5]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+MAX_LATENCY: [4033.4375, 3182.0, 172.5625]: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+USE_TCP: False: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+TITLE: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST: llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST
+meta titles: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+graph title: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+graph title: HWQUEUES:4, CORES:12, UDP Ports:1, Threads/Port:12, TARGET:Intel, Server:llvmE10k, USE_TCP:False
+graph x_axis: []
+graph x_axis_main: []
+graph x_axis_other: []
+sort order keys: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+[(4, 12, 1, 12, 'Intel', 0)]
+[0]
+|  HWQUEUES  |     CORES  | UDP Ports  | Threads/P  |    TARGET  |    Server  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  | vtotal TP  |  Net_rate  |   avg TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+|         4  |        12  |         1  |        12  |     Intel  |  llvmE10k  |        16  |       128  |         8  | [436312.3  | [0, 0, 0]  | [3.570000  | [27269.52  | [19.125,   | [19.125,   | [inf, inf  | [45.3125,  | [59.125,   | [66.4375,  | [4033.437  |     False  |llvmE10k,Intel_S,udp,2,Q_4,P_1024,,SRVI_1,SRV_12,C_8,BEST  |

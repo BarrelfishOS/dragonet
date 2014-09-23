@@ -1,0 +1,469 @@
+./netperf-wrapper -d 2 -I 1 -l 10 -c fancyEchoLinux --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 8 --serverInstances 1 --hwqueues 1 --clientcores 1 -T 10.113.4.95 udp_rr --packet 64 --concurrency 1 -t fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1 -o ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/ -L ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_//fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1.log
+toCoreList2 0,1,2,3,4,5,6,7
+FancyEcho Parameters:  -a t0 -p 888  -a t1 -p 888  -a t2 -p 888  -a t3 -p 888  -a t4 -p 888  -a t5 -p 888  -a t6 -p 888  -a t7 -p 888  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7 
+Cores used by machine ziger2: [0]
+Cores used by machine sbrinz2: [0]
+Cores used by machine gruyere: [0]
+Cores used by machine burrata: [0]
+Cores used by machine ziger2: [1]
+Cores used by machine sbrinz2: [1]
+Cores used by machine gruyere: [1]
+Cores used by machine burrata: [1]
+Cores used by machine ziger2: [2]
+Cores used by machine sbrinz2: [2]
+Cores used by machine gruyere: [2]
+Cores used by machine burrata: [2]
+Cores used by machine ziger2: [3]
+Cores used by machine sbrinz2: [3]
+Cores used by machine gruyere: [3]
+Cores used by machine burrata: [3]
+Cores used by machine asiago: [2, 3, 4, 5, 6, 7, 8, 9]
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-09:03:02:02: Starting server applications
+
+2014-07-09:03:02:06: Starting client applications
+
+2014-07-09:03:02:06: Benchmark running, for threads which are marked for waiting
+
+2014-07-09:03:02:21: Benchmark done (runtime = 15.342767 secs), killing other threads
+
+2014-07-09:03:02:21: Waiting for kill cleanup
+
+2014-07-09:03:02:21: Processing results
+
+2014-07-09:03:02:21: cleaning up server applications
+
+2014-07-09:03:02:22: Done with collecting data
+
+generating filename with title fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+using ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030151.277549.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_1.json.gz as dump file
+Test data is in [../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030151.277549.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_1.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+Server: fancyEchoLinux: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+HWQUEUES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+SERVERS_INSTANCES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+SERVER_CORES: 8: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+CLIENTS: 16: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+TCONCURRENCY: 16: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+CONCURRENCY: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+total TPS: [396547.718]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+Net_rate: [0.2]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+avg TPS: [24784.232375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+get_min: [30.9375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+MIN_LATENCY: [30.9375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+RT_LATENCY: [87.30943749999997]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+P50_LATENCY: [85.9375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+P90_LATENCY: [110.9375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+P99_LATENCY: [138.1875]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+MAX_LATENCY: [569.0625]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+USE_TCP: False: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+TITLE: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1
+[('fancyEchoLinux', 1, 1, 8, 16, 0)]
+|    Server  |  HWQUEUES  | SERVERS_I  | SERVER_CO  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  |  Net_rate  |   avg TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+| fancyEcho  |         1  |         1  |         8  |        16  |        16  |         1  | [396547.7  |     [0.2]  | [24784.23  | [30.9375]  | [30.9375]  | [87.30943  | [85.9375]  | [110.9375  | [138.1875  | [569.0625  |     False  |fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1  |
+./netperf-wrapper -d 2 -I 1 -l 10 -c fancyEchoLinux --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 8 --serverInstances 1 --hwqueues 1 --clientcores 1 -T 10.113.4.95 udp_rr --packet 64 --concurrency 2 -t fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2 -o ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/ -L ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_//fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2.log
+toCoreList2 0,1,2,3,4,5,6,7
+FancyEcho Parameters:  -a t0 -p 888  -a t1 -p 888  -a t2 -p 888  -a t3 -p 888  -a t4 -p 888  -a t5 -p 888  -a t6 -p 888  -a t7 -p 888  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7 
+Cores used by machine ziger2: [0]
+Cores used by machine sbrinz2: [0]
+Cores used by machine gruyere: [0]
+Cores used by machine burrata: [0]
+Cores used by machine ziger2: [1]
+Cores used by machine sbrinz2: [1]
+Cores used by machine gruyere: [1]
+Cores used by machine burrata: [1]
+Cores used by machine ziger2: [2]
+Cores used by machine sbrinz2: [2]
+Cores used by machine gruyere: [2]
+Cores used by machine burrata: [2]
+Cores used by machine ziger2: [3]
+Cores used by machine sbrinz2: [3]
+Cores used by machine gruyere: [3]
+Cores used by machine burrata: [3]
+Cores used by machine asiago: [2, 3, 4, 5, 6, 7, 8, 9]
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-09:03:02:42: Starting server applications
+
+2014-07-09:03:02:46: Starting client applications
+
+2014-07-09:03:02:46: Benchmark running, for threads which are marked for waiting
+
+2014-07-09:03:03:02: Benchmark done (runtime = 15.311002 secs), killing other threads
+
+2014-07-09:03:03:02: Waiting for kill cleanup
+
+2014-07-09:03:03:02: Processing results
+
+2014-07-09:03:03:02: cleaning up server applications
+
+2014-07-09:03:03:02: Done with collecting data
+
+generating filename with title fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+using ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030231.740901.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_2.json.gz as dump file
+Test data is in [../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030231.740901.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_2.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+Server: fancyEchoLinux: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+HWQUEUES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+SERVERS_INSTANCES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+SERVER_CORES: 8: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+CLIENTS: 16: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+TCONCURRENCY: 32: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+CONCURRENCY: 2: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+total TPS: [509875.126]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+Net_rate: [0.27]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+avg TPS: [31867.195375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+get_min: [29.5625]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+MIN_LATENCY: [29.5625]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+RT_LATENCY: [97.64325000000002]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+P50_LATENCY: [89.0]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+P90_LATENCY: [139.125]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+P99_LATENCY: [168.0]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+MAX_LATENCY: [554.0625]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+USE_TCP: False: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+TITLE: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2
+[('fancyEchoLinux', 1, 1, 8, 16, 0)]
+|    Server  |  HWQUEUES  | SERVERS_I  | SERVER_CO  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  |  Net_rate  |   avg TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+| fancyEcho  |         1  |         1  |         8  |        16  |        32  |         2  | [509875.1  |    [0.27]  | [31867.19  | [29.5625]  | [29.5625]  | [97.64325  |    [89.0]  | [139.125]  |   [168.0]  | [554.0625  |     False  |fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2  |
+./netperf-wrapper -d 2 -I 1 -l 10 -c fancyEchoLinux --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 8 --serverInstances 1 --hwqueues 1 --clientcores 1 -T 10.113.4.95 udp_rr --packet 64 --concurrency 4 -t fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4 -o ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/ -L ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_//fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4.log
+toCoreList2 0,1,2,3,4,5,6,7
+FancyEcho Parameters:  -a t0 -p 888  -a t1 -p 888  -a t2 -p 888  -a t3 -p 888  -a t4 -p 888  -a t5 -p 888  -a t6 -p 888  -a t7 -p 888  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7 
+Cores used by machine ziger2: [0]
+Cores used by machine sbrinz2: [0]
+Cores used by machine gruyere: [0]
+Cores used by machine burrata: [0]
+Cores used by machine ziger2: [1]
+Cores used by machine sbrinz2: [1]
+Cores used by machine gruyere: [1]
+Cores used by machine burrata: [1]
+Cores used by machine ziger2: [2]
+Cores used by machine sbrinz2: [2]
+Cores used by machine gruyere: [2]
+Cores used by machine burrata: [2]
+Cores used by machine ziger2: [3]
+Cores used by machine sbrinz2: [3]
+Cores used by machine gruyere: [3]
+Cores used by machine burrata: [3]
+Cores used by machine asiago: [2, 3, 4, 5, 6, 7, 8, 9]
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-09:03:03:23: Starting server applications
+
+2014-07-09:03:03:27: Starting client applications
+
+2014-07-09:03:03:27: Benchmark running, for threads which are marked for waiting
+
+2014-07-09:03:03:42: Benchmark done (runtime = 15.361143 secs), killing other threads
+
+2014-07-09:03:03:42: Waiting for kill cleanup
+
+2014-07-09:03:03:42: Processing results
+
+2014-07-09:03:03:42: cleaning up server applications
+
+2014-07-09:03:03:43: Done with collecting data
+
+generating filename with title fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+using ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030312.178814.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_4.json.gz as dump file
+Test data is in [../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030312.178814.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_4.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+Server: fancyEchoLinux: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+HWQUEUES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+SERVERS_INSTANCES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+SERVER_CORES: 8: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+CLIENTS: 16: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+TCONCURRENCY: 64: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+CONCURRENCY: 4: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+total TPS: [670175.995]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+Net_rate: [0.35]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+avg TPS: [41885.9996875]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+get_min: [33.6875]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+MIN_LATENCY: [33.6875]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+RT_LATENCY: [128.7134375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+P50_LATENCY: [113.1875]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+P90_LATENCY: [215.0]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+P99_LATENCY: [278.25]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+MAX_LATENCY: [912.25]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+USE_TCP: False: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+TITLE: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4
+[('fancyEchoLinux', 1, 1, 8, 16, 0)]
+|    Server  |  HWQUEUES  | SERVERS_I  | SERVER_CO  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  |  Net_rate  |   avg TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+| fancyEcho  |         1  |         1  |         8  |        16  |        64  |         4  | [670175.9  |    [0.35]  | [41885.99  | [33.6875]  | [33.6875]  | [128.7134  | [113.1875  |   [215.0]  |  [278.25]  |  [912.25]  |     False  |fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4  |
+./netperf-wrapper -d 2 -I 1 -l 10 -c fancyEchoLinux --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 8 --serverInstances 1 --hwqueues 1 --clientcores 1 -T 10.113.4.95 udp_rr --packet 64 --concurrency 8 -t fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8 -o ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/ -L ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_//fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8.log
+toCoreList2 0,1,2,3,4,5,6,7
+FancyEcho Parameters:  -a t0 -p 888  -a t1 -p 888  -a t2 -p 888  -a t3 -p 888  -a t4 -p 888  -a t5 -p 888  -a t6 -p 888  -a t7 -p 888  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7 
+Cores used by machine ziger2: [0]
+Cores used by machine sbrinz2: [0]
+Cores used by machine gruyere: [0]
+Cores used by machine burrata: [0]
+Cores used by machine ziger2: [1]
+Cores used by machine sbrinz2: [1]
+Cores used by machine gruyere: [1]
+Cores used by machine burrata: [1]
+Cores used by machine ziger2: [2]
+Cores used by machine sbrinz2: [2]
+Cores used by machine gruyere: [2]
+Cores used by machine burrata: [2]
+Cores used by machine ziger2: [3]
+Cores used by machine sbrinz2: [3]
+Cores used by machine gruyere: [3]
+Cores used by machine burrata: [3]
+Cores used by machine asiago: [2, 3, 4, 5, 6, 7, 8, 9]
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-09:03:04:03: Starting server applications
+
+2014-07-09:03:04:07: Starting client applications
+
+2014-07-09:03:04:07: Benchmark running, for threads which are marked for waiting
+
+2014-07-09:03:04:23: Benchmark done (runtime = 15.324763 secs), killing other threads
+
+2014-07-09:03:04:23: Waiting for kill cleanup
+
+2014-07-09:03:04:23: Processing results
+
+2014-07-09:03:04:23: cleaning up server applications
+
+2014-07-09:03:04:23: Done with collecting data
+
+generating filename with title fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+using ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030352.687617.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_8.json.gz as dump file
+Test data is in [../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030352.687617.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_8.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+Server: fancyEchoLinux: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+HWQUEUES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+SERVERS_INSTANCES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+SERVER_CORES: 8: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+CLIENTS: 16: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+TCONCURRENCY: 128: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+CONCURRENCY: 8: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+total TPS: [850826.7009999999]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+Net_rate: [0.39]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+avg TPS: [53176.66881249999]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+get_min: [47.9375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+MIN_LATENCY: [47.9375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+RT_LATENCY: [361.64575]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+P50_LATENCY: [250.25]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+P90_LATENCY: [756.0]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+P99_LATENCY: [1519.1875]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+MAX_LATENCY: [5197.625]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+USE_TCP: False: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+TITLE: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8
+[('fancyEchoLinux', 1, 1, 8, 16, 0)]
+|    Server  |  HWQUEUES  | SERVERS_I  | SERVER_CO  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  |  Net_rate  |   avg TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+| fancyEcho  |         1  |         1  |         8  |        16  |       128  |         8  | [850826.7  |    [0.39]  | [53176.66  | [47.9375]  | [47.9375]  | [361.6457  |  [250.25]  |   [756.0]  | [1519.187  | [5197.625  |     False  |fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8  |
+./netperf-wrapper -d 2 -I 1 -l 10 -c fancyEchoLinux --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 8 --serverInstances 1 --hwqueues 1 --clientcores 1 -T 10.113.4.95 udp_rr --packet 64 --concurrency 16 -t fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16 -o ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/ -L ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_//fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16.log
+toCoreList2 0,1,2,3,4,5,6,7
+FancyEcho Parameters:  -a t0 -p 888  -a t1 -p 888  -a t2 -p 888  -a t3 -p 888  -a t4 -p 888  -a t5 -p 888  -a t6 -p 888  -a t7 -p 888  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7 
+Cores used by machine ziger2: [0]
+Cores used by machine sbrinz2: [0]
+Cores used by machine gruyere: [0]
+Cores used by machine burrata: [0]
+Cores used by machine ziger2: [1]
+Cores used by machine sbrinz2: [1]
+Cores used by machine gruyere: [1]
+Cores used by machine burrata: [1]
+Cores used by machine ziger2: [2]
+Cores used by machine sbrinz2: [2]
+Cores used by machine gruyere: [2]
+Cores used by machine burrata: [2]
+Cores used by machine ziger2: [3]
+Cores used by machine sbrinz2: [3]
+Cores used by machine gruyere: [3]
+Cores used by machine burrata: [3]
+Cores used by machine asiago: [2, 3, 4, 5, 6, 7, 8, 9]
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-09:03:04:44: Starting server applications
+
+2014-07-09:03:04:48: Starting client applications
+
+2014-07-09:03:04:48: Benchmark running, for threads which are marked for waiting
+
+2014-07-09:03:05:03: Benchmark done (runtime = 15.361330 secs), killing other threads
+
+2014-07-09:03:05:03: Waiting for kill cleanup
+
+2014-07-09:03:05:03: Processing results
+
+2014-07-09:03:05:03: cleaning up server applications
+
+2014-07-09:03:05:04: Done with collecting data
+
+generating filename with title fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+using ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030433.162397.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_16.json.gz as dump file
+Test data is in [../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030433.162397.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_16.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+Server: fancyEchoLinux: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+HWQUEUES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+SERVERS_INSTANCES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+SERVER_CORES: 8: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+CLIENTS: 16: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+TCONCURRENCY: 256: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+CONCURRENCY: 16: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+total TPS: [931688.2309999999]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+Net_rate: [0.44999999999999996]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+avg TPS: [58230.514437499995]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+get_min: [74.5625]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+MIN_LATENCY: [74.5625]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+RT_LATENCY: [6508.049562499999]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+P50_LATENCY: [311.4375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+P90_LATENCY: [17662.6875]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+P99_LATENCY: [18492.9375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+MAX_LATENCY: [19593.0]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+USE_TCP: False: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+TITLE: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16
+[('fancyEchoLinux', 1, 1, 8, 16, 0)]
+|    Server  |  HWQUEUES  | SERVERS_I  | SERVER_CO  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  |  Net_rate  |   avg TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+| fancyEcho  |         1  |         1  |         8  |        16  |       256  |        16  | [931688.2  | [0.449999  | [58230.51  | [74.5625]  | [74.5625]  | [6508.049  | [311.4375  | [17662.68  | [18492.93  | [19593.0]  |     False  |fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16  |
+./netperf-wrapper -d 2 -I 1 -l 10 -c fancyEchoLinux --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 8 --serverInstances 1 --hwqueues 1 --clientcores 1 -T 10.113.4.95 udp_rr --packet 64 --concurrency 32 -t fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32 -o ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/ -L ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_//fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32.log
+toCoreList2 0,1,2,3,4,5,6,7
+FancyEcho Parameters:  -a t0 -p 888  -a t1 -p 888  -a t2 -p 888  -a t3 -p 888  -a t4 -p 888  -a t5 -p 888  -a t6 -p 888  -a t7 -p 888  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7 
+Cores used by machine ziger2: [0]
+Cores used by machine sbrinz2: [0]
+Cores used by machine gruyere: [0]
+Cores used by machine burrata: [0]
+Cores used by machine ziger2: [1]
+Cores used by machine sbrinz2: [1]
+Cores used by machine gruyere: [1]
+Cores used by machine burrata: [1]
+Cores used by machine ziger2: [2]
+Cores used by machine sbrinz2: [2]
+Cores used by machine gruyere: [2]
+Cores used by machine burrata: [2]
+Cores used by machine ziger2: [3]
+Cores used by machine sbrinz2: [3]
+Cores used by machine gruyere: [3]
+Cores used by machine burrata: [3]
+Cores used by machine asiago: [2, 3, 4, 5, 6, 7, 8, 9]
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-09:03:05:24: Starting server applications
+
+2014-07-09:03:05:28: Starting client applications
+
+2014-07-09:03:05:28: Benchmark running, for threads which are marked for waiting
+
+2014-07-09:03:05:44: Benchmark done (runtime = 15.326674 secs), killing other threads
+
+2014-07-09:03:05:44: Waiting for kill cleanup
+
+2014-07-09:03:05:44: Processing results
+
+2014-07-09:03:05:44: cleaning up server applications
+
+2014-07-09:03:05:44: Done with collecting data
+
+generating filename with title fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+using ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030513.607521.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_32.json.gz as dump file
+Test data is in [../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030513.607521.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_32.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+Server: fancyEchoLinux: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+HWQUEUES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+SERVERS_INSTANCES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+SERVER_CORES: 8: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+CLIENTS: 16: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+TCONCURRENCY: 512: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+CONCURRENCY: 32: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+total TPS: [938114.0279999999]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+Net_rate: [0.47000000000000003]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+avg TPS: [58632.126749999996]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+get_min: [119.875]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+MIN_LATENCY: [119.875]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+RT_LATENCY: [944.2484375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+P50_LATENCY: [554.0625]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+P90_LATENCY: [611.0]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+P99_LATENCY: [16190.0]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+MAX_LATENCY: [35747.8125]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+USE_TCP: False: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+TITLE: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32
+[('fancyEchoLinux', 1, 1, 8, 16, 0)]
+|    Server  |  HWQUEUES  | SERVERS_I  | SERVER_CO  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  |  Net_rate  |   avg TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+| fancyEcho  |         1  |         1  |         8  |        16  |       512  |        32  | [938114.0  | [0.470000  | [58632.12  | [119.875]  | [119.875]  | [944.2484  | [554.0625  |   [611.0]  | [16190.0]  | [35747.81  |     False  |fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32  |
+./netperf-wrapper -d 2 -I 1 -l 10 -c fancyEchoLinux --udp --serverCoreShift 2 -H asiago -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata -C ziger2 -C sbrinz2 -C gruyere -C burrata --servercores 8 --serverInstances 1 --hwqueues 1 --clientcores 1 -T 10.113.4.95 udp_rr --packet 64 --concurrency 64 -t fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64 -o ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/ -L ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_//fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64.log
+toCoreList2 0,1,2,3,4,5,6,7
+FancyEcho Parameters:  -a t0 -p 888  -a t1 -p 888  -a t2 -p 888  -a t3 -p 888  -a t4 -p 888  -a t5 -p 888  -a t6 -p 888  -a t7 -p 888  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7 
+Cores used by machine ziger2: [0]
+Cores used by machine sbrinz2: [0]
+Cores used by machine gruyere: [0]
+Cores used by machine burrata: [0]
+Cores used by machine ziger2: [1]
+Cores used by machine sbrinz2: [1]
+Cores used by machine gruyere: [1]
+Cores used by machine burrata: [1]
+Cores used by machine ziger2: [2]
+Cores used by machine sbrinz2: [2]
+Cores used by machine gruyere: [2]
+Cores used by machine burrata: [2]
+Cores used by machine ziger2: [3]
+Cores used by machine sbrinz2: [3]
+Cores used by machine gruyere: [3]
+Cores used by machine burrata: [3]
+Cores used by machine asiago: [2, 3, 4, 5, 6, 7, 8, 9]
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002, 9003, 9003, 9003, 9003]
+Actually running the benchmark to collect data
+2014-07-09:03:06:04: Starting server applications
+
+2014-07-09:03:06:09: Starting client applications
+
+2014-07-09:03:06:09: Benchmark running, for threads which are marked for waiting
+
+2014-07-09:03:06:24: Benchmark done (runtime = 15.310728 secs), killing other threads
+
+2014-07-09:03:06:24: Waiting for kill cleanup
+
+2014-07-09:03:06:24: Processing results
+
+2014-07-09:03:06:24: cleaning up server applications
+
+2014-07-09:03:06:24: Done with collecting data
+
+generating filename with title fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+using ../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030554.019777.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_64.json.gz as dump file
+Test data is in [../netperfScaleResults/Linux/rP64//Intel_S//fancyEchoLinux/udp/P_64/HWQ_1/2/udp_rr//TP_MAX/S_8//maxTP_Intel_S_/udp_rr-2014-07-09T030554.019777.fancyEchoLinux_Intel_S_udp_2_Q_1_P_64__SRVI_1_SRV_8_C_64.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+Server: fancyEchoLinux: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+HWQUEUES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+SERVERS_INSTANCES: 1: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+SERVER_CORES: 8: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+CLIENTS: 16: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+TCONCURRENCY: 1024: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+CONCURRENCY: 64: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+total TPS: [912068.9879999999]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+Net_rate: [0.47000000000000003]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+avg TPS: [57004.31174999999]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+get_min: [157.0625]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+MIN_LATENCY: [157.0625]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+RT_LATENCY: [1960.6460625000002]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+P50_LATENCY: [1129.875]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+P90_LATENCY: [1208.1875]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+P99_LATENCY: [19838.5]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+MAX_LATENCY: [41078.375]: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+USE_TCP: False: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+TITLE: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64
+[('fancyEchoLinux', 1, 1, 8, 16, 0)]
+|    Server  |  HWQUEUES  | SERVERS_I  | SERVER_CO  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  |  Net_rate  |   avg TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+| fancyEcho  |         1  |         1  |         8  |        16  |      1024  |        64  | [912068.9  | [0.470000  | [57004.31  | [157.0625  | [157.0625  | [1960.646  | [1129.875  | [1208.187  | [19838.5]  | [41078.37  |     False  |fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64  |
+TPITERATOR: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_1, 10.113.4.95, 8, 1, 396547.718, 396547
+TPITERATOR: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_2, 10.113.4.95, 8, 2, 509875.126, 509875
+TPITERATOR: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_4, 10.113.4.95, 8, 4, 670175.995, 670175
+TPITERATOR: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_8, 10.113.4.95, 8, 8, 850826.7009999999, 850826
+TPITERATOR: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_16, 10.113.4.95, 8, 16, 931688.2309999999, 931688
+TPITERATOR: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_32, 10.113.4.95, 8, 32, 938114.0279999999, 938114
+TPITERATOR: fancyEchoLinux,Intel_S,udp,2,Q_1,P_64,,SRVI_1,SRV_8,C_64, 10.113.4.95, 8, 64, 912068.9879999999, 912068

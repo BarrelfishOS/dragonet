@@ -1,0 +1,94 @@
++ local -r -i max_attempts=4
++ shift
++ local -r 'cmd=./netperf-wrapper -d 2 -I 1 -l 10 -c noServer --udp --serverCoreShift 0 -H burrata -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 --servercores 12 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.96 udp_rr --packet 64 --concurrency 128 -t llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST -o ../echoServerResults/P64results/dragonet_Intel_Q10/Q10_P64_run//Intel_S//udp_rr/llvmE10k/udp/P_64/HWQ_10/0//TP_MAX/P_12/T_12//maxTP_Intel_S_/ -L ../echoServerResults/P64results/dragonet_Intel_Q10/Q10_P64_run//Intel_S//udp_rr/llvmE10k/udp/P_64/HWQ_10/0//TP_MAX/P_12/T_12//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST.log'
++ local -i attempt_num=1
++ echo ./netperf-wrapper -d 2 -I 1 -l 10 -c noServer --udp --serverCoreShift 0 -H burrata -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 --servercores 12 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.96 udp_rr --packet 64 --concurrency 128 -t llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST -o ../echoServerResults/P64results/dragonet_Intel_Q10/Q10_P64_run//Intel_S//udp_rr/llvmE10k/udp/P_64/HWQ_10/0//TP_MAX/P_12/T_12//maxTP_Intel_S_/ -L ../echoServerResults/P64results/dragonet_Intel_Q10/Q10_P64_run//Intel_S//udp_rr/llvmE10k/udp/P_64/HWQ_10/0//TP_MAX/P_12/T_12//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST.log
+./netperf-wrapper -d 2 -I 1 -l 10 -c noServer --udp --serverCoreShift 0 -H burrata -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 --servercores 12 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.96 udp_rr --packet 64 --concurrency 128 -t llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST -o ../echoServerResults/P64results/dragonet_Intel_Q10/Q10_P64_run//Intel_S//udp_rr/llvmE10k/udp/P_64/HWQ_10/0//TP_MAX/P_12/T_12//maxTP_Intel_S_/ -L ../echoServerResults/P64results/dragonet_Intel_Q10/Q10_P64_run//Intel_S//udp_rr/llvmE10k/udp/P_64/HWQ_10/0//TP_MAX/P_12/T_12//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST.log
++ ./netperf-wrapper -d 2 -I 1 -l 10 -c noServer --udp --serverCoreShift 0 -H burrata -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 -C ziger1 -C ziger2 -C sbrinz2 -C appenzeller-e1000 --servercores 12 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.96 udp_rr --packet 64 --concurrency 128 -t llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST -o ../echoServerResults/P64results/dragonet_Intel_Q10/Q10_P64_run//Intel_S//udp_rr/llvmE10k/udp/P_64/HWQ_10/0//TP_MAX/P_12/T_12//maxTP_Intel_S_/ -L ../echoServerResults/P64results/dragonet_Intel_Q10/Q10_P64_run//Intel_S//udp_rr/llvmE10k/udp/P_64/HWQ_10/0//TP_MAX/P_12/T_12//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST.log
+generating data for machine burrata
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz2
+generating data for machine appenzeller-e1000
+port_list_for_clients dst: [888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888, 888]
+port_list_for_clients src: [9000, 9000, 9000, 9000, 9001, 9001, 9001, 9001, 9002, 9002, 9002, 9002]
+Running experiment for time of 12
+Actually running the benchmark to collect data
+2014-09-19:03:10:21:Setting up machines
+
+2014-09-19:03:10:29: Start run
+
+2014-09-19:03:10:29: Starting server applications
+
+2014-09-19:03:10:29: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-19:03:10:29: Starting client applications
+
+
+2014-09-19:03:10:29: Benchmark running, for threads which are marked for waiting
+
+2014-09-19:03:10:44: Benchmark done (runtime = 14.975758 secs), killing other threads
+
+2014-09-19:03:10:44: Waiting for kill cleanup
+
+2014-09-19:03:10:44: Processing results
+
+2014-09-19:03:10:44: cleaning up server applications
+
+
+2014-09-19:03:10:44: Done with collecting data
+
+
+generating filename with title llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+using ../echoServerResults/P64results/dragonet_Intel_Q10/Q10_P64_run//Intel_S//udp_rr/llvmE10k/udp/P_64/HWQ_10/0//TP_MAX/P_12/T_12//maxTP_Intel_S_/udp_rr-2014-09-19T031020.839220.llvmE10k_Intel_S_udp_0_Q_10_P_64__SRVI_1_SRV_12_C_128_BEST.json.gz as dump file
+Test data is in [../echoServerResults/P64results/dragonet_Intel_Q10/Q10_P64_run//Intel_S//udp_rr/llvmE10k/udp/P_64/HWQ_10/0//TP_MAX/P_12/T_12//maxTP_Intel_S_/udp_rr-2014-09-19T031020.839220.llvmE10k_Intel_S_udp_0_Q_10_P_64__SRVI_1_SRV_12_C_128_BEST.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+HWQUEUES: 10: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+CORES: 12: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+UDP Ports: 1: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+Threads/Port: 12: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+TARGET: 10.113.4.96: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+Server: noServer: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+CLIENTS: 12: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+TCONCURRENCY: 1536: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+CONCURRENCY: 128: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+total TPS: [1519029.321]: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+vtotal TPS: [1519029.321]: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+Net_rate: [0.7800000000000001]: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+avg TPS: [126585.77675]: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+MIN TPS: [28086.356]: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+get_min: [81.91666666666667]: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+MIN_LATENCY: [81.91666666666667]: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+RT_LATENCY: [1295.79375]: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+P50_LATENCY: [1286.6666666666667]: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+P90_LATENCY: [1506.0833333333333]: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+P99_LATENCY: [2108.9166666666665]: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+MAX_LATENCY: [13802.166666666666]: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+USE_TCP: False: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST
+TITLE: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST: llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVNo output formatter selected.
+Test data is in ../echoServerResults/P64results/dragonet_Intel_Q10/Q10_P64_run//Intel_S//udp_rr/llvmE10k/udp/P_64/HWQ_10/0//TP_MAX/P_12/T_12//maxTP_Intel_S_/udp_rr-2014-09-19T031020.839220.llvmE10k_Intel_S_udp_0_Q_10_P_64__SRVI_1_SRV_12_C_128_BEST.json.gz (use with -i to format).
+I_1,SRV_12,C_128,BEST
+meta titles: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+graph title: ['HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+graph title: HWQUEUES:10, CORES:12, UDP Ports:1, Threads/Port:12, TARGET:10.113.4.96, Server:noServer, USE_TCP:False
+graph x_axis: []
+graph x_axis_main: ['CORES']
+graph x_axis_other: []
+sort order keys: ['CORES', 'HWQUEUES', 'CORES', 'UDP Ports', 'Threads/Port', 'TARGET', 'Server', 'USE_TCP']
+[(12, 10, 12, 1, 12, 0)]
+[0]
+|  HWQUEUES  |     CORES  | UDP Ports  | Threads/P  |    TARGET  |    Server  |   CLIENTS  | TCONCURRE  | CONCURREN  | total TPS  | vtotal TP  |  Net_rate  |   avg TPS  |   MIN TPS  |   get_min  | MIN_LATEN  | RT_LATENC  | P50_LATEN  | P90_LATEN  | P99_LATEN  | MAX_LATEN  |   USE_TCP  |     TITLE  |
+|        10  |        12  |         1  |        12  | 10.113.4.  |  noServer  |        12  |      1536  |       128  | [1519029.  | [1519029.  | [0.780000  | [126585.7  | [28086.35  | [81.91666  | [81.91666  | [1295.793  | [1286.666  | [1506.083  | [2108.916  | [13802.16  |     False  |llvmE10k,Intel_S,udp,0,Q_10,P_64,,SRVI_1,SRV_12,C_128,BEST  |

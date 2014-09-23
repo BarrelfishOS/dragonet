@@ -1,0 +1,271 @@
+./netperf-wrapper -d 2 -l 5 -c llvmE10k --udp --serverCoreShift 0 -H asiago -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gottardo -C appenzeller-e1000 -C gruyere -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gottardo -C appenzeller-e1000 -C gruyere --servercores 10 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.95 memcached_rr --packet 1024 --concurrency 2 -t llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_2,warmup -o ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10_NOHT//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_Intel_S_/ -L ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10_NOHT//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_10/T_10//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_10,C_2,warmup.log
+generating data for machine asiago
+generating data for machine burrata
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz1
+generating data for machine sbrinz2
+generating data for machine gottardo
+generating data for machine appenzeller-e1000
+generating data for machine gruyere
+generating data for machine burrata
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz1
+generating data for machine sbrinz2
+generating data for machine gottardo
+generating data for machine appenzeller-e1000
+generating data for machine gruyere
+toCoreList2 0,1,2,3,4,5,6,7,8,9,10
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9
+toCoreList2 10,11,12,13,14,15,16,17,18,19
+memcached dragonet Parameters: T0.f[10.113.4.95:7777/10.113.4.29:0]T1.f[10.113.4.95:7777/10.113.4.26:0]T2.f[10.113.4.95:7777/10.113.4.20:0]T3.f[10.113.4.95:7777/10.113.4.67:0]T4.f[10.113.4.95:7777/10.113.4.96:0]T5.f[10.113.4.95:7777/10.113.4.57:0]T6.f[10.113.4.95:7777/10.113.4.51:0]T7.f[10.113.4.95:7777/10.113.4.71:0]
+memcached dragonet Parameters: T0.f[10.113.4.95:7777/10.113.4.29:0]T1.f[10.113.4.95:7777/10.113.4.26:0]T2.f[10.113.4.95:7777/10.113.4.20:0]T3.f[10.113.4.95:7777/10.113.4.67:0]T4.f[10.113.4.95:7777/10.113.4.96:0]T5.f[10.113.4.95:7777/10.113.4.57:0]T6.f[10.113.4.95:7777/10.113.4.51:0]T7.f[10.113.4.95:7777/10.113.4.71:0]
+Cores used by machine burrata: [0]
+Cores used by machine ziger1: [0]
+Cores used by machine ziger2: [0]
+Cores used by machine sbrinz1: [0]
+Cores used by machine sbrinz2: [0]
+Cores used by machine gottardo: [0]
+Cores used by machine appenzeller-e1000: [0]
+Cores used by machine gruyere: [0]
+Cores used by machine burrata: [1]
+Cores used by machine ziger1: [1]
+Cores used by machine ziger2: [1]
+Cores used by machine sbrinz1: [1]
+Cores used by machine sbrinz2: [1]
+Cores used by machine gottardo: [1]
+Cores used by machine appenzeller-e1000: [1]
+Cores used by machine gruyere: [1]
+Cores used by machine asiago: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+port_list_for_clients: [7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777]
+port_list_for_clients src: [8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 8001, 8001, 8001, 8001, 8001, 8001, 8001, 8001]
+Running experiment for time of 7
+Actually running the benchmark to collect data
+2014-09-22:17:53:28:Setting up machines
+
+2014-09-22:17:53:37: Start run
+
+2014-09-22:17:53:38: Starting server applications
+
+memcached0: INIT: Machine asiago: Executing init command [cd dragonet/Dragonet/ ; sudo ./scripts/pravin/deployDragonetGen.sh e10k 10 ]
+
+
+memcached0: INIT: Machine asiago: the response of executing init command is 
++ set -e
++ sudo killall stack-tap
+stack-tap: no process found
++ true
++ sudo killall bench-fancyecho
+bench-fancyecho: no process found
++ true
++ sudo killall bench-echo
+bench-echo: no process found
++ true
++ sudo killall stack-e10k
++ sudo killall stack-sf
+stack-sf: no process found
++ true
++ rm -f some.log
++ sudo bash -c 'echo 512 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages'
++ sudo rm -rf '/dev/shm/dragonet*'
++ sudo rm -rf '/dev/shm/bulk_pool_*'
+++ ipcs
+++ grep root
+++ grep 666
+++ grep ' 0'
+++ cut '-d ' -f2
++ rm -f '*.ready'
++ rm -f '*.failed'
++ rm -f allAppslist.appready
++ rm -f stack.dnready
++ rm -f '*.dnready'
++ cat /proc/meminfo
++ grep HugePages_Free
+HugePages_Free:      359
+Waiting for Dragonet to start
+Waiting for Dragonet to be ready
+Waiting for 10 hw queues ( 20 pipelines)
+The NIC driver has not started yet, giving up
+Dragonet is ready
+
+
+
+memcached0: INIT: Machine asiago: Executing init command [cd dragonet/Dragonet/ ;  sudo ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log   ../benchmarking/memcached/memcached -N T0.f[10.113.4.95:7777/10.113.4.29:0]T1.f[10.113.4.95:7777/10.113.4.26:0]T2.f[10.113.4.95:7777/10.113.4.20:0]T3.f[10.113.4.95:7777/10.113.4.67:0]T4.f[10.113.4.95:7777/10.113.4.96:0]T5.f[10.113.4.95:7777/10.113.4.57:0]T6.f[10.113.4.95:7777/10.113.4.51:0]T7.f[10.113.4.95:7777/10.113.4.71:0] -c 64000 -m 64000 -u root -p 0 -U  7777 -t 10 -l 10.113.4.95 ]
+
+
+memcached0: INIT: Machine asiago: the response of executing init command is 
+Done with lunching command [../benchmarking/memcached/memcached] in background
+
+
+
+memcached0: INIT: Machine asiago: Executing init command [sleep 4]
+
+
+memcached0: INIT: Machine asiago: the response of executing init command is 
+
+
+
+
+2014-09-22:17:56:43: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+running READY cmd [cd dragonet/Dragonet/ ; ./scripts/pravin/wait_for_dn_app.sh 10 10 stack-e10k memcached] on machine [asiago]
+Traceback (most recent call last):
+  File "./netperf-wrapper", line 64, in <module>
+    results[0] = agg.postprocess(agg.aggregate(results[0]))
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/aggregators.py", line 296, in aggregate
+    results.add_result(i+1, self.collect())
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/aggregators.py", line 150, in collect
+    self.m_instances[m]['machine'].threads[n].is_ready_check()
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 180, in is_ready_check
+    ans = self.machine_ref._exec_cmd_blocking(cmd)
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 74, in _exec_cmd_blocking
+    stderr=subprocess.STDOUT)
+  File "/usr/lib/python2.7/subprocess.py", line 544, in check_output
+    raise CalledProcessError(retcode, cmd, output=output)
+subprocess.CalledProcessError: Command 'ssh asiago 'cd dragonet/Dragonet/ ; ./scripts/pravin/wait_for_dn_app.sh 10 10 stack-e10k memcached'' returned non-zero exit status 1
+Attempt 1 failed! Trying again in 1 seconds...
+cleaning machine burrata
+ssh burrata sudo killall  memaslap netperf netserver memcached bench-fancyecho stack-sf stack-tap stack-e10k fancyEchoLinux
+cleaning machine ziger1
+ssh ziger1 sudo killall  memaslap netperf netserver memcached bench-fancyecho stack-sf stack-tap stack-e10k fancyEchoLinux
+cleaning machine ziger2
+ssh ziger2 sudo killall  memaslap netperf netserver memcached bench-fancyecho stack-sf stack-tap stack-e10k fancyEchoLinux
+cleaning machine sbrinz1
+ssh sbrinz1 sudo killall  memaslap netperf netserver memcached bench-fancyecho stack-sf stack-tap stack-e10k fancyEchoLinux
+cleaning machine sbrinz2
+ssh sbrinz2 sudo killall  memaslap netperf netserver memcached bench-fancyecho stack-sf stack-tap stack-e10k fancyEchoLinux
+cleaning machine gottardo
+ssh gottardo sudo killall  memaslap netperf netserver memcached bench-fancyecho stack-sf stack-tap stack-e10k fancyEchoLinux
+cleaning machine appenzeller-e1000
+ssh appenzeller-e1000 sudo killall  memaslap netperf netserver memcached bench-fancyecho stack-sf stack-tap stack-e10k fancyEchoLinux
+cleaning machine gruyere
+ssh gruyere sudo killall  memaslap netperf netserver memcached bench-fancyecho stack-sf stack-tap stack-e10k fancyEchoLinux
+generating data for machine asiago
+generating data for machine burrata
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz1
+generating data for machine sbrinz2
+generating data for machine gottardo
+generating data for machine appenzeller-e1000
+generating data for machine gruyere
+generating data for machine burrata
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz1
+generating data for machine sbrinz2
+generating data for machine gottardo
+generating data for machine appenzeller-e1000
+generating data for machine gruyere
+toCoreList2 0,1,2,3,4,5,6,7,8,9,10
+toCoreList2 t0 t1 t2 t3 t4 t5 t6 t7 t8 t9
+toCoreList2 10,11,12,13,14,15,16,17,18,19
+memcached dragonet Parameters: T0.f[10.113.4.95:7777/10.113.4.29:0]T1.f[10.113.4.95:7777/10.113.4.26:0]T2.f[10.113.4.95:7777/10.113.4.20:0]T3.f[10.113.4.95:7777/10.113.4.67:0]T4.f[10.113.4.95:7777/10.113.4.96:0]T5.f[10.113.4.95:7777/10.113.4.57:0]T6.f[10.113.4.95:7777/10.113.4.51:0]T7.f[10.113.4.95:7777/10.113.4.71:0]
+memcached dragonet Parameters: T0.f[10.113.4.95:7777/10.113.4.29:0]T1.f[10.113.4.95:7777/10.113.4.26:0]T2.f[10.113.4.95:7777/10.113.4.20:0]T3.f[10.113.4.95:7777/10.113.4.67:0]T4.f[10.113.4.95:7777/10.113.4.96:0]T5.f[10.113.4.95:7777/10.113.4.57:0]T6.f[10.113.4.95:7777/10.113.4.51:0]T7.f[10.113.4.95:7777/10.113.4.71:0]
+Cores used by machine burrata: [0]
+Cores used by machine ziger1: [0]
+Cores used by machine ziger2: [0]
+Cores used by machine sbrinz1: [0]
+Cores used by machine sbrinz2: [0]
+Cores used by machine gottardo: [0]
+Cores used by machine appenzeller-e1000: [0]
+Cores used by machine gruyere: [0]
+Cores used by machine burrata: [1]
+Cores used by machine ziger1: [1]
+Cores used by machine ziger2: [1]
+Cores used by machine sbrinz1: [1]
+Cores used by machine sbrinz2: [1]
+Cores used by machine gottardo: [1]
+Cores used by machine appenzeller-e1000: [1]
+Cores used by machine gruyere: [1]
+Cores used by machine asiago: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+port_list_for_clients: [7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777]
+port_list_for_clients src: [8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 8001, 8001, 8001, 8001, 8001, 8001, 8001, 8001]
+Running experiment for time of 7
+Actually running the benchmark to collect data
+2014-09-22:17:59:44:Setting up machines
+
+2014-09-22:17:59:54: Start run
+
+2014-09-22:17:59:54: Starting server applications
+
+memcached0: INIT: Machine asiago: Executing init command [cd dragonet/Dragonet/ ; sudo ./scripts/pravin/deployDragonetGen.sh e10k 10 ]
+
+
+memcached0: INIT: Machine asiago: the response of executing init command is 
++ set -e
++ sudo killall stack-tap
+stack-tap: no process found
++ true
++ sudo killall bench-fancyecho
+bench-fancyecho: no process found
++ true
++ sudo killall bench-echo
+bench-echo: no process found
++ true
++ sudo killall stack-e10k
++ sudo killall stack-sf
+stack-sf: no process found
++ true
++ rm -f some.log
++ sudo bash -c 'echo 512 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages'
++ sudo rm -rf '/dev/shm/dragonet*'
++ sudo rm -rf '/dev/shm/bulk_pool_*'
+++ ipcs
+++ grep 666
+++ grep root
+++ cut '-d ' -f2
+++ grep ' 0'
++ rm -f '*.ready'
++ rm -f '*.failed'
++ rm -f allAppslist.appready
++ rm -f stack.dnready
++ rm -f '*.dnready'
++ cat /proc/meminfo
++ grep HugePages_Free
+HugePages_Free:      359
+Waiting for Dragonet to start
+Waiting for Dragonet to be ready
+Waiting for 10 hw queues ( 20 pipelines)
+The NIC driver has not started yet, giving up
+Dragonet is ready
+
+
+
+memcached0: INIT: Machine asiago: Executing init command [cd dragonet/Dragonet/ ;  sudo ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log   ../benchmarking/memcached/memcached -N T0.f[10.113.4.95:7777/10.113.4.29:0]T1.f[10.113.4.95:7777/10.113.4.26:0]T2.f[10.113.4.95:7777/10.113.4.20:0]T3.f[10.113.4.95:7777/10.113.4.67:0]T4.f[10.113.4.95:7777/10.113.4.96:0]T5.f[10.113.4.95:7777/10.113.4.57:0]T6.f[10.113.4.95:7777/10.113.4.51:0]T7.f[10.113.4.95:7777/10.113.4.71:0] -c 64000 -m 64000 -u root -p 0 -U  7777 -t 10 -l 10.113.4.95 ]
+
+
+memcached0: INIT: Machine asiago: the response of executing init command is 
+Done with lunching command [../benchmarking/memcached/memcached] in background
+
+
+
+memcached0: INIT: Machine asiago: Executing init command [sleep 4]
+
+
+memcached0: INIT: Machine asiago: the response of executing init command is 
+
+
+
+
+2014-09-22:18:03:00: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+running READY cmd [cd dragonet/Dragonet/ ; ./scripts/pravin/wait_for_dn_app.sh 10 10 stack-e10k memcached] on machine [asiago]
+Traceback (most recent call last):
+  File "./netperf-wrapper", line 64, in <module>
+    results[0] = agg.postprocess(agg.aggregate(results[0]))
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/aggregators.py", line 296, in aggregate
+    results.add_result(i+1, self.collect())
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/aggregators.py", line 150, in collect
+    self.m_instances[m]['machine'].threads[n].is_ready_check()
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 180, in is_ready_check
+    ans = self.machine_ref._exec_cmd_blocking(cmd)
+  File "/home/shindep/git/dragonet/benchmarking/netperf-wrapper/netperf_wrapper/runners.py", line 74, in _exec_cmd_blocking
+    stderr=subprocess.STDOUT)
+  File "/usr/lib/python2.7/subprocess.py", line 544, in check_output
+    raise CalledProcessError(retcode, cmd, output=output)
+subprocess.CalledProcessError: Command 'ssh asiago 'cd dragonet/Dragonet/ ; ./scripts/pravin/wait_for_dn_app.sh 10 10 stack-e10k memcached'' returned non-zero exit status 1
+Attempt 2 failed and there are no more attempts left!

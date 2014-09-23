@@ -1,0 +1,175 @@
++ local -r -i max_attempts=4
++ shift
++ local -r 'cmd=./netperf-wrapper -d 2 -I 3 -l 10 -c noServer --udp --serverCoreShift 0 -H asiago -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gottardo -C appenzeller-e1000 -C gruyere -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gottardo -C appenzeller-e1000 -C gruyere --servercores 16 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.95 memcached_rr --packet 1024 --concurrency 128 -t llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST -o ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_16/T_16//maxTP_Intel_S_/ -L ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_16/T_16//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST.log'
++ local -i attempt_num=1
++ echo ./netperf-wrapper -d 2 -I 3 -l 10 -c noServer --udp --serverCoreShift 0 -H asiago -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gottardo -C appenzeller-e1000 -C gruyere -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gottardo -C appenzeller-e1000 -C gruyere --servercores 16 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.95 memcached_rr --packet 1024 --concurrency 128 -t llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST -o ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_16/T_16//maxTP_Intel_S_/ -L ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_16/T_16//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST.log
+./netperf-wrapper -d 2 -I 3 -l 10 -c noServer --udp --serverCoreShift 0 -H asiago -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gottardo -C appenzeller-e1000 -C gruyere -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gottardo -C appenzeller-e1000 -C gruyere --servercores 16 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.95 memcached_rr --packet 1024 --concurrency 128 -t llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST -o ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_16/T_16//maxTP_Intel_S_/ -L ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_16/T_16//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST.log
++ ./netperf-wrapper -d 2 -I 3 -l 10 -c noServer --udp --serverCoreShift 0 -H asiago -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gottardo -C appenzeller-e1000 -C gruyere -C burrata -C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gottardo -C appenzeller-e1000 -C gruyere --servercores 16 --serverInstances 1 --hwqueues 10 --clientcores 1 -T 10.113.4.95 memcached_rr --packet 1024 --concurrency 128 -t llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST -o ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_16/T_16//maxTP_Intel_S_/ -L ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_16/T_16//maxTP_Intel_S_//llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST.log
+generating data for machine asiago
+generating data for machine burrata
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz1
+generating data for machine sbrinz2
+generating data for machine gottardo
+generating data for machine appenzeller-e1000
+generating data for machine gruyere
+generating data for machine burrata
+generating data for machine ziger1
+generating data for machine ziger2
+generating data for machine sbrinz1
+generating data for machine sbrinz2
+generating data for machine gottardo
+generating data for machine appenzeller-e1000
+generating data for machine gruyere
+Cores used by machine burrata: [0]
+Cores used by machine ziger1: [0]
+Cores used by machine ziger2: [0]
+Cores used by machine sbrinz1: [0]
+Cores used by machine sbrinz2: [0]
+Cores used by machine gottardo: [0]
+Cores used by machine appenzeller-e1000: [0]
+Cores used by machine gruyere: [0]
+Cores used by machine burrata: [1]
+Cores used by machine ziger1: [1]
+Cores used by machine ziger2: [1]
+Cores used by machine sbrinz1: [1]
+Cores used by machine sbrinz2: [1]
+Cores used by machine gottardo: [1]
+Cores used by machine appenzeller-e1000: [1]
+Cores used by machine gruyere: [1]
+Cores used by machine asiago: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+port_list_for_clients: [7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777, 7777]
+port_list_for_clients src: [8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 8001, 8001, 8001, 8001, 8001, 8001, 8001, 8001]
+Running experiment for time of 12
+Actually running the benchmark to collect data
+2014-09-22:14:45:56:Setting up machines
+
+2014-09-22:14:46:06: Start run
+
+2014-09-22:14:46:06: Starting server applications
+
+2014-09-22:14:46:06: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:14:46:06: Starting client applications
+
+
+2014-09-22:14:46:06: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:14:46:22: Benchmark done (runtime = 16.291226 secs), killing other threads
+
+2014-09-22:14:46:22: Waiting for kill cleanup
+
+2014-09-22:14:46:22: Processing results
+
+2014-09-22:14:46:22: cleaning up server applications
+
+
+2014-09-22:14:46:22: Done with collecting data
+
+
+2014-09-22:14:46:22:Setting up machines
+
+2014-09-22:14:46:33: Start run
+
+2014-09-22:14:46:33: Starting server applications
+
+2014-09-22:14:46:33: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:14:46:33: Starting client applications
+
+
+2014-09-22:14:46:33: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:14:46:49: Benchmark done (runtime = 16.214298 secs), killing other threads
+
+2014-09-22:14:46:49: Waiting for kill cleanup
+
+2014-09-22:14:46:49: Processing results
+
+2014-09-22:14:46:49: cleaning up server applications
+
+
+2014-09-22:14:46:49: Done with collecting data
+
+
+2014-09-22:14:46:49:Setting up machines
+
+2014-09-22:14:46:59: Start run
+
+2014-09-22:14:46:59: Starting server applications
+
+2014-09-22:14:46:59: Making sure that servers are up
+
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+Running is_ready_cmd on machine [server-0] 
+Server has no isready cmd
+2014-09-22:14:46:59: Starting client applications
+
+
+2014-09-22:14:46:59: Benchmark running, for threads which are marked for waiting
+
+2014-09-22:14:47:16: Benchmark done (runtime = 16.212631 secs), killing other threads
+
+2014-09-22:14:47:16: Waiting for kill cleanup
+
+2014-09-22:14:47:16: Processing results
+
+2014-09-22:14:47:16: cleaning up server applications
+
+
+2014-09-22:14:47:16: Done with collecting data
+
+
+generating filename with title llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+using ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_16/T_16//maxTP_Intel_S_/memcached_rr-2014-09-22T144555.516538.llvmE10k_Intel_S_udp_0_Q_10_P_1024__SRVI_1_SRV_16_C_128_BEST.json.gz as dump file
+Test data is in [../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_16/T_16//maxTP_Intel_S_/memcached_rr-2014-09-22T144555.516538.llvmE10k_Intel_S_udp_0_Q_10_P_1024__SRVI_1_SRV_16_C_128_BEST.json.gz] (use with -i to format).
+
+Data available for processing, analyzing it
+HWQUEUES: 10: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+CORES: 16: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+SERVERS_INSTANCES: 1: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+SERVER_CORES: 16: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+TARGET: Intel: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+Server: noServer: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+SERVER_CORESHIFT: 0: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+CLIENTS: 16: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+TCONCURRENCY: 2048: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+S CPU: [92.42171722424341, 92.52902007637738, 69.90607453602502]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+total TPS: [1192819.5833333335, 1189086.9166666667, 1189494.3333333335]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+MIN TPS: [68774.0, 59453.0, 67639.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+vtotal TPS: [1192819.5833333335, 1189086.9166666667, 1189494.3333333335]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+Net_rate: [1352.5000000000002, 1347.7999999999997, 1347.9999999999998]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+avg TPS: [74551.22395833334, 74317.93229166667, 74343.39583333334]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+get_min: [56.625, 64.25, 70.625]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+get_avg: [1717.5, 1767.75, 1730.75]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+get_max: [1388842.6875, 3447492.3125, 702816.375]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+get_misses total: [11540.0, 8070.0, 2730.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+udp_timeout total: [9.0, 7.0, 2.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+packet_drop total: [0.0, 0.0, 0.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+USE_TCP: False: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+threads count: [1.0, 1.0, 1.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+concurrency: [128.0, 128.0, 128.0]: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+TITLE: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST: llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+meta titles: ['HWQUEUES', 'CORES', 'SERVERS_INSTANCES', 'SERVER_CORES', 'TARGET', 'Server', 'SERVER_CORESHIFT', 'CLIENTS', 'TCONCURRENCY', 'USE_TCP', 'TITLE']
+graph title: ['HWQUEUES', 'CORES', 'SERVERS_INSTANCES', 'SERVER_CORES', 'TARGET', 'Server', 'SERVER_CORESHIFT', 'CLIENTS', 'TCONCURRENCY', 'USE_TCP', 'TITLE']
+graph title: HWQUEUES:10, CORES:16, SERVERS_INSTANCES:1, SERVER_CORES:16, TARGET:Intel, Server:noServer, SERVER_CORESHIFT:0, CLIENTS:16, TCONCURRENCY:2048, USE_TCP:False, TITLE:llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST
+graph x_axis: []
+graph x_axis_main: ['CORES']
+graph x_axis_other: []
+sort order keys: ['CORES', 'HWQUEUES', 'CORES', 'SERVERS_INSTANCES', 'SERVER_CORES', 'TARGET', 'Server', 'SERVER_CORESHIFT', 'CLIENTS', 'TCONCURRENCY', 'USE_TCP', 'TITLE']
+[(16, 10, 16, 1, 16, 0)]
+[0]
+|  HWQUEUES  |     CORES  | SERVERS_I  | SERVER_CO  |    TARGET  |    Server  | SERVER_CO  |   CLIENTS  | TCONCURRE  |     S CPU  | total TPS  |   MIN TPS  | vtotal TP  |  Net_rate  |   avg TPS  |   get_min  |   get_avg  |   get_max  | get_misse  | udp_timeo  | packet_dr  |   USE_TCP  | threads c  | concurren  |     TITLE  |
+|        10  |        16  |     No output formatter selected.
+Test data is in ../echoServerResults/MemcachedV2P1024DP/Dragonet_Intel_Q10/runMemcached_Q10//Intel_S//memcached_rr/llvmE10k/udp/P_1024/HWQ_10/0//TP_MAX/P_16/T_16//maxTP_Intel_S_/memcached_rr-2014-09-22T144555.516538.llvmE10k_Intel_S_udp_0_Q_10_P_1024__SRVI_1_SRV_16_C_128_BEST.json.gz (use with -i to format).
+    1  |        16  |     Intel  |  noServer  |         0  |        16  |      2048  | [92.42171  | [1192819.  | [68774.0,  | [1192819.  | [1352.500  | [74551.22  | [56.625,   | [1717.5,   | [1388842.  | [11540.0,  | [9.0, 7.0  | [0.0, 0.0  |     False  | [1.0, 1.0  | [128.0, 1  |llvmE10k,Intel_S,udp,0,Q_10,P_1024,,SRVI_1,SRV_16,C_128,BEST  |

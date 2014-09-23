@@ -38,13 +38,24 @@ shift
 mkdir -p ${outDir}
 
 #set -x
-set +e
+#set +e
 for dname in `ls ${dataDir}` ;
 do
-    echo "generating line for ${dname} located at ${dataDir}/${dname}"
-    ./graphGenScale.sh "${dataDir}/${dname}" | grep "#####" > "${outDir}/${dname}.result"
+    if [ -d "${dataDir}/${dname}" ] ; then
+        echo "generating line for ${dname} located at ${dataDir}/${dname}"
+        ./graphGenScale.sh "${dataDir}/${dname}" | grep "#####" > "${outDir}/${dname}.result"
+        isEmpty=`wc -l "${outDir}/${dname}.result"`
+        if [ "${isEmpty}" == "0" ] ; then
+            echo "no data found for ${outDir}/${dname}.result, so removing it"
+            rm "${outDir}/${dname}.result"
+        fi
+    else
+        echo "ignoring "${dataDir}/${dname}" as it's  afile "
+    fi
 done
 set -e
 
-../plottingTools/plottingScript.py --title "${titleText}" --x "Application Cores" --y "Transactions per Second(TPS)" --psize ${pktSize}  --save "${outDir}/ScalabilityP${pktSize}.pdf"  `find ${outDir}/ -name '*.result' | sort -r`
+echo "now, we try and plot the data"
+
+../plottingTools/plottingScript.py --title "${titleText}" --x "Flows" --y "Transactions per Second(TPS)" --psize ${pktSize}  --save "${outDir}/ScalabilityP${pktSize}.pdf"  `find ${outDir}/ -name '*.result' | sort -r`
 
