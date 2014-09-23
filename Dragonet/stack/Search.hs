@@ -266,7 +266,7 @@ searchGreedyFlows_ :: Int
                    -> (C.Configuration, [Flow])
                    -> [Flow]
                    -> C.Configuration
-searchGreedyFlows_ nq costF (cnf,_) []= trN cnf $ "searchGreedyFlows_:"
+searchGreedyFlows_ nq costF (cnf,_) []= tr cnf $ "searchGreedyFlows_:"
                                               ++ (e10kCfgStr cnf)
 searchGreedyFlows_ nq costF (curCnf,curFs) (f:fs) = trN recurse msg
     where confs  = flAllConfs nq f curCnf
