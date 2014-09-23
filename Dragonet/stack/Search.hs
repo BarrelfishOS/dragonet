@@ -172,7 +172,7 @@ e10kCost prgU costQFn = retFn
                             ++ ppShow qmap2
                             ++ "<-----")
 
-                    ret_ = costQFn qmap3
+                    ret_ = costQFn qmap_
                     ret = trN ret_ $ "conf:" ++ (e10kCfgStr conf)
                                     ++ "\ncost:" ++ (show ret_)
 
