@@ -529,6 +529,18 @@ class PlotFormatter(Formatter):
             else:
                 config['axes'][i].set_ylabel(unit[i])
 
+    def _init_client_plot(self, config=None, axis=None):
+        if axis is None:
+            axis = self.figure.gca()
+        if config is None:
+            config = self.config
+
+        self._init_timeseries_plot(config, axis)
+        axis.set_xlabel('')
+
+        self.start_position = 1
+
+
 
     def _init_box_plot(self, config=None, axis=None):
         if axis is None:
@@ -1189,6 +1201,80 @@ class PlotFormatter(Formatter):
             bp = config['axes'][axes_id].boxplot(data)
 
         axis.set_xticklabels(ticklabels, fontsize=15, rotation=90)
+
+    def do_client_plot(self, results, config=None, axis=None):
+        if config is None:
+            config = self.config
+        axis = config['axes'][0]
+
+        group_size = len(results)
+        ticklabels = []
+        ticks = []
+        pos = 1
+
+        colours = ['b', 'g', 'c', 'm', 'k']
+        while len(colours) < len(results):
+            colours = colours *2
+
+        for i,s in enumerate(config['series']):
+            if 'axis' in s and s['axis'] == 2:
+                a = 1
+            else:
+                a = 0
+
+            data = []
+            for r in results:
+                if 'args' in s.keys():
+                    args = s['args']
+                    val = s['data'](r._results, r.metadata, **args)
+                else:
+                    val = s['data'](r._results, r.metadata)
+
+                # val =  s['data'](r._results, r.metadata)
+
+                data.append(val)
+                #data.append([i for i in r.series(s['data']) if i is not None])
+
+            if 'label' in s:
+                ticklabels.append(s['label'])
+                print "appending %s" % (s['label'])
+            else:
+                ticklabels.append(i)
+                print "appending-2 %s" % (s['label'])
+
+            positions = range(pos,pos+group_size)
+            ticks.append(self.np.mean(positions))
+
+            bp = config['axes'][a].boxplot(data,
+                                           positions=positions)
+
+            for j,r in enumerate(results):
+                self.plt.setp(bp['boxes'][j], color=colours[j])
+                if i == 0 and group_size > 1:
+                    bp['caps'][j*2].set_label(r.label())
+                for k in 'caps','whiskers','fliers':
+                    if bp[k]:
+                        self.plt.setp(bp[k][j*2], color=colours[j])
+                        self.plt.setp(bp[k][j*2+1], color=colours[j])
+
+            pos += group_size+1
+
+
+        axis.set_xticks(ticks)
+        axis.set_xticklabels(ticklabels)
+        axis.set_xlim(0,pos-1)
+
+        if 'scaling' in config:
+            btm,top = config['scaling']
+        else:
+            btm,top = 0,100
+
+        for a in range(len(config['axes'])):
+            if data[a]:
+                self._do_scaling(config['axes'][a], data[a], btm, top)
+
+
+
 
     def do_box_plot(self, results, config=None, axis=None):
         if config is None:
