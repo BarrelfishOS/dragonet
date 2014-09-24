@@ -19,7 +19,7 @@ metric_units = {
 
 metric_error = {
     #"Total_Avg" : "Total_Std",
-    "MEAN_LATENCY" : "STDDEV_LATENCY",
+    #"MEAN_LATENCY" : "STDDEV_LATENCY",
 }
 
 def clientId(c):
@@ -111,6 +111,8 @@ if __name__ == "__main__":
         "dnet-64b-40-conc32-prio" : "nsdi_data/priority/Test_udp_rr/CONCUR_32/PKT_64/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T212422.113155.Priority_llvmE10k_CLC_40_PKT_64.json.gz",
         "dnet-1k-40-conc32"       : "nsdi_data/Test_udp_rr/CONCUR_32/PKT_1024/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T011553.951088.llvmE10k_CLC_40_PKT_1024.json.gz",
         "dnet-1k-40-conc32-prio"  : "nsdi_data/priority/Test_udp_rr/CONCUR_32/PKT_1024/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T212818.324440.Priority_llvmE10k_CLC_40_PKT_1024.json.gz",
+        "dnet-64b-40-conc16-prio" : "nsdi_data/priority/Test_udp_rr/CONCUR_16/PKT_64/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T231643.776683.Priority_Test_udp_rr_CONCUR_16_PKT_64_NIC_Intel_SRV_llvmE10k_CLC_40.json.gz",
+        "dnet-1k-40-conc16-prio"  : "nsdi_data/priority/Test_udp_rr/CONCUR_16/PKT_1024/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T232040.450589.Priority_Test_udp_rr_CONCUR_16_PKT_1024_NIC_Intel_SRV_llvmE10k_CLC_40.json.gz",
     }
 
     def plot_echo(pprefix, fids, metric):
@@ -135,6 +137,8 @@ if __name__ == "__main__":
         plot_echo("echo-1k-40", ["dnet-1k-40", "linux-1k-40"], metric)
         plot_echo("echo-64b-40-conc32-prio", ["dnet-64b-40-conc32", "dnet-64b-40-conc32-prio"], metric)
         plot_echo("echo-1k-40-conc32-prio", ["dnet-1k-40-conc32", "dnet-1k-40-conc32-prio"], metric)
+        plot_echo("echo-1k-40-conc16-prio", ["dnet-1k-40-conc16-prio"], metric)
+        plot_echo("echo-64b-40-conc16-prio", ["dnet-64b-40-conc16-prio"], metric)
 
     for metric in ("TPS", "Total_Avg"):
         plot_memcached("memcached-64b-40", ["dnet-64b-40", "linux-64b-40"], metric)
