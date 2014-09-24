@@ -17,6 +17,11 @@ metric_units = {
     "Total_Avg" : "usecs",
 }
 
+metric_error = {
+    #"Total_Avg" : "Total_Std",
+    "MEAN_LATENCY" : "STDDEV_LATENCY",
+}
+
 def clientId(c):
     return int(c[6:])
 
@@ -54,6 +59,11 @@ def plot_per_client(fnames, fids, pid, app, metric, client_class=None):
         client_ids = [clientId(c) for c in clients]
 
         yvals = [float(get_result(c,metric)) for c in clients ]
+        yerr  = None
+        if metric in metric_error:
+            error = metric_error[metric]
+            errs = [float(get_result(c,error)) for c in clients]
+            yerr = [errs, errs]
         xresults[fids[idx]] = yvals
         #plt.figure(figsize=(10,2))
         xvals = index + (idx*bwidth)
@@ -64,7 +74,8 @@ def plot_per_client(fnames, fids, pid, app, metric, client_class=None):
                width=bwidth,
                label = fids[idx],
                color = colors[idx],
-               #yerr=[lat_stdev,lat_stdev],
+               yerr=yerr,
+               error_kw=dict(ecolor='black'),
                #align="center"
         )
         idx += 1
