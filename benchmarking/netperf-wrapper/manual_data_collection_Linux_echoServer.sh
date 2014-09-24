@@ -101,7 +101,6 @@ CLIENTCOUNT=8
 SRVCORES=8
 get_data_for_conc_1
 
-
 exit 0
 
 
