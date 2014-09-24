@@ -59,6 +59,8 @@ ClientList="-C burrata -C ziger1 -C ziger2 -C gottardo -C appenzeller-e1000 -C s
 
 ECHO_SERVER="memcached"
 ECHO_SERVER="memcached_poll"
+
+ECHO_SERVER="memcached_rss"
 UDP_TEST_NAME="memcached_rr"
 HWQUEUE=10
 SRVCORES=10
