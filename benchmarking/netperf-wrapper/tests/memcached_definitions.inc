@@ -307,7 +307,7 @@ def SRV_CMDS(name):
                         "out_cmd" : [],
                 }
 
-    if name == "memcached_poll" :
+    if name == "memcached_poll_old" :
         return {
 
                     "init_cmd_special" : [
@@ -332,6 +332,41 @@ def SRV_CMDS(name):
                     "kill_cmd" : [],
                     "out_cmd" : []
                 }
+
+    if name == "memcached_poll" :
+        return {
+
+                    "init_cmd_special" : [
+                      "echo 50 | sudo tee /proc/sys/net/core/busy_poll",
+                      "echo 50 | sudo tee  /proc/sys/net/core/busy_read",
+
+                      "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
+                          toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))
+                        + " ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log  "
+                        + " ../benchmarking/memcached/memcached -c 64000 -m 64000 -u root %s %d -t %d -l %s " % (
+                            "-p 0 -U ",
+                            SERVER_INITIAL_PORT, SERVER_CORES, TARGET),
+                      "sleep 2",
+                      "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
+                                    ],
+
+                    "init_cmd" : [],
+                    "exec_cmd" : "echo 'memcached should be already running'",
+                    "kill_cmd" : [
+                       "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_2"),
+                       "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s " % (
+                           "./ethtool_out_1", "./ethtool_out_2"),
+                       "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s 1000 | grep rx_packets " % (
+                           "./ethtool_out_1", "./ethtool_out_2"),
+                       "sudo memcached || true",
+                       "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                       "echo 0 | sudo tee  /proc/sys/net/core/busy_read",
+                                 ],
+                    "out_cmd" : [],
+                }
+
+
+
 
     if name == "noServer" :
         return {
