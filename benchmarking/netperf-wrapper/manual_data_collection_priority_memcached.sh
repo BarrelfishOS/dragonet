@@ -22,7 +22,7 @@ getData() {
 
 title="Priority_${ECHO_SERVER},CLC_${CLIENTCOUNT},PKT_${PACKETSIZE}"
 
-OUTDIR="./nsdi_data/priority_v3/Test_${UDP_TEST_NAME}/PKT_${PACKETSIZE}/NIC_Intel/SRV_${ECHO_SERVER}/"
+OUTDIR="./nsdi_data/priority/Test_${UDP_TEST_NAME}/PKT_${PACKETSIZE}/NIC_Intel/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift 0  ${ClientList} --servercores ${SRVCORES} \
@@ -31,6 +31,7 @@ mkdir -p "${OUTDIR}"
 }
 
 ClientList="-C ziger1 -C ziger2 -C burrata -C gottardo -C appenzeller-e1000 -C sbrinz1 -C gruyere -C sbrinz2 "
+
 
 ECHO_SERVER="llvmE10k"
 UDP_TEST_NAME="memcached_rr"
@@ -41,13 +42,13 @@ PACKETSIZE=1024
 CLIENTCOUNT=8
 SRVCORES=8
 
-
 SRVCORES=10
+
+
+CLIENTCOUNT=40
 CLIENTCOUNT=32
 
 CLIENTCOUNT=24
-
-CLIENTCOUNT=40
 set -x
 set -e
 
