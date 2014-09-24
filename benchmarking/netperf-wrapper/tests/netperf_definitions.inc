@@ -6,7 +6,8 @@ TOTAL_LENGTH=LENGTH + 2
 onload_prefix="onload --profile=latency --preload=/usr/lib64/libonload.so"
 
 SERVER_INITIAL_PORT =  888
-CLIENT_INITIAL_PORT =  9000
+CLIENT_INITIAL_PORT =  8000
+
 UNIQUE_CLIENTS = list(set(CLIENTS))
 NETPERF_CMD="../netperf-2.6.0/src/netperf -fg -4"
 

@@ -41,8 +41,7 @@ def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
     # socket info per slot
     appID = 0
     portNo = SERVER_INITIAL_PORT
-    unique_clients = list(set(CLIENTS))
-    sorted_clients = sorted(CLIENTS)
+    sorted_clients = CLIENTS
     sorted_clients_port_mapping = getClientPortList(sorted_clients, CLIENT_INITIAL_PORT, noPorts)
     #    print "Sorted clients are %s" % ( sorted_clients )
     #print "Sorted clients port mapping %s" % (sorted_clients_port_mapping)
@@ -57,7 +56,6 @@ def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
                 noPorts))
         sys.exit()
 
-#    assert(len(unique_clients) >= 4)
     clientsPerThread = len(CLIENTS) / threadsPerPort
 
     if threadsPerPort == 1 :
@@ -198,7 +196,7 @@ def SRV_CMDS(name):
                 }
 
     dragonet_filter_selector = {
-                "llvmSF":   False,
+                "llvmSF":   True,
                 "llvmE10k": True,
             }
 
