@@ -2,6 +2,7 @@ module Stack (
     instantiate,
     instantiateGreedy,
     instantiateKK,
+    instantiateKKwithSortedFlows,
     startStack,
 
     StackState(..),
@@ -690,15 +691,21 @@ ssExecUpd sstv = STM.atomically $ do
 epsDiff :: [EndpointDesc] -> [EndpointDesc] -> [EndpointDesc]
 epsDiff es1 es2 = S.toList $ S.difference (S.fromList es1) (S.fromList es2)
 
+dummyImpFn :: Flow -> Bool
+dummyImpFn _ = True
 
-instantiateKK ::
-           ([Flow] -> C.Configuration)  -- | get configuration
+instantiateKK = instantiateKKwithSortedFlows dummyImpFn
+
+instantiateKKwithSortedFlows ::
+           (Flow -> Bool)                              -- | function to tell
+                    -- if a flow is gold or not.  if gold, it will be moved to begining
+        -> ([Flow] -> C.Configuration)  -- | get configuration
         -> (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
         -> String                                      -- | Name of llvm-helpers
         -> (PLI.StateHandle -> C.Configuration -> IO ()) -- | Implement PRG conf
         -> (StackState -> String -> PG.PGNode -> String) -- | Assign nodes to PL
         -> IO ()
-instantiateKK getConf (prgU,prgHelp) llvmH cfgImpl cfgPLA = do
+instantiateKKwithSortedFlows isImp getConf (prgU,prgHelp) llvmH cfgImpl cfgPLA = do
     -- Prepare graphs and so on
     (lpgU,lpgHelp) <- LPG.graphH
     let mergeH = prgHelp `Sem.mergeHelpers` lpgHelp
@@ -738,7 +745,11 @@ instantiateKK getConf (prgU,prgHelp) llvmH cfgImpl cfgPLA = do
             putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
             putStrLn $ "LPG config: " ++ show lpgCfg
 
-            let prgConf = getConf $ map epToFlow allEps
+            let allFlows = map epToFlow allEps
+                impList = filter isImp $ allFlows
+                otherList = filter (not . isImp) $ map epToFlow allEps
+                sortedFlows = impList ++  otherList
+                prgConf = getConf $ sortedFlows
 
             plg <- O.makeGraph mergeH prgU lpgC implTransforms (pla lbl) dbg prgConf
 

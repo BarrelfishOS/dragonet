@@ -37,8 +37,8 @@ shift
 
 mkdir -p ${outDir}
 
-#set -x
-#set +e
+set -x
+set -e
 for dname in `ls ${dataDir}` ;
 do
     if [ -d "${dataDir}/${dname}" ] ; then

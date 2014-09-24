@@ -513,16 +513,37 @@ fs = [ FlowUDPv4 {
    , flSrcIp    = Nothing
    , flSrcPort  = Nothing } | i <- [1..40] ]
 
+fs2 = [ FlowUDPv4 {
+     flDstIp    = Just 127
+   , flDstPort  = Just $ fromIntegral $ 7777
+   , flSrcIp    = Just $ fromIntegral $ 50 + j
+   , flSrcPort  = Just $ fromIntegral $ 8000 + i } | i <- [0..8], j <- [0..8] ]
+
+
+-- These two should be the gold flows
+-- ziger1 : 10.113.4.51:8000
+-- ziger2 : 10.113.4.57:8000
+
 isGoldFl FlowUDPv4 {flDstPort = Just port} = isJust $ L.find (==port) [1001,1002]
+
+isGoldFl2 FlowUDPv4 {flDstPort = Just sport, flSrcIp = Just sip} = ans
+    where
+        ans
+            | (sport == 8000) && (sip == 51) =  True
+            | (sport == 8000) && (sip == 57) =  True
+            | otherwise = False
+isGoldFl2 _ = False
+
+
 goldFlPerQ = 1
-priorityCost' = priorityCost isGoldFl goldFlPerQ
+priorityCost' = priorityCost isGoldFl2 goldFlPerQ
 
 test = do
     let nq = 10
     --e10k <- e10kC_simple
     --writeFile "tests/e10kC.dot" $ toDot e10k
-    --prgU <- e10kU
-    prgU <- e10kU_simple
+    prgU <- e10kU
+    --prgU <- e10kU_simple
 
     let priFn = e10kCost prgU (priorityCost' nq)
         balFn = e10kCost prgU (balanceCost nq)
@@ -531,7 +552,7 @@ test = do
         costFn = priFn
 
         --conf  = searchGreedyConfE10k nq costFn fs
-        conf  = searchGreedyFlowsE10k nq costFn fs
+        conf  = searchGreedyFlowsE10k nq costFn fs2
 
     putStrLn $ e10kCfgStr conf
     putStrLn $ "Cost:" ++ (show $ costFn fs conf)
