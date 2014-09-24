@@ -230,10 +230,16 @@ def SRV_CMDS(name):
                       + "./fancyEchoLinux %s " % (
                             genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, False)),
                         "sleep 2",
+                        "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
                                     ],
                     "init_cmd" : [],
                     "exec_cmd" : "echo 'fancyEchoLinux should be already running'",
                     "kill_cmd" : [
+                                "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_2"),
+                                "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s " % (
+                                    "./ethtool_out_1", "./ethtool_out_2"),
+                                "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s 1000 | grep rx_packets " % (
+                                    "./ethtool_out_1", "./ethtool_out_2"),
                                 "sudo killall fancyEchoLinux || true",
                                 "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
                                 "echo 0 | sudo tee  /proc/sys/net/core/busy_read",
