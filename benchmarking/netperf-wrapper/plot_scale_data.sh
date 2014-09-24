@@ -37,7 +37,7 @@ shift
 
 mkdir -p ${outDir}
 
-set -x
+set +x
 set -e
 for dname in `ls ${dataDir}` ;
 do
@@ -57,5 +57,40 @@ set -e
 
 echo "now, we try and plot the data"
 
-../plottingTools/plottingScript.py --title "${titleText}" --x "Flows" --y "Transactions per Second(TPS)" --psize ${pktSize}  --save "${outDir}/ScalabilityP${pktSize}.pdf"  `find ${outDir}/ -name '*.result' | sort -r`
+../plottingTools/plottingScript.py --title "${titleText}" --x "Flows" \
+--y "Transactions per Second(TPS)" --psize ${pktSize}  \
+--save "${outDir}/ScalabilityP${pktSize}.pdf"  \
+`find ${outDir}/ -name '*.result' | sort -r`
+
+
+echo "Now generating graphs with AVG TPS per client"
+
+set -x
+set -e
+for dname in `ls ${dataDir}` ;
+do
+    if [ -d "${dataDir}/${dname}" ] ; then
+        echo "generating line for ${dname} located at ${dataDir}/${dname}"
+        ./graphGenScale.sh "${dataDir}/${dname}" "AVG" | grep "#####" > "${outDir}/${dname}.avgResult"
+        isEmpty=`wc -l "${outDir}/${dname}.avgResult"`
+        if [ "${isEmpty}" == "0" ] ; then
+            echo "no data found for ${outDir}/${dname}.avgResult, so removing it"
+            rm "${outDir}/${dname}.avgResult"
+        fi
+    else
+        echo "ignoring "${dataDir}/${dname}" as it's  afile "
+    fi
+done
+set -e
+
+echo "now, we try and plot the data with AVG TPS"
+
+../plottingTools/plottingScript.py --title "${titleText}" --x "Flows" \
+    --y "AVG Transactions per client per Second(TPS)" --psize ${pktSize} \
+--save "${outDir}/AvgTPSPerClientScalabilityP${pktSize}.pdf" \
+`find ${outDir}/ -name '*.avgResult' | sort -r`
+
+echo "The plots can be found at ${outDir}/AvgTPSPerClientScalabilityP${pktSize}.pdf"
+echo "The plots can be found at ${outDir}/ScalabilityP${pktSize}.pdf"
+
 
