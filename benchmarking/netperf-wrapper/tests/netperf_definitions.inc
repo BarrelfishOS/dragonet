@@ -35,12 +35,10 @@ def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
     # socket info per slot
     appID = 0
     portNo = SERVER_INITIAL_PORT
-    unique_clients = list(set(CLIENTS))
-    sorted_clients = sorted(CLIENTS)
-    sorted_clients_port_mapping = getClientPortList(sorted_clients, CLIENT_INITIAL_PORT, noPorts)
-    #    print "Sorted clients are %s" % ( sorted_clients )
-    #print "Sorted clients port mapping %s" % (sorted_clients_port_mapping)
-
+    sorted_clients = (CLIENTS)
+    sorted_clients.reverse()
+    sorted_clients_port_mapping = (getClientPortList(sorted_clients, CLIENT_INITIAL_PORT, noPorts))
+    sorted_clients_port_mapping.reverse()
 
     # Make sure that number of unique clients is more than threadsPerPort
     if createDedicatedFlows and len(sorted_clients ) < threadsPerPort :
@@ -51,7 +49,6 @@ def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
                 noPorts))
         sys.exit()
 
-#    assert(len(unique_clients) >= 4)
     clientsPerThread = len(CLIENTS) / threadsPerPort
 
     if threadsPerPort == 1 :
@@ -91,6 +88,7 @@ def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
     for kk in range(0, threadsPerPort):
         ret = ret + (" -t -q t%d " % (kk))
     print "FancyEcho Parameters (updated) : %s" % (ret)
+    sys.exit(1)
     return ret
 
 def endpoints_to_wait():
