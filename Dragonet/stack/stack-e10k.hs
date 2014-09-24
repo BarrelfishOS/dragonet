@@ -300,6 +300,10 @@ main = do
     let costFn   = Search.e10kCost prgU (Search.balanceCost nq)
         searchFn = Search.searchGreedyE10k nq costFn
 
+    let goldFlPerQ = 1
+        costFnPriority   = Search.e10kCost prgU ((Search.priorityCost Search.isGoldFl2M goldFlPerQ) nq)
+        searchFnPririty = Search.searchGreedyE10k nq costFnPriority
+
 
     --instantiate prgH "llvm-helpers-e10k" costFunction (oracle nq)
     --    (implCfg tcstate chan) plAssignMerged
@@ -309,5 +313,8 @@ main = do
     --    (implCfg tcstate chan) plAssign
 --    instantiate prgH "llvm-helpers-e10k" F.dummyFitness (oracleMultiQueue nq)
 --        (implCfg tcstate chan) plAssign
-    instantiateKK searchFn prgH "llvm-helpers-e10k" (implCfg tcstate chan) plAssignMerged
+
+    --instantiateKK searchFn prgH "llvm-helpers-e10k" (implCfg tcstate chan) plAssignMerged
+
+    instantiateKKwithSortedFlows Search.isGoldFl2M searchFnPririty prgH "llvm-helpers-e10k" (implCfg tcstate chan) plAssignMerged
 

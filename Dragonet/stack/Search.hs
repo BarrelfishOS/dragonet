@@ -8,6 +8,7 @@ module Search (
   searchGreedyConfE10k,
   searchGreedySF,
   priorityCost,
+  isGoldFl2M, -- Two machines in gold flow
   test
 ) where
 
@@ -22,6 +23,8 @@ import Dragonet.Conventions (isTruePort, isFalsePort)
 import qualified Util.GraphHelpers as GH
 import qualified Dragonet.Predicate as PR
 import qualified Dragonet.ProtocolGraph.Utils as PGU
+import qualified Dragonet.ProtocolGraph.Utils as PGU
+import Dragonet.Implementation.IPv4 as IP4
 
 import qualified Data.List as L
 import qualified Data.Map.Strict as M
@@ -519,27 +522,39 @@ fs = [ FlowUDPv4 {
 fs2 = [ FlowUDPv4 {
      flDstIp    = Just 127
    , flDstPort  = Just $ fromIntegral $ 7777
-   , flSrcIp    = Just $ fromIntegral $ 50 + j
-   , flSrcPort  = Just $ fromIntegral $ 8000 + i } | i <- [0..8], j <- [0..8] ]
+   , flSrcIp    = IP4.ipFromString "10.113.4.51"
+   , flSrcPort  = Just $ fromIntegral $ 8000 + i } | i <- [0..30] ]
 
 
 -- These two should be the gold flows
 -- ziger1 : 10.113.4.51:8000
 -- ziger2 : 10.113.4.57:8000
 
+myFromMaybe (Just x) = x
+myFromMaybe _ = error "No IP address"
+
 isGoldFl FlowUDPv4 {flDstPort = Just port} = isJust $ L.find (==port) [1001,1002]
 
-isGoldFl2 FlowUDPv4 {flDstPort = Just sport, flSrcIp = Just sip} = ans
+isGoldFl2M FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip} = ans
     where
         ans
-            | (sport == 8000) && (sip == 51) =  True
-            | (sport == 8000) && (sip == 57) =  True
+            | (sport == 8000) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
+            | (sport == 8005) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
             | otherwise = False
-isGoldFl2 _ = False
+isGoldFl2M _ = False
 
+
+sortFlows isImp fl = sortedFlows
+    where
+        allFlows = fl
+        impList = filter isImp $ allFlows
+        otherList = filter (not . isImp) allFlows
+        sortedFlows = impList ++  otherList
+
+fs2Sorted = sortFlows isGoldFl2M fs2
 
 goldFlPerQ = 1
-priorityCost' = priorityCost isGoldFl2 goldFlPerQ
+priorityCost' = priorityCost isGoldFl2M goldFlPerQ
 
 test = do
     let nq = 10
@@ -555,7 +570,7 @@ test = do
         costFn = priFn
 
         --conf  = searchGreedyConfE10k nq costFn fs
-        conf  = searchGreedyFlowsE10k nq costFn fs2
+        conf  = searchGreedyFlowsE10k nq costFn fs2Sorted
 
     putStrLn $ e10kCfgStr conf
     putStrLn $ "Cost:" ++ (show $ costFn fs conf)
