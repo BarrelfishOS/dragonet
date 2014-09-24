@@ -1,6 +1,7 @@
 module Dragonet.Flows (
     Flow(..),
-    flowPred
+    flowPred,
+    flowStr,
 ) where
 
 import qualified Dragonet.Predicate as PR
@@ -8,6 +9,9 @@ import qualified Dragonet.Predicate as PR
 -- Flow definitions
 
 import Data.Word
+import Data.Maybe
+import Dragonet.Implementation.IPv4 as IP4
+import Control.Monad (liftM)
 
 type IPv4Addr = Word32
 type UDPPort  = Word16
@@ -44,3 +48,17 @@ flowPred (FlowUDPv4 {flSrcIp   = srcIp,
                              [srcIpPred,dstIpPred,srcPortPred,dstPortPred]
              bld = PR.predBuildFold
              xand = (PR.buildAND bld)
+
+flowStr :: Flow -> String
+flowStr (FlowUDPv4 {flSrcIp   = srcIp,
+                     flDstIp   = dstIp,
+                     flSrcPort = srcPort,
+                     flDstPort = dstPort})
+ = "FL("++l4p++","++l3s++","++l3d++","++l4s++","++l4d++")"
+    where
+        l4p = "UDP"
+        showIP = IP4.ipToString
+        l3s = maybe "*" showIP $ srcIp
+        l3d = maybe "*" showIP $ dstIp
+        l4s = fromMaybe "*" $ liftM show $ srcPort
+        l4d = fromMaybe "*" $ liftM show $ dstPort
