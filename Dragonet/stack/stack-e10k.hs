@@ -9,6 +9,7 @@ import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.ProtocolGraph.Utils as PGU
 
 import qualified Graphs.E10k as E10k
+import Graphs.Cfg (e10kCfgStr)
 import qualified Runner.E10KControl as CTRL
 
 import qualified ReadArgs as RA
@@ -32,7 +33,8 @@ import qualified Fitness as F
 import Debug.Trace (trace)
 import Text.Show.Pretty (ppShow)
 
-tr = flip . trace
+tr a b = trace b a
+trN a b = a
 
 localIP :: Word32
 localIP = MD.asiagoIP_E10K
@@ -298,7 +300,8 @@ main = do
     -- Prepare graphs and so on
     prgH@(prgU,_) <- E10k.graphH
     let costFn   = Search.e10kCost prgU (Search.balanceCost nq)
-        searchFn = Search.searchGreedyE10k nq costFn
+        searchFn flows = tr ret $ "Conf selected:" ++ (e10kCfgStr ret)
+            where ret = Search.searchGreedyE10k nq costFn flows
 
     let goldFlPerQ = 1
         costFnPriority   = Search.e10kCost prgU ((Search.priorityCost Search.isGoldFl2M goldFlPerQ) nq)
