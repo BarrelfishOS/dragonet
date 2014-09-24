@@ -311,17 +311,18 @@ def SRV_CMDS(name):
         return {
 
                     "init_cmd_special" : [
-                        #"echo 50 | sudo tee /proc/sys/net/core/busy_poll",
-                        #"echo 50 | sudo tee /proc/sys/net/core/busy_read",
+                        "echo 50 | sudo tee /proc/sys/net/core/busy_poll",
+                        "echo 50 | sudo tee /proc/sys/net/core/busy_read",
                         "cd dragonet/Dragonet/ ; rm -f ./ethtool_out_1 ./ethtool_out_2",
                         "cd dragonet/Dragonet/ ; ethtool -S %s > %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
                                     ],
                     "init_cmd" : [],
                     "exec_cmd" : "sudo ./runBetter.sh ../memcached/memcached -c 64000 -m 64000 -u ubuntu ",
+
                     "kill_cmd_special" : [
                         "sudo killall memcached || true",
-                        #"echo 0 | sudo tee /proc/sys/net/core/busy_poll",
-                        #"echo 0 | sudo tee /proc/sys/net/core/busy_read",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_poll",
+                        "echo 0 | sudo tee /proc/sys/net/core/busy_read",
                         "cd dragonet/Dragonet/ ; ethtool -S %s > %s " % (SERVERS_IF[SERVERS[0]], "./ethtool_out_2"),
                         "cd dragonet/Dragonet/ ; ./diff_stats.py %s %s " % (
                             "./ethtool_out_1", "./ethtool_out_2"),
