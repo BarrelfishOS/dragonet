@@ -88,7 +88,6 @@ def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
     for kk in range(0, threadsPerPort):
         ret = ret + (" -t -q t%d " % (kk))
     print "FancyEcho Parameters (updated) : %s" % (ret)
-    sys.exit(1)
     return ret
 
 def endpoints_to_wait():
@@ -173,6 +172,7 @@ def SRV_CMDS(name):
         return {
                     "client_extra_opts" : "-N",
 
+                    # sudo ethtool -n eth7 rx-flow-hash udp4 # for setting up RSS
                     "init_cmd_special" : [
                       "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
                           toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))

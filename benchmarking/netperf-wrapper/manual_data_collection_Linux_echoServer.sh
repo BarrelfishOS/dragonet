@@ -52,7 +52,41 @@ get_data_for_conc_1() {
 }
 
 
-ClientList="-C ziger1 -C ziger2 -C gottardo -C appenzeller-e1000 -C sbrinz1 -C gruyere -C sbrinz2--10.113.4.29 -C sbrinz2--10.113.4.129 -C burrata--10.113.4.96 -C burrata--10.113.4.196"
+get_data_for_conc_32() {
+
+./cleanupServer.sh
+./cleanupClient.sh
+
+    CONCURRENTY=32
+    PACKETSIZE=64
+    getData
+
+    sleep 3
+
+    PACKETSIZE=1024
+    getData
+
+    sleep 3
+}
+
+get_data_for_conc_16() {
+
+./cleanupServer.sh
+./cleanupClient.sh
+
+    CONCURRENTY=16
+    PACKETSIZE=64
+    getData
+
+    sleep 3
+
+    PACKETSIZE=1024
+    getData
+
+    sleep 3
+}
+
+
 
 ClientList="-C burrata -C ziger1 -C ziger2 -C gottardo -C appenzeller-e1000 -C sbrinz1 -C gruyere -C sbrinz2 "
 
@@ -83,23 +117,33 @@ set -e
 #exit 0
 
 CLIENTCOUNT=40
-get_data_for_conc_1
+get_data_for_conc_32
+get_data_for_conc_16
+
+sleep 3
 
 CLIENTCOUNT=32
-get_data_for_conc_1
+get_data_for_conc_32
+get_data_for_conc_16
 
 sleep 3
 
 CLIENTCOUNT=24
-get_data_for_conc_1
+get_data_for_conc_32
+get_data_for_conc_16
 
+sleep 3
 
 CLIENTCOUNT=16
-get_data_for_conc_1
+get_data_for_conc_32
+get_data_for_conc_16
+
+sleep 3
 
 CLIENTCOUNT=8
 SRVCORES=8
-get_data_for_conc_1
+get_data_for_conc_32
+get_data_for_conc_16
 
 exit 0
 
