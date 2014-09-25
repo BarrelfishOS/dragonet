@@ -42,6 +42,9 @@ main = do
     defaultMainWith
                 defaultConfig { cfgSamples = ljust 5 }
                 (return ())
-                [   bench "10" $ nf benchBal 10
+                [   bench "1"  $ nf benchBal 1
+                  , bench "5"  $ nf benchBal 5
+                  , bench "10" $ nf benchBal 10
                   , bench "20" $ nf benchBal 20
-                  , bench "40" $ nf benchBal 40]
+                  , bench "40" $ nf benchBal 40
+                  , bench "80" $ nf benchBal 80]
