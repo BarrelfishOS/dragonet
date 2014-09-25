@@ -20,8 +20,8 @@ exit 0
 
 getData() {
 
-title="Priority_Test_${UDP_TEST_NAME},CONCUR_${CONCURRENTY},PKT_${PACKETSIZE},NIC_Intel,SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-OUTDIR="./nsdi_data/priority/Test_${UDP_TEST_NAME}/CONCUR_${CONCURRENTY}/PKT_${PACKETSIZE}/NIC_Intel/SRV_${ECHO_SERVER}/"
+title="Priority_Test_${UDP_TEST_NAME},CONCUR_${CONCURRENTY},PKT_${PACKETSIZE},${NIC_TYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+OUTDIR="./nsdi_data/priority/Test_${UDP_TEST_NAME}/CONCUR_${CONCURRENTY}/PKT_${PACKETSIZE}/${NIC_TYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift 0  ${ClientList} --servercores ${SRVCORES} \
@@ -56,9 +56,9 @@ SRVCORES=10
 
 CLIENTCOUNT=40
 
-startStack
+#startStack
 
-check_working_dummy
+#check_working_dummy
 
 
 PACKETSIZE=64
