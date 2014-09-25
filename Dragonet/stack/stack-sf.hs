@@ -265,8 +265,6 @@ implCfg tcstate chan sh config = do
 
 
 
-
-
 -- Create separate pipelines for rx and tx per hardware queue
 plAssign :: StackState -> String -> PG.PGNode -> String
 plAssign _ _ (_,n)
@@ -309,6 +307,7 @@ main = do
     --    (implCfg tcstate chan) plAssign
 --    instantiate prgH "llvm-helpers-sf" F.dummyFitness (oracleMultiQueue nq)
 --        (implCfg tcstate chan) plAssign
+
     instantiateKK searchFn prgH "llvm-helpers-sf" (implCfg tcstate chan) plAssignMerged
 
 

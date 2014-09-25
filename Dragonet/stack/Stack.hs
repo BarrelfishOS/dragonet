@@ -743,13 +743,17 @@ instantiateKKwithSortedFlows isImp getConf (prgU,prgHelp) llvmH cfgImpl cfgPLA =
                 -- LPG config is essentially all flows in network stack
             putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
             putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
-            putStrLn $ "LPG config: " ++ show lpgCfg
+            --putStrLn $ "LPG config: " ++ show lpgCfg
 
             let allFlows = map epToFlow allEps
                 impList = filter isImp $ allFlows
                 otherList = filter (not . isImp) $ map epToFlow allEps
                 sortedFlows = impList ++  otherList
                 prgConf = getConf $ sortedFlows
+
+            --putStrLn $ "All flows are: " ++ show allFlows
+
+            --putStrLn $ "Important flows found: " ++ show impList
 
             plg <- O.makeGraph mergeH prgU lpgC implTransforms (pla lbl) dbg prgConf
 

@@ -63,6 +63,8 @@ static struct cfg_endpoint *ceps = NULL;
 static struct cfg_appq *caqs = NULL;
 static struct cfg_thread *cthreads = NULL;
 
+static pthread_mutex_t    stack_init_sequencer_mutex;
+static int thread_count = 0;
 
 static void print_usage(void)
 {
@@ -354,6 +356,19 @@ static void *run_thread(void *arg)
     bool locked;
     unsigned int idle = 0;
 
+    while (1) {
+        pthread_mutex_lock(&stack_init_sequencer_mutex);
+        if ( th->localtid == thread_count) {
+            printf("Thread with id %d starting\n", th->localtid);
+            break;
+        }
+        // not youre turn, release the lock and wait
+        pthread_mutex_unlock(&stack_init_sequencer_mutex);
+        sched_yield();
+    } // end while: your turn
+
+
+
     // Make sure everything is initialized
     for (i = 0; i < th->num_aqs; i++) {
         caq = th->aqs[i];
@@ -385,6 +400,11 @@ static void *run_thread(void *arg)
         }
         pthread_mutex_unlock(&caq->mutex);
     }
+
+    printf("Thread with id %d is done\n", th->localtid);
+    ++thread_count;
+    pthread_mutex_unlock(&stack_init_sequencer_mutex);
+
 
     while (true) {
         for (i = 0; i < th->num_aqs; i++) {
@@ -448,6 +468,14 @@ static void wait_threads(void)
 
 int main(int argc, char *argv[])
 {
+
+    int res = pthread_mutex_init(&stack_init_sequencer_mutex, NULL);
+    if (res != 0) {
+        fprintf(stderr, "pttrhead_mutex_init failed: %s\n", strerror(res));
+        abort();
+    }
+
+
     parse_params(argc, argv);
     start_threads();
     wait_threads();
