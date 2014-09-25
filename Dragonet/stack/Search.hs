@@ -583,7 +583,7 @@ sfCost = e10kCost
 
 searchGreedySF = searchGreedyE10k
 
-sortedRealFlows = filter isGoldFl2M real40Flows
+sortedRealFlows = sortFlows isGoldFl2M real40Flows
 
 -- All flows are:
 real40Flows = [FlowUDPv4 {flSrcIp = Just 175178803, flDstIp = Just 175178847, flDstPort = Just 7777, flSrcPort = Just 8000},
