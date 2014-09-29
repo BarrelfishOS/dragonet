@@ -278,11 +278,13 @@ plAssign _ _ (_,n)
 plAssignMerged :: StackState -> String -> PG.PGNode -> String
 plAssignMerged _ _ (_,n) = PG.nTag n
 
+llvm_helpers = "llvm-helpers-sf"
 
-main = do
+main_balanced = do
 
     (nq :: Int) <- RA.readArgs
-    print $ "Number of queues used: " ++ show nq
+    print $ "Running stack for balanced scinario with queues: " ++ show nq
+
 
     let state = CfgState {
                     csThread = Nothing,
@@ -298,16 +300,33 @@ main = do
     let costFn   = Search.sfCost prgU (Search.balanceCost nq)
         searchFn = Search.searchGreedySF nq costFn
 
+    instantiateKK searchFn prgH llvm_helpers (implCfg tcstate chan) plAssignMerged
 
-    --instantiate prgH "llvm-helpers-sf" costFunction (oracle nq)
-    --    (implCfg tcstate chan) plAssignMerged
-    --instantiate prgH "llvm-helpers-sf" F.fitnessFunction (oracle nq)
-    --instantiate prgH "llvm-helpers-sf" F.priorityFitness  (oracle nq)
-    --instantiateGreedy prgH "llvm-helpers-sf" F.priorityFitness (oracle nq)
-    --    (implCfg tcstate chan) plAssign
---    instantiate prgH "llvm-helpers-sf" F.dummyFitness (oracleMultiQueue nq)
---        (implCfg tcstate chan) plAssign
 
-    instantiateKK searchFn prgH "llvm-helpers-sf" (implCfg tcstate chan) plAssignMerged
+main_priority = do
 
+    (nq :: Int) <- RA.readArgs
+    print $ "Running stack for balanced scinario with queues: " ++ show nq
+
+    let state = CfgState {
+                    csThread = Nothing,
+                    cs5Tuples = M.empty,
+                    cs5TUnused = [0..127]
+                }
+
+    -- Channel and MVar with thread id of control thread
+    tcstate <- STM.newTVarIO state
+    chan <- STM.newTChanIO
+    -- Prepare graphs and so on
+    prgH@(prgU,_) <- SF.graphH
+
+    let goldFlPerQ = 1
+        costFnPriority   = Search.sfCost prgU ((Search.priorityCost
+                    Search.isGoldFl2M goldFlPerQ) nq)
+        searchFnPririty = Search.searchGreedySF nq costFnPriority
+    instantiateKKwithSortedFlows Search.isGoldFl2M searchFnPririty
+                prgH llvm_helpers  (implCfg tcstate chan) plAssignMerged
+
+main = main_balanced
+--main = main_priority
 
