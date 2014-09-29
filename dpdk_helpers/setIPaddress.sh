@@ -67,12 +67,14 @@ setIPaddr "00:1b:21:8f:1a:c0" "10.44.4.26" "sbrinz1" "intel1" "no" "no" "" ""
 
 echo "for sbrinz2"
 setDHCPIPaddr "00:30:48:d7:99:58" "10.110.4.29" "sbrinz2"
-setIPaddr "90:e2:ba:3a:6d:20" "10.22.4.29" "sbrinz2" "intel1" "direct" "gruyere-intel1" "0000:85:00.0" "cable-nc10-m3"
+#setIPaddr "90:e2:ba:3a:6d:20" "10.22.4.29" "sbrinz2" "intel1" "direct" "gruyere-intel1" "0000:85:00.0" "cable-nc10-m3"
+setIPaddr "90:e2:ba:3a:6d:20" "10.113.4.129" "sbrinz2" "intel1" "switch" ""  "0000:85:00.0" "cable-nc10-m3" ## for NSDI paper
 setIPaddr "90:e2:ba:3a:6d:21" "10.113.4.29" "sbrinz2" "intel2" "switch" "18" "0000:85:00.1" "cable-short-thin"
 
 echo "for ziger1"
 setDHCPIPaddr "00:21:28:6B:98:ba" "10.110.4.51" "ziger1"
-setIPaddr "00:1b:21:8f:18:64" "10.22.4.51" "ziger1" "intel1" "direct" "appenzeller-sf1" "" "cable-144"
+#setIPaddr "00:1b:21:8f:18:64" "10.22.4.51" "ziger1" "intel1" "direct" "appenzeller-sf1" "" "cable-144"
+setIPaddr "00:1b:21:8f:18:64" "10.113.4.151" "ziger1" "intel1" "switch" "" "" "cable-144"  ## for NSDI paper
 setIPaddr "00:1b:21:8f:18:65" "10.113.4.51" "ziger1" "intel2" "switch" "17" "" "cable-2"
 
 echo "for ziger2"
@@ -114,7 +116,8 @@ echo "for burrata"
 setDHCPIPaddr "00:1e:67:92:52:d1" "10.110.4.96" "burrata"
 #setIPaddr "00:1e:67:9f:4f:de" "10.22.4.96" "burrata" "intel1" "direct" "asiago-sf2" ""
 setIPaddr "00:1e:67:9f:4f:de" "10.113.4.96" "burrata" "intel1" "switch" "20" ""
-setIPaddr "00:1e:67:9f:4f:df" "10.22.4.196" "burrata" "intel2" "direct" "asiago-intel1" ""
+setIPaddr "00:1e:67:9f:4f:df" "10.113.4.196" "burrata" "intel2" "switch" "" "" ## for NSDI
+#setIPaddr "00:1e:67:9f:4f:df" "10.22.4.196" "burrata" "intel2" "direct" "asiago-intel1" ""
 
 echo "for tomme1"
 setDHCPIPaddr "00:21:28:3b:3f:9e" "10.110.4.41" "tomme1"

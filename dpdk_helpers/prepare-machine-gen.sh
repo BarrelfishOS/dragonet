@@ -128,6 +128,8 @@ get_repository () {
     fi
     git clone /cdrom/casper/mount/repository/dragonet
     cd dragonet
+    #git checkout execmodel
+    git checkout nsdi15
 }
 
 
@@ -142,6 +144,7 @@ install_openonload() {
     sudo ./scripts/onload_install
     sudo onload_tool reload
     sudo cp build/gnu_x86_64/lib/ciul/libciul.so.1.1.1 /lib/
+
     cd ${MYBASE}
     setIPaddress.sh
 }
@@ -186,7 +189,16 @@ install_others() {
     sudo make install
 }
 
+install_z3_related() {
+    cd ~/
+    cp -r /cdrom/casper/mount/bin/z3Solver/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/ .
+    cd /usr/bin/
+    sudo ln -s /home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/bin/z3 z3
+    sudo cp ~/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/bin/libz3.so /lib/x86_64-linux-gnu/
 
+    cd ~/dragonet/Dragonet
+    cabal install z3 --extra-include-dirs=/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/include/ --extra-lib-dirs=/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/bin/
+}
 
 install_server_related() {
     install_Dragonet
