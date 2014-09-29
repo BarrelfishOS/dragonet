@@ -21,8 +21,8 @@ exit 0
 
 getData() {
 
-title="Priority_Test_${UDP_TEST_NAME},CONCUR_${CONCURRENTY},PKT_${PACKETSIZE},${NIC_TYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-OUTDIR="./nsdi_data/Priority/Test_${UDP_TEST_NAME}/CONCUR_${CONCURRENTY}/PKT_${PACKETSIZE}/${NIC_TYPE}/SRV_${ECHO_SERVER}/"
+title="priority_Test_${UDP_TEST_NAME},CONCUR_${CONCURRENTY},PKT_${PACKETSIZE},${NIC_TYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+OUTDIR="./nsdi_data/priority/Test_${UDP_TEST_NAME}/CONCUR_${CONCURRENTY}/PKT_${PACKETSIZE}/${NIC_TYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift 0  ${ClientList} --servercores ${SRVCORES} \
