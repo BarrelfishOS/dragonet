@@ -45,20 +45,8 @@ graph SFPRG {
                     proto: <Enum (TCP,UDP,SCP,OTHER)>,
                     sport: <UInt 16>,
                     dport: <UInt 16>,
-                    prio:  Int 1 7,
                     queue: UInt 2) } <,128>
             function config5tuple
-            port queues[Q0Valid Q1Valid Q2Valid Q3Valid Q4Valid Q5Valid Q6Valid Q7Valid Q8Valid Q9Valid Q10Valid]
-            port default[CFDirFilter] }
-
-        config CFDirFilter {
-            type { (sip:   UInt 32,
-                    dip:   UInt 32,
-                    proto: Enum (TCP,UDP,SCP,OTHER),
-                    sport: UInt 16,
-                    dport: UInt 16,
-                    queue: UInt 2) }
-            function configFDir
             port queues[Q0Valid Q1Valid Q2Valid Q3Valid Q4Valid Q5Valid Q6Valid Q7Valid Q8Valid Q9Valid Q10Valid]
             port default[ToDefaultQueue] }
 

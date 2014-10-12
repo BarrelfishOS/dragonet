@@ -235,11 +235,13 @@ fi
 ##################################################################
 
 ./scripts/pravin/wait_for_dragonet.sh 10 ${STACKNAME}
-run_for_40_cores_10threads_debug_echoserver
+run_for_4_cores
 sudo killall ${STACKNAME}
 exit 0
 
 ##################################################################
+
+#run_for_40_cores_10threads_debug_echoserver
 
 #run_memcached_client_manual_debug_40flows_8unique_clients
 #run_memcached_client_manual_debug_8flows_8unique_clients

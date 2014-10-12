@@ -45,7 +45,6 @@ oracleHardcoded ::  SS.OracleArgs -> [(String,C.Configuration)]
 oracleHardcoded  args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,
         SS.oraclePrg = oPrg, SS.oracleNewConns = eps , SS.oracleSS = ss}) = [
                 ("default",[
-                ("RxCFDirFilter", PG.CVList []),
                 ("RxC5TupleFilter", PG.CVList [
                      PG.CVTuple [
                         PG.CVMaybe Nothing, -- $ Just $ PG.CVInt $ fromIntegral MD.ziger2IP, -- srcAddr,
@@ -108,7 +107,7 @@ oracleMultiQueue nq args@(SS.OracleArgs{ SS.oracleOldConf = oldconf,  SS.oracleP
                 nJust (Just _) = 1
                 cvMInt :: Integral a => Maybe a -> PG.ConfValue
                 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
-                prio = (1 +) $ sum [nJust sIP, nJust dIP, nJust sP, nJust dP]
+                prio = 1 -- hardcoded to fixed value as SF does not have priorities
 
 oracle ::  Int -> SS.OracleArgs -> [(String, C.Configuration)]
 oracle nq args@(SS.OracleArgs {SS.oracleOldConf = (oldconfname,oldconf), SS.oracleNewConns = eps}) = ret
@@ -144,7 +143,7 @@ mk5TupleFromEP ep q = PG.CVTuple [ cvMInt sIP, cvMInt dIP,
                 nJust (Just _) = 1
                 cvMInt :: Integral a => Maybe a -> PG.ConfValue
                 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
-                prio = (1 +) $ sum [nJust sIP, nJust dIP, nJust sP, nJust dP]
+                prio = 1 -- hardcoded to fixed value as SF does not have priorities
 
 
 add5TupleToConf :: C.Configuration -> EndpointDesc -> Integer -> C.Configuration
