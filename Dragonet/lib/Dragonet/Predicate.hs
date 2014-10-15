@@ -36,6 +36,8 @@ module Dragonet.Predicate (
     dnetPrShow
 ) where
 
+import Dragonet.Predicate.Definitions (PredExpr(..), AtomKey, AtomVal)
+
 import Dragonet.ProtocolGraph        as PG
 import qualified Util.GraphHelpers   as GH
 import Dragonet.ProtocolGraph.Utils  (getFNodeByName, edgeDeps, edgePort, spawnDeps, isSpawnTarget)
@@ -130,13 +132,6 @@ pgSpawnPreds bld pg n = case length spawn_edges of
 ------- Path predicates -----
 --
 
-data PredExpr = PredAtom PG.NLabel PG.NPort |
-                PredOr  [PredExpr] |
-                PredAnd [PredExpr] |
-                PredNot PredExpr   |
-                PredTrue | PredFalse
-    deriving (Eq)
-
 instance Show PredExpr where
     show (PredAtom node port) = "pred(" ++ node ++ "," ++ port ++ ")"
     show (PredOr l)  = "or(" ++ (L.intercalate ","  $ map show l) ++ ")"
@@ -148,19 +143,19 @@ instance Show PredExpr where
 --
 -- Atom assignments
 --
-type PredAssignment = (PG.NLabel, PG.NPort, PredExpr)
+type PredAssignment = (AtomKey, AtomVal, PredExpr)
 
-mkAss :: PG.NLabel-> PG.NPort -> PredExpr -> PredAssignment
+mkAss :: AtomKey-> AtomVal -> PredExpr -> PredAssignment
 mkAss nlabel port expr
     | predIsConst expr = (nlabel, port, expr)
     | otherwise = error "Let's keep assigments to constants unless we need otherwise"
 
 -- group  (and validate) a list for assigments by label
-groupAssignments :: [PredAssignment] -> [(PG.NLabel, [PredAssignment])]
+groupAssignments :: [PredAssignment] -> [(AtomKey, [PredAssignment])]
 groupAssignments as = as_grouped'
     where groups :: [[PredAssignment]]
           groups = L.groupBy ((==) `on` \(l,_,_) -> l) as
-          as_grouped :: [(PG.NLabel, [PredAssignment])]
+          as_grouped :: [(AtomKey, [PredAssignment])]
           as_grouped = [ ((\ (l,_,_) -> l) $ (x !! 0), L.nub x) | x <- groups]
           as_grouped' = map validate_group as_grouped
           validate_group x@(glbl, gassignments) = x'
@@ -309,7 +304,7 @@ predEval :: PredExpr -> [PredAssignment] -> PredExpr
 predEval e as = predEval_ e (groupAssignments as)
 
 predEval_ :: PredExpr
-          -> [(PG.NLabel, [PredAssignment])]
+          -> [(AtomKey, [PredAssignment])]
           -> PredExpr
 -- constants
 predEval_ PredTrue  _ = PredTrue
