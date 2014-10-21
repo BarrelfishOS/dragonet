@@ -311,11 +311,7 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
     let updateGraphT x = doTimeIt "updateGraph"  $ updateGraph x
         updateGraph sstv = do
             putStrLn "updateGraph entry"
-            ss <- STM.atomically $ do
-                ss <- STM.readTVar sstv
-                let ss' = ss { ssVersion = ssVersion ss + 1 }
-                STM.writeTVar sstv ss'
-                return ss'
+            ss <- ssNewVer sstv
 
             -- STEP: we need to create incremantal ss with adding one flow at a time
             let allEps = M.elems $ ssEndpoints ss  -- FIXME: this list should return one flow at a time
@@ -400,12 +396,26 @@ initStackSt = StackState {
 }
 
 -- TODO: use this in instantiate
+-- bump the version number
 ssNewVer :: STM.TVar StackState -> IO (StackState)
 ssNewVer sstv = STM.atomically $ do
     ss <- STM.readTVar sstv
     let ss' = ss { ssVersion = ssVersion ss + 1 }
     STM.writeTVar sstv ss'
     return ss'
+
+-- Update:
+--  bump the version number
+--  update the prevEndpoints
+--  return : new stack state, endpoints added, endpoints removed
+ssExecUpd :: STM.TVar StackState -> IO (StackState, M.Map EndpointId EndpointDesc)
+ssExecUpd sstv = STM.atomically $ do
+    ss <- STM.readTVar sstv
+    let prevEps = ssPrevEndpoints ss
+        newEps  = ssEndpoints ss
+        ss' = ss { ssVersion = ssVersion ss + 1, ssPrevEndpoints = newEps }
+    STM.writeTVar sstv ss'
+    return (ss', prevEps)
 
 -- config LPG based on stack state information
 ssConfigLPG :: StackState -> PG.PGraph -> PG.PGraph
@@ -473,18 +483,6 @@ getEmptyConf = ("EmptyCOnf",
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
--- an update graph is executed:
---  bump the version number
---  update the prevEndpoints
---  return : new stack state, endpoints added, endpoints removed
-ssExecUpd :: STM.TVar StackState -> IO (StackState, M.Map EndpointId EndpointDesc)
-ssExecUpd sstv = STM.atomically $ do
-    ss <- STM.readTVar sstv
-    let prevEps = ssPrevEndpoints ss
-        newEps  = ssEndpoints ss
-        ss' = ss { ssVersion = ssVersion ss + 1, ssPrevEndpoints = newEps }
-    STM.writeTVar sstv ss'
-    return (ss', prevEps)
 
 epsDiff :: [EndpointDesc] -> [EndpointDesc] -> [EndpointDesc]
 epsDiff es1 es2 = S.toList $ S.difference (S.fromList es1) (S.fromList es2)
