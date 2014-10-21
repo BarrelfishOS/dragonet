@@ -19,10 +19,12 @@ module Dragonet.Predicate (
     nodePredCache, PredCache,
     depPredCache,
     --
-    predParser,
-    parseStr, parseStr_,
+    parseStr_,
+    parseStr,
     parseStrDNF,
-    parseFile, predGetAtoms,
+    parseStrFold,
+    --
+    predGetAtoms,
     --
     PredAssignment,
     --
@@ -36,7 +38,10 @@ module Dragonet.Predicate (
     dnetPrShow
 ) where
 
-import Dragonet.Predicate.Definitions (PredExpr(..), AtomKey, AtomVal)
+import Dragonet.Predicate.Definitions (PredExpr(..), PredBuild(..),
+                                       predBuildSimple,
+                                       AtomKey, AtomVal)
+import Dragonet.Predicate.Parser (parseStr_)
 
 import Dragonet.ProtocolGraph        as PG
 import qualified Util.GraphHelpers   as GH
@@ -50,9 +55,7 @@ import Data.Tuple (swap)
 import Data.Maybe
 import Data.Function (on)
 
-import Control.Applicative ((<$>))
 import qualified Control.Monad.State as ST
-import qualified Text.ParserCombinators.Parsec as P
 
 import Text.Show.Functions -- show instance for functions, so that ConfFunction
                            -- gets Show and we can derive Show for PredBuild PredCompSt
@@ -106,7 +109,7 @@ pgSpawnEdgePred bld (node, (_, _, ESpawn _ attrs)) = expr
           isPredAttr (ESAttrPredicate _) = True -- only this one for now
 
           parse :: ESAttribute -> PredExpr
-          parse (ESAttrPredicate x) = parseStr $ xtrace ("parsing: " ++ x) x
+          parse (ESAttrPredicate x) = parseStrFold $ xtrace ("parsing: " ++ x) x
 
           predicates = filter isPredAttr attrs
           predicates' = xtrace ("predicates are: " ++ (show predicates)) predicates
@@ -127,18 +130,6 @@ pgSpawnPreds bld pg n = case length spawn_edges of
     where mapfn = pgSpawnEdgePred
           spawn_edges = spawnDeps pg n
           nlabel = nLabel $ snd n
-
---
-------- Path predicates -----
---
-
-instance Show PredExpr where
-    show (PredAtom node port) = "pred(" ++ node ++ "," ++ port ++ ")"
-    show (PredOr l)  = "or(" ++ (L.intercalate ","  $ map show l) ++ ")"
-    show (PredAnd l) = "and(" ++ (L.intercalate "," $ map show l) ++ ")"
-    show (PredNot e) = "not("++ (show e) ++ ")"
-    show PredTrue    = "true"
-    show PredFalse   = "false"
 
 --
 -- Atom assignments
@@ -812,7 +803,7 @@ portPred_ bld fnode@(FNode {}) port = pred
           -- Note that, if needed, they can be added in the port predicates
           -- (e.g., in the unicorn file)
           pred  = case L.lookup port (PG.nPredicates fnode) of
-                   Just x -> parseStr_ bld x
+                   Just x -> predDoBuild bld x
                    Nothing -> atom
           atom  = case length (nPorts fnode) of
                     0 -> error $ "We expect a port named `" ++ port ++ "' in node:\n" ++ (ppShow fnode)
@@ -1037,23 +1028,6 @@ dnetPrShow expr = assert (isDNF expr) ret
                   fAtomName (PredAtom n _) = n
                   fAtomName (PredNot (PredAtom n _)) = n
 
-
--- predicate constructors
-data PredBuild = PredBuild {
-      buildAND    :: [PredExpr] -> PredExpr
-    , buildOR     :: [PredExpr] -> PredExpr
-    , buildNOT    :: PredExpr   -> PredExpr
-    , builderName :: String
-} deriving (Show)
-
--- just use the constructors
-predBuildSimple = PredBuild {
-      buildAND    = PredAnd
-    , buildOR     = PredOr
-    , buildNOT    = PredNot
-    , builderName = "Constructors"
-}
-
 -- do some folding to simplify expressions
 predBuildFold = PredBuild {
       buildAND    = predAndFold
@@ -1082,95 +1056,11 @@ predDoBuild b@(PredBuild {buildOR = bor}) (PredOr l) =
 predDoBuild b@(PredBuild {buildNOT = bnot}) (PredNot e) =
     bnot $ predDoBuild b e
 
---
-------- silly parser for building predicate expression
---
-
-wspace :: P.CharParser PredBuild ()
-wspace = P.skipMany (P.oneOf " \t")
-
-parse_id :: P.CharParser PredBuild String
-parse_id = do
-    c <- P.letter
-    cs <- P.many (P.alphaNum P.<|> P.char '_')
-    return $ c:cs
-
-kw_parse :: String -> P.CharParser PredBuild ()
-kw_parse kw = do
-    P.string kw
-    P.notFollowedBy P.alphaNum
-
-par_parse :: P.CharParser PredBuild (PredExpr)
-par_parse = do
-    P.char '('
-    e <- expr_parse
-    P.char ')'
-    return e
-
-not_parse :: P.CharParser PredBuild (PredExpr)
-not_parse = do
-    bNOT <- buildNOT <$> P.getState
-    kw_parse "not"
-    P.char '('
-    wspace
-    e <- expr_parse
-    wspace
-    P.char ')'
-    return $ bNOT e
-
-term_parse :: P.CharParser PredBuild (PredExpr)
-term_parse = do
-    kw_parse "pred"
-    P.char '('
-    wspace
-    nlabel <- parse_id
-    wspace
-    P.char ','
-    wspace
-    port <- parse_id
-    wspace
-    P.char ')'
-    return $ PredAtom nlabel port
-
-op_parse :: String -> ([PredExpr] -> PredExpr) -> P.CharParser PredBuild (PredExpr)
-op_parse kw constructor = do
-    kw_parse kw
-    P.char '('
-    l <- P.sepBy1 expr_parse (wspace >> P.char ',' >> wspace)
-    P.char ')'
-    return $ constructor l
-
-expr_parse :: P.CharParser PredBuild (PredExpr)
-expr_parse = do
-        bAND <- buildAND <$> P.getState
-        bOR  <- buildOR  <$> P.getState
-        x <- (kw_parse "true"  >> return PredTrue)
-                P.<|> (kw_parse "false"  >> return PredFalse)
-                P.<|> par_parse
-                P.<|> not_parse
-                P.<|> (op_parse "and" bAND)
-                P.<|> (op_parse "or" bOR)
-                P.<|> term_parse
-        return x
-
-predParser :: P.CharParser PredBuild (PredExpr)
-predParser = do
-    wspace
-    x <- expr_parse
-    wspace
-    P.eof
-    return x
-
-parseStr_ :: PredBuild -> String -> PredExpr
-parseStr_ builders input = case P.runParser predParser builders "(top level)" input of
-    Right x -> x
-    Left err -> error $ "Could not parse: --" ++ input ++ "-- error:" ++ (show err)
-
-parseStr :: String -> PredExpr
-parseStr = parseStr_ predBuildFold
-
 parseStrDNF :: String -> PredExpr
 parseStrDNF = parseStr_ predBuildDNF
 
-parseFile :: FilePath -> IO (PredExpr)
-parseFile fname = readFile fname >>= return . parseStr
+parseStrFold :: String -> PredExpr
+parseStrFold = parseStr_ predBuildFold
+
+parseStr :: String -> PredExpr
+parseStr = parseStr_ predBuildSimple

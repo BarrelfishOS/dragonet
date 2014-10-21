@@ -33,6 +33,7 @@ module Dragonet.ProtocolGraph (
 ) where
 
 import Dragonet.Semantics (PortSemantics)
+import Dragonet.Predicate.Definitions (PredExpr(..))
 
 import qualified Data.Graph.Inductive as DGI
 import qualified Control.Monad.State as ST
@@ -52,8 +53,8 @@ data Node =
         nAttributes     :: [NAttribute],
         nPorts          :: [NPort],
         nImplementation :: NImplementation,
-        nSemantics      :: [(NPort,PortSemantics)],
-        nPredicates     :: [(NPort, String)],
+        nSemantics      :: [(NPort, PortSemantics)],
+        nPredicates     :: [(NPort, PredExpr)],
         nOrigin         :: String  -- LPG, PRG, etc (mostly for debugging)
         } |
     ONode {

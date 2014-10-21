@@ -201,8 +201,8 @@ nodeL5Tuple c = (baseFNode (c5tString c) bports) {
                     nAttributes = c5tAttr c,
                     nSemantics = [("true",tSems),("false",fSems)],
                     nPredicates = [
-                        ("true",  (show $ c5TuplePredT c)),
-                        ("false", (show $ c5TuplePredF c))
+                        ("true",  c5TuplePredT c),
+                        ("false", c5TuplePredF c)
                     ]
                     }
     where

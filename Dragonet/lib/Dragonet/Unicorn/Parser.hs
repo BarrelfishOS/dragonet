@@ -27,6 +27,8 @@ import Dragonet.ProtocolGraph (NAttribute(..),ESAttribute(..))
 import qualified Util.SMTLibParser as SMTP
 import qualified SMTLib2 as SMT
 
+import Dragonet.Predicate as PR
+
 -----------------------------------------------------------------------------
 -- Representing parsed code
 
@@ -60,7 +62,7 @@ data Node =
         nSpawns    :: [Spawn],
         nAttrs     :: [NAttribute],
         nPortSems  :: [(String, SMT.Expr)],
-        nPortPreds :: [(String, String)],
+        nPortPreds :: [(String, PR.PredExpr)],
         nImplFun   :: Maybe String } |
 
     Config {
@@ -78,7 +80,7 @@ data Node =
         nSpawns    :: [Spawn],
         nAttrs     :: [NAttribute],
         nPortSems  :: [(String, SMT.Expr)],
-        nPortPreds :: [(String, String)],
+        nPortPreds :: [(String, PR.PredExpr)],
         nImplFun   :: Maybe String } |
 
     And {
@@ -202,7 +204,7 @@ predicates = do
     reserved "predicate"
     p <- identifier
     pred <- stringLiteral
-    return (p, pred)
+    return (p, PR.parseStr pred)
 
 implFun = do { reserved "implementation" ; identifier }
 

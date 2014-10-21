@@ -178,7 +178,7 @@ e10kCost prgU costQFn = retFn
                             ++ ppShow qmap2
                             ++ "<-----")
 
-                    ret_ = costQFn qmap_
+                    ret_ = costQFn qmap3
                     ret = trN ret_ $ "conf:" ++ (e10kCfgStr conf)
                                     ++ "\ncost:" ++ (show ret_)
 
@@ -441,13 +441,13 @@ reachedQueue (_,PG.FNode {PG.nLabel = name})
     | name == "RxToDefaultQueue" =  Just 0
     | otherwise  = Nothing
 
-doFlowQueueNextPort :: PR.PredExpr -> [(PG.NPort, String)] -> PG.NPort
-doFlowQueueNextPort flPred ((port,portPredStr):rest) = ret
+doFlowQueueNextPort :: PR.PredExpr -> [(PG.NPort, PR.PredExpr)] -> PG.NPort
+doFlowQueueNextPort flPred ((port,portPred_):rest) = ret
     where sat     = isJust $ PR.dnfSAT andExpr
           andExpr = (PR.buildAND bld) [portPred,flPred]
-          portPred = PR.parseStr_ bld portPredStr
+          portPred = PR.predDoBuild bld portPred_
           bld = PR.predBuildDNF
-          -- NB: we assuem that each flow is assigned exclusively to a singel
+          -- NB: we assume that each flow is assigned exclusively to a single
           -- queue, so we return the first match
           ret = case sat of
                 True  -> port
