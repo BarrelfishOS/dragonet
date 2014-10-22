@@ -2477,7 +2477,9 @@ s32 ixgbe_reset_pipeline_82599(struct ixgbe_hw *hw)
 	IXGBE_WRITE_REG(hw, IXGBE_AUTOC,
 			autoc_reg ^ (0x4 << IXGBE_AUTOC_LMS_SHIFT));
 	/* Wait for AN to leave state 0 */
-	for (i = 0; i < 10; i++) {
+        /* PS: Increased the waiting loop from 10 to 100 as 10 was not enough
+         *      for my hardware setup. */
+	for (i = 0; i < 100; i++) {
 		msec_delay(4);
 		anlp1_reg = IXGBE_READ_REG(hw, IXGBE_ANLP1);
 		if (anlp1_reg & IXGBE_ANLP1_AN_STATE_MASK)
