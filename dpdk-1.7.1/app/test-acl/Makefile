@@ -34,7 +34,6 @@ include $(RTE_SDK)/mk/rte.vars.mk
 ifeq ($(CONFIG_RTE_LIBRTE_ACL),y)
 
 APP = testacl
-
 CFLAGS += $(WERROR_FLAGS)
 
 # all source are stored in SRCS-y
