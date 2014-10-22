@@ -79,27 +79,26 @@ int main(int argc, char *argv[])
 #include <pthread.h>
 #include <packet_access.h>
 #include <pipelines.h>
+#include <dpdk_backend.h>
 
 #define MAX_QUEUES                     128
 
-
+#define CONFIG_LOCAL_MAC  0ULL //
+#define CONFIG_LOCAL_IP  0x0a71045f //   "10.113.4.95"
 
 static uint64_t qstat[MAX_QUEUES] = {0, 0};
+static void *drv = NULL;
 
 static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
     struct state *state, struct input **in, uint8_t qi)
 {
+    node_out_t out_decision = P_E10kRxQueue0_drop;
     assert(qi < MAX_QUEUES);
-    assert(!"NYI");
-    node_out_t port = 0;
-#if 0
-    struct dragonet_e10k *e10k = (struct dragonet_e10k *) state->tap_handler;
-    struct dragonet_e10k_queue *q;
-    void *op;
-    size_t len;
+    struct dragonet_dpdk_queue *q;
+
+    struct dragonet_dpdk *e10k = (struct dragonet_dpdk *) state->tap_handler;
+    size_t len = 0;
     int last;
-    uint64_t flags;
-    struct input *qin;
 
     // Respawn this node
     // FIXME: shouldn't  value S_E10kRxQueue0_poll should depend which queue-id?
@@ -111,32 +110,64 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
             return P_E10kRxQueue0_drop;
         }
 
-        // FIXME: DPDK specific init
+        // DPDK specific init
+        state->tap_handler = (void *)init_dpdk_wrapper_deleteme(IFNAME);
 
-        if (!dpdk_if_init(state, CONFIG_PCI_ADDR)) {
-            pl_panic(pipeline_handle, "Initializing e10k device failed\n");
+        if (state->tap_handler == NULL) {
+            printf("ERROR: Initializing dpdk e10k device failed\n");
+            abort();
         }
-        e10k = (struct dragonet_e10k *) state->tap_handler;
+        e10k = (void *) state->tap_handler;
 
         // clear up the stats array
         memset(qstat, 0, sizeof(qstat));
         // set the local IP and mac
-        state->local_mac = e10k->card.macaddr;
+        state->local_mac = CONFIG_LOCAL_MAC;
         state->local_ip = CONFIG_LOCAL_IP;
+
+        *in = input_alloc();  // I am not sure if this is needed,
+                // but keeping there as there is similar line in e10k init code
+
         declare_dragonet_initialized(DN_READY_FNAME, "e10k driver started!\n");
         printf("Initialized\n");
     }
     q = e10k->queues + qi;
 
+    // get handle on queue, and make sure that it is correct
+    assert(e10k != NULL);
+    q = e10k->queues + qi;
+    // FIXME: currently the queue is NULL as we are supporting only one queue
+    //          This should get fixed when we have multiple queues
+    //assert(q->queue != NULL);
+
     // FIXME: make sure that queue is initialized and populated
 
     // FIXME: code to get a packet
-    if (e10k_queue_get_rxbuf(q->queue, &op, &len, &last, &flags) != 0) {
-        return P_E10kRxQueue0_drop;
-    }
-    qin = op;
+    //ssize_t len = dpdk_rx_wrapper(q, in);
 
-    // FIXME: Make sure that there are no errors
+    if (len == 0) {
+        // There are no new packets...
+        return P_SFRxQueue0_drop;
+    }
+    // FIXME: follwoing steps should be done where packet is received
+    //          so, it should be in dpdk_rx_wrapper
+/*    qin->qid = qi;
+    // Set packet boundaries
+    pkt_append(qin, -(qin->len - len));
+    *in = qin;
+*/
+
+    // We received new packet
+    ++q->rx_pkts;
+    dprint
+    //printf
+        ("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
+            "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
+            "######## received RX packet\n",
+            __FILE__,  __func__, __LINE__, qi, q->rx_pkts,
+            state->tap_handler, e10k->e10kif,
+            &e10k->queues[0], e10k->queues[0].queue,
+            qi, q, q->queue);
 
 #if SHOW_INTERVAL_STATS
 
@@ -150,18 +181,12 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
 #endif // SHOW_INTERVAL_STATS
     ++qstat[qi];
 
-    qin->qid = qi;
-    // Set packet boundaries
-    pkt_append(qin, -(qin->len - len));
 
-    *in = qin;
-    port = P_E10kRxQueue0_out;
+    out_decision = P_E10kRxQueue0_out;
 
-add_buf:
     // FIXME: Add new buffer
 
-#endif // 0
-    return port;
+    return out_decision;
 
 } // end function: rx_queue
 

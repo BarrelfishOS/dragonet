@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <sched.h>
 #include <assert.h>
+#include <dpdk_backend.h>
 
 /* Hack */
 /*void e10k_qcb_write_queue_tails(struct e10k_card *c,
@@ -11,6 +12,12 @@
 
 void e10k_ctrl_waitready(struct state *state)
 {
+    void *drv;
+    do {
+        drv = (void *) state->tap_handler;
+        sched_yield();
+    } while (drv == NULL);
+
     assert(!"NYI");
 }
 

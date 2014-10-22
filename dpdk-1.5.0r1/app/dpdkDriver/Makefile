@@ -38,6 +38,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 #APP = dpdkDriver
 LIB = libdpdk_driver.so
 
+LDFLAGS += -lm
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)
 

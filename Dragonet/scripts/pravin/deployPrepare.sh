@@ -18,6 +18,9 @@ do
 	sudo ipcrm -m $i ;
 done
 
+# removing hugpages (assuming they are mounted on /mnt/huge/ location)
+sudo rm -rf /mnt/huge/*
+
 rm -f *.ready
 rm -f *.failed
 rm -f *.appready
