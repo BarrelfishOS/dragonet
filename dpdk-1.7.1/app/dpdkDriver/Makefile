@@ -31,12 +31,50 @@
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-#DIRS-$(CONFIG_RTE_APP_TEST) += test
-#DIRS-$(CONFIG_RTE_LIBRTE_ACL) += test-acl
-#DIRS-$(CONFIG_RTE_LIBRTE_PIPELINE) += test-pipeline
-#DIRS-$(CONFIG_RTE_TEST_PMD) += test-pmd
-#DIRS-$(CONFIG_RTE_LIBRTE_CMDLINE) += cmdline_test
-#DIRS-$(CONFIG_RTE_LIBRTE_EAL_LINUXAPP) += dump_cfg
-DIRS-$(CONFIG_RTE_DPDK) += dpdkDriver
+ifeq ($(CONFIG_RTE_DPDK),y)
 
-include $(RTE_SDK)/mk/rte.subdir.mk
+#
+# library name
+#
+#APP = testpmd
+LIB = libdpdk_driver.so
+
+CFLAGS += -O3
+CFLAGS += $(WERROR_FLAGS)
+
+ifeq ($(CONFIG_RTE_LIBRTE_PMD_PCAP),y)
+LDFLAGS += -lpcap
+endif
+
+#
+# all source are stored in SRCS-y
+#
+#SRCS-y := testpmd.c
+SRCS-y := dpdkControl.c
+SRCS-y += dpdkData.c
+SRCS-y += parameters.c
+SRCS-$(CONFIG_RTE_LIBRTE_CMDLINE) += cmdline.c
+SRCS-y += config.c
+SRCS-y += iofwd.c
+SRCS-y += macfwd.c
+SRCS-y += macfwd-retry.c
+SRCS-y += macswap.c
+SRCS-y += flowgen.c
+SRCS-y += rxonly.c
+SRCS-y += txonly.c
+SRCS-y += csumonly.c
+SRCS-y += icmpecho.c
+SRCS-$(CONFIG_RTE_LIBRTE_IEEE1588) += ieee1588fwd.c
+SRCS-y += mempool_anon.c
+
+ifeq ($(CONFIG_RTE_EXEC_ENV_LINUXAPP),y)
+CFLAGS_mempool_anon.o := -D_GNU_SOURCE
+endif
+CFLAGS_cmdline.o := -D_GNU_SOURCE
+
+# this application needs libraries first
+DEPDIRS-y += lib
+include $(RTE_SDK)/mk/rte.lib.mk
+
+#include $(RTE_SDK)/mk/rte.app.mk
+endif

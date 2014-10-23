@@ -180,8 +180,8 @@ executable stack-dpdk
     build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
                         llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
                         transformers, pretty-show
-    ghc-options:        -threaded -L../dpdk-1.5.0r1/build/lib/ -ldpdk_driver -lintel_dpdk -lpthread -ldl -lrt -rdynamic
-    --ghc-options:        -threaded -L../dpdk-1.5.0r1/build/lib/ -lintel_dpdk -lpthread -ldl -lrt -rdynamic
+    ghc-options:        -threaded -L../dpdk-1.7.1/build/lib/ -ldpdk_driver -lintel_dpdk -lpthread -ldl -lrt -rdynamic
+    --ghc-options:        -threaded -L../dpdk-1.7.1/build/lib/ -lintel_dpdk -lpthread -ldl -lrt -rdynamic
 	                -- -lrt needed for clock_gettime
 	                -- -ldl needed for dlopen and friends
     C-sources:          stack/Runner/dyn_remote_client.c,
