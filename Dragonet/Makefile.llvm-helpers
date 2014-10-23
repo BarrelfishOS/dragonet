@@ -143,9 +143,6 @@ $(BUILD_DIR)/llvm-helpers-sf.bc: $(BUILD_DIR)/llvm-c_impl-sf.bc $(helpers_common
 $(BUILD_DIR)/llvm-helpers-dpdk.bc: $(BUILD_DIR)/llvm-c_impl-dpdk.bc $(helpers_common)
 	$(LLVM_LINK) $^ -o $@
 
-	# -L ../../openonload-201310-u2/build/gnu_x86_64/lib/ciul/ -Wl,-no-as-needed -lciul
-
-
 # dyn helpers
 
 cfiles_dyn_helpers=stack/Runner/dyn_helpers.c \

@@ -77,17 +77,15 @@ int main(int argc, char *argv[])
 #include <signal.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <packet_access.h>
-#include <pipelines.h>
 #include <dpdk_backend.h>
 
 #define MAX_QUEUES                     128
 
-#define CONFIG_LOCAL_MAC  0ULL //
+#define CONFIG_LOCAL_MAC  0x07459f671e00ULL // 00:1e:67:9f:45:07 // asiago - e10k
 #define CONFIG_LOCAL_IP  0x0a71045f //   "10.113.4.95"
 
 static uint64_t qstat[MAX_QUEUES] = {0, 0};
-static void *drv = NULL;
+
 
 static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
     struct state *state, struct input **in, uint8_t qi)
@@ -142,20 +140,33 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
 
     // FIXME: make sure that queue is initialized and populated
 
-    // FIXME: code to get a packet
-    //ssize_t len = dpdk_rx_wrapper(q, in);
+    // NOTE: This is assuming that dpdk_rx_wrapper is blocking!!!
+    // allocate buffer to copy the packet
+    *in = input_alloc();
+    if ((*in) == NULL) {
+        printf("%s:%s:%d: sf driver is running out of buffers\n"
+                " soon hardware will start dropping packets\n",
+                __FILE__, __FUNCTION__, __LINE__);
 
-    if (len == 0) {
+        // NOTE: If there is no buffer than we don't consume or drop the packet
+        // we just leave there, hoping that next call might be lucky
+        // and get buffer.  If not, hardware will eventually start dropping
+        // packet.
+        return 0;
+    }
+    // start working on RX space
+    pkt_prepend((*in), (*in)->space_before);
+
+    dprint("Waiting for incoming packets\n");
+    size_t copylen = get_packetV2(0, 0, q->qid, (*in)->data, (*in)->len);
+
+    dprint("packet RX %zu\n", copylen);
+    pkt_append(*in, -((*in)->len - copylen));
+
+    if (copylen == 0) {
         // There are no new packets...
         return P_SFRxQueue0_drop;
     }
-    // FIXME: follwoing steps should be done where packet is received
-    //          so, it should be in dpdk_rx_wrapper
-/*    qin->qid = qi;
-    // Set packet boundaries
-    pkt_append(qin, -(qin->len - len));
-    *in = qin;
-*/
 
     // We received new packet
     ++q->rx_pkts;
@@ -176,16 +187,12 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
         printf
 //        dprint
             ("QueueID:%"PRIu8":[TID:%d]: has handled %"PRIu64" packets, size:%zu\n",
-               qi, (int)pthread_self(), qstat[qi], len);
+               qi, (int)pthread_self(), qstat[qi], copylen);
    }
 #endif // SHOW_INTERVAL_STATS
     ++qstat[qi];
 
-
     out_decision = P_E10kRxQueue0_out;
-
-    // FIXME: Add new buffer
-
     return out_decision;
 
 } // end function: rx_queue
@@ -194,30 +201,36 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
 static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
 {
 
-    assert(!"NYI");
-#if 0
-    struct dragonet_e10k *e10k;
-    struct dragonet_e10k_queue *q;
+    struct dragonet_dpdk *e10k;
+    struct dragonet_dpdk_queue *q;
     void *op;
     struct input *qin = *in;
 
     // wait while you get proper handler.
     // FIXME: how do I make sure that this code is thread-safe?
     do {
-        e10k = (struct dragonet_e10k *) state->tap_handler;
+        e10k = (struct dragonet_dpdk *) state->tap_handler;
     } while (e10k == NULL);
     q = e10k->queues + qi;
-    while (!q->populated);
+    // wait till queue is allocated
+    while (q->qstate == 0);
 
-    // FIXME: Check if there are processed buffers on the TX queue
-    while (e10k_queue_get_txbuf(q->queue, &op) == 0) {
-        qin = op;
-        input_free(qin);
-    }
+    ++q->tx_pkts;
+    dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
+            "e10k_if = %p, (vq0 [%p, qstate %d], [vq-%"PRIu8": %p, qstate %d], "
+            "######## Trying to send packet, data: %p, len:%"PRIu32"\n",
+            __FILE__,  __func__, __LINE__, qi, q->tx_pkts,
+            state->tap_handler, e10k->e10kif,
+            &e10k->queues[0], e10k->queues[0].qstate,
+            qi, q, q->qstate, (*in)->data, (*in)->len);
 
-    *in = NULL;
-#endif // 0
-    return 0;
+    dpdk_tx_wrapper(q, (*in)->data, (*in)->len, qi);
+
+    dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d]:"
+            "##############  packet sent, data: %p, len:%"PRIu32"\n",
+            __FILE__, __func__, __LINE__, qi, q->tx_pkts, (*in)->data, (*in)->len);
+
+    return P_RxQueue_out;
 }
 
 node_out_t do_pg__E10kRxQueue0(struct ctx_E10kRxQueue0 *context,

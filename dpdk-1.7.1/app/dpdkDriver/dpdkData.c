@@ -31,6 +31,14 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/******************************************************************
+ * FIXME: This file is copied from dpdk-1.5.0r1/app/dpdkDriver/dpdkData.c
+ *      which intern was based on some code in  dpdk-1.5.0r1/app/testpmd/
+ *      code.  So, essentially old codebase.  You may want to fix it wo
+ *      work with newcode.
+ *
+ ******************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -306,8 +314,8 @@ int init_dpdk_setupV2(void)
         "--",
         "--pkt-filter-mode=perfect",
 //        "--pkt-filter-mode=signature",
-        "--rxq=2",
-        "--txq=2",
+        "--rxq=8",
+        "--txq=8",
 	"--burst=1",
         "--disable-rss",
         "--disable-hw-vlan",
@@ -369,6 +377,7 @@ struct dpdk_info *init_dpdk_setup_and_get_default_queue2(char *ifAddr)
     dev->port_id = 0;
     dev->queue_id = 0;
     dev->ptr = NULL;
+    // FIXME: send some useful pointer here instead of sending empty box!!!
     return dev;
 }
 
