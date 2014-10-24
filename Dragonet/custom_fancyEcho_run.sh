@@ -191,6 +191,9 @@ run_for_1_cores_null() {
 }
 
 
+set -x
+set -e
+
 if [ -z $1 ] ; then
     echo "ERROR: provide the stack name"
     echo "USAGE: $0 <stackname>"
@@ -216,26 +219,35 @@ else
         echo "NOTE: using ${SERVERIP} as server-IP address"
     else
 
-        if [ "$STACKNAME" ==  "stack-tap" ] ; then
-            SERVERIP="192.168.123.1"
+        if [ "$STACKNAME" ==  "stack-dpdk" ] ; then
+            SERVERIP="10.113.4.96"  # For burrata as server
+            SERVERIP="10.113.4.95"  # for asiago as server
+            echo "NOTE: using ${SERVERIP} as server-IP address"
         else
 
-            if [ "$STACKNAME" ==  "stack-null" ] ; then
-                SERVERIP="127.0.0.1"
+
+            if [ "$STACKNAME" ==  "stack-tap" ] ; then
+                SERVERIP="192.168.123.1"
             else
-                print "Invalid stack type $STACKNAME"
-                exit 1
+
+                if [ "$STACKNAME" ==  "stack-null" ] ; then
+                    SERVERIP="127.0.0.1"
+                else
+                    print "Invalid stack type $STACKNAME"
+                    exit 1
+                fi
             fi
         fi
     fi
 fi
+
 
 ##################################################################
         ## Main ##
 ##################################################################
 
 ./scripts/pravin/wait_for_dragonet.sh 10 ${STACKNAME}
-run_for_4_cores
+run_for_1_cores
 sudo killall ${STACKNAME}
 exit 0
 

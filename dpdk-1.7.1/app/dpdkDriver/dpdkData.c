@@ -118,48 +118,14 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
         char *pkt_out, size_t buf_len);
 void send_packetV2(int core_id, int port_id, int queue_id,
         char *pkt_tx, size_t len);
-int init_dpdk_setupV2(void);
+int init_dpdk_setupV2(int queues);
 
 
 // Simplified wrapper functions
-struct dpdk_info *init_dpdk_setup_and_get_default_queue2(char *ifAddr);
-int send_packet_wrapper(struct dpdk_info *dinf, char *pkt_tx, size_t len);
-int get_packet_wrapper(struct dpdk_info *dinf, char *pkt_tx, size_t len);
+struct dpdk_info *init_dpdk_setup_and_get_default_queue2(char *ifAddr,
+        int queues);
 
-static struct cmdline *virtual_cl = NULL; // virtual cmdline for Dragonet
-//int exec_control_command(const char *cmd);
-
-//  ###################### TO DELETE ########################
-
-int fdir_add_perfect_filter_wrapper_dummy(int queue_id, char *srcIP, int srcPort,
-        char *dstIP, int dstPort, int type);
-int fdir_add_perfect_filter2_wrapper_dummy(int queue_id);
-int fdir_del_perfect_filter_wrapper_dummy(int queue_id);
-int fdir_add_flow_filter_wrapper_dummy(int queue_id);
-int fdir_del_flow_filter_wrapper_dummy(int queue_id);
-
-
-void tx_cksum_set_dummy(portid_t port_id, uint8_t cksum_mask);
-void fdir_add_signature_filter_dummy(portid_t port_id, uint8_t queue_id,
-			       struct rte_fdir_filter *fdir_filter);
-void fdir_update_signature_filter_dummy(portid_t port_id, uint8_t queue_id,
-				  struct rte_fdir_filter *fdir_filter);
-void fdir_remove_signature_filter_dummy(portid_t port_id,
-				  struct rte_fdir_filter *fdir_filter);
-void fdir_get_infos_dummy(portid_t port_id);
-void fdir_add_perfect_filter_dummy(portid_t port_id, uint16_t soft_id,
-			     uint8_t queue_id, uint8_t drop,
-			     struct rte_fdir_filter *fdir_filter);
-void fdir_update_perfect_filter_dummy(portid_t port_id, uint16_t soft_id,
-				uint8_t queue_id, uint8_t drop,
-				struct rte_fdir_filter *fdir_filter);
-void fdir_remove_perfect_filter_dummy(portid_t port_id, uint16_t soft_id,
-				struct rte_fdir_filter *fdir_filter);
-void fdir_set_masks_dummy(portid_t port_id, struct rte_fdir_masks *fdir_masks);
-
-
-//  ######################  ########################
-
+static int already_initialized = 0; // checks if the init function is already called
 
 void send_packetV2(int core_id, int port_id, int queue_id,
         char *pkt_tx, size_t len)
@@ -221,13 +187,6 @@ fail:
 	return;
 } // end function: send_packetV2
 
-
-int send_packet_wrapper(struct dpdk_info *dinf, char *pkt_tx, size_t len)
-{
-    assert(dinf != NULL);
-    send_packetV2(dinf->core_id, dinf->port_id, dinf->queue_id, pkt_tx, len);
-    return len;
-}
 
 size_t get_packetV2(int core_id, int port_id, int queue_id,
         char *pkt_out, size_t buf_len)
@@ -293,54 +252,64 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
 } // end function: get_packetV2
 
 
-int get_packet_wrapper(struct dpdk_info *dinf, char *pkt_tx, size_t len)
-{
-    assert(dinf != NULL);
-    return get_packetV2(dinf->core_id, dinf->port_id, dinf->queue_id,
-        pkt_tx, len);
-}
-
-#define ARGNOS 15
-int init_dpdk_setupV2(void)
+#define ARGNOS (15)
+int init_dpdk_setupV2(int queues)
 {
 
-    if (virtual_cl != NULL) {
+    if (already_initialized == 1) {
         printf("ERROR: Already initialized\n");
+        assert(!"ERROR: Already initialized\n");
         return -1;
     }
-    const char *myArgs[ARGNOS] = {"./a.out",
+
+    const char *myArgs[ARGNOS] = {"./stack-dpdk",
         "-c", "0x18",  // coremask
         "-n", "1",  // no of ports
+        "--file-prefix=dnetHuge",
+//        "--no-huge",
+        "-m", "700",
         "--",
         "--pkt-filter-mode=perfect",
 //        "--pkt-filter-mode=signature",
-        "--rxq=8",
-        "--txq=8",
 	"--burst=1",
         "--disable-rss",
         "--disable-hw-vlan",
         "", ""}; // 13 arguments
 
-    char *myArgs2[ARGNOS];
-    int i;
-    for (i = 0; i < ARGNOS; ++i) {
-        printf("copying %dth string [%s]\n", i, myArgs[i]);
-        myArgs2[i] = malloc(127);
-        if (myArgs[i] == NULL) {
-            myArgs2[i] = NULL;
+    char *myArgs2[ARGNOS + 4];
+    int i, j;
+    for (i = 0, j = 0; i < ARGNOS ; ++i, ++j) {
+        myArgs2[j] = malloc(127);
+        if (strcmp("--", myArgs[i]) == 0) {
+            printf("Inserting special agruments at location %d, "
+                    "after seprator: [%s]\n", i, myArgs[i]);
+            snprintf(myArgs2[j], 126, "--");
+
+            ++j;
+            myArgs2[j] = malloc(127);
+            snprintf(myArgs2[j], 126, "--rxq=%d", queues);
+
+            ++j;
+            myArgs2[j] = malloc(127);
+            snprintf(myArgs2[j], 126, "--txq=%d", queues);
+
         } else {
-            strncpy(myArgs2[i], myArgs[i], 126);
+            if (myArgs[i] == NULL) {
+                printf("Found NULL for location %d, so putting null\n", i);
+                myArgs2[j] = NULL;
+            } else {
+                printf("copying %dth string [%s]\n", i, myArgs[i]);
+                strncpy(myArgs2[j], myArgs[i], 126);
+            }
         }
-    }
+    } // end for:  marshalling cmdline args
 
     printf("Hello world from DPDK...., V3\n");
-    int ret = init_device(13, myArgs2);
+    int ret = init_device(j, myArgs2);
     if (ret < 0) {
         printf("ERROR: %s: Initialization failed (ret val=%d)\n",
                 __func__, ret);
     }
-
-
 
     printf("\nInitialization successful.\n");
     return ret;
@@ -354,11 +323,13 @@ int main(int __attribute__((unused)) argc, char __attribute__((unused)) *argv[])
 #endif // 0
 
 
-struct dpdk_info *init_dpdk_setup_and_get_default_queue2(char *ifAddr)
+struct dpdk_info *init_dpdk_setup_and_get_default_queue2(char *ifAddr,
+        int queues)
 {
     printf("WARNING: Ignoring %s interface address suggestion\n", ifAddr);
-    printf("    going for default hardcoded value\n");
-    int ret = init_dpdk_setupV2();
+    printf("    going for the NIC which is connected to uio\n");
+    printf("Initializing %d queues\n", queues);
+    int ret = init_dpdk_setupV2(queues);
     if (ret < 0) {
         printf("ERROR: %s:%d:%s init_dpdk_setupV2 failed\n",
                     __FILE__, __LINE__, __func__);
@@ -381,350 +352,3 @@ struct dpdk_info *init_dpdk_setup_and_get_default_queue2(char *ifAddr)
     return dev;
 }
 
-//  ###################### TO DELETE ########################
-
-typedef uint8_t  lcoreid_t;
-typedef uint8_t  portid_t;
-typedef uint16_t queueid_t;
-typedef uint16_t streamid_t;
-
-static int
-port_id_is_invalid_dummy(portid_t port_id)
-{
-	if (port_id < nb_ports)
-		return 0;
-	printf("Invalid port %d (must be < nb_ports=%d)\n", port_id, nb_ports);
-	return 1;
-}
-
-
-void
-fdir_add_signature_filter_dummy(portid_t port_id, uint8_t queue_id,
-			  struct rte_fdir_filter *fdir_filter)
-{
-	int diag;
-
-	if (port_id_is_invalid_dummy(port_id))
-		return;
-
-	diag = rte_eth_dev_fdir_add_signature_filter(port_id, fdir_filter,
-						     queue_id);
-	if (diag == 0)
-		return;
-
-	printf("rte_eth_dev_fdir_add_signature_filter for port_id=%d failed "
-	       "diag=%d\n", port_id, diag);
-}
-
-void
-fdir_update_signature_filter_dummy(portid_t port_id, uint8_t queue_id,
-			     struct rte_fdir_filter *fdir_filter)
-{
-	int diag;
-
-	if (port_id_is_invalid_dummy(port_id))
-		return;
-
-	diag = rte_eth_dev_fdir_update_signature_filter(port_id, fdir_filter,
-							queue_id);
-	if (diag == 0)
-		return;
-
-	printf("rte_eth_dev_fdir_update_signature_filter for port_id=%d failed "
-	       "diag=%d\n", port_id, diag);
-}
-
-void
-fdir_remove_signature_filter_dummy(portid_t port_id,
-			     struct rte_fdir_filter *fdir_filter)
-{
-	int diag;
-
-	if (port_id_is_invalid_dummy(port_id))
-		return;
-
-	diag = rte_eth_dev_fdir_remove_signature_filter(port_id, fdir_filter);
-	if (diag == 0)
-		return;
-
-	printf("rte_eth_dev_fdir_add_signature_filter for port_id=%d failed "
-	       "diag=%d\n", port_id, diag);
-
-}
-
-void
-fdir_get_infos_dummy(portid_t port_id)
-{
-	struct rte_eth_fdir fdir_infos;
-
-	static const char *fdir_stats_border = "########################";
-
-	if (port_id_is_invalid_dummy(port_id))
-		return;
-
-	rte_eth_dev_fdir_get_infos(port_id, &fdir_infos);
-
-	printf("\n  %s FDIR infos for port %-2d     %s\n",
-	       fdir_stats_border, port_id, fdir_stats_border);
-
-	printf("  collision: %-10"PRIu64"  free:     %"PRIu64"\n"
-	       "  maxhash:   %-10"PRIu64"  maxlen:   %"PRIu64"\n"
-	       "  add:       %-10"PRIu64"  remove:   %"PRIu64"\n"
-	       "  f_add:     %-10"PRIu64"  f_remove: %"PRIu64"\n",
-	       (uint64_t)(fdir_infos.collision), (uint64_t)(fdir_infos.free),
-	       (uint64_t)(fdir_infos.maxhash), (uint64_t)(fdir_infos.maxlen),
-	       fdir_infos.add, fdir_infos.remove,
-	       fdir_infos.f_add, fdir_infos.f_remove);
-	printf("  %s############################%s\n",
-	       fdir_stats_border, fdir_stats_border);
-}
-
-void
-fdir_add_perfect_filter_dummy(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
-			uint8_t drop, struct rte_fdir_filter *fdir_filter)
-{
-	int diag;
-
-	if (port_id_is_invalid_dummy(port_id))
-		return;
-
-	diag = rte_eth_dev_fdir_add_perfect_filter(port_id, fdir_filter,
-						   soft_id, queue_id, drop);
-	if (diag == 0)
-		return;
-
-	printf("rte_eth_dev_fdir_add_perfect_filter for port_id=%d failed "
-	       "diag=%d\n", port_id, diag);
-}
-
-void
-fdir_update_perfect_filter_dummy(portid_t port_id, uint16_t soft_id, uint8_t queue_id,
-			   uint8_t drop, struct rte_fdir_filter *fdir_filter)
-{
-	int diag;
-
-	if (port_id_is_invalid_dummy(port_id))
-		return;
-
-	diag = rte_eth_dev_fdir_update_perfect_filter(port_id, fdir_filter,
-						      soft_id, queue_id, drop);
-	if (diag == 0)
-		return;
-
-	printf("rte_eth_dev_fdir_update_perfect_filter for port_id=%d failed "
-	       "diag=%d\n", port_id, diag);
-}
-
-void
-fdir_remove_perfect_filter_dummy(portid_t port_id, uint16_t soft_id,
-			   struct rte_fdir_filter *fdir_filter)
-{
-	int diag;
-
-	if (port_id_is_invalid_dummy(port_id))
-		return;
-
-	diag = rte_eth_dev_fdir_remove_perfect_filter(port_id, fdir_filter,
-						      soft_id);
-	if (diag == 0)
-		return;
-
-	printf("rte_eth_dev_fdir_update_perfect_filter for port_id=%d failed "
-	       "diag=%d\n", port_id, diag);
-}
-
-void
-fdir_set_masks_dummy(portid_t port_id, struct rte_fdir_masks *fdir_masks)
-{
-	int diag;
-
-	if (port_id_is_invalid_dummy(port_id))
-		return;
-
-	diag = rte_eth_dev_fdir_set_masks(port_id, fdir_masks);
-	if (diag == 0)
-		return;
-
-	printf("rte_eth_dev_set_masks_filter for port_id=%d failed "
-	       "diag=%d\n", port_id, diag);
-}
-
-
-/*
-void set_filter_values()
-{
-
-    memset(&fdir_filter, 0, sizeof(struct rte_fdir_filter));
-
-    // PS: Added to parse the IP address................
-    cmdline_parse_token_ipaddr_t token;
-    char buf[CMDLINE_TEST_BUFSIZE];
-    cmdline_ipaddr_t result;
-
-    // clear out everything
-    memset(buf, 0, sizeof(buf));
-    memset(&result, 0, sizeof(result));
-    memset(&token, 0, sizeof(token));
-    token.ipaddr_data.flags = CMDLINE_IPADDR_V4;
-    ret = cmdline_parse_ipaddr((cmdline_parse_token_hdr_t*)&token,
-        ipaddr_valid_strs[i].str, (void*)&result);
-    // ####################################################
-
-
-    if (res->ip_src.family == AF_INET)
-        fdir_filter.ip_src.ipv4_addr = res->ip_src.addr.ipv4.s_addr;
-    else
-        memcpy(&(fdir_filter.ip_src.ipv6_addr),
-                &(res->ip_src.addr.ipv6),
-                sizeof(struct in6_addr));
-
-    if (res->ip_dst.family == AF_INET)
-        fdir_filter.ip_dst.ipv4_addr = res->ip_dst.addr.ipv4.s_addr;
-    else
-        memcpy(&(fdir_filter.ip_dst.ipv6_addr),
-                &(res->ip_dst.addr.ipv6),
-                sizeof(struct in6_addr));
-
-    fdir_filter.port_dst = rte_cpu_to_be_16(res->port_dst);
-    fdir_filter.port_src = rte_cpu_to_be_16(res->port_src);
-
-    if (!strcmp(res->protocol, "udp"))
-        fdir_filter.l4type = RTE_FDIR_L4TYPE_UDP;
-    else if (!strcmp(res->protocol, "tcp"))
-        fdir_filter.l4type = RTE_FDIR_L4TYPE_TCP;
-    else if (!strcmp(res->protocol, "sctp"))
-        fdir_filter.l4type = RTE_FDIR_L4TYPE_SCTP;
-    else //  default only IP
-        fdir_filter.l4type = RTE_FDIR_L4TYPE_NONE;
-
-    if (res->ip_dst.family == AF_INET6)
-        fdir_filter.iptype = RTE_FDIR_IPTYPE_IPV6;
-    else
-        fdir_filter.iptype = RTE_FDIR_IPTYPE_IPV4;
-
-    fdir_filter.vlan_id    = rte_cpu_to_be_16(res->vlan_id);
-    fdir_filter.flex_bytes = rte_cpu_to_be_16(res->flexbytes_value);
-
-
-} // end function: set_filter_values
-
-*/
-
-int fdir_add_perfect_filter_wrapper_dummy(int queue_id, char *srcIP,
-        int srcPort, char *dstIP, int dstPort, int type)
-{
-/*
-    printf("%s:%s: for queue %d filter [srcIP=%s, scrPort=%d, dstIP=%s, "
-            "dstPort =%d, type =%d]\n",
-            __FILE__, __func__,
-            queue_id, srcIP, srcPort, dstIP, dstPort, type);
-*/
-    return 0;
-    struct rte_fdir_filter fdir_filter;
-    memset(&fdir_filter, 0, sizeof(struct rte_fdir_filter));
-
-    int diag;
-
-    diag = rte_eth_dev_fdir_add_perfect_filter(0, NULL,
-            0, queue_id, 0);
-    if (diag == 0)
-        return 0;
-    else {
-        printf("%s:%s: failed: for queue %d filter "
-                "[srcIP=%s, scrPort=%d, dstIP=%s, dstPort =%d, type =%d]\n",
-                __FILE__, __func__,
-                queue_id, srcIP, srcPort, dstIP, dstPort, type);
-
-        return -1;
-    }
-    return 0;
-}
-
-int
-fdir_add_perfect_filter2_wrapper_dummy(int queue_id)
-{
-    return fdir_add_perfect_filter_wrapper_dummy(queue_id, NULL, 0, NULL, 0, 0);
-}
-
-int
-fdir_del_perfect_filter_wrapper_dummy(int queue_id)
-{
-/*
-    printf("%s:%s: for queue %d filter del\n",
-            __FILE__, __func__,
-            queue_id);
-*/
-
-//    const char *cmd = "help ports\r\n";
-//    const char *cmd = "add_perfect_filter 0 udp src 0.0.0.0 0 "
-//        "dst 0.0.0.0 0 flexbytes 0 vlan 0 queue 0 soft 0\r\n";
-
-/*    printf("%s:%s: for queue %d filter add\n",
-            __FILE__, __func__,
-            queue_id);
-*/
-
-/*
-    printf("###############################\n");
-    printf("## calling cmdline\n");
-    struct cmdline *cl = create_virtual_cmdline();
-    printf("\n## executing command [%s] \n", cmd);
-    int ret = exec_virtual_cmd(cl, cmd);
-    printf("############################### return = %d ####\n", ret);
-    */
-    return queue_id; // 0; // FIXME: to avoid unused queue_id error.
-}
-
-
-#if 0
-// Execute the command sent on the NIC.
-// To be used by Dragonet remotely.
-// Example commands:
-//    const char *cmd = "help ports\r\n";
-//    const char *cmd = "add_perfect_filter 0 udp src 0.0.0.0 0 "
-//        "dst 0.0.0.0 0 flexbytes 0 vlan 0 queue 0 soft 0\r\n";
-int exec_control_command(const char *cmd)
-{
-
-
-    int ret = 0;
-    if (virtual_cl == NULL) {
-        printf("ERROR: command called before initializing the cmdline\n");
-        return -1;
-    }
-
-    printf("\n## executing command [%s] \n", cmd);
-    ret = exec_virtual_cmd(virtual_cl, cmd);
-
-    if (ret < 0) {
-        printf("ERROR: %s: Execution failed for command [%s] (ret val=%d)\n",
-                __func__, cmd, ret);
-    }
-
-    return ret;
-} // end function: exec_control_command
-#endif // 0
-int
-fdir_add_flow_filter_wrapper_dummy(int queue_id)
-{
-    /*
-    printf("%s:%s: for queue %d flow-filter add\n",
-            __FILE__, __func__,
-            queue_id);
-    */
-    return queue_id; // 0; // FIXME: to avoid unused queue_id error.
-}
-
-
-
-int
-fdir_del_flow_filter_wrapper_dummy(int queue_id)
-{
-    printf("%s:%s: for queue %d flow-filter del\n",
-            __FILE__, __func__,
-            queue_id);
-    return 0;
-}
-
-
-//  ###################### ########################

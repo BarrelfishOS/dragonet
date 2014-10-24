@@ -86,6 +86,10 @@ int main(int argc, char *argv[])
 
 static uint64_t qstat[MAX_QUEUES] = {0, 0};
 
+// number of queues that device will configure.
+// TODO: This number should be provided by the stack-dpdk commandline arg
+//      and should not be hardcoded here.
+static int queues_to_use = 16;
 
 static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
     struct state *state, struct input **in, uint8_t qi)
@@ -109,7 +113,8 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
         }
 
         // DPDK specific init
-        state->tap_handler = (void *)init_dpdk_wrapper_deleteme(IFNAME);
+        state->tap_handler = (void *)init_dpdk_wrapper_deleteme(IFNAME,
+                queues_to_use);
 
         if (state->tap_handler == NULL) {
             printf("ERROR: Initializing dpdk e10k device failed\n");
