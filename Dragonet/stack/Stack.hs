@@ -1,7 +1,6 @@
 module Stack (
-    instantiate,
-    instantiateKK,
-    instantiateKKwithSortedFlows,
+    instantiateOpt,
+    instantiateFlows,
     startStack,
 
     StackState(..),
@@ -290,7 +289,8 @@ lpgConfig ss = lpgConfig' allEps ss
         allEps = M.elems $ ssEndpoints ss
 
 
-instantiate :: (Ord a, Show a) =>
+-- instantiate a stack using Dragonet.Optimization
+instantiateOpt :: (Ord a, Show a) =>
            (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
         -> String                                      -- | Name of llvm-helpers
         -> (StackState -> [EndpointDesc] -> O.CostFunction a) -- | Cost Function
@@ -298,7 +298,7 @@ instantiate :: (Ord a, Show a) =>
         -> (PLI.StateHandle -> C.Configuration -> IO ()) -- | Implement PRG conf
         -> (StackState -> String -> PG.PGNode -> String) -- | Assign nodes to PL
         -> IO ()
-instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
+instantiateOpt (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
     -- Prepare graphs and so on
     (lpgU,lpgHelp) <- LPG.graphH
     let helpers = prgHelp `Sem.mergeHelpers` lpgHelp
@@ -360,21 +360,8 @@ instantiate (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
             putStrLn "################### calling appendFile with app ready notice"
             appendFile("allAppslist.appready") $ "Application is ready!\n"
 
-        initSS = StackState {
-                ssNextAppId = 1,
-                ssNextSocketId = 1,
-                ssNextEndpointId = 1,
-                ssApplications = M.empty,
-                ssAppChans = M.empty,
-                ssSockets = M.empty,
-                ssEndpoints = M.empty,
-                ssPrevEndpoints = M.empty,
-                ssUpdateGraphs = updateGraph,
-                ssVersion = 0
-            }
-
     putStrLn "Let's fire her up!"
-    sstv <- STM.atomically $ STM.newTVar $ initSS
+    sstv <- ssInit updateGraph
     updateGraph sstv
     putStrLn "Starting interface thread"
     PLA.interfaceThread stackname (eventHandler sstv)
@@ -403,6 +390,10 @@ ssNewVer sstv = STM.atomically $ do
     let ss' = ss { ssVersion = ssVersion ss + 1 }
     STM.writeTVar sstv ss'
     return ss'
+
+ssInit :: (STM.TVar StackState -> IO ()) -> IO (STM.TVar StackState)
+ssInit updateGraph =
+    STM.atomically $ STM.newTVar $ initStackSt {ssUpdateGraphs = updateGraph}
 
 -- Update:
 --  bump the version number
@@ -437,8 +428,7 @@ startStack (lpgU, lpgH) (prgC, prgH) embed_fn llvmH cfgPLA = do
     stackH <- PLD.ctxState ctx
     sharedSt <- PLI.stackState stackH
 
-    let initSS = initStackSt { ssUpdateGraphs = updateGraph }
-        updateGraph sstv = do
+    let updateGraph sstv = do
             putStrLn "updateGraph entry"
             ss <- ssNewVer sstv
             let lpgC = ssConfigLPG ss lpgU
@@ -467,7 +457,7 @@ startStack (lpgU, lpgH) (prgC, prgH) embed_fn llvmH cfgPLA = do
             putStrLn "updateGraph exit"
 
     putStrLn "Let's fire her up!!"
-    sstv <- STM.atomically $ STM.newTVar $ initSS
+    sstv <- ssInit updateGraph
     updateGraph sstv
     putStrLn "Starting interface thread"
     PLA.interfaceThread stackname (eventHandler sstv)
@@ -487,70 +477,49 @@ getEmptyConf = ("EmptyCOnf",
 epsDiff :: [EndpointDesc] -> [EndpointDesc] -> [EndpointDesc]
 epsDiff es1 es2 = S.toList $ S.difference (S.fromList es1) (S.fromList es2)
 
-dummyImpFn :: Flow -> Bool
-dummyImpFn _ = True
-
-instantiateKK = instantiateKKwithSortedFlows dummyImpFn
-
-instantiateKKwithSortedFlows ::
-           (Flow -> Bool)                              -- | function to tell
-                    -- if a flow is gold or not.  if gold, it will be moved to begining
-        -> ([Flow] -> C.Configuration)  -- | get configuration
+instantiateFlows ::
+           ([Flow] -> C.Configuration)                    -- | get configuration
         -> (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
         -> String                                      -- | Name of llvm-helpers
         -> (PLI.StateHandle -> C.Configuration -> IO ()) -- | Implement PRG conf
         -> (StackState -> String -> PG.PGNode -> String) -- | Assign nodes to PL
         -> IO ()
-instantiateKKwithSortedFlows isImp getConf (prgU,prgHelp) llvmH cfgImpl cfgPLA = do
+instantiateFlows getConf (prgU,prgHelp) llvmH cfgImpl cfgPLA = do
     -- Prepare graphs and so on
-    (lpgU,lpgHelp) <- LPG.graphH
+    (lpgU, lpgHelp) <- LPG.graphH
     let mergeH = prgHelp `Sem.mergeHelpers` lpgHelp
         stackname = "dragonet"
     ctx <- PLD.initialContext stackname
     stackhandle <- PLD.ctxState ctx
     sharedState <- PLI.stackState stackhandle
-
     -- Function to adapt graph to current stack state
-    let initSS = initStackSt { ssUpdateGraphs = updateGraph }
-        updateGraphT x = doTimeIt "updateGraphKK"  $ updateGraph x
-        updateGraph sstv = do
-            putStrLn "updateGraphKK entry"
+    let updateGraph sstv = do
+            putStrLn "instantiateFlows::updateGraph"
             (ss, prevEpsM) <- ssExecUpd sstv
             -- STEP: we need to create incremantal ss with adding one flow at a time
             let allEps = M.elems $ ssEndpoints ss  -- FIXME: this list should return one flow at a time
-
-                prevEps = M.elems prevEpsM
-                newEps = epsDiff allEps prevEps
-                rmEps = epsDiff prevEps allEps
-
+                --prevEps = M.elems prevEpsM
+                --newEps = epsDiff allEps prevEps
+                --rmEps = epsDiff prevEps allEps
+                -- LPG config is essentially all flows in network stack
                 lpgCfg = lpgConfig' allEps ss
                 -- Configure LPG
                 lpgC = C.applyConfig lpgCfg lpgU
-                lbl = "kk"
+                lbl = "instSearch"
                 debug :: O.DbgFunction ()
+                --dbg = O.dbgDummy
                 debug = O.dbgDotfiles $ "out/graphs-xxx/" ++ (show $ ssVersion ss)
                 dbg = debug lbl
-                --dbg = O.dbgDummy
-                --
+
                 -- Transformations to be applied to graph before implementing it
                 implTransforms = [IT.coupleTxSockets, IT.mergeSockets]
                 pla = (plAssign cfgPLA ss)
-
-                -- LPG config is essentially all flows in network stack
-            putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
-            putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
+            --putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
+            --putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
             --putStrLn $ "LPG config: " ++ show lpgCfg
 
-            let allFlows = map epToFlow allEps
-                impList = filter isImp $ allFlows
-                otherList = filter (not . isImp) $ map epToFlow allEps
-                sortedFlows = impList ++  otherList
-                prgConf = getConf $ sortedFlows
-
+            let prgConf = getConf $ map epToFlow allEps
             --putStrLn $ "All flows are: " ++ show allFlows
-
-            --putStrLn $ "Important flows found: " ++ show impList
-
             plg <- O.makeGraph mergeH prgU lpgC implTransforms (pla lbl) dbg prgConf
 
             -- apply PRG confuguration
@@ -570,10 +539,9 @@ instantiateKKwithSortedFlows isImp getConf (prgU,prgHelp) llvmH cfgImpl cfgPLA =
             -- FIXME: Create file here.
             putStrLn "################### calling appendFile with app ready notice"
             appendFile("allAppslist.appready") $ "Application is ready!\n"
-
-
+        updateGraphT x = doTimeIt "instantiateFlows::updateGraph"  $ updateGraph x
     putStrLn "Let's fire her up!"
-    sstv <- STM.atomically $ STM.newTVar $ initSS
+    sstv <- ssInit updateGraph
     updateGraph sstv
     putStrLn "Starting interface thread"
     PLA.interfaceThread stackname (eventHandler sstv)

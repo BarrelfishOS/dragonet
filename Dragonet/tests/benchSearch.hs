@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 import qualified Graphs.E10k as E10k
 import qualified Graphs.Cfg as Cfg
 import qualified Dragonet.Configuration as C
@@ -13,7 +15,7 @@ import Control.Applicative ((<$>))
 import Criterion.Main (defaultMainWith, defaultMain, nf, whnf, bench)
 import Criterion.Config
 
-
+import Text.Show.Pretty (ppShow)
 
 e10kT_simple = E10k.graphH_ "Graphs/E10k/prgE10kImpl-simple.unicorn"
 e10kU_simple = fst <$> e10kT_simple
@@ -34,17 +36,26 @@ priorityCost' = S.priorityCost isGoldFl goldFlPerQ
 
 --
 main = do
-    let nq = 10
+    let nq = 10 -- number of queues
+        --nflowsl = [1,5,10,20,40,80]
+        nflowsl = [10]
+        samples = 10
     prgU <- e10kU_simple
-    let priFn = S.e10kCost prgU (priorityCost' nq)
-        balFn = S.e10kCost prgU (S.balanceCost nq)
-        benchBal nflows = show $ (S.searchGreedyFlowsE10k nq balFn (flows nflows))
+    let priFn = priorityCost' nq
+        balFn = S.balanceCost nq
+        costFn = balFn
+
+        searchSt = S.initSearchSt {  S.sOracle   = S.E10kOracleSt {S.nQueues = nq}
+                                   , S.sPrgU     = prgU
+                                   , S.sCostFn   = costFn
+                                   , S.sStrategy = S.searchGreedyFlows}
+
+        benchBal nflows = show $ S.evalSearch searchSt (flows nflows)
+        benchNf nflows  = bench ("search: " ++ (show nflows)) $ nf benchBal nflows
+        benchs = [benchNf x | x <- nflowsl]
+
+
     defaultMainWith
-                defaultConfig { cfgSamples = ljust 5 }
+                defaultConfig { cfgSamples = ljust samples }
                 (return ())
-                [   bench "1"  $ nf benchBal 1
-                  , bench "5"  $ nf benchBal 5
-                  , bench "10" $ nf benchBal 10
-                  , bench "20" $ nf benchBal 20
-                  , bench "40" $ nf benchBal 40
-                  , bench "80" $ nf benchBal 80]
+                benchs
