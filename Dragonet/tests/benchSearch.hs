@@ -45,12 +45,13 @@ main = do
         balFn = S.balanceCost nq
         costFn = balFn
 
-        searchSt = S.initSearchSt {  S.sOracle   = S.E10kOracleSt {S.nQueues = nq}
-                                   , S.sPrgU     = prgU
-                                   , S.sCostFn   = costFn
-                                   , S.sStrategy = S.searchGreedyFlows}
+        oracle   = S.E10kOracleSt {S.nQueues = nq}
+        searchParams = S.initSearchParams {  S.sOracle  = oracle
+                                          , S.sPrgU     = prgU
+                                          , S.sCostFn   = costFn
+                                          , S.sStrategy = S.searchGreedyFlows}
 
-        benchBal nflows = show $ S.evalSearch searchSt (flows nflows)
+        benchBal nflows = show $ S.runSearch searchParams (flows nflows)
         benchNf nflows  = bench ("search: " ++ (show nflows)) $ nf benchBal nflows
         benchs = [benchNf x | x <- nflowsl]
 

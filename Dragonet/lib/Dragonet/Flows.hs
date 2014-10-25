@@ -1,3 +1,5 @@
+ {-# LANGUAGE DeriveGeneric #-}
+
 module Dragonet.Flows (
     Flow(..),
     flowPred,
@@ -13,6 +15,9 @@ import Data.Maybe
 import Dragonet.Implementation.IPv4 as IP4
 import Control.Monad (liftM)
 
+import GHC.Generics (Generic)
+import Data.Hashable
+
 type IPv4Addr = Word32
 type UDPPort  = Word16
 
@@ -23,7 +28,10 @@ data Flow =
     flDstIp    :: Maybe IPv4Addr,
     flDstPort  :: Maybe UDPPort,
     flSrcPort  :: Maybe UDPPort
-  } deriving (Show, Eq, Ord)
+  }
+ deriving (Show, Eq, Ord, Generic)
+
+instance Hashable Flow
 
 flowPred :: Flow -> PR.PredExpr
 flowPred (FlowUDPv4 {flSrcIp   = srcIp,

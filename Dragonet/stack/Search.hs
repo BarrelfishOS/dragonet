@@ -1,10 +1,11 @@
 {-# LANGUAGE RankNTypes, LiberalTypeSynonyms, ExistentialQuantification, GeneralizedNewtypeDeriving, MultiParamTypeClasses #-}
 -- Simple search functions
 module Search (
-  evalSearch,
-  runSearch,
+  SearchParams(..),
+  initSearchParams,
   SearchSt(..),
   initSearchSt,
+  runSearch,
   E10kOracleSt(..),
   searchGreedyFlows,
   balanceCost,
@@ -35,7 +36,13 @@ import Data.Int
 import Data.Function (on)
 import Data.Char (isDigit)
 
-import qualified Control.Monad.State.Strict as ST
+import qualified Control.Monad.ST        as ST
+import qualified Data.STRef              as STR
+
+import Control.Monad (forM)
+import qualified Data.HashTable.ST.Basic as HB
+import qualified Data.HashTable.Class    as H
+
 import Control.Applicative ((<$>))
 
 import Debug.Trace (trace)
@@ -75,64 +82,76 @@ instance OracleSt E10kOracleSt where
     emptyConf _ = e10kCfgEmpty
     showConf _  = e10kCfgStr
 
-type SearchStrategy o =
-  (OracleSt o) => CostFnM -> o -> [Flow] -> Search o C.Configuration
 
-data SearchSt o = (OracleSt o) => SearchSt {
+type FlowCache s = HB.HashTable s (PG.NLabel, Flow) PG.NPort
+
+data SearchParams o = (OracleSt o) => SearchParams {
       sOracle     :: o
     , sPrgU       :: PG.PGraph
     , sCostFn     :: CostQueueFn -- cost function
-    , sOrderFlows :: [Flow] -> [Flow] -- order (sort) flows as a heuristic
     , sStrategy   :: SearchStrategy o
-    , sFlowCache  :: M.Map (PG.NLabel, Flow) PG.NPort
+    , sOrderFlows :: [Flow] -> [Flow] -- order (sort) flows as a heuristic
+}
+
+initSearchParams :: (OracleSt o) => SearchParams o
+initSearchParams = SearchParams {
+      sOracle = undefined
+    , sPrgU   = undefined
+    , sCostFn = undefined
+    , sStrategy = undefined
+    , sOrderFlows = id
+}
+
+data SearchSt s o = (OracleSt o) => SearchSt {
+      sParams     :: SearchParams o
+    , sFlowCache  :: FlowCache s
 }
 
 -- initialize search state (add default values when applicable)
-initSearchSt :: (OracleSt o) => SearchSt o
-initSearchSt = SearchSt {
-      sOracle     = undefined
-    , sPrgU       = undefined
-    , sCostFn     = undefined
-    , sStrategy   = undefined
-    , sOrderFlows = id
-    , sFlowCache  = M.empty
-}
+initSearchSt :: (OracleSt o) => SearchParams o -> ST.ST s (SearchSt s o)
+initSearchSt params = do
+    h <- H.new
+    return $ SearchSt {
+          sParams     = params
+        , sFlowCache  = h
+    }
 
+runSearch :: (OracleSt o) => SearchParams o -> [Flow] -> C.Configuration
+runSearch params flows = ST.runST $ do
+   st <- initSearchSt params
+   doSearch st flows
 
-newtype Search o a = Search {unSearch :: ST.State  (SearchSt o) a}
-    deriving (Monad, Functor, ST.MonadState (SearchSt o))
+doSearch :: (OracleSt o) => (SearchSt s o) -> [Flow] -> ST.ST s C.Configuration
+doSearch st flows = do
+    let params = sParams st
+        costFn = sCostFn params
+        sortFn = sOrderFlows params
+        oracle = sOracle params
+        search = sStrategy params
+        prgU   = sPrgU params
+        flowC  = sFlowCache st
 
-doSearch :: (OracleSt o) => [Flow] -> (Search o) C.Configuration
-doSearch flows = do
-    costFn <- ST.gets sCostFn
-    sortFn <- ST.gets sOrderFlows
-    oracle <- ST.gets sOracle
-    search <- ST.gets sStrategy
-    prgU   <- ST.gets sPrgU
     let flows' = sortFn flows
-        costFn' :: (OracleSt o) => [Flow] -> C.Configuration -> (Search o) Cost
+        --costFn' :: [Flow] -> C.Configuration -> STATE.ST s Cost
         costFn' fls conf = do
             let prgC = C.applyConfig conf prgU
             -- NOTE: There is still some code around trying to compute qmap with
             -- different ways:
             --  - E10k.flowQueue: old E10k-specific version of flowQueue
             --  - yQmap and xQmap
-            qmap <- ST.forM fls $ \fl -> do
-                q <- flowQueue prgC fl
+            qmap <- forM fls $ \fl -> do
+                q <- flowQueue flowC prgC fl
                 return (fl, q)
             return $ costFn qmap
 
     conf <- search costFn' oracle flows'
     return conf
 
-runSearch :: (OracleSt o)
-          => SearchSt o -> [Flow] -> (C.Configuration, SearchSt o)
-runSearch st flows = ST.runState (unSearch $ doSearch flows) st
-
-evalSearch :: (OracleSt o)
-          => SearchSt o -> [Flow] -> C.Configuration
-evalSearch st flows = ST.evalState (unSearch $ doSearch flows) st
-
+type SearchStrategy o =
+  (OracleSt o) => ([Flow] -> C.Configuration -> ST.ST s Cost)
+                -> o
+                -> [Flow]
+                -> ST.ST s C.Configuration
 
 -- searchGreedyFlows: examine one flow at a time. Depends on the ordering of
 -- flows. We can use that as a heuristic
@@ -141,11 +160,11 @@ searchGreedyFlows costFn oracle flows = searchGreedyFlows_ costFn oracle st0 flo
     where st0 = (emptyConf oracle, []) -- initial state
 
 searchGreedyFlows_ :: OracleSt o
-                   => CostFnM
+                   =>  ([Flow] -> C.Configuration -> ST.ST s Cost)
                    -> o
                    -> (C.Configuration, [Flow])
                    -> [Flow]
-                   -> (Search o) C.Configuration
+                   -> ST.ST s C.Configuration
 
 searchGreedyFlows_ _ o (cnf,_) [] = return $ trN cnf msg
     where msg = ("searchGreedyFlows_:" ++ (showConf o cnf))
@@ -154,7 +173,7 @@ searchGreedyFlows_ costFn oracle (curCnf, curFlows) (f:fs) = do
     let confs    = flowConfs oracle curCnf f
         newCurFs = f:curFlows
 
-    conf_costs <- ST.forM confs $ \cnf -> do
+    conf_costs <- forM confs $ \cnf -> do
         cnfCost <- costFn newCurFs cnf
         return (cnf, cnfCost)
 
@@ -178,11 +197,11 @@ searchGreedyConf costFn oracle flows = searchGreedyConf_ costFn oracle st0 flows
     where st0 = (emptyConf oracle, []) -- initial state
 
 searchGreedyConf_ :: OracleSt o
-                   => CostFnM
+                   => ([Flow] -> C.Configuration -> ST.ST s Cost)
                    -> o
                    -> (C.Configuration, [Flow])
                    -> [Flow]
-                   -> (Search o) C.Configuration
+                   -> ST.ST s C.Configuration
 
 searchGreedyConf_ _ o (cnf,_) [] = return $ trN cnf msg
     where msg = ("searchGreedyConf_:" ++ (showConf o cnf))
@@ -192,7 +211,7 @@ searchGreedyConf_ costFn oracle (curCnf, curFlows) flows = do
         confs = flowsSingleConfs oracle curCnf flows
         all_flows = curFlows ++ flows
 
-    costs <- ST.forM confs $ \x@(fl, cnf) -> do
+    costs <- forM confs $ \x@(fl, cnf) -> do
         cnfCost <- costFn all_flows cnf
         return (x, cnfCost)
 
@@ -222,7 +241,7 @@ data Cost = CostOK         |
 
 -- the basic form of a cost function for the search algorithms
 type CostFn  = [Flow] -> C.Configuration -> Cost
-type CostFnM  = (OracleSt o) => [Flow] -> C.Configuration -> (Search o) Cost
+--type CostFnM  = [Flow] -> C.Configuration -> ST.ST s Cost
 -- cost functions based on how flows are mapped into queues
 type QueueId = Int
 type CostQueueFn = [(Flow, QueueId)] -> Cost
@@ -493,39 +512,40 @@ doFlowQueueNextPort_ flPred ((port,portPred_):rest) = ret
                 True  -> port
                 False -> doFlowQueueNextPort_ flPred rest
 
-doFlowNextPort :: (OracleSt o)
-               => (Flow, PR.PredExpr) -> PG.Node -> (Search o) PG.NPort
+doFlowNextPort :: (Flow, PR.PredExpr) -> PG.Node -> ST.ST s PG.NPort
 doFlowNextPort (_, flPred) node = return $ doFlowQueueNextPort_ flPred nPreds
     where nPreds = PG.nPredicates node
 
-doFlowNextPortCache :: (OracleSt o)
-               => (Flow, PR.PredExpr) -> PG.Node -> (Search o) PG.NPort
-doFlowNextPortCache x@(fl, flPred) node = do
+doFlowNextPortCache :: FlowCache s
+                    -> (Flow, PR.PredExpr)
+                    -> PG.Node
+                    -> ST.ST s PG.NPort
+doFlowNextPortCache flowCache x@(fl, flPred) node = do
     let key = (PG.nLabel node, fl)
-    flowCache <- ST.gets sFlowCache
-    case M.lookup key flowCache of
+    ret <- H.lookup flowCache key
+    case ret of
         Just x -> return $ trN x "HIT"
         Nothing -> do
             ret <- doFlowNextPort x node
-            ST.modify $ \s -> s {sFlowCache = M.insert key ret flowCache}
+            H.insert flowCache key ret
             return $ trN ret "MISS"
 
 
-doFlowQueue :: (OracleSt o)
-            => PG.PGraph -> PG.PGNode -> (Flow, PR.PredExpr) -> (Search o) QueueId
-doFlowQueue g (nid,node@(PG.FNode {PG.nLabel = lbl})) flowT
+doFlowQueue :: FlowCache s -> PG.PGraph -> PG.PGNode -> (Flow, PR.PredExpr)
+            -> ST.ST s QueueId
+doFlowQueue fc g (nid,node@(PG.FNode {PG.nLabel = lbl})) flowT
     | Just q <- reachedQueue (nid,node) = return q
     | otherwise = do
-          nextPort <- doFlowNextPortCache flowT node
+          nextPort <- doFlowNextPortCache fc flowT node
           let nextNodel = [ n | (n,e) <- PGU.edgeSucc g (nid,node),
                                          PGU.edgePort e == nextPort]
               nextNode = case nextNodel of
-                  [n] -> doFlowQueue g n flowT
+                  [n] -> doFlowQueue fc g n flowT
                   []  -> error $ "doFlowQueue: port" ++ nextPort ++ "not found"
                   _   -> error $ "doFlowQueue: more than one edges " ++ nextPort ++ " found in F-node " ++ lbl
           nextNode
 
-doFlowQueue g (nid,node@(PG.ONode {PG.nLabel = lbl})) flowT
+doFlowQueue fc g (nid,node@(PG.ONode {PG.nLabel = lbl})) flowT
     | Just q <- reachedQueue (nid,node) = return q
     | otherwise = nextNode
     -- In theory we need to determine the next port based on the incoming port.
@@ -536,15 +556,15 @@ doFlowQueue g (nid,node@(PG.ONode {PG.nLabel = lbl})) flowT
           nextNodel = [ n | (n,e) <- PGU.edgeSucc g (nid,node),
                             PGU.edgePort e == nextPort]
           nextNode = case nextNodel of
-             [n] -> doFlowQueue g n flowT
+             [n] -> doFlowQueue fc g n flowT
              []  -> error $ "doFlowQueue: port" ++ nextPort ++ "not found"
              _  -> error $ "doFlowQueue: more than one edges " ++ nextPort ++ " found in O-node " ++ lbl
 
-flowQueue :: (OracleSt o) => PG.PGraph -> Flow -> (Search o) QueueId
-flowQueue prgC flow = do
+flowQueue :: FlowCache s -> PG.PGraph -> Flow -> ST.ST s QueueId
+flowQueue fc prgC flow = do
     let flPred = flowPred flow
         node1 = flowQueueStart prgC
-    doFlowQueue prgC node1 (flow, flPred)
+    doFlowQueue fc prgC node1 (flow, flPred)
 
 flowQueueStart :: PG.PGraph -> PG.PGNode
 flowQueueStart prgC = node1
@@ -600,14 +620,13 @@ test = do
         dummyFn      = dummyCost
 
         costFn = balFn
-        searchSt = initSearchSt {  sOracle = e10kOracle
-                                 , sPrgU   = prgU
-                                 , sCostFn = costFn
-                                 , sStrategy = searchGreedyFlows}
-        cnf = evalSearch searchSt fs
+        params = initSearchParams {  sOracle = e10kOracle
+                                   , sPrgU   = prgU
+                                   , sCostFn = costFn
+                                   , sStrategy = searchGreedyFlows}
 
-    return (cnf)
-
+        conf = runSearch params fs
+    return ()
 --fs2 = [ FlowUDPv4 {
 --     flDstIp    = Just 127
 --   , flDstPort  = Just $ fromIntegral $ 7777
