@@ -58,29 +58,5 @@ struct dragonet_dpdk
 } // end function: init_dpdk_wrapper_deleteme
 
 
-// NOTE: this function is blocking!!!! unlike corresponding onload version
-pktoff_t dpdk_rx_wrapper(struct dragonet_dpdk_queue *q,
-        struct input **in)
-{
-    size_t copylen = 0;
-    assert(q != NULL);
-
-    // receive packet from DPDK
-//    size_t copylen = get_packetV2(0, 0, q->qid, (*in)->data, (*in)->len);
-    // TODO: Add error checking here
-//    assert(copylen > 0);
-    return copylen;
-} // end function: dpdk_rx_wrapper
-
-
-int dpdk_tx_wrapper(struct dragonet_dpdk_queue *q, char *pkt,
-        pktoff_t len, uint8_t qid)
-{
-    assert(q != NULL);
-    //dpdk_queue_t *q_handle = q->queue;
-
-    send_packetV2(0, 0, qid, pkt, (size_t)len);
-    return len;
-}
 
 

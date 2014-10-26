@@ -34,6 +34,7 @@
 #ifndef _DPDKCONTROL_H_
 #define _DPDKCONTROL_H_
 
+#include <stdbool.h>
 #include <rte_byteorder.h>
 #include <rte_string_fns.h>
 
@@ -551,7 +552,97 @@ int port_id_is_invalid(portid_t port_id);
 int rx_queue_id_is_invalid(queueid_t rxq_id);
 int tx_queue_id_is_invalid(queueid_t txq_id);
 
+
+// ***************************************************************
+// DPDK and Dragonet interface specific
+// TODO: Maybe these should be in separate and independent ".h" file
+// ***************************************************************
+
+//#define MYDEBUG     1
+#ifdef MYDEBUG
+#define dprint(x...) do {                                           \
+    printf("%s:%s:%d: ", __BASE_FILE__, __FUNCTION__, __LINE__);    \
+    printf(":" x); } while(0)
+
+//#define dprint(x...)    printf("dpdkDrv: " x)
+#else
+#define dprint(x...)   ((void)0)
+#endif // MYDEBUG
+
+
+
+typedef uint8_t  lcoreid_t;
+typedef uint8_t  portid_t;
+typedef uint16_t queueid_t;
+
+// TODO: Get rid of all generic datatypes like int, etc... use specific types
+
+// This is supposed to be the closure struct which should hold all the
+//      device related state
+struct dpdk_info {
+    int core_id;
+    int port_id;
+    int queue_id;
+    void *ptr;
+};
+
+size_t get_packet_nonblock(void *nic_p, int core_id, int port_id,
+        int queue_id, char *pkt_out, size_t buf_len);
+size_t get_packet_blocking(void *nic_p, int core_id, int port_id,
+        int queue_id, char *pkt_out, size_t buf_len);
+void send_packetV2(void *nic_p, int core_id, int port_id,
+        int queue_id, char *pkt_tx, size_t len);
+
+// Initialization of DPDK
 int init_device(int argc, char** argv);
+int init_dpdk_setupV2(int queues);
+
+// Simplified wrapper function which essentially calls init_dpdk_setupV2
+//      function
+void *init_dpdk_setup_and_get_default_queue2(char *ifAddr, int queues);
+
+
+// ***************************************************************
+// Filter management
+// ***************************************************************
+
+/**
+ * Set 5tuple filter
+ * @param protocol
+ *      should hold actual protocol field value
+ * @return
+ *   - <0: error
+ *   -  otherwise: success
+ */
+int set_5tuple_filter(void *nic_handle, uint32_t dst_ip, uint32_t src_ip,
+         uint16_t dst_port, uint16_t src_port, uint16_t protocol, uint16_t mask,
+         uint8_t priority, uint8_t queue_id, uint8_t index_value);
+
+/**
+ * set flow director filter
+ *  NOTE: It is assumed that you are *adding* a *perfect matching filter*.
+ *      Other type of filters are supported, but not used here yet.
+ *
+ * @param protocol
+ *      should hold actual protocol field value
+ * @return
+ *   - <0: error
+ *   -  otherwise: success
+ */
+bool set_fdir_filter( void *nic_p, uint32_t dst_ip, uint32_t src_ip,
+        uint16_t dst_port, uint16_t src_port, uint16_t protocol,
+        uint16_t mask, uint8_t queue_id, uint16_t soft_id);
+
+
+
+// for Internal use
+
+// get default port from provided NIC device state
+portid_t get_portid(void *nic_handle);
+
+
+// ***************************************************************
+// ***************************************************************
 
 /*
  * Work-around of a compilation error with ICC on invocations of the

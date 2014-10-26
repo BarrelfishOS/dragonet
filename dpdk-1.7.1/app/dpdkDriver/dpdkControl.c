@@ -1899,28 +1899,36 @@ init_device(int argc, char** argv)
 	return 0;
 }
 
+// **************************************************************
+// NIC state to be sent to Dragonet
+// TODO:  Make this better
+// **************************************************************
+
+// Get portid
+uint8_t get_portid(void *nic_handle)
+{
+    assert(nic_handle != NULL);
+    return (uint8_t)0;
+} // end function: get_portid
+
+// **************************************************************
 // Filter management code
-//
+// **************************************************************
 
-/*int set_5tuple_filter(void *nic_handle, uint32_t dst_ip, uint32_t src_ip,
-        uint16_t dst_port, uint16_t src_port, int protocol, uint16_t mask,
-        int priority, int queue_id, int index_value);
-*/
-int set_5tuple_filter(void *nic_handle, uint32_t dst_ip, uint32_t src_ip,
-         uint16_t dst_port, uint16_t src_port, uint16_t protocol, uint16_t mask,
-         uint8_t priority, uint8_t queue_id, uint8_t index_value);
-
-int set_5tuple_filter(void *nic_handle, uint32_t dst_ip, uint32_t src_ip,
+int set_5tuple_filter(
+         void *nic_handle, uint32_t dst_ip, uint32_t src_ip,
          uint16_t dst_port, uint16_t src_port, uint16_t protocol, uint16_t mask,
          uint8_t priority, uint8_t queue_id, uint8_t index_value)
 {
-        int port_id = 0;
+        // FIXME: make getting of portid more generic portid
+        uint8_t port_id = get_portid(nic_handle);
 	int ret = 0;
 	struct rte_5tuple_filter filter;
 
         printf("Trying to set a 5tuple filter\n");
         assert(nic_handle != NULL);
 	memset(&filter, 0, sizeof(struct rte_5tuple_filter));
+
         filter.protocol = protocol;
 
         /* converting to big endian. */
@@ -1935,6 +1943,10 @@ int set_5tuple_filter(void *nic_handle, uint32_t dst_ip, uint32_t src_ip,
 	filter.priority = priority;
 
         // setting up the mask
+        // Lets work out individual mask bits from single mask entry
+        // These values *MUST* match with values from verify_fdir_mask function
+        //      Value 0 ==> Do not mask it! Use for filtering
+        //      Value 1 ==> Do mask it!  Don't use for filtering
         filter.src_ip_mask =   (mask & 0x08) ? 1 : 0;
         filter.dst_ip_mask =   (mask & 0x04) ? 1 : 0;
         filter.src_port_mask = (mask & 0x02) ? 1 : 0;
@@ -1967,5 +1979,225 @@ int set_5tuple_filter(void *nic_handle, uint32_t dst_ip, uint32_t src_ip,
         return ret;
 } // end function: set_5tuple_filter
 
+// Some local state to remember what is the current state of fdir filters
+// TODO: move it in nic_specific state wrapper struct
+static bool is_fdir_mask_set = false;
+static struct rte_fdir_masks fdir_mask_current;
+
+// Set a filter mask for fdir
+static void set_fdir_filter_mask(
+        void *nic_p, uint32_t mask_src_ip, uint32_t mask_dst_ip,
+        uint16_t mask_src_port, uint16_t mask_dst_port)
+{
+        uint8_t port_id = get_portid(nic_p);
+	memset(&fdir_mask_current, 0, sizeof(struct rte_fdir_masks));
+
+        // Here value 0 ==> Do not use the field
+        //      value 1 ==> Use the field
+
+	fdir_mask_current.only_ip_flow  = 0; // l4 is relevant
+	fdir_mask_current.vlan_id       = 0;
+	fdir_mask_current.vlan_prio     = 0;
+        if (mask_src_ip) fdir_mask_current.src_ipv4_mask = 0xffffffff;
+        if (mask_dst_ip) fdir_mask_current.dst_ipv4_mask = 0xffffffff;
+        if (mask_src_port) fdir_mask_current.src_port_mask = 0xffff;
+        if (mask_dst_port) fdir_mask_current.dst_port_mask = 0xffff;
+	fdir_mask_current.flexbytes     = 0;
+
+        printf("%s: mask_src_ip = %"PRIu32", mask_src_port = %"PRIu16", "
+                " mask_dst_ip = %"PRIu32", mask_dst_port = %"PRIu16"\n",
+                __FUNCTION__,
+                fdir_mask_current.src_ipv4_mask,
+                fdir_mask_current.src_port_mask,
+                fdir_mask_current.dst_ipv4_mask,
+                fdir_mask_current.dst_port_mask);
+
+	return fdir_set_masks(port_id, &fdir_mask_current);
+}
+
+// Function to make sure that current fdir mask matches the mask of filter
+//      which is being installed
+static bool verify_fdir_mask(void *nic_p, uint16_t mask)
+{
+    // Lets work out individual mask bits from single mask entry
+    // These values *MUST* match with values from set_5tuple_filter function
+    //      Value 0 ==> Do not mask it! Use for filtering
+    //      Value 1 ==> Mask it!  Don't use for filtering
+    //      Essentially, we are converting the "mask" value into "Use" value
+    uint32_t src_ip_mask   = (mask & 0x08) ? 0 : 1;
+    uint32_t dst_ip_mask   = (mask & 0x04) ? 0 : 1;
+    uint16_t src_port_mask = (mask & 0x02) ? 0 : 1;
+    uint16_t dst_port_mask = (mask & 0x01) ? 0 : 1;
+
+
+    // setting up the mask
+    // if there is no mask set yet, the set if based on current value
+    if (!is_fdir_mask_set) {
+        set_fdir_filter_mask(nic_p, src_ip_mask, dst_ip_mask,
+                src_port_mask, dst_port_mask);
+        is_fdir_mask_set = true;
+        return true;
+    }
+
+    // If we are here, then mask must be set
+    // Lets verify if the mask matches the current filter mask
+
+    bool is_mismatched = false;
+
+    if (src_ip_mask) {
+        if (fdir_mask_current.src_ipv4_mask != 0xffffffff) {
+            printf("%s:%s:%d: ERROR: FDIR filter does not match src_ip mask!!\n",
+                    __FILE__, __FUNCTION__, __LINE__);
+            is_mismatched = true;
+        }
+    }
+    if (dst_ip_mask) {
+        if (fdir_mask_current.dst_ipv4_mask != 0xffffffff) {
+            printf("%s:%s:%d: ERROR: FDIR filter does not match src_ip mask!!\n",
+                    __FILE__, __FUNCTION__, __LINE__);
+            is_mismatched = true;
+        }
+    }
+    if (src_port_mask) {
+         if (fdir_mask_current.src_port_mask != 0xffff) {
+            printf("%s:%s:%d: ERROR: FDIR filter does not match src_ip mask!!\n",
+                    __FILE__, __FUNCTION__, __LINE__);
+            is_mismatched = true;
+        }
+    }
+    if (dst_port_mask) {
+        if(fdir_mask_current.dst_port_mask != 0xffff) {
+            printf("%s:%s:%d: ERROR: FDIR filter does not match src_ip mask!!\n",
+                    __FILE__, __FUNCTION__, __LINE__);
+            is_mismatched = true;
+        }
+    }
+
+    // report error if there is a mismatch
+    if (is_mismatched) {
+        printf("ERROR: FDIR filter does not match existing fdir mask\n");
+        abort();
+        return false;
+    }
+
+    // everything looks fine!  lets report success :-)
+    return true;
+} // end function: verify_fdir_mask
+
+bool set_fdir_filter(void *nic_p, uint32_t dst_ip, uint32_t src_ip,
+        uint16_t dst_port, uint16_t src_port, uint16_t protocol,
+        uint16_t mask, uint8_t queue_id, uint16_t soft_id)
+{
+        uint8_t port_id = get_portid(nic_p);
+	struct rte_fdir_filter fdir_filter;
+
+
+
+	memset(&fdir_filter, 0, sizeof(struct rte_fdir_filter));
+
+        // setting iptype to IPV4
+        fdir_filter.iptype = RTE_FDIR_IPTYPE_IPV4;
+
+        /* converting to big endian. */
+	fdir_filter.ip_dst.ipv4_addr = rte_cpu_to_be_32(dst_ip);
+	fdir_filter.ip_src.ipv4_addr = rte_cpu_to_be_32(src_ip);
+	fdir_filter.port_dst = rte_cpu_to_be_16(dst_port);
+	fdir_filter.port_src = rte_cpu_to_be_16(src_port);
+
+        // based on protocol field value, convert it into filter specific value
+        //  ref: https://en.wikipedia.org/wiki/List_of_IP_protocol_numbers
+        switch(protocol){
+            case 0x11: // UDP
+		fdir_filter.l4type = RTE_FDIR_L4TYPE_UDP;
+                break;
+            case 0x06: // TCP
+		fdir_filter.l4type = RTE_FDIR_L4TYPE_TCP;
+                break;
+            case 0x84: // sctp
+		fdir_filter.l4type = RTE_FDIR_L4TYPE_SCTP;
+                break;
+            default:
+	        /* default only IP */
+		fdir_filter.l4type = RTE_FDIR_L4TYPE_NONE;
+            } // end switch
+
+	//fdir_filter.flex_bytes = rte_cpu_to_be_16(flexbytes_value);
+
+        printf("\n\n### %s:%s:%d:  [#### IMP ####]"
+            "soft-index: %"PRIu16", Queue: %"PRIu8", mask: %"PRIu16", "
+            "(protocol: %"PRIu16",  l4Type: %"PRIu16"), "
+            "srcIP: %"PRIu32", srcPort: %"PRIu16",  "
+            "dstIP: %"PRIu32", dstPort: %"PRIu16"\n\n",
+            __FILE__, __FUNCTION__, __LINE__,
+            soft_id,
+            queue_id,
+            mask,
+            protocol,
+            fdir_filter.l4type,
+            fdir_filter.ip_src.ipv4_addr,
+            fdir_filter.port_src,
+            fdir_filter.ip_dst.ipv4_addr,
+            fdir_filter.port_dst
+            );
+
+        // make sure that mask matches the global mask
+        bool verify_mask = verify_fdir_mask(nic_p, mask);
+        if (!verify_mask) {
+            printf("%s:%s:%d:ERROR: fdir mask verification failed, "
+                    "can't set the filter\n",
+                    __FILE__, __FUNCTION__, __LINE__);
+            return false;
+        }
+
+        // For time being, we are assuming that we are inserting
+        //      add_perfect_filter
+        int action_type = 1;
+
+        switch(action_type) {
+
+            case 1: // "add_perfect_filter"
+		fdir_add_perfect_filter(port_id, soft_id, queue_id,
+					//(uint8_t) (queue_id < 0),
+                                        0,
+					&fdir_filter);
+                return true;
+                break;
+            case 2: //  "upd_perfect_filter"
+		fdir_update_perfect_filter(port_id, soft_id,
+					   queue_id,
+					   //(uint8_t) (queue_id < 0),
+                                           0,
+					   &fdir_filter);
+                return true;
+                break;
+            case 3: // "rm_perfect_filter"
+		fdir_remove_perfect_filter(port_id, soft_id,
+					   &fdir_filter);
+                return true;
+                break;
+
+
+            case 4: //"add_signature_filter"
+		fdir_add_signature_filter(port_id, queue_id, &fdir_filter);
+                return true;
+                break;
+            case 5: // "upd_signature_filter"
+		fdir_update_signature_filter(port_id, queue_id,
+					     &fdir_filter);
+                return true;
+                break;
+            case 6: //  "rm_signature_filter"
+		fdir_remove_signature_filter(port_id, &fdir_filter);
+                return true;
+                break;
+
+            default: // "default"
+                printf("%s:%s:%d:ERROR: Wrong type of action: %d\n",
+                        __FILE__, __FUNCTION__, __LINE__,
+                        action_type);
+                return false;
+            } // end switch
+        return false;
+} // end function: set_fdir_filter
 
 

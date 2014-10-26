@@ -86,7 +86,7 @@
 
 #define GOTO_FAIL(str, ...) do {					\
 		printf("%s FAILED (%s: l.%d): <" str ">\n",		\
-		       __func__, __FILE__, __LINE__,  ##__VA_ARGS__);			\
+		       __func__, __FILE__, __LINE__,  ##__VA_ARGS__);   \
 		goto fail;						\
 } while(0)
 
@@ -94,43 +94,16 @@
 #define MBUF_SIZE (2048 + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
 #define     IFNAMSIZDPDK        1023
 
-//#define MYDEBUG     1
-#ifdef MYDEBUG
-#define dprint(x...)    printf("dpdkData:" x)
-#else
-#define dprint(x...)   ((void)0)
-#endif // MYDEBUG
 
-
-typedef uint8_t  lcoreid_t;
-typedef uint8_t  portid_t;
-typedef uint16_t queueid_t;
-
-struct dpdk_info {
-    int core_id;
-    int port_id;
-    int queue_id;
-    void *ptr;
-};
-
-size_t get_packetV2(int core_id, int port_id, int queue_id,
-        char *pkt_out, size_t buf_len);
-void send_packetV2(int core_id, int port_id, int queue_id,
-        char *pkt_tx, size_t len);
-int init_dpdk_setupV2(int queues);
-size_t get_packet_blocking(int core_id, int port_id, int queue_id,
-        char *pkt_out, size_t buf_len);
-
-// Simplified wrapper functions
-struct dpdk_info *init_dpdk_setup_and_get_default_queue2(char *ifAddr,
-        int queues);
 
 static int already_initialized = 0; // checks if the init function is already called
 
-void send_packetV2(int core_id, int port_id, int queue_id,
+void send_packetV2(void *nic_p, int core_id, int port_id, int queue_id,
         char *pkt_tx, size_t len)
 {
 	struct ether_hdr *eth;
+
+        assert(nic_p != NULL);
 
         struct rte_mbuf *m = rte_pktmbuf_alloc(fwd_lcores[core_id]->mbp);
 
@@ -189,7 +162,7 @@ fail:
 
 
 
-size_t get_packet_blocking(int core_id, int port_id, int queue_id,
+size_t get_packet_blocking(void *nic_p, int core_id, int port_id, int queue_id,
         char *pkt_out, size_t buf_len)
 {
     struct rte_mbuf *pkts_burst[2];
@@ -197,13 +170,15 @@ size_t get_packet_blocking(int core_id, int port_id, int queue_id,
     unsigned portid, nb_rx;
     size_t pkt_size = 0;
 
+    assert(nic_p != NULL);
 /*
     struct rte_mbuf *pkts_burst2[2];
     unsigned nb_rx_other_q = 0;
 */
 
-    dprint("get_packetV2 on queue_id %d, port_id %d, core_id %d\n", queue_id,
+    dprint("get_packet_blocking on queue_id %d, port_id %d, core_id %d\n", queue_id,
             port_id, core_id);
+
     portid = port_id;
 
     do {
@@ -251,10 +226,10 @@ size_t get_packet_blocking(int core_id, int port_id, int queue_id,
     dprint("received packet of size %zu\n", pkt_size);
     return pkt_size;
 
-} // end function: get_packetV2
+} // end function: get_packet_blocking
 
 
-size_t get_packetV2(int core_id, int port_id, int queue_id,
+size_t get_packet_nonblock(void *nic_p, int core_id, int port_id, int queue_id,
         char *pkt_out, size_t buf_len)
 {
     struct rte_mbuf *pkts_burst[2];
@@ -262,8 +237,8 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
     unsigned portid, nb_rx;
     size_t pkt_size = 0;
 
-    dprint("get_packetV2 on queue_id %d, port_id %d, core_id %d\n", queue_id,
-            port_id, core_id);
+    assert(nic_p != NULL);
+
     portid = port_id;
 
     nb_rx = rte_eth_rx_burst((uint8_t) portid, (uint16_t) queue_id,
@@ -302,10 +277,11 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
     }
     memcpy(pkt_out, m->pkt.data, pkt_size);
     rte_pktmbuf_free(m);
-    dprint("received packet of size %zu\n", pkt_size);
-    return pkt_size;
 
-} // end function: get_packetV2
+    dprint("queue_id %d, port_id %d, core_id %d:"
+            " received pkt of len %zu\n", queue_id, port_id, core_id, pkt_size);
+    return pkt_size;
+} // end function: get_packet_nonblock
 
 
 #define ARGNOS (15)
@@ -379,7 +355,7 @@ int main(int __attribute__((unused)) argc, char __attribute__((unused)) *argv[])
 #endif // 0
 
 
-struct dpdk_info *init_dpdk_setup_and_get_default_queue2(char *ifAddr,
+void *init_dpdk_setup_and_get_default_queue2(char *ifAddr,
         int queues)
 {
     printf("WARNING: Ignoring %s interface address suggestion\n", ifAddr);
@@ -405,6 +381,6 @@ struct dpdk_info *init_dpdk_setup_and_get_default_queue2(char *ifAddr,
     dev->queue_id = 0;
     dev->ptr = NULL;
     // FIXME: send some useful pointer here instead of sending empty box!!!
-    return dev;
+    return (void *)dev;
 }
 

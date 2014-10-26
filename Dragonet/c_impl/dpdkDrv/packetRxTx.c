@@ -1,75 +1,3 @@
-#if 0
-#include <implementation.h>
-
-// I need PCI address and not the interface name
-//#define IFNAME              "eth2"
-#define IFNAME              "eth2"
-
-#define CONFIG_LOCAL_MAC_sf    0x64188f211b00ULL  //    "00:1b:21:8f:18:64"
-#define CONFIG_LOCAL_IP_sf   0x0a160425          //   "10.22.4.37"
-        // NOTE: Can be generated in python with ``print "%02x%02x%02x%02x" % (10,113,4,71)``
-
-
-#define IFNAME              "eth3"
-#define CONFIG_LOCAL_MAC_sf  0x06459F671E00ULL   //  "00:1E:67:9F:45:06 "
-#define CONFIG_LOCAL_IP_sf   0x0a16040b //   "10.22.4.11"
-
-struct dpdk_info;
-static
-uint64_t dpdk_mac_read(device_t ttd) {
-    return (CONFIG_LOCAL_MAC_sf);
-}
-
-static
-uint32_t dpdk_ip_read(device_t ttd) {
-    return (CONFIG_LOCAL_IP_sf);
-}
-
-static
-void *init_dpdk_wrapper(char *arg)
-{
-    return ((void *) init_dpdk_setup_and_get_default_queue(IFNAME));
-}
-
-static
-pktoff_t dpdk_rx_wrapper(device_t dev, uint8_t *data, pktoff_t len)
-{
-    struct dpdk_info *dpdk = (struct dpdk_info *)dev;
-    return ((pktoff_t)get_packet_wrapper(dpdk, (char *)data, len));
-}
-
-static
-int dpdk_tx_wrapper(device_t dev, uint8_t *data, pktoff_t len)
-{
-    struct dpdk_info *dpdk = (struct dpdk_info *)dev;
-    return (send_packet_wrapper(dpdk, (char *)data, len));
-}
-
-static struct driver dpdk_driver = {
-    .drv_handle = NULL,
-
-    .drv_init = init_dpdk_wrapper,
-    .drv_rx = dpdk_rx_wrapper,
-    .drv_tx = dpdk_tx_wrapper,
-
-    .drv_mac_read = dpdk_mac_read,
-    .drv_ip_read = dpdk_ip_read,
-};
-
-static
-struct driver *get_dpdk_driver(void)
-{
-    return &dpdk_driver;
-}
-
-int main(int argc, char *argv[])
-{
-    struct driver *drv = NULL;
-    drv = get_dpdk_driver();
-    return main_loop(drv);
-}
-#endif // 0
-
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -164,7 +92,9 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
     }
 
     dprint("Waiting for incoming packets\n");
-    size_t copylen = get_packetV2(0, 0, q->qid, (q->pkt_holder)->data,
+    size_t copylen = get_packet_nonblock((void *)e10k, 0, 0,
+            q->qid,
+            (q->pkt_holder)->data,
             (q->pkt_holder)->len);
 
     if (copylen == 0) {
@@ -229,19 +159,19 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
     while (q->qstate == 0);
 
     ++q->tx_pkts;
-    dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
+    dprint("[QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
             "e10k_if = %p, (vq0 [%p, qstate %d], [vq-%"PRIu8": %p, qstate %d], "
             "######## Trying to send packet, data: %p, len:%"PRIu32"\n",
-            __FILE__,  __func__, __LINE__, qi, q->tx_pkts,
-            state->tap_handler, e10k->e10kif,
+            qi, q->tx_pkts, state->tap_handler, e10k->e10kif,
             &e10k->queues[0], e10k->queues[0].qstate,
             qi, q, q->qstate, (*in)->data, (*in)->len);
 
-    dpdk_tx_wrapper(q, (*in)->data, (*in)->len, qi);
+    // Actually sending packet using DPDK
+    send_packetV2((void *)e10k, 0, 0, qi, (*in)->data, (size_t)(*in)->len);
 
-    dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d]:"
+    dprint("[QID:%"PRIu8"], [pktid:%d]:"
             "##############  packet sent, data: %p, len:%"PRIu32"\n",
-            __FILE__, __func__, __LINE__, qi, q->tx_pkts, (*in)->data, (*in)->len);
+            qi, q->tx_pkts, (*in)->data, (*in)->len);
 
     return P_RxQueue_out;
 }

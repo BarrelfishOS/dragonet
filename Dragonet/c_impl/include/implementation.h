@@ -29,11 +29,20 @@ get_tsc(void) {
 }
 #endif // 0
 
+/*
+//  output with cpu cycles
+#define dprint(x...)    do { printf("TID:%d:Cycle:%"PRIu64":", \
+(int)pthread_self(), get_tsc()); printf(":debug:" x); } while(0)
+*/
+#define dbg_printf(x...) printf("TID:%d:%s:%s:%d: ", (int)pthread_self(),   \
+            __BASE_FILE__, __FUNCTION__, __LINE__); printf(":" x);          \
+    } while(0)
+
 
 //#define MYDEBUG     1
 #ifdef MYDEBUG
-//#define dprint(x...)    do { printf("TID:%d:Cycle:%"PRIu64":", (int)pthread_self(), get_tsc()); printf(":debug:" x); } while(0)
-#define dprint(x...)    do { printf("TID:%d:%s:%s:%d: ", (int)pthread_self(), __FILE__, __FUNCTION__, __LINE__); printf(":" x); } while(0)
+
+#define dprint(x...)  dbg_printf(x)
 #else
 #define dprint(x...)   ((void)0)
 #endif // MYDEBUG
@@ -53,6 +62,17 @@ get_tsc(void) {
 //#define SHOW_INTERVAL_STATS  1
 //#define INTERVAL_STAT_FREQUENCY     (1)
 //#define INTERVAL_STAT_FREQUENCY     (10000)
+
+/** Shows the type of each IPv4 packet.  Helpful in seeing which packets
+ *      are going where.  When used with "INTERVAL_STAT_FREQUENCY      1"
+ *      it helps to work out which queue, which core packet is being processed.
+ */
+//#define PACKET_CLASIFY_DEBUG      1
+#ifdef PACKET_CLASIFY_DEBUG
+#define clasify_msg(x...)       printf(x)
+#else
+#define clasify_msg(x...)       dprint(x)
+#endif // PACKET_CLASIFY_DEBUG
 
 #define DEFAULT_BUFFER_SIZE             (2048)
 

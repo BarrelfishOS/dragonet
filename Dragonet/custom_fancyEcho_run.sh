@@ -186,11 +186,9 @@ run_for_2_cores_full_filters_test() {
     echo fancyEcho running on ${SERVERIP} with single application thread and single socket
     sudo ./dist/build/bench-fancyecho/bench-fancyecho \
     -a t0  -f ${SERVERIP}:7777/10.113.4.71:9000 \
-    -a t1 -p 888 \
+    -a t1  -f ${SERVERIP}:7777/10.113.4.71:9001 \
     -t -q t0 -t -q t1
 }
-
-
 
 
 run_for_1_cores() {

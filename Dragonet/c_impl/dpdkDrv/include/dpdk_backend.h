@@ -43,22 +43,19 @@ struct dragonet_dpdk {
 //      This indirection is there to avoid adding DPDK specific
 //      code
 struct dragonet_dpdk *init_dpdk_wrapper_deleteme(char *name, int queues);
-pktoff_t dpdk_rx_wrapper(struct dragonet_dpdk_queue *q,
-        struct input **in);
-int dpdk_tx_wrapper(struct dragonet_dpdk_queue *q, char *pkt,
-        pktoff_t len, uint8_t qid);
-
 
 // External function prototypes to avoid compile-time warning
 //  copied from dpdk-1.7.1/app/dpdkDriver/dpdkData.c
 //  This is essentially the interface that is being used between
 //          Dragonet and DPDK
-void send_packetV2(int core_id, int port_id, int queue_id,
+void send_packetV2(void *nic_p, int core_id, int port_id, int queue_id,
     char *pkt_tx, size_t len);
-size_t get_packetV2(int core_id, int port_id, int queue_id,
-    char *pkt_out, size_t buf_len);
-int init_dpdk_setupV2(int queues);
-int init_device(int argc, char **argv);
+size_t get_packet_nonblock(void *nic_p,  int core_id, int port_id,
+        int queue_id, char *pkt_out, size_t buf_len);
+
+//int init_dpdk_setupV2(int queues);
+//int init_device(int argc, char **argv);
+
 void *init_dpdk_setup_and_get_default_queue2(char *ifAddr, int queues);
 
 
@@ -66,5 +63,20 @@ void *init_dpdk_setup_and_get_default_queue2(char *ifAddr, int queues);
 int set_5tuple_filter(void *e10k_nic, uint32_t dst_ip, uint32_t src_ip,
         uint16_t dst_port, uint16_t src_port, uint16_t protocol, uint16_t mask,
         uint8_t priority, uint8_t queue_id, uint8_t index_value);
+
+/**
+ * set flow director filter
+ *  NOTE: It is assumed that you are *adding* a *perfect matching filter*.
+ *      Other type of filters are supported, but not used here yet.
+ *
+ * @param protocol
+ *      should hold actual protocol field value
+ * @return
+ *   - <0: error
+ *   -  otherwise: success
+ */
+bool set_fdir_filter( void *nic_p, uint32_t dst_ip, uint32_t src_ip,
+        uint16_t dst_port, uint16_t src_port, uint16_t protocol,
+        uint16_t mask, uint8_t queue_id, uint16_t soft_id);
 
 #endif // DPDK_BACKEND_H_
