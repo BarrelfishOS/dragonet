@@ -37,6 +37,7 @@
 #include <signal.h>
 #include <string.h>
 #include <time.h>
+#include <assert.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -1897,4 +1898,74 @@ init_device(int argc, char** argv)
 
 	return 0;
 }
+
+// Filter management code
+//
+
+/*int set_5tuple_filter(void *nic_handle, uint32_t dst_ip, uint32_t src_ip,
+        uint16_t dst_port, uint16_t src_port, int protocol, uint16_t mask,
+        int priority, int queue_id, int index_value);
+*/
+int set_5tuple_filter(void *nic_handle, uint32_t dst_ip, uint32_t src_ip,
+         uint16_t dst_port, uint16_t src_port, uint16_t protocol, uint16_t mask,
+         uint8_t priority, uint8_t queue_id, uint8_t index_value);
+
+int set_5tuple_filter(void *nic_handle, uint32_t dst_ip, uint32_t src_ip,
+         uint16_t dst_port, uint16_t src_port, uint16_t protocol, uint16_t mask,
+         uint8_t priority, uint8_t queue_id, uint8_t index_value)
+{
+        int port_id = 0;
+	int ret = 0;
+	struct rte_5tuple_filter filter;
+
+        printf("Trying to set a 5tuple filter\n");
+        assert(nic_handle != NULL);
+	memset(&filter, 0, sizeof(struct rte_5tuple_filter));
+        filter.protocol = protocol;
+
+        /* converting to big endian. */
+	filter.dst_ip = rte_cpu_to_be_32(dst_ip);
+	filter.src_ip = rte_cpu_to_be_32(src_ip);
+
+        /* need convert to big endian. */
+        filter.dst_port = rte_cpu_to_be_16(dst_port);
+	filter.src_port = rte_cpu_to_be_16(src_port);
+
+        filter.tcp_flags = 0; // FIXME: what exactly is tcp_flags???
+	filter.priority = priority;
+
+        // setting up the mask
+        filter.src_ip_mask =   (mask & 0x08) ? 1 : 0;
+        filter.dst_ip_mask =   (mask & 0x04) ? 1 : 0;
+        filter.src_port_mask = (mask & 0x02) ? 1 : 0;
+        filter.dst_port_mask = (mask & 0x01) ? 1 : 0;
+        //filter.protocol_mask = (mask & 0x01) ? 1 : 0;
+
+        printf("\n\n### %s:%s:%d:  [#### IMP ####]"
+            "Priority: %"PRIu8", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
+            "srcIP: %"PRIu32", srcPort: %"PRIu16",  dstIP: %"PRIu32", dstPort: %"PRIu16"\n\n",
+            __FILE__, __FUNCTION__, __LINE__,
+            filter.priority,
+            queue_id,
+            mask,
+            filter.protocol,
+            filter.src_ip,
+            filter.src_port,
+            filter.dst_ip,
+            filter.dst_port
+            );
+
+        // FIXME: what is index_value??
+	ret = rte_eth_dev_add_5tuple_filter(port_id, index_value,
+                        &filter, queue_id);
+        if (ret < 0) {
+            printf("5tuple filter setting error: (%s)\n", strerror(-ret));
+
+        } else {
+            printf("5tuple filter success!!\n");
+        }
+        return ret;
+} // end function: set_5tuple_filter
+
+
 

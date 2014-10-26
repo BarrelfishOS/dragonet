@@ -90,9 +90,15 @@ node_out_t do_pg__RxL3IPv4Classify(struct ctx_RxL3IPv4Classify *context,
     // P_RxL3IPv4Classify_udp, P_RxL3IPv4Classify_icmp, P_RxL3IPv4Classify_drop
     (*in)->attr->offset_l4 = ipv4_payload_off(*in);
     switch (ipv4_protocol_rd(*in)) {
-        case IPV4_PROTO_ICMP:   return P_RxL3IPv4Classify_icmp;
-        case IPV4_PROTO_UDP:    return P_RxL3IPv4Classify_udp;
-        default:                return P_RxL3IPv4Classify_drop;
+        case IPV4_PROTO_ICMP:
+            dprint("##################### ICMP packet\n");
+            return P_RxL3IPv4Classify_icmp;
+        case IPV4_PROTO_UDP:
+            dprint("##################### UDP packet\n");
+            return P_RxL3IPv4Classify_udp;
+        default:
+            dprint("##################### Unknown packet\n");
+            return P_RxL3IPv4Classify_drop;
     }
 }
 

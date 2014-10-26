@@ -102,7 +102,6 @@
 #endif // MYDEBUG
 
 
-
 typedef uint8_t  lcoreid_t;
 typedef uint8_t  portid_t;
 typedef uint16_t queueid_t;
@@ -201,7 +200,8 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
     unsigned nb_rx_other_q = 0;
 */
 
-    dprint("get_packetV2 on queue_id %d\n", queue_id);
+    dprint("get_packetV2 on queue_id %d, port_id %d, core_id %d\n", queue_id,
+            port_id, core_id);
     portid = port_id;
 
     do {

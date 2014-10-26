@@ -175,6 +175,24 @@ run_for_2_cores_full_filters() {
     -t -q t0 -t -q t1
 }
 
+run_for_1_cores_full_filters() {
+    echo fancyEcho running on ${SERVERIP} with single application thread and single socket
+    sudo ./dist/build/bench-fancyecho/bench-fancyecho \
+    -a t0  -f ${SERVERIP}:7777/10.113.4.71:9000 \
+    -t -q t0
+}
+
+run_for_2_cores_full_filters_test() {
+    echo fancyEcho running on ${SERVERIP} with single application thread and single socket
+    sudo ./dist/build/bench-fancyecho/bench-fancyecho \
+    -a t0  -f ${SERVERIP}:7777/10.113.4.71:9000 \
+    -a t1 -p 888 \
+    -t -q t0 -t -q t1
+}
+
+
+
+
 run_for_1_cores() {
     echo fancyEcho running on ${SERVERIP} with single application thread and single socket
     sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0  -p 7777 -t -q t0
@@ -247,11 +265,13 @@ fi
 ##################################################################
 
 ./scripts/pravin/wait_for_dragonet.sh 10 ${STACKNAME}
-run_for_1_cores
+run_for_2_cores_full_filters_test
+#run_for_1_cores_full_filters
 sudo killall ${STACKNAME}
 exit 0
 
 ##################################################################
+
 
 #run_for_40_cores_10threads_debug_echoserver
 

@@ -52,7 +52,7 @@ get_tsc(void) {
 //  memecached has its own copy of these variables in dnet_interface.h
 //#define SHOW_INTERVAL_STATS  1
 //#define INTERVAL_STAT_FREQUENCY     (1)
-#define INTERVAL_STAT_FREQUENCY     (10000)
+//#define INTERVAL_STAT_FREQUENCY     (10000)
 
 #define DEFAULT_BUFFER_SIZE             (2048)
 

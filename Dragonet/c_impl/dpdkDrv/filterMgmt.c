@@ -25,41 +25,32 @@ bool e10k_ctrl_5tuple_set(struct state *state,
         uint16_t l4_type, uint16_t mask)
 {
 
-    assert(!"NYI");
+    struct dragonet_dpdk *e10k_nic = (struct dragonet_dpdk *)state->tap_handler;
 
-#if 0
-//    struct dragonet_e10k *e10k = (struct dragonet_e10k *) state->tap_handler;
-    struct e10k_5tfilter f;
-
-/*    if (e10k == NULL) {
+    if (e10k_nic == NULL) {
         return false;
     }
-*/
-    f.enabled  = true;
-    f.priority = priority;
-    f.queue    = queue;
-    f.src_ip   = src_ip;
-    f.dst_ip   = dst_ip;
-    f.src_port = src_port;
-    f.dst_port = dst_port;
-    f.mask     = mask;
-    f.l4_type  = l4_type;
+
+    l4_type = 0x11; // FIXME: hardcoding the type to UDP
+
     printf("\n\n### %s:%s:%d:  [#### IMP ####]"
             "Priority: %"PRIu8", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
             "srcIP: %"PRIu32", srcPort: %"PRIu16",  dstIP: %"PRIu32", dstPort: %"PRIu16"\n\n",
             __FILE__, __FUNCTION__, __LINE__,
-            f.priority,
-            f.queue,
-            f.mask,
-            f.l4_type,
-            f.src_ip,
-            f.src_port,
-            f.dst_ip,
-            f.dst_port
+            priority,
+            queue,
+            mask,
+            l4_type,
+            src_ip,
+            src_port,
+            dst_ip,
+            dst_port
             );
-//    return e10k_5tfilter_setup(&e10k->card, index, &f);
-#endif // 0
-    return false;
+
+    int ret = set_5tuple_filter(e10k_nic, dst_ip, src_ip, dst_port, src_port,
+            l4_type, mask, priority, queue, index);
+    if (ret < 0) return false;
+    return true;
 }
 
 
