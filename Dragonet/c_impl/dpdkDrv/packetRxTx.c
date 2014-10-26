@@ -145,33 +145,41 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
 
     // FIXME: make sure that queue is initialized and populated
 
-    // NOTE: This is assuming that dpdk_rx_wrapper is blocking!!!
-    // allocate buffer to copy the packet
-    *in = input_alloc();
-    if ((*in) == NULL) {
-        printf("%s:%s:%d: sf driver is running out of buffers\n"
-                " soon hardware will start dropping packets\n",
-                __FILE__, __FUNCTION__, __LINE__);
+    if (q->pkt_holder == NULL) {
+        // allocate buffer to copy the packet
+        q->pkt_holder = input_alloc();
+        if ((q->pkt_holder) == NULL) {
+            printf("%s:%s:%d: sf driver is running out of buffers\n"
+                    " soon hardware will start dropping packets\n",
+                    __FILE__, __FUNCTION__, __LINE__);
 
-        // NOTE: If there is no buffer than we don't consume or drop the packet
-        // we just leave there, hoping that next call might be lucky
-        // and get buffer.  If not, hardware will eventually start dropping
-        // packet.
-        return 0;
+            // NOTE: If there is no buffer than we don't consume or drop the packet
+            // we just leave there, hoping that next call might be lucky
+            // and get buffer.  If not, hardware will eventually start dropping
+            // packet.
+            return 0;
+        }
+        // start working on RX space
+        pkt_prepend((q->pkt_holder), (q->pkt_holder)->space_before);
     }
-    // start working on RX space
-    pkt_prepend((*in), (*in)->space_before);
 
     dprint("Waiting for incoming packets\n");
-    size_t copylen = get_packetV2(0, 0, q->qid, (*in)->data, (*in)->len);
-
-    dprint("packet RX %zu\n", copylen);
-    pkt_append(*in, -((*in)->len - copylen));
+    size_t copylen = get_packetV2(0, 0, q->qid, (q->pkt_holder)->data,
+            (q->pkt_holder)->len);
 
     if (copylen == 0) {
         // There are no new packets...
         return P_SFRxQueue0_drop;
     }
+
+
+    dprint("packet RX %zu\n", copylen);
+    pkt_append(q->pkt_holder, -((q->pkt_holder)->len - copylen));
+
+    // passing the buffer to in, and marking pkt_holder so that
+    //      next RX will allocate buffer
+    *in =  q->pkt_holder;
+    q->pkt_holder = NULL;
 
     // We received new packet
     ++q->rx_pkts;

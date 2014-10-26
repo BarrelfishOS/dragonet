@@ -21,6 +21,7 @@ struct dragonet_dpdk_queue {
     uint8_t qid;                        // qid
     dpdk_queue_t queue;                 // queue handle (assuming its needed by dpdk)
     int qstate;                         // state of queue (unused, free,
+    struct input *pkt_holder;           //  Buffer where RX packet will be received.
                                         //      in-use, initialized, etc...)
 
     // variables maintaining counters, stats, state and other info needed

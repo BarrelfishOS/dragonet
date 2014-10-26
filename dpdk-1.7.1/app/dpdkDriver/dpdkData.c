@@ -118,7 +118,8 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
 void send_packetV2(int core_id, int port_id, int queue_id,
         char *pkt_tx, size_t len);
 int init_dpdk_setupV2(int queues);
-
+size_t get_packet_blocking(int core_id, int port_id, int queue_id,
+        char *pkt_out, size_t buf_len);
 
 // Simplified wrapper functions
 struct dpdk_info *init_dpdk_setup_and_get_default_queue2(char *ifAddr,
@@ -187,7 +188,8 @@ fail:
 } // end function: send_packetV2
 
 
-size_t get_packetV2(int core_id, int port_id, int queue_id,
+
+size_t get_packet_blocking(int core_id, int port_id, int queue_id,
         char *pkt_out, size_t buf_len)
 {
     struct rte_mbuf *pkts_burst[2];
@@ -217,6 +219,60 @@ size_t get_packetV2(int core_id, int port_id, int queue_id,
         }
 */
     } while (nb_rx <= 0);
+
+    assert(nb_rx == 1);
+
+    if (nb_rx > 1) {
+        printf("ERROR: (%s:%d:%s) Multiple pkts (%d) in queue %d"
+                "for core %d, in brust, processing only one pkt\n",
+                __FILE__, __LINE__, __func__,
+                nb_rx, port_id, core_id);
+    }
+
+    //printf("Received %d packets on queue %d\n", nb_rx, queue_id);
+
+    // Taking out the fist packet from the brust
+    m = pkts_burst[0];
+    rte_prefetch0(rte_pktmbuf_mtod(m, void *));
+
+    //printf("Packet of len %d received at %p\n", m->pkt.pkt_len, m->pkt.data);
+    if (m->pkt.pkt_len > 0 && m->pkt.pkt_len < buf_len) {
+        // rte_pktmbuf_dump(m, 0);
+        pkt_size = m->pkt.pkt_len;
+    } else {
+        printf("ERROR: (%s:%d:%s) too small buffer to copy packet."
+                "pkt_len %"PRIu32", buf_len = %zd\n",
+                __FILE__, __LINE__, __func__,
+                m->pkt.pkt_len, buf_len);
+        pkt_size =  buf_len;
+    }
+    memcpy(pkt_out, m->pkt.data, pkt_size);
+    rte_pktmbuf_free(m);
+    dprint("received packet of size %zu\n", pkt_size);
+    return pkt_size;
+
+} // end function: get_packetV2
+
+
+size_t get_packetV2(int core_id, int port_id, int queue_id,
+        char *pkt_out, size_t buf_len)
+{
+    struct rte_mbuf *pkts_burst[2];
+    struct rte_mbuf *m;
+    unsigned portid, nb_rx;
+    size_t pkt_size = 0;
+
+    dprint("get_packetV2 on queue_id %d, port_id %d, core_id %d\n", queue_id,
+            port_id, core_id);
+    portid = port_id;
+
+    nb_rx = rte_eth_rx_burst((uint8_t) portid, (uint16_t) queue_id,
+                pkts_burst, 1);
+
+    if (nb_rx == 0) {
+       // no packets to read yet.
+       return 0;
+    }
 
     assert(nb_rx == 1);
 
