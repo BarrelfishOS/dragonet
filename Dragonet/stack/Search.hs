@@ -17,19 +17,21 @@ import qualified Dragonet.Configuration       as C
 import qualified Dragonet.ProtocolGraph       as PG
 import qualified Util.GraphHelpers            as GH
 import qualified Dragonet.Predicate           as PR
-import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Dragonet.Implementation.IPv4 as IP4
 
 import Dragonet.DotGenerator (toDot)
 import Dragonet.Conventions (rxQPref, isTruePort, isFalsePort)
 import Dragonet.Flows(Flow (..), flowPred)
 
+import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Graphs.E10k as E10k
 import Graphs.Cfg (prgCfg, prgCfgEmpty, e10kCfgEmpty, e10kCfgStr)
 
-import qualified Data.List       as L
-import qualified Data.Map.Strict as M
-import qualified Data.Set        as S
+import qualified Data.List            as L
+import qualified Data.Map.Strict      as M
+import qualified Data.Set             as S
+import qualified Data.Graph.Inductive as DGI
+
 import Data.Word
 import Data.Maybe
 import Data.Int
@@ -531,56 +533,60 @@ doFlowNextPortCache flowCache x@(fl, flPred) node = do
             return $ trN ret "MISS"
 
 
-doFlowQueue :: FlowCache s -> PG.PGraph -> PG.PGNode -> (Flow, PR.PredExpr)
+doFlowQueue :: FlowCache s -> PG.PGGDecomp -> (Flow, PR.PredExpr)
             -> ST.ST s QueueId
-doFlowQueue fc g (nid,node@(PG.FNode {PG.nLabel = lbl})) flowT
-    | Just q <- reachedQueue (nid,node) = return q
+--doFlowQueue fc g (nid,node@(PG.FNode {PG.nLabel = lbl})) flowT
+doFlowQueue fc d@(ctx, g) flowT
+    | Just q <- reachedQueue lnode = return q
     | otherwise = do
-          nextPort <- doFlowNextPortCache fc flowT node
-          let nextNodel = [ n | (n,e) <- PGU.edgeSucc g (nid,node),
-                                         PGU.edgePort e == nextPort]
-              nextNode = case nextNodel of
-                  [n] -> doFlowQueue fc g n flowT
-                  []  -> error $ "doFlowQueue: port" ++ nextPort ++ "not found"
-                  _   -> error $ "doFlowQueue: more than one edges " ++ nextPort ++ " found in F-node " ++ lbl
-          nextNode
-
-doFlowQueue fc g (nid,node@(PG.ONode {PG.nLabel = lbl})) flowT
-    | Just q <- reachedQueue (nid,node) = return q
-    | otherwise = nextNode
-    -- In theory we need to determine the next port based on the incoming port.
-    -- However, currently there is no way to determine what are the "true"
-    -- incoming edges, so we resort into a hack where we always pick the "true"
-    -- port as the nextPort when encountering an ONode
-    where nextPort = "true"
-          nextNodel = [ n | (n,e) <- PGU.edgeSucc g (nid,node),
-                            PGU.edgePort e == nextPort]
-          nextNode = case nextNodel of
-             [n] -> doFlowQueue fc g n flowT
-             []  -> error $ "doFlowQueue: port" ++ nextPort ++ "not found"
-             _  -> error $ "doFlowQueue: more than one edges " ++ nextPort ++ " found in O-node " ++ lbl
+          nextPort <- case node of
+                PG.FNode {} -> doFlowNextPortCache fc flowT (snd lnode)
+                -- In theory we need to determine the next port based on the
+                -- incoming port.  However, currently there is no way to
+                -- determine what are the "true" incoming edges, so we resort
+                -- into a hack where we always pick the "true" port as the
+                -- nextPort when encountering an ONode
+                PG.ONode {} -> return "true"
+          let d' = sucPortDecomp d nextPort
+          doFlowQueue fc d' flowT
+    where lnode = DGI.labNode' ctx
+          node = snd lnode
+          lbl = PG.nLabel node
 
 flowQueue :: FlowCache s -> PG.PGraph -> Flow -> ST.ST s QueueId
 flowQueue fc prgC flow = do
     let flPred = flowPred flow
-        node1 = flowQueueStart prgC
-    doFlowQueue fc prgC node1 (flow, flPred)
+        d0 = flowQueueStart prgC
+    doFlowQueue fc d0 (flow, flPred)
 
-flowQueueStart :: PG.PGraph -> PG.PGNode
-flowQueueStart prgC = node1
-    where
-          node0_ = "RxL2EtherClassifyL3_"
+sucPortCtx_ :: PG.PGContext -> PG.NPort -> DGI.Node
+sucPortCtx_ ctx port = fst next
+    where sucs = DGI.lsuc' ctx
+          next = case L.find (\ (_,s) -> port == PGU.edgePort_ s) sucs of
+                Just x  -> x
+                Nothing -> error $ "Cannot find successor of node:" ++ nodeL ++ " on port:" ++ port
+          nodeL = PG.nLabel $ DGI.lab' ctx
+
+sucPortDecomp :: PG.PGGDecomp -> PG.NPort -> PG.PGGDecomp
+sucPortDecomp (ctx, g) port = ret
+    where next = sucPortCtx_ ctx port
+          ret  = doMatch next g
+
+doMatch :: DGI.Node -> PG.PGraph -> PG.PGGDecomp
+doMatch nid g = case DGI.match nid g of
+    (Just ctx, g') -> (ctx, g')
+    (Nothing, _) -> error "doMatch failed"
+
+flowQueueStart :: PG.PGraph -> PG.PGGDecomp
+flowQueueStart prgC = d1
+    where node0_ = "RxL2EtherClassifyL3_"
           port0 = "other"
-          node0 = case GH.filterNodesByL (\x -> (PG.nLabel x) == node0_) prgC of
-            [x] -> x
-            []  -> error $ "No matches for node:" ++ node0_
-            _   -> error $ "More than one matches for node:" ++ node0_
-          node1 = case [ n | (n,e) <- PGU.edgeSucc prgC node0,
-                          PGU.edgePort e == port0] of
-            [x] -> x
-            _   -> error $ "More than one connection matches for node:"
-                           ++ node0_ ++ " port:" ++ port0
-
+          node0 = case GH.findNodeByL (\x -> (PG.nLabel x) == node0_) prgC of
+              Just x -> x
+              Nothing -> error $ "More than one matches for node:" ++ node0_
+          d0 :: PG.PGGDecomp
+          d0 = doMatch (fst node0) prgC
+          d1 = sucPortDecomp d0 port0
 
 -- Code for performing simple tests
 

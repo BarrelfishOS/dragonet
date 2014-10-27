@@ -7,7 +7,7 @@ module Dragonet.ProtocolGraph.Utils (
     getFNodeByName',
     getFNodeByNameTag',
     getPGNAttr,
-    spawnDeps, isSpawnTarget, edgeDeps, edgePort, edgeSucc,
+    spawnDeps, isSpawnTarget, edgeDeps, edgePort, edgePort_, edgeSucc,
     isSink_, isSource_,
     isSpawnEdge_, isSpawnEdge,
     isNormalEdge_, isNormalEdge,
@@ -112,6 +112,10 @@ edgePort :: PGEdge -> NPort
 edgePort pedge = case pedge of
     (_, _, ESpawn _ _) -> error "spawn edges do not have ports"
     (_, _, Edge p)     -> p
+
+edgePort_ :: Edge -> NPort
+edgePort_ (Edge p) = p
+edgePort_ (ESpawn _ _) = error "spawn edges do not have ports"
 
 -- normal (i.e., not spawn) incoming dependencies
 edgeDeps :: PGraph -> PGNode -> [(PGNode, PGEdge)]

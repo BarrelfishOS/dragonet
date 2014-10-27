@@ -7,6 +7,8 @@ module Dragonet.ProtocolGraph (
     PGEdge,
     PGContext,
     PGAdj,
+    PGDecomp,
+    PGGDecomp,
 
     NLabel,
     NTag,
@@ -99,8 +101,11 @@ instance Eq Edge where
 type PGraph = DGI.Gr Node Edge
 type PGNode = DGI.LNode Node
 type PGEdge = DGI.LEdge Edge
-type PGContext = DGI.Context Node Edge
-type PGAdj     = DGI.Adj Edge
+type PGContext  = DGI.Context Node Edge
+type PGMContext = DGI.MContext Node Edge
+type PGAdj      = DGI.Adj Edge
+type PGDecomp   = (PGMContext, PGraph)
+type PGGDecomp  = (PGContext, PGraph)
 
 
 -------------------------------------------------------------------------------
