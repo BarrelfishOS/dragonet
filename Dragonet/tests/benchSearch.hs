@@ -38,7 +38,7 @@ priorityCost' = S.priorityCost isGoldFl goldFlPerQ
 main = do
     let nq = 10 -- number of queues
         --nflowsl = [1,5,10,20,40,80]
-        nflowsl = [100]
+        nflowsl = [100,200]
         samples = 3
     prgU <- e10kU_simple
     let priFn = priorityCost' nq
