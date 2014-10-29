@@ -8,6 +8,7 @@ module Graphs.E10k (
     prepareConf,
 
     parse5tCFG, c5tString, c5tFullString,
+    parse5t,
     parseFDirCFG, cFDtString,
 
     flowQueue,
