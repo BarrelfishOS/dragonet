@@ -654,7 +654,7 @@ predEquivHard_ expr1 expr2 = ret
     where atoms1 = predGetAtoms expr1
           atoms2 = predGetAtoms expr2
           atoms  = L.nub $ atoms1 ++ atoms2
-          all_assigns = getAllAssigns (tr atoms ("ATOMS: " ++ (ppShow atoms)))
+          all_assigns = getAllAssigns (trN atoms ("ATOMS: " ++ (ppShow atoms)))
           ret = case length atoms of
             0 -> andErr [[]] checkAssignment
             _ -> andErr all_assigns checkAssignment

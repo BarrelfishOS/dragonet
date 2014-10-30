@@ -190,6 +190,7 @@ graph g1 {
         port p2[F2]
 
         predicate p1 "pred(Prop1,X)"
+        predicate p2 "pred(Prop1,Y)"
     }
     boolean F1 {
         port true false [F3_]
@@ -217,7 +218,7 @@ g1_tests = [
  g1PredT "D3" "or(and(pred(D0,o1),pred(D1,true)),and(pred(D0,o2),pred(D2,true)))",
  g1PredT "E3" "or(pred(E1,true),pred(E2,true))",
  g1PredT "G" "or(pred(Gsrc3,true),and(pred(Gsrc1,true),pred(Gsrc2,true)))",
- g1PredT "F1" "and(pred(Prop1,X),pred(F0,p1))",
+ g1PredT "F1" "and(pred(Prop1,X))",
  g1PredT "F3" "false"
  ]
 
