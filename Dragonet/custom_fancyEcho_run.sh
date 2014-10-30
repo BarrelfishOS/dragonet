@@ -175,6 +175,22 @@ run_for_2_cores_full_filters() {
     -t -q t0 -t -q t1
 }
 
+run_for_1_cores_full_filters() {
+    echo fancyEcho running on ${SERVERIP} with single application thread and single socket
+    sudo ./dist/build/bench-fancyecho/bench-fancyecho \
+    -a t0  -f ${SERVERIP}:7777/10.113.4.71:9000 \
+    -t -q t0
+}
+
+run_for_2_cores_full_filters_test() {
+    echo fancyEcho running on ${SERVERIP} with single application thread and single socket
+    sudo ./dist/build/bench-fancyecho/bench-fancyecho \
+    -a t0  -f ${SERVERIP}:7777/10.113.4.71:9000 \
+    -a t1  -f ${SERVERIP}:7777/10.113.4.71:9001 \
+    -t -q t0 -t -q t1
+}
+
+
 run_for_1_cores() {
     echo fancyEcho running on ${SERVERIP} with single application thread and single socket
     sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0  -p 7777 -t -q t0
@@ -190,6 +206,9 @@ run_for_1_cores_null() {
     -t -q t0 -q t1 -q t2 -q t3
 }
 
+
+set -x
+set -e
 
 if [ -z $1 ] ; then
     echo "ERROR: provide the stack name"
@@ -216,30 +235,41 @@ else
         echo "NOTE: using ${SERVERIP} as server-IP address"
     else
 
-        if [ "$STACKNAME" ==  "stack-tap" ] ; then
-            SERVERIP="192.168.123.1"
+        if [ "$STACKNAME" ==  "stack-dpdk" ] ; then
+            SERVERIP="10.113.4.96"  # For burrata as server
+            SERVERIP="10.113.4.95"  # for asiago as server
+            echo "NOTE: using ${SERVERIP} as server-IP address"
         else
 
-            if [ "$STACKNAME" ==  "stack-null" ] ; then
-                SERVERIP="127.0.0.1"
+
+            if [ "$STACKNAME" ==  "stack-tap" ] ; then
+                SERVERIP="192.168.123.1"
             else
-                print "Invalid stack type $STACKNAME"
-                exit 1
+
+                if [ "$STACKNAME" ==  "stack-null" ] ; then
+                    SERVERIP="127.0.0.1"
+                else
+                    print "Invalid stack type $STACKNAME"
+                    exit 1
+                fi
             fi
         fi
     fi
 fi
+
 
 ##################################################################
         ## Main ##
 ##################################################################
 
 ./scripts/pravin/wait_for_dragonet.sh 10 ${STACKNAME}
-run_for_4_cores
+run_for_2_cores_full_filters_test
+#run_for_1_cores_full_filters
 sudo killall ${STACKNAME}
 exit 0
 
 ##################################################################
+
 
 #run_for_40_cores_10threads_debug_echoserver
 

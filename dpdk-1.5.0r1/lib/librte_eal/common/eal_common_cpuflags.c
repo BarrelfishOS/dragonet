@@ -1,13 +1,13 @@
 /*-
  *   BSD LICENSE
- * 
+ *
  *   Copyright(c) 2010-2013 Intel Corporation. All rights reserved.
  *   All rights reserved.
- * 
+ *
  *   Redistribution and use in source and binary forms, with or without
  *   modification, are permitted provided that the following conditions
  *   are met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above copyright
@@ -17,7 +17,7 @@
  *     * Neither the name of Intel Corporation nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -203,7 +203,7 @@ rte_cpu_get_features(struct cpuid_parameters_t params)
                    "c" (params.ecx),
                    "d" (params.edx));
 #else
-	asm volatile ( 
+	asm volatile (
             "mov %%ebx, %%edi\n"
             "cpuid\n"
             "xchgl %%ebx, %%edi;\n"
@@ -269,13 +269,18 @@ rte_cpu_check_supported(void)
 			RTE_COMPILE_TIME_CPUFLAGS
 	};
 	unsigned i;
+        printf("init world from DPDK\n");
 
-	for (i = 0; i < sizeof(compile_time_flags)/sizeof(compile_time_flags[0]); i++)
+	for (i = 0; i < sizeof(compile_time_flags)/sizeof(compile_time_flags[0]); i++) {
+                printf("checking init compile flag %u \n", i);
 		if (rte_cpu_get_flag_enabled(compile_time_flags[i]) < 1) {
+                    printf(" init compile flag value compile_time_flags[%u] = %d \n", i,
+                            compile_time_flags[i]);
 			fprintf(stderr,
 			        "ERROR: This system does not support \"%s\".\n"
 			        "Please check that RTE_MACHINE is set correctly.\n",
 			        cpu_feature_table[compile_time_flags[i]].name);
 			exit(1);
 		}
+        }
 }

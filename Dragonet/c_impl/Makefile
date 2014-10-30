@@ -60,7 +60,7 @@ DPDKLIBOBJS+=dpdkDrv/txonly.o
 
 cDpdk: $(DPDKOBJFILES) objfiles
 	#DPDKLIBOBJS = $(wildcard dpdkDrv/*.o)
-	$(CC) $(LDFLAGS) -o $@ $(DPDKOBJFILES) $(DPDKLIBOBJS) -L../../dpdk-1.5.0r1/build/lib/ -lintel_dpdk -lpthread -ldl -lrt
+	$(CC) $(LDFLAGS) -o $@ $(DPDKOBJFILES) $(DPDKLIBOBJS) -L../../dpdk-1.5.0r1/build/lib/ -lintel_dpdk  -ldpdk_driver -lpthread -ldl -lrt
 	# -lrt needed for clock_gettime
 	# -ldl needed for dlopen and friends
 

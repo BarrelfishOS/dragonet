@@ -114,7 +114,7 @@ int init_dpdk_setupV2(void);
 
 
 // Simplified wrapper functions
-struct dpdk_info *init_dpdk_setup_and_get_default_queue(char *ifAddr);
+struct dpdk_info *init_dpdk_setup_and_get_default_queue2(char *ifAddr);
 int send_packet_wrapper(struct dpdk_info *dinf, char *pkt_tx, size_t len);
 int get_packet_wrapper(struct dpdk_info *dinf, char *pkt_tx, size_t len);
 
@@ -383,15 +383,15 @@ int init_dpdk_setupV2(void)
     return ret;
 } // end function:  init_dpdk_setupV2
 
-#if 0
+//#if 0
 int main(int __attribute__((unused)) argc, char __attribute__((unused)) *argv[])
 {
     return init_dpdk_setupV2();
 }
-#endif // 0
+//#endif // 0
 
 
-struct dpdk_info *init_dpdk_setup_and_get_default_queue(char *ifAddr)
+struct dpdk_info *init_dpdk_setup_and_get_default_queue2(char *ifAddr)
 {
     printf("WARNING: Ignoring %s interface address suggestion\n", ifAddr);
     printf("    going for default hardcoded value\n");

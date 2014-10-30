@@ -74,6 +74,8 @@ cfiles_cimpl_e10k = $(CIMPL_DIR)/impl_e10k.c \
 cfiles_cimpl_null = $(CIMPL_DIR)/impl_null.c
 cfiles_cimpl_sf =   $(CIMPL_DIR)/onloadDrv/efdragonet.c \
                     $(CIMPL_DIR)/onloadDrv/efvi_sfw.c
+cfiles_cimpl_dpdk = $(CIMPL_DIR)/dpdkDrv/packetRxTx.c \
+                    $(CIMPL_DIR)/dpdkDrv/dpdk_backend.c
 
 #ofiles_sf_related =  efdragonet.o efvi_sfw.o
 
@@ -83,6 +85,7 @@ bcfiles_cimpl_e10k = $(call bcmap_cimpl, $(cfiles_cimpl_e10k))
 bcfiles_cimpl_null = $(call bcmap_cimpl, $(cfiles_cimpl_null))
 bcfiles_cimpl_sf   = $(call bcmap_cimpl, $(cfiles_cimpl_sf))
 #ofiles_sf_helper   = $(call omap_sf_hack, $(ofiles_sf_related))
+bcfiles_cimpl_dpdk   = $(call bcmap_cimpl, $(cfiles_cimpl_dpdk))
 
 
 $(BUILD_DIR)/c_impl/%.bc : $(CIMPL_DIR)/%.c
@@ -105,6 +108,9 @@ $(BUILD_DIR)/llvm-c_impl-null.bc: $(bcfiles_cimpl_null)
 
 #$(BUILD_DIR)/llvm-c_impl-sf.bc: $(bcfiles_cimpl_sf) #$(ofiles_sf_helper)
 $(BUILD_DIR)/llvm-c_impl-sf.bc: $(bcfiles_cimpl_sf)
+	$(LLVM_LINK) $^ -o $@
+
+$(BUILD_DIR)/llvm-c_impl-dpdk.bc: $(bcfiles_cimpl_dpdk)
 	$(LLVM_LINK) $^ -o $@
 
 #efdragonet.o: sf_onloadLibs
@@ -133,8 +139,9 @@ $(BUILD_DIR)/llvm-helpers-null.bc: $(BUILD_DIR)/llvm-c_impl-null.bc $(helpers_co
 $(BUILD_DIR)/llvm-helpers-sf.bc: $(BUILD_DIR)/llvm-c_impl-sf.bc $(helpers_common)
 	$(LLVM_LINK) $^ -o $@
 
-	# -L ../../openonload-201310-u2/build/gnu_x86_64/lib/ciul/ -Wl,-no-as-needed -lciul
 
+$(BUILD_DIR)/llvm-helpers-dpdk.bc: $(BUILD_DIR)/llvm-c_impl-dpdk.bc $(helpers_common)
+	$(LLVM_LINK) $^ -o $@
 
 # dyn helpers
 
