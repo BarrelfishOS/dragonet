@@ -11,12 +11,12 @@ import Stack
 
 
 -- Does not really matter as we only have one config
-costFunction :: StackState -> O.CostFunction Int
-costFunction _ _ = 1
+costFunction :: StackState -> [EndpointDesc] -> O.CostFunction Int
+costFunction _ _ _ = (1, "cost:always 1")
 
 -- TAP config is trivial
-oracle :: PG.PGraph -> StackState -> [(String,C.Configuration)]
-oracle _ _ = [("default",[])]
+oracle :: OracleArgs -> [(String,C.Configuration)]
+oracle _ = [("default",[])]
 
 -- So is implementing it
 implCfg :: PLI.StateHandle -> C.Configuration -> IO ()
@@ -33,5 +33,5 @@ plAssignSplit _ _ (_,n)
 main = do
     -- Prepare graphs and so on
     prgH <- Tap.graphH
-    instantiate prgH "llvm-helpers-tap" costFunction oracle implCfg plAssignSplit
+    instantiateOpt prgH "llvm-helpers-tap" costFunction oracle implCfg plAssignSplit
 

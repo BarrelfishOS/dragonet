@@ -47,11 +47,11 @@ graph dummy {
 
 -- Does not really matter as we only have one config
 costFunction :: S.StackState -> O.CostFunction Int
-costFunction _ _ = 1
+costFunction _ _ = (1, "")
 
 -- TAP config is trivial
-oracle :: PG.PGraph -> S.StackState -> [(String,C.Configuration)]
-oracle _ _ = [("default",[])]
+oracle :: S.OracleArgs -> [(String,C.Configuration)]
+oracle _ = [("default",[])]
 
 -- So is implementing it
 implCfg :: PLI.StateHandle -> C.Configuration -> IO ()

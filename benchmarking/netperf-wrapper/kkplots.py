@@ -36,11 +36,11 @@ def plot_per_client(fnames, fids, pid, app, metric, client_class=None):
         return cmp(xi,yi)
 
     colors = ["r", "b", "g"]
-    bwidth = .4
+    bwidth = .2
     nclients = 40
     index = np.arange(40)
 
-    fig = plt.figure(figsize=(10,2))
+    fig = plt.figure(figsize=(12,2))
     fig.clf()
     gs = gridspec.GridSpec(1,2, width_ratios=[4,1])
     ax = plt.subplot(gs[0])
@@ -103,16 +103,23 @@ def plot_per_client(fnames, fids, pid, app, metric, client_class=None):
 
 if __name__ == "__main__":
     fresults_echo = {
-        "dnet-64b-40"             : "nsdi_data/Test_udp_rr/CONCUR_1/PKT_64/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T031116.210807.llvmE10k_CLC_40_PKT_64.json.gz",
-        "linux-64b-40"            : "nsdi_data/Test_udp_rr/CONCUR_1/PKT_64/NIC_Intel/SRV_fancyEchoLinuxPoll/udp_rr-2014-09-24T054326.587080.Test_udp_rr_CONCUR_1_PKT_64_NIC_Intel_SRV_fancyEchoLinuxPoll_CLC_40.json.gz",
-        "dnet-1k-40"              : "nsdi_data/Test_udp_rr/CONCUR_1/PKT_1024/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T031514.597472.llvmE10k_CLC_40_PKT_1024.json.gz",
-        "linux-1k-40"             : "nsdi_data/Test_udp_rr/CONCUR_1/PKT_1024/NIC_Intel/SRV_fancyEchoLinuxPoll/udp_rr-2014-09-24T054831.626261.Test_udp_rr_CONCUR_1_PKT_1024_NIC_Intel_SRV_fancyEchoLinuxPoll_CLC_40.json.gz",
-        "dnet-64b-40-conc32"      : "nsdi_data/Test_udp_rr/CONCUR_32/PKT_64/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T011154.065430.llvmE10k_CLC_40_PKT_64.json.gz",
-        "dnet-64b-40-conc32-prio" : "nsdi_data/priority/Test_udp_rr/CONCUR_32/PKT_64/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T212422.113155.Priority_llvmE10k_CLC_40_PKT_64.json.gz",
-        "dnet-1k-40-conc32"       : "nsdi_data/Test_udp_rr/CONCUR_32/PKT_1024/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T011553.951088.llvmE10k_CLC_40_PKT_1024.json.gz",
-        "dnet-1k-40-conc32-prio"  : "nsdi_data/priority/Test_udp_rr/CONCUR_32/PKT_1024/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T212818.324440.Priority_llvmE10k_CLC_40_PKT_1024.json.gz",
-        "dnet-64b-40-conc16-prio" : "nsdi_data/priority/Test_udp_rr/CONCUR_16/PKT_64/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T231643.776683.Priority_Test_udp_rr_CONCUR_16_PKT_64_NIC_Intel_SRV_llvmE10k_CLC_40.json.gz",
-        "dnet-1k-40-conc16-prio"  : "nsdi_data/priority/Test_udp_rr/CONCUR_16/PKT_1024/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T232040.450589.Priority_Test_udp_rr_CONCUR_16_PKT_1024_NIC_Intel_SRV_llvmE10k_CLC_40.json.gz",
+        "dnet-64b-40"               : "nsdi_data/Test_udp_rr/CONCUR_1/PKT_64/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T031116.210807.llvmE10k_CLC_40_PKT_64.json.gz",
+        "linux-64b-40"              : "nsdi_data/Test_udp_rr/CONCUR_1/PKT_64/NIC_Intel/SRV_fancyEchoLinuxPoll/udp_rr-2014-09-24T054326.587080.Test_udp_rr_CONCUR_1_PKT_64_NIC_Intel_SRV_fancyEchoLinuxPoll_CLC_40.json.gz",
+        "dnet-1k-40"                : "nsdi_data/Test_udp_rr/CONCUR_1/PKT_1024/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T031514.597472.llvmE10k_CLC_40_PKT_1024.json.gz",
+        "linux-1k-40"               : "nsdi_data/Test_udp_rr/CONCUR_1/PKT_1024/NIC_Intel/SRV_fancyEchoLinuxPoll/udp_rr-2014-09-24T054831.626261.Test_udp_rr_CONCUR_1_PKT_1024_NIC_Intel_SRV_fancyEchoLinuxPoll_CLC_40.json.gz",
+        "dnet-64b-40-conc32"        : "nsdi_data/Test_udp_rr/CONCUR_32/PKT_64/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T011154.065430.llvmE10k_CLC_40_PKT_64.json.gz",
+        "dnet-64b-40-conc32-prio"   : "nsdi_data/priority/Test_udp_rr/CONCUR_32/PKT_64/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T212422.113155.Priority_llvmE10k_CLC_40_PKT_64.json.gz",
+        "dnet-1k-40-conc32"         : "nsdi_data/Test_udp_rr/CONCUR_32/PKT_1024/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T011553.951088.llvmE10k_CLC_40_PKT_1024.json.gz",
+        "dnet-1k-40-conc32-prio"    : "nsdi_data/priority/Test_udp_rr/CONCUR_32/PKT_1024/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T212818.324440.Priority_llvmE10k_CLC_40_PKT_1024.json.gz",
+        "dnet-64b-40-conc16-prio"   : "nsdi_data/priority/Test_udp_rr/CONCUR_16/PKT_64/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T231643.776683.Priority_Test_udp_rr_CONCUR_16_PKT_64_NIC_Intel_SRV_llvmE10k_CLC_40.json.gz",
+        "dnet-1k-40-conc16-prio"    : "nsdi_data/priority/Test_udp_rr/CONCUR_16/PKT_1024/NIC_Intel/SRV_llvmE10k/udp_rr-2014-09-24T232040.450589.Priority_Test_udp_rr_CONCUR_16_PKT_1024_NIC_Intel_SRV_llvmE10k_CLC_40.json.gz",
+       #
+       "linux-1k-40-conc32"         : "nsdi_data/Test_udp_rr/CONCUR_32/PKT_1024/NIC_Intel/SRV_fancyEchoLinuxPoll/udp_rr-2014-09-25T074208.700060.Test_udp_rr_CONCUR_32_PKT_1024_NIC_Intel_SRV_fancyEchoLinuxPoll_CLC_40.json.gz",
+       "linux-64b-40-conc32"        : "nsdi_data/Test_udp_rr/CONCUR_32/PKT_64/NIC_Intel/SRV_fancyEchoLinuxPoll/udp_rr-2014-09-25T073704.451032.Test_udp_rr_CONCUR_32_PKT_64_NIC_Intel_SRV_fancyEchoLinuxPoll_CLC_40.json.gz",
+       "dnet-1k-40-conc32-sf"       : "nsdi_data/Test_udp_rr/CONCUR_32/PKT_1024/NIC_SF/SRV_llvmSF/udp_rr-2014-09-25T111809.887378.Test_udp_rr_CONCUR_32_PKT_1024_NIC_SF_SRV_llvmSF_CLC_40.json.gz",
+       "dnet-64b-40-conc32-sf"      : "nsdi_data/Test_udp_rr/CONCUR_32/PKT_64/NIC_SF/SRV_llvmSF/udp_rr-2014-09-25T111409.886868.Test_udp_rr_CONCUR_32_PKT_64_NIC_SF_SRV_llvmSF_CLC_40.json.gz",
+       "dnet-1k-40-conc32-prio-sf"  : "nsdi_data/priority/Test_udp_rr/CONCUR_32/PKT_1024/NIC_SF/SRV_llvmSF/udp_rr-2014-09-25T121518.072007.Priority_Test_udp_rr_CONCUR_32_PKT_1024_NIC_SF_SRV_llvmSF_CLC_40.json.gz",
+       "dnet-64b-40-conc32-prio-sf" : "nsdi_data/priority/Test_udp_rr/CONCUR_32/PKT_64/NIC_SF/SRV_llvmSF/udp_rr-2014-09-25T121120.809915.Priority_Test_udp_rr_CONCUR_32_PKT_64_NIC_SF_SRV_llvmSF_CLC_40.json.gz",
     }
 
     def plot_echo(pprefix, fids, metric):
@@ -136,9 +143,11 @@ if __name__ == "__main__":
         plot_echo("echo-64b-40", ["dnet-64b-40", "linux-64b-40"], metric)
         plot_echo("echo-1k-40", ["dnet-1k-40", "linux-1k-40"], metric)
         plot_echo("echo-64b-40-conc32-prio", ["dnet-64b-40-conc32", "dnet-64b-40-conc32-prio"], metric)
-        plot_echo("echo-1k-40-conc32-prio", ["dnet-1k-40-conc32", "dnet-1k-40-conc32-prio"], metric)
-        plot_echo("echo-1k-40-conc16-prio", ["dnet-1k-40-conc16-prio"], metric)
-        plot_echo("echo-64b-40-conc16-prio", ["dnet-64b-40-conc16-prio"], metric)
+        plot_echo("echo-1k-40-conc32-prio", ["dnet-1k-40-conc32", "dnet-1k-40-conc32-prio", "linux-1k-40-conc32"], metric)
+        plot_echo("echo-64b-40-conc32-prio-sf", ["dnet-64b-40-conc32-sf", "dnet-64b-40-conc32-prio-sf"], metric)
+        plot_echo("echo-1k-40-conc32-prio-sf", ["dnet-1k-40-conc32-sf", "dnet-1k-40-conc32-prio-sf"], metric)
+        #plot_echo("echo-1k-40-conc16-prio", ["dnet-1k-40-conc16-prio"], metric)
+        #plot_echo("echo-64b-40-conc16-prio", ["dnet-63b-40-conc16-prio"], metric)
 
     for metric in ("TPS", "Total_Avg"):
         plot_memcached("memcached-64b-40", ["dnet-64b-40", "linux-64b-40"], metric)

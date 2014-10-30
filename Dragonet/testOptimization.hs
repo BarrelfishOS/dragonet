@@ -40,8 +40,9 @@ plAssign _ (_,n)
 --------------------------------------------------------------------------------
 -- Cost Function
 
-costFunction :: PL.PLGraph -> Integer
-costFunction plg = sum $ map (plCost . snd) $ DGI.labNodes plg
+costFunction :: PL.PLGraph -> (Integer, String)
+costFunction plg = (cost, "testOptimization::CostFunction")
+    where cost = sum $ map (plCost . snd) $ DGI.labNodes plg
 
 plCost :: PL.Pipeline -> Integer
 plCost pl = sum $ map (nodeCost . snd) $ DGI.labNodes $ PL.plGraph pl

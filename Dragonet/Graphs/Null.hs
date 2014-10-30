@@ -214,7 +214,7 @@ nodeL5Tuple c = (baseFNode (c5tString c) bports) {
             ]
 
 config5tuple :: ConfFunction
-config5tuple _ inE outE cfg = do
+config5tuple _ _ inE outE cfg = do
     ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
     let lastEdge = (endN,defaultN,endP)
     return (edges ++ [lastEdge])
@@ -304,7 +304,7 @@ parseFDT (CVTuple
         convInt (CVInt i) = fromIntegral i
 
 configFDir :: ConfFunction
-configFDir _ inE outE cfg = do
+configFDir _ _ inE outE cfg = do
     ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
     let lastEdge = (endN,defaultN,endP)
     return (edges ++ [lastEdge])
@@ -333,7 +333,7 @@ configFDir _ inE outE cfg = do
             return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
 
 configQueues :: ConfFunction
-configQueues cfgn inE outE (CVInt qs) = do
+configQueues _ (_,cfgn) inE outE (CVInt qs) = do
     ret <- foldM addNode [] [1..qs]
     return ret
     where addNode prev n = do

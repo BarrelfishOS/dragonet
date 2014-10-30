@@ -14,7 +14,7 @@ import qualified Runner.SFControl as CTRL
 import qualified ReadArgs as RA
 
 import Stack
-import qualified Search
+import qualified Dragonet.Search as Search
 import qualified Stack as SS
 
 import Control.Monad (forever, forM_)
@@ -31,6 +31,8 @@ import qualified Fitness as F
 
 import Debug.Trace (trace)
 import Text.Show.Pretty (ppShow)
+
+import qualified Scenarios.S1 as S1
 
 tr = flip . trace
 
@@ -279,33 +281,10 @@ plAssignMerged _ _ (_,n) = PG.nTag n
 
 llvm_helpers = "llvm-helpers-sf"
 
-main_balanced = do
-
-    (nq :: Int) <- RA.readArgs
-    print $ "Running stack for balanced scinario with queues: " ++ show nq
-
-
-    let state = CfgState {
-                    csThread = Nothing,
-                    cs5Tuples = M.empty,
-                    cs5TUnused = [0..127]
-                }
-
-    -- Channel and MVar with thread id of control thread
-    tcstate <- STM.newTVarIO state
-    chan <- STM.newTChanIO
-    -- Prepare graphs and so on
-    prgH@(prgU,_) <- SF.graphH
-    let costFn   = Search.sfCost prgU (Search.balanceCost nq)
-        searchFn = Search.searchGreedySF nq costFn
-
-    instantiateKK searchFn prgH llvm_helpers (implCfg tcstate chan) plAssignMerged
-
-
-main_priority = do
-
-    (nq :: Int) <- RA.readArgs
-    print $ "Running stack for balanced scinario with queues: " ++ show nq
+main = do
+    ((nq,costfn) :: (Int,String)) <- RA.readArgs
+    print $ "Number of queues used: " ++ show nq
+    print $ "Cost function: " ++ show costfn
 
     let state = CfgState {
                     csThread = Nothing,
@@ -319,13 +298,18 @@ main_priority = do
     -- Prepare graphs and so on
     prgH@(prgU,_) <- SF.graphH
 
-    let goldFlPerQ = 1
-        costFnPriority   = Search.sfCost prgU ((Search.priorityCost
-                    Search.isGoldFl2M goldFlPerQ) nq)
-        searchFnPririty = Search.searchGreedySF nq costFnPriority
-    instantiateKKwithSortedFlows Search.isGoldFl2M searchFnPririty
-                prgH llvm_helpers  (implCfg tcstate chan) plAssignMerged
+    let sfOracle = Search.sfOracleInit nq
+        priFn      = S1.priorityCost nq
+        balFn      = Search.balanceCost nq
+        strategy   = Search.searchGreedyFlows
+        costFns    = [("balance", balFn), ("priority", priFn)]
+        costFn     = case lookup costfn costFns of
+                        Just x  -> x
+                        Nothing -> error $ "Uknown cost function:" ++ costfn
+        sparams    = Search.initSearchParams {   Search.sOracle = sfOracle
+                                               , Search.sPrgU   = prgU
+                                               , Search.sCostFn = priFn
+                                               , Search.sStrategy = strategy }
+        searchFn   = Search.runSearch sparams
 
-main = main_balanced
---main = main_priority
-
+    instantiateFlows searchFn prgH llvm_helpers (implCfg tcstate chan) plAssignMerged

@@ -15,7 +15,7 @@ import qualified Runner.E10KControl as CTRL
 import qualified ReadArgs as RA
 
 import Stack
-import qualified Search
+import qualified Dragonet.Search as Search
 import qualified Stack as SS
 
 import Control.Monad (forever, forM_)
@@ -32,6 +32,8 @@ import qualified Fitness as F
 
 import Debug.Trace (trace)
 import Text.Show.Pretty (ppShow)
+
+import qualified Scenarios.S1 as S1
 
 tr a b = trace b a
 trN a b = a
@@ -284,53 +286,32 @@ plAssignMerged _ _ (_,n) = PG.nTag n
 
 llvm_helpers = "llvm-helpers-dpdk"
 
-main_balanced = do
-
-    (nq :: Int) <- RA.readArgs
+main = do
+    ((nq,costfn) :: (Int,String)) <- RA.readArgs
     print $ "Number of queues used: " ++ show nq
-
+    print $ "Cost function: " ++ show costfn
 
     let state = CfgState {
                     csThread = Nothing,
                     cs5Tuples = M.empty,
-                    cs5TUnused = [0..127]
-                }
-
-    -- Channel and MVar with thread id of control thread
-    tcstate <- STM.newTVarIO state
-    chan <- STM.newTChanIO
-    -- Prepare graphs and so on
-    prgH@(prgU,_) <- E10k.graphH
-    let costFn   = Search.e10kCost prgU (Search.balanceCost nq)
-        searchFn = Search.searchGreedyE10k nq costFn
-
-    instantiateKK searchFn prgH llvm_helpers (implCfg tcstate chan) plAssignMerged
-
-
-main_priority = do
-
-    (nq :: Int) <- RA.readArgs
-    print $ "Number of queues used: " ++ show nq
-
-    let state = CfgState {
-                    csThread = Nothing,
-                    cs5Tuples = M.empty,
-                    cs5TUnused = [0..127]
-                }
-
+                    cs5TUnused = [0..127] }
     -- Channel and MVar with thread id of control thread
     tcstate <- STM.newTVarIO state
     chan <- STM.newTChanIO
     -- Prepare graphs and so on
     prgH@(prgU,_) <- E10k.graphH
 
-    let goldFlPerQ = 1
-        costFnPriority   = Search.e10kCost prgU ((Search.priorityCost
-                    Search.isGoldFl2M goldFlPerQ) nq)
-        searchFnPririty = Search.searchGreedyE10k nq costFnPriority
-    instantiateKKwithSortedFlows Search.isGoldFl2M searchFnPririty
-                prgH llvm_helpers  (implCfg tcstate chan) plAssignMerged
-
-
-main = main_priority
-
+    let e10kOracle = Search.E10kOracleSt {Search.nQueues = nq}
+        priFn      = S1.priorityCost nq
+        balFn      = Search.balanceCost nq
+        strategy   = Search.searchGreedyFlows
+        costFns    = [("balance", balFn), ("priority", priFn)]
+        costFn     = case lookup costfn costFns of
+                        Just x  -> x
+                        Nothing -> error $ "Uknown cost function:" ++ costfn
+        sparams    = Search.initSearchParams {   Search.sOracle = e10kOracle
+                                               , Search.sPrgU   = prgU
+                                               , Search.sCostFn = priFn
+                                               , Search.sStrategy = strategy }
+        searchFn   = Search.runSearch sparams
+    instantiateFlows searchFn prgH llvm_helpers (implCfg tcstate chan) plAssignMerged

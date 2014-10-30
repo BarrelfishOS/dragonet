@@ -14,7 +14,7 @@ import qualified Runner.NullControl as CTRL
 import qualified ReadArgs as RA
 
 import Stack
-import qualified Search
+import qualified Dragonet.Search as Search
 import qualified Stack as SS
 
 import Control.Monad (forever, forM_)
@@ -31,6 +31,8 @@ import qualified Fitness as F
 
 import Debug.Trace (trace)
 import Text.Show.Pretty (ppShow)
+
+import qualified Scenarios.S1 as S1
 
 tr = flip . trace
 
@@ -280,35 +282,35 @@ plAssign _ _ (_,n)
 plAssignMerged :: StackState -> String -> PG.PGNode -> String
 plAssignMerged _ _ (_,n) = PG.nTag n
 
+llvm_helpers = "llvm_helpers_null"
 
 main = do
-
-    (nq :: Int) <- RA.readArgs
+    ((nq,costfn) :: (Int,String)) <- RA.readArgs
     print $ "Number of queues used: " ++ show nq
+    print $ "Cost function: " ++ show costfn
 
     let state = CfgState {
                     csThread = Nothing,
                     cs5Tuples = M.empty,
-                    cs5TUnused = [0..127]
-                }
-
+                    cs5TUnused = [0..127] }
     -- Channel and MVar with thread id of control thread
     tcstate <- STM.newTVarIO state
     chan <- STM.newTChanIO
     -- Prepare graphs and so on
     prgH@(prgU,_) <- Null.graphH
-    let costFn   = Search.e10kCost prgU (Search.balanceCost nq)
-        searchFn = Search.searchGreedyE10k nq costFn
 
-
-    --instantiate prgH "llvm-helpers-null" costFunction (oracle nq)
-    --    (implCfg tcstate chan) plAssignMerged
-    --instantiate prgH "llvm-helpers-null" F.fitnessFunction (oracle nq)
-    --instantiate prgH "llvm-helpers-null" F.priorityFitness  (oracle nq)
-    --instantiateGreedy prgH "llvm-helpers-null" F.priorityFitness (oracle nq)
-    --    (implCfg tcstate chan) plAssign
---    instantiate prgH "llvm-helpers-null" F.dummyFitness (oracleMultiQueue nq)
---        (implCfg tcstate chan) plAssign
-    instantiateKK searchFn prgH "llvm-helpers-null" (implCfg tcstate chan) plAssignMerged
-
+    let e10kOracle = Search.E10kOracleSt {Search.nQueues = nq}
+        priFn      = S1.priorityCost nq
+        balFn      = Search.balanceCost nq
+        strategy   = Search.searchGreedyFlows
+        costFns    = [("balance", balFn), ("priority", priFn)]
+        costFn     = case lookup costfn costFns of
+                        Just x  -> x
+                        Nothing -> error $ "Uknown cost function:" ++ costfn
+        sparams    = Search.initSearchParams {   Search.sOracle = e10kOracle
+                                               , Search.sPrgU   = prgU
+                                               , Search.sCostFn = priFn
+                                               , Search.sStrategy = strategy }
+        searchFn   = Search.runSearch sparams
+    instantiateFlows searchFn prgH llvm_helpers (implCfg tcstate chan) plAssignMerged
 
