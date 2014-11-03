@@ -23,8 +23,7 @@ lpgCfg = [
                 PG.CVMaybe Nothing,
                 PG.CVMaybe Nothing,
                 PG.CVMaybe Nothing,
-                PG.CVMaybe $ Just $ PG.CVInt 7 ]--,
-            {--
+                PG.CVMaybe $ Just $ PG.CVInt 7 ],
             PG.CVTuple [
                 PG.CVList [PG.CVTuple [PG.CVInt 1, PG.CVInt 0]],
                 PG.CVMaybe Nothing,
@@ -50,7 +49,6 @@ lpgCfg = [
                 PG.CVMaybe $ Just $ PG.CVInt 2345,
                 PG.CVMaybe $ Just $ PG.CVInt 3,
                 PG.CVMaybe $ Just $ PG.CVInt 3456 ]
-            --}
         ])]
 
 prgCfgEmpty = e10kCfgEmpty

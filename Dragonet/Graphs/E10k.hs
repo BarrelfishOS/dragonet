@@ -237,11 +237,16 @@ config5tuple _ _ inE outE cfg = do
         (Just ((defaultN,_),_)) = L.find ((== "default") . ePort . snd) outE
         -- Lookup node id for specified queue
         queue i = queueN
-            where (Just ((queueN,_),_)) = L.find (isRxQValidN i . fst) outE
+            --(Just ((queueN,_),_)) = L.find (isRxQValidN i . fst) outE
+            where queueN = case L.find (isRxQValidN i . fst) outE of
+                            Just ((x,_),_) -> x
+                            Nothing -> error $ "no RxQValid for queue=" ++ (show i) ++ " Does queue exist?"
+
 
         -- Get filter configurations ordered by priority
         cmpPrio = compare `on` c5tPriority
-        cfgs = reverse $ L.sortBy cmpPrio $ parse5tCFG cfg
+        cfgs_ = reverse $ L.sortBy cmpPrio $ parse5tCFG cfg
+        cfgs = trN cfgs_ (ppShow cfgs_)
 
         -- Generate node and edges for one filter
         addFilter ((iN,iE),es) c = do
@@ -439,7 +444,7 @@ configRxQueues g (cfgnid,cfgn) inE outE (CVInt qs) = do
             -- the first onde
             dupEs  <- case n == defQ of
                        True  -> return oE
-                       False -> duplicateDFS g (cfgnid,cfgn) q_nid (++ (show n))
+                       False -> duplicateDFS g (cfgnid,cfgn) q_nid (++ "__RxQ" ++ (show n))
 
             let newEdges = iE ++ sE ++ orE ++ dupEs
             return ((q_nid,o_nid),newEdges)

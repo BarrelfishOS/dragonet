@@ -80,13 +80,10 @@ graph prg1 {
     config RxQueues {
         attr "software"
         spawn poll RxQueues
-        port out[Bar] }
+        port out[] }
 
     config TxQueues {
         attr "software" }
-
-    node Bar {
-    }
 }
 |]
 
@@ -102,12 +99,27 @@ graph lpg1 {
 emb1 :: PG.PGraph
 emb1 = U.strToGraph [r|
 graph emb1 {
+    node Foo {
+        port queues[RxQ0Valid RxQ1Valid]
+        port default[RxQ0Valid]
+    }
+
+    or RxQ0Valid {
+        port true[RxQueue0__Q0]
+        port false[]
+    }
+
+    or RxQ1Valid {
+        port true[RxQueue1__Q1]
+        port false[]
+    }
+
     node TxA__Q1 { port out[TxQueue1__Q1] }
-    node TxA__Q2 { port out[TxQueue2__Q2] }
+    node TxA__Q0 { port out[TxQueue0__Q0] }
     node RxQueue1__Q1 { spawn poll RxQueue1__Q1 }
-    node RxQueue2__Q2 { spawn poll RxQueue2__Q2 }
+    node RxQueue0__Q0 { spawn poll RxQueue0__Q0 }
     node TxQueue1__Q1 {}
-    node TxQueue2__Q2 {}
+    node TxQueue0__Q0 {}
 }
 |]
 
@@ -137,6 +149,7 @@ embTest msg prg lpg expect fname_suffix =
     writeFile ("tests/lpg" ++ fname_suffix ++ ".dot") $ toDot lpg
     writeFile ("tests/prg" ++ fname_suffix ++ ".dot") $ toDot prg
     writeFile ("tests/emb" ++ fname_suffix ++ ".dot") $ toDot emb
+    writeFile ("tests/exp" ++ fname_suffix ++ ".dot") $ toDot expect
 
     errmsg <- case cond of
         True  -> return "SUCCESS"
@@ -355,7 +368,6 @@ graph prg3 {
 
         node L4UDPFillChecksum  {
             port out_true[L3Done]
-            //predicate out_true "pred(FOO,YEAHHHHHHHHHHHHHHHHHHHHHHHHHHH)"
         }
 
         node L4UTCPFillChecksum { port out_true[L4Done] }
@@ -597,7 +609,7 @@ cluster Rx {
 }
 |]
 
---t4 = embTests (prg4,lpg4) [] "prg4/lpg4 checks"
+t4 = embTests (prg4,lpg4) [] "prg4/lpg4 checks" "4"
 
 ------------------------------------------------------------------------------
 ------------------------------------------------------------------------------
@@ -611,7 +623,7 @@ tests =
    , t1
    , t2
    , t3
-   --, t4
+   , t4
  ]
 
 lpgT = LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
@@ -632,14 +644,15 @@ e10kC_simple = (C.applyConfig prgCfg) <$> e10kU_simple
 
 e10kOffloadU = do
     (e10kU, e10kH) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl-offload.unicorn"
-    let nQueues = 1
-        prgConf = prgCfgEmpty --prgCfgEmpty
+    let nQueues = 3
+        -- cnf = prgCfgEmpty
+        cnf = prgCfg
         prgQConf = [("RxQueues", PG.CVInt nQueues), ("TxQueues", PG.CVInt nQueues)]
         ret = C.applyConfig prgQConf $  E10k.prepareConf e10kU
-        ret' = C.applyConfig prgConf ret
-        -- since some queues might not be used, clean up the PRG graph
-        ret'' = PGU.cleanupGraph ret'
-    return ret'
+        ret' = C.applyConfig cnf ret
+    writeFile "tests/prgE10k-ret1.dot"  $ toDot ret
+    -- since some queues might not be used, clean up the PRG graph
+    return $ PGU.cleanupGraph ret'
 
 
 
@@ -657,19 +670,28 @@ prPred gr s = do
 
 main = do
 
-    e10k_prg  <- e10kC_simple
+    {--
+    lpg <- lpgC
+    e10k_prg <- e10kC_simple
+    e10k_prg_offload <- e10kOffloadU
+    writeFile "tests/prgE10k.dot"   $ toDot e10k_prg_offload
+    --}
+
+    {-
     writeFile "tests/prgE10k.dot"   $ toDot e10k_prg
     prPred e10k_prg "RxQueue0"
     prPred e10k_prg "RxQueue1"
     prPred e10k_prg "RxQueue2"
+    -}
 
-    --e10k_prg2 <- e10kOffloadU
-    --lpg <- lpgC
-    --let emb_e10k = embeddingX e10k_prg2 lpg
-    --writeFile "tests/prgE10k.dot"   $ toDot e10k_prg
+    runTestTT tests
+
+    {--
+    let emb_e10k = embeddingX e10k_prg_offload lpg
     --writeFile "tests/prgE10k-2.dot" $ toDot e10k_prg2
-    --writeFile "tests/embE10k.dot" $ toDot emb_e10k
+    writeFile "tests/embE10k.dot" $ toDot emb_e10k
     --writeFile "tests/prg1.dot" $ toDot prg1
+    --}
 
     {--
     writeFile "tests/prg4.dot" $ toDot prg4
@@ -677,7 +699,6 @@ main = do
     let emb4 = embeddingRxTx2 prg4 lpg4
     writeFile "tests/emb4.dot" $ toDot emb4
     --}
-    --runTestTT tests
 
     --prPred emb4 "RxQueue"
     --prPred emb4 "RxisPing"

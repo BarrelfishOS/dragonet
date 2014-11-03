@@ -131,10 +131,16 @@ data EmbDirection = EmbRx | EmbTx
 -- EmbNodeRemoved:   node removed
 -- EmbNodeRedundant: node not needed (short-circuited on a particular port)
 --                   The active port in the redundant node collapses with
---                   another graph point (node,graph)
+--                   another graph point (node,port)
 -- EmbNodePartial:   node only partially needed (a number of ports are redundant)
+--
 -- The difference between the two last cases is that we insert the node in the
--- latter case
+-- latter case. An EmbNodePartial that consists of a single active port is not
+-- equivalent to a EmbNodeRedundant since the node might perform a necessary
+-- computation and (cannot be omitted). In the Rx side, where the nodes
+-- typically perform demultiplexing only the port selection matters. In such a
+-- case, an EmbNodePartial with a single port is equivalent to an
+-- EmbNodeRedundant (check embRxNode).
 data EmbNode = EmbNode DGI.Node |
                EmbNodeRemoved   |
                EmbNodeRedundant PG.NPort (DGI.Node, PG.NPort) |
@@ -152,9 +158,10 @@ data EmbedSt = EmbedSt {
       embPrg        :: PG.PGraph    -- prg graph (does not change)
     , origLpg       :: PG.PGraph    -- lpg graph to embed (does not change)
 
-    -- As we embed nodes, we move nodes from the LPG to the embedded graph
+    -- As we embed nodes, we move nodes from the LPG to the embedded graph.
     -- curLpg contains the part of the LPG that is not yet embedded, while
     -- curEmb is the embedded graph.
+    -- curEmb is initialized as the PRG.
     , curEmb       :: PG.PGraph
     , curLpg       :: PG.PGraph
 
@@ -396,8 +403,8 @@ initEmbedDir dir = do
 
 embedDir :: Embed ()
 embedDir = do
-    st  <- ST.get
-    cur_lpg <- ST.gets curLpg
+    st       <- ST.get
+    cur_lpg  <- ST.gets curLpg
     orig_lpg <- ST.gets origLpg
     case embFindNext st of
         Nothing                -> return () -- no more nodes to embed
@@ -432,6 +439,11 @@ embGetPrev st (nid,_) = [ (pid, fromJust $ DGI.lab lpg pid) | pid <- embGetPrev_
     where lpg = origLpg st
 
 -- get a list of the next nodes (based on the embedding order)
+--
+--  NB: There is an assumption here: Tx and Rx sides are connected via spawn
+--  edges.  Hence, if using sucNE/preNE functions that only consider "normal"
+--  edges we cannot reach Tx from Rx and vice versa.
+--
 embGetNext_ :: EmbedSt -> DGI.Node -> [DGI.Node]
 embGetNext_ st = case (curDir st) of
     EmbRx -> PGU.sucNE lpg
@@ -526,28 +538,30 @@ embNodeEdgeActive node (PG.Edge {PG.ePort = port}) = embNodePortActive node port
 embRxNode :: EmbedSt -> PG.PGNode -> Int -> (DGI.Node, PG.NPort) -> EmbNode
 embRxNode st node@(nid, fnode@(PG.FNode {})) idx (prevId, prevPort)
     | spawnTarget = EmbNode embIdDummy
-    | redundant   = EmbNodeRedundant (snd restP0) (prevId, prevPort)
+    | redundant   = EmbNodeRedundant (snd aliveP0) (prevId, prevPort)
+    | partial     = EmbNodePartial embIdDummy $ map snd alivePs
     | otherwise   = EmbNode embIdDummy
  where
     pred = embRxPred st node idx
     portExpr p = tr ret msg
         where portPred = (PR.portPred_ embBld fnode p)
               ret = (PR.buildAND embBld) [pred, portPred]
-              msg = "      port expr  for port " ++ (show p) ++ " is:" ++ (show portPred)
+              msg = "      port:" ++ (show p) ++ "\n\tpred:" ++ (show portPred) ++ "\n\texpr:" ++ (show ret)
     portsExpr = map portExpr $ PG.nPorts fnode
     spawnTarget = PGU.isSpawnTarget (origLpg st) node
     ports = PG.nPorts fnode
     portsExpr' = zip portsExpr ports
-    (deadPs,restPs) = L.partition ((==PR.PredFalse) . fst) portsExpr'
-    --redundant = length restPs == 1 && PR.predEquivHard (fst restP0) pred
-    redundant = length restPs == 1 && PR.dnfEquiv (fst restP0) pred
-    restP0 = head restPs
+    (deadPs,alivePs) = L.partition ((==PR.PredFalse) . fst) portsExpr'
+    --redundant = length alivePs == 1 && PR.predEquivHard (fst aliveP0) pred
+    redundant = length alivePs == 1 && PR.dnfEquiv (fst aliveP0) pred
+    partial = length deadPs > 0
+    aliveP0 = head alivePs
 
 embRxPredCache :: EmbedSt -> Int -> PR.PredCache
 embRxPredCache st idx = M.singleton (fst $ embLpgRx st) ((embPrgRxPreds st) !! idx)
 
 embRxPred :: EmbedSt -> PG.PGNode -> Int -> PR.PredExpr
-embRxPred st node idx = trN pred ("    Pred: Idx:" ++ (show idx) ++ " node:" ++ (pgName node) ++ " pred:" ++ (show pred))
+embRxPred st node idx = tr pred ("      Pred: Idx:" ++ (show idx) ++ " node:" ++ (pgName node) ++ " pred:" ++ (show pred))
     where predCache = embRxPredCache st idx
           pred = PR.nodePredCache (origLpg st) node predCache
 
@@ -583,9 +597,12 @@ doEmbRx st orig_ctx@(ins, nid, fnode@PG.FNode {}, outs) idx = ret
           -- check if the port of the previous node is active.
           -- If not, we can omit this node. Otherwise figure out the mapping for
           -- the embedding node
-          embN = embRxNode st lpgN  idx (fromJust $ embGetNP st (prevId, prevPort) idx)
           portActive_ = embNodePortActive prevEmb prevPort
-          portActive = tr portActive_ ("\n    previous node port:"
+          portActive = tr portActive_ ("\n    "
+                                              ++ " [PRG Boundary:"
+                                              ++ (pgName $ ((embPrgRx st) !! idx))
+                                              ++ "] => "
+                                              ++ "previous node port:"
                                               ++ prevPort
                                               ++ " is active: "
                                               ++ (show portActive_)
@@ -593,6 +610,7 @@ doEmbRx st orig_ctx@(ins, nid, fnode@PG.FNode {}, outs) idx = ret
           ret = case portActive of
               False -> EmbNodeRemoved
               True  -> embN
+          embN = embRxNode st lpgN  idx (fromJust $ embGetNP st (prevId, prevPort) idx)
 
 -- embedding an O-node for Rx
 doEmbRx st orig_ctx@(ins, nid, onode@PG.ONode { PG.nOperator = op}, outs) idx = ret
@@ -704,8 +722,8 @@ embUpdate lpgCtx@(_,lpgNid,nlbl,_) embNs_ = do
         newNMap  = M.insertWith w lpgNid embNs nmap
            where w _ _ = error $ "LPG node: " ++ (PG.nLabel nlbl) ++ " already exists in the node map"
         ndiff = (DGI.noNodes newEmb) - (DGI.noNodes emb)
-        msg = "  Adding " ++ (show ndiff) ++ " nodes to the embedded graph"
-              -- ++ "\n    embMaps =" ++ (show embMaps)
+        msg = "\n  Adding " ++ (show ndiff) ++ " node(s) to the embedded graph"
+              ++ "\n    embMaps = " ++ (show embNs)
     ST.modify $ \s -> (tr s msg) { curEmb = newEmb,
                                    embRevLpgMap = newRMap,
                                    embNodeMap = newNMap}
@@ -728,28 +746,62 @@ embIsQueueNode :: EmbDirection -> PG.Node -> Bool
 embIsQueueNode EmbRx = isRxQueueNode
 embIsQueueNode EmbTx = isTxQueueNode
 
--- the given LPG context is a queue node. Do the embedding
+-- check if two nodes have the same structure
+pgMatch :: PG.Node -> PG.Node -> Bool
+pgMatch (PG.FNode {PG.nPorts = p1}) (PG.FNode {PG.nPorts = p2}) = p1 == p2
+
+-- Provide an embedded mapping for an Rx queue node
+--  lpgN: the LPG queue node
+--  prgN: The corresponding PRG node
+mapRxQueueNode :: PG.PGNode -> PG.PGNode -> EmbNode
+mapRxQueueNode lpgN@(lpgNid,lpgNlbl) prgN@(prgNid,prgNlbl)
+    | PG.FNode {PG.nPorts = lpgNports} <- lpgNlbl,
+      PG.FNode {PG.nPorts = prgNports} <- prgNlbl =
+        let commonPorts = L.intersect lpgNports prgNports
+            lenCommonPorts = length commonPorts
+            errmsg = "PRG node " ++ (pgName prgN) ++
+                     " does not have common ports with LPG node " ++
+                     (pgName lpgN)
+        in if lenCommonPorts == 0 then error errmsg
+           else case compare lenCommonPorts (length lpgNports) of
+                  EQ -> EmbNode prgNid
+                  LT -> EmbNodePartial prgNid commonPorts
+                  GT -> error "mapRxQueueNode: this should not happen"
+    | otherwise = error "mapRxQueueNode: one of the nodes is not an F-node"
+
+-- Provide an embedded mapping for an Tx queue node
+-- no structural check is necessary
+mapTxQueueNode :: PG.PGNode -> PG.PGNode -> EmbNode
+mapTxQueueNode (_, PG.FNode {}) (prgNid, PG.FNode {}) = EmbNode prgNid
+mapTxQueueNode _ _  = error "mapTxQueueNode: one of the nodes is not an F-node"
+
+-- the given LPG context is a queue node. Do the embedding.
+--
+-- NB: The initial state of the embedded graph is the PRG. Hence, the boundary
+-- (queue) nodes we are dealing with here already exist in the embedded graph
+-- with the ids and labels of the PRG graph. Hence the mapping id is the id of
+-- the matching PRG node.
 embedQueueNode :: PG.PGContext -> Embed ()
-embedQueueNode lpg_ctx@(_,nid,nlbl,_) = do
+embedQueueNode lpg_ctx@(_,lpgNid,lpgNlbl,_) = do
+    let lpgN = (lpgNid, lpgNlbl)
     dir  <- ST.gets curDir
     nmap <- ST.gets embNodeMap
     prg  <- ST.gets embPrg
+
+    -- prgNodes is the boundary of PRG nodes (sources or sinks)
     prgNodes <- case dir of
         EmbRx -> ST.gets embPrgRx
         EmbTx -> ST.gets embPrgTx
-
-    -- verify that PRG/LPG nodes have the same structure
-    let verifyPrgNode prgn = case pgMatch nlbl (snd prgn) of
-            True  -> prgn
-            False -> error $ "PRG node " ++ (pgName prgn) ++ " does not match LPG " ++ (PG.nLabel nlbl) ++ " node's structure"
-        prgNodes' = map verifyPrgNode prgNodes
-        msg = "    Adding queue nodes:" ++ show (map pgName prgNodes')
+    embNodes <- case dir of
+        EmbRx -> return $ map (mapRxQueueNode lpgN) prgNodes
+        EmbTx -> return $ map (mapTxQueueNode lpgN) prgNodes
 
     -- create new map
-    let newNmap = M.insertWith w nid [EmbNode xid | (xid,_) <- prgNodes'] nmap
-            where w _ _ = error $ "Node: " ++ (PG.nLabel nlbl) ++ " already exists in the embedded map"
+    let newNmap = M.insertWith w lpgNid embNodes nmap
+            where w _ _ = error $ "Node: " ++ (pgName lpgN) ++ " already exists in the embedded map"
 
     -- update state
+    let msg = "    Adding queue nodes:" ++ show (map pgName prgNodes)
     ST.modify $ \s -> (tr s msg) {embNodeMap = newNmap}
 
     return ()
@@ -780,10 +832,6 @@ ctxNode (_,_,n,_) = n
 
 pgName :: PG.PGNode -> String
 pgName = PG.nLabel . snd
-
--- check if two nodes have the same structure
-pgMatch :: PG.Node -> PG.Node -> Bool
-pgMatch (PG.FNode {PG.nPorts = p1}) (PG.FNode {PG.nPorts = p2}) = p1 == p2
 
 checkEmbeddedAdjs :: EmbedSt -> PG.Node -> PG.PGAdj -> PG.PGAdj
 checkEmbeddedAdjs st node adjs = adjs'
