@@ -644,15 +644,15 @@ e10kC_simple = (C.applyConfig prgCfg) <$> e10kU_simple
 
 e10kOffloadU = do
     (e10kU, e10kH) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl-offload.unicorn"
-    let nQueues = 3
-        -- cnf = prgCfgEmpty
-        cnf = prgCfg
+    let --(nQueues, cnf) = (3, prgCfg)
+        (nQueues, cnf) = (1, prgCfgEmpty)
         prgQConf = [("RxQueues", PG.CVInt nQueues), ("TxQueues", PG.CVInt nQueues)]
         ret = C.applyConfig prgQConf $  E10k.prepareConf e10kU
         ret' = C.applyConfig cnf ret
-    writeFile "tests/prgE10k-ret1.dot"  $ toDot ret
+        ret'' = PGU.cleanupGraph ret'
+    --writeFile "tests/prgE10k-queues.dot"  $ toDot ret'
     -- since some queues might not be used, clean up the PRG graph
-    return $ PGU.cleanupGraph ret'
+    return ret'
 
 
 
@@ -670,12 +670,16 @@ prPred gr s = do
 
 main = do
 
-    {--
+    -- runTestTT tests
+
     lpg <- lpgC
     e10k_prg <- e10kC_simple
     e10k_prg_offload <- e10kOffloadU
-    writeFile "tests/prgE10k.dot"   $ toDot e10k_prg_offload
-    --}
+    let emb_e10k = embeddingX e10k_prg_offload lpg
+
+    writeFile "tests/lpgC.dot"    $ toDot lpg
+    writeFile "tests/prgE10k.dot" $ toDot e10k_prg_offload
+    writeFile "tests/embE10k.dot" $ toDot emb_e10k
 
     {-
     writeFile "tests/prgE10k.dot"   $ toDot e10k_prg
@@ -684,12 +688,9 @@ main = do
     prPred e10k_prg "RxQueue2"
     -}
 
-    runTestTT tests
 
     {--
-    let emb_e10k = embeddingX e10k_prg_offload lpg
     --writeFile "tests/prgE10k-2.dot" $ toDot e10k_prg2
-    writeFile "tests/embE10k.dot" $ toDot emb_e10k
     --writeFile "tests/prg1.dot" $ toDot prg1
     --}
 

@@ -240,7 +240,7 @@ config5tuple _ _ inE outE cfg = do
             --(Just ((queueN,_),_)) = L.find (isRxQValidN i . fst) outE
             where queueN = case L.find (isRxQValidN i . fst) outE of
                             Just ((x,_),_) -> x
-                            Nothing -> error $ "no RxQValid for queue=" ++ (show i) ++ " Does queue exist?"
+                            Nothing -> error $ "E10k.config5tuple: no RxQValid for queue=" ++ (show i) ++ " Does queue exist?"
 
 
         -- Get filter configurations ordered by priority

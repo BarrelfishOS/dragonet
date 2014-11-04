@@ -13,7 +13,8 @@ module Dragonet.ProtocolGraph.Utils (
     isNormalEdge_, isNormalEdge,
     cleanupGraph, cleanupGraphWith,
     pgDfsNEs, pgRDfsNEs,
-    sucNE, preNE, lpreNE, lsucNE
+    sucNE, preNE, lpreNE, lsucNE,
+    unconnectedPorts
 ) where
 
 import Dragonet.ProtocolGraph
@@ -123,6 +124,12 @@ edgeDeps gr dst = filter (isNormalEdge . snd) $ GH.labLPre gr dst
 
 isSink_ :: PGraph -> DGI.Node -> Bool
 isSink_ gr nid = null $ filter (isNormalEdge_ . snd) (DGI.lsuc gr nid)
+
+unconnectedPorts :: PGraph -> PGNode -> [NPort]
+unconnectedPorts gr (nid,nlbl) =  S.toList $ S.difference allPorts allEdgePorts
+    where allPorts     = S.fromList $ nPorts nlbl
+          allEdgePorts = S.fromList $ [edgePort_ e | (_,e) <- DGI.lsuc gr nid,
+                                                     isNormalEdge_ e]
 
 isSource_ :: PGraph -> DGI.Node -> Bool
 isSource_ gr nid = null $ filter (isNormalEdge_ . snd) (DGI.lpre gr nid)

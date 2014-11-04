@@ -174,9 +174,14 @@ data EmbedSt = EmbedSt {
     , embRevLpgMap :: M.Map DGI.Node DGI.Node
 
     -- prg out nodes (Rx)
-    , embPrgRx      :: [PG.PGNode]
-    , embPrgRxPreds :: [PR.PredExpr]
-    , embPrgRxTags  :: [String]
+    -- nodes to connect the LPG to
+    , embPrgRx            :: [PG.PGNode]
+    -- predicate for each node
+    , embPrgRxPreds       :: [PR.PredExpr]
+    -- queue tag for each node
+    , embPrgRxTags        :: [String]
+    -- Unused ports for each node (i.e., points to connect the LPG)
+    , embPrgRxUnusedPorts :: [[PG.NPort]]
 
     -- prg in nodes (Tx)
     , embPrgTx     :: [PG.PGNode]
@@ -197,6 +202,7 @@ data EmbedSt = EmbedSt {
 -- PRG Rx nodes (i.e., points where the LPG will connect to the PRG's RX side)
 -- detection along with their tags
 -- start from Rx queue nodes and find the sink nodes
+-- DEPRECATED by prgRxNodes'
 prgRxNodes :: PG.PGraph -> [(PG.PGNode, QTag)]
 prgRxNodes prg = L.concat $ map getQSinks rxQs
     where rxQs  = GH.filterNodesByL isRxQueueNode prg
@@ -206,10 +212,27 @@ prgRxNodes prg = L.concat $ map getQSinks rxQs
                             | nid <- DFS.dfs [fst qn] prg
                             , PGU.isSink_ prg nid ]
 
+
+-- PRG Rx nodes (i.e., points where the LPG will connect to the PRG's RX side)
+-- detection along with their tags. For each queue, we select the nodes which
+-- have unconnected ports.
+prgRxNodes' :: PG.PGraph -> [((PG.PGNode, [PG.NPort]), QTag)]
+prgRxNodes' prg = L.concat $ map getQSinks rxQs
+    where rxQs = GH.filterNodesByL isRxQueueNode prg
+          getN n = (n, fromJust $ DGI.lab prg n)
+          getQSinks :: PG.PGNode -> [((PG.PGNode, [PG.NPort]), QTag)]
+          getQSinks qn =  [ ((node, lports), qtag)
+                            | nid <- DFS.dfs [fst qn] prg
+                            , let node   = getN nid
+                            , let qtag   =  qGetTag $ snd  qn
+                            , let lports = PGU.unconnectedPorts prg node
+                            , not $ L.null lports]
+
+
 -- PRG Tx nodes (i.e., points where the LPG will connect to the PRG's TX side)
 -- detection along with their corresponding tags.
 --
--- For now we assume that onlty TxQueue nodes fill that role.
+-- For now we assume that only TxQueue nodes fill that role.
 prgTxNodes :: PG.PGraph -> [(PG.PGNode, QTag)]
 prgTxNodes prg = zip nodes tags
     where tags  = map (qGetTag . snd) nodes
@@ -266,10 +289,12 @@ initEmbedSt prg lpg = EmbedSt {
     , embRevLpgMap  = M.empty
     --
     , embPrgRx      = rxNodes
-    , embPrgTx      = txNodes
     , embPrgRxTags  = rxTags
-    , embPrgTxTags  = txTags
     , embPrgRxPreds = rxPreds
+    , embPrgRxUnusedPorts = rxPorts
+    --
+    , embPrgTx      = txNodes
+    , embPrgTxTags  = txTags
     , embPrgTxOuts  = txOutNodes
     --
     , embLpgRx      = lpgRxNode lpg
@@ -277,7 +302,8 @@ initEmbedSt prg lpg = EmbedSt {
     , lpgGrayNodes  = undefined
     , curDir        = undefined
 }
-    where (rxNodes, rxTags) = unzip $ prgRxNodes prg
+    where (rxNodesPorts, rxTags) = unzip $ prgRxNodes' prg
+          (rxNodes, rxPorts)     = unzip rxNodesPorts
           (txNodes, txTags) = unzip $ prgTxNodes prg
           rxPreds = map (PR.nodePred prg) rxNodes
           txOutNodes = prgTxOutNodes prg
@@ -750,13 +776,21 @@ embIsQueueNode EmbTx = isTxQueueNode
 pgMatch :: PG.Node -> PG.Node -> Bool
 pgMatch (PG.FNode {PG.nPorts = p1}) (PG.FNode {PG.nPorts = p2}) = p1 == p2
 
+
+-- Provide an embedded mapping for an Tx queue node
+-- no structural check is necessary
+mapTxQueueNode :: PG.PGNode -> PG.PGNode -> EmbNode
+mapTxQueueNode (_, PG.FNode {}) (prgNid, PG.FNode {}) = EmbNode prgNid
+mapTxQueueNode _ _  = error "mapTxQueueNode: one of the nodes is not an F-node"
+
 -- Provide an embedded mapping for an Rx queue node
 --  lpgN: the LPG queue node
 --  prgN: The corresponding PRG node
-mapRxQueueNode :: PG.PGNode -> PG.PGNode -> EmbNode
-mapRxQueueNode lpgN@(lpgNid,lpgNlbl) prgN@(prgNid,prgNlbl)
+--  prgNports: the unconnected ports of the PRG node
+mapRxQueueNode :: PG.PGNode -> (PG.PGNode, [PG.NPort]) -> EmbNode
+mapRxQueueNode lpgN@(lpgNid,lpgNlbl) (prgN@(prgNid,prgNlbl), prgNports)
     | PG.FNode {PG.nPorts = lpgNports} <- lpgNlbl,
-      PG.FNode {PG.nPorts = prgNports} <- prgNlbl =
+      PG.FNode {} <- prgNlbl =
         let commonPorts = L.intersect lpgNports prgNports
             lenCommonPorts = length commonPorts
             errmsg = "PRG node " ++ (pgName prgN) ++
@@ -768,12 +802,6 @@ mapRxQueueNode lpgN@(lpgNid,lpgNlbl) prgN@(prgNid,prgNlbl)
                   LT -> EmbNodePartial prgNid commonPorts
                   GT -> error "mapRxQueueNode: this should not happen"
     | otherwise = error "mapRxQueueNode: one of the nodes is not an F-node"
-
--- Provide an embedded mapping for an Tx queue node
--- no structural check is necessary
-mapTxQueueNode :: PG.PGNode -> PG.PGNode -> EmbNode
-mapTxQueueNode (_, PG.FNode {}) (prgNid, PG.FNode {}) = EmbNode prgNid
-mapTxQueueNode _ _  = error "mapTxQueueNode: one of the nodes is not an F-node"
 
 -- the given LPG context is a queue node. Do the embedding.
 --
@@ -792,9 +820,12 @@ embedQueueNode lpg_ctx@(_,lpgNid,lpgNlbl,_) = do
     prgNodes <- case dir of
         EmbRx -> ST.gets embPrgRx
         EmbTx -> ST.gets embPrgTx
+
     embNodes <- case dir of
-        EmbRx -> return $ map (mapRxQueueNode lpgN) prgNodes
-        EmbTx -> return $ map (mapTxQueueNode lpgN) prgNodes
+       EmbTx -> return $ map (mapTxQueueNode lpgN) prgNodes
+       EmbRx -> do
+            ts <- ST.gets $ \s -> zip prgNodes (embPrgRxUnusedPorts s)
+            return $ map (mapRxQueueNode lpgN) ts
 
     -- create new map
     let newNmap = M.insertWith w lpgNid embNodes nmap
