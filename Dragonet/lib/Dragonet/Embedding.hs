@@ -200,24 +200,10 @@ data EmbedSt = EmbedSt {
 }
 
 -- PRG Rx nodes (i.e., points where the LPG will connect to the PRG's RX side)
--- detection along with their tags
--- start from Rx queue nodes and find the sink nodes
--- DEPRECATED by prgRxNodes'
-prgRxNodes :: PG.PGraph -> [(PG.PGNode, QTag)]
-prgRxNodes prg = L.concat $ map getQSinks rxQs
-    where rxQs  = GH.filterNodesByL isRxQueueNode prg
-          getN n = (n, fromJust $ DGI.lab prg n)
-          getQSinks :: PG.PGNode -> [(PG.PGNode, QTag)]
-          getQSinks qn =  [ (getN nid, qGetTag $ (snd  qn))
-                            | nid <- DFS.dfs [fst qn] prg
-                            , PGU.isSink_ prg nid ]
-
-
--- PRG Rx nodes (i.e., points where the LPG will connect to the PRG's RX side)
 -- detection along with their tags. For each queue, we select the nodes which
 -- have unconnected ports.
-prgRxNodes' :: PG.PGraph -> [((PG.PGNode, [PG.NPort]), QTag)]
-prgRxNodes' prg = L.concat $ map getQSinks rxQs
+prgRxNodes :: PG.PGraph -> [((PG.PGNode, [PG.NPort]), QTag)]
+prgRxNodes prg = L.concat $ map getQSinks rxQs
     where rxQs = GH.filterNodesByL isRxQueueNode prg
           getN n = (n, fromJust $ DGI.lab prg n)
           getQSinks :: PG.PGNode -> [((PG.PGNode, [PG.NPort]), QTag)]
@@ -302,13 +288,15 @@ initEmbedSt prg lpg = EmbedSt {
     , lpgGrayNodes  = undefined
     , curDir        = undefined
 }
-    where (rxNodesPorts, rxTags) = unzip $ prgRxNodes' prg
+    where (rxNodesPorts, rxTags) = unzip $ prgRxNodes prg
           (rxNodes, rxPorts)     = unzip rxNodesPorts
-          (txNodes, txTags) = unzip $ prgTxNodes prg
-          rxPreds = map (PR.nodePred prg) rxNodes
-          txOutNodes = prgTxOutNodes prg
-          taggedPrg  = qTagNodes prg ((prgRxNodes prg) ++ (prgTxNodes prg))
-          lpg'       = setOrigin "LPG" lpg
+          xPrgRxNodes            = zip rxNodes rxTags
+          xPrgTxNodes            = prgTxNodes prg
+          (txNodes, txTags)      = unzip xPrgTxNodes
+          rxPreds                = map (PR.nodePred prg) rxNodes
+          txOutNodes             = prgTxOutNodes prg
+          taggedPrg              = qTagNodes prg (xPrgRxNodes ++ xPrgTxNodes)
+          lpg'                   = setOrigin "LPG" lpg
 
 -- number of duplicates for each LPG node
 dupsNr :: EmbedSt -> Int
