@@ -22,6 +22,10 @@ static void app_graph_send(struct dynr_action *act, void *data)
     app_control_send_graph_cmd(*fd, act);
 }
 
+/**
+ * Registers the event handlers, and loops infinitely handling the events
+ * using the registered event handlers.
+ */
 void app_control_init(
     const char *stackname,
     void (*new_application)(int,struct dynr_client *),

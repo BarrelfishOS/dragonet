@@ -60,29 +60,62 @@ dsAddDPL x@(_,pli) ds@DynState { dsPipelines = pls } =
 diff :: Eq a => [a] -> [a] -> ([a],[a])
 diff old new = (old `UM.minusL` new, new `UM.minusL` old)
 
+{-|
+ - The function 'run' calls "runPipelines'" which will run each pipeline
+ -      individually by using the 'pipeline init' function provided here.
+ -
+ - Defines a function 'pipeline init', which
+ -      * starts new pipeline if it does not exist,
+ -      * updates the connection queues if the pipeline already exists
+ -}
 run ::
+    -- | Initial context (currently its always 'initialContext')
     DynContext ->
+    -- | Function to create connector node to connect two pipelines
     (PL.Pipeline -> PL.Pipeline -> (PLI.POutput,PLI.PInput)) ->
+    -- | Function to create pipeline threads
     (PL.PLabel -> IO DynPipeline) ->
+    -- | Pipelined graph
     PL.PLGraph ->
     IO ()
 run ctx pconn pcreate plg = do
         PLI.runPipelines' pconn pinit plg
         return ()
     where
+    {-| Function 'pinit': pipeline initialization code for given pipeline
+     -   * Reads the current state of pipelines from STM
+     -   * If given pipeline exists in it then
+     -      + stop it
+     -      + get the config and in, out queues for it
+     -   * Else: (given pipeline does not exists in it)
+     -      + Create new pipeline with empty in, out queues
+     -   * Add/remove queue in the In and Out list based on
+     -      + has new queue added (new connection)
+     -      + has existing queue removed (close, re-route connection)
+     -   * Update the graph associated with the pipeline
+     -   * Restart the execution of the pipeline
+     -}
     pinit pli = do
         let pl = PLI.pliPipeline pli
             lbl = PL.plLabel pl
         ds <- STM.readTVarIO ctx
-        -- Get/create dpl
+        -- Get/create dpl based on existing pipeline
         (dpl,ins,outs) <- case dsPipeline ds lbl of
+                -- pipeline already exists, we will just stop it
+                -- and return the pointer to it
                 Just x@(dpl,pli') -> do
                     dplStop dpl
                     return (dpl, PLI.pliInQs pli', PLI.pliOutQs pli')
+                -- pipeline does not exist, we will create one here
                 Nothing -> do
-                    dpl <- pcreate lbl
+                    dpl <- pcreate lbl  -- Code which is creating a pipeline
                     return (dpl, [], [])
-        -- Update queues between pipelines
+
+        -- Update queues between pipelines.
+        {- Get the diff between existing queues and new queues between pipelines
+        -- Remove the queues which are not anymore
+        -- Add the queues which are newly introduced.
+        -}
         let (inDel,inAdd) = diff ins $ PLI.pliInQs pli
             (outDel,outAdd) = diff outs $ PLI.pliOutQs pli
         forM_ inDel $ \(l,_) -> dplInQRemove dpl l

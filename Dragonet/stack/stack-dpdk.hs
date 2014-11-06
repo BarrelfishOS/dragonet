@@ -168,12 +168,25 @@ addToCVL (PG.CVList l) v = PG.CVList $ v:l
 
 
 --------------------------------------------------
-
+{-|
+ - Actions supported by the DPDK driver of Intel 82599 NIC
+ -}
 data CfgAction =
-    CfgASet5Tuple Word8 CTRL.FTuple |
-    CfgAClear5Tuple Word8
+    CfgASet5Tuple Word8 CTRL.FTuple  |
+    CfgAClear5Tuple Word8            |
+    CfgASetFDir Word8 CTRL.FDirTuple |
+    CfgAClearFDir Word8
     deriving (Eq,Show)
 
+{-|
+ - a Driver control thread (or driver-thread).
+ -    * Reads a Software Transaction based channel for commands (CfgAction)
+ -          for driver and executes them.
+ -    * The typical commands are in type CfgAction
+ -      - set5Tuple, clear5Tuple, setFDir, clearFDir
+ -
+ - It keeps doing that in an infinite loop
+ -}
 controlThread :: STM.TChan CfgAction -> PLI.StateHandle -> IO ()
 controlThread chan sh = do
     -- Wait for card to be initialized
@@ -185,31 +198,46 @@ controlThread chan sh = do
             CfgASet5Tuple idx ft -> CTRL.ftSet sh idx ft
             CfgAClear5Tuple idx -> CTRL.ftUnset sh idx
 
+            CfgASetFDir idx ft -> CTRL.fdirSet sh idx ft
+            CfgAClearFDir idx -> CTRL.fdirUnset sh idx
+
 data CfgState = CfgState {
         csThread :: Maybe ThreadId,
         -- Maps 5-tuples to ids
         cs5Tuples :: M.Map CTRL.FTuple Word8,
         -- Unused 5-tuple indexes
         cs5TUnused :: [Word8]
+        -- FIXME: add state for FDir filters as well
     }
 
--- Implement specified configuration
-implCfg :: STM.TVar CfgState -> STM.TChan CfgAction -> PLI.StateHandle
-            -> C.Configuration -> IO ()
+{-|
+ - Function to implement specified configuration.
+ -   * Make sure that there is a thread running to handle driver changes (driver-thread)
+ -   * Translate the configuration changes into filter specific actions
+ -   * Find the differences in the existing filter configuration and the
+ -      one requested.  This should tell which filters to remove and which to add
+ -   * Send a message to driver-thread about removing and adding filters using STM
+ -   * Update the current state to reflect the new allocation of filters
+ -}
+implCfg :: STM.TVar CfgState -> STM.TChan CfgAction ->
+        PLI.StateHandle -> C.Configuration -> IO ()
 implCfg tcstate chan sh config = do
     putStrLn $ "e10k-implCfg: " ++ show config
     cstate <- STM.atomically $ STM.readTVar tcstate
     -- Ensure control thread is running
+    -- If not, create a haskell-level thread (instead of OS-level thread)
     cstate' <- case csThread cstate of
         Nothing -> do
             tid <- forkIO $ controlThread chan sh
             return $ cstate { csThread = Just tid }
         Just _ -> return cstate
     let Just (PG.CVList tuples) = lookup "RxC5TupleFilter" config
+
     -- Make sure there are not too many entries
     if length tuples > 128
         then error "More than 128 5-tuples configured"
         else return ()
+
     let ftm = cs5Tuples cstate'
         -- Parse 5tuples into internal representation
         fts = S.fromList $ map parseTuple tuples
@@ -218,32 +246,49 @@ implCfg tcstate chan sh config = do
         toRemove = S.toList (existing S.\\ fts)
         -- New tuples to add
         toAdd = S.toList (fts S.\\ existing)
+
+        -- We need IDs for new filters.
+        --  Lets reuse the IDs of the filters that we are deleting
         toRemIds = map (ftm M.!) toRemove
+        -- And if we need more, we will use unused IDs
         usableIds = toRemIds ++ cs5TUnused cstate'
         -- Add indexes to the new tuples
         toAddId = zip toAdd usableIds
+
         -- Remove old 5ts from map and add new ones
         ftm' = foldl (flip M.delete) ftm toRemove
         ftm'' = foldl (flip $ uncurry M.insert) ftm' toAddId
+
     -- If necessary, clear 5tuples in hardware
     cstate'' <- if length toAdd < length toRemIds
         then do
+            -- We are using the IDs from the filters that we are removing
+            --  So, we must free them first, otherwise we will have conflict
             let toFree = drop (length toAdd) toRemIds
             forM_ toFree $ \i ->
+                -- Sending a message to driver-thread about removing filters
                 STM.atomically $ STM.writeTChan chan $ CfgAClear5Tuple i
             return $ cstate' {
+                        -- Update the state to reflect correct status of unused
+                        --  and used filters
                         cs5TUnused = toFree ++ cs5TUnused cstate',
                         cs5Tuples = ftm'' }
         else do
             let toAlloc = (length toAdd) - (length toRemIds)
             return cstate' {
+                        -- Update the state to reflect correct status of unused
+                        --  and used filters
                         cs5TUnused = drop toAlloc $ cs5TUnused cstate',
                         cs5Tuples = ftm'' }
+    -- Send the message to the driver thread to add the filters
     forM_ toAddId $ \(ft,i) ->
         STM.atomically $ STM.writeTChan chan $ CfgASet5Tuple i ft
     STM.atomically $ STM.writeTVar tcstate cstate''
     return ()
     where
+        {-|
+         - Function to parse the  configuration and return 5tuple filter
+         -}
         parseTuple (PG.CVTuple [PG.CVMaybe msIP,
                                 PG.CVMaybe mdIP,
                                 PG.CVMaybe mProto,
@@ -266,8 +311,6 @@ implCfg tcstate chan sh config = do
         parseProto (PG.CVEnum 1) = CTRL.L4UDP
         -- parseProto PG.CVEnum 2 = CTRL.L4SCTP
         -- parseProto PG.CVEnum 3 = CTRL.L4Other
-
-
 
 
 
@@ -294,7 +337,9 @@ main = do
     let state = CfgState {
                     csThread = Nothing,
                     cs5Tuples = M.empty,
-                    cs5TUnused = [0..127] }
+                    cs5TUnused = [0..127]
+                    --, csFDirUnused = [0..1023] -- FIXME: enable this
+                    }
     -- Channel and MVar with thread id of control thread
     tcstate <- STM.newTVarIO state
     chan <- STM.newTChanIO
@@ -311,7 +356,15 @@ main = do
                         Nothing -> error $ "Uknown cost function:" ++ costfn
         sparams    = Search.initSearchParams {   Search.sOracle = e10kOracle
                                                , Search.sPrgU   = prgU
+                                               -- FIXME: Shouldn't following be `costFn`
                                                , Search.sCostFn = priFn
                                                , Search.sStrategy = strategy }
         searchFn   = Search.runSearch sparams
-    instantiateFlows searchFn prgH llvm_helpers (implCfg tcstate chan) plAssignMerged
+
+    instantiateFlows
+        searchFn                -- ^ returns configurations to evaluate
+        prgH                    -- ^ PRG
+        llvm_helpers            -- ^ llvm helpers
+        (implCfg tcstate chan)  -- ^ Function to implement given conf
+        plAssignMerged          -- ^ classifies graph-nodes into pipelines based on node-tag
+

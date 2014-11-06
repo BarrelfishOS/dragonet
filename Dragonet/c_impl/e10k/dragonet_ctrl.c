@@ -32,6 +32,21 @@ bool e10k_ctrl_5tuple_unset(struct state *state, uint8_t index)
     return e10k_5tfilter_setup(&e10k->card, index, &f);
 }
 
+bool e10k_ctrl_fdir_unset(struct state *state, uint8_t index)
+{
+    assert(!"NYI e10k_ctrl_5tuple_unset");
+    return false;
+}
+bool e10k_ctrl_fdir_set(struct state *state,
+        uint16_t index, uint8_t queue,
+        uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port,
+        uint16_t l4_type, uint16_t mask)
+{
+    assert(!"NYI e10k_ctrl_fdir_set");
+    return false;
+}
+
+
 bool e10k_ctrl_5tuple_set(struct state *state,
         uint8_t index, uint8_t priority, uint8_t queue,
         uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port,

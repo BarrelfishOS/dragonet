@@ -310,10 +310,17 @@ muxIDFromLabel ais ch nl qid = do
         Just pnum = firstIdx (nl ==) $ PG.nPorts dxn -- Port number
     return pnum
 
-
+{-|
+ - Creates a dedicated thread to handle the events related to the app.
+ - NOTE: Its currently not used, as it is involved in LLVM runner codepath
+ -}
 initAppInterface :: Show b =>
-        INC.PolicyState a b -> (AppIfState a b -> b -> IO ()) ->
-            String -> PLI.StackHandle -> [PLI.PipelineImpl] -> IO ()
+           INC.PolicyState a b
+        -> (AppIfState a b -> b -> IO ())
+        -> String
+        -> PLI.StackHandle
+        -> [PLI.PipelineImpl]
+        -> IO ()
 initAppInterface pstate hwact stackname sh plis = do
     st <- PLI.stackState sh
     sm <- STM.newTVarIO M.empty
@@ -327,12 +334,15 @@ initAppInterface pstate hwact stackname sh plis = do
             aiAppIDs = appIDs,
             aiPLIs = plis,
             aiAppChans = acs }
+    -- Creates a thread, and dispatches it to run "infinite event loop"
+    --      which is dispatching events using the event handlers provided here.
     tid <- forkOS $ APP.interfaceThread stackname (appEvent ais)
     return ()
     where
         apps = map fst $ mapMaybe getAppPLI plis
         appIDs = BM.fromList $ zip apps [1..]
         mapPLI (l,p) = (appIDs BM.! l,p)
+        -- ^ FIXME: is this needed?  I could not find any use for it?
         getAppPLI pli
             | take 3 lbl == "App" = Just (drop 3 lbl,pli)
             | otherwise = Nothing

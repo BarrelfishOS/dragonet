@@ -81,30 +81,62 @@ type CostQueueFn = QMap -> Cost
 type CostFn a s = (ConfChange a)
                 => [Flow] -> C.Configuration -> a -> ST.ST s Cost
 
+{-|
+  A class 'ConfChange' provides functionality to apply a changeset of generic
+  type 'a' to given configuration and return new configuration.
+ -}
 class ConfChange a where
     applyConfChange :: C.Configuration -> a -> C.Configuration
 
--- Oracle: iterate configuration space
--- (we will probably have to rethink the interface)
+{-|
+  Class 'OracleSt' encomasses most of the functionality for an Oracle.
+  It gives a way to iterate over the configuration space,
+  in addition to a way to initialize and show the configuration.
+  NOTE: (we will probably have to rethink the interface)
+  TODO: Understand what '|' means in class declaration --PS
+-}
 class (ConfChange a) => OracleSt o a | o -> a where
     -- seems too OO, but not sure how to do it better
+    -- | 'emptyConf' returns initial empty configuration
     emptyConf  ::       o -> C.Configuration
+    -- | 'showConf' converts the configuration to string for printing and debugging
     showConf   ::       o -> C.Configuration -> String
     -- iterators
+    -- | 'flowConfChanges' will return suggestion configuration changes for
+    -- |     a new flow
     flowConfChanges :: o -> C.Configuration -> Flow -> [a]
     -- used for incremental update of qmap
+    -- | Returns the queues that may get affected by this change.
+    -- | Note that it always includes the default queue as it will
+    -- | get affected as some traffic will stop appearing there.
     affectedQueues  :: o -> C.Configuration -> a -> [QueueId]
 
 type FlowCache s      = HB.HashTable s (PG.NLabel, Flow) PG.NPort
 
+{-|
+ The class 'SearchParams' includes all the functionality related to Oracle
+    and searching for proper configuration.
+-}
 data SearchParams o a = (OracleSt o a) => SearchParams {
+    -- | The actual Oracle function
       sOracle     :: o
+    -- | PRG graph of the underlying NIC which will be used for reasoning
     , sPrgU       :: PG.PGraph
+    -- | A cost function to evaluate and compare different configurations.
+    -- |  function with minimum cost will be selected.  Example cost functions
+    -- |  are balance, priority, etc.
     , sCostFn     :: CostQueueFn -- cost function
+    -- | Strategy about how and which configuation space should be selected
+    --      for evaluation.  Example strategies: greedy search, all space.
     , sStrategy   :: SearchStrategy o a
-    , sOrderFlows :: [Flow] -> [Flow] -- order (sort) flows as a heuristic
+    -- | Order (sort) flows as a heuristic
+    , sOrderFlows :: [Flow] -> [Flow]
 }
 
+{-|
+  This is the type which will be used by other part of the code to
+  encapsulate everything about searching configuration space.
+ -}
 type SearchStrategy o a = (OracleSt o a) =>
   SearchSt s o a -> [Flow] -> ST.ST s C.Configuration
 
@@ -125,9 +157,21 @@ flowsSingleConfs x conf fs =
     [(fl, applyConfChange conf change) | (fl,change) <- flowsSingleConfChanges x conf fs]
 
 
+{-|
+  The 'E10kConfChange' type holds all the legal changes in the configuration
+  of the 82599 NIC.
+  This type is an instance of generic ConfChange.
+   TODO: It should also include E10KInsertFdir, and RemoveFilter,
+   Update filters, as we are introducing them
+ -}
 data E10kConfChange = E10kInsert5T PG.ConfValue
-
 instance ConfChange E10kConfChange where
+    {-|
+      The function 'applyConfChange' will add the given 5tuple filter into
+      the list if existing 5tuple fitlers, while keeping everything else
+      in the configuration same.
+      TODO: Add code to add other type of actions as well (fdir, delete, update)
+     -}
     --applyConfChange :: C.Configuration -> E10kConfChange -> C.Configuration
     applyConfChange conf (E10kInsert5T c5t) = ("RxC5TupleFilter", new5t):rest
         where new5t :: PG.ConfValue
@@ -145,11 +189,24 @@ instance ConfChange E10kConfChange where
 newtype E10kOracleSt = E10kOracleSt {nQueues :: Int }
 e10kDefaultQ = 0
 
+{-|
+  Making the type 'E10kOracleSt' member of class "Oracle state" to work as
+  as Oracle for Intel 82599 NIC.
+  It will provide a way to generate initial empty configuation, showing
+  configuration, and querying about affected queues from current configuration.
+ -}
 instance OracleSt E10kOracleSt E10kConfChange where
+    {-|
+     - Basic implementation which suggests a putting current flow in all
+     - the queues, generating nQueue number of configurations.
+     - This implementation does not care for current state of queues,
+     -  and counts on cost-function to help in selecting proper queue.
+    -}
     flowConfChanges E10kOracleSt { nQueues = nq } c fl =
         [E10kInsert5T $ mk5TupleFromFl fl q |  q <- allQueues nq]
-    emptyConf _ = e10kCfgEmpty
-    showConf _  = e10kCfgStr
+
+    emptyConf _ = e10kCfgEmpty -- ^ Creates initial empty configuration
+    showConf _  = e10kCfgStr -- ^ Converts conf to string
 
     affectedQueues E10kOracleSt { nQueues = nq } conf (E10kInsert5T c5t) =
         [e10kDefaultQ, xq]
@@ -184,7 +241,15 @@ initSearchSt params = do
         , sFlowCache  = h
     }
 
-runSearch :: (OracleSt o a) => SearchParams o a -> [Flow] -> C.Configuration
+
+{-|
+ - Runs the given Oracle, on given set of flows, and return the selected
+ -  configuration
+ -}
+runSearch :: (OracleSt o a) =>
+    SearchParams o a    -- ^ Oracle: in form of a group of all relevant parameters
+    -> [Flow]           -- ^ List of flows for which configuration is to be searched
+    -> C.Configuration  -- ^ Selected configuration
 runSearch params flows = ST.runST $ do
    st <- initSearchSt params
    doSearch st flows
@@ -243,8 +308,15 @@ qMapIncremental st conf confChange flows oldQmap_ = do
     return (prgC, newConf, qmap)
 
 
+{-|
+ - It sorts the flow list using the function 'sOrderFlows' from parameter
+ - Then it applies the search strategy given in 'sStrategy' parameter
+ -      with current search state to find a configuation
+ -}
 doSearch :: (OracleSt o a)
-         => (SearchSt s o a) -> [Flow] -> ST.ST s C.Configuration
+         => (SearchSt s o a)        -- ^ Current search state
+         -> [Flow]                  -- ^ List of flows to evalaute
+         -> ST.ST s C.Configuration -- ^ selected configuration
 doSearch st flows = do
     let params = sParams st
         costFn = sCostFn params
@@ -266,26 +338,55 @@ searchGreedyFlows :: SearchStrategy o a
 searchGreedyFlows st flows = searchGreedyFlows_ st x0 flows
     where x0 = (emptyConf $ sOracle $ sParams st, [], [])
 
+{-|
+ - Recursive search in configuration space where
+ -      * We consider one flow at time, and find best configuration
+ -          for that flow from current state.
+ -      * Update current state by adding best configuration selected above
+ -      * Recursively consider rest of the flow, but with updated current state
+ -  Complexity of the algorithm
+ -      * q == number of queues
+ -      * n == number of flows
+ -      * For every flow, we will evaluate 'O(q)' configurations
+ -      * So, the overall complexity of [[searchGreedyFlows]] is
+ -          'O(nq) * O(cost-functions)'
+ -}
 searchGreedyFlows_ :: (OracleSt o a)
+                   -- | Current state of search algorithm
                    => SearchSt s o a
+                   -- | Configuration buit till now for already configured flows
                    -> (C.Configuration, [Flow], QMap)
+                   -- | Flows for which configuration should be checked
                    -> [Flow]
+                   -- | Final configuration
                    -> ST.ST s C.Configuration
 
+{-|
+ - Terminating condidtion for recursion: when there are no more flows left,
+ -  use the configuration built till now as solution configuration.
+ -}
 searchGreedyFlows_ st (cnf,_,_) [] = return $ trN cnf msg
     where msg = ("searchGreedyFlows_:" ++ (showConf (sOracle $ sParams st) cnf))
 
+{-|
+ - Process single flow on top of the flow list
+ - And apply recursion for rest of the list, with updated configuration
+ -}
 searchGreedyFlows_ st (curCnf, curFlows, curQmap) (f:fs) = do
     let oracle      = sOracle $ sParams st
         costFn      = sCostFn $ sParams st
         prgU        = sPrgU $ sParams st
+
+        -- Configuration changes suggested by Oracle for adding single flow f
         confChanges = flowConfChanges oracle curCnf f
         newCurFs    = f:curFlows
 
+    -- Finding out the costs for all the configurations suggested by Oracle
     conf_costs <- forM confChanges $ \cc -> do
         (prgC, newCnf, qmap) <- zQmapIncremental st curCnf cc newCurFs  curQmap
         return (newCnf, costFn qmap, qmap)
 
+    -- selecting the configuration with minimum cost cost
     let snd3 (_,x,_) = x
         (best_cnf, lower_cost, qmap') =  L.minimumBy (compare `on` snd3) conf_costs
         msg = "searchGreedyFlows_: step:"
@@ -293,6 +394,7 @@ searchGreedyFlows_ st (curCnf, curFlows, curQmap) (f:fs) = do
             ++ " cost is " ++ (show lower_cost)
             ++ "\nSELECTED " ++ (showConf oracle best_cnf)
 
+    -- Apply same stragegy for rest of the flows, but with modified running conf
     recurse <- searchGreedyFlows_ st (best_cnf, newCurFs, qmap') fs
     return $ trN recurse msg
 
