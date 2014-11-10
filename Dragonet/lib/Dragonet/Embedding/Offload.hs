@@ -5,6 +5,7 @@ module Dragonet.Embedding.Offload (
 
 import qualified Util.GraphHelpers as GH
 import qualified Dragonet.ProtocolGraph as PG
+import qualified Dragonet.ProtocolGraph.Utils as PGU
 import Dragonet.ProtocolGraph.Utils (getFNodeByNameTag', getPGNodeByName, isSpawnTarget, edgeDeps)
 import Dragonet.Predicate (PredExpr(..), predGetAtoms, predEval, predEquiv, predEquivHard)
 import Dragonet.Predicate (computePred, initPredCompSt_, PredCompSt(..))
@@ -38,14 +39,6 @@ embedOffload embgraph tag =  embGraph $ execEmbeddingTx st0
                             , qtag      = qTag tag}
 
 -- Helpers. Some of them we might want to move to different file
-
--- Get the (single) predecssor.
--- If there are more than one predecessors throw an error. Note that F-nodes
--- have, by definition, a single predecessor.
-getSinglePre :: PG.PGraph -> PG.PGNode -> PG.PGNode
-getSinglePre g n = if len == 1 then (ps !! 0) else error $ "expecting single predecessor for node " ++ (PG.nLabel $ snd n) ++ " (has: " ++ (show len) ++ ")"
-    where len = length ps
-          ps = GH.labPre g n
 
 -- find a node reachable from src
 findReachable :: PG.PGraph -> PG.PGNode -> (PG.PGNode -> Bool) -> Maybe PG.PGNode
@@ -137,7 +130,7 @@ txCandidatesInit = do
 getTxCandidates :: PG.PGraph -> PG.PGNode -> [PG.PGNode]
 getTxCandidates graph sink = filter isFNode $ GH.rdfsStop isFNode [node0] graph
     where node0_ = tr node0 $ "node0=" ++ (ppShow node0)
-          node0 = getSinglePre graph sink
+          node0 = PGU.getSinglePre graph sink
           isFNode :: PG.PGNode -> Bool
           isFNode n@(_, PG.FNode {}) = True
           isFNode n                  = False

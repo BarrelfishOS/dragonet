@@ -14,7 +14,11 @@ module Dragonet.ProtocolGraph.Utils (
     cleanupGraph, cleanupGraphWith,
     pgDfsNEs, pgRDfsNEs,
     sucNE, preNE, lpreNE, lsucNE,
-    unconnectedPorts
+    lsucPortNE, sucPortNE,
+    unconnectedPorts,
+    isOnode_, isOnode, isFnode_, isFnode,
+    getSinglePre, getSinglePrePort,
+    dominates,
 ) where
 
 import Dragonet.ProtocolGraph
@@ -136,11 +140,7 @@ isSource_ gr nid = null $ filter (isNormalEdge_ . snd) (DGI.lpre gr nid)
 
 -- pre (but only considering normal edges)
 preNE :: PGraph -> DGI.Node -> [DGI.Node]
-preNE gr n = map mapFn $ filter filtFn $ DGI.inn gr n
-    where filtFn (src,dst,edge) = isNormalEdge_ edge
-          mapFn  (src,dst,edge) = case dst == n of
-                   True -> src
-                   False -> error "I'm doing something wrong!"
+preNE gr n = map fst $ lpreNE gr n
 
 lpreNE :: PGraph -> DGI.Node -> [(DGI.Node, Edge)]
 lpreNE gr n = map mapFn $ filter filtFn $ DGI.inn gr n
@@ -150,11 +150,7 @@ lpreNE gr n = map mapFn $ filter filtFn $ DGI.inn gr n
                    False -> error "I'm doing something wrong!"
 
 sucNE :: PGraph -> DGI.Node -> [DGI.Node]
-sucNE gr n = map mapFn $ filter filtFn $ DGI.out gr n
-    where filtFn (src,dst,edge) = isNormalEdge_ edge
-          mapFn  (src,dst,edge) = case src == n of
-                    True -> dst
-                    False -> error "I'm doing something wrong!"
+sucNE gr n = map fst $ lsucNE gr n
 
 lsucNE :: PGraph -> DGI.Node -> [(DGI.Node, Edge)]
 lsucNE gr n = map mapFn $ filter filtFn $ DGI.out gr n
@@ -162,6 +158,13 @@ lsucNE gr n = map mapFn $ filter filtFn $ DGI.out gr n
           mapFn  (src,dst,edge) = case src == n of
                     True -> (dst,edge)
                     False -> error "I'm doing something wrong!"
+
+lsucPortNE :: PGraph -> DGI.Node -> NPort -> [(DGI.Node, Edge)]
+lsucPortNE g nid port = filter filtFn $ lsucNE g nid
+    where filtFn (_,e) = (edgePort_ e) == port
+
+sucPortNE :: PGraph -> DGI.Node -> NPort -> [DGI.Node]
+sucPortNE gr n p = map fst $ lsucPortNE gr n p
 
 -- normal (i.e., not spawn) sucessor nodes
 edgeSucc :: PGraph -> PGNode -> [(PGNode, PGEdge)]
@@ -211,3 +214,61 @@ pgRDfsNEs graph start = DFS.xdfsWith getNext getResult start' graph
               where ins' = filter (isNormalEdge_ . fst) ins
           getResult :: PGContext -> PGNode
           getResult ctx@(_, nid, nlbl, _) = (nid,nlbl)
+
+isOnode_ :: Node -> Bool
+isOnode_ (ONode {}) = True
+isOnode_ _          = False
+isOnode             = isOnode_ . snd
+
+isFnode_ :: Node -> Bool
+isFnode_ (FNode {}) = True
+isFnode_ _          = False
+isFnode             = isFnode_ . snd
+
+-- Get the (single) predecssor.
+-- If there are more than one predecessors throw an error. Note that F-nodes
+-- have, by definition, a single predecessor.
+getSinglePre :: PGraph -> PGNode -> PGNode
+getSinglePre g n = if len == 1 then (head ps) else error msg
+    where len = length ps
+          ps = GH.labPre g n
+          msg = "expecting single predecessor for node "
+                ++ (nLabel $ snd n) ++ " (has: " ++ (show len) ++ ")"
+
+
+-- Get the (single) predecssor and the port that it connects.
+getSinglePrePort :: PGraph -> PGNode -> (PGNode, NPort)
+getSinglePrePort gr (nid,nlbl) = (pre,prePort)
+    where lpres = DGI.lpre gr nid
+          (preNid, preEdge) = case DGI.lpre gr nid of
+                                [(nid,edge)] -> (nid,edge)
+                                otherwise -> error msg
+          preNlbl = fromJust $ DGI.lab gr preNid
+          pre = (preNid, preNlbl)
+          prePort = edgePort_  preEdge
+          msg = "expecting single predecessor for node " ++ (nLabel nlbl)
+
+-- domination (does not consider spawn edges)
+dominates :: PGraph -> (PGNode, NPort) -> PGNode -> Bool
+-- F-node
+dominates g (src@(srcId,_), p) dst@(_, FNode {})
+    | ndeps == 0 = False -- nowhere to go, cannot find a connection to @dst
+    | ndeps > 1  = error $ "F-nodes have at most one incoming edge" ++ (nLabel $ snd dst)
+    -- ndeps == 1
+    | depNodeId == srcId = (dep_port == p) -- same node
+    | otherwise = dominates g (src, p) depNode
+    where deps = edgeDeps g dst
+          ndeps = length deps
+          (depNode@(depNodeId,_),dep_edge) = deps !! 0
+          dep_port            = edgePort dep_edge
+-- O-Node
+dominates g (src@(srcId,_), p) dst@(_, ONode { nOperator = op}) = comb_op $ map check_fn deps
+    where deps = edgeDeps g dst
+          check_fn :: (PGNode, PGEdge) -> Bool
+          check_fn (xnode@(xnodeId,_), xedge)
+             | srcId == xnodeId && (edgePort xedge) == p = True
+             | otherwise = dominates g (src, p) xnode
+          comb_op = case op of
+                     NOpAnd -> or   -- we only need one to dominate
+                     NOpOr  -> and  -- we need all to dominate
+                     otherwise -> error "NYI: not sure about the semantics. We might need to map with not"

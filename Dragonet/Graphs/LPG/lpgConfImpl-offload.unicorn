@@ -125,7 +125,7 @@ graph lpg {
         cluster L3IPv4 {
             boolean ValidHeaderLength {
                 port true[ValidReassembly ValidVersion ValidLength
-                          ValidTTL ValidChecksum Classify ValidLocalIP]
+                          ValidTTL ValidChecksum ValidLocalIP]
                 port false[] }
 
             boolean ValidReassembly {
@@ -141,10 +141,19 @@ graph lpg {
                 port true false[Valid] }
 
             boolean ValidChecksum {
-                port true false[Valid] }
+                port true false[Valid]
+            }
 
             boolean ValidLocalIP {
                 port true false[Valid] }
+
+            and Valid {
+                port true[.L3IPAndBelowValid Classify]
+                port false[Drop]
+            }
+
+            node Drop {
+            }
 
             node Classify {
                 port udp[.L4UDPValidHeaderLength]
@@ -152,9 +161,6 @@ graph lpg {
                 port drop[]
                 semantics udp { (= L4P.UDP (L4.Proto pkt)) }
                 semantics icmp { (= L4P.ICMP (L4.Proto pkt)) } }
-
-            and Valid {
-                port true false[.L3IPValid] }
 
         }
 
@@ -165,10 +171,6 @@ graph lpg {
         /*boolean L3IPv6ValidHeaderLength {
             port true false[L3IPValid] }*/
 
-
-
-        or L3IPValid {
-            port true false[L3IPAndBelowValid] }
 
         and L3IPAndBelowValid {
             port true false[L3ICMPValid L4UDPValid] }

@@ -670,7 +670,7 @@ prPred gr s = do
 
 main = do
 
-    -- runTestTT tests
+    --runTestTT tests
 
     lpg <- lpgC
     e10k_prg <- e10kC_simple

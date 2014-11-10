@@ -95,14 +95,13 @@ graph e10kPRG {
 
         node E10kIPv4Csum {
             attr "software"
-            port out[]
-            /*
             port valid[E10kIPv4CsumValid]
             port invalid[E10kIPv4CsumInvalid]
-            */
+
+            predicate valid "pred(RxL3IPv4ValidChecksum, true)"
+            predicate invalid "pred(RxL3IPv4ValidChecksum, false)"
         }
 
-        /*
         node E10kIPv4CsumValid {
             attr "software"
             port out[]
@@ -112,8 +111,6 @@ graph e10kPRG {
             attr "software"
             port out[]
         }
-        */
-
     }
 
     cluster Tx {
