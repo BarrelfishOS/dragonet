@@ -66,7 +66,10 @@ graph lpg {
                 semantics arp { (= L3P.ARP (L3.Proto pkt)) }
 
                 predicate ipv4 "pred(EthType, IPv4)"
+                predicate ipv6 "pred(EthType, IPv6)"
                 predicate arp  "pred(EthType, ARP)"
+                // add this to make the Classify node redundant when the protocol is known
+                predicate drop "not(or(pred(EthType,IPv4),pred(EthType,IPv6),pred(EthType,ARP)))"
             }
         }
 
@@ -160,8 +163,13 @@ graph lpg {
                 port icmp[.L3ICMPValidHeaderLength]
                 port drop[]
                 semantics udp { (= L4P.UDP (L4.Proto pkt)) }
-                semantics icmp { (= L4P.ICMP (L4.Proto pkt)) } }
+                semantics icmp { (= L4P.ICMP (L4.Proto pkt)) }
 
+                predicate udp "pred(IpProt,UDP)"
+                predicate icmp "pred(IpProt,ICMP)"
+                // add this to make the Classify node redundant when the protocol is known
+                 predicate drop "not(or(pred(IpProt,UDP),pred(IpProt,ICMP)))"
+            }
         }
 
 
@@ -218,7 +226,10 @@ graph lpg {
 
             and Valid {
                 port true[CUDPSockets]
-                port false[] }
+                port false[Drop] }
+
+            node Drop {
+            }
 
             config CUDPSockets {
                 type { (id:    UInt64,

@@ -104,6 +104,44 @@ graph e10kPRG {
 
         node E10kIPv4CsumValid {
             attr "software"
+            port out[IsUDP]
+        }
+
+        node IsUDP {
+            attr "software"
+            port true[UDPOut]
+            port false[NoUDPOut]
+
+            predicate true "pred(IpProt,UDP)"
+            predicate false "not(pred(IpProt,UDP))"
+        }
+
+        node UDPOut {
+            attr "software"
+            port out[E10kUDPCsum]
+        }
+
+        node E10kUDPCsum {
+            attr "software"
+            port valid[E10kUDPCsumValid]
+            port invalid[E10kUDPCsumInvalid]
+
+            predicate valid "pred(RxL4UDPValidChecksum, true)"
+            predicate invalid "pred(RxL4UDPValidChecksum, false)"
+        }
+
+        node E10kUDPCsumValid {
+            attr "software"
+            port out[]
+        }
+
+        node E10kUDPCsumInvalid {
+            attr "software"
+            port out[]
+        }
+
+        node NoUDPOut {
+            attr "software"
             port out[]
         }
 
@@ -119,6 +157,54 @@ graph e10kPRG {
             attr "sink"
             attr "source"
             attr "software"
-            port out[] }
+            port out[PrgIsIPv4] }
+
+        node PrgIsIPv4 {
+            attr "software"
+            port true[SetIPv4CTX]
+            port false[NoIPv4]
+
+            predicate true "pred(EthType,IPv4)"
+            predicate false "not(pred(EthType,IPv4))"
+        }
+
+        node SetIPv4CTX {
+            attr "software"
+            port true[PrgDone]
+        }
+
+        node NoIPv4 {
+            attr "software"
+            port true[PrgDone]
+        }
+
+        or PrgDone {
+            port true[HwEntry]
+            port false[]
+        }
+
+        node HwEntry {
+            port out[IsIPv4CtxSet]
+        }
+
+        node IsIPv4CtxSet {
+            port ctx_true[L3IPv4FillChecksum]
+            port noctx_true[Out_]
+
+            predicate ctx_true "pred(TxSetIPv4CTX,true)"
+            predicate noctx_true "not(pred(TxSetIPv4CTX,true))"
+        }
+
+        node L3IPv4FillChecksum {
+            port true[Out_]
+        }
+
+        or Out_ {
+            port true[Out]
+            port false[]
+        }
+
+        node Out {
+        }
     }
 }

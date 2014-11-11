@@ -548,7 +548,7 @@ embOffloadTxNode_ lpgN idx = do
         msg_res     = case equiv of
             Nothing -> " canOffload: YES"
             --Just x  -> "canOffload: NO (offending assignment:\n" ++ (ppShow $ L.sortBy (compare `on` (\(p,_,_)-> p)) x)
-            Just x  -> "canOffload: NO (" ++ x ++ ")"
+            Just x  -> "canOffload: NO. dnfEquiv said:\n`" ++ x ++ "\n'"
 
         newEmb      = DGI.delNode embNid emb
 
@@ -572,7 +572,7 @@ embOffloadTx = do
         prgNs = DGI.labNodes prg
         -- NB: intersectBy keeps the element from the first list
         candidates_ = L.intersectBy ((==) `on` pgName) lpgTxNs prgNs
-        candidates  = trN candidates_ ("===> Tx Offload candidates:" ++ (show $ map pgName candidates_))
+        candidates  = tr candidates_ ("===> Tx Offload candidates:" ++ (show $ map pgName candidates_))
     ST.forM_ candidates embOffloadTxNode
     return ()
 
@@ -741,13 +741,14 @@ embNodePortActive (EmbNodeRemoved) _         = False
 embNodePortActive (EmbNode _)      _         = True
 embNodePortActive (EmbNodeRedundant p _) port  = port == p
 embNodePortActive (EmbNodePartial _ ps) port = port `elem` ps
+embNodePortActive (EmbNodeBoolConst _ p) port = port == p
 
 embNodeEdgeActive :: EmbNode -> PG.Edge -> Bool
 embNodeEdgeActive node (PG.Edge {PG.ePort = port}) = embNodePortActive node port
 
 -- check whether an F-node port is connected to an O-node
 nodePortConnectedToONode :: PG.PGraph -> DGI.Node -> PG.NPort -> Bool
-nodePortConnectedToONode g nid port = not $ null $ PGU.sucPortNE g nid port
+nodePortConnectedToONode g nid port = not $ null $ filter filtFn $ PGU.sucPortNE g nid port
     where filtFn xid = case fromJust $ DGI.lab g xid of
                          PG.ONode {} -> True
                          otherwise -> False
@@ -798,6 +799,9 @@ embGetNP st (nid, nport) idx = case embGetNodeMap st nid idx of
         False -> Nothing
     EmbNodeRedundant p (embId,embPort) -> case nport == p of
         True  -> Just (embId, embPort)
+        False -> Nothing
+    EmbNodeBoolConst embId p -> case nport == p of
+        True -> Just (embId, nport)
         False -> Nothing
 
 -- name of idx-th  PRG boundary
