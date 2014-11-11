@@ -68,14 +68,10 @@ configLPGUDPSockets _ _ inE outE cfg = concat <$> mapM addEndpoint tuples
             -- Filter/demultiplexing node
             (dxN,_) <- C.confMNewNode $ addFAttrs $ addFSemantics $
                         PG.baseFNode filterS bports
-            -- Endpoint packet valid node
-            (veN,_) <- C.confMNewNode $
-                        PG.baseONode (filterS ++ "Valid")
-                        bports PG.NOpAnd
             -- Add socket nodes
             sEdges <- case sockets of
                 [] -> error "Endpoint without sockets"
-                [sock] -> addSocket (veN,"true") irN sock
+                [sock] -> addSocket (dxN,"true") irN sock
                 _ -> do
                     let sports = map (show . socketId) sockets
                     -- If we have more than one socket, add balance node
@@ -85,15 +81,11 @@ configLPGUDPSockets _ _ inE outE cfg = concat <$> mapM addEndpoint tuples
                     -- Add sockets
                     es <- forM sockets $ \s ->
                         addSocket (bN,show $ socketId s) irN s
-                    return $ concat es ++ [(veN,bN,PG.Edge "true")]
+                    return $ concat es ++ [(dxN,bN,PG.Edge "true")]
             let dfEdges = map (\(a,b,p) -> (a,b,PG.Edge p)) [
-                    (vhN,dxN,"true"),  -- RxL4UDPValidHeaderLength -> Filter
-                    (dxN,veN,"false"), -- Filter -> ValidSocket
-                    (dxN,veN,"true"),  -- Filter -> ValidSocket
+                    (vN,dxN,"true"),  -- RxL4UDPValid -> Filter
                     (dxN,cN,"false"),  -- Filter -> Collect
-                    (dxN,cN,"true"),   -- Filter -> Collect
-                    (vN, veN,"false"), -- RxL4UDPValid -> ValidSocket
-                    (vN, veN,"true")]  -- RxL4UDPValid -> ValidSocket
+                    (dxN,cN,"true")]   -- Filter -> Collect
             return $ dfEdges ++ sEdges
             where
                 bports = ["false","true"]
