@@ -460,7 +460,6 @@ pgConstNodeVal (PG.FNode { PG.nLabel = name })
 graphFoldConst :: PG.PGraph -> PG.PGNode -> PG.PGraph
 graphFoldConst gr constN@(constNid,constNlbl) = tr ret $ "graphFoldConst: " ++ (pgName constN)
     where ret = foldl (graphFoldConstSucc prev constN) gr lsuc
-
           alivePort = if pgConstNodeVal constNlbl then "true" else "false"
 
           -- successor nodes:
@@ -516,6 +515,21 @@ embCleanup = do
     ST.modify $ \s -> s { curEmb = clEmb }
     return ()
 
+doOffloadNode :: PG.PGraph -> PG.PGNode  -> PG.PGraph
+doOffloadNode gr node@(nodeNid,nodeLbl) = ret
+    where ports = PG.nPorts nodeLbl
+          nports = length ports
+          ret = case nports of
+            1         -> offload
+            otherwise -> error $ "Not sure how to offload node with " ++ (show nports) ++ " ports"
+          -- TODO: make optimizations?
+          offload = newG
+          ((prevNid,_), prevPort) = PGU.getSinglePrePort gr node
+          next = DGI.lsuc gr nodeNid
+          newG =    DGI.delNode nodeNid
+                  $ DGI.insEdges [(prevNid,x, PG.Edge prevPort) | (x,e) <- next]
+                  $ DGI.delEdges [(nodeNid,x) | (x,_) <- next] gr
+
 embOffloadTxNode_ :: PG.PGNode -> Int -> Embed ()
 embOffloadTxNode_ lpgN idx = do
     nmap   <- ST.gets embNodeMap
@@ -541,8 +555,8 @@ embOffloadTxNode_ lpgN idx = do
         canOffload  = isNothing equiv
         msg         = "\n   Trying to offload TX Node:" ++ offlName ++
                       -- "\n" ++
-                      --"   predicate before on " ++ outName ++ ": " ++ (PR.dnetPrShow prOut) ++ "\n\n" ++
-                      --"   predicate after  on " ++ outName ++ ": " ++ (PR.dnetPrShow newPrOut) ++ "\n"
+                      -- "   predicate before on " ++ outName ++ ": " ++ (PR.dnetPrShow prOut) ++ "\n\n" ++
+                      -- "   predicate after  on " ++ outName ++ ": " ++ (PR.dnetPrShow newPrOut) ++ "\n" ++
                       msg_res
 
         msg_res     = case equiv of
@@ -550,7 +564,7 @@ embOffloadTxNode_ lpgN idx = do
             --Just x  -> "canOffload: NO (offending assignment:\n" ++ (ppShow $ L.sortBy (compare `on` (\(p,_,_)-> p)) x)
             Just x  -> "canOffload: NO. dnfEquiv said:\n`" ++ x ++ "\n'"
 
-        newEmb      = DGI.delNode embNid emb
+        newEmb = doOffloadNode emb (embNid, fromJust $ DGI.lab emb embNid)
 
     case tr canOffload msg of
         True -> ST.modify $ \s -> s { curEmb = newEmb}

@@ -265,9 +265,9 @@ graph lpg {
                 port drop[] }
 
             node AllocateHeader {
-                port true[FillHeader FillChecksum .L3IPv4Prepare] }
+                port true[FillHeader .L3IPv4Prepare] }
 
-            node FillHeader   { port true[Done] }
+            node FillHeader   { port true[FillChecksum] }
             node FillChecksum { port true[Done] }
 
             and Done { port true false[.UDPv4Done] }
@@ -293,10 +293,10 @@ graph lpg {
                 port false[] }
 
             node AllocateHeader {
-                port out[FillHeader FillChecksum Routing] }
+                port out[FillHeader Routing] }
 
             node FillHeader {
-                port true[Done] }
+                port true[FillChecksum] }
 
 
             node FillChecksum {
