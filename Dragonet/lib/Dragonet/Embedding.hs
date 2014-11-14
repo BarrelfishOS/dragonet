@@ -1,7 +1,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Dragonet.Embedding(
     embeddingRxTx,
-    embeddingRxTx2
+    embeddingRxTx2,
+
+    foldAndCleanup, foldAndCleanupAll,
 ) where
 
 import qualified Dragonet.ProtocolGraph       as PG
@@ -354,52 +356,87 @@ dupsNr :: EmbedSt -> Int
 dupsNr st = case (curDir st) of
               EmbRx -> length $ embPrgRx st
               EmbTx -> length $ embPrgTx st
-
+--
+-- Folding constant operands of ONodes
+-- ===================================
+--
+-- Currently, all O-nodes can be short-circuted. Hence, each operator is
+-- characterized by two parameters:
+--  SC_I -> input value that short-circuts the operator
+--  SC_O -> output value when operator is short-circuted
+-- (see opShortCircuitInOut)
 --
 --                                      --> (O-node)
 -- +-----+-+         +-------+    -----/
 -- |     |X|-------->|CONST|A|---/--      +-----+-+     ---> X
 -- |Prev +-+         +-------+      \---->|     |T|----/---> Y
--- |     |Y|                              | AND +-+
+-- |     |Y|                              |  OP +-+
 -- +-----+-+                          --->|     |F|--------> Z
 --                            -------/    +-----+-+    \---> W
 --       (Other operands)----/
 --
 --
--- Case 1: Const node does not contribute to ONode result
--- (e.g., A=True)
---   We cannot just remove the edge and the node, because the AND also acts as a
---   barrier that ensures that the previous node is indeed executed. Drawing an
---   edge from (Prev, X) to AND is not trivial because if A is True then
---   (Prev, X) must connect to the TRUE part of AND which in our implementation
---   is tricky (We need inPort for edges going into O-nodes). If (Prev, X),
---   howerver, dominates any of the AND's operands, we can remove the
---   (Const,A) -> AND edge
+-- For each operand (node connected to the O-node) O_i, there is a TRUE (t_i)
+-- and a FALSE (f_i) input. Missing edges are interpreted as inputs that cannot
+-- be activated.
 --
--- Case 2: Const ndoe short-circuits the ONode result
--- (e.g., A=False)
---   Since we now the result, we can directly connect Prev.X to all of the
---   ONode's appropriate destinations (e.g., Z and W for A=False above). There
---   are two sub-cases depending on the destination type:
---    i) if it's an F-node, we just introduce a new edge
---   ii) if it's an O-node, we introduce another const
+-- The output is (e.g., for OP=AND)
+--  SC_O (=False)      : one SC_I (=False) input is activated
+-- (NOT SC_O) (=True)  : all (NOT SC_I) (=True) inputs are activated
+--
+-- There are three cases:
+--  - Case 1: Const value does not short-circuit O-node: A = (NOT SC_I)
+--    (e.g., for OP=AND, A=TRUE)
+--
+--    In this case, We can remove the edge from CONST to OP if we can show that
+--    activation of any of the other operands implies that the constant node is
+--    also activated. Otherwise, it might be the case that the const node is
+--    never activated and hence its (constant) value is never passed to the
+--    O-node.
+--
+--    Hence, if (Prev,X) dominates any of the OP's operands, we can remove the
+--    (CONST,A) -> OP edge
+--
+--  - Case 2: Const value short-circuits O-node: A = SC_I
+--    (e.g., for OP=AND, A=FALSE)
+--
+--    Hence, there are two possible outcomes:
+--     . OP node is never activated
+--     . OP node is activated and its output is SC_O
+--
+--    In this case we can:
+--     . remove all (NOT SC_I) edges since they do not contribute to the result
+--     . remove all (NOT SC_O) edges, since they cannot be activated
+--     . Potentially connect all nodes connected to OP's SC_O to
+--       Prev.X (e..g, for OP=AND, A=False, conect Z and W to Prev.X) and
+--       effectively remove OP from the graph.
+--
+--   Why potentially? We need to avoid the case where the OP node is activated
+--   to False by another node, while the CONST node is never activated. Hence,
+--   we only do the last part if all OP's operands are dominated by Prev.X
+--   because then there is no way for another operand to be activated without
+--   the CONST node being activated.
+--
+--   Depending on the destination type of the nodes connected to OP's SC_O we
+--   need to perform a different operation:
+--    i)  if it's an F-node, we introduce (Prev.X -> Z) edge
+--    ii) if it's an O-node, we introduce (Prev.X -> (CONST SC_O) -> Z) edge
+--        (i.e., we add a new CONST node)
+--
+--  - Case 3: Const is the only input of the O-node
+--    In this case we can short-circuit (see case 2) to the appropriate edge
 --
 graphFoldConstSucc :: (PG.PGNode, PG.NPort) ->
                       PG.PGNode -> PG.PGraph -> PG.PGNode -> PG.PGraph
-graphFoldConstSucc prevSrc@((prevNid,_), prevPort)
+graphFoldConstSucc prevSrc@((prevNid,prevLbl), prevPort)
                    (constNid,constNlbl) gr (opNid,opNlbl)
-    -- NB: for AND and OR, the result of the operataor when short-circuited
-    -- (i.e., FALSE argment in AND, TRUE argument in TRUE) is the constant
-    -- value, but that's not true for other operators (e.g., think of NOT).
-    | op == PG.NOpAnd && nArgs == 1        = removeOpEdges constVal
-    | op == PG.NOpOr  && nArgs == 1        = removeOpEdges constVal
-    | op == PG.NOpAnd && constVal == False = removeOpEdges False
-    | op == PG.NOpOr  && constVal == True  = removeOpEdges True
-    | op == PG.NOpAnd && constVal == True  = tryRemoveConstEdge
-    | op == PG.NOpOr  && constVal == False = tryRemoveConstEdge
-    | otherwise = error "NYI"
+    | nArgs == 1       = tryShortCircuit (PG.opSingleVal op constVal)
+    | constVal == scIn = tryShortCircuit scOut
+    | otherwise        = tryRemoveConstEdge
     where constVal = pgConstNodeVal constNlbl
           op = PG.nOperator opNlbl
+          -- short-circuted in/out values for the given operator
+          Just (scIn, scOut) = PG.opShortCircuitInOut op
           -- operator argument nodes
           opArgs = DGI.pre gr opNid
           -- operator arguments (operands)
@@ -418,39 +455,50 @@ graphFoldConstSucc prevSrc@((prevNid,_), prevPort)
                      False -> error "NYI: cannot remove const edge"
 
           -- Case 2:
-          -- We know the result of the Onode (it's opResult):
-          --  . remove all ONode's predecessors edges
-          --  . remove all ONode's successor edges from the port != opResult
-          removeOpEdges opResult = tr ret "graphFoldConst: CASE 2"
+          canShortCircuit = all (PGU.dominates gr prevSrc) otherOperands
+          tryShortCircuit opResult = tr ret "graphFoldConst: CASE 2"
             where
+                  ret = case canShortCircuit of
+                    True  -> g3
+                    False -> g0
+
                   alivePort = if opResult then "true" else "false"
                   isAliveEdge (_,e) = (PGU.edgePort_ e) == alivePort
-                  outs = PGU.lsucNE gr opNid
-                  (aliveOuts, deadOuts) = L.partition isAliveEdge outs
-                  succAlive = [(nid,nlbl) | (nid,_) <- aliveOuts
-                                          , let nlbl = fromJust $ DGI.lab gr nid]
-                  (succAliveF,succAliveO) = L.partition PGU.isFnode succAlive
-                  newEdgesF = [(prevNid, nid, PG.Edge prevPort)
-                               | (nid,_) <- succAliveF]
+                  opOuts = PGU.lsucNE gr opNid
+                  (aliveOuts, deadOuts) = L.partition isAliveEdge opOuts
 
-                  newConstNode = (newNid, newLbl)
-                      where newNid = head $ DGI.newNodes 1 gr
-                            newLbl = PG.baseFNode newConst ["true","false"]
-                            newConst = if alivePort == "true"
-                                          then constTrueName
-                                          else constFalseName
-                  newConstEdges = fromPrev:fromConst
-                        where fromPrev  = (prevNid, constNid, PG.Edge prevPort)
-                              fromConst = [(constNid, nid, PG.Edge alivePort)
-                                           | (nid,_) <- succAliveO]
-                  -- delete all edges
-                  g1 = DGI.delEdges [(opNid, xid) | (xid,_) <- outs] gr
+                  -- cannot short-circuit:
+                  --  . delete all dead edges from the ONode:
+                  g0 = DGI.delEdges [ (opNid, xid) | (xid,_) <- deadOuts ] gr
+                  -- can short-circute:
+                  --  . delete all edges from ONode
+                  --  . insert new edges to F-nodes (2i)
+                  --  . insert new const node, and new const node edges (2ii)
+                  g1 = DGI.delEdges [(opNid, xid) | (xid,_) <- aliveOuts] g0
                   g2 = DGI.insEdges newEdgesF g1
                   g3 = case length succAliveO of
                          0 -> g2
                          otherwise -> DGI.insEdges newConstEdges
                                       $ DGI.insNode newConstNode g2
-                  ret = g3
+                  -- ONode alive successors
+                  succAlive = [(nid,nlbl) | (nid,_) <- aliveOuts
+                                          , let nlbl = fromJust $ DGI.lab gr nid]
+                  -- split successor into F-nodes and O-nodes
+                  (succAliveF,succAliveO) = L.partition PGU.isFnode succAlive
+                  -- new edges to F-nodes
+                  newEdgesF = [(prevNid, nid, PG.Edge prevPort) | (nid,_) <- succAliveF]
+                  -- new const node and new const node edges
+                  newConstNode = tr (newConstNid, newConstLbl) $ "Inserting new const node: " ++ (show newConstNid)
+                  newConstNid = head $ DGI.newNodes 1 gr
+                  newConstLbl_ = PG.baseFNode newConstName ["true","false"]
+                  newConstLbl  = newConstLbl_ {PG.nTag = PG.nTag prevLbl}
+                  newConstName = if alivePort == "true"
+                                       then constTrueName
+                                       else constFalseName
+                  newConstEdges = fromPrev:fromConst
+                        where fromPrev  = (prevNid, newConstNid, PG.Edge prevPort)
+                              fromConst = [(newConstNid, nid, PG.Edge alivePort)
+                                           | (nid,_) <- succAliveO]
 
 pgConstNodeVal :: PG.Node -> Bool
 pgConstNodeVal (PG.FNode { PG.nLabel = name })
@@ -458,8 +506,9 @@ pgConstNodeVal (PG.FNode { PG.nLabel = name })
     | (name == constFalseName) = False
 
 graphFoldConst :: PG.PGraph -> PG.PGNode -> PG.PGraph
-graphFoldConst gr constN@(constNid,constNlbl) = tr ret $ "graphFoldConst: " ++ (pgName constN)
+graphFoldConst gr constN@(constNid,constNlbl) = tr ret msg
     where ret = foldl (graphFoldConstSucc prev constN) gr lsuc
+          msg = "graphFoldConst: " ++ (show (constNid, (pgName constN)))
           alivePort = if pgConstNodeVal constNlbl then "true" else "false"
 
           -- successor nodes:
@@ -478,17 +527,45 @@ graphFoldConst gr constN@(constNid,constNlbl) = tr ret $ "graphFoldConst: " ++ (
           prev :: (PG.PGNode, PG.NPort)
           prev = PGU.getSinglePrePort gr constN
 
-doEmbCleanup :: PG.PGraph
-             -> (PG.PGNode -> Bool) -- isSource
-             -> (PG.PGNode -> Bool) -- isSink
-             -> PG.PGraph
-doEmbCleanup g isSource isSink
+foldAndCleanup g isSourceF isSinkF = foldAndCleanup_ g isSourceF isSinkF empty
+    where empty = S.fromList []
+
+foldAndCleanup_ :: PG.PGraph           -- graph
+                -> (PG.PGNode -> Bool) -- isSource
+                -> (PG.PGNode -> Bool) -- isSink
+                -> S.Set DGI.Node      -- already visited consts
+                -> PG.PGraph
+foldAndCleanup_ g isSource isSink oldConsts
     | isNothing constNode0 = g_clean
     | otherwise            = recurse
-    where g_clean    = PGU.cleanupGraphWith isSource isSink g
-          constNode0 = GH.findNodeByL pgNodeIsConst g_clean
-          g'         = graphFoldConst g_clean (fromJust constNode0)
-          recurse = doEmbCleanup g' isSource isSink
+    where g_clean = PGU.cleanupGraphWith isSource isSink g
+          findFn (nid,nlbl) = (pgNodeIsConst nlbl)
+                              && (nid `S.notMember` oldConsts)
+          constNode0 = GH.findNode findFn g_clean
+          constNode0'= fromJust constNode0
+          g' = graphFoldConst g_clean constNode0'
+          oldConsts' = S.insert (fst constNode0') oldConsts
+          recurse = foldAndCleanup_ g' isSource isSink oldConsts'
+
+foldAndCleanupAll_ :: PG.PGraph           -- graph
+                   -> (PG.PGNode -> Bool) -- isSource
+                   -> (PG.PGNode -> Bool) -- isSink
+                   -> S.Set DGI.Node      -- already visited consts
+                   -> [PG.PGraph]
+foldAndCleanupAll_ g isSource isSink oldConsts
+    | isNothing constNode0 = [g,g_clean]
+    | otherwise            = [g,g_clean,g'] ++ recurse
+    where g_clean = PGU.cleanupGraphWith isSource isSink g
+          findFn (nid,nlbl) = (pgNodeIsConst nlbl)
+                              && (nid `S.notMember` oldConsts)
+          constNode0 = GH.findNode findFn g_clean
+          constNode0'= fromJust constNode0
+          g' = graphFoldConst g_clean constNode0'
+          oldConsts' = S.insert (fst constNode0') oldConsts
+          recurse = foldAndCleanupAll_ g' isSource isSink oldConsts'
+
+foldAndCleanupAll g isSourceF isSinkF = foldAndCleanupAll_ g isSourceF isSinkF s0
+    where s0 = S.fromList []
 
 embCleanup :: Embed ()
 embCleanup = do
@@ -498,7 +575,7 @@ embCleanup = do
     -- We check the LPG graph to determine whether a node is a sink or a source.
     -- If a reverse mapping does not exist, then this must be a  PRG node, so we
     -- just return True so that cleanupGraphWith does not remove it
-    let  clEmb = doEmbCleanup emb isSrc isSink
+    let  clEmb = foldAndCleanup emb isSrc isSink
          isSrc (nid,node) = ret --tr ret ("Checking if " ++ (show name) ++ "(" ++ (show nid) ++ ") is a source node: " ++ (show ret))
             where name = PG.nLabel node
                   ret = if name `elem` [constTrueName, constFalseName]
@@ -606,7 +683,7 @@ embedRxTx = do
         True -> return ()
         False -> error "Done, but LPG is not empty"
     embedSpawnEdges
-    embOffloadTx
+    --embOffloadTx
     --prEmbed "Before cleanup"
     embCleanup
 
@@ -773,7 +850,8 @@ embRxNode st node@(nid, fnode@(PG.FNode {})) idx (prevId, prevPort)
     | redundant   = case boolconst of
                      False -> tr embNodeRedundant $ "\nNode: " ++ (pgName node) ++ " found redundant on PRG endpoint " ++ (show idx) ++ " (" ++ prgRxBoundary st idx ++ ")"
                      True  -> tr embNodeBoolConst $ "\nNode: " ++ (pgName node) ++ " found boolconst " ++ (alivePort0) ++ " on PRG endpoint " ++ (show idx) ++ " (" ++ prgRxBoundary st idx ++ ")"
-    | partial     = EmbNodePartial embIdDummy $ map snd alivePs
+    | partial     = tr embNodePartial $ "\nNode: " ++ (pgName node) ++ " found partial " ++ (show alivePorts) ++ " on PRG endpoint " ++ (show idx) ++ " (" ++ prgRxBoundary st idx ++ ")"
+
     | otherwise   = EmbNode embIdDummy
  where
     pred = embRxPred st node idx
@@ -787,6 +865,8 @@ embRxNode st node@(nid, fnode@(PG.FNode {})) idx (prevId, prevPort)
     portsExpr' = zip portsExpr ports
     (deadPs,alivePs) = L.partition ((==PR.PredFalse) . fst) portsExpr'
     partial = length deadPs > 0
+    alivePorts = map snd alivePs
+    embNodePartial = EmbNodePartial embIdDummy alivePorts
     aliveP0 = head alivePs
     (alivePred0, alivePort0) = aliveP0
     -- check for offload
@@ -886,10 +966,10 @@ doEmbRx st orig_ctx@(ins, nid, onode@PG.ONode { PG.nOperator = op}, outs) idx = 
    t_port_false = pred_port_t == PR.PredFalse
    f_port_false = pred_port_f == PR.PredFalse
 
-   msg = --"    pred_port_t=" ++ (show pred_port_t) ++ "\n" ++
-         --"    pred_port_f=" ++ (show pred_port_f) ++ "\n" ++
-         --"    t_preds=" ++ (show t_preds) ++ "\n" ++
-         --"    f_preds=" ++ (show f_preds) ++ "\n" ++
+   msg = "    pred_port_t=" ++ (show pred_port_t) ++ "\n" ++
+         "    pred_port_f=" ++ (show pred_port_f) ++ "\n" ++
+         "    t_preds=" ++ (show t_preds) ++ "\n" ++
+         "    f_preds=" ++ (show f_preds) ++ "\n" ++
          "    embNode=" ++ (show $ ret_) ++ "\n"
 
    ret = trN ret_ msg
@@ -976,8 +1056,13 @@ embedNode ctx = do
     st  <- ST.get
     len <- ST.gets dupsNr
     let embNs :: [EmbNode]
-        embNs = [doEmbNode st ctx idx | idx <- [0..len-1]]
+        embNs = [doEmbNodeTrace st ctx idx | idx <- [0..len-1]]
     embUpdate ctx embNs
+
+doEmbNodeTrace :: EmbedSt -> PG.PGContext -> Int -> EmbNode
+doEmbNodeTrace st ctx@(_,_,nlbl,_) idx = trN ret msg
+    where ret = doEmbNode st ctx idx
+          msg = "Node: " ++ (PG.nLabel nlbl) ++ " PRG Endpoint " ++ (show idx)  ++ " mapped to:" ++ (show ret)
 
 doEmbNode :: EmbedSt -> PG.PGContext -> Int -> EmbNode
 doEmbNode st orig_ctx@(ins,nid,nlbl,outs) idx
@@ -1058,7 +1143,7 @@ embedQueueNode lpg_ctx@(_,lpgNid,lpgNlbl,_) = do
 ctxEmbed :: PG.PGContext -> Embed ()
 ctxEmbed ctx_ = do
     dir <- ST.gets curDir
-    let ctx@(ins,nid,nlbl,outs) = trN ctx_ ("\n  Embedding CTX: " ++ (ctxStr ctx_))
+    let ctx@(ins,nid,nlbl,outs) = tr ctx_ ("\n  Embedding CTX: " ++ (ctxStr ctx_))
     case embIsQueueNode dir nlbl of
         True  -> embedQueueNode ctx
         False -> embedNode ctx

@@ -33,6 +33,8 @@ import qualified Data.Graph.Inductive.Query.DFS as DFS
 import qualified Util.GraphHelpers as GH
 import Data.Functor ((<$>))
 
+import Dragonet.DotGenerator (toDot, toDotHighlight)
+
 import Debug.Trace (trace)
 tr = flip trace
 trN = \x  _ -> x
@@ -240,13 +242,17 @@ getSinglePre g n = if len == 1 then (head ps) else error msg
 getSinglePrePort :: PGraph -> PGNode -> (PGNode, NPort)
 getSinglePrePort gr (nid,nlbl) = (pre,prePort)
     where lpres = DGI.lpre gr nid
-          (preNid, preEdge) = case DGI.lpre gr nid of
+          (preNid, preEdge) = case lpres of
                                 [(nid,edge)] -> (nid,edge)
                                 otherwise -> error msg
           preNlbl = fromJust $ DGI.lab gr preNid
           pre = (preNid, preNlbl)
           prePort = edgePort_  preEdge
-          msg = "expecting single predecessor for node " ++ (nLabel nlbl)
+          msg = "expecting single predecessor for node " ++ (nLabel nlbl) ++ " instead got:\n" ++ (show $ length lpres)
+                ++ (show lpres)
+                ++ "\n-------CUT--------------\n"
+                ++ (toDot gr)
+                ++ "\n------------------------"
 
 -- domination (does not consider spawn edges)
 dominates :: PGraph -> (PGNode, NPort) -> PGNode -> Bool

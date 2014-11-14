@@ -5,7 +5,7 @@ module Util.GraphHelpers(
     filterCtx,
     reduceNodes,
     labelNode,
-    findNodeByL,
+    findNodeByL, findNode,
     filterNodesByL,
     elliminateConflicts,
     mergeGraphsBy,
@@ -44,6 +44,9 @@ labelNode g n = do { a <- lab g n; return (n,a) }
 -- find based on its label
 findNodeByL :: Graph gr => (a -> Bool) -> gr a b -> Maybe (LNode a)
 findNodeByL f g = L.find (\(_,l) -> f l) $ labNodes g
+
+findNode :: Graph gr => (LNode a -> Bool) -> gr a b -> Maybe (LNode a)
+findNode f g = L.find f $ labNodes g
 
 filterNodesByL :: Graph gr => (a -> Bool) -> gr a b -> [LNode a]
 filterNodesByL f g = filter (\(_,l) -> f l) $ labNodes g

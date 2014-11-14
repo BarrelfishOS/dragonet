@@ -31,7 +31,10 @@ module Dragonet.ProtocolGraph (
 
     nAttrAdd,
     nAttrsAdd,
-    nAttrElem
+    nAttrElem,
+
+    opShortCircuitInOut,
+    opSingleVal,
 ) where
 
 import Dragonet.Semantics (PortSemantics)
@@ -237,3 +240,17 @@ nAttrsAdd a n = n { nAttributes = nAttributes n ++ a }
 nAttrElem :: NAttribute -> Node -> Bool
 nAttrElem a n = elem a $ nAttributes n
 
+
+-- Operator nodes can be short-circuted -> Just (in,out)
+-- in:  value that short-circuts the operator
+-- out: result when the short-circuted value is applied
+-- If all inputs are (NOT in) then the output is (NOT out)
+opShortCircuitInOut :: NOperator -> Maybe (Bool, Bool)
+opShortCircuitInOut NOpAnd   = Just (False, False)
+opShortCircuitInOut NOpOr    = Just (True, True)
+opShortCircuitInOut NOpNAnd  = Just (False, True)
+opShortCircuitInOut NOpNOr   = Just (True, False)
+
+opSingleVal :: NOperator -> Bool -> Bool
+opSingleVal op val = if val == inV then outV else (not outV)
+    where Just (inV, outV) = opShortCircuitInOut op

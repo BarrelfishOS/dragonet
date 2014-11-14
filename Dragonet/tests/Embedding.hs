@@ -678,7 +678,7 @@ main = do
     e10k_prg_offload <- e10kOffloadU
     let emb_e10k = embeddingX e10k_prg_offload lpg
 
-    writeFile "tests/lpgU.dot"    $ toDot lpgU
+   -- writeFile "tests/lpgU.dot"    $ toDot lpgU
     writeFile "tests/lpgC.dot"    $ toDot lpg
     writeFile "tests/prgE10k.dot" $ toDot e10k_prg_offload
     writeFile "tests/embE10k.dot" $ toDot emb_e10k

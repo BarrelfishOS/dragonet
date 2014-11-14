@@ -21,7 +21,7 @@ graph lpg {
         cluster L2Ether {
             boolean Classified {
                 port true[ValidLength]
-                port false[]
+                port false[Drop_]
                 semantics true { (= L2P.Ethernet (L2.Proto pkt)) }}
 
             boolean ValidLength {
@@ -47,20 +47,23 @@ graph lpg {
             boolean ValidLocalMAC {
                 port true false[Valid] }
 
+            boolean ValidType {
+                port true false[Valid]
+            }
+
             /* Note that .L3ARPNeedsResponse .L3ARPValidPendingResponse probably
              * belong in here */
             and Valid {
-                port true false[.L3IPAndBelowValid] }
-
-            boolean ValidType {
                 port true[ClassifyL3]
-                port false[] }
+                port false[Drop_]
+            }
 
             node ClassifyL3 {
                 port ipv4[.L3IPv4ValidHeaderLength]
                 port ipv6[]
                 port arp[.L3ARPValidHeaderLength]
                 port drop[]
+
                 semantics ipv4 { (= L3P.IP4 (L3.Proto pkt)) }
                 semantics ipv6 { (= L3P.IP6 (L3.Proto pkt)) }
                 semantics arp { (= L3P.ARP (L3.Proto pkt)) }
@@ -71,6 +74,14 @@ graph lpg {
                 // add this to make the Classify node redundant when the protocol is known
                 predicate drop "not(or(pred(EthType,IPv4),pred(EthType,IPv6),pred(EthType,ARP)))"
             }
+
+            and Drop_ {
+                port true[]
+                port false[Drop]
+            }
+
+            node Drop {}
+
         }
 
 
@@ -129,7 +140,7 @@ graph lpg {
             boolean ValidHeaderLength {
                 port true[ValidReassembly ValidVersion ValidLength
                           ValidTTL ValidChecksum ValidLocalIP]
-                port false[] }
+                port false[Drop_] }
 
             boolean ValidReassembly {
                 port true false[Valid] }
@@ -151,7 +162,12 @@ graph lpg {
                 port true false[Valid] }
 
             and Valid {
-                port true[.L3IPAndBelowValid Classify]
+                port true[Classify]
+                port false[Drop_]
+            }
+
+            and Drop_ {
+                port true[]
                 port false[Drop]
             }
 
@@ -179,9 +195,6 @@ graph lpg {
         /*boolean L3IPv6ValidHeaderLength {
             port true false[L3IPValid] }*/
 
-
-        and L3IPAndBelowValid {
-            port true false[L3ICMPValid L4UDPValid] }
 
 
         /*******************************************/
