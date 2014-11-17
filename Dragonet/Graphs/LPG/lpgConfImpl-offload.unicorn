@@ -19,14 +19,13 @@ graph lpg {
         /* Ethernet RX                             */
 
         cluster L2Ether {
-            boolean Classified {
+            node Classified {
                 port true[ValidLength]
-                port false[Drop_]
                 semantics true { (= L2P.Ethernet (L2.Proto pkt)) }}
 
             boolean ValidLength {
                 port true[ValidUnicast ValidMulticast ValidBroadcast
-                          ValidSrc ValidType ValidLocalMAC]
+                          ValidLocalMAC]
                 port false[] }
 
             boolean ValidUnicast {
@@ -41,28 +40,40 @@ graph lpg {
             or ValidDest {
                 port true false[Valid] }
 
-            boolean ValidSrc {
-                port true false[Valid] }
+            // always returns true in c_impl: Ignore
+            // boolean ValidSrc {
+            //    port true false[Valid] }
 
             boolean ValidLocalMAC {
                 port true false[Valid] }
 
+            /*
+            // this checks whether ethertype is >= IPv6Type (i.e., 0x800)
+            // we could also move it to ClassifyL3
+            // ====> We did move it!
             boolean ValidType {
                 port true false[Valid]
+
+                // formulating the predicates this way makes the false port
+                // inactive if we know the EthType (e.g. due to a NIC filter)
+                predicate true  "pred(L2EtherValidType,true)"
+                predicate false "pred(EthType,INVALID)"
             }
+            */
 
             /* Note that .L3ARPNeedsResponse .L3ARPValidPendingResponse probably
              * belong in here */
             and Valid {
                 port true[ClassifyL3]
-                port false[Drop_]
+                port false[Drop]
             }
 
             node ClassifyL3 {
                 port ipv4[.L3IPv4ValidHeaderLength]
                 port ipv6[]
                 port arp[.L3ARPValidHeaderLength]
-                port drop[]
+                port unknown[]
+                port invalid[]
 
                 semantics ipv4 { (= L3P.IP4 (L3.Proto pkt)) }
                 semantics ipv6 { (= L3P.IP6 (L3.Proto pkt)) }
@@ -71,13 +82,11 @@ graph lpg {
                 predicate ipv4 "pred(EthType, IPv4)"
                 predicate ipv6 "pred(EthType, IPv6)"
                 predicate arp  "pred(EthType, ARP)"
+                // ethertype is < than IPv4 type (0x800)
+                predicate invalid "pred(EthType,Invalid)"
                 // add this to make the Classify node redundant when the protocol is known
-                predicate drop "not(or(pred(EthType,IPv4),pred(EthType,IPv6),pred(EthType,ARP)))"
-            }
-
-            and Drop_ {
-                port true[]
-                port false[Drop]
+                // uknown ethertype
+                predicate unknown "not(or(pred(EthType,IPv4),pred(EthType,IPv6),pred(EthType,ARP)))"
             }
 
             node Drop {}

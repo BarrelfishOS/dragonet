@@ -643,7 +643,7 @@ e10kH_simple = snd <$> e10kT_simple
 e10kC_simple = (C.applyConfig prgCfg) <$> e10kU_simple
 
 e10kOffloadU = do
-    (e10kU, e10kH) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl-offload.unicorn"
+    (e10kU, e10kH) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl-minimal.unicorn"
     let --(nQueues, cnf) = (3, prgCfg)
         (nQueues, cnf) = (1, prgCfgEmpty)
         prgQConf = [("RxQueues", PG.CVInt nQueues), ("TxQueues", PG.CVInt nQueues)]

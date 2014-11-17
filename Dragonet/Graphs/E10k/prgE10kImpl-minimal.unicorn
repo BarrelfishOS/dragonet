@@ -1,0 +1,223 @@
+graph e10kPRG {
+    cluster Rx {
+        cluster L2Ether {
+            boolean Classified {
+                attr "source"
+                spawn poll Classified
+                port true[ValidLength]
+                port false[] }
+
+            boolean ValidLength {
+                port true[PrgL2Filter]
+                port false[] }
+
+            // there are unicast host filters that can be used for this.
+            // (see L2 filtering -> 7.1.1.1) in the 82599 spec
+            // They are set for the whole NIC (i.e., before queue assignment)
+            // so if we want to handle broadcasts we need to use virtual functions
+            node PrgL2Filter {
+                port out[ValidCRC]
+
+                predicate out "and(pred(RxL2EtherValidUnicast,true),pred(RxL2EtherValidLocalMAC,true))"
+            }
+
+            boolean ValidCRC {
+                port true[.C5TupleFilter]
+                port false[] }
+
+            /*
+            node ClassifyL3_ {
+                port ipv4[.L3IPv4Classified .L3IPv4Checksum_]
+                port other[.C5TupleFilter] }
+             */
+
+        }
+
+        /*
+         * This happens after the queues now
+        cluster L3IPv4 {
+
+            boolean Classified {
+                implementation E10kL3IPv4Classified
+                attr "software"
+                port true false[]
+                constraint true "IPv4"
+                constraint false "!IPv4" }
+
+            node Checksum_ {
+                port out[ValidChecksum .C5TupleFilter] }
+
+            boolean ValidChecksum {
+                implementation E10kL3IPv4ValidChecksum
+                attr "software"
+                port true false[] }
+        }
+        */
+
+        config C5TupleFilter {
+            type { (sip:   <UInt 32>,
+                    dip:   <UInt 32>,
+                    proto: <Enum (TCP,UDP,SCP,OTHER)>,
+                    sport: <UInt 16>,
+                    dport: <UInt 16>,
+                    prio:  Int 1 7,
+                    queue: UInt 2) } <,128>
+            function config5tuple
+            port queues[Queues]
+            port default[CFDirFilter] }
+
+        config CFDirFilter {
+            type { (sip:   UInt 32,
+                    dip:   UInt 32,
+                    proto: Enum (TCP,UDP,SCP,OTHER),
+                    sport: UInt 16,
+                    dport: UInt 16,
+                    queue: UInt 2) }
+            function configFDir
+            port queues[Queues]
+            port default[Queues] }
+
+        config Queues {
+            //implementation E10kRxQueue
+            attr "unproductive"
+            attr "software"
+            attr "init"
+            attr "sink"
+            // Remove "spawn poll Queues" because It leads to paths that do not
+            // have the predicate of the previous H/W nodes. We can always add
+            // it again with the appropriate spawn predicates if needed.
+            //spawn poll Queues
+            port out[isIPv4]
+            port drop[]
+            port init[]
+        }
+
+        node isIPv4 {
+            attr "software"
+            port true[E10kIPv4Csum]
+            port false[noIPv4Out]
+
+            predicate true "pred(EthType, IPv4)"
+            predicate false "not(pred(EthType, IPv4))"
+        }
+
+        node noIPv4Out {
+            attr "software"
+            port out[]
+        }
+
+        node E10kIPv4Csum {
+            attr "software"
+            port valid[E10kIPv4CsumValid]
+            port invalid[E10kIPv4CsumInvalid]
+
+            predicate valid "pred(RxL3IPv4ValidChecksum, true)"
+            predicate invalid "pred(RxL3IPv4ValidChecksum, false)"
+        }
+
+        node E10kIPv4CsumValid {
+            attr "software"
+            port out[IsUDP]
+        }
+
+        node IsUDP {
+            attr "software"
+            port true[UDPOut]
+            port false[NoUDPOut]
+
+            predicate true "pred(IpProt,UDP)"
+            predicate false "not(pred(IpProt,UDP))"
+        }
+
+        node UDPOut {
+            attr "software"
+            port out[E10kUDPCsum]
+        }
+
+        node E10kUDPCsum {
+            attr "software"
+            port valid[E10kUDPCsumValid]
+            port invalid[E10kUDPCsumInvalid]
+
+            predicate valid "pred(RxL4UDPValidChecksum, true)"
+            predicate invalid "pred(RxL4UDPValidChecksum, false)"
+        }
+
+        node E10kUDPCsumValid {
+            attr "software"
+            port out[]
+        }
+
+        node E10kUDPCsumInvalid {
+            attr "software"
+            port out[]
+        }
+
+        node NoUDPOut {
+            attr "software"
+            port out[]
+        }
+
+        node E10kIPv4CsumInvalid {
+            attr "software"
+            port out[]
+        }
+    }
+
+    cluster Tx {
+        config Queues {
+            // implementation E10kTxQueue0
+            attr "sink"
+            attr "source"
+            attr "software"
+            port out[PrgIsIPv4] }
+
+        node PrgIsIPv4 {
+            attr "software"
+            port true[SetIPv4CTX]
+            port false[NoIPv4]
+
+            predicate true "pred(EthType,IPv4)"
+            predicate false "not(pred(EthType,IPv4))"
+        }
+
+        node SetIPv4CTX {
+            attr "software"
+            port true[PrgDone]
+        }
+
+        node NoIPv4 {
+            attr "software"
+            port true[PrgDone]
+        }
+
+        or PrgDone {
+            port true[HwEntry]
+            port false[]
+        }
+
+        node HwEntry {
+            port out[IsIPv4CtxSet]
+        }
+
+        node IsIPv4CtxSet {
+            port ctx_true[L3IPv4FillChecksum]
+            port noctx_true[Out_]
+
+            predicate ctx_true "pred(TxSetIPv4CTX,true)"
+            predicate noctx_true "not(pred(TxSetIPv4CTX,true))"
+        }
+
+        node L3IPv4FillChecksum {
+            port true[Out_]
+        }
+
+        or Out_ {
+            port true[Out]
+            port false[]
+        }
+
+        node Out {
+        }
+    }
+}
