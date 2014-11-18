@@ -121,7 +121,10 @@ ftSet st idx (FTuple p q l3 l4 sIP dIP sP dP) = do
 
 -- NOTE: fdirCount is based on a value in prgE10kImpl for CFDirFilter
 -- TODO: Get this value by parsing NIC prg instead of hardcoding it
-fdirCount = 1024
+-- FIXME: It will not work for values more than 128 as somewhere we are using
+--      Word8 to store and pass these values
+--fdirCount = 1024
+fdirCount = 127
 
 foreign import ccall "e10k_ctrl_fdir_unset"
     c_fdirUnset :: PLI.StateHandle -> Word8 -> IO Bool
@@ -141,7 +144,7 @@ fdirUnset st idx = do
 fdirSet :: PLI.StateHandle -> Word8 -> FDirTuple -> IO ()
 fdirSet st idx (FDirTuple q l3 l4 sIP dIP sP dP) = do
     if idx >= fdirCount
-        then error "FdirQF index too high"
+        then error ("################## ERROR: FdirQF index " ++ (show idx) ++ " too high " ++ (show fdirCount) ++ " ############")
         else return ()
     waitReady st
     res <- c_fdirSet st idx q

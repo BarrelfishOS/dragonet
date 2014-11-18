@@ -10,7 +10,7 @@ module Graphs.E10k (
     parse5tCFG, c5tString, c5tFullString,
     parse5t,
     parseFDirCFG, cFDtString,
-
+    parseFDT,
     flowQueue,
     graphH, graphH_
 ) where
@@ -196,9 +196,15 @@ parse5t (CVTuple
         convProto (CVEnum 3) = C5TPL4Other
         convInt (CVInt i) = fromIntegral i
 
-
-
-nodeL5Tuple c = (baseFNode (c5tString c) bports) {
+{-|
+ - Returns a PG.Node based on given 5Tuple configuration.
+ -  - It creates a empty node with `c5tString c` as label and [true, false] as
+ -      outgoing ports
+ -  - It then modifies this node with proper attributes, semantics and
+ -      predicates
+ -}
+nodeL5Tuple :: C5Tuple -> PG.Node
+nodeL5Tuple c = (PG.baseFNode (c5tString c) bports) {
                     nAttributes = c5tAttr c,
                     nSemantics = [("true",tSems),("false",fSems)],
                     nPredicates = [
@@ -293,8 +299,47 @@ cFDtAttr c =
 parseFDirCFG :: ConfValue -> [CFDirTuple]
 parseFDirCFG (CVList l) = map parseFDT l
 
+parseFDT11 :: ConfValue -> CFDirTuple
+parseFDT11 c@(CVTuple
+           [mSIP,
+            mDIP,
+            mProto,
+            mSPort,
+            mDPort,
+            CVInt queue]) = trace ("calling parseFDT with " ++ (show c)
+                ++ "and proto is " ++ (show mProto)) $ (parseFDT c)
+
+{-|
+ - Parses the configuration and returns FDirTuple filter
+ -}
 parseFDT :: ConfValue -> CFDirTuple
 parseFDT (CVTuple
+           [CVMaybe mSIP,
+            CVMaybe mDIP,
+            CVMaybe mProto,
+            CVMaybe mSPort,
+            CVMaybe mDPort,
+            CVInt queue]) =
+    CFDirTuple {
+            cfdtQueue     = fromIntegral queue,
+            cfdtL4Proto   = convProto  mProto,
+            cfdtL3Src     = convInt  mSIP,
+            cfdtL3Dst     = convInt  mDIP,
+            cfdtL4Src     = convInt  mSPort,
+            cfdtL4Dst     = convInt  mDPort
+    }
+    where
+        convProto (Just (CVEnum 0)) = C5TPL4TCP
+        convProto (Just (CVEnum 1)) = C5TPL4UDP
+        convProto (Just (CVEnum 2)) = C5TPL4SCTP
+        convProto (Just (CVEnum 3)) = C5TPL4Other
+        convProto (Just x) = error ("Don't know the value "  ++ (show x))
+        convInt (Just (CVInt i)) = fromIntegral i
+        convInt (Just x) = error ("Don't know the value "  ++ (show x))
+        convInt x = error ("Don't know the value ---"  ++ (show x))
+
+parseFDTOld :: ConfValue -> CFDirTuple
+parseFDTOld (CVTuple
            [sIP,
             dIP,
             proto,
@@ -316,6 +361,46 @@ parseFDT (CVTuple
         convProto (CVEnum 3) = C5TPL4Other
         convInt (CVInt i) = fromIntegral i
 
+
+
+{-|
+ - Returns a PG.Node based on given FDir configuration.
+ -  - It creates a empty node with `cFDtString c` as label and [true, false] as
+ -      outgoing ports
+ -  - It then modifies this node with proper attributes, semantics and
+ -      predicates
+ -}
+nodeLFDir :: CFDirTuple -> PG.Node
+nodeLFDir c = (PG.baseFNode (cFDtString c) bports) {
+                    nAttributes = cFDtAttr c,
+                    nSemantics = [("true",tSems),("false",fSems)],
+                    nPredicates = [
+                        ("true",  cFDirPredT c),
+                        ("false", cFDirPredF c)
+                    ]
+                    }
+    where
+        bports = ["true","false"]
+        tSems = foldl1 SMTC.and $ (catMaybes  [
+                ipSems "src" <$> (Just $ cfdtL3Src c),
+                ipSems "dst" <$> (Just $ cfdtL3Dst c),
+                portSems "src" <$> (Just $ cfdtL4Src c),
+                portSems "dst" <$> (Just $ cfdtL4Dst c)
+                ]) ++ protoSems
+        fSems = SMTC.not tSems
+        pkt = SMT.app "pkt" []
+        ipSems n i = SMTBV.bv (fromIntegral i) 32 SMTC.===
+            SMT.app (fromString $ "IP4." ++ n) [pkt]
+        portSems n i = SMTBV.bv (fromIntegral i) 16 SMTC.===
+                    SMT.app (fromString $ "UDP." ++ n) [pkt]
+        protoSems = [
+            SMT.app "L3.Proto" [pkt] SMTC.=== SMT.app "L3P.IP4" [],
+            SMT.app "L4.Proto" [pkt] SMTC.=== SMT.app "L4P.UDP" []
+            ]
+
+
+
+
 configFDir :: ConfFunction
 configFDir _ _ inE outE cfg = do
     ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
@@ -333,13 +418,8 @@ configFDir _ _ inE outE cfg = do
         -- Get filter configurations
         cfgs = parseFDirCFG cfg
 
-        -- Generate node and edges for one filter
-        bports = ["true","false"]
-        nodeL c = (baseFNode (cFDtString c) bports) {
-                    nAttributes = cFDtAttr c
-                    }
         addFilter ((iN,iE),es) c = do
-            (n,_) <- confMNewNode $ nodeL c
+            (n,_) <- confMNewNode $ nodeLFDir c
             let inEdge = (iN,n,iE)
             let tEdge = (n,queue $ cfdtQueue c,Edge "true")
             let fEdge = (n,queue $ cfdtQueue c,Edge "false")
@@ -489,16 +569,20 @@ maybeMatch Nothing _ = True
 maybeMatch _ Nothing = True
 maybeMatch (Just x1) (Just x2) = x1 == x2
 
-c5TL4ProtoPred :: C5TL4Proto -> PR.PredExpr
-c5TL4ProtoPred C5TPL4UDP = PR.PredAnd [PR.PredAtom "EthType" "IPv4",
-                                       PR.PredAtom "IpProt" "UDP"]
-
-c5TuplePredT :: C5Tuple -> PR.PredExpr
-c5TuplePredT (C5Tuple {c5tL4Proto = cProt,
-                      c5tL3Src   = cSrcIp,
-                      c5tL3Dst   = cDstIp,
-                      c5tL4Src   = cSrcPort,
-                      c5tL4Dst   = cDstPort})
+{-|
+ - Creates a layer-5 full tuple based on given values.
+ -  NOTE: currently only works with UDP protocol
+ -}
+fullL5Pred
+  :: (Show a, Show a1, Show a2, Show a3)
+  => Maybe C5TL4Proto   -- ^ Maybe Protocol type
+  -> Maybe a3           -- ^ Maybe src IP address
+  -> Maybe a2           -- ^ Maybe dst IP address
+  -> Maybe a1           -- ^ Maybe src port
+  -> Maybe a            -- ^ Maybe dst port
+  -> PR.PredExpr        -- ^ Returns Predicate expressing condition matching
+                        --     the values (or wildcards)
+fullL5Pred cProt cSrcIp cDstIp cSrcPort cDstPort
  | cProt == Just C5TPL4UDP = ret
        where protPreds = [PR.PredAtom "EthType" "IPv4", PR.PredAtom "IpProt" "UDP"]
              srcIpPred = maybe PR.PredTrue
@@ -519,9 +603,44 @@ c5TuplePredT (C5Tuple {c5tL4Proto = cProt,
              xand = (PR.buildAND bld)
 
 
+
+cFDirPredT :: CFDirTuple -> PR.PredExpr
+cFDirPredT (CFDirTuple {
+                        cfdtL4Proto = cProt,
+                        cfdtL3Src   = cSrcIp,
+                        cfdtL3Dst   = cDstIp,
+                        cfdtL4Src   = cSrcPort,
+                        cfdtL4Dst   = cDstPort}) =
+      fullL5Pred (Just cProt) (Just cSrcIp) (Just cDstIp)
+            (Just cSrcPort) (Just cDstPort)
+
+{-| Prepending the cFDirTuple Predicate with False
+ -}
+cFDirPredF :: CFDirTuple -> PR.PredExpr
+cFDirPredF fdir = (PR.buildNOT bld) (cFDirPredT fdir)
+    where bld = PR.predBuildFold
+
+
+c5TL4ProtoPred :: C5TL4Proto -> PR.PredExpr
+c5TL4ProtoPred C5TPL4UDP = PR.PredAnd [PR.PredAtom "EthType" "IPv4",
+                                       PR.PredAtom "IpProt" "UDP"]
+
+
+c5TuplePredT :: C5Tuple -> PR.PredExpr
+c5TuplePredT (C5Tuple {c5tL4Proto = cProt,
+                      c5tL3Src   = cSrcIp,
+                      c5tL3Dst   = cDstIp,
+                      c5tL4Src   = cSrcPort,
+                      c5tL4Dst   = cDstPort}) =
+      fullL5Pred cProt cSrcIp cDstIp cSrcPort cDstPort
+
+{-| Prepending the cTuple Predicate with False
+ -}
 c5TuplePredF :: C5Tuple -> PR.PredExpr
 c5TuplePredF t5 = (PR.buildNOT bld) (c5TuplePredT t5)
     where bld = PR.predBuildFold
+
+
 
 
 flowMatches5TF :: Flow -> C5Tuple -> Bool

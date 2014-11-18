@@ -3,7 +3,7 @@
 import qualified Graphs.E10k as E10k
 import qualified Graphs.Cfg as Cfg
 import qualified Dragonet.Configuration as C
-import qualified Search as S
+import qualified Dragonet.Search as S
 
 import Dragonet.Flows (Flow(..))
 
@@ -21,12 +21,21 @@ e10kT_simple = E10k.graphH_ "Graphs/E10k/prgE10kImpl-simple.unicorn"
 e10kU_simple = fst <$> e10kT_simple
 e10kH_simple = snd <$> e10kT_simple
 
-flows :: Int -> [Flow]
-flows nflows = [ FlowUDPv4 {
+listenFlows :: Int -> [Flow]
+listenFlows nflows = [ FlowUDPv4 {
      flDstIp    = Just 127
    , flDstPort  = Just $ fromIntegral $ 1000 + i
    , flSrcIp    = Nothing
    , flSrcPort  = Nothing } | i <- [1..nflows] ]
+
+
+connectFlows :: Int -> [Flow]
+connectFlows nflows = [ FlowUDPv4 {
+     flDstIp    = Just 127
+   , flDstPort  = Just $ fromIntegral $ 1000 + i
+   , flSrcIp    = Just 123
+   , flSrcPort  = Just 7777 } | i <- [1..nflows] ]
+
 
 
 isGoldFl FlowUDPv4 {flDstPort = Just port} = isJust $ L.find (==port) [1001,1002]
@@ -40,6 +49,7 @@ main = do
         --nflowsl = [1,5,10,20,40,80]
         nflowsl = [100,200]
         samples = 3
+        flows = connectFlows
     prgU <- e10kU_simple
     let priFn = priorityCost' nq
         balFn = S.balanceCost nq

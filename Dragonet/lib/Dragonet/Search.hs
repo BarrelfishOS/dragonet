@@ -104,7 +104,15 @@ class (ConfChange a) => OracleSt o a | o -> a where
     -- iterators
     -- | 'flowConfChanges' will return suggestion configuration changes for
     -- |     a new flow
-    flowConfChanges :: o -> C.Configuration -> Flow -> [a]
+    flowConfChanges ::
+        -- | Oracle specific information
+           o
+        -- | FIXME: configuration of what? Is it current NIC configuration?
+        -> C.Configuration
+        -- | New flow to add into the system
+        -> Flow
+        -- | suggested policy change
+        -> [a]
     -- used for incremental update of qmap
     -- | Returns the queues that may get affected by this change.
     -- | Note that it always includes the default queue as it will
@@ -165,6 +173,10 @@ flowsSingleConfs x conf fs =
    Update filters, as we are introducing them
  -}
 data E10kConfChange = E10kInsert5T PG.ConfValue
+                | E10kInsertFDir PG.ConfValue
+                | E10kInsertSYN PG.ConfValue
+    deriving (Eq, Ord, Show) -- Not exactly needed, but good to have
+
 instance ConfChange E10kConfChange where
     {-|
       The function 'applyConfChange' will add the given 5tuple filter into
@@ -183,6 +195,29 @@ instance ConfChange E10kConfChange where
 
               rest :: C.Configuration
               rest  = L.filter ((/="RxC5TupleFilter") . fst) conf
+
+    applyConfChange conf (E10kInsertFDir cFdir) = ("RxCFDirFilter", newFdir):rest
+        where newFdir :: PG.ConfValue
+              newFdir = addToCVL oldFdir cFdir
+              oldFdir :: PG.ConfValue
+              oldFdir = case L.lookup "RxCFDirFilter" conf of
+                        Just l -> l
+                        Nothing -> error "addFDirToConf: Did not find RxCFDirFilter"
+
+              rest :: C.Configuration
+              rest  = L.filter ((/="RxCFDirFilter") . fst) conf
+
+    applyConfChange conf (E10kInsertSYN cSyn) = ("RxCSynFilter", newSyn):rest
+        where newSyn :: PG.ConfValue
+              -- Overwriting old filter value with new one
+              newSyn = overwriteCVL oldSyn cSyn
+              oldSyn :: PG.ConfValue
+              oldSyn = case L.lookup "RxCSynFilter" conf of
+                        Just l -> l
+                        Nothing -> error "addSynToConf: Did not find RxCSynFilter"
+
+              rest :: C.Configuration
+              rest  = L.filter ((/="RxCSynFilter") . fst) conf
 
 
 -- E10K (simple for now) oracle
@@ -203,15 +238,22 @@ instance OracleSt E10kOracleSt E10kConfChange where
      -  and counts on cost-function to help in selecting proper queue.
     -}
     flowConfChanges E10kOracleSt { nQueues = nq } c fl =
+        -- FIXME: get better algorithm for queue allocation
+        [E10kInsertFDir $ mkFDirFromFl fl q |  q <- allQueues nq]
+        ++
         [E10kInsert5T $ mk5TupleFromFl fl q |  q <- allQueues nq]
 
     emptyConf _ = e10kCfgEmpty -- ^ Creates initial empty configuration
     showConf _  = e10kCfgStr -- ^ Converts conf to string
 
+    -- QUESTION: Is it assumed that there will be only one operation in
+    --      conf change?
     affectedQueues E10kOracleSt { nQueues = nq } conf (E10kInsert5T c5t) =
         [e10kDefaultQ, xq]
         where xq = E10k.c5tQueue $ E10k.parse5t c5t
-
+    affectedQueues E10kOracleSt { nQueues = nq } conf (E10kInsertFDir cFdir) =
+        [e10kDefaultQ, xq]
+        where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
 
 type SFOracleSt = E10kOracleSt
 
@@ -660,20 +702,29 @@ mk5TupleFromFl fl@(FlowUDPv4 {}) q =
        dP   = flDstPort fl
        prio = 1
 
-add5TupleToConf :: C.Configuration -> Flow -> QueueId -> C.Configuration
-add5TupleToConf conf fl q = ("RxC5TupleFilter", new5t):rest
-    where new5t :: PG.ConfValue
-          new5t  = addToCVL old5t (mk5TupleFromFl fl q)
-          old5t :: PG.ConfValue
-          old5t = case L.lookup "RxC5TupleFilter" conf of
-                    Just l -> l
-                    Nothing -> error "add5TupleToConf: Did not find RxC5TupleFilter"
-
-          rest :: C.Configuration
-          rest  = L.filter ((/="RxC5TupleFilter") . fst) conf
+mkFDirFromFl :: Flow -> QueueId -> PG.ConfValue
+mkFDirFromFl fl@(FlowUDPv4 {}) q =
+    PG.CVTuple [ cvMInt $ sIP,
+    cvMInt $ dIP,
+    PG.CVMaybe $ Just $ PG.CVEnum 1,
+    cvMInt $ sP,
+    cvMInt $ dP,
+    PG.CVInt $ fromIntegral q]
+    where
+       sIP  = flSrcIp   fl
+       dIP  = flDstIp   fl
+       sP   = flSrcPort fl
+       dP   = flDstPort fl
 
 addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
 addToCVL (PG.CVList l) v = PG.CVList $ v:l
+
+{-|
+ - Overwrite the old value(s) with new value
+ -}
+overwriteCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
+overwriteCVL (PG.CVList l) v = PG.CVList $ [v]
+
 
 cvMInt :: Integral a => Maybe a -> PG.ConfValue
 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
@@ -693,6 +744,11 @@ reachedQueue (_,PG.ONode {PG.nLabel = name}) = ret
 reachedQueue (_,PG.FNode {PG.nLabel = name})
     | name == "RxToDefaultQueue" =  Just 0
     | otherwise  = Nothing
+
+doFlowQueueNextPort__ :: PR.PredExpr -> [(PG.NPort, PR.PredExpr)] -> PG.NPort
+doFlowQueueNextPort__ flPred aa = tr (doFlowQueueNextPort_ flPred aa) (
+        "pred = [" ++ (show flPred) ++ "], list =[" ++ (show aa) ++ "]" )
+
 
 doFlowQueueNextPort_ :: PR.PredExpr -> [(PG.NPort, PR.PredExpr)] -> PG.NPort
 doFlowQueueNextPort_ flPred ((port,portPred_):rest) = ret
@@ -880,6 +936,14 @@ isGoldFl FlowUDPv4 {flDstPort = Just port} = isJust $ L.find (==port) [1001,1002
 goldFlPerQ = 1
 priorityCost' = priorityCost isGoldFl goldFlPerQ
 
+connectFlows :: Int -> [Flow]
+connectFlows nflows = [ FlowUDPv4 {
+     flDstIp    = Just 127
+   , flDstPort  = Just $ fromIntegral $ 1000 + i
+   , flSrcIp    = Just 123
+   , flSrcPort  = Just 7777 } | i <- [1..nflows] ]
+
+
 
 test = do
     -- unconfigured PRG
@@ -897,6 +961,11 @@ test = do
                                    , sCostFn = costFn
                                    , sStrategy = searchGreedyFlows}
 
-        conf = runSearch params fs
+        conflows = connectFlows 10
+        conf = runSearch params $  conflows
+        --conf = runSearch params $ connectFlows 10
+    print $ "connected flows : " ++ (ppShow conflows)
+    print $ "Cost function: " ++ ppShow conf
+
     return ()
 
