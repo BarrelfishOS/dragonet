@@ -5,9 +5,14 @@ module Runner.E10KControl (
     L4Proto(..),
 
     waitReady,
+    -- f5 filters
     ftUnset,
     ftSet,
-    ftCount
+    ftCount,
+    -- fdir filters
+    fdirUnset,
+    fdirSet,
+    fdirCount
 ) where
 
 import qualified Dragonet.Pipelines.Implementation as PLI
@@ -41,12 +46,12 @@ data FTuple = FTuple {
 
 data FDirTuple = FDirTuple {
     fdtQueue   :: Word8,
-    fdtL3Proto :: L3Proto,
-    fdtL4Proto :: L4Proto,
-    fdtL3Src   :: Word32,
-    fdtL3Dst   :: Word32,
-    fdtL4Src   :: Word16,
-    fdtL4Dst   :: Word16
+    fdtL3Proto :: Maybe L3Proto,
+    fdtL4Proto :: Maybe L4Proto,
+    fdtL3Src   :: Maybe Word32,
+    fdtL3Dst   :: Maybe Word32,
+    fdtL4Src   :: Maybe Word16,
+    fdtL4Dst   :: Maybe Word16
 } deriving (Eq,Show,Ord)
 
 
@@ -97,6 +102,54 @@ ftSet st idx (FTuple p q l3 l4 sIP dIP sP dP) = do
         l4' mask
     if not res
         then error "e10k_ctrl_5tuple_set failed"
+        else return ()
+    where
+        mbFlag Nothing n _ = n
+        mbFlag (Just _) _ j = j
+        mask = (mbFlag l4 maskL4Proto 0) .|.
+               (mbFlag sIP maskSrcIP 0) .|.
+               (mbFlag dIP maskDstIP 0) .|.
+               (mbFlag sP maskSrcPort 0) .|.
+               (mbFlag dP maskDstPort 0)
+        l4' = case l4 of
+            Nothing -> 0
+            Just t -> case t of
+                L4TCP -> l4tTCP
+                L4UDP -> l4tUDP
+
+-- ##################### fdir flow management ###################
+
+-- NOTE: fdirCount is based on a value in prgE10kImpl for CFDirFilter
+-- TODO: Get this value by parsing NIC prg instead of hardcoding it
+fdirCount = 1024
+
+foreign import ccall "e10k_ctrl_fdir_unset"
+    c_fdirUnset :: PLI.StateHandle -> Word8 -> IO Bool
+
+foreign import ccall "e10k_ctrl_fdir_set"
+    c_fdirSet :: PLI.StateHandle -> Word32 -> Word8 -> Word32
+        -> Word32 -> Word16 -> Word16 -> Word16 -> Word16 -> IO Bool
+
+fdirUnset :: PLI.StateHandle -> Int -> IO ()
+fdirUnset st idx = do
+    waitReady st
+    res <- c_fdirUnset st (fromIntegral idx)
+    if not res
+        then error "e10k_ctrl_fdir_unset failed"
+        else return ()
+
+fdirSet :: PLI.StateHandle -> Int -> FDirTuple -> IO ()
+fdirSet st idx (FDirTuple q l3 l4 sIP dIP sP dP) = do
+    if (fromIntegral idx) >= fdirCount
+        then error ("################## ERROR: FdirQF index " ++ (show idx) ++ " too high " ++ (show fdirCount) ++ " ############")
+        else return ()
+    waitReady st
+    res <- c_fdirSet st (fromIntegral idx ) q
+        (fromMaybe 0 sIP) (fromMaybe 0 dIP)
+        (fromMaybe 0 sP) (fromMaybe 0 dP)
+        l4' mask
+    if not res
+        then error "e10k_ctrl_fdir_set failed"
         else return ()
     where
         mbFlag Nothing n _ = n

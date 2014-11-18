@@ -145,6 +145,16 @@ sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
 -t -q t0  -t -q t1  -t -q t2  -t -q t3
 }
 
+run_for_4_cores_appenzeller() {
+    echo fancyEcho running on ${SERVERIP} with 4 application threads
+sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
+-a t0  -f ${SERVERIP}:888/10.113.4.71:9000 \
+-a t1  -f ${SERVERIP}:889/10.113.4.71:9000 \
+-a t2  -f ${SERVERIP}:890/10.113.4.71:9000 \
+-a t3  -f ${SERVERIP}:891/10.113.4.71:9000 \
+-t -q t0  -t -q t1  -t -q t2  -t -q t3
+}
+
 
 run_for_4_cores_with_wildcards() {
 # old way, with wildcards
@@ -263,7 +273,8 @@ fi
 ##################################################################
 
 ./scripts/pravin/wait_for_dragonet.sh 10 ${STACKNAME}
-run_for_2_cores_full_filters_test
+run_for_4_cores_appenzeller
+#run_for_2_cores_full_filters_test
 #run_for_1_cores_full_filters
 sudo killall ${STACKNAME}
 exit 0

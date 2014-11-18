@@ -15,12 +15,19 @@ void e10k_ctrl_waitready(struct state *state)
 
 bool e10k_ctrl_5tuple_unset(struct state *state, uint8_t index)
 {
-    assert(!"NYI");
+    assert(!"NYI e10k_ctrl_5tuple_unset");
     return false;
 }
 
+bool e10k_ctrl_fdir_unset(struct state *state, uint8_t index)
+{
+    assert(!"NYI e10k_ctrl_5tuple_unset");
+    return false;
+}
+
+
 bool e10k_ctrl_fdir_set(struct state *state,
-        uint16_t index, uint8_t queue,
+        uint32_t index, uint8_t queue,
         uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port,
         uint16_t l4_type, uint16_t mask)
 {
@@ -81,15 +88,13 @@ bool e10k_ctrl_5tuple_set(struct state *state,
             );
 
     // FIXME: just for testing fdir filters.  Remove this line after testing
-    return e10k_ctrl_fdir_set(state, (uint16_t)index, queue,
-            src_ip, dst_ip, src_port, dst_port, l4_type, mask);
+//    return e10k_ctrl_fdir_set(state, (uint16_t)index, queue,
+//            src_ip, dst_ip, src_port, dst_port, l4_type, mask);
 
     int ret = set_5tuple_filter(e10k_nic, dst_ip, src_ip, dst_port, src_port,
             l4_type, mask, priority, queue, index);
     if (ret < 0) return false;
     return true;
 }
-
-
 
 

@@ -301,7 +301,11 @@ createPipelineClient gh pl = do
             dsNextQH = 0 }
     return $ mkDPL pl tds
 
-
+{-|
+ -      * Creates an OS thread for an execution thread
+ -      * Waits for graph handle to instantiate on STM
+ -      * Creates a client-side pipeline using the handle received
+ -}
 -- Start pipeline execution engine in this thread
 createPipeline :: PL.PLGraph -> String -> String -> PL.PLabel
                     -> IO PD.DynPipeline
@@ -323,6 +327,7 @@ createPipeline plg stackname helpers mname = do
 
     -- Wait for graph handle from execution thread
     gh <- STM.atomically $ STM.takeTMVar mv
+    -- Create a pipeline using the graph handle read from the STM
     createPipelineClient gh mname
     where
         -- LLVM file with helper utilities

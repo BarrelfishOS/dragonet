@@ -92,6 +92,11 @@ foreign import ccall "wrapper"
 foreign import ccall "wrapper"
     mkOpSocketClose :: OpSocketClose -> IO (FunPtr OpSocketClose)
 
+{-|
+ - Calls the c function "app_control_init" with proper agruments.
+ - NOTE: keep in mind that the C function has an infinite loop
+ - handling event.  So, this function will never return.
+ -}
 appControlInit :: String -> OpNewApp -> OpRegister -> OpStopApp -> OpUDPListen
         -> OpUDPFlow -> OpSocketSpan -> OpSocketClose -> IO ()
 appControlInit sn a b c d e f g = do
@@ -131,6 +136,11 @@ hOpSocketClose :: (ChanHandle -> Event -> IO ()) -> OpSocketClose
 hOpSocketClose eh ch si = eh ch $ EvSocketClose si
 
 
+{-|
+ - function 'interfaceThread' runs the **infinite** event loop using the
+ -  event handlers provided.  Note that this just calls the C equivalant
+ -  function which will never return.
+ -}
 interfaceThread :: String -> (ChanHandle -> Event -> IO ()) -> IO ()
 interfaceThread stackname eh = do
     appControlInit stackname (hOpNewApp eh) (hOpRegister eh) (hOpStopApp eh)
