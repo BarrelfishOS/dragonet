@@ -5,7 +5,6 @@ module Stack (
 
     StackState(..),
     EndpointDesc(..),
-    SocketDesc(..),
     AppDesc(..),
     OracleArgs(..)
 ) where
@@ -50,13 +49,9 @@ data AppDesc = AppDesc {
     adGraphHandle :: PLI.GraphHandle
 }
 
-data SocketDesc = SocketDesc {
-    sdAppId :: PLA.AppId,
-    sdEpId  :: EndpointId
-}
-
 data EndpointDesc = EndpointUDPIPv4 {
-    edSockets :: [PLA.SocketId],
+    -- an endpoint might have multiple application sockets
+    edSockets :: [(PLA.SocketId, PLA.AppId)],
     edIP4Src :: Maybe PLA.IPv4Addr,
     edIP4Dst :: Maybe PLA.IPv4Addr,
     edUDPSrc :: Maybe PLA.UDPPort,
@@ -79,8 +74,10 @@ data StackState = StackState {
     ssNextEndpointId :: EndpointId,
     ssApplications :: M.Map PLA.AppId AppDesc,
     ssAppChans :: M.Map PLA.ChanHandle PLA.AppId,
-    ssSockets :: M.Map PLA.SocketId SocketDesc,
     ssEndpoints :: M.Map EndpointId EndpointDesc,
+    -- A mapping from socketId to EndpointId:
+    --  used in spanning
+    ssSockets :: M.Map PLA.SocketId EndpointId,
     -- quick hack to maintain the previous endpoints so that we can find the
     -- difference between the current and the old state. It is probably better
     -- to actually track the changes from the event handlers though.
@@ -180,17 +177,16 @@ eventHandler sstv ch (PLA.EvSocketUDPListen (ip,port)) = do
             sid = ssNextSocketId ss
             eid = ssNextEndpointId ss
             ep = EndpointUDPIPv4 {
-                    edSockets = [sid],
+                    edSockets = [(sid,aid)],
                     edIP4Src = Nothing,
                     edIP4Dst = if ip == 0 then Nothing else Just ip,
                     edUDPSrc = Nothing,
                     edUDPDst = if port == 0 then Nothing else Just port
                 }
-            sd = SocketDesc { sdAppId = aid, sdEpId = eid }
             ss' = ss {
                 ssNextSocketId = sid + 1,
                 ssNextEndpointId = eid + 1,
-                ssSockets = M.insert sid sd $ ssSockets ss,
+                ssSockets = M.insert sid eid $ ssSockets ss,
                 ssEndpoints = M.insert eid ep $ ssEndpoints ss
             }
         STM.writeTVar sstv $ ss'
@@ -207,17 +203,16 @@ eventHandler sstv ch (PLA.EvSocketUDPFlow (sIp,sP) (dIp,dP)) = do
             sid = ssNextSocketId ss
             eid = ssNextEndpointId ss
             ep = EndpointUDPIPv4 {
-                    edSockets = [sid],
+                    edSockets = [(sid,aid)],
                     edIP4Src =if sIp == 0 then Nothing else Just sIp,
                     edIP4Dst = if dIp == 0 then Nothing else Just dIp,
                     edUDPSrc = if sP == 0 then Nothing else Just sP,
                     edUDPDst = if dP == 0 then Nothing else Just dP
                 }
-            sd = SocketDesc { sdAppId = aid, sdEpId = eid }
             ss' = ss {
                 ssNextSocketId = sid + 1,
                 ssNextEndpointId = eid + 1,
-                ssSockets = M.insert sid sd $ ssSockets ss,
+                ssSockets = M.insert sid eid $ ssSockets ss,
                 ssEndpoints = M.insert eid ep $ ssEndpoints ss
             }
         STM.writeTVar sstv $ ss'
@@ -231,15 +226,12 @@ eventHandler sstv ch (PLA.EvSocketSpan oldsid) = do
     (sid,ss) <- STM.atomically $ do
         ss <- STM.readTVar sstv
         let Just aid = M.lookup ch $ ssAppChans ss
+            Just eid = M.lookup oldsid $ ssSockets ss
             sid = ssNextSocketId ss
-            Just oldsd = M.lookup oldsid $ ssSockets ss
-            eid = sdEpId oldsd
             Just ep = M.lookup eid $ ssEndpoints ss
-            sd = SocketDesc { sdAppId = aid, sdEpId = eid }
-            ep' = ep { edSockets = edSockets ep ++ [sid] }
+            ep' = ep { edSockets = (sid,aid):(edSockets ep)}
             ss' = ss {
                 ssNextSocketId = sid + 1,
-                ssSockets = M.insert sid sd $ ssSockets ss,
                 ssEndpoints = M.insert eid ep' $ ssEndpoints ss
             }
         STM.writeTVar sstv $ ss'
@@ -257,34 +249,29 @@ eventHandler sstv ch ev = do
 
 -- generates the necessary LPG configuration based on the limited number of
 --      endpoints in socket state
-lpgConfig' :: [EndpointDesc] -> StackState -> C.Configuration
-lpgConfig' ll ss = [("RxL4UDPCUDPSockets", PG.CVList $ cUdpSockets)]
+lpgConfig :: [EndpointDesc] -> C.Configuration
+lpgConfig eps = [("RxL4UDPCUDPSockets", PG.CVList cUdpSockets)]
     where
-        --eps = ll
-        eps = M.elems $ ssEndpoints ss
-        cUdpSockets = map (PG.CVTuple . cUdpSocket) $ eps
-        cUdpSocket ed = [ PG.CVList $ map (buildSock) sids,
+        cUdpSockets = map (PG.CVTuple . cUdpSocket) eps
+        cUdpSocket ed = [ PG.CVList $ map buildSock socks,
                           PG.CVMaybe msIP,
                           PG.CVMaybe msPort,
                           PG.CVMaybe mdIP,
                           PG.CVMaybe mdPort]
             where
-                sids = edSockets ed
+                socks = edSockets ed
                 msIP = PG.CVInt <$> fromIntegral <$> edIP4Src ed
                 mdIP = PG.CVInt <$> fromIntegral <$> edIP4Dst ed
                 msPort = PG.CVInt <$> fromIntegral <$> edUDPSrc ed
                 mdPort = PG.CVInt <$> fromIntegral <$> edUDPDst ed
-        buildSock sid = PG.CVTuple [PG.CVInt $ fromIntegral sid,
-                                    PG.CVInt $ fromIntegral aid]
-            where
-                Just sd = M.lookup sid $ ssSockets ss
-                aid = sdAppId sd
+        buildSock sock@(sid,aid) = PG.CVTuple [PG.CVInt $ fromIntegral sid,
+                                   PG.CVInt $ fromIntegral aid]
 
 
 -- generates the necessary LPG configuration based on the stack state
 -- (specifically on the state's endpoints and sockets)
-lpgConfig :: StackState -> C.Configuration
-lpgConfig ss = lpgConfig' allEps ss
+lpgConfigSS :: StackState -> C.Configuration
+lpgConfigSS ss = lpgConfig allEps
     where
         allEps = M.elems $ ssEndpoints ss
 
@@ -315,7 +302,7 @@ instantiateOpt (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
 
             -- STEP: we need to create incremantal ss with adding one flow at a time
             let allEps = M.elems $ ssEndpoints ss  -- FIXME: this list should return one flow at a time
-                lpgCfg = lpgConfig' allEps ss
+                lpgCfg = lpgConfig allEps
                 -- Configure LPG
                 lpgC = C.applyConfig lpgCfg lpgU
                 dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
@@ -410,7 +397,7 @@ ssExecUpd sstv = STM.atomically $ do
 
 -- config LPG based on stack state information
 ssConfigLPG :: StackState -> PG.PGraph -> PG.PGraph
-ssConfigLPG ss lpgU = C.applyConfig (lpgConfig ss) lpgU
+ssConfigLPG ss lpgU = C.applyConfig (lpgConfigSS ss) lpgU
 
 -- a simpler version of instantiate:
 --  - assumes a configured PRG and does not call optimize
@@ -502,7 +489,7 @@ instantiateFlows getConf (prgU,prgHelp) llvmH cfgImpl cfgPLA = do
                 --newEps = epsDiff allEps prevEps
                 --rmEps = epsDiff prevEps allEps
                 -- LPG config is essentially all flows in network stack
-                lpgCfg = lpgConfig' allEps ss
+                lpgCfg = lpgConfig allEps
                 -- Configure LPG
                 lpgC = C.applyConfig lpgCfg lpgU
                 lbl = "instSearch"
