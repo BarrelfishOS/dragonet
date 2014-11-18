@@ -51,8 +51,8 @@ localIP = MD.asiagoIP_E10K
 data CfgAction =
     CfgASet5Tuple Word8 CTRL.FTuple  |
     CfgAClear5Tuple Word8            |
-    CfgASetFDir Word8 CTRL.FDirTuple |
-    CfgAClearFDir Word8
+    CfgASetFDir Int CTRL.FDirTuple |
+    CfgAClearFDir Int
     deriving (Eq,Show)
 
 {-|
@@ -70,9 +70,9 @@ data CfgState = CfgState {
         -- | Unused 5-tuple indexes
         cs5TUnused :: [Word8],
         -- | Maps FDir to ids
-        csFDirs :: M.Map CTRL.FDirTuple Word8,
+        csFDirs :: M.Map CTRL.FDirTuple Int,
         -- | Unused FDir indexes
-        csFDirsUnused :: [Word8]
+        csFDirsUnused :: [Int]
     }
 
 
@@ -408,7 +408,6 @@ main = do
 
     let t5count :: Word8
         t5count = fromIntegral c5TupleFilters
-        cfcount :: Word8
         cfcount = fromIntegral cFDirFilters
 
         state = CfgState {

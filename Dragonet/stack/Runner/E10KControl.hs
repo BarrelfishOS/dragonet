@@ -121,33 +121,30 @@ ftSet st idx (FTuple p q l3 l4 sIP dIP sP dP) = do
 
 -- NOTE: fdirCount is based on a value in prgE10kImpl for CFDirFilter
 -- TODO: Get this value by parsing NIC prg instead of hardcoding it
--- FIXME: It will not work for values more than 128 as somewhere we are using
---      Word8 to store and pass these values
---fdirCount = 1024
-fdirCount = 127
+fdirCount = 1024
 
 foreign import ccall "e10k_ctrl_fdir_unset"
     c_fdirUnset :: PLI.StateHandle -> Word8 -> IO Bool
 
 foreign import ccall "e10k_ctrl_fdir_set"
-    c_fdirSet :: PLI.StateHandle -> Word8 -> Word8 -> Word32
+    c_fdirSet :: PLI.StateHandle -> Word32 -> Word8 -> Word32
         -> Word32 -> Word16 -> Word16 -> Word16 -> Word16 -> IO Bool
 
-fdirUnset :: PLI.StateHandle -> Word8 -> IO ()
+fdirUnset :: PLI.StateHandle -> Int -> IO ()
 fdirUnset st idx = do
     waitReady st
-    res <- c_fdirUnset st idx
+    res <- c_fdirUnset st (fromIntegral idx)
     if not res
         then error "e10k_ctrl_fdir_unset failed"
         else return ()
 
-fdirSet :: PLI.StateHandle -> Word8 -> FDirTuple -> IO ()
+fdirSet :: PLI.StateHandle -> Int -> FDirTuple -> IO ()
 fdirSet st idx (FDirTuple q l3 l4 sIP dIP sP dP) = do
-    if idx >= fdirCount
+    if (fromIntegral idx) >= fdirCount
         then error ("################## ERROR: FdirQF index " ++ (show idx) ++ " too high " ++ (show fdirCount) ++ " ############")
         else return ()
     waitReady st
-    res <- c_fdirSet st idx q
+    res <- c_fdirSet st (fromIntegral idx ) q
         (fromMaybe 0 sIP) (fromMaybe 0 dIP)
         (fromMaybe 0 sP) (fromMaybe 0 dP)
         l4' mask

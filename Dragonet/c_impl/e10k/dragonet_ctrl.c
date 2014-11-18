@@ -38,7 +38,7 @@ bool e10k_ctrl_fdir_unset(struct state *state, uint8_t index)
     return false;
 }
 bool e10k_ctrl_fdir_set(struct state *state,
-        uint16_t index, uint8_t queue,
+        uint32_t index, uint8_t queue,
         uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port,
         uint16_t l4_type, uint16_t mask)
 {
