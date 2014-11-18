@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Graphs.LPG (
+    lpgConfig,
     graphH, graphH_
 ) where
 
@@ -7,6 +8,8 @@ import qualified Dragonet.ProtocolGraph as PG
 import Dragonet.ProtocolGraph.Utils (getPGNodeByName)
 import qualified Dragonet.Configuration as C
 import qualified Dragonet.Semantics as SEM
+
+import Dragonet.Endpoint (EndpointDesc(..))
 
 import qualified SMTLib2 as SMT
 import qualified SMTLib2.Core as SMTC
@@ -21,6 +24,28 @@ import Data.String (fromString)
 import Util.Misc (mapT2)
 
 import Graphs.Helpers
+
+
+-- generates the necessary LPG configuration based on the limited number of
+--      endpoints in socket state
+lpgConfig :: [EndpointDesc] -> C.Configuration
+lpgConfig eps = [("RxL4UDPCUDPSockets", PG.CVList cUdpSockets)]
+    where
+        cUdpSockets = map (PG.CVTuple . cUdpSocket) eps
+        cUdpSocket ed = [ PG.CVList $ map buildSock socks,
+                          PG.CVMaybe msIP,
+                          PG.CVMaybe msPort,
+                          PG.CVMaybe mdIP,
+                          PG.CVMaybe mdPort]
+            where
+                socks = edSockets ed
+                msIP = PG.CVInt <$> fromIntegral <$> edIP4Src ed
+                mdIP = PG.CVInt <$> fromIntegral <$> edIP4Dst ed
+                msPort = PG.CVInt <$> fromIntegral <$> edUDPSrc ed
+                mdPort = PG.CVInt <$> fromIntegral <$> edUDPDst ed
+        buildSock sock@(sid,aid) = PG.CVTuple [PG.CVInt $ fromIntegral sid,
+                                   PG.CVInt $ fromIntegral aid]
+
 
 configLPGUDPSockets :: PG.ConfFunction
 configLPGUDPSockets _ _ inE outE cfg = concat <$> mapM addEndpoint tuples

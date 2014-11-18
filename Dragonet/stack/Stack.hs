@@ -17,6 +17,8 @@ import qualified Dragonet.Pipelines.Implementation as PLI
 import qualified Dragonet.Pipelines.Applications as PLA
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.Semantics as Sem
+
+import Dragonet.Endpoint (SocketId,AppId,IPv4Addr,UDPPort,EndpointDesc(..))
 import Dragonet.Flows  (Flow(..))
 
 import Graphs.Cfg (e10kCfgEmpty)
@@ -49,15 +51,6 @@ data AppDesc = AppDesc {
     adGraphHandle :: PLI.GraphHandle
 }
 
-data EndpointDesc = EndpointUDPIPv4 {
-    -- an endpoint might have multiple application sockets
-    edSockets :: [(PLA.SocketId, PLA.AppId)],
-    edIP4Src :: Maybe PLA.IPv4Addr,
-    edIP4Dst :: Maybe PLA.IPv4Addr,
-    edUDPSrc :: Maybe PLA.UDPPort,
-    edUDPDst :: Maybe PLA.UDPPort
-} deriving (Show, Eq, Ord)
-
 epToFlow EndpointUDPIPv4 {edIP4Src = srcIp,
                           edUDPSrc = srcPort,
                           edIP4Dst = dstIp,
@@ -69,15 +62,15 @@ epToFlow EndpointUDPIPv4 {edIP4Src = srcIp,
           flSrcPort  = srcPort }
 
 data StackState = StackState {
-    ssNextAppId :: PLA.AppId,  -- This ID will be given to the next app that tries to connect
-    ssNextSocketId :: PLA.SocketId,
+    ssNextAppId :: AppId,  -- This ID will be given to the next app that tries to connect
+    ssNextSocketId :: SocketId,
     ssNextEndpointId :: EndpointId,
-    ssApplications :: M.Map PLA.AppId AppDesc,
-    ssAppChans :: M.Map PLA.ChanHandle PLA.AppId,
+    ssApplications :: M.Map AppId AppDesc,
+    ssAppChans :: M.Map PLA.ChanHandle AppId,
     ssEndpoints :: M.Map EndpointId EndpointDesc,
     -- A mapping from socketId to EndpointId:
     --  used in spanning
-    ssSockets :: M.Map PLA.SocketId EndpointId,
+    ssSockets :: M.Map SocketId EndpointId,
     -- quick hack to maintain the previous endpoints so that we can find the
     -- difference between the current and the old state. It is probably better
     -- to actually track the changes from the event handlers though.
@@ -310,31 +303,11 @@ eventHandler sstv ch ev = do
 --------------------------------------------------------------------------------
 -- Main
 
--- generates the necessary LPG configuration based on the limited number of
---      endpoints in socket state
-lpgConfig :: [EndpointDesc] -> C.Configuration
-lpgConfig eps = [("RxL4UDPCUDPSockets", PG.CVList cUdpSockets)]
-    where
-        cUdpSockets = map (PG.CVTuple . cUdpSocket) eps
-        cUdpSocket ed = [ PG.CVList $ map buildSock socks,
-                          PG.CVMaybe msIP,
-                          PG.CVMaybe msPort,
-                          PG.CVMaybe mdIP,
-                          PG.CVMaybe mdPort]
-            where
-                socks = edSockets ed
-                msIP = PG.CVInt <$> fromIntegral <$> edIP4Src ed
-                mdIP = PG.CVInt <$> fromIntegral <$> edIP4Dst ed
-                msPort = PG.CVInt <$> fromIntegral <$> edUDPSrc ed
-                mdPort = PG.CVInt <$> fromIntegral <$> edUDPDst ed
-        buildSock sock@(sid,aid) = PG.CVTuple [PG.CVInt $ fromIntegral sid,
-                                   PG.CVInt $ fromIntegral aid]
-
 
 -- generates the necessary LPG configuration based on the stack state
 -- (specifically on the state's endpoints and sockets)
 lpgConfigSS :: StackState -> C.Configuration
-lpgConfigSS ss = lpgConfig allEps
+lpgConfigSS ss = LPG.lpgConfig allEps
     where
         allEps = M.elems $ ssEndpoints ss
 
@@ -376,7 +349,7 @@ instantiateOpt (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
 
             -- get list of all endpoints from stack-state
             let allEps = M.elems $ ssEndpoints ss
-                lpgCfg = lpgConfig allEps
+                lpgCfg = LPG.lpgConfig allEps
 
                 -- Configure LPG with all these endpoints
                 lpgC = C.applyConfig lpgCfg lpgU
@@ -629,7 +602,7 @@ instantiateFlows getConf (prgU,prgHelp) llvmH cfgImpl cfgPLA = do
                 --rmEps = epsDiff prevEps allEps
 
                 -- LPG config is essentially all flows in network stack
-                lpgCfg = lpgConfig allEps
+                lpgCfg = LPG.lpgConfig allEps
                 -- Configure LPG
                 lpgC = C.applyConfig lpgCfg lpgU
 
