@@ -25,6 +25,8 @@ static void app_graph_send(struct dynr_action *act, void *data)
 /**
  * Registers the event handlers, and loops infinitely handling the events
  * using the registered event handlers.
+ *
+ * (called from haskell code)
  */
 void app_control_init(
     const char *stackname,
@@ -157,15 +159,15 @@ void app_control_init(
                     break;
                 case APPCTRL_SOCKET_UDPFLOW:
                     dprintf("APPCTRL_SOCKET_UDPFLOW: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
-                            msg.data.socket_udpflow.s_ip,
-                            msg.data.socket_udpflow.s_port,
-                            msg.data.socket_udpflow.d_ip,
-                            msg.data.socket_udpflow.d_port);
+                            msg.data.socket_udpflow.l_ip,
+                            msg.data.socket_udpflow.l_port,
+                            msg.data.socket_udpflow.r_ip,
+                            msg.data.socket_udpflow.r_port);
                     socket_udpflow(appfds[i],
-                            msg.data.socket_udpflow.s_ip,
-                            msg.data.socket_udpflow.s_port,
-                            msg.data.socket_udpflow.d_ip,
-                            msg.data.socket_udpflow.d_port);
+                            msg.data.socket_udpflow.l_ip,
+                            msg.data.socket_udpflow.l_port,
+                            msg.data.socket_udpflow.r_ip,
+                            msg.data.socket_udpflow.r_port);
                     break;
                 case APPCTRL_SOCKET_SPAN:
                     dprintf("APPCTRL_SOCKET_SPAN\n");

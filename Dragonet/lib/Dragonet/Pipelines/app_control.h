@@ -46,11 +46,12 @@ struct app_control_message {
             uint32_t ip;
             uint16_t port;
         } socket_udplisten;
+        // local/remote UDP endpoints
         struct {
-            uint32_t s_ip;
-            uint32_t d_ip;
-            uint16_t s_port;
-            uint16_t d_port;
+            uint32_t l_ip;
+            uint32_t r_ip;
+            uint16_t l_port;
+            uint16_t r_port;
         } socket_udpflow;
         struct {
             socket_id_t id;

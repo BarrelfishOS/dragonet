@@ -18,7 +18,7 @@ import qualified Dragonet.Pipelines.Applications as PLA
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.Semantics as Sem
 
-import Dragonet.Endpoint (SocketId,AppId,IPv4Addr,UDPPort,EndpointDesc(..))
+import Dragonet.Endpoint (SocketId,AppId,IPv4Addr,UDPPort,EndpointDesc(..),)
 import Dragonet.Flows  (Flow(..))
 
 import Graphs.Cfg (e10kCfgEmpty)
@@ -51,15 +51,20 @@ data AppDesc = AppDesc {
     adGraphHandle :: PLI.GraphHandle
 }
 
-epToFlow EndpointUDPIPv4 {edIP4Src = srcIp,
-                          edUDPSrc = srcPort,
-                          edIP4Dst = dstIp,
-                          edUDPDst = dstPort }
+-- For endpoints, we use local/remote
+-- Should we use the same for flows (instead of Rx/Tx)?
+-- We typically use flows on the Rx side, so the mapping is:
+--  local:  dst
+--  remote: src
+epToFlow EndpointUDPv4 {epLocalIp = lIp,
+                          epLocalPort = lPort,
+                          epRemoteIp = rIp,
+                          epRemotePort = rPort }
    = FlowUDPv4 {
-          flSrcIp = srcIp,
-          flDstIp = dstIp,
-          flDstPort  = dstPort,
-          flSrcPort  = srcPort }
+          flSrcIp = rIp,
+          flDstIp = lIp,
+          flDstPort  = lPort,
+          flSrcPort  = rPort }
 
 data StackState = StackState {
     ssNextAppId :: AppId,  -- This ID will be given to the next app that tries to connect
@@ -208,12 +213,12 @@ eventHandler sstv ch (PLA.EvSocketUDPListen (ip,port)) = do
         let Just aid = M.lookup ch $ ssAppChans ss
             sid = ssNextSocketId ss
             eid = ssNextEndpointId ss
-            ep = EndpointUDPIPv4 {
-                    edSockets = [(sid,aid)],
-                    edIP4Src = Nothing,
-                    edIP4Dst = if ip == 0 then Nothing else Just ip,
-                    edUDPSrc = Nothing,
-                    edUDPDst = if port == 0 then Nothing else Just port
+            ep = EndpointUDPv4 {
+                    epSockets = [(sid,aid)],
+                    epLocalIp = if ip == 0 then Nothing else Just ip,
+                    epLocalPort = if port == 0 then Nothing else Just port,
+                    epRemoteIp = Nothing,
+                    epRemotePort = Nothing
                 }
             ss' = ss {
                 ssNextSocketId = sid + 1,
@@ -229,22 +234,22 @@ eventHandler sstv ch (PLA.EvSocketUDPListen (ip,port)) = do
 {-|
  -  Handing event SocketUDPFlow:
  -      This is prettymuch same as above execution (eventHandler UDPListen),
- -      except that it does not force having Nothing for source IP and port
+ -      except that it does not force having Nothing for remote IP and port
  -      TODO: This function can be written as specialized case of above.
  -}
-eventHandler sstv ch (PLA.EvSocketUDPFlow (sIp,sP) (dIp,dP)) = do
+eventHandler sstv ch (PLA.EvSocketUDPFlow (lIp,lPort) (rIp,rPort)) = do
     (sid,ss) <- STM.atomically $ do
         ss <- STM.readTVar sstv
         -- TODO: check overlapping
         let Just aid = M.lookup ch $ ssAppChans ss
             sid = ssNextSocketId ss
             eid = ssNextEndpointId ss
-            ep = EndpointUDPIPv4 {
-                    edSockets = [(sid,aid)],
-                    edIP4Src =if sIp == 0 then Nothing else Just sIp,
-                    edIP4Dst = if dIp == 0 then Nothing else Just dIp,
-                    edUDPSrc = if sP == 0 then Nothing else Just sP,
-                    edUDPDst = if dP == 0 then Nothing else Just dP
+            ep = EndpointUDPv4 {
+                    epSockets = [(sid,aid)],
+                    epLocalIp =if lIp == 0 then Nothing else Just lIp,
+                    epRemoteIp = if rIp == 0 then Nothing else Just rIp,
+                    epLocalPort = if lPort == 0 then Nothing else Just lPort,
+                    epRemotePort = if rPort == 0 then Nothing else Just rPort
                 }
             ss' = ss {
                 ssNextSocketId = sid + 1,
@@ -254,8 +259,8 @@ eventHandler sstv ch (PLA.EvSocketUDPFlow (sIp,sP) (dIp,dP)) = do
             }
         STM.writeTVar sstv $ ss'
         return (sid,ss')
-    putStrLn $ "SocketUDPFlow f=" ++ show (sIp,sP) ++ "/" ++ show (dIp,dP) ++
-        " -> " ++ show sid
+    putStrLn $ "SocketUDPFlow f=" ++ show (rIp,rPort) ++ "/"
+                ++ show (lIp,lPort) ++ " -> " ++ show sid
     PLA.sendMessage ch $ PLA.MsgSocketInfo sid
     ssUpdateGraphs ss sstv
 
@@ -279,7 +284,7 @@ eventHandler sstv ch (PLA.EvSocketSpan oldsid) = do
             sid = ssNextSocketId ss
             Just ep = M.lookup eid $ ssEndpoints ss
             -- add a new socket with appID and old endpointID to the list
-            ep' = ep { edSockets = (sid,aid):(edSockets ep)}
+            ep' = ep { epSockets = (sid,aid):(epSockets ep)}
             -- Update the stackState with:
             ss' = ss {
                 ssNextSocketId = sid + 1, -- incremented SID

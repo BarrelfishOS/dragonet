@@ -3,7 +3,7 @@ module Dragonet.Endpoint (
     AppId,
     IPv4Addr,
     UDPPort,
-    EndpointDesc(..)
+    EndpointDesc(..),
 ) where
 
 
@@ -15,11 +15,11 @@ type IPv4Addr = Word32
 type UDPPort  = Word16
 
 -- Endpoint descriptor
-data EndpointDesc = EndpointUDPIPv4 {
-    -- an endpoint might have multiple application sockets
-    edSockets :: [(SocketId, AppId)],
-    edIP4Src :: Maybe IPv4Addr,
-    edIP4Dst :: Maybe IPv4Addr,
-    edUDPSrc :: Maybe UDPPort,
-    edUDPDst :: Maybe UDPPort
+data EndpointDesc = EndpointUDPv4 {
+    -- an endpoint might be connected to multiple application sockets
+    epSockets    :: [(SocketId, AppId)],
+    epLocalIp    :: Maybe IPv4Addr,
+    epRemoteIp   :: Maybe IPv4Addr,
+    epLocalPort  :: Maybe UDPPort,
+    epRemotePort :: Maybe UDPPort
 } deriving (Show, Eq, Ord)

@@ -32,17 +32,17 @@ lpgConfig :: [EndpointDesc] -> C.Configuration
 lpgConfig eps = [("RxL4UDPCUDPSockets", PG.CVList cUdpSockets)]
     where
         cUdpSockets = map (PG.CVTuple . cUdpSocket) eps
-        cUdpSocket ed = [ PG.CVList $ map buildSock socks,
-                          PG.CVMaybe msIP,
-                          PG.CVMaybe msPort,
-                          PG.CVMaybe mdIP,
-                          PG.CVMaybe mdPort]
+        cUdpSocket ep = [ PG.CVList $ map buildSock socks,
+                          PG.CVMaybe rIP,
+                          PG.CVMaybe rPort,
+                          PG.CVMaybe lIP,
+                          PG.CVMaybe lPort]
             where
-                socks = edSockets ed
-                msIP = PG.CVInt <$> fromIntegral <$> edIP4Src ed
-                mdIP = PG.CVInt <$> fromIntegral <$> edIP4Dst ed
-                msPort = PG.CVInt <$> fromIntegral <$> edUDPSrc ed
-                mdPort = PG.CVInt <$> fromIntegral <$> edUDPDst ed
+                socks = epSockets ep
+                rIP = PG.CVInt <$> fromIntegral <$> epRemoteIp ep
+                lIP = PG.CVInt <$> fromIntegral <$> epLocalIp ep
+                rPort = PG.CVInt <$> fromIntegral <$> epRemotePort ep
+                lPort = PG.CVInt <$> fromIntegral <$> epLocalPort ep
         buildSock sock@(sid,aid) = PG.CVTuple [PG.CVInt $ fromIntegral sid,
                                    PG.CVInt $ fromIntegral aid]
 

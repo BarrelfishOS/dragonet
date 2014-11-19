@@ -53,6 +53,7 @@ type OpNewApp = ChanHandle -> GraphHandle -> IO ()
 type OpRegister = ChanHandle -> CString -> IO ()
 type OpStopApp = ChanHandle -> Bool -> IO ()
 type OpUDPListen = ChanHandle -> IPv4Addr -> UDPPort -> IO ()
+-- (flow: local ip, local port, remote ip, remote port)
 type OpUDPFlow = ChanHandle -> IPv4Addr -> UDPPort -> IPv4Addr ->
                     UDPPort -> IO ()
 type OpSocketSpan = ChanHandle -> SocketId -> IO ()
@@ -123,8 +124,8 @@ hOpUDPListen :: (ChanHandle -> Event -> IO ()) -> OpUDPListen
 hOpUDPListen eh ch ip port = eh ch $ EvSocketUDPListen (ip,port)
 
 hOpUDPFlow :: (ChanHandle -> Event -> IO ()) -> OpUDPFlow
-hOpUDPFlow eh ch s_ip s_port d_ip d_port =
-    eh ch $ EvSocketUDPFlow (s_ip, s_port) (d_ip, d_port)
+hOpUDPFlow eh ch l_ip l_port r_ip r_port =
+    eh ch $ EvSocketUDPFlow (l_ip, l_port) (r_ip, r_port)
 
 hOpSocketSpan :: (ChanHandle -> Event -> IO ()) -> OpSocketClose
 hOpSocketSpan eh ch si = eh ch $ EvSocketSpan si
