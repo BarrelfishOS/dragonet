@@ -14,6 +14,8 @@ import Dragonet.Predicate (PredExpr, nodePred)
 import qualified Dragonet.Predicate as PR
 import Graphs.Cfg (lpgCfg,prgCfg,prgCfgEmpty)
 
+import qualified Scenarios.S2 as S2
+
 import Data.Maybe
 import Data.Function (on)
 import qualified Data.Graph.Inductive           as DGI
@@ -629,7 +631,7 @@ tests =
 lpgT = LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
 lpgU = fst <$> lpgT
 lpgH = snd <$> lpgT
-lpgC = C.applyConfig lpgCfg <$> lpgU
+lpgC = C.applyConfig S2.lpgConf <$> lpgU
 
 e10kT = E10k.graphH_ "Graphs/E10k/prgE10kImpl.unicorn"
 e10kU = fst <$> e10kT
