@@ -882,44 +882,56 @@ nodePortConnectedToONode g nid port = not $ null $ filter filtFn $ PGU.sucPortNE
                          PG.ONode {} -> True
                          otherwise -> False
 
-embRxNode :: EmbedSt -> PG.PGNode -> Int -> (DGI.Node, PG.NPort) -> EmbNode
-embRxNode st node@(nid, fnode@(PG.FNode {})) idx (prevId, prevPort)
-    | spawnTarget = tr (EmbNode embIdDummy) $ "\nNode:" ++ (pgName node) ++ " is a spawn target"
-    | redundant   = case boolconst of
-                     False -> tr embNodeRedundant $ "\nNode: " ++ (pgName node) ++ " found redundant on PRG endpoint " ++ (show idx) ++ " (" ++ prgRxBoundary st idx ++ ")"
-                     True  -> tr embNodeBoolConst $ "\nNode: " ++ (pgName node) ++ " found boolconst " ++ (alivePort0) ++ " on PRG endpoint " ++ (show idx) ++ " (" ++ prgRxBoundary st idx ++ ")"
-    | partial     = tr embNodePartial $ "\nNode: " ++ (pgName node) ++ " found partial " ++ (show alivePorts) ++ " on PRG endpoint " ++ (show idx) ++ " (" ++ prgRxBoundary st idx ++ ")"
-    | otherwise   = tr (EmbNode embIdDummy) $  "\nNode:" ++ (pgName node) ++ " normal mapping"
+embRxMsg :: PG.PGNode -> Int -> EmbNode -> String
+embRxMsg node idx result = error "NYI"
+  where s0 = "Node:" ++ (pgName node) ++ "mapping (idx=" ++ (show idx) ++ ") :"
+        rest = case result of
+          EmbNode _            -> " Normal"
+          EmbNodeRemoved       -> " Removed"
+          EmbNodePartial _ ps  -> " Partial (alive ports:" ++ (show ps) ++ ")"
+          EmbNodeRedundant _ _ -> " Redundant"
+          EmbNodeBoolConst _ _ -> " Boolconst"
 
- where
-    pred = embRxPred st node idx
-    portExpr p = trN ret msg
-        where portPred = (PR.portPred_ embBld fnode p)
-              ret = (PR.buildAND embBld) [pred, portPred]
-              msg = "      port:" ++ (show p)
-                     ++ "\n\tportPred:" ++ (show portPred)
-                     ++ "\n\tpred:" ++ (ppShow pred)
-                     ++ "\n\texpr:" ++ (ppShow ret)
-    portsExpr = map portExpr $ PG.nPorts fnode
-    spawnTarget = PGU.isSpawnTarget (origLpg st) node
-    ports = PG.nPorts fnode
-    portsExpr' = zip portsExpr ports
-    (deadPs,alivePs) = L.partition ((==PR.PredFalse) . fst) portsExpr'
-    partial = length deadPs > 0
-    alivePorts = map snd alivePs
-    embNodePartial = EmbNodePartial embIdDummy alivePorts
-    aliveP0 = head alivePs
-    (alivePred0, alivePort0) = aliveP0
-    -- check for offload
-    --redundant = length alivePs == 1 && PR.predEquivHard (fst aliveP0) pred
-    redundant = length alivePs == 1 && PR.dnfEquiv alivePred0 pred
-    -- We use a boolconst node if the node is redundand AND the (single) alive
-    -- port is connected to an O-node in the LPG. Note that, due to
-    -- optimizations we might end up with this node connected to an F-node in
-    -- the embedded graph.
-    boolconst = nodePortConnectedToONode (origLpg st) nid alivePort0
-    embNodeRedundant = EmbNodeRedundant alivePort0 (prevId, prevPort)
-    embNodeBoolConst = EmbNodeBoolConst embIdDummy alivePort0
+embRxNode :: PG.PGNode -> Int -> (DGI.Node, PG.NPort) -> Embed EmbNode
+embRxNode node@(nid, fnode@(PG.FNode {})) idx (prevId, prevPort) = do
+    nodePred <- embRxPred node idx
+    lpg      <- ST.gets origLpg
+
+    let portsExpr' = [ (port, portExpr)
+                     | port <- PG.nPorts fnode
+                     , let portPred = PR.portPred embBld node port
+                     , let portExpr = PR.buildAND embBld [nodePred, portPred] ]
+
+        spawnTarget = PGU.isSpawnTarget lpg node
+
+        (deadPs,alivePs) = L.partition ((==PR.PredFalse) . snd) portsExpr'
+        alivePorts = map fst alivePs
+        (alivePort0, alivePred0) = head alivePs
+
+        -- Checks
+        partial = length deadPs > 0
+        -- check for offload
+        redundant = length alivePs == 1 && PR.dnfEquiv alivePred0 nodePred
+        boolconst = nodePortConnectedToONode lpg nid alivePort0
+
+        -- Results
+        embNodePartial = EmbNodePartial embIdDummy alivePorts
+        -- We use a boolconst node if the node is redundand AND the (single) alive
+        -- port is connected to an O-node in the LPG. Note that, due to
+        -- optimizations we might end up with this node connected to an F-node in
+        -- the embedded graph.
+        embNodeRedundant = EmbNodeRedundant alivePort0 (prevId, prevPort)
+        embNodeBoolConst = EmbNodeBoolConst embIdDummy alivePort0
+
+    let ret
+           | spawnTarget = EmbNode embIdDummy
+           | redundant  = case boolconst of
+                             False -> embNodeRedundant
+                             True  -> embNodeBoolConst
+           | partial     = embNodePartial
+           | otherwise   = EmbNode embIdDummy
+
+    return ret
 
 embRxPredCache :: EmbedSt -> Int -> PR.PredCache
 embRxPredCache st idx = trN ret msg
@@ -929,13 +941,16 @@ embRxPredCache st idx = trN ret msg
           msg = "Entry node predicate for idx=" ++ (show idx)
                  ++ " is " ++ (ppShow lpgEntryPred)
 
-embRxPred :: EmbedSt -> PG.PGNode -> Int -> PR.PredExpr
-embRxPred st node idx = trN pred  msg
-    where predCache = embRxPredCache st idx
-          pred = PR.nodePredCache (origLpg st) node predCache
-          msg = "      Pred: Idx:" ++ (show idx)
-                  ++ " node:" ++ (pgName node)
-                  ++ " pred:" ++ (show pred)
+embRxPred :: PG.PGNode -> Int -> Embed PR.PredExpr
+embRxPred node idx = do
+    st <- ST.get
+    let predCache = embRxPredCache st idx
+        -- XXX
+        pred = PR.nodePredCache (origLpg st) node predCache
+        msg = "      Pred: Idx:" ++ (show idx)
+              ++ " node:" ++ (pgName node)
+              ++ " pred:" ++ (show pred)
+    return $ trN pred  msg
 
 embGetNP :: EmbedSt -> (DGI.Node, PG.NPort) -> Int -> Maybe (DGI.Node, PG.NPort)
 embGetNP st (nid, nport) idx = case embGetNodeMap st nid idx of
@@ -959,92 +974,90 @@ prgRxBoundary st idx = pgName $ (embPrgRx st) !! idx
 -- We need to get:
 --  - the predicate for reaching this node
 --  - use it to calculate the incomming edge predicate
-doEmbRx :: EmbedSt -> PG.PGContext -> Int -> EmbNode
-doEmbRx st orig_ctx@(ins, nid, fnode@PG.FNode {}, outs) idx = ret
-    where
-          lpgN = (nid, fnode)
-          -- get previous  node id, label, and label from the LPG
-          (prevId, PG.Edge {PG.ePort = prevPort}) = case embGetPrevL_ st nid of
-              [x] -> x
-              []  -> error $ "Node " ++ (pgName lpgN) ++ " has zero predecessors"
-              otherwise -> error $ "Node " ++ (pgName lpgN) ++ " has more than one predecessors"
-          prevNode = (prevId, fromJust $ DGI.lab (origLpg st) prevId)
+doEmbRx :: PG.PGContext -> Int -> Embed EmbNode
+doEmbRx orig_ctx@(ins, nid, fnode@PG.FNode {}, outs) idx = do
+    st <- ST.get
 
-          -- get the embedded graph node mapping of the previous node
-          prevEmb = embGetNodeMap st prevId idx
+    let lpgN = (nid, fnode)
+        -- get previous  node id, label, and label from the LPG
+        (prevId, PG.Edge {PG.ePort = prevPort}) = case embGetPrevL_ st nid of
+            [x] -> x
+            []  -> error $ "Node " ++ (pgName lpgN) ++ " has zero predecessors"
+            otherwise -> error $ "Node " ++ (pgName lpgN) ++ " has >1 predecessors"
+        prevNode = (prevId, fromJust $ DGI.lab (origLpg st) prevId)
 
-          -- check if the port of the previous node is active.
-          -- If not, we can omit this node. Otherwise figure out the mapping for
-          -- the embedding node
-          portActive_ = embNodePortActive prevEmb prevPort
-          portActive = trN portActive_ ("\n    "
-                                              ++ " [PRG Boundary:"
-                                              ++ prgRxBoundary st idx
-                                              ++ "] => "
-                                              ++ "previous node port:"
-                                              ++ prevPort
-                                              ++ " is active: "
-                                              ++ (show portActive_)
-                                              )
-          ret = case portActive of
-              False -> EmbNodeRemoved
-              True  -> embN
-          embN = embRxNode st lpgN  idx (fromJust $ embGetNP st (prevId, prevPort) idx)
+        -- get the embedded graph node mapping of the previous node
+        prevEmb = embGetNodeMap st prevId idx
+
+        -- check if the port of the previous node is active.
+        -- If not, we can omit this node. Otherwise figure out the mapping for
+        -- the embedding node
+        portActive = embNodePortActive prevEmb prevPort
+
+    case portActive of
+      False -> return EmbNodeRemoved
+      True  -> do
+         embRxNode lpgN idx (fromJust $ embGetNP st (prevId, prevPort) idx)
 
 -- embedding an O-node for Rx
-doEmbRx st orig_ctx@(ins, nid, onode@PG.ONode { PG.nOperator = op}, outs) idx = ret
-  where
-   lpgN = (nid, onode)
-   -- get previous nodes and edges
-   prevs :: [(DGI.Node, PG.Edge)]
-   prevs = embGetPrevL_ st nid
-   (t_prevs, f_prevs) = L.partition (isTruePort . edgePortName_) prevs
-   t_pmaps  = [ embGetNodeMap st nid idx | (nid, e) <- t_prevs ]
-   f_pmaps  = [ embGetNodeMap st nid idx | (nid, e) <- f_prevs ]
-   t_active = [ embNodeEdgeActive nm e | ((_, e), nm) <- zip t_prevs t_pmaps ]
-   f_active = [ embNodeEdgeActive nm e | ((_, e), nm) <- zip f_prevs f_pmaps ]
-   t_all_inactive = and $ map not t_active
-   f_all_inactive = and $ map not f_active
-   all_inactive = t_all_inactive && f_all_inactive
-   predCache = embRxPredCache st idx
+-- TODO: Note sure if this adheres to the O-node semantics (see notes/ONodes)
+doEmbRx orig_ctx@(ins, nid, onode@PG.ONode { PG.nOperator = op}, outs) idx = do
+  st <- ST.get
+  let lpgN = (nid, onode)
+      -- get previous nodes and edges
+      prevs :: [(DGI.Node, PG.Edge)]
+      prevs = embGetPrevL_ st nid
+      (t_prevs, f_prevs) = L.partition (isTruePort . edgePortName_) prevs
+      t_pmaps :: [EmbNode]
+      t_pmaps  = [ embGetNodeMap st nid idx | (nid, e) <- t_prevs ]
+      f_pmaps  = [ embGetNodeMap st nid idx | (nid, e) <- f_prevs ]
+      t_active = [ embNodeEdgeActive nm e | ((_, e), nm) <- zip t_prevs t_pmaps ]
+      f_active = [ embNodeEdgeActive nm e | ((_, e), nm) <- zip f_prevs f_pmaps ]
+      t_all_inactive = and $ map not t_active
+      f_all_inactive = and $ map not f_active
+      all_inactive = t_all_inactive && f_all_inactive
+      predCache = embRxPredCache st idx
 
-   getDepPred :: (DGI.Node, PG.Edge) -> PR.PredExpr
-   getDepPred (nid, PG.Edge { PG.ePort = port }) = p
-       where p  = PR.depPredCache (origLpg st) ((nid,node), port) predCache
-             node = fromJust $ DGI.lab (origLpg st) nid
-   t_preds = map getDepPred t_prevs
-   f_preds = map getDepPred f_prevs
-   pred_port_t  = PR.opPred embBld t_preds (op, "true")
-   pred_port_f  = PR.opPred embBld f_preds ((PR.opNot op), "true")
-   t_port_false = pred_port_t == PR.PredFalse
-   f_port_false = pred_port_f == PR.PredFalse
+      --- XXX
+      getDepPred :: (DGI.Node, PG.Edge) -> PR.PredExpr
+      getDepPred (nid, PG.Edge { PG.ePort = port }) = p
+          where p  = PR.depPredCache (origLpg st) ((nid,node), port) predCache
+                node = fromJust $ DGI.lab (origLpg st) nid
+      t_preds = map getDepPred t_prevs
+      f_preds = map getDepPred f_prevs
+      pred_port_t  = PR.opPred embBld t_preds (op, "true")
+      pred_port_f  = PR.opPred embBld f_preds ((PR.opNot op), "true")
+      t_port_false = pred_port_t == PR.PredFalse
+      f_port_false = pred_port_f == PR.PredFalse
 
-   msg = "    pred_port_t=" ++ (show pred_port_t) ++ "\n" ++
-         "    pred_port_f=" ++ (show pred_port_f) ++ "\n" ++
-         "    t_preds=" ++ (show t_preds) ++ "\n" ++
-         "    f_preds=" ++ (show f_preds) ++ "\n" ++
-         "    embNode=" ++ (show $ ret_) ++ "\n"
+      msg = "    pred_port_t=" ++ (show pred_port_t) ++ "\n" ++
+            "    pred_port_f=" ++ (show pred_port_f) ++ "\n" ++
+            "    t_preds=" ++ (show t_preds) ++ "\n" ++
+            "    f_preds=" ++ (show f_preds) ++ "\n" ++
+            "    embNode=" ++ (show $ ret_) ++ "\n"
 
-   ret = trN ret_ msg
-   ret_ = if all_inactive then EmbNodeRemoved
-          else if t_port_false && f_port_false then EmbNodeRemoved
-          else if f_port_false then trueRet
-          else if t_port_false then falseRet
-          else EmbNode embId
+      ret = trN ret_ msg
+      ret_ = if all_inactive then EmbNodeRemoved
+             else if t_port_false && f_port_false then EmbNodeRemoved
+             else if f_port_false then trueRet
+             else if t_port_false then falseRet
+             else EmbNode embId
 
-   -- only the true (false) port is active
-   --t_prevX = L.find ((PR.predEquivHard pred_port_t) . snd)  (zip t_prevs t_preds)
-   t_prevX = L.find ((PR.dnfEquiv pred_port_t) . snd)  (zip t_prevs t_preds)
-   trueRet  = case t_prevX of
-              Just x  -> EmbNodeRedundant "true" np'
-                 where n = (fst . fst) x
-                       p = edgePortName_ $ (fst x)
-                       np' = fromJust $ embGetNP st (n, p) idx
-              Nothing -> EmbNodePartial embId ["true"]
-   falseRet = EmbNodePartial embId ["false"]
-   -- node will not be enabled
-   emptyRet = (EmbNodeRemoved, Nothing)
-   embId    = embIdDummy
+      -- only the true (false) port is active
+      --t_prevX = L.find ((PR.predEquivHard pred_port_t) . snd)  (zip t_prevs t_preds)
+      t_prevX = L.find ((PR.dnfEquiv pred_port_t) . snd)  (zip t_prevs t_preds)
+      trueRet  = case t_prevX of
+                 Just x  -> EmbNodeRedundant "true" np'
+                    where n = (fst . fst) x
+                          p = edgePortName_ $ (fst x)
+                          np' = fromJust $ embGetNP st (n, p) idx
+                 Nothing -> EmbNodePartial embId ["true"]
+      falseRet = EmbNodePartial embId ["false"]
+      -- node will not be enabled
+      emptyRet = (EmbNodeRemoved, Nothing)
+      embId    = embIdDummy
+
+  return ret
 
 embGetNodeMap :: EmbedSt -> DGI.Node -> Int -> EmbNode
 embGetNodeMap st nid idx = case M.lookup nid (embNodeMap st) of
@@ -1106,23 +1119,18 @@ embUpdate lpgCtx@(_,lpgNid,nlbl,_) embNs_ = do
 
 embedNode :: PG.PGContext -> Embed ()
 embedNode ctx = do
-    st  <- ST.get
     len <- ST.gets dupsNr
-    let embNs :: [EmbNode]
-        embNs = [doEmbNodeTrace st ctx idx | idx <- [0..len-1]]
+    embNs <- ST.mapM (doEmbNode ctx) [0..len-1]
     embUpdate ctx embNs
 
-doEmbNodeTrace :: EmbedSt -> PG.PGContext -> Int -> EmbNode
-doEmbNodeTrace st ctx@(_,_,nlbl,_) idx = trN ret msg
-    where ret = doEmbNode st ctx idx
-          msg = "Node: " ++ (PG.nLabel nlbl) ++ " PRG Endpoint " ++ (show idx)  ++ " mapped to:" ++ (show ret)
-
-doEmbNode :: EmbedSt -> PG.PGContext -> Int -> EmbNode
-doEmbNode st orig_ctx@(ins,nid,nlbl,outs) idx
-    -- One the Tx side, we always embed the node
-    | (curDir st) == EmbTx = EmbNode embIdDummy
-    -- Rx
-    | (curDir st) == EmbRx = doEmbRx st orig_ctx idx
+doEmbNode :: PG.PGContext -> Int -> Embed EmbNode
+doEmbNode orig_ctx@(ins,nid,nlbl,outs) idx = do
+    dir <- ST.gets curDir
+    case dir of
+        -- One the Tx side, we always embed the node
+        EmbTx -> return $ EmbNode embIdDummy
+        -- Rx
+        EmbRx -> doEmbRx orig_ctx idx
 
 embIsQueueNode :: EmbDirection -> PG.Node -> Bool
 embIsQueueNode EmbRx = isRxQueueNode
