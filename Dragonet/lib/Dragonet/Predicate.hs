@@ -16,7 +16,7 @@ module Dragonet.Predicate (
     predFnodePort, opPred, opNot,
     portPred, portPred_,
     --
-    nodePredCache, PredCache,
+    nodePredCache, PredCache, nodePredCache',
     depPredCache,
     --
     parseStr_,
@@ -784,6 +784,14 @@ nodePredCache g n c = fst $ computePred $ initPredCompSt_ {
       predGraph = g
     , predDst   = n
     , predCache = c}
+
+nodePredCache' :: PG.PGraph -> PG.PGNode -> PredCache -> (PredExpr, PredCache)
+nodePredCache' g n c =
+ let (pred,st) = computePred $ initPredCompSt_ {
+                                    predGraph = g
+                                  , predDst   = n
+                                  , predCache = c}
+ in (pred, predCache st)
 
 depPredCache :: PG.PGraph -> (PG.PGNode, PG.NPort) -> PredCache -> PredExpr
 depPredCache g (n,p) c = fst ret

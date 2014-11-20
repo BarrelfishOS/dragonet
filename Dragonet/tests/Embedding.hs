@@ -656,8 +656,6 @@ e10kOffloadU = do
     -- since some queues might not be used, clean up the PRG graph
     return ret'
 
-
-
 remPrefix :: String -> String -> String
 remPrefix prefix str = case L.stripPrefix prefix str of
     Nothing -> str

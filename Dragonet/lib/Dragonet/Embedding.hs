@@ -226,6 +226,8 @@ data EmbedSt = EmbedSt {
     , embPrgRxTags        :: [String]
     -- Unused ports for each node (i.e., points to connect the LPG)
     , embPrgRxUnusedPorts :: [[PG.NPort]]
+    -- Predicate cache for each PRG out node
+    , embRxPredCaches     :: [PR.PredCache]
 
     -- prg in nodes (Tx)
     , embPrgTx     :: [PG.PGNode]
@@ -322,6 +324,7 @@ initEmbedSt prg lpg = EmbedSt {
     , embPrgRxTags  = rxTags
     , embPrgRxPreds = rxPreds
     , embPrgRxUnusedPorts = rxPorts
+    , embRxPredCaches = [] -- see embRxInitPredCaches
     --
     , embPrgTx      = txNodes
     , embPrgTxTags  = txTags
@@ -714,6 +717,7 @@ prEmbed prefix = do
 -- main embedding function
 embedRxTx :: Embed ()
 embedRxTx = do
+    embRxInitPredCaches
     initEmbedDir EmbRx >> embedDir
     initEmbedDir EmbTx >> embedDir
     lpg  <- ST.gets curLpg
@@ -721,7 +725,7 @@ embedRxTx = do
         True -> return ()
         False -> error "Done, but LPG is not empty"
     embedSpawnEdges
-    --embOffloadTx
+    embOffloadTx
     --prEmbed "Before cleanup"
     embCleanup
 
@@ -894,7 +898,7 @@ embRxMsg node idx result = error "NYI"
 
 embRxNode :: PG.PGNode -> Int -> (DGI.Node, PG.NPort) -> Embed EmbNode
 embRxNode node@(nid, fnode@(PG.FNode {})) idx (prevId, prevPort) = do
-    nodePred <- embRxPred node idx
+    nodePred <- embRxPred idx node
     lpg      <- ST.gets origLpg
 
     let portsExpr' = [ (port, portExpr)
@@ -933,24 +937,61 @@ embRxNode node@(nid, fnode@(PG.FNode {})) idx (prevId, prevPort) = do
 
     return ret
 
-embRxPredCache :: EmbedSt -> Int -> PR.PredCache
-embRxPredCache st idx = trN ret msg
-    where ret = M.singleton lpgEntryNid lpgEntryPred
-          lpgEntryNid =  fst $ embLpgRx st
-          lpgEntryPred = (embPrgRxPreds st) !! idx
-          msg = "Entry node predicate for idx=" ++ (show idx)
-                 ++ " is " ++ (ppShow lpgEntryPred)
 
-embRxPred :: PG.PGNode -> Int -> Embed PR.PredExpr
-embRxPred node idx = do
-    st <- ST.get
-    let predCache = embRxPredCache st idx
-        -- XXX
-        pred = PR.nodePredCache (origLpg st) node predCache
+
+--
+-- code for using and dealing with embRxPredCaches
+--   embRxInitPredCaches
+--   embRxPred
+--   embRxDepPred
+--
+--  These functions compute predicates for Rx nodes for the embedding. The
+--  predicates are computed on the original LPG nodes. To account for each PRG
+--  endpoint we initialize a cache for each RPG endpoint where the LPG entry
+--  node has the predicate of the PRG endpoint.
+embRxInitPredCaches :: Embed ()
+embRxInitPredCaches = do
+    prgPreds        <- ST.gets embPrgRxPreds
+    (lpgEntryNid,_) <- ST.gets embLpgRx
+
+    let caches = [M.singleton lpgEntryNid pred | pred <- prgPreds]
+
+    ST.modify $ \st -> st { embRxPredCaches = caches }
+    return ()
+
+embRxPredCache :: Int -> EmbedSt -> PR.PredCache
+embRxPredCache idx st =  case embRxPredCaches st of
+    [] -> error "No caches found. Have you called embRxInitPredCaches?"
+    xs -> xs !! idx
+
+lUpdate :: [a] -> Int -> a -> [a]
+lUpdate [] _ _ = error "lUpdate: list larger than index"
+lUpdate (x:xs) idx e = case idx of
+                          0          -> e:xs
+                          otherwise  -> x:(lUpdate xs (idx-1) e)
+embRxPred :: Int -> PG.PGNode -> Embed PR.PredExpr
+embRxPred idx node = do
+    lpg   <- ST.gets origLpg
+    predCache <- ST.gets (embRxPredCache idx)
+    let
+        (pred,predCache') = PR.nodePredCache' lpg node predCache
         msg = "      Pred: Idx:" ++ (show idx)
               ++ " node:" ++ (pgName node)
               ++ " pred:" ++ (show pred)
+    -- update cache
+    ST.modify $ \st -> st { embRxPredCaches =
+                               lUpdate (embRxPredCaches st) idx predCache'}
     return $ trN pred  msg
+
+embRxDepPred :: Int -> (DGI.Node, PG.Edge) -> Embed PR.PredExpr
+embRxDepPred idx (nid, PG.Edge { PG.ePort = port }) = do
+    lpg <- ST.gets origLpg
+    predCache <- ST.gets (embRxPredCache idx)
+    let node = (nid, fromJust $ DGI.lab lpg nid)
+        ret = PR.depPredCache lpg (node,port) predCache
+    -- TODO: update cache
+    return ret
+
 
 embGetNP :: EmbedSt -> (DGI.Node, PG.NPort) -> Int -> Maybe (DGI.Node, PG.NPort)
 embGetNP st (nid, nport) idx = case embGetNodeMap st nid idx of
@@ -1016,16 +1057,11 @@ doEmbRx orig_ctx@(ins, nid, onode@PG.ONode { PG.nOperator = op}, outs) idx = do
       t_all_inactive = and $ map not t_active
       f_all_inactive = and $ map not f_active
       all_inactive = t_all_inactive && f_all_inactive
-      predCache = embRxPredCache st idx
 
-      --- XXX
-      getDepPred :: (DGI.Node, PG.Edge) -> PR.PredExpr
-      getDepPred (nid, PG.Edge { PG.ePort = port }) = p
-          where p  = PR.depPredCache (origLpg st) ((nid,node), port) predCache
-                node = fromJust $ DGI.lab (origLpg st) nid
-      t_preds = map getDepPred t_prevs
-      f_preds = map getDepPred f_prevs
-      pred_port_t  = PR.opPred embBld t_preds (op, "true")
+  t_preds <- ST.mapM (embRxDepPred idx) t_prevs
+  f_preds <- ST.mapM (embRxDepPred idx) f_prevs
+
+  let pred_port_t  = PR.opPred embBld t_preds (op, "true")
       pred_port_f  = PR.opPred embBld f_preds ((PR.opNot op), "true")
       t_port_false = pred_port_t == PR.PredFalse
       f_port_false = pred_port_f == PR.PredFalse
