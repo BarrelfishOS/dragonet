@@ -23,21 +23,17 @@ import Dragonet.Flows  (Flow(..))
 
 import Graphs.Cfg (e10kCfgEmpty)
 
-import qualified Data.Maybe as MB
-
 import qualified Data.Graph.Inductive as DGI
 import Control.Applicative ((<$>))
 import Util.GraphHelpers (findNodeByL)
 import qualified Dragonet.ProtocolGraph.Utils as PGU
 
-import qualified Graphs.Tap as Tap
 import qualified Graphs.LPG as LPG
 import qualified Graphs.ImplTransforms as IT
 
 import Runner.Dynamic (createPipeline, createPipelineClient)
 
 import qualified Control.Concurrent.STM as STM
-import Control.Concurrent (threadDelay)
 import qualified Data.Map as M
 import qualified Data.Set as S
 

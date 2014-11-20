@@ -19,7 +19,6 @@ import Data.Function (on)
 import qualified Data.List  as L
 import qualified Data.Map   as M
 import qualified Data.Set   as S
-import qualified Data.Tuple as T
 
 import qualified Data.Graph.Inductive           as DGI
 import qualified Data.Graph.Inductive.Query.DFS as DFS
