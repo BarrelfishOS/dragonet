@@ -52,6 +52,17 @@ data AppDesc = AppDesc {
 -- We typically use flows on the Rx side, so the mapping is:
 --  local:  dst
 --  remote: src
+--
+--  Note that endpoints are conceptually different than flows:
+--   - Endpoints are LPG nodes that are (typically) configured by the
+--     application and are "programming" the net stack to steer packets into
+--     particular buffers (i.e., sockets)
+--
+--   - Flows, on the other hand, are packet classes that are used to evaluate
+--     PRG configurations via cost functions. Given a set of flows, we use the
+--     PRG to determine how these flows are mapped into the queues for a given
+--     configuration. Then, we evaluate these mappings using a cost function.
+--
 epToFlow EndpointUDPv4 {epLocalIp = lIp,
                           epLocalPort = lPort,
                           epRemoteIp = rIp,
