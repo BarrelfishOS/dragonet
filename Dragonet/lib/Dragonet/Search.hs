@@ -255,6 +255,7 @@ instance OracleSt E10kOracleSt E10kConfChange where
 
     -- QUESTION: Is it assumed that there will be only one operation in
     --      conf change?
+    -- affectedQueues E10kOracleSt { nQueues = nq } _ _ = allQueues nq
     affectedQueues E10kOracleSt { nQueues = nq } conf (E10kInsert5T c5t) =
         [e10kDefaultQ, xq]
         where xq = E10k.c5tQueue $ E10k.parse5t c5t
@@ -430,8 +431,17 @@ searchGreedyFlows_ st (curCnf, curFlows, curQmap) (f:fs) = do
         prgU        = sPrgU $ sParams st
 
         -- Configuration changes suggested by Oracle for adding single flow f
-        confChanges = flowConfChanges oracle curCnf f
-        newCurFs    = f:curFlows
+        confChanges  = flowConfChanges oracle curCnf f
+        newCurFs = xtr f:curFlows
+        -- spew out a warning when processing the same flow more than once,
+        -- because it might lead to problems. One example is that it breaks the
+        -- current assumption of affectedQueues when incrementally calculating
+        -- the qmap
+        xtr = case f `elem` curFlows of
+            False -> id
+            True ->  trace  ("Flow " ++ (flowStr f) ++ " was seen before!"
+                             ++ " this might cause problems")
+
 
     -- Finding out the costs for all the configurations suggested by Oracle
     conf_costs <- forM confChanges $ \cc -> do
@@ -971,8 +981,6 @@ connectFlows nflows = [ FlowUDPv4 {
    , flDstPort  = Just $ fromIntegral $ 1000 + i
    , flSrcIp    = Just 123
    , flSrcPort  = Just 7777 } | i <- [1..nflows] ]
-
-
 
 test = do
     -- unconfigured PRG
