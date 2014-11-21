@@ -38,6 +38,7 @@ import qualified Scenarios.S1 as S1
 tr a b = trace b a
 trN a b = a
 
+{-
 localIP :: Word32
 localIP = MD.asiagoIP_E10K
 --localIP = MD.burrataIP
@@ -165,7 +166,7 @@ add5TupleToConf conf ep q = ("RxC5TupleFilter", new5t):rest
 
 addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
 addToCVL (PG.CVList l) v = PG.CVList $ v:l
-
+-}
 
 --------------------------------------------------
 

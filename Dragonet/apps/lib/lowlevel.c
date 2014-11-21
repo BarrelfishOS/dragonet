@@ -332,10 +332,10 @@ errval_t dnal_socket_bind(dnal_sockh_t                 sh,
             msg.data.socket_udplisten.port = dest->data.ip4udp.port_local;
         } else {
             msg.type = APPCTRL_SOCKET_UDPFLOW;
-            msg.data.socket_udpflow.s_ip = dest->data.ip4udp.ip_remote;
-            msg.data.socket_udpflow.d_ip = dest->data.ip4udp.ip_local;
-            msg.data.socket_udpflow.s_port = dest->data.ip4udp.port_remote;
-            msg.data.socket_udpflow.d_port = dest->data.ip4udp.port_local;
+            msg.data.socket_udpflow.r_ip = dest->data.ip4udp.ip_remote;
+            msg.data.socket_udpflow.l_ip = dest->data.ip4udp.ip_local;
+            msg.data.socket_udpflow.r_port = dest->data.ip4udp.port_remote;
+            msg.data.socket_udpflow.l_port = dest->data.ip4udp.port_local;
         }
     } else {
         return DNERR_BADDEST;

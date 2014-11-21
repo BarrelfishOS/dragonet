@@ -129,14 +129,13 @@ get_repository () {
     git clone /cdrom/casper/mount/repository/dragonet
     cd dragonet
     #git checkout execmodel
-    git checkout nsdi15
+    git checkout kkourt-nsdi15
 }
 
 
 install_dpdk() {
-    cd ${MYBASE}/dragonet/dpdk-1.5.0r1/
+    cd ${MYBASE}/dragonet/dpdk-1.7.1/
     ./doConfig.sh
-    make
 }
 
 install_openonload() {
@@ -154,21 +153,31 @@ install_Dragonet() {
 sudo apt-get install -y clang-3.4 clang-3.4-doc libclang-common-3.4-dev libclang-3.4-dev libclang1-3.4 libclang1-3.4-dbg libllvm-3.4-ocaml-dev libllvm3.4 libllvm3.4-dbg lldb-3.4 llvm-3.4 llvm-3.4-dev llvm-3.4-doc llvm-3.4-examples llvm-3.4-runtime clang-modernize-3.4 clang-format-3.4 python-clang-3.4 lldb-3.4-dev
 
 sudo apt-get install -y ghc cabal-install zlib1g-dev g++-4.6 happy
+sudo apt-get install -y ghc*-prof
 
     cd ${MYBASE}
-    # copy cabal installation from root if you are not root
-    if [[ "$HOME" == "/root" ]]; then
-        echo "installing as root user, so skipping cabal-install as it should be already there!"
-    else
-        cabal update
-        cabal install cabal-install
-        export PATH="${HOME}/.cabal/bin:$PATH"
-    fi
+
+    cabal update
+    cabal install cabal-install
+    export PATH="${HOME}/.cabal/bin:$PATH"
 
     cd ${MYBASE}/dragonet/Dragonet/
+
+    echo "Cleaning up old installation"
+    rm -rf ./dist
+    rm -rf .cabal_sandbox
+
+    echo "Preparing sandbox"
     ./prepare_sandbox.sh
-    cabal build llvm-cgen llvm-cgen-e10k bench-echo llvm-cgen-sf
+
+    # FIXME: make sure that the z3 library exists
+
+    cabal install z3 --extra-include-dirs=/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/include/ --extra-lib-dirs=/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/bin/
+
+    #cabal build llvm-cgen llvm-cgen-e10k bench-echo llvm-cgen-sf
+    cabal build bench-fancyecho stack-tap stack-e10k-dummy stack-sf stack-e10k
 }
+
 
 install_memcached() {
     cd ${MYBASE}/dragonet/benchmarking/memcached/
@@ -192,12 +201,15 @@ install_others() {
 install_z3_related() {
     cd ~/
     cp -r /cdrom/casper/mount/bin/z3Solver/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/ .
+    link_and_compile_z3
+}
+
+link_and_compile_z3() {
     cd /usr/bin/
     sudo ln -s /home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/bin/z3 z3
     sudo cp ~/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/bin/libz3.so /lib/x86_64-linux-gnu/
 
-    cd ~/dragonet/Dragonet
-    cabal install z3 --extra-include-dirs=/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/include/ --extra-lib-dirs=/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/bin/
+    install_Dragonet
 }
 
 install_server_related() {
@@ -211,6 +223,26 @@ install_client_related() {
 }
 
 
+install_spark_related() {
+    #sudo apt-get update
+    sudo apt-get install -y openjdk-7-jre-headless scala openjdk-7-jdk
+    cd ${HOME}
+    #tar -xf /cdrom/casper/mount/spark/spark-1.1.0-bin-hadoop2.4.tgz
+    install_spark_nfs
+}
+
+refresh_nfs() {
+    sudo umount "${HOME}/spark"
+    sudo mount -t nfs -o proto=tcp,port=2049  10.110.4.4:/local/nfs/pravin/spark/spark-1.1.0   ./spark
+}
+
+
+install_spark_nfs() {
+    sudo apt-get -o Dpkg::Options::="--force-confnew" install -y nfs-common
+    mkdir -p "${HOME}/spark"
+    sudo mount -t nfs -o proto=tcp,port=2049  10.110.4.4:/local/nfs/pravin/spark/spark-1.1.0   ./spark
+}
+
 show_usage() {
         echo "Please specify what you want to install"
         echo "Usage: ${0} [-g -s -c -o -d -v]"
@@ -220,12 +252,16 @@ show_usage() {
         echo "           -c -->  compile and install client side of dragonet"
         echo "           -s -->  compile and install server side of dragonet"
         echo "           -v -->  setup vim configuration (pravin's configuration)"
+        echo "           -z -->  install z3 related"
+        echo "           -l -->  Only link and compile DN with z3"
+        echo "           -p -->  install spark deps"
+        echo "           -r -->  refresh NFS mount for spark"
         echo "Examples (installing everything): ${0} -g -d -o -c -s"
         echo "Examples (installing minimal client):: ${0} -g -c"
         exit 1
 }
 
-while getopts ":gcsdov" opt; do
+while getopts ":gcsdovzprl" opt; do
   case $opt in
     g)
         echo "-g was triggered, cloning git repo"
@@ -251,6 +287,23 @@ while getopts ":gcsdov" opt; do
         echo "-v was triggered, setting up pravin's vim configuration"
         VIMSETUP="yes"
       ;;
+    p)
+        echo "-p was triggered, setting up spark deps"
+        SPARKSETUP="yes"
+      ;;
+    r)
+        echo "-r was triggered, refreshing spark nfs mount by remounting it"
+        REFRESHNFS="yes"
+      ;;
+    z)
+        echo "-z was triggered, setting up z3"
+        Z3SETUP="yes"
+      ;;
+    l)
+        echo "-z was triggered, setting up z3"
+        Z3LINKCOMPILE="yes"
+      ;;
+
     \?)
         echo "Invalid option: -$OPTARG" >&2
         show_usage
@@ -294,6 +347,37 @@ if [ "${SERVERCOMPILE}" == "yes" ] ; then
 else
     echo "Skipping Compiling Dragonet server side"
 fi
+
+if [ "${SPARKSETUP}" == "yes" ] ; then
+    echo "Installing spark setup"
+    install_spark_related
+else
+    echo "Skipping Installing z3 setup"
+fi
+
+
+if [ "${REFRESHNFS}" == "yes" ] ; then
+    echo "Refreshing Spark NFS mount"
+    refresh_nfs
+else
+    echo "Skipping Refreshing Spark NFS mount"
+fi
+
+if [ "${Z3SETUP}" == "yes" ] ; then
+    echo "Installing z3 setup"
+    install_z3_related
+else
+    echo "Skipping Installing z3 setup"
+fi
+
+if [ "${Z3LINKCOMPILE}" == "yes" ] ; then
+    echo "Linking z3 and compiling dragonet with it"
+    link_and_compile_z3
+else
+    echo "Linking z3 and compiling it"
+fi
+
+
 
 if [ "${CLIENTCOMPILE}" == "yes" ] ; then
     echo "Compiling Dragonet client side"
