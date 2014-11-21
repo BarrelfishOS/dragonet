@@ -35,14 +35,12 @@ import qualified Data.Map.Strict      as M
 import qualified Data.Set             as S
 import qualified Data.Graph.Inductive as DGI
 
-import Data.Word
 import Data.Maybe
 import Data.Int
 import Data.Function (on)
 import Data.Char (isDigit)
 
 import qualified Control.Monad.ST        as ST
-import qualified Data.STRef              as STR
 
 import Control.Monad (forM)
 import qualified Data.HashTable.ST.Basic as HB
