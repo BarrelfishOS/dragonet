@@ -68,7 +68,7 @@ e10kCfgStr cnf_ = ret
                           $ E10k.parse5tCFG c
            cfdt = case L.lookup "RxCFDirFilter" cnf of
                Nothing -> []
-               Just c  -> map (((++) " ") . E10k.cFDtString)
+               Just c  -> map (((++) " ") . E10k.cFDtFullString)
                           $ E10k.parseFDirCFG c
 
 prgCfg = [

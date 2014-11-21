@@ -23,6 +23,6 @@ main = do
                  , Search.sStrategy = Search.searchGreedyFlows
             }
         conf = Search.runSearch sparams S1.sortedRealFlows
-    putStrLn $ "connected flows used: " ++ (ppShow S1.sortedRealFlows)
-    putStrLn $ "Cost function: \n" ++  ppShow conf
+    --putStrLn $ "connected flows used: " ++ (ppShow S1.sortedRealFlows)
+    putStrLn $ "Configuration: " ++ (Search.showConf  e10kOracle conf)
 

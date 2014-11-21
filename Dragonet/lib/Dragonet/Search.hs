@@ -8,6 +8,7 @@ module Dragonet.Search (
   SearchSt(..),
   initSearchSt,
   runSearch,
+  OracleSt(..),
   E10kOracleSt(..),
   sfOracleInit,
   searchGreedyFlows,
@@ -24,7 +25,7 @@ import qualified Dragonet.Implementation.IPv4 as IP4
 
 import Dragonet.DotGenerator (toDot)
 import Dragonet.Conventions (rxQPref, isTruePort, isFalsePort)
-import Dragonet.Flows(Flow (..), flowPred)
+import Dragonet.Flows(Flow (..), flowPred, flowStr)
 
 import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Graphs.E10k as E10k
@@ -57,25 +58,32 @@ trN a b = a
 allQueues :: Int -> [QueueId]
 allQueues nq = [1..(nq-1)] ++ [0] :: [QueueId]
 
--- NB that due to the ordering, costOK will always have the smaller value, and
+-- NB: due to ordering, costOK will always have the smaller value, and
 -- costReject will always have the highest value.
 -- NB: instead of using L.minimum we can implement a function that  can
 -- short-circuit CostOK to save some iterations.
--- i.e., L.minimum $ CostOK:[CostVal $ 0.1 + i | i <- [1..]]
+-- e.g., L.minimum $ CostOK:[CostVal $ 0.1 + i | i <- [1..]]
 -- will never return
 data Cost = CostOK         |
             CostVal Float  |
-            CostReject Float -- small hack to rate rejected solutions
+            CostReject Float -- reject value allows to rate rejected solutions
     deriving (Eq, Ord, Show)
 
--- cost functions based on how flows are mapped into queues
 type QueueId     = Int
 type QMap        = [(Flow, QueueId)]
 --type QMap        = M.Map Flow QueueId
-type CostQueueFn = QMap -> Cost
 
+qmapStr_ :: (Flow,QueueId) -> String
+qmapStr_ (f,q) = (flowStr f) ++ "-> Q" ++ (show q)
+
+qmapStr :: [(Flow,QueueId)] -> String
+qmapStr flows = "QMAP:\n" ++ L.intercalate "\n" [ "  " ++ qmapStr_ f | f <- flows ]
+
+-- There are two types of cost functions:
+-- cost functions based on how flows are mapped into queues
+--   User-defined cost functions use this form
+type CostQueueFn = QMap -> Cost
 -- the basic form of a cost function for the search algorithms
---type CostFn s = [Flow] -> C.Configuration -> ST.ST s Cost
 type CostFn a s = (ConfChange a)
                 => [Flow] -> C.Configuration -> a -> ST.ST s Cost
 
@@ -87,11 +95,12 @@ class ConfChange a where
     applyConfChange :: C.Configuration -> a -> C.Configuration
 
 {-|
-  Class 'OracleSt' encomasses most of the functionality for an Oracle.
-  It gives a way to iterate over the configuration space,
-  in addition to a way to initialize and show the configuration.
+  Class 'OracleSt' is the NIC-specific implementation for an Oracle
+  It provides means to iterate the configuration space,
+  and means to initialize and show the configuration.
   NOTE: (we will probably have to rethink the interface)
   TODO: Understand what '|' means in class declaration --PS
+        see: https://www.haskell.org/haskellwiki/Functional_dependencies --AKK
 -}
 class (ConfChange a) => OracleSt o a | o -> a where
     -- seems too OO, but not sure how to do it better
@@ -100,28 +109,26 @@ class (ConfChange a) => OracleSt o a | o -> a where
     -- | 'showConf' converts the configuration to string for printing and debugging
     showConf   ::       o -> C.Configuration -> String
     -- iterators
-    -- | 'flowConfChanges' will return suggestion configuration changes for
-    -- |     a new flow
+    -- | 'flowConfChanges' returns configuration changes for a new flow
     flowConfChanges ::
-        -- | Oracle specific information
+        -- | Oracle
            o
-        -- | FIXME: configuration of what? Is it current NIC configuration?
+        -- | Current configuration
         -> C.Configuration
-        -- | New flow to add into the system
+        -- | New flow to consider
         -> Flow
-        -- | suggested policy change
+        -- | A set of configuration changes
         -> [a]
-    -- used for incremental update of qmap
+
+    -- affected queues: used for incremental update of qmap
     -- | Returns the queues that may get affected by this change.
     -- | Note that it always includes the default queue as it will
     -- | get affected as some traffic will stop appearing there.
     affectedQueues  :: o -> C.Configuration -> a -> [QueueId]
 
-type FlowCache s      = HB.HashTable s (PG.NLabel, Flow) PG.NPort
 
 {-|
- The class 'SearchParams' includes all the functionality related to Oracle
-    and searching for proper configuration.
+ The class 'SearchParams' contains the search parameters
 -}
 data SearchParams o a = (OracleSt o a) => SearchParams {
     -- | The actual Oracle function
@@ -268,6 +275,8 @@ initSearchParams = SearchParams {
     , sOrderFlows = id
 }
 
+type FlowCache s      = HB.HashTable s (PG.NLabel, Flow) PG.NPort
+
 data SearchSt s o a = (OracleSt o a) => SearchSt {
       sParams     :: SearchParams o a
     , sFlowCache  :: FlowCache s
@@ -320,6 +329,7 @@ qMap st conf confChange flows = do
 qmapHT :: QMap -> ST.ST s (HB.HashTable s Flow QueueId)
 qmapHT qmap = H.fromList qmap
 
+-- NOTE: This is not used, but is kept around for future reference
 qMapIncremental :: (OracleSt o a)
                 => SearchSt s o a -> C.Configuration -> a -> [Flow] -> QMap
                 -> ST.ST s (PG.PGraph, C.Configuration, QMap)
@@ -427,14 +437,21 @@ searchGreedyFlows_ st (curCnf, curFlows, curQmap) (f:fs) = do
     conf_costs <- forM confChanges $ \cc -> do
         (prgC, newCnf, qmap) <- zQmapIncremental st curCnf cc newCurFs  curQmap
         return (newCnf, costFn qmap, qmap)
+    let msg_all_costs = L.intercalate "\n"
+                           ["C" ++ (show idx) ++ "\n " ++ (showConf oracle cnf)
+                             ++ "\n COST:" ++ (show cost)
+                             ++ "\n " ++ (qmapStr qmap) ++ "\n"
+                           | (idx,(cnf,cost,qmap)) <- zip [1..] conf_costs]
 
     -- selecting the configuration with minimum cost cost
     let snd3 (_,x,_) = x
         (best_cnf, lower_cost, qmap') =  L.minimumBy (compare `on` snd3) conf_costs
         msg = "searchGreedyFlows_: step:"
             ++ (show $ length curFlows)
-            ++ " cost is " ++ (show lower_cost)
-            ++ "\nSELECTED " ++ (showConf oracle best_cnf)
+            -- ++ "\n" ++ msg_all_costs
+            ++ "  => lower cost is " ++ (show lower_cost)
+            ++ "\n=> SELECTED configuration is " ++ (showConf oracle best_cnf)
+            ++ "\n"
 
     -- Apply same stragegy for rest of the flows, but with modified running conf
     recurse <- searchGreedyFlows_ st (best_cnf, newCurFs, qmap') fs
@@ -763,8 +780,12 @@ doFlowQueueNextPort_ flPred ((port,portPred_):rest) = ret
                 False -> doFlowQueueNextPort_ flPred rest
 
 doFlowNextPort :: (Flow, PR.PredExpr) -> PG.Node -> ST.ST s PG.NPort
-doFlowNextPort (_, flPred) node = return $ doFlowQueueNextPort_ flPred nPreds
+doFlowNextPort (fl, flPred) node = return ret'
     where nPreds = PG.nPredicates node
+          ret = doFlowQueueNextPort_ flPred nPreds
+          ret' = trN ret $ "Flow:" ++ (flowStr fl) ++
+                          " Node:"  ++ (PG.nLabel node) ++
+                          " Port:" ++ ret
 
 doFlowNextPortCache :: FlowCache s
                     -> (Flow, PR.PredExpr)
@@ -785,7 +806,9 @@ doFlowQueue :: FlowCache s -> PG.PGGDecomp -> (Flow, PR.PredExpr)
             -> ST.ST s QueueId
 --doFlowQueue fc g (nid,node@(PG.FNode {PG.nLabel = lbl})) flowT
 doFlowQueue fc d@(ctx, g) flowT
-    | Just q <- reachedQueue lnode = return q
+    | Just q <- reachedQueue lnode = return $ trN q
+                                            $ "Flow:" ++ (flowStr $ fst flowT)
+                                            ++ " Reached Queue:" ++ (show q)
     | otherwise = do
           nextPort <- case node of
                 PG.FNode {} -> doFlowNextPortCache fc flowT (snd lnode)
@@ -881,17 +904,23 @@ zQmapIncremental st conf confChange flows oldQmap_ = do
 
     return $ (prgC, conf, qmap0 ++ qmap)
 
-sucPortCtx_ :: PG.PGContext -> PG.NPort -> DGI.Node
-sucPortCtx_ ctx port = fst next
+sucPortCtx_ :: PG.PGraph -> PG.PGContext -> PG.NPort -> DGI.Node
+sucPortCtx_ g ctx port = fst next
     where sucs = DGI.lsuc' ctx
-          next = case L.find (\ (_,s) -> port == PGU.edgePort_ s) sucs of
-                Just x  -> x
-                Nothing -> error $ "Cannot find successor of node:" ++ nodeL ++ " on port:" ++ port
+          sucsPort =  L.filter (\ (_,s) -> port == PGU.edgePort_ s) sucs
+          next = case sucsPort of
+                [x] -> x
+                []  -> error $ "Cannot find successor of node:" ++ nodeL ++" on port:" ++ port
+                xs  -> error $ "More than one successors on node:" ++ nodeL ++
+                               " for port:" ++ port ++
+                               " -> " ++  (show nextLs)
           nodeL = PG.nLabel $ DGI.lab' ctx
+          nextLs = [ PG.nLabel n | (x,_) <- sucsPort
+                                 , let n = fromJust $ DGI.lab g x ]
 
 sucPortDecomp :: PG.PGGDecomp -> PG.NPort -> PG.PGGDecomp
 sucPortDecomp (ctx, g) port = ret
-    where next = sucPortCtx_ ctx port
+    where next = sucPortCtx_ g ctx port
           ret  = doMatch next g
 
 doMatch :: DGI.Node -> PG.PGraph -> PG.PGGDecomp
@@ -961,11 +990,13 @@ test = do
                                    , sCostFn = costFn
                                    , sStrategy = searchGreedyFlows}
 
-        conflows = connectFlows 10
-        conf = runSearch params $  conflows
+        conflows = connectFlows 40
+        conf = runSearch params conflows
+        prgC = C.applyConfig conf prgU
         --conf = runSearch params $ connectFlows 10
-    print $ "connected flows : " ++ (ppShow conflows)
-    print $ "Cost function: " ++ ppShow conf
+    --print $ "connected flows : " ++ (ppShow conflows)
+    putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
+    writeFile "tests/search-prg-result.dot" $ toDot prgC
 
     return ()
 

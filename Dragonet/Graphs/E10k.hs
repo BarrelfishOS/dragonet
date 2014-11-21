@@ -9,7 +9,7 @@ module Graphs.E10k (
 
     parse5tCFG, c5tString, c5tFullString,
     parse5t,
-    parseFDirCFG, cFDtString,
+    parseFDirCFG, cFDtString, cFDtFullString,
     parseFDT,
     flowQueue,
     graphH, graphH_
@@ -231,39 +231,57 @@ nodeL5Tuple c = (PG.baseFNode (c5tString c) bports) {
             SMT.app "L4.Proto" [pkt] SMTC.=== SMT.app "L4P.UDP" []
             ]
 
-config5tuple :: ConfFunction
-config5tuple _ _ inE outE cfg = do
+-- Common helper for configuring 5-tuple and FD configuration nodes
+--  NB: Eventually, we might want to better abstract these "filter" nodes
+doConfigFilter :: (ConfValue -> [a])
+               -> (a -> PG.Node)
+               -> (a -> QueueID)
+               -> ConfFunction
+doConfigFilter parseConf mkNodeLabel getQueue _ _ inE outE cfg = do
     ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
     let lastEdge = (endN,defaultN,endP)
     return (edges ++ [lastEdge])
     where
-        -- Node and Port for the incoming edge for the first node
-        start = (fst $ fst $ head inE, snd $ head inE)
-        -- Node for default queue
-        (Just ((defaultN,_),_)) = L.find ((== "default") . ePort . snd) outE
-        -- Lookup node id for specified queue
-        queue i = queueN
-            --(Just ((queueN,_),_)) = L.find (isRxQValidN i . fst) outE
-            where queueN = case L.find (isRxQValidN i . fst) outE of
-                            Just ((x,_),_) -> x
-                            Nothing -> error $ "E10k.config5tuple: no RxQValid for queue=" ++ (show i) ++ " Does queue exist?"
+      -- Node and Port for the incoming edge for the first node
+      start :: (DGI.Node, PG.Edge)
+      start = (fst $ fst $ head inE, snd $ head inE)
+      -- Node for default queue
+      defaultN :: DGI.Node
+      (Just ((defaultN,_),_)) = L.find ((== "default") . ePort . snd) outE
+      -- Lookup node id for specified queue
+      queue :: QueueID -> DGI.Node
+      queue i = queueN
+        where queueN = case L.find (isRxQValidN i . fst) outE of
+                         Just ((x,_),_) -> x
+                         Nothing -> error errmsg
+              errmsg = "E10k.config5tuple: no RxQValid for queue=" ++ (show i)
+                        ++ " Does queue exist?"
+      cfgs = parseConf cfg
 
+      addFilter ((iN,iE),es) c = do
+         (n,_) <- confMNewNode $ mkNodeLabel c
+         let inEdge = (iN,n,iE)
+         let tEdge = (n,queue $ getQueue c,Edge "true")
+         let fEdge = (n,queue $ getQueue c,Edge "false")
+         -- NB: We do not include the false edge to the OR queue node, to make
+         -- it easier to reason about where flows end up in things like
+         -- flowQueue
+         -- return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
+         return ((n,Edge "false"), es ++ [inEdge,tEdge])
 
-        -- Get filter configurations ordered by priority
-        cmpPrio = compare `on` c5tPriority
-        cfgs_ = reverse $ L.sortBy cmpPrio $ parse5tCFG cfg
-        cfgs = trN cfgs_ (ppShow cfgs_)
+config5tuple :: ConfFunction
+config5tuple = doConfigFilter parseConf mkNodeLabel getQueue
+    where parseConf c = trN cfgs_ (ppShow cfgs_)
+            where cmpPrio = compare `on` c5tPriority
+                  cfgs_ = reverse $ L.sortBy cmpPrio $ parse5tCFG c
+          mkNodeLabel = nodeL5Tuple
+          getQueue    = c5tQueue
 
-        -- Generate node and edges for one filter
-        addFilter ((iN,iE),es) c = do
-            (n,_) <- confMNewNode $ nodeL5Tuple c
-            let inEdge = (iN,n,iE)
-            let tEdge = (n,queue $ c5tQueue c,Edge "true")
-            let fEdge = (n,queue $ c5tQueue c,Edge "false")
-            --return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
-            return ((n,Edge "false"), es ++ [inEdge,tEdge])
-
-
+configFDir :: ConfFunction
+configFDir = doConfigFilter parseConf mkNodeLabel getQueue
+    where parseConf = parseFDirCFG
+          mkNodeLabel = nodeLFDir
+          getQueue    = cfdtQueue
 
 -------------------------------------------------------------------------------
 -- Implementation of configuration of the flow director filters
@@ -286,6 +304,11 @@ cFDtString c = "FDir("++l4p++","++l3s++","++l3d++","++l4s++","++l4d++")"
         l3d = IP4.ipToString $ cfdtL3Dst c
         l4s = show $ cfdtL4Src c
         l4d = show $ cfdtL4Dst c
+
+cFDtFullString :: CFDirTuple -> String
+cFDtFullString c = (cFDtString c) ++ " -> Q" ++ (show q)
+    where
+         q = cfdtQueue c
 
 cFDtAttr :: CFDirTuple -> [NAttribute]
 cFDtAttr c =
@@ -403,32 +426,6 @@ nodeLFDir c = (PG.baseFNode (cFDtString c) bports) {
             SMT.app "L4.Proto" [pkt] SMTC.=== SMT.app "L4P.UDP" []
             ]
 
-
-
-
-configFDir :: ConfFunction
-configFDir _ _ inE outE cfg = do
-    ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
-    let lastEdge = (endN,defaultN,endP)
-    return (edges ++ [lastEdge])
-    where
-        -- Node and Port for the incoming edge for the first node
-        start = (fst $ fst $ head inE, snd $ head inE)
-        -- Node for default queue
-        (Just ((defaultN,_),_)) = L.find ((== "default") . ePort . snd) outE
-        -- Lookup node id for specified queue
-        queue i = queueN
-            where (Just ((queueN,_),_)) = L.find (isRxQValidN i . fst) outE
-
-        -- Get filter configurations
-        cfgs = parseFDirCFG cfg
-
-        addFilter ((iN,iE),es) c = do
-            (n,_) <- confMNewNode $ nodeLFDir c
-            let inEdge = (iN,n,iE)
-            let tEdge = (n,queue $ cfdtQueue c,Edge "true")
-            let fEdge = (n,queue $ cfdtQueue c,Edge "false")
-            return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
 
 duplicateDFS :: PGraph -> PGNode -> DGI.Node -> (String -> String) -> ConfMonad [PGEdge]
 duplicateDFS g (nid,nlbl) nid' dupname = do
