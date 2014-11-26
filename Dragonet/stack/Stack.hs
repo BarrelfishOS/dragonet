@@ -1,32 +1,31 @@
 module Stack (
     instantiateOpt,
     instantiateFlows,
-    startStack,
 
     StackState(..),
     EndpointDesc(..),
     AppDesc(..),
-    OracleArgs(..)
 ) where
 
-import qualified Dragonet.Configuration as C
-import qualified Dragonet.Optimization as O
-import qualified Dragonet.Pipelines as PL
-import qualified Dragonet.Pipelines.Dynamic as PLD
+import qualified Dragonet.Configuration            as C
+import qualified Dragonet.Optimization             as O
+import qualified Dragonet.Pipelines                as PL
+import qualified Dragonet.Pipelines.Dynamic        as PLD
 import qualified Dragonet.Pipelines.Implementation as PLI
-import qualified Dragonet.Pipelines.Applications as PLA
-import qualified Dragonet.ProtocolGraph as PG
-import qualified Dragonet.Semantics as Sem
+import qualified Dragonet.Pipelines.Applications   as PLA
+import qualified Dragonet.ProtocolGraph            as PG
+import qualified Dragonet.ProtocolGraph.Utils      as PGU
+import qualified Dragonet.Semantics                as Sem
 
-import Dragonet.Endpoint (SocketId,AppId,IPv4Addr,UDPPort,EndpointDesc(..),)
-import Dragonet.Flows  (Flow(..))
+import Dragonet.Endpoint (SocketId,AppId,EndpointDesc(..),epsDiff)
+import Dragonet.Flows (Flow(..), epToFlow)
 
 import Graphs.Cfg (e10kCfgEmpty)
 
 import qualified Data.Graph.Inductive as DGI
-import Control.Applicative ((<$>))
 import Util.GraphHelpers (findNodeByL)
-import qualified Dragonet.ProtocolGraph.Utils as PGU
+
+import Control.Applicative ((<$>))
 
 import qualified Graphs.LPG as LPG
 import qualified Graphs.ImplTransforms as IT
@@ -35,78 +34,133 @@ import Runner.Dynamic (createPipeline, createPipelineClient)
 
 import qualified Control.Concurrent.STM as STM
 import qualified Data.Map as M
-import qualified Data.Set as S
 
 import Util.XTimeIt (doTimeIt,dontTimeIt)
 import Text.Show.Pretty (ppShow)
 
-type EndpointId = Int
+-- StackArgs: static arguments for instantiating the stack
+--  Don't use StackArgs to construct it, use stackArgsDefault
+--  If you want to call it directly, read the comments at stackArgsDefault
+type PrgApplyCfg = (PLI.StateHandle -> C.Configuration -> IO ())
+type PlaConfigure = (StackState -> String -> PG.PGNode -> String)
+type GraphH = (PG.PGraph, Sem.Helpers)
+data StackArgs = StackArgs {
+    -- NIC-specific fields
+      stPrgH      :: GraphH -- | (unconfigured) PRG (+sem helpers)
+    , stLlvmH     :: String -- | LLVM helpers filename
+    , stCfgImpl   :: PrgApplyCfg -- | implement given PRG conf
+    -- other fields
+    , stLpgH      :: GraphH -- | (unconfigured) LPG (+sem helpers)
+    , stCfgPLA    :: PlaConfigure -- | Group the LPG nodes into pipelines
+    , stName      :: String -- | stack name
+    -- helper fiels (can be build from fields above)
+    , stMergedH   :: Sem.Helpers -- | merged helpers
+}
 
+-- helper for constructing StackArgs
+stackArgsDefault :: IO StackArgs
+stackArgsDefault = do
+    lpgH <- LPG.graphH -- default LPG
+    return $ StackArgs {
+    -- H/W specific fields: must be set by the caller
+      stPrgH      = undefined
+    , stLlvmH     = undefined
+    , stCfgImpl   = undefined
+    -- fields with default values: may be set by the caller
+    , stLpgH      = lpgH
+    , stCfgPLA    = plAssignByTag
+    , stName      = "dragonet"
+    -- fields set by initInstArgs: must not be set by the caller
+    , stMergedH   = undefined
+  }
+  where plAssignByTag :: StackState -> String -> PG.PGNode -> String
+        plAssignByTag _ _ (_,n) = PG.nTag n
+
+-- initialize stack arguments
+--   sets fields that are not set by the user
+initStackArgs :: StackArgs -> StackArgs
+initStackArgs args =  args {stMergedH =  mergedHelpers}
+    where (_,prgHelpers) = stPrgH args
+          (_,lpgHelpers) = stLpgH args
+          mergedHelpers = prgHelpers `Sem.mergeHelpers` lpgHelpers
+
+-- application descriptor
 data AppDesc = AppDesc {
     adLabel :: String,
     adGraphHandle :: PLI.GraphHandle
 }
 
--- For endpoints, we use local/remote
--- Should we use the same for flows (instead of Rx/Tx)?
--- We typically use flows on the Rx side, so the mapping is:
---  local:  dst
---  remote: src
---
---  Note that endpoints are conceptually different than flows:
---   - Endpoints are LPG nodes that are (typically) configured by the
---     application and are "programming" the net stack to steer packets into
---     particular buffers (i.e., sockets)
---
---   - Flows, on the other hand, are packet classes that are used to evaluate
---     PRG configurations via cost functions. Given a set of flows, we use the
---     PRG to determine how these flows are mapped into the queues for a given
---     configuration. Then, we evaluate these mappings using a cost function.
---
-epToFlow EndpointUDPv4 {epLocalIp = lIp,
-                          epLocalPort = lPort,
-                          epRemoteIp = rIp,
-                          epRemotePort = rPort }
-   = FlowUDPv4 {
-          flSrcIp = rIp,
-          flDstIp = lIp,
-          flDstPort  = lPort,
-          flSrcPort  = rPort }
-
+-- StackState: dynamic stack state (changes as flows come and go)
+-- TODO: Add StackArgs here
+type EndpointId = Int
 data StackState = StackState {
-    ssNextAppId :: AppId,  -- This ID will be given to the next app that tries to connect
-    ssNextSocketId :: SocketId,
-    ssNextEndpointId :: EndpointId,
-    ssApplications :: M.Map AppId AppDesc,
-    ssAppChans :: M.Map PLA.ChanHandle AppId,
-    ssEndpoints :: M.Map EndpointId EndpointDesc,
-    -- A mapping from socketId to EndpointId:
-    --  used in spanning
-    ssSockets :: M.Map SocketId EndpointId,
+    -- applications, channels, and endpoints
+      ssNextAppId      :: AppId  -- id for the next app that tries to connect
+    , ssNextSocketId   :: SocketId -- id for next socket
+    , ssNextEndpointId :: EndpointId -- id for next endpoint
+    , ssApplications   :: M.Map AppId AppDesc
+    , ssAppChans       :: M.Map PLA.ChanHandle AppId
+    , ssEndpoints      :: M.Map EndpointId EndpointDesc
+    , ssSockets        :: M.Map SocketId EndpointId
     -- quick hack to maintain the previous endpoints so that we can find the
     -- difference between the current and the old state. It is probably better
     -- to actually track the changes from the event handlers though.
-    ssPrevEndpoints :: M.Map EndpointId EndpointDesc,
-    ssUpdateGraphs :: STM.TVar StackState -> IO (),
-    ssVersion :: Int
+    , ssPrevEndpoints  :: M.Map EndpointId EndpointDesc
+    -- callback to update the graph
+    , ssUpdateGraphs   :: STM.TVar StackState -> IO ()
+    -- each stack state gets a new version number
+    , ssVersion        :: Int
+    -- pipeline handlers
+    , ssCtx            :: PLD.DynContext
+    , ssStackHandle    :: PLI.StackHandle
+    , ssSharedState    :: PLI.StateHandle
 }
 
+-- return a configured LPG based on endpoint information
+ssConfigureLpg :: StackState -> StackArgs -> PG.PGraph
+ssConfigureLpg ss args = C.applyConfig lpgCfg lpgU
+    where allEps   = M.elems $ ssEndpoints ss
+          lpgCfg   = LPG.lpgConfig allEps
+          (lpgU,_) = stLpgH args
 
--- Oracle related
-data OracleArgs =  OracleArgs {
-        oracleOldConf           :: (String,C.Configuration)
-        , oraclePrg             :: PG.PGraph
-        , oracleNewConns        :: [EndpointDesc]
-        , oracleSS              :: StackState
-    } deriving ()
+-- wrapper for O.makegraph
+ssMakeGraph :: StackState -> StackArgs -> C.Configuration -> String
+            -> IO PL.PLGraph
+ssMakeGraph ss args prgConf lbl = do
+    let mergeH     = stMergedH args
+        (prgU,_)   = stPrgH args
+        lpgC       = ssConfigureLpg ss args
+        -- graph transformations
+        implXForms = [IT.coupleTxSockets, IT.mergeSockets]
+        debug :: O.DbgFunction ()
+        debug = O.dbgDotfiles $ "out/graphs-fff/" ++ (show $ ssVersion ss)
+        --dbg = O.dbgDummy
+        dbg    = debug lbl
+        cfgPLA = stCfgPLA args
+        pla    = (plAssign cfgPLA ss)
+    O.makeGraph mergeH prgU lpgC implXForms (pla lbl) dbg prgConf
 
-initOracleArgs :: PG.PGraph -> [EndpointDesc] -> StackState -> OracleArgs
-initOracleArgs prg endps ss = OracleArgs  {
-    oracleOldConf = getEmptyConf,
-    oraclePrg  = prg,
-    oracleNewConns  = endps,
-    oracleSS = ss
-}
+-- wrapper for O.optimize
+ssOptimize :: (Ord a, Show a)
+           => StackState -> StackArgs
+           -> (StackState -> [EndpointDesc] -> O.CostFunction a)
+           -> (StackState -> [(String,C.Configuration)])
+           -> IO (PL.PLGraph, (String, C.Configuration), PG.PGraph)
+ssOptimize ss args costFun cfgOracle = do
+    let mergeH    = stMergedH args
+        (prgU,_)  = stPrgH args
+        lpgC      = ssConfigureLpg ss args
+        -- graph transformations
+        allEps     = M.elems $ ssEndpoints ss
+        implXForms = [IT.coupleTxSockets, IT.mergeSockets]
+        --dbg :: O.DbgFunction ()
+        dbg = O.dbgDotfiles $ "out/graphs-ooo/" ++ (show $ ssVersion ss)
+        --dbg = O.dbgDummy
+        cfgPLA = stCfgPLA args
+        pla  = (plAssign cfgPLA ss)
+        costFun' = costFun ss allEps
+        pCfgs = cfgOracle ss
+    O.optimize mergeH prgU lpgC implXForms pla dbg costFun' pCfgs
 
 -- Force socket nodes in their respective pipeline, for the rest use the
 -- function f
@@ -114,10 +168,7 @@ plAssign f ss cfg m@(_,n)
     | Just said <- PGU.getPGNAttr n "appid" = "App" ++ said
     | otherwise = f ss cfg m
 
-
-{-|
- - Creates input and output nodes to connect two pipelines
- -}
+-- Creates input and output nodes to connect two pipelines
 plConnect :: PL.Pipeline -> PL.Pipeline -> (PLI.POutput,PLI.PInput)
 plConnect i o = (PLI.POQueue n, PLI.PIQueue n)
     where n = PL.plLabel i ++ "_to_" ++ PL.plLabel o
@@ -316,138 +367,43 @@ eventHandler sstv ch ev = do
 -- Main
 
 
--- generates the necessary LPG configuration based on the stack state
--- (specifically on the state's endpoints and sockets)
-lpgConfigSS :: StackState -> C.Configuration
-lpgConfigSS ss = LPG.lpgConfig allEps
-    where
-        allEps = M.elems $ ssEndpoints ss
-
-
--- instantiate a stack using Dragonet.Optimization
-instantiateOpt :: (Ord a, Show a) =>
-           (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
-        -> String                                      -- | Name of llvm-helpers
-        -> (StackState -> [EndpointDesc] -> O.CostFunction a) -- | Cost Function
-        -> (OracleArgs -> [(String,C.Configuration)]) -- | Oracle
-        -> (PLI.StateHandle -> C.Configuration -> IO ()) -- | Implement PRG conf
-        -> (StackState -> String -> PG.PGNode -> String) -- | Assign nodes to PL
-        -> IO ()
-instantiateOpt (prgU,prgHelp) llvmH costFun cfgOracle cfgImpl cfgPLA = do
-    -- Prepare graphs and so on
-    (lpgU,lpgHelp) <- LPG.graphH
-    let helpers = prgHelp `Sem.mergeHelpers` lpgHelp
-        stackname = "dragonet"
-    ctx <- PLD.initialContext stackname
-    stackhandle <- PLD.ctxState ctx
-    sharedState <- PLI.stackState stackhandle
-
-    {-| Function 'updateGraph' adapts the graph to current stack state.  It
-     -   * generates all the endpoints from current stack-state,
-     -   * generates an LPG based on the stack-state
-     -   * Finds out best PRG configuration for current state by using Oracle
-     -   * Decides on transformations to be applied on the graph before
-     -          implementing it
-     -   * STEP: Generate an Optimize combined graph,
-     -            based on the above PRG, LPG and transformations
-     -   * STEP: Applies the configuration changes
-     -   * STEP: Runs the pipelines
-     -
-     -}
-    let updateGraphT x = doTimeIt "updateGraph"  $ updateGraph x
-        updateGraph sstv = do
-            putStrLn "updateGraph entry"
-            ss <- ssNewVer sstv
-
-            -- get list of all endpoints from stack-state
-            let allEps = M.elems $ ssEndpoints ss
-                lpgCfg = LPG.lpgConfig allEps
-
-                -- Configure LPG with all these endpoints
-                lpgC = C.applyConfig lpgCfg lpgU
-                -- creating an LPG dotfile for debugging
-                dbg = O.dbgDotfiles $ "out/graphs-tap/" ++ (show $ ssVersion ss)
-                --dbg = O.dbgDummy
-
-                -- Generate PRG configurations using ORACLE based on
-                --          current LPG and stackState
-                pCfgs = cfgOracle $ initOracleArgs lpgC allEps ss
-
-                -- Transformations to be applied to graph before implementing it
-                implTransforms = [IT.coupleTxSockets, IT.mergeSockets]
-
-            -- LPG config is essentially all flows in network stack,
-            --      so, showing current state here for debugging
-            putStrLn $ "LPG config: " ++ show lpgCfg
-
-            -- STEP: Generate an Optimize combined graph,
-            --      based on the above PRG, LPG and transformations
-            (plg,(_,pCfg), prgpc) <- O.optimize
-                    helpers                    -- ^ Semantics helpers combined
-                    prgU                       -- ^ Unconfigured PRG
-                    lpgC                       -- ^ Configured LPG
-                    implTransforms             -- ^ Implementation transforms
-                    (plAssign cfgPLA ss)       -- ^ Assign nodes to pipelines
-                    dbg                        -- ^ Debugging function
-                    (costFun ss allEps)        -- ^ Cost function
-                    pCfgs                      -- ^ Configurations to evaluate
-
-            putStrLn $ "Optimization done!"
-
-            -- STEP: apply PRG confuguration
-            --      This is the step where actually filters will be inserted
-            --      in the NIC
-            cfgImpl sharedState pCfg
-
-            -- Function to Create pipelines
-            let createPL pl@('A':'p':'p':aids) = do
-                    -- Creating application pipeline.  Untrusted zone
-                    --      in application address-space
-                    putStrLn $ "Creating App pipeline: " ++ pl
-                    createPipelineClient agh pl
-                    where
-                        aid = read aids
-                        Just app = M.lookup aid $ ssApplications ss
-                        agh = adGraphHandle app
-                createPL pl = do
-                    -- Creating stack-pipeline. Trusted zone
-                    --      in dragonet address-space
-                    putStrLn $ "Creating local pipeline: ##### " ++ pl
-                    createPipeline plg stackname llvmH pl
-
-            -- STEP: Run pipelines
-            PLD.run ctx plConnect createPL $ addMuxIds plg
-
-            putStrLn "updateGraph exit"
-            -- FIXME: Create file here.
-            putStrLn "################### calling appendFile with app ready notice"
-            appendFile("allAppslist.appready") $ "Application is ready!\n"
-
-    putStrLn "Let's fire her up!"
-    sstv <- ssInit updateGraph
-    -- Stack is initialized, now lets update the state for first time manually
-    updateGraph sstv
-
-    putStrLn "Starting interface thread"
-    PLA.interfaceThread stackname (eventHandler sstv)
-
-
---
-
 initStackSt = StackState {
-    ssNextAppId = 1,
-    ssNextSocketId = 1,
-    ssNextEndpointId = 1,
-    ssApplications = M.empty,
-    ssAppChans = M.empty,
-    ssSockets = M.empty,
-    ssEndpoints = M.empty,
-    ssPrevEndpoints = M.empty,
+    -- need to be set by the caller
     ssUpdateGraphs = undefined,
-    ssVersion = 0
+    ssCtx = undefined,
+    ssStackHandle = undefined,
+    ssSharedState = undefined,
+    -- initial values
+    ssNextAppId      = 1,
+    ssNextSocketId   = 1,
+    ssNextEndpointId = 1,
+    ssApplications   = M.empty,
+    ssAppChans       = M.empty,
+    ssSockets        = M.empty,
+    ssEndpoints      = M.empty,
+    ssPrevEndpoints  = M.empty,
+    ssVersion        = 0
 }
 
--- TODO: use this in instantiate
+-- initialize stack state
+ssInitialize
+    -- | Function to update the graph
+    :: (STM.TVar StackState -> IO ())
+    -> StackArgs
+    -- | Updated stack-state and IO actions
+    -> IO (STM.TVar StackState)
+ssInitialize updateGraph args = do
+    ctx <- PLD.initialContext (stName args)
+    stackHandle <- PLD.ctxState ctx
+    sharedState <- PLI.stackState stackHandle
+    STM.atomically $ STM.newTVar $
+             initStackSt {
+                  ssUpdateGraphs = updateGraph
+                , ssCtx          = ctx
+                , ssStackHandle  = stackHandle
+                , ssSharedState  = sharedState
+             }
+
 -- bump the version number
 ssNewVer :: STM.TVar StackState -> IO (StackState)
 ssNewVer sstv = STM.atomically $ do
@@ -455,18 +411,6 @@ ssNewVer sstv = STM.atomically $ do
     let ss' = ss { ssVersion = ssVersion ss + 1 }
     STM.writeTVar sstv ss'
     return ss'
-
-{-|
- - Initialize the stackState, with specific function (eg: updateGraph)
- - for updating the graphs
- -}
-ssInit ::
-    -- | Function to update the graph
-        (STM.TVar StackState -> IO ())
-    -- | Updated stack-state and IO actions
-    ->  IO (STM.TVar StackState)
-ssInit updateGraph =
-    STM.atomically $ STM.newTVar $ initStackSt {ssUpdateGraphs = updateGraph}
 
 -- Update:
 --  bump the version number
@@ -481,84 +425,124 @@ ssExecUpd sstv = STM.atomically $ do
     STM.writeTVar sstv ss'
     return (ss', prevEps)
 
--- config LPG based on stack state information
-ssConfigLPG :: StackState -> PG.PGraph -> PG.PGraph
-ssConfigLPG ss lpgU = C.applyConfig (lpgConfigSS ss) lpgU
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
--- a simpler version of instantiate:
---  - assumes a configured PRG and does not call optimize
---  - PRG does not change across execution
-startStack :: (PG.PGraph, Sem.Helpers) -- | unconfigured LPG
-           -> (PG.PGraph, Sem.Helpers) -- | configured PRG
-           -> (PG.PGraph -> PG.PGraph -> PG.PGraph) -- | embedding function
-           -> String -- | name of llvm-helpers
-           -> (StackState -> String -> PG.PGNode -> String) -- | PL assignment
-           -> IO ()
-startStack (lpgU, lpgH) (prgC, prgH) embed_fn llvmH cfgPLA = do
-    let mergeH = prgH `Sem.mergeHelpers` lpgH
-        stackname = "dragonet"
-    ctx <- PLD.initialContext stackname
-    stackH <- PLD.ctxState ctx
-    sharedSt <- PLI.stackState stackH
 
-    let updateGraph sstv = do
-            putStrLn "updateGraph entry"
-            ss <- ssNewVer sstv
-            let lpgC = ssConfigLPG ss lpgU
-                dbg ::O.DbgFunction ()
-                dbg = O.dbgDotfiles $ "out/graphs-dummy/" ++ (show $ ssVersion ss)
-                debug = dbg "dummy"
-                implTransforms = [IT.mergeSockets]
-                lbl = "dummy"
-                pla = (plAssign cfgPLA ss)
-
-            --debug "prg" $ O.DbgPGraph prgC
-            plg <- O.makeGraph' mergeH prgC lpgC embed_fn implTransforms (pla lbl) debug
-            error "DONE!"
-
-            let createPL pl@('A':'p':'p':aids) = do
-                    putStrLn $ "Creating App pipeline: " ++ pl
-                    createPipelineClient agh pl
-                    where
-                        aid = read aids
-                        Just app = M.lookup aid $ ssApplications ss
-                        agh = adGraphHandle app
-                createPL pl = do
-                    putStrLn $ "Creating local pipeline: ##### " ++ pl
-                    createPipeline plg stackname llvmH pl
-            PLD.run ctx plConnect createPL $ addMuxIds plg
-            putStrLn "updateGraph exit"
-
-    putStrLn "Let's fire her up!!"
-    sstv <- ssInit updateGraph
+type UpdateGraphFn = STM.TVar StackState -> IO ()
+instantiateStack :: StackArgs -> UpdateGraphFn -> IO ()
+instantiateStack args updateGraph = do
+    putStrLn "Let's fire her up!"
+    -- initialize stack state and call updateGraph for the first time
+    sstv <- ssInitialize updateGraph args
     updateGraph sstv
     putStrLn "Starting interface thread"
-    PLA.interfaceThread stackname (eventHandler sstv)
+    PLA.interfaceThread (stName args) (eventHandler sstv)
+
+--  Function: depending on userspace/driverspace pipeline
+--       create pipeline-threads
+--  QUESTION: Do these pipelines are getting created everytime
+--      updateGraph is being called?  They should happen only
+--      in begining, and whenever new application arrives.
+ssCreatePL
+    :: StackArgs
+    -> StackState
+    -> PL.PLGraph
+    -> PL.PLabel
+    -> IO PLD.DynPipeline
+ssCreatePL args ss plg pl@('A':'p':'p':aids) = do
+    -- Creating application pipeline.  Untrusted zone
+    --      in application address-space
+    putStrLn $ "Creating App pipeline: " ++ pl
+    createPipelineClient agh pl
+    where
+      aid = read aids
+      Just app = M.lookup aid $ ssApplications ss
+      agh = adGraphHandle app
+ssCreatePL args ss plg pl = do
+    -- Creating stack-pipeline. Trusted zone
+    --      in dragonet address-space
+    putStrLn $ "Creating local pipeline: ##### " ++ pl
+    -- Creates a thread to handle the pipeline
+    --      NOTE: following function will actually create a thread
+    createPipeline plg (stName args) (stLlvmH args) pl
+
+-- updateGraph function that uses O.optimize
+updateGraphOpt
+    :: (Show a, Ord a)
+    => (StackState -> [EndpointDesc] -> O.CostFunction a) -- cost function
+    -> (StackState -> [(String,C.Configuration)]) -- oracle
+    -> StackArgs
+    -> STM.TVar StackState
+    -> IO ()
+updateGraphOpt costFn cfgOracle args sstv = do
+    putStrLn "updateGraphOpt"
+    ss <- ssNewVer sstv
+    let lpgC = ssConfigureLpg ss args
+
+    -- STEP: Generate an Optimize combined graph,
+    --    based on the above PRG, LPG and transformations
+    (plg,(_,pCfg),prgpc) <- ssOptimize ss args costFn cfgOracle
+
+     -- STEP: apply PRG configuration
+     --    This is the step where actually filters will be inserted in the NIC
+    (stCfgImpl args) (ssSharedState ss) pCfg
+
+    -- STEP: Run pipelines
+    PLD.run (ssCtx ss) plConnect (ssCreatePL args ss plg) $ addMuxIds plg
+
+    putStrLn "updateGraph exit"
+    -- FIXME: Create file here.
+    putStrLn "################### calling appendFile with app ready notice"
+    appendFile("allAppslist.appready") $ "Application is ready!\n"
 
 
+-- updateGraph function that uses Dragonet.Search functions
+updateGraphFlows
+    :: ([Flow] -> C.Configuration)
+    -> StackArgs
+    -> STM.TVar StackState
+    -> IO ()
+updateGraphFlows getConf args sstv = do
+   putStrLn "updateGraphFlows"
+   (ss, prevEpsM) <- ssExecUpd sstv
+   -- get list of all endpoints from stack-state
+   let allEps = M.elems $ ssEndpoints ss
+       --prevEps = M.elems prevEpsM
+       --newEps = epsDiff allEps prevEps
+       --rmEps = epsDiff prevEps allEps
+       --putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
+       --putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
+       prgConf = getConf $ map epToFlow allEps
+       lbl = "updateGraphFlows"
 
-getEmptyConf = ("EmptyCOnf",
-                    [ ("RxCFDirFilter", PG.CVList []),
-                      ("RxC5TupleFilter", PG.CVList [])
-                    ]
-                )
+   -- STEP: Create a new combined, but pipelined graph
+   --          with both LPG and PRG with configuration applied
+   plg <- ssMakeGraph ss args prgConf lbl
 
---------------------------------------------------------------------------------
---------------------------------------------------------------------------------
+   -- STEP: apply PRG configuration
+   -- NOTE: This is the step where actually filters will be inserted
+   --      in the NIC
+   (stCfgImpl args) (ssSharedState ss) prgConf
+
+   -- STEP: Run each pipeline
+   --   * Create pipeline in separate thread if it don't exist
+   --   * If pipeline exist then
+   --       + stop it
+   --       + Update the in/out connecting queues based on changes
+   -- NOTE: ctx is still an initial context, is that efficient?
+   PLD.run (ssCtx ss) plConnect (ssCreatePL args ss plg) $ addMuxIds plg
+
+   putStrLn "updateGraph exit"
+   -- FIXME: Create file here.
+   putStrLn "################### calling appendFile with app ready notice"
+   appendFile("allAppslist.appready") $ "Application is ready!\n"
 
 
-epsDiff :: [EndpointDesc] -> [EndpointDesc] -> [EndpointDesc]
-epsDiff es1 es2 = S.toList $ S.difference (S.fromList es1) (S.fromList es2)
+-- OLD/Deprecated interface
 
-{-|
- - The function 'instantiateFlows' is initialization function which
- -   * Sets up all the event handling mechanisms in place:
- -      + Done by 'updateGraph' function defined in the function-body.
- -   * Creates initial minimal stack which will handle the default graph,
- -      by calling 'updateGraph' function
- -   * Then goes on **infinite event dispatch** loop handling
- -          request events from applications
- -}
+-- instantiateFlows function that uses the new interface
+-- DEPRECATED: Have the callers use the new interface
 instantiateFlows ::
         -- | Function to get a configuration by searching using Oracle
            ([Flow] -> C.Configuration)
@@ -571,127 +555,32 @@ instantiateFlows ::
         -- | function to Group the LPG nodes into pipelines
         -> (StackState -> String -> PG.PGNode -> String)
         -> IO ()
-instantiateFlows getConf (prgU,prgHelp) llvmH cfgImpl cfgPLA = do
-    -- Prepare graphs and so on
-    (lpgU, lpgHelp) <- LPG.graphH
-    -- Merge LPG and PRG helpers
-    let mergeH = prgHelp `Sem.mergeHelpers` lpgHelp
-        stackname = "dragonet"
+instantiateFlows getConf prgH llvmH cfgImpl cfgPLA = do
+    args0 <- stackArgsDefault
+    let args = initStackArgs $ args0 { stPrgH     = prgH
+                                     , stLlvmH   = llvmH
+                                     , stCfgImpl = cfgImpl
+                                     , stCfgPLA  = cfgPLA }
+    let updFn = updateGraphFlows getConf args
+    instantiateStack args updFn
 
-    ctx <- PLD.initialContext stackname
-    stackhandle <- PLD.ctxState ctx
-    sharedState <- PLI.stackState stackhandle
 
-    {-|
-     - Function 'updateGraph' adapts the graph to current stack state.  It
-     -   * generates all the endpoints from current stack-state,
-     -   * generates an LPG based on the stack-state
-     -   * STEP: Finds out best PRG configuration for current state
-     -          by using given Oracle
-     -   * Decides on transformations to be applied on the graph before
-     -          implementing it
-     -   * STEP: Generate a combined pipelined-graph,
-     -            based on the above PRG, LPG and transformations
-     -   * STEP: Applies the configuration changes
-     -   * STEP: Runs the pipelines
-     -
-     -  This function will be called in following situations
-     -      * To manually kickoff start of the stack (only once, in this function)
-     -      * App event UDPListen
-     -      * App event UDPFlow
-     -      * App event SpanSocket
-     -}
-    let updateGraph sstv = do
-            putStrLn "instantiateFlows::updateGraph"
-
-            -- TODO: Understand what is this?
-            (ss, prevEpsM) <- ssExecUpd sstv
-
-            -- get list of all endpoints from stack-state
-            let allEps = M.elems $ ssEndpoints ss
-                --prevEps = M.elems prevEpsM
-                --newEps = epsDiff allEps prevEps
-                --rmEps = epsDiff prevEps allEps
-
-                -- LPG config is essentially all flows in network stack
-                lpgCfg = LPG.lpgConfig allEps
-                -- Configure LPG
-                lpgC = C.applyConfig lpgCfg lpgU
-
-                -- creating an LPG dotfile for debugging
-                lbl = "instSearch"
-                debug :: O.DbgFunction ()
-                --dbg = O.dbgDummy
-                debug = O.dbgDotfiles $ "out/graphs-xxx/" ++ (show $ ssVersion ss)
-                dbg = debug lbl
-
-                -- Transformations to be applied to graph before implementing it
-                implTransforms = [IT.coupleTxSockets, IT.mergeSockets]
-                pla = (plAssign cfgPLA ss)
-                --putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
-                --putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
-                --putStrLn $ "LPG config: " ++ show lpgCfg
-
-             -- Generate PRG configurations using ORACLE based on current LPG
-             --         and stackState
-            let prgConf = getConf $ map epToFlow allEps
-
-            -- STEP: Create a new combined, but pipelined graph
-            --          with both LPG and PRG with configuration applied
-            plg <- O.makeGraph mergeH prgU lpgC implTransforms (pla lbl) dbg prgConf
-
-            -- STEP: apply PRG confuguration
-            -- NOTE: This is the step where actually filters will be inserted
-            --      in the NIC
-            cfgImpl sharedState prgConf
-
-            --  Function: depending on userspace/driverspace pipeline
-            --       create pipeline-threads
-            --  QUESTION: Do these pipelines are getting created everytime
-            --      updateGraph is being called?  They should happen only
-            --      in begining, and whenever new application arrives.
-            let createPL pl@('A':'p':'p':aids) = do
-                    -- If it starts with word "App", then assuming application
-                    -- Creating application pipeline.  Untrusted zone
-                    --      in application address-space
-                    putStrLn $ "Creating App pipeline: " ++ pl
-                    createPipelineClient agh pl
-                    where
-                        aid = read aids
-                        Just app = M.lookup aid $ ssApplications ss
-                        agh = adGraphHandle app
-                createPL pl = do
-                    -- Creating stack-pipeline. Trusted zone
-                    --      in dragonet address-space
-                    putStrLn $ "Creating local pipeline: ##### " ++ pl
-                    -- Creates a thread to handle the pipeline
-                    --      NOTE: following function will actually create a thread
-                    createPipeline plg stackname llvmH pl
-
-            -- STEP: Run each pipeline
-            --   * Create pipeline in separate thread if it don't exist
-            --   * If pipeline exist then
-            --       + stop it
-            --       + Update the in/out connecting queues based on changes
-            -- NOTE: ctx is still an initial context, is that efficient?
-            PLD.run ctx plConnect createPL $ addMuxIds plg
-
-            putStrLn "updateGraph exit"
-            -- FIXME: Create file here.
-            putStrLn "################### calling appendFile with app ready notice"
-            appendFile("allAppslist.appready") $ "Application is ready!\n"
-
-        -- | Wrapper for updateGraph which will time the execution of function
-        updateGraphT x = doTimeIt "instantiateFlows::updateGraph"  $ updateGraph x
-
-    putStrLn "Let's fire her up!"
-    -- Creating a stack-state with updateGraph as a function to update graph
-    sstv <- ssInit updateGraph
-    -- Stack is initialized, now lets update the state for first time manually
-    updateGraph sstv
-
-    -- Starting an **infinite event loop** handling events
-    --      using event-handlers defined in sstv.
-    putStrLn "Starting interface thread"
-    PLA.interfaceThread stackname (eventHandler sstv)
-
+-- instantiateFlows function that uses the new interface:
+-- DEPRECATED: Have the callers use the new interface
+-- instantiate a stack using Dragonet.Optimization
+instantiateOpt :: (Ord a, Show a) =>
+           (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
+        -> String                                      -- | Name of llvm-helpers
+        -> (StackState -> [EndpointDesc] -> O.CostFunction a) -- | Cost Function
+        -> (StackState -> [(String,C.Configuration)]) -- | Oracle
+        -> (PLI.StateHandle -> C.Configuration -> IO ()) -- | Implement PRG conf
+        -> (StackState -> String -> PG.PGNode -> String) -- | Assign nodes to PL
+        -> IO ()
+instantiateOpt prgH llvmH costFun cfgOracle cfgImpl cfgPLA = do
+    args0 <- stackArgsDefault
+    let args = initStackArgs $ args0 { stPrgH     = prgH
+                                     , stLlvmH   = llvmH
+                                     , stCfgImpl = cfgImpl
+                                     , stCfgPLA  = cfgPLA }
+    let updFn = updateGraphOpt costFun cfgOracle args
+    instantiateStack args updFn

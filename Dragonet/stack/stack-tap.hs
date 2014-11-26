@@ -15,8 +15,8 @@ costFunction :: StackState -> [EndpointDesc] -> O.CostFunction Int
 costFunction _ _ _ = (1, "cost:always 1")
 
 -- TAP config is trivial
-oracle :: OracleArgs -> [(String,C.Configuration)]
-oracle _ = [("default",[])]
+optOracle :: StackState -> [(String,C.Configuration)]
+optOracle _ = [("default",[])]
 
 -- So is implementing it
 implCfg :: PLI.StateHandle -> C.Configuration -> IO ()
@@ -33,5 +33,6 @@ plAssignSplit _ _ (_,n)
 main = do
     -- Prepare graphs and so on
     prgH <- Tap.graphH
-    instantiateOpt prgH "llvm-helpers-tap" costFunction oracle implCfg plAssignSplit
+    instantiateOpt prgH "llvm-helpers-tap" costFunction optOracle implCfg plAssignSplit
+    --instantiateFlows (\_ -> []) prgH "llvm-helpers-tap" implCfg plAssignSplit
 
