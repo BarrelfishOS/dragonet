@@ -15,7 +15,6 @@ module Graphs.E10k (
     graphH, graphH_
 ) where
 
-import Dragonet.ProtocolGraph
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Dragonet.Predicate as PR
@@ -55,19 +54,19 @@ trN = \x  _ -> x
 type QueueID = Int
 
 
-isRxQValidN :: Int -> PGNode -> Bool
+isRxQValidN :: Int -> PG.PGNode -> Bool
 isRxQValidN i (_,n) =
-    (nLabel n == "Q" ++ show i ++ "Valid") ||
-        (nLabel n == "RxQ" ++ show i ++ "Valid")
+    (PG.nLabel n == "Q" ++ show i ++ "Valid") ||
+        (PG.nLabel n == "RxQ" ++ show i ++ "Valid")
 
-addCfgFun :: Node -> ConfFunction
+addCfgFun :: PG.Node -> ConfFunction
 addCfgFun n
     | l == "RxC5TupleFilter" = config5tuple
     | l == "RxCFDirFilter"   = configFDir
     | l == "RxQueues"        = configRxQueues
     | l == "TxQueues"        = configTxQueues -- not a real configuration, but helpful for building PRGs
     | otherwise = error $ "Unknown LPG CNode: '" ++ l ++ "'"
-    where l = nLabel n
+    where l = PG.nLabel n
 
 
 -------------------------------------------------------------------------------
@@ -153,7 +152,7 @@ strToC5t str = assert (check1 && check2) ret
             | s == "*"  = Nothing
             | otherwise = Just $ read s
 
-c5tAttr :: C5Tuple -> [NAttribute]
+c5tAttr :: C5Tuple -> [PG.NAttribute]
 c5tAttr c =
     if null constr then [] else [aTrue, aFalse]
     where
@@ -164,8 +163,8 @@ c5tAttr c =
                 do {s <- c5tL4Src c; return ("SourcePort=" ++ show s)},
                 do {d <- c5tL4Dst c; return ("DestPort=" ++ show d)} ]
         cT = foldl1 (\a b -> a ++ "&" ++ b) constr
-        aTrue = NAttrCustom $ "C.true:" ++ cT
-        aFalse = NAttrCustom $ "C.false:!(" ++ cT ++ ")"
+        aTrue = PG.NAttrCustom $ "C.true:" ++ cT
+        aFalse = PG.NAttrCustom $ "C.false:!(" ++ cT ++ ")"
         showIP = IP4.ipToString
 
 parse5tCFG :: ConfValue -> [C5Tuple]
@@ -205,9 +204,9 @@ parse5t (CVTuple
  -}
 nodeL5Tuple :: C5Tuple -> PG.Node
 nodeL5Tuple c = (PG.baseFNode (c5tString c) bports) {
-                    nAttributes = c5tAttr c,
-                    nSemantics = [("true",tSems),("false",fSems)],
-                    nPredicates = [
+                    PG.nAttributes = c5tAttr c,
+                    PG.nSemantics = [("true",tSems),("false",fSems)],
+                    PG.nPredicates = [
                         ("true",  c5TuplePredT c),
                         ("false", c5TuplePredF c)
                     ]
@@ -247,7 +246,7 @@ doConfigFilter parseConf mkNodeLabel getQueue _ _ inE outE cfg = do
       start = (fst $ fst $ head inE, snd $ head inE)
       -- Node for default queue
       defaultN :: DGI.Node
-      (Just ((defaultN,_),_)) = L.find ((== "default") . ePort . snd) outE
+      (Just ((defaultN,_),_)) = L.find ((== "default") . PG.ePort . snd) outE
       -- Lookup node id for specified queue
       queue :: QueueID -> DGI.Node
       queue i = queueN
@@ -261,13 +260,13 @@ doConfigFilter parseConf mkNodeLabel getQueue _ _ inE outE cfg = do
       addFilter ((iN,iE),es) c = do
          (n,_) <- confMNewNode $ mkNodeLabel c
          let inEdge = (iN,n,iE)
-         let tEdge = (n,queue $ getQueue c,Edge "true")
-         let fEdge = (n,queue $ getQueue c,Edge "false")
+         let tEdge = (n,queue $ getQueue c,PG.Edge "true")
+         let fEdge = (n,queue $ getQueue c,PG.Edge "false")
          -- NB: We do not include the false edge to the OR queue node, to make
          -- it easier to reason about where flows end up in things like
          -- flowQueue
          -- return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
-         return ((n,Edge "false"), es ++ [inEdge,tEdge])
+         return ((n,PG.Edge "false"), es ++ [inEdge,tEdge])
 
 config5tuple :: ConfFunction
 config5tuple = doConfigFilter parseConf mkNodeLabel getQueue
@@ -310,7 +309,7 @@ cFDtFullString c = (cFDtString c) ++ " -> Q" ++ (show q)
     where
          q = cfdtQueue c
 
-cFDtAttr :: CFDirTuple -> [NAttribute]
+cFDtAttr :: CFDirTuple -> [PG.NAttribute]
 cFDtAttr c =
     [aTrue, aFalse]
     where
@@ -321,8 +320,8 @@ cFDtAttr c =
                   ("SourcePort=" ++ (show $ cfdtL4Src c)),
                   ("DestPort=" ++ (show $ cfdtL4Dst c)) ]
         cT = constr `UM.joinBy` "&"
-        aTrue = NAttrCustom $ "C.true:" ++ cT
-        aFalse = NAttrCustom $ "C.false:!(" ++ cT ++ ")"
+        aTrue = PG.NAttrCustom $ "C.true:" ++ cT
+        aFalse = PG.NAttrCustom $ "C.false:!(" ++ cT ++ ")"
 
 parseFDirCFG :: ConfValue -> [CFDirTuple]
 parseFDirCFG (CVList l) = map parseFDT l
@@ -400,9 +399,9 @@ parseFDTOld (CVTuple
  -}
 nodeLFDir :: CFDirTuple -> PG.Node
 nodeLFDir c = (PG.baseFNode (cFDtString c) bports) {
-                    nAttributes = cFDtAttr c,
-                    nSemantics = [("true",tSems),("false",fSems)],
-                    nPredicates = [
+                    PG.nAttributes = cFDtAttr c,
+                    PG.nSemantics = [("true",tSems),("false",fSems)],
+                    PG.nPredicates = [
                         ("true",  cFDirPredT c),
                         ("false", cFDirPredF c)
                     ]
@@ -427,7 +426,7 @@ nodeLFDir c = (PG.baseFNode (cFDtString c) bports) {
             ]
 
 
-duplicateDFS :: PGraph -> PGNode -> DGI.Node -> (String -> String) -> ConfMonad [PGEdge]
+duplicateDFS :: PG.PGraph -> PG.PGNode -> DGI.Node -> (String -> String) -> ConfMonad [PG.PGEdge]
 duplicateDFS g (nid,nlbl) nid' dupname = do
     let dfs = DFS.dfsWith getPgN [nid] g
         getPgN ctx@(ins,nid,nlbl,outs) = ((nid,nlbl),outs)
@@ -435,8 +434,8 @@ duplicateDFS g (nid,nlbl) nid' dupname = do
         nodesDup = drop 1 nodes -- nodes to be duplicated (do not include first node)
         oEdges = map snd dfs
 
-        dupNode :: Node -> Node
-        dupNode n = n { nLabel = (dupname $ nLabel n) }
+        dupNode :: PG.Node -> PG.Node
+        dupNode n = n { PG.nLabel = (dupname $ PG.nLabel n) }
 
     dupNodes <- forM (map (dupNode . snd) nodesDup) confMNewNode
 
@@ -446,7 +445,7 @@ duplicateDFS g (nid,nlbl) nid' dupname = do
 
         getOutEs ctx@(ins,nid,nlbl,outs) = outs
 
-        mapOutNodeEdges :: DGI.Node -> PGAdj -> [(DGI.Node, DGI.Node, Edge)]
+        mapOutNodeEdges :: DGI.Node -> PG.PGAdj -> [(DGI.Node, DGI.Node, PG.Edge)]
         mapOutNodeEdges nid adjs = [ (getDup nid, getDup nid_o, e) | (e,nid_o) <- adjs ]
             where getDup :: DGI.Node -> DGI.Node
                   getDup nid = case L.lookup nid nodeMap of
@@ -475,35 +474,35 @@ configRxQueues g (cfgnid,cfgn) inE outE (CVInt qs) = do
     where addNode n = do
             -- first create queue copies
             let name = "RxQueue" ++ (show n)
-                attrs = nAttributes cfgn
-                ports = nPorts cfgn
-                qimpl = NImplFunction "E10kRxQueue"
-                node = (baseFNode name ports) { nAttributes = attrs,
-                                                nImplementation = qimpl}
+                attrs = PG.nAttributes cfgn
+                ports = PG.nPorts cfgn
+                qimpl = PG.NImplFunction "E10kRxQueue"
+                node = (PG.baseFNode name ports) { PG.nAttributes = attrs,
+                                                   PG.nImplementation = qimpl}
                 oname = "RxQ" ++ (show n) ++ "Valid"
-                onode = baseONode oname ["true","false"] NOpOr {}
+                onode = PG.baseONode oname ["true","false"] PG.NOpOr {}
                 defQ = 0
 
             (q_nid, _) <- confMNewNode node
             (o_nid, _) <- confMNewNode onode
 
-            let edge_to_self :: (PGNode, Edge) -> Bool
-                edge_to_self ((_, CNode {nLabel = x}), _) = x == nLabel cfgn
+            let edge_to_self :: (PG.PGNode, PG.Edge) -> Bool
+                edge_to_self ((_, PG.CNode {PG.nLabel = x}), _) = x == PG.nLabel cfgn
                 edge_to_self _ = False
 
-                edge_default :: (PGNode, Edge) -> Bool
 
                 (inSelf, inOther)   = L.partition edge_to_self inE
                 (outSelf, outOther) = L.partition edge_to_self outE
 
-                self :: [Edge] -- self edges
+                self :: [PG.Edge] -- self edges
                 self_in  = L.sort $ [ e | (_, e) <- inSelf ]
                 self_out = L.sort $ [ e | (_, e) <- outSelf ]
                 self = case (self_in == self_out) of
                     True -> self_in
                     False -> error "in and out self edges do not match"
 
-                edge_default (_, Edge { ePort = p }) = L.isPrefixOf "default" p
+                edge_default :: (PG.PGNode, PG.Edge) -> Bool
+                edge_default (_, PG.Edge { PG.ePort = p }) = L.isPrefixOf "default" p
                 (inDef, inQueues) = L.partition edge_default inOther
 
                 -- default edges are included only in queue 1
@@ -515,7 +514,7 @@ configRxQueues g (cfgnid,cfgn) inE outE (CVInt qs) = do
                 -- self edges
                 sE  = [ (q_nid, q_nid, e)    | e <- self ]
                 -- or edges (just the true port)
-                orE = [ (o_nid, q_nid, Edge { ePort = "true" }) ]
+                orE = [ (o_nid, q_nid, PG.Edge { PG.ePort = "true" }) ]
 
             -- duplciate all the nodes after the queue for all the queues but
             -- the first onde
@@ -533,18 +532,18 @@ configTxQueues _ (_,cfgn) inE outE (CVInt qs) = do
     where addNode prev n = do
             -- first create queue copies
             let name = "TxQueue" ++ (show n)
-                attrs = nAttributes cfgn
-                ports = nPorts cfgn
-                qimpl = NImplFunction "E10kTxQueue0"
-                node = (baseFNode name ports) { nAttributes = attrs,
-                                                nImplementation = qimpl}
-                onode = baseONode name ["true","false"] NOpOr {}
+                attrs = PG.nAttributes cfgn
+                ports = PG.nPorts cfgn
+                qimpl = PG.NImplFunction "E10kTxQueue0"
+                node = (PG.baseFNode name ports) { PG.nAttributes = attrs,
+                                                   PG.nImplementation = qimpl}
+                onode = PG.baseONode name ["true","false"] PG.NOpOr {}
 
             (q_nid, _) <- confMNewNode node
-            let edge_to_self :: (PGNode, Edge) -> Bool
-                edge_to_self ((_, CNode { nLabel = xlbl }), _) = xlbl == nLabel cfgn
+            let edge_to_self :: (PG.PGNode, PG.Edge) -> Bool
+                edge_to_self ((_, PG.CNode { PG.nLabel = xlbl }), _) = xlbl == PG.nLabel cfgn
                 edge_to_self _ = False
-                self :: [Edge] -- self edges
+                self :: [PG.Edge] -- self edges
                 self_in  = L.sort $ [ e | (_, e) <- filter edge_to_self inE]
                 self_out = L.sort $ [ e | (_, e) <- filter edge_to_self outE]
                 self = case (self_in == self_out) of
@@ -559,7 +558,7 @@ configTxQueues _ (_,cfgn) inE outE (CVInt qs) = do
             return $ prev ++ iE ++ oE ++ sE
 
 
-prepareConf :: PGraph -> PGraph
+prepareConf :: PG.PGraph -> PG.PGraph
 prepareConf = replaceConfFunctions addCfgFun
 
 ----
@@ -670,7 +669,7 @@ flowGetPort fl (_, nlbl)
                                    True  -> "true"
                                    False -> "false"
     | otherwise = error $ "flowGetPort:"  ++ (PG.nLabel nlbl)
-    where name = nLabel nlbl
+    where name = PG.nLabel nlbl
 
 reachedQueue :: PG.PGNode -> Maybe QueueID
 reachedQueue (_,PG.ONode {PG.nLabel = name}) = ret
@@ -717,12 +716,12 @@ flowQueue prgC flow = ret
             _   -> error $ "More than one connection matches for node:"
                            ++ node0_ ++ " port:" ++ port0
 
-graphH_ :: FilePath -> IO (PGraph, SEM.Helpers)
+graphH_ :: FilePath -> IO (PG.PGraph, SEM.Helpers)
 graphH_ fname = do
     (pg, helpers) <- parseGraph fname
     let pg' = prepareConf pg
     return (pg', helpers)
 
-graphH :: IO (PGraph,SEM.Helpers)
+graphH :: IO (PG.PGraph,SEM.Helpers)
 graphH = graphH_ "Graphs/E10k/prgE10kImpl.unicorn"
 
