@@ -173,6 +173,8 @@ node_out_t do_pg__TxL3ARPAllocateHeader(
 node_out_t do_pg__TxL3ARPFillHeader(struct ctx_TxL3ARPFillHeader *context,
         struct state *state, struct input **in)
 {
+
+    ++debug_pkt_stats.tx_arpv;
     dprint("%s:%s:%d \n", __FILE__, __func__, __LINE__);
     // P_true, P_false
     arp_htype_wr(*in, ARP_HTYPE_ETHERNET);

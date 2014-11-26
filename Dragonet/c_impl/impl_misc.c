@@ -7,12 +7,13 @@
     return P_Queue_out;
 }*/
 
-//static int drop_count = 0;
+static int drop_count = 0;
 node_out_t do_pg__PacketDrop(struct state *state, struct input *in)
 {
     dprint("PacketDrop!\n");
-    //++drop_count;
-    //printf("PacketDrop! %d\n", drop_count);
+    ++drop_count;
+    ++debug_pkt_stats.rx_drop;
+    printf("PacketDrop! %d\n", drop_count);
     return 0;
 }
 

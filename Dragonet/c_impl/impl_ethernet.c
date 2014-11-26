@@ -73,16 +73,23 @@ node_out_t do_pg__RxL2EtherClassifyL3(struct ctx_RxL2EtherClassifyL3 *context,
         struct state *state, struct input **in)
 {
     (*in)->attr->offset_l3 = 14;
+
+    ++debug_pkt_stats.rx_ethv;
     switch (eth_type_read(*in)) {
         case eth_type_IPv4  : dprint("%s: pkt IPv4\n", __func__);
+                              ++debug_pkt_stats.rx_ipv4;
                               return P_RxL2EtherClassifyL3_ipv4;
         case eth_type_IPv6  : dprint("%s: pkt IPv6\n", __func__);
+                              ++debug_pkt_stats.rx_ipv6;
                               return P_RxL2EtherClassifyL3_ipv6;
         case eth_type_ARP   : dprint("%s: pkt ARP\n", __func__);
+                              ++debug_pkt_stats.rx_arp;
                               return P_RxL2EtherClassifyL3_arp;
         default             : dprint("%s: pkt DROP\n", __func__);
+                              ++debug_pkt_stats.rx_drop;
                               return P_RxL2EtherClassifyL3_drop;
     }
+    ++debug_pkt_stats.rx_drop;
     return P_RxL2EtherClassifyL3_drop;
 }
 
@@ -105,6 +112,7 @@ node_out_t do_pg__TxL2EtherFillHeader(struct ctx_TxL2EtherFillHeader *context,
         struct state *state, struct input **in)
 {
 
+    ++debug_pkt_stats.tx_ethv;
     mac_t src_mac = (*in)->attr->eth_src_mac;
     mac_t dst_mac = (*in)->attr->eth_dst_mac;
     uint16_t ethType = (*in)->attr->eth_type;

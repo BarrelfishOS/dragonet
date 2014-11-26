@@ -34,12 +34,6 @@ import Text.Show.Pretty (ppShow)
 
 import qualified Scenarios.S1 as S1
 
-localIP :: Word32
-localIP = MD.asiagoIP_E10K
---localIP = MD.burrataIP
-
---------------------------------------------------
-
 data CfgAction =
     CfgASet5Tuple Word8 CTRL.FTuple |
     CfgAClear5Tuple Word8
@@ -179,7 +173,7 @@ main = do
                         Nothing -> error $ "Uknown cost function:" ++ costfn
         sparams    = Search.initSearchParams {   Search.sOracle = e10kOracle
                                                , Search.sPrgU   = prgU
-                                               , Search.sCostFn = priFn
+                                               , Search.sCostFn = costFn
                                                , Search.sStrategy = strategy }
         searchFn   = Search.runSearch sparams
     instantiateFlows searchFn prgH llvm_helpers (implCfg tcstate chan) plAssignMerged

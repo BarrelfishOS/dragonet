@@ -103,6 +103,7 @@ def SRV_CMDS(name):
     dragonet_container = {
                 "llvmSF":   ["./scripts/pravin/deployDragonetGen.sh", "stack-sf" , "sf"],
                 "llvmE10k": ["./scripts/pravin/deployDragonetGen.sh", "stack-e10k", "e10k"],
+                "dpdk": ["./scripts/pravin/deployDragonetGen.sh", "stack-dpdk", "dpdk"],
                 }
 
 
@@ -110,12 +111,14 @@ def SRV_CMDS(name):
         return {
                     "client_extra_opts" : "-N",
 
-                    "init_cmd_special_pinned_unpinned" : [
-                            #"init_cmd_special" : [
+                    "init_cmd_special_unpinned" : [
+                        #"init_cmd_special" : [
                       "cd dragonet/Dragonet/ ; sudo %s %s %d %s" % (
                           dragonet_container[name][0],
                           dragonet_container[name][2],
-                          HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
+                          HWQUEUES,
+                          "priority"
+                          #"balance"
                             ),
 
                       "cd dragonet/Dragonet/ ; sudo  ./scripts/pravin/runBetterBg.sh 4 ./ ./fancyecho-out.log  "
@@ -130,8 +133,10 @@ def SRV_CMDS(name):
                           toCoreList2(range(MAX_CORES - (HWQUEUES), MAX_CORES)),
                           dragonet_container[name][0],
                           dragonet_container[name][2],
-                          HWQUEUES, toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
-                            ),
+                          HWQUEUES,
+                          "priority"
+                          #"balance"
+                          ),
 
                       "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
                         toCoreList2(range((0 + SERVER_CORESHIFT), (SERVER_CORESHIFT + (SERVERS_INSTANCES*SERVER_CORES)))))

@@ -37,16 +37,22 @@
 #include <stdbool.h>
 #include <rte_byteorder.h>
 #include <rte_string_fns.h>
+#include <pthread.h>
+#include <assert.h>
 
 #define RTE_PORT_ALL            (~(portid_t)0x0)
 
 #define RTE_TEST_RX_DESC_MAX    2048
 #define RTE_TEST_TX_DESC_MAX    2048
 
+
 #define RTE_PORT_STOPPED        (uint16_t)0
 #define RTE_PORT_STARTED        (uint16_t)1
 #define RTE_PORT_CLOSED         (uint16_t)2
 #define RTE_PORT_HANDLING       (uint16_t)3
+
+
+#define MAX_QUEUES_SUPPORTED        (128)
 
 /*
  * Default size of the mbuf data buffer to receive standard 1518-byte
@@ -60,12 +66,13 @@
  */
 #define RTE_MAX_SEGS_PER_PKT 255 /**< pkt.nb_segs is a 8-bit unsigned char. */
 
-//#define MAX_PKT_BURST 512
-//#define DEF_PKT_BURST 32
-#define MAX_PKT_BURST 1
-#define DEF_PKT_BURST 1
+#define MAX_PKT_BURST 512
+#define DEF_PKT_BURST 32
+//#define MAX_PKT_BURST 1
+//#define DEF_PKT_BURST 1
 
-#define DEF_MBUF_CACHE 250
+//#define DEF_MBUF_CACHE 250
+#define DEF_MBUF_CACHE 0
 
 #define CACHE_LINE_SIZE_ROUNDUP(size) \
 	(CACHE_LINE_SIZE * ((size + CACHE_LINE_SIZE - 1) / CACHE_LINE_SIZE))
@@ -370,6 +377,10 @@ extern struct fwd_engine *cur_fwd_eng;
 extern struct fwd_lcore  **fwd_lcores;
 extern struct fwd_stream **fwd_streams;
 
+
+extern struct rte_mempool *tx_queues_mbp[MAX_QUEUES_SUPPORTED];
+extern struct rte_mempool *rx_queues_mbp[MAX_QUEUES_SUPPORTED];
+
 extern portid_t nb_peer_eth_addrs; /**< Number of peer ethernet addresses. */
 extern struct ether_addr peer_eth_addrs[RTE_MAX_ETHPORTS];
 
@@ -396,17 +407,48 @@ current_fwd_lcore(void)
 
 /* Mbuf Pools */
 static inline void
-mbuf_poolname_build(unsigned int sock_id, char* mp_name, int name_size)
+mbuf_poolname_build_old(unsigned int sock_id, char* mp_name, int name_size)
 {
 	snprintf(mp_name, name_size, "mbuf_pool_socket_%u", sock_id);
 }
 
 static inline struct rte_mempool *
-mbuf_pool_find(unsigned int sock_id)
+mbuf_pool_find_old(unsigned int sock_id)
 {
 	char pool_name[RTE_MEMPOOL_NAMESIZE];
 
-	mbuf_poolname_build(sock_id, pool_name, sizeof(pool_name));
+	mbuf_poolname_build_old(sock_id, pool_name, sizeof(pool_name));
+	return (rte_mempool_lookup((const char *)pool_name));
+}
+
+static inline void
+mbuf_poolname_build(int qid, int coreid, int direction, char* mp_name,
+        int name_size)
+{
+    switch (direction) {
+        case 2:
+	    snprintf(mp_name, name_size, "mbuf_pool_socket_%u", qid);
+            return;
+            break;
+        case 0:
+        case 1:
+	    snprintf(mp_name, name_size, "mbuf_p_%s_q_%d_c_%d",
+                ((direction == 1)? "rx" : "tx"), qid, coreid);
+            return;
+            break;
+        default:
+            assert(!"ERROR: invalid direction\n");
+            return;
+        }
+}
+
+
+static inline struct rte_mempool *
+mbuf_pool_find(int qid, int coreid, int direction)
+{
+	char pool_name[RTE_MEMPOOL_NAMESIZE];
+
+	mbuf_poolname_build(qid, coreid, direction, pool_name, sizeof(pool_name));
 	return (rte_mempool_lookup((const char *)pool_name));
 }
 
@@ -561,7 +603,7 @@ int tx_queue_id_is_invalid(queueid_t txq_id);
 //#define MYDEBUG     1
 #ifdef MYDEBUG
 #define dprint(x...) do {                                           \
-    printf("%s:%s:%d: ", __BASE_FILE__, __FUNCTION__, __LINE__);    \
+    printf("TID:%d:%s:%s:%d: ", (int)pthread_self(), __BASE_FILE__, __FUNCTION__, __LINE__);    \
     printf(":" x); } while(0)
 
 //#define dprint(x...)    printf("dpdkDrv: " x)
@@ -569,7 +611,9 @@ int tx_queue_id_is_invalid(queueid_t txq_id);
 #define dprint(x...)   ((void)0)
 #endif // MYDEBUG
 
-
+//#define SHOW_INTERVAL_STATS  1
+//#define INTERVAL_STAT_FREQUENCY     (1)
+#define INTERVAL_STAT_FREQUENCY     (1000)
 
 typedef uint8_t  lcoreid_t;
 typedef uint8_t  portid_t;
@@ -592,6 +636,8 @@ size_t get_packet_blocking(void *nic_p, int core_id, int port_id,
         int queue_id, char *pkt_out, size_t buf_len);
 void send_packetV2(void *nic_p, int core_id, int port_id,
         int queue_id, char *pkt_tx, size_t len);
+
+void print_stats_dpdk(void *nic_p, int port_idi);
 
 // Initialization of DPDK
 int init_device(int argc, char** argv);

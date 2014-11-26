@@ -10,7 +10,6 @@
 #include <pthread.h>
 
 #include <pipelines.h>
-#include "../../lib/Util/tap.h"
 
 
 #if 0
@@ -34,7 +33,7 @@ get_tsc(void) {
 #define dprint(x...)    do { printf("TID:%d:Cycle:%"PRIu64":", \
 (int)pthread_self(), get_tsc()); printf(":debug:" x); } while(0)
 */
-#define dbg_printf(x...) printf("TID:%d:%s:%s:%d: ", (int)pthread_self(),   \
+#define dbg_printf(x...) do { printf("TID:%d:%s:%s:%d: ", (int)pthread_self(),   \
             __BASE_FILE__, __FUNCTION__, __LINE__); printf(":" x);          \
     } while(0)
 
@@ -43,6 +42,7 @@ get_tsc(void) {
 #ifdef MYDEBUG
 
 #define dprint(x...)  dbg_printf(x)
+
 #else
 #define dprint(x...)   ((void)0)
 #endif // MYDEBUG
@@ -61,7 +61,7 @@ get_tsc(void) {
 //  memecached has its own copy of these variables in dnet_interface.h
 //#define SHOW_INTERVAL_STATS  1
 //#define INTERVAL_STAT_FREQUENCY     (1)
-#define INTERVAL_STAT_FREQUENCY     (10000)
+#define INTERVAL_STAT_FREQUENCY     (1000)
 
 /** Shows the type of each IPv4 packet.  Helpful in seeing which packets
  *      are going where.  When used with "INTERVAL_STAT_FREQUENCY      1"
@@ -75,6 +75,9 @@ get_tsc(void) {
 #endif // PACKET_CLASIFY_DEBUG
 
 #define DEFAULT_BUFFER_SIZE             (2048)
+
+
+#include "../../lib/Util/tap.h"
 
 typedef int node_out_t;
 typedef uint16_t pktoff_t;
@@ -133,6 +136,7 @@ struct arp_cache {
 
     struct arp_cache *next;
 };
+
 
 struct input_attributes {
     // Offset for headers on different layers
@@ -272,5 +276,33 @@ enum spawn_priority {
 bool spawn_impl(struct ctx_generic *ctx, struct input *in, enum out_spawns s,
         enum spawn_priority p);
 #define spawn(nctx,in,sid,prio) spawn_impl(&(nctx)->generic, in, sid, prio)
+
+
+// For stats debugging
+struct pkt_stats {
+    uint64_t rx_eth;
+    uint64_t rx_ethv;
+    uint64_t rx_arp;
+    uint64_t rx_arpv;
+    uint64_t rx_ipv4;
+    uint64_t rx_ipv6;
+    uint64_t rx_icmp;
+    uint64_t rx_icmpv;
+    uint64_t rx_udp;
+    uint64_t rx_drop;
+    uint64_t tx_eth;
+    uint64_t tx_ethv;
+    uint64_t tx_arp;
+    uint64_t tx_arpv;
+    uint64_t tx_ipv4;
+    uint64_t tx_ipv6;
+    uint64_t tx_icmp;
+    uint64_t tx_icmpv;
+    uint64_t tx_udp;
+    uint64_t tx_drop;
+};
+extern struct pkt_stats debug_pkt_stats;
+void show_pkt_stats(struct pkt_stats *stats);
+
 
 #endif // IMPLEMENTATION_H_

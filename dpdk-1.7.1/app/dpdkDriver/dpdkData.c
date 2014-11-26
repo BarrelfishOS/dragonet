@@ -98,49 +98,104 @@
 
 static int already_initialized = 0; // checks if the init function is already called
 
+static uint64_t rx_count = 0;
+static uint64_t tx_count = 0;
+static uint64_t tx_error = 0;
+static int64_t count_diff = 0;
+static int64_t count_diff_last = 0;
+
+void print_stats_dpdk(void *nic_p, int port_idi)
+{
+    uint8_t port_id = (uint8_t)port_idi;
+    assert(nic_p != NULL);
+    struct rte_eth_stats stats;
+    memset(&stats, 0, sizeof(struct rte_eth_stats));
+    rte_eth_stats_get(port_id, &stats);
+
+    printf
+    //dprint
+        ("SW (RX:%-10"PRIu64", TX:%-10"PRIu64", DIFF:%-10"PRId64"), "
+            "HW-RX (T:%-10"PRIu64", D: %-10"PRIu64" E: %-10"PRIu64"), "
+            "HW-TX (T:%-10"PRIu64", D: %-10"PRIu64", E: %-10"PRIu64"), "
+            "FDIR (H:%-10"PRIu64" M:%-10"PRIu64"), MBUF-E: %-10"PRIu64"\n",
+            rx_count, tx_count, ((uint64_t)rx_count - (uint64_t)tx_count),
+            stats.ipackets, stats.imissed, stats.ierrors,
+            stats.opackets, stats.oerrors, tx_error,
+            stats.fdirmatch,  stats.fdirmiss,
+            stats.rx_nombuf
+          );
+}
+
+
 void send_packetV2(void *nic_p, int core_id, int port_id, int queue_id,
         char *pkt_tx, size_t len)
 {
-	struct ether_hdr *eth;
 
+        struct rte_mbuf *m_tx = NULL;
+
+        dprint("sending pkt-no %"PRIu64" on q:%d, core=%d\n",
+                tx_count, queue_id, core_id);
         assert(nic_p != NULL);
-
-        struct rte_mbuf *m = rte_pktmbuf_alloc(fwd_lcores[core_id]->mbp);
-
-	if (m == NULL) {
-		GOTO_FAIL("Cannot allocate mbuf");
-//		printf("ERROR: (%s:%d:%s) Cannot allocate mbuf\n",
-//                        __FILE__, __LINE__, __func__);
-//                return;
+        if (m_tx == NULL) {
+            //m_tx = rte_pktmbuf_alloc(fwd_lcores[core_id]->mbp);
+            m_tx = rte_pktmbuf_alloc(tx_queues_mbp[queue_id]);
         }
-	if (rte_pktmbuf_pkt_len(m) != 0) {
+
+	if (m_tx == NULL) {
+                ++tx_error;
+		printf("ERROR: (%s:%d:%s) Cannot allocate mbuf. core_id: %d, queue=%d\n",
+                       __FILE__, __LINE__, __func__, core_id, queue_id);
+                print_stats_dpdk(nic_p, port_id);
+		GOTO_FAIL("Cannot allocate mbuf");
+                return;
+        }
+	if (rte_pktmbuf_pkt_len(m_tx) != 0) {
+                ++tx_error;
+
+                printf("ERROR: buf has len of %"PRIu32", instead of 0\n",
+                        rte_pktmbuf_pkt_len(m_tx));
+
+                rte_pktmbuf_reset(m_tx);
+                printf("NOTE: buf has len of %"PRIu32" after reset\n",
+                        rte_pktmbuf_pkt_len(m_tx));
+
+                print_stats_dpdk(nic_p, port_id);
+                abort();
+
 		GOTO_FAIL("Bad length");
 //		printf("ERROR: (%s:%d:%s) Bad length of allocated mbuf\n",
 //                        __FILE__, __LINE__, __func__);
-//		rte_pktmbuf_free(m);
+		rte_pktmbuf_free(m_tx);
                 return;
         }
 
-	char *data = rte_pktmbuf_append(m, len);
-	if (data == NULL)
+	char *data = rte_pktmbuf_append(m_tx, len);
+	if (data == NULL) {
+                ++tx_error;
 		GOTO_FAIL("Cannot append data");
-	if (rte_pktmbuf_pkt_len(m) != len)
+        }
+	if (rte_pktmbuf_pkt_len(m_tx) != len) {
+                ++tx_error;
 		GOTO_FAIL("Bad pkt length");
-//	if (rte_pktmbuf_data_len(m) != MBUF_TEST_DATA_LEN)
+        }
+//	if (rte_pktmbuf_data_len(m_tx) != MBUF_TEST_DATA_LEN)
 //		GOTO_FAIL("Bad data length");
 	memcpy(data, pkt_tx, len);
-	if (!rte_pktmbuf_is_contiguous(m))
+	if (!rte_pktmbuf_is_contiguous(m_tx)) {
+                ++tx_error;
 		GOTO_FAIL("Buffer should be continuous");
+            }
 
 
-	eth = rte_pktmbuf_mtod(m, struct ether_hdr *);
+//	struct ether_hdr *eth;
+//	eth = rte_pktmbuf_mtod(m_tx, struct ether_hdr *);
 
 	/* src addr */
         // ether_addr_copy(&l2fwd_ports_eth_addr[port_id], &eth->s_addr);
-	ether_addr_copy(&ports[port_id].eth_addr, &eth->s_addr);
+//	ether_addr_copy(&ports[port_id].eth_addr, &eth->s_addr);
 
 	struct rte_mbuf *m_table[2];
-        m_table[0] = m;
+        m_table[0] = m_tx;
         m_table[1] = NULL;
         uint16_t nb_pkts = 1;
 	unsigned ret = rte_eth_tx_burst(port_id, (uint16_t) queue_id,
@@ -150,13 +205,42 @@ void send_packetV2(void *nic_p, int core_id, int port_id, int queue_id,
                 printf("failed to send packet\n");
                 assert(ret == nb_pkts); // FIXME: I need better way to handle errors
 		do {
+			//rte_pktmbuf_reset(m_table[ret]);
 			rte_pktmbuf_free(m_table[ret]);
 		} while (++ret < nb_pkts);
-	}
+                ++tx_error;
+	} else {
+            tx_count =  tx_count + ret;
+
+            count_diff_last = count_diff;
+            count_diff = (int64_t)rx_count - (int64_t)tx_count;
+#ifdef SHOW_INTERVAL_STATS
+            if (tx_count % INTERVAL_STAT_FREQUENCY == 0) {
+                dprint("## TX ##\n");
+                print_stats_dpdk(nic_p, port_id);
+            }
+#endif // SHOW_INTERVAL_STATS
+/*
+            if (count_diff > count_diff_last) {
+                printf("## DIFF %"PRId64" , last-diff %"PRId64" ##\n",
+                        count_diff, count_diff_last);
+                print_stats_dpdk(nic_p, port_id);
+            }
+*/
+        }
+
+        dprint("sending done: pkt-no %"PRIu64" on q:%d, core=%d\n",
+                tx_count, queue_id, core_id);
+//        tx_lock = 0;
+        return;
 
 fail:
-	if (m)
-		rte_pktmbuf_free(m);
+        if (m_tx) {
+            printf("ERROR: %s:%s: %p Packet not sent!\n",
+                    __FILE__, __FUNCTION__, m_tx);
+            rte_pktmbuf_free(m_tx);
+
+        }
 	return;
 } // end function: send_packetV2
 
@@ -229,6 +313,7 @@ size_t get_packet_blocking(void *nic_p, int core_id, int port_id, int queue_id,
 } // end function: get_packet_blocking
 
 
+
 size_t get_packet_nonblock(void *nic_p, int core_id, int port_id, int queue_id,
         char *pkt_out, size_t buf_len)
 {
@@ -262,6 +347,7 @@ size_t get_packet_nonblock(void *nic_p, int core_id, int port_id, int queue_id,
 
     // Taking out the fist packet from the brust
     m = pkts_burst[0];
+
     rte_prefetch0(rte_pktmbuf_mtod(m, void *));
 
     //printf("Packet of len %d received at %p\n", m->pkt.pkt_len, m->pkt.data);
@@ -280,6 +366,13 @@ size_t get_packet_nonblock(void *nic_p, int core_id, int port_id, int queue_id,
 
     dprint("queue_id %d, port_id %d, core_id %d:"
             " received pkt of len %zu\n", queue_id, port_id, core_id, pkt_size);
+
+    ++rx_count;
+#ifdef SHOW_INTERVAL_STATS
+    if (rx_count % INTERVAL_STAT_FREQUENCY == 0) {
+        print_stats_dpdk(nic_p, port_id);
+    }
+#endif // SHOW_INTERVAL_STATS
     return pkt_size;
 } // end function: get_packet_nonblock
 
@@ -295,15 +388,15 @@ int init_dpdk_setupV2(int queues)
     }
 
     const char *myArgs[ARGNOS] = {"./stack-dpdk",
-        "-c", "0x18",  // coremask
-        "-n", "1",  // no of ports
+        "-c", "0xfffff",  // coremask
+        "-n", "1",  // no of mem chanels // FIXME: figure out proper value here
         "--file-prefix=dnetHuge",
 //        "--no-huge",
         "-m", "700",
         "--",
         "--pkt-filter-mode=perfect",
 //        "--pkt-filter-mode=signature",
-	"--burst=1",
+	"--burst=16",
         "--disable-rss",
         "--disable-hw-vlan",
         "", ""}; // 13 arguments
@@ -344,6 +437,7 @@ int init_dpdk_setupV2(int queues)
     }
 
     printf("\nInitialization successful.\n");
+
     return ret;
 } // end function:  init_dpdk_setupV2
 

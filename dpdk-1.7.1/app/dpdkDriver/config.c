@@ -271,7 +271,7 @@ port_infos_display(portid_t port_id)
 	printf("\nConnect to socket: %u", port->socket_id);
 
 	if (port_numa[port_id] != NUMA_NO_CONFIG) {
-		mp = mbuf_pool_find(port_numa[port_id]);
+		mp = mbuf_pool_find(0, 0, 0);
 		if (mp)
 			printf("\nmemory allocation on the socket: %d",
 							port_numa[port_id]);
