@@ -105,26 +105,6 @@ executable stack-tap
                         ../external/bulktransfer/lib/include
     default-language:   Haskell2010
 
----- dummy graph that implements everything in software and connects to tap
-executable stack-e10k-dummy
-    hs-source-dirs:     ., stack, fitness
-    main-is:            stack-e10k-dummy.hs
-    build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
-                        llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
-                        transformers, raw-strings-qq, pretty-show
-    ghc-options:        -threaded
-    C-sources:          stack/Runner/dyn_remote_client.c
-    Include-dirs:       c_impl/include,
-                        c_impl/e10k/include
-    CC-options:         -Wall -Wno-unused-function
-    x-helpers-files:    llvm-dyn-helpers.bc,
-                        llvm-helpers-tap.bc
-    x-helpers-makefile: Makefile.llvm-helpers
-    x-helpers-includes: c_impl/include,
-                        lib/Dragonet/Pipelines,
-                        ../external/bulktransfer/lib/include
-    default-language:   Haskell2010
-
 executable stack-sf
     hs-source-dirs:     ., stack, fitness
     main-is:            stack-sf.hs
