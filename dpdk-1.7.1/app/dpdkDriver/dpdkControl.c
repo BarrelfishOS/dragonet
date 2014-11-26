@@ -123,6 +123,9 @@ portid_t nb_ports;             /**< Number of probed ethernet ports. */
 struct fwd_lcore **fwd_lcores; /**< For all probed logical cores. */
 lcoreid_t nb_lcores;           /**< Number of probed logical cores. */
 
+struct rte_mempool *tx_queues_mbp[MAX_QUEUES_SUPPORTED];
+struct rte_mempool *rx_queues_mbp[MAX_QUEUES_SUPPORTED];
+
 /*
  * Test Forwarding Configuration.
  *    nb_fwd_lcores <= nb_cfg_lcores <= nb_lcores
@@ -431,9 +434,10 @@ testpmd_mbuf_pool_ctor(struct rte_mempool *mp,
 	mbp_priv->mbuf_data_room_size = mbp_ctor_arg->seg_buf_size;
 }
 
-static void
+static struct rte_mempool *
 mbuf_pool_create(uint16_t mbuf_seg_size, unsigned nb_mbuf,
-		 unsigned int socket_id)
+        unsigned int socket_id,
+        int qid, int coreid, int direction)
 {
 	char pool_name[RTE_MEMPOOL_NAMESIZE];
 	struct rte_mempool *rte_mp;
@@ -447,7 +451,8 @@ mbuf_pool_create(uint16_t mbuf_seg_size, unsigned nb_mbuf,
 		(uint16_t) CACHE_LINE_ROUNDUP(sizeof(struct rte_mbuf));
 	mb_ctor_arg.seg_buf_size = mbp_ctor_arg.seg_buf_size;
 	mb_size = mb_ctor_arg.seg_buf_offset + mb_ctor_arg.seg_buf_size;
-	mbuf_poolname_build(socket_id, pool_name, sizeof(pool_name));
+	//mbuf_poolname_build_old(socket_id, pool_name, sizeof(pool_name));
+	mbuf_poolname_build(qid, coreid, direction, pool_name, sizeof(pool_name));
 
 #ifdef RTE_LIBRTE_PMD_XENVIRT
 	rte_mp = rte_mempool_gntalloc_create(pool_name, nb_mbuf, mb_size,
@@ -479,10 +484,12 @@ mbuf_pool_create(uint16_t mbuf_seg_size, unsigned nb_mbuf,
 
 	if (rte_mp == NULL) {
 		rte_exit(EXIT_FAILURE, "Creation of mbuf pool for socket %u "
-						"failed\n", socket_id);
+				", q: %d, core: %d, direction: %d, failed\n",
+                                socket_id, qid, coreid, direction);
 	} else if (verbose_level > 0) {
 		rte_mempool_dump(stdout, rte_mp);
 	}
+        return rte_mp;
 }
 
 /*
@@ -548,20 +555,43 @@ void init_config(void)
 	if (param_total_num_mbufs)
 		nb_mbuf_per_pool = param_total_num_mbufs;
 	else {
+
+		nb_mbuf_per_pool = RTE_TEST_RX_DESC_MAX + MAX_PKT_BURST;
+#if 0
 		nb_mbuf_per_pool = RTE_TEST_RX_DESC_MAX + (nb_lcores * mb_mempool_cache)
 				+ RTE_TEST_TX_DESC_MAX + MAX_PKT_BURST;
 
 		if (!numa_support)
 			nb_mbuf_per_pool = (nb_mbuf_per_pool * nb_ports);
+#endif // 0
 	}
 
 	if (!numa_support) {
-		if (socket_num == UMA_NO_CONFIG)
-			mbuf_pool_create(mbuf_data_size, nb_mbuf_per_pool, 0);
-		else
-			mbuf_pool_create(mbuf_data_size, nb_mbuf_per_pool,
-						 socket_num);
-	}
+            printf("#### no numa support:  %u \n", nb_mbuf_per_pool);
+        } else {
+            printf("#### with numa support:  %u \n", nb_mbuf_per_pool);
+        }
+
+
+	if (!numa_support) {
+                unsigned int socket_id_tmp = 0;
+		if (socket_num == UMA_NO_CONFIG) {
+                   socket_id_tmp = 0;
+                } else {
+                   socket_id_tmp = socket_num;
+                }
+                // create mbuf pool for each rx qid
+                printf("#### creating mbuf_pools for %d rx queue\n", (int)
+                        nb_rxq);
+                int qidt = 0;
+                for (qidt = 0; qidt < nb_rxq; ++qidt) {
+		    rx_queues_mbp[qidt] = mbuf_pool_create(
+                            mbuf_data_size, nb_mbuf_per_pool,
+                            socket_id_tmp,
+                            qidt, qidt, 0 /* RX direction */ );
+                    assert(rx_queues_mbp[qidt] != NULL);
+	        }
+        }
 
 	/* Configuration of Ethernet ports. */
 	ports = rte_zmalloc("testpmd: ports",
@@ -605,23 +635,48 @@ void init_config(void)
 			nb_mbuf = (nb_mbuf_per_pool *
 						port_per_socket[i]);
 			if (nb_mbuf)
-				mbuf_pool_create(mbuf_data_size,
-						nb_mbuf,i);
+				mbuf_pool_create(mbuf_data_size, nb_mbuf,
+                                        i, (int)i, 0, 2 /*socket*/);
 		}
 	}
 	init_port_config();
+
+
+
+	/*
+	 * Records which Mbuf pool to use by each TX queue, if needed.
+	 */
+        printf("##### Initializing mbufs for %d TX queues\n", (int)nb_txq);
+        unsigned int socket_id_tmp = 0;
+	for (lc_id = 0; lc_id < nb_txq; ++lc_id){
+                    printf("Creating mpbuf pool for tx queue: %d\n", lc_id);
+		    tx_queues_mbp[lc_id] = mbuf_pool_create(
+                            mbuf_data_size, nb_mbuf_per_pool,
+                            socket_id_tmp,
+                            (int)lc_id, (int)lc_id, 1 /* TX direction */ );
+                    assert(tx_queues_mbp[lc_id] != NULL);
+
+		mbp = mbuf_pool_find(lc_id, lc_id, 1);
+		if (mbp == NULL) {
+                    printf("No mbuf pool found for TX queue %d (core=%d, direction=%d)\n",
+                            lc_id, lc_id, 1);
+                    abort();
+                }
+		tx_queues_mbp[lc_id] = mbp;
+	}
+        printf("##### Done with Initializing mbufs for %d TX queues\n",
+                (int)nb_txq);
 
 	/*
 	 * Records which Mbuf pool to use by each logical core, if needed.
 	 */
 	for (lc_id = 0; lc_id < nb_lcores; lc_id++) {
-		mbp = mbuf_pool_find(
-			rte_lcore_to_socket_id(fwd_lcores_cpuids[lc_id]));
-
+		mbp = mbuf_pool_find(lc_id, lc_id, 1);
 		if (mbp == NULL)
-			mbp = mbuf_pool_find(0);
+			mbp = mbuf_pool_find(0, 0, 1);
 		fwd_lcores[lc_id]->mbp = mbp;
 	}
+
 
 	/* Configuration of packet forwarding streams. */
 	if (init_fwd_streams() < 0)
@@ -1353,45 +1408,40 @@ start_port(portid_t pid)
 				port->need_reconfig_queues = 1;
 				return -1;
 			}
-			/* setup rx queues */
-			for (qi = 0; qi < nb_rxq; qi++) {
-				if ((numa_support) &&
-					(rxring_numa[pi] != NUMA_NO_CONFIG)) {
-					struct rte_mempool * mp =
-						mbuf_pool_find(rxring_numa[pi]);
-					if (mp == NULL) {
-						printf("Failed to setup RX queue:"
-							"No mempool allocation"
-							"on the socket %d\n",
-							rxring_numa[pi]);
-						return -1;
-					}
 
-					diag = rte_eth_rx_queue_setup(pi, qi,
-					     nb_rxd,rxring_numa[pi],
-					     &(port->rx_conf),mp);
-				}
-				else
-					diag = rte_eth_rx_queue_setup(pi, qi,
-					     nb_rxd,port->socket_id,
-					     &(port->rx_conf),
-				             mbuf_pool_find(port->socket_id));
+                        /* setup rx queues */
+                        for (qi = 0; qi < nb_rxq; qi++) {
 
-				if (diag == 0)
-					continue;
+                            struct rte_mempool * mp =
+                                //mbuf_pool_find(rxring_numa[pi]);
+                                mbuf_pool_find((int)qi, (int)qi, 0);
+                            if (mp == NULL) {
+                                printf("Failed to setup RX queue:"
+                                        "No mempool allocation"
+                                        "on the core %d, q %d, dir %d/rx \n",
+                                        (int)qi, (int)qi, 0);
+                                return -1;
+                            }
+
+                            diag = rte_eth_rx_queue_setup(pi, qi,
+                                    nb_rxd,rxring_numa[pi],
+                                    &(port->rx_conf), mp);
+
+                            if (diag == 0)
+                                continue;
 
 
-				/* Fail to setup rx queue, return */
-				if (rte_atomic16_cmpset(&(port->port_status),
-							RTE_PORT_HANDLING,
-							RTE_PORT_STOPPED) == 0)
-					printf("Port %d can not be set back "
-							"to stopped\n", pi);
-				printf("Fail to configure port %d rx queues\n", pi);
-				/* try to reconfigure queues next time */
-				port->need_reconfig_queues = 1;
-				return -1;
-			}
+                            /* Fail to setup rx queue, return */
+                            if (rte_atomic16_cmpset(&(port->port_status),
+                                        RTE_PORT_HANDLING,
+                                        RTE_PORT_STOPPED) == 0)
+                                printf("Port %d can not be set back "
+                                        "to stopped\n", pi);
+                            printf("Fail to configure port %d rx queues\n", pi);
+                            /* try to reconfigure queues next time */
+                            port->need_reconfig_queues = 1;
+                            return -1;
+                        }
 		}
 		/* start port */
 		if (rte_eth_dev_start(pi) < 0) {

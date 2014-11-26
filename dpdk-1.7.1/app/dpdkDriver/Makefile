@@ -39,6 +39,7 @@ ifeq ($(CONFIG_RTE_DPDK),y)
 #APP = testpmd
 LIB = libdpdk_driver.so
 
+#CFLAGS += -O0 -g
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)
 

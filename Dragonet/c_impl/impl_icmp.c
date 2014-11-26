@@ -34,6 +34,7 @@ node_out_t do_pg__RxL3ICMPIsTypeRequest(
     uint8_t icmp_type = icmp_hdr_type_read(*in);
     uint8_t icmp_code = icmp_hdr_code_read(*in);
     if ((icmp_type == icmpTypeEchoRequest) && (icmp_code == 0x0)) {
+        ++debug_pkt_stats.rx_icmpv;
         return P_true;
     } else {
         return P_false;
@@ -73,6 +74,7 @@ node_out_t do_pg__TxL3ICMPInitiateResponse(
     (*in)->attr->ip4_src = dstIP;  // FIXME: maybe I should read it from global state
     (*in)->attr->icmp_id = id;
 
+    ++debug_pkt_stats.tx_icmpv;
     return P_TxL3ICMPInitiateResponse_out;
 }
 

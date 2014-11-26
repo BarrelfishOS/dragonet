@@ -307,7 +307,11 @@ static void parse_params(int argc, char *argv[])
 }
 
 
-static void handle_event(struct dnal_aq_event *event, struct cfg_thread *th)
+//#define TX_LOAD_GEN     (1)
+#define TX_STR      "ttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+
+static void handle_event(struct dnal_aq_event *event, struct cfg_thread *th,
+                dnal_appq_t stack)
 {
     struct input *in;
     struct dnal_net_destination dest;
@@ -339,8 +343,26 @@ static void handle_event(struct dnal_aq_event *event, struct cfg_thread *th)
             dest.data.ip4udp.port_remote,
             (int)in->len);
 */
+
+#if TX_LOAD_GEN
+    for(;;) {
+        struct input *in_tmp;
+        int ret = dnal_aq_buffer_alloc(stack, &in_tmp);
+        assert(ret == SYS_ERR_OK);
+        assert(in_tmp != NULL);
+        int bufsize =  strlen(TX_STR);
+        pkt_prepend(in_tmp, bufsize);
+        memcpy(in_tmp->data, TX_STR, bufsize);
+        dnal_socket_send(event->data.inpacket.socket, in_tmp, &dest);
+    }
+#endif  // TX_LOAD_GEN
+
+    // usual echo back
     dnal_socket_send(event->data.inpacket.socket, in, &dest);
+
 }
+
+
 
 static void *run_thread(void *arg)
 {
@@ -420,7 +442,9 @@ static void *run_thread(void *arg)
             if (err == SYS_ERR_OK) {
                 // This needs to be inside the critical section, since we'll
                 // send out data through the AQ
-                handle_event(&event, th);
+                // FIXME: NOW: pass dnal_appq_t daq; // dragonet application endpoint
+                    // so that it can do allocation for sending out packet
+                handle_event(&event, th, caq->opaque);
                 idle = 0;
             } else {
                 idle++;

@@ -53,6 +53,8 @@ void send_packetV2(void *nic_p, int core_id, int port_id, int queue_id,
 size_t get_packet_nonblock(void *nic_p,  int core_id, int port_id,
         int queue_id, char *pkt_out, size_t buf_len);
 
+void print_stats_dpdk(void *nic_p, int port_idi);
+
 //int init_dpdk_setupV2(int queues);
 //int init_device(int argc, char **argv);
 

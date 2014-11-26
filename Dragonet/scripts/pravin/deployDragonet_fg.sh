@@ -42,7 +42,15 @@ set -x
 set -e
 
 #sudo strace -fCrtT ./dist/build/${APPNAME}/${APPNAME} ${HWQUEUES}
+
+# normal run
 ${INITCMD} ; sudo ${EXTRAENV} ./dist/build/${STACKNAME}/${STACKNAME} $@
+
+# gdb run
+#echo "cmdline: $@"
+#${INITCMD} ; sudo ${EXTRAENV} gdb ./dist/build/${STACKNAME}/${STACKNAME}
+
+# strace run
 #${INITCMD} ; sudo strace -fCrtT ${EXTRAENV} ./dist/build/${STACKNAME}/${STACKNAME} $@
 
 # Initialized

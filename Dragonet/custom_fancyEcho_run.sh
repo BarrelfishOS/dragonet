@@ -195,15 +195,35 @@ run_for_1_cores_full_filters() {
 run_for_2_cores_full_filters_test() {
     echo fancyEcho running on ${SERVERIP} with single application thread and single socket
     sudo ./dist/build/bench-fancyecho/bench-fancyecho \
-    -a t0  -f ${SERVERIP}:7777/10.113.4.71:9000 \
-    -a t1  -f ${SERVERIP}:7777/10.113.4.71:9001 \
+    -a t0  -f ${SERVERIP}:888/10.113.4.71:8000 \
+    -a t1  -f ${SERVERIP}:888/10.113.4.71:8001 \
     -t -q t0 -t -q t1
 }
 
+run_for_6_cores_6_flows() {
+    echo fancyEcho running on ${SERVERIP} with single application thread and single socket
+    sudo ./dist/build/bench-fancyecho/bench-fancyecho \
+    -a t0  -f 10.113.4.95:888/10.113.4.29:8000  \
+    -a t1  -f 10.113.4.95:888/10.113.4.26:8000  \
+    -a t2  -f 10.113.4.95:888/10.113.4.71:8000  \
+    -a t3  -f 10.113.4.95:888/10.113.4.96:8000  \
+    -a t4  -f 10.113.4.95:888/10.113.4.57:8000  \
+    -a t5  -f 10.113.4.95:888/10.113.4.51:8000  \
+    -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5
+
+}
+
+dpdk_debug_2_cores_test() {
+    echo fancyEcho running on ${SERVERIP} with single application thread and single socket
+    sudo ./dist/build/bench-fancyecho/bench-fancyecho \
+    -a t0  -f 10.113.4.95:888/10.113.4.26:8000  \
+    -a t1  -f 10.113.4.95:888/10.113.4.51:8000  \
+    -t -q t0  -t -q t1
+}
 
 run_for_1_cores() {
     echo fancyEcho running on ${SERVERIP} with single application thread and single socket
-    sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0  -p 7777 -t -q t0
+    sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0  -p 888 -t -q t0
 }
 
 run_for_1_cores_null() {
@@ -273,12 +293,18 @@ fi
 ##################################################################
 
 ./scripts/pravin/wait_for_dragonet.sh 10 ${STACKNAME}
-run_for_4_cores_appenzeller
+run_for_6_cores_6_flows
+#run_for_1_cores
 #run_for_2_cores_full_filters_test
-#run_for_1_cores_full_filters
+#dpdk_debug_2_cores_test
 sudo killall ${STACKNAME}
 exit 0
+##################################################################
 
+
+#run_for_4_cores_appenzeller
+#run_for_2_cores_full_filters_test
+#run_for_1_cores_full_filters
 ##################################################################
 
 

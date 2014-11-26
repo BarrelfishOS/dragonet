@@ -36,6 +36,7 @@ import qualified Scenarios.S1 as S1
 
 tr = flip . trace
 
+{-
 localIP :: Word32
 localIP = MD.asiagoIP_SF
 --localIP = MD.burrataIP
@@ -163,7 +164,7 @@ add5TupleToConf conf ep q = ("RxC5TupleFilter", new5t):rest
 addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
 addToCVL (PG.CVList l) v = PG.CVList $ v:l
 
-
+-}
 --------------------------------------------------
 
 data CfgAction =
@@ -308,7 +309,7 @@ main = do
                         Nothing -> error $ "Uknown cost function:" ++ costfn
         sparams    = Search.initSearchParams {   Search.sOracle = sfOracle
                                                , Search.sPrgU   = prgU
-                                               , Search.sCostFn = priFn
+                                               , Search.sCostFn =  costFn
                                                , Search.sStrategy = strategy }
         searchFn   = Search.runSearch sparams
 

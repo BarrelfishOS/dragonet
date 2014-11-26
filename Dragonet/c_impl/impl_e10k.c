@@ -371,9 +371,11 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
 //        dprint
             ("QueueID:%"PRIu8":[TID:%d]: has handled %"PRIu64" packets, size:%zu\n",
                qi, (int)pthread_self(), qstat[qi], len);
+    show_pkt_stats(&debug_pkt_stats);
    }
 #endif // SHOW_INTERVAL_STATS
     ++qstat[qi];
+    ++debug_pkt_stats.rx_eth;
 
     qin->qid = qi;
     // Set packet boundaries
@@ -407,6 +409,8 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
 
     e10k_queue_add_txbuf(q->queue, qin->phys, qin->len, qin, 1, 1, qin->len);
     e10k_queue_bump_txtail(q->queue);
+
+    ++debug_pkt_stats.tx_eth;
 
     // Check if there are processed buffers on the TX queue
     while (e10k_queue_get_txbuf(q->queue, &op) == 0) {

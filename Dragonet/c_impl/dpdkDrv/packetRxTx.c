@@ -13,6 +13,7 @@
 #define CONFIG_LOCAL_IP  0x0a71045f //   "10.113.4.95"
 
 static uint64_t qstat[MAX_QUEUES] = {0, 0};
+static uint64_t qstat_tx[MAX_QUEUES] = {0, 0};
 
 // number of queues that device will configure.
 // TODO: This number should be provided by the stack-dpdk commandline arg
@@ -52,6 +53,7 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
 
         // clear up the stats array
         memset(qstat, 0, sizeof(qstat));
+        memset(qstat_tx, 0, sizeof(qstat_tx));
         // set the local IP and mac
         state->local_mac = CONFIG_LOCAL_MAC;
         state->local_ip = CONFIG_LOCAL_IP;
@@ -91,8 +93,8 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
         pkt_prepend((q->pkt_holder), (q->pkt_holder)->space_before);
     }
 
-    dprint("Waiting for incoming packets\n");
-    size_t copylen = get_packet_nonblock((void *)e10k, 0, 0,
+    //dprint("Waiting for incoming packets\n");
+    size_t copylen = get_packet_nonblock((void *)e10k, q->qid, 0,
             q->qid,
             (q->pkt_holder)->data,
             (q->pkt_holder)->len);
@@ -127,13 +129,18 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
 
     //printf("dpdk: Yay, we got a full packet!\n");
     if (qstat[qi] % INTERVAL_STAT_FREQUENCY == 0) {
-        printf
-//        dprint
-            ("QueueID:%"PRIu8":[TID:%d]: has handled %"PRIu64" packets, size:%zu\n",
-               qi, (int)pthread_self(), qstat[qi], copylen);
-   }
+        //printf
+            dprint
+            ("QueueID:%"PRIu8":[TID:%d]: RX:%-10"PRIu64", TX:%-10"PRIu64", RX_event\n",
+             qi, (int)pthread_self(), qstat[qi], qstat_tx[qi]);
+
+        show_pkt_stats(&debug_pkt_stats);
+        print_stats_dpdk((void *)e10k, 0);
+    }
 #endif // SHOW_INTERVAL_STATS
+
     ++qstat[qi];
+    ++debug_pkt_stats.rx_eth;
 
     out_decision = P_E10kRxQueue0_out;
     return out_decision;
@@ -158,7 +165,6 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
     // wait till queue is allocated
     while (q->qstate == 0);
 
-    ++q->tx_pkts;
     dprint("[QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
             "e10k_if = %p, (vq0 [%p, qstate %d], [vq-%"PRIu8": %p, qstate %d], "
             "######## Trying to send packet, data: %p, len:%"PRIu32"\n",
@@ -167,7 +173,25 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
             qi, q, q->qstate, (*in)->data, (*in)->len);
 
     // Actually sending packet using DPDK
-    send_packetV2((void *)e10k, 0, 0, qi, (*in)->data, (size_t)(*in)->len);
+    send_packetV2((void *)e10k, qi, 0, qi, (*in)->data, (size_t)(*in)->len);
+
+#if SHOW_INTERVAL_STATS
+
+    //printf("dpdk: Yay, we got a full packet!\n");
+    if (qstat_tx[qi] % INTERVAL_STAT_FREQUENCY == 0) {
+        printf
+//        dprint
+            ("QueueID:%"PRIu8":[TID:%d]: RX:%-10"PRIu64", TX:%-10"PRIu64", TX_event\n",
+               qi, (int)pthread_self(), qstat[qi], qstat_tx[qi]);
+
+    show_pkt_stats(&debug_pkt_stats);
+    print_stats_dpdk((void *)e10k, 0);
+   }
+#endif // SHOW_INTERVAL_STATS
+
+    ++q->tx_pkts;
+    ++qstat_tx[qi];
+    ++debug_pkt_stats.tx_eth;
 
     dprint("[QID:%"PRIu8"], [pktid:%d]:"
             "##############  packet sent, data: %p, len:%"PRIu32"\n",
