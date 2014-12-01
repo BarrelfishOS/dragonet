@@ -144,7 +144,7 @@ static nodefun_t graph_fnode_resolve(const char *name, void *data)
     return NULL;
 }
 
-static void process_graph_cmd(dnal_appq_t aq,
+static void process_graph_cmd(struct dnal_app_queue *aq,
                               struct app_control_message *msg)
 {
 
@@ -152,7 +152,7 @@ static void process_graph_cmd(dnal_appq_t aq,
 
 errval_t dnal_aq_create(const char  *stackname,
                         const char  *slotname,
-                        dnal_appq_t *appqueue)
+                        struct dnal_app_queue **appqueue)
 {
     struct dnal_app_queue *aq;
     int s;
@@ -209,7 +209,7 @@ errval_t dnal_aq_create(const char  *stackname,
     return SYS_ERR_OK;
 }
 
-errval_t dnal_aq_poll(dnal_appq_t           aq,
+errval_t dnal_aq_poll(struct dnal_app_queue *aq,
                       struct dnal_aq_event *event)
 {
     struct input *in;
@@ -254,7 +254,7 @@ errval_t dnal_aq_poll(dnal_appq_t           aq,
     return SYS_ERR_OK;
 }
 
-errval_t dnal_aq_buffer_alloc(dnal_appq_t    aq,
+errval_t dnal_aq_buffer_alloc(struct dnal_app_queue  *aq,
                               struct input **buffer)
 {
     *buffer = input_alloc_plh(aq->pipeline_handle);
@@ -265,20 +265,20 @@ errval_t dnal_aq_buffer_alloc(dnal_appq_t    aq,
     return SYS_ERR_OK;
 }
 
-errval_t dnal_aq_buffer_free(dnal_appq_t   aq,
+errval_t dnal_aq_buffer_free(struct dnal_app_queue *aq,
                              struct input *buffer)
 {
     input_free_plh(aq->pipeline_handle, buffer);
     return SYS_ERR_OK;
 }
 
-struct state *dnal_aq_state(dnal_appq_t aq)
+struct state *dnal_aq_state(struct dnal_app_queue *aq)
 {
     return aq->state;
 }
 
-errval_t dnal_socket_create(dnal_appq_t   aq,
-                            dnal_sockh_t *sockethandle)
+errval_t dnal_socket_create(struct dnal_app_queue *aq,
+                            struct dnal_socket_handle **sockethandle)
 {
     struct dnal_socket_handle *sh;
 
@@ -313,7 +313,7 @@ static errval_t sockh_from_sockinfo(struct dnal_socket_handle   *sh,
     return SYS_ERR_OK;
 }
 
-errval_t dnal_socket_bind(dnal_sockh_t                 sh,
+errval_t dnal_socket_bind(struct dnal_socket_handle   *sh,
                           struct dnal_net_destination *dest)
 {
     struct app_control_message msg;
@@ -346,9 +346,9 @@ errval_t dnal_socket_bind(dnal_sockh_t                 sh,
     return sockh_from_sockinfo(sh, &msg, dest);
 }
 
-errval_t dnal_socket_span(dnal_sockh_t sh,
-                          dnal_appq_t  naq,
-                          dnal_sockh_t nsh)
+errval_t dnal_socket_span(struct dnal_socket_handle *sh,
+                          struct dnal_app_queue *naq,
+                          struct dnal_socket_handle *nsh)
 {
     struct app_control_message msg;
 
@@ -362,7 +362,7 @@ errval_t dnal_socket_span(dnal_sockh_t sh,
     return sockh_from_sockinfo(nsh, &msg, &sh->dest);
 }
 
-errval_t dnal_socket_send(dnal_sockh_t                 sh,
+errval_t dnal_socket_send(struct dnal_socket_handle   *sh,
                           struct input                *buf,
                           struct dnal_net_destination *dest)
 {
@@ -427,7 +427,7 @@ errval_t dnal_socket_send(dnal_sockh_t                 sh,
  * Reads out the per-socket opaque value saved previously, or NULL if not
  * initialized.
  */
-void *dnal_socket_opaque_get(dnal_sockh_t sockethandle)
+void *dnal_socket_opaque_get(struct dnal_socket_handle *sockethandle)
 {
     return sockethandle->opaque;
 }
@@ -435,7 +435,7 @@ void *dnal_socket_opaque_get(dnal_sockh_t sockethandle)
 /**
  * Set the per-socket opaque value.
  */
-void dnal_socket_opaque_set(dnal_sockh_t sockethandle,
+void dnal_socket_opaque_set(struct dnal_socket_handle *sockethandle,
                             void        *opaque)
 {
     sockethandle->opaque = opaque;

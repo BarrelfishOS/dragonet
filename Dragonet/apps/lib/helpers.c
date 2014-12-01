@@ -9,7 +9,7 @@
 #include <helpers.h>
 
 struct stack_handle {
-    dnal_appq_t aq;
+    struct dnal_app_queue *aq;
 };
 
 struct input *stack_input_alloc(struct stack_handle *sh)
@@ -29,7 +29,7 @@ void stack_input_free(struct stack_handle *sh, struct input *in)
 struct stack_handle *stack_init(const char *stackname, const char *name)
 {
     struct stack_handle *sh;
-    dnal_appq_t aq;
+    struct dnal_app_queue *aq;
     errval_t err;
 
     err = dnal_aq_create(stackname, name, &aq);
@@ -86,7 +86,7 @@ socket_handle_t socket_create(struct stack_handle *stack,
                               void *data)
 {
     struct socket_handle *sh;
-    dnal_sockh_t lsh;
+    struct dnal_socket_handle *lsh;
 
     if (!err_is_ok(dnal_socket_create(stack->aq, &lsh))) {
         return NULL;

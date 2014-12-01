@@ -311,7 +311,7 @@ static void parse_params(int argc, char *argv[])
 #define TX_STR      "ttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
 
 static void handle_event(struct dnal_aq_event *event, struct cfg_thread *th,
-                dnal_appq_t stack)
+                struct dnal_app_queue *stack)
 {
     struct input *in;
     struct dnal_net_destination dest;
@@ -370,8 +370,8 @@ static void *run_thread(void *arg)
     struct cfg_appq *caq;
     struct cfg_socket *cs;
     size_t i;
-    dnal_appq_t daq;
-    dnal_sockh_t dsh;
+    struct dnal_app_queue *daq;
+    struct dnal_socket_handle *dsh;
     struct dnal_net_destination dnd;
     struct dnal_aq_event event;
     errval_t err;
@@ -442,7 +442,7 @@ static void *run_thread(void *arg)
             if (err == SYS_ERR_OK) {
                 // This needs to be inside the critical section, since we'll
                 // send out data through the AQ
-                // FIXME: NOW: pass dnal_appq_t daq; // dragonet application endpoint
+                // FIXME: NOW: pass struct dnal_app_queue daq; // dragonet application endpoint
                     // so that it can do allocation for sending out packet
                 handle_event(&event, th, caq->opaque);
                 idle = 0;

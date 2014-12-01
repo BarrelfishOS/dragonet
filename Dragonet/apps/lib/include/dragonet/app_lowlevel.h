@@ -7,10 +7,7 @@
 
 #include <implementation.h>
 
-// These structures are opaque to applications
-struct dnal_app_queue;
-struct dnal_socket_handle;
-
+// The following structures are opaque to applications
 
 /**
  * Connection of the application to the network stack.
@@ -18,7 +15,7 @@ struct dnal_socket_handle;
  * through. An application can have multiple application connections (e.g. for
  * different threads).
  */
-typedef struct dnal_app_queue *dnal_appq_t;
+struct dnal_app_queue;
 
 /**
  * A socket handle represents a particular socket on a particular application
@@ -27,7 +24,7 @@ typedef struct dnal_app_queue *dnal_appq_t;
  * respective application queue, as well as to specify the destination socket
  * for packets received on the respective application queue.
  */
-typedef struct dnal_socket_handle *dnal_sockh_t;
+struct dnal_socket_handle;
 
 
 enum dnal_aq_event_type {
@@ -40,7 +37,7 @@ struct dnal_aq_event {
     union {
         struct {
             /** Socket handle this packet is destined for */
-            dnal_sockh_t  socket;
+            struct dnal_socket_handle *socket;
             /** Buffer for received packet */
             struct input *buffer;
         } inpacket;
@@ -82,7 +79,7 @@ struct dnal_net_destination {
  */
 errval_t dnal_aq_create(const char  *stackname,
                         const char  *slotname,
-                        dnal_appq_t *appqueue);
+                        struct dnal_app_queue **appqueue);
 
 /**
  * Destroy application queue (not implemented).
@@ -91,7 +88,7 @@ errval_t dnal_aq_create(const char  *stackname,
  *
  * @param appqueue Handle for app queue to destroy
  */
-errval_t dnal_aq_destroy(dnal_appq_t appqueue);
+errval_t dnal_aq_destroy(struct dnal_app_queue *appqueue);
 
 /**
  * Poll application queue for an event
@@ -107,8 +104,8 @@ errval_t dnal_aq_destroy(dnal_appq_t appqueue);
  *   - If no event was found, DNERR_NOEVENT
  *   - Other error codes might be returned in case of failure
  */
-errval_t dnal_aq_poll(dnal_appq_t           appqueue,
-                      struct dnal_aq_event *event);
+errval_t dnal_aq_poll(struct dnal_app_queue *appqueue,
+                      struct dnal_aq_event  *event);
 
 /**
  * Allocate new buffer for use on this queue.
@@ -119,8 +116,8 @@ errval_t dnal_aq_poll(dnal_appq_t           appqueue,
  * @param appqueue Application queue to allocate buffer from
  * @param buffer   Location to store pointer to the buffer
  */
-errval_t dnal_aq_buffer_alloc(dnal_appq_t    appqueue,
-                              struct input **buffer);
+errval_t dnal_aq_buffer_alloc(struct dnal_app_queue *appqueue,
+                              struct input          **buffer);
 
 /**
  * Free buffer
@@ -128,13 +125,13 @@ errval_t dnal_aq_buffer_alloc(dnal_appq_t    appqueue,
  * @param appqueue Application queue to free buffer to
  * @param buffer   Buffer to free
  */
-errval_t dnal_aq_buffer_free(dnal_appq_t   appqueue,
-                             struct input *buffer);
+errval_t dnal_aq_buffer_free(struct dnal_app_queue *appqueue,
+                             struct input          *buffer);
 
 /**
  * Get pointer to shared global dragonet state.
  */
-struct state *dnal_aq_state(dnal_appq_t appqueue);
+struct state *dnal_aq_state(struct dnal_app_queue *appqueue);
 
 
 /******************************************************************************/
@@ -150,8 +147,8 @@ struct state *dnal_aq_state(dnal_appq_t appqueue);
  * @param appqueue     App queue to create socket on
  * @param sockethandle Location to store socket handle
  */
-errval_t dnal_socket_create(dnal_appq_t   appqueue,
-                            dnal_sockh_t *sockethandle);
+errval_t dnal_socket_create(struct dnal_app_queue      *appqueue,
+                            struct dnal_socket_handle **sockethandle);
 
 /**
  * Bind socket to network endpoint.
@@ -159,7 +156,7 @@ errval_t dnal_socket_create(dnal_appq_t   appqueue,
  * @param sockethandle Socket handle
  * @param destination  Network endpoint to bind to
  */
-errval_t dnal_socket_bind(dnal_sockh_t                 sockethandle,
+errval_t dnal_socket_bind(struct dnal_socket_handle   *sockethandle,
                           struct dnal_net_destination *destination);
 
 /**
@@ -175,9 +172,9 @@ errval_t dnal_socket_bind(dnal_sockh_t                 sockethandle,
  * @param newqueue     App queue to create socket on
  * @param sockethandle Undbound socket handle (from socket_create) on newqueue
  */
-errval_t dnal_socket_span(dnal_sockh_t orig,
-                          dnal_appq_t  newqueue,
-                          dnal_sockh_t sockethandle);
+errval_t dnal_socket_span(struct dnal_socket_handle *orig,
+                          struct dnal_app_queue *newqueue,
+                          struct dnal_socket_handle *sockethandle);
 
 /**
  * Close particular socket handle.
@@ -185,7 +182,7 @@ errval_t dnal_socket_span(dnal_sockh_t orig,
  *
  * @param sockethandle Handle to be closed
  */
-errval_t dnal_socket_close(dnal_sockh_t sockethandle);
+errval_t dnal_socket_close(struct dnal_socket_handle *sockethandle);
 
 /**
  * Send out data on a socket handle.
@@ -196,7 +193,7 @@ errval_t dnal_socket_close(dnal_sockh_t sockethandle);
  *                       flow-based sockets (UDP flows, or TCP connections in
  *                       the future).
  */
-errval_t dnal_socket_send(dnal_sockh_t                 sockethandle,
+errval_t dnal_socket_send(struct dnal_socket_handle   *sockethandle,
                           struct input                *buffer,
                           struct dnal_net_destination *dest);
 
@@ -204,12 +201,12 @@ errval_t dnal_socket_send(dnal_sockh_t                 sockethandle,
  * Reads out the per-socket opaque value saved previously, or NULL if not
  * initialized.
  */
-void *dnal_socket_opaque_get(dnal_sockh_t sockethandle);
+void *dnal_socket_opaque_get(struct dnal_socket_handle *sockethandle);
 
 /**
  * Set the per-socket opaque value.
  */
-void dnal_socket_opaque_set(dnal_sockh_t sockethandle,
+void dnal_socket_opaque_set(struct dnal_socket_handle *sockethandle,
                             void        *opaque);
 
 #endif // ndef DRAGONET_APP_LOWLEVEL_H_

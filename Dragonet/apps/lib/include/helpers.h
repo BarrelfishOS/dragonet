@@ -18,7 +18,7 @@ struct socket_handle;
 typedef struct socket_handle *socket_handle_t;
 struct socket_handle {
     struct stack_handle *stack;
-    dnal_sockh_t lsh;
+    struct dnal_socket_handle *lsh;
     void (*cb_receive)(socket_handle_t, struct input *, void *);
     void *data;
 };

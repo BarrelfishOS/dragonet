@@ -24,7 +24,7 @@ struct cfg_udpep {
     struct sockaddr_in   si_r;
     int                  primary_thread;
     int                  state;  // is it initilized, etc..
-    dnal_sockh_t  orig_socket;
+    struct dnal_socket_handle *orig_socket;
     pthread_mutex_t      ep_lock; // to protect initilization and spawning
 };
 

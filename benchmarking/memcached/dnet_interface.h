@@ -65,8 +65,8 @@ struct dn_thread_state {
 //    struct stack_handle *stack;
 //    socket_handle_t sh;
 
-    dnal_appq_t                 daq;                        // dragonet application endpoint
-    dnal_sockh_t                dshList[MAX_SOCKETS_APP];   // Socket handle list
+    struct dnal_app_queue       *daq;                        // dragonet application endpoint
+    struct dnal_socket_handle   *dshList[MAX_SOCKETS_APP];   // Socket handle list
     int                         socket_count;               // 0
     struct dnal_net_destination dndList[MAX_SOCKETS_APP];    // listen address for binding
     struct dnal_net_destination dest;   // destination for currently processing packet
