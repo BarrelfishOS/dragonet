@@ -87,7 +87,7 @@ executable opt-test
     default-language:   Haskell2010
 
 executable stack-tap
-    hs-source-dirs:     ., stack, fitness
+    hs-source-dirs:     ., stack
     main-is:            stack-tap.hs
     build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
                         llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
@@ -106,7 +106,7 @@ executable stack-tap
     default-language:   Haskell2010
 
 executable stack-sf
-    hs-source-dirs:     ., stack, fitness
+    hs-source-dirs:     ., stack
     main-is:            stack-sf.hs
     build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
                         llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
@@ -136,11 +136,11 @@ executable stack-sf
     default-language:   Haskell2010
 
 executable stack-e10k
-    hs-source-dirs:     ., stack, fitness
+    hs-source-dirs:     ., stack
     main-is:            stack-e10k.hs
-    build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
+    build-depends:      Dragonet, base, smtLib, fgl, containers, mtl, directory,
                         llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
-                        transformers, pretty-show
+                        transformers, pretty-show, optparse-applicative
     ghc-options:        -threaded
     C-sources:          stack/Runner/dyn_remote_client.c,
                         c_impl/e10k/e10k_card.c,
@@ -162,7 +162,7 @@ executable stack-e10k
 
 
 executable stack-dpdk
-    hs-source-dirs:     ., stack, fitness
+    hs-source-dirs:     ., stack
     main-is:            stack-dpdk.hs
     build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
                         llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
@@ -189,7 +189,7 @@ executable stack-dpdk
 
 
 executable stack-null
-    hs-source-dirs:     ., stack, fitness
+    hs-source-dirs:     ., stack
     main-is:            stack-null.hs
     build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
                         llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
@@ -211,7 +211,7 @@ executable stack-null
 
 
 executable benchSearch
-    hs-source-dirs:     ., fitness
+    hs-source-dirs:     .
     main-is:            tests/benchSearch.hs
     build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
                         llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
@@ -221,7 +221,7 @@ executable benchSearch
 
 
 executable oracleTest
-    hs-source-dirs:     ., fitness
+    hs-source-dirs:     .
     main-is:            tests/OracleTest.hs
     build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
                         llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,

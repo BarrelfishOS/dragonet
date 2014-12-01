@@ -28,7 +28,6 @@ import qualified Data.List as L
 import Data.Word
 
 import qualified MachineDetails as MD
-import qualified Fitness as F
 
 import Debug.Trace (trace)
 import Text.Show.Pretty (ppShow)
