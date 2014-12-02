@@ -1,26 +1,26 @@
 {-# LANGUAGE FlexibleInstances, UndecidableInstances,
                OverlappingInstances, ScopedTypeVariables #-}
 
-import qualified Dragonet.Configuration as C
-import qualified Dragonet.Optimization as O
-import qualified Dragonet.Pipelines as PL
-import qualified Dragonet.Pipelines.Implementation as PLI
-import qualified Dragonet.ProtocolGraph as PG
-import qualified Dragonet.ProtocolGraph.Utils as PGU
-import qualified Dragonet.Search as Search
+import qualified Dragonet.Configuration            as  C
+import qualified Dragonet.Optimization             as  O
+import qualified Dragonet.Pipelines                as  PL
+import qualified Dragonet.Pipelines.Implementation as  PLI
+import qualified Dragonet.ProtocolGraph            as  PG
+import qualified Dragonet.ProtocolGraph.Utils      as  PGU
+import qualified Dragonet.Search                   as  SE
 
 import qualified Graphs.E10k as E10k
+import qualified Graphs.Tap as Tap
+
 import Graphs.Cfg (e10kCfgStr)
 import qualified Runner.E10KControl as CTRL
 
-import qualified ReadArgs as RA
+import qualified Options.Applicative as OA
 
-import Stack
-import qualified Dragonet.Search as Search
 import qualified Stack as SS
 
 import Control.Monad (forever, forM_)
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>),(<*>))
 import Control.Concurrent(forkIO, ThreadId)
 import qualified Control.Concurrent.STM as STM
 import qualified Data.Map as M
@@ -139,11 +139,8 @@ implCfg tcstate chan sh config = do
         -- parseProto PG.CVEnum 3 = CTRL.L4Other
 
 
-
-
-
 -- Create separate pipelines for rx and tx per hardware queue
-plAssign :: StackState -> String -> PG.PGNode -> String
+plAssign :: SS.StackState -> String -> PG.PGNode -> String
 plAssign _ _ (_,n)
     | take 2 lbl == "Tx" = "Tx" ++ tag
     | otherwise = "Rx" ++ tag
@@ -152,38 +149,86 @@ plAssign _ _ (_,n)
         tag = PG.nTag n
 
 -- Only create one pipeline per hardware queue
-plAssignMerged :: StackState -> String -> PG.PGNode -> String
+plAssignMerged :: SS.StackState -> String -> PG.PGNode -> String
 plAssignMerged _ _ (_,n) = PG.nTag n
 
 llvm_helpers = "llvm-helpers-e10k"
 
-main = do
-    ((nq,costfn) :: (Int,String)) <- RA.readArgs
-    print $ "Number of queues used: " ++ show nq
-    print $ "Cost function: " ++ show costfn
+data StackE10kOpts = StackE10kOpts {
+      optNq     :: Int
+    , optCostFn :: Int -> SE.CostQueueFn
+    , optDummy  :: Bool
+} deriving (Show)
 
-    let state = CfgState {
-                    csThread = Nothing,
-                    cs5Tuples = M.empty,
-                    cs5TUnused = [0..127] }
-    -- Channel and MVar with thread id of control thread
+e10kImplFunction :: IO (PLI.StateHandle -> C.Configuration -> IO ())
+e10kImplFunction = do
+    --  Channel and MVar with thread id of control thread
+    let state = CfgState { csThread = Nothing
+                         , cs5Tuples = M.empty
+                         , cs5TUnused = [0..127]}
     tcstate <- STM.newTVarIO state
-    chan <- STM.newTChanIO
-    -- Prepare graphs and so on
-    prgH@(prgU,_) <- E10k.graphH
+    chan    <- STM.newTChanIO
+    return $ implCfg tcstate chan
 
-    let e10kOracle = Search.E10kOracleSt {Search.nQueues = nq}
-        priFn      = S1.priorityCost nq
-        balFn      = Search.balanceCost nq
-        strategy   = Search.searchGreedyFlows
-        costFns    = [("balance", balFn), ("priority", priFn)]
-        costFn     = case lookup costfn costFns of
-                        Just x  -> x
-                        Nothing -> error $ "Uknown cost function:" ++ costfn
-        sparams    = Search.initSearchParams {   Search.sOracle = e10kOracle
-                                               , Search.sPrgU   = prgU
-                                               , Search.sCostFn = priFn
-                                               , Search.sStrategy = strategy }
-        searchFn   = Search.runSearch sparams
+e10kPrgArgs :: IO SS.StackPrgArgs
+e10kPrgArgs = do
+    prgH <- E10k.graphH
+    implFn <- e10kImplFunction
+    return SS.StackPrgArgs { SS.stPrgH = prgH
+                           , SS.stLlvmH = "llvm-helpers-e10k"
+                           , SS.stCfgImpl = implFn }
 
-    instantiateFlows searchFn prgH llvm_helpers (implCfg tcstate chan) plAssignMerged
+dummyImplFn :: PLI.StateHandle -> C.Configuration -> IO ()
+dummyImplFn _ conf = do
+    putStrLn $ e10kCfgStr conf
+    return ()
+
+tapPrgArgs :: IO SS.StackPrgArgs
+tapPrgArgs = do
+    prgH <- Tap.graphH
+    return SS.StackPrgArgs { SS.stPrgH = prgH
+                           , SS.stLlvmH = "llvm-helpers-tap"
+                           , SS.stCfgImpl = dummyImplFn }
+
+runStackE10k :: StackE10kOpts -> IO ()
+runStackE10k opts = do
+    -- PRG
+    (prgU,_) <- E10k.graphH
+    let nq       = optNq opts
+        costFn   = (optCostFn opts) nq
+        dummy    = optDummy opts
+        searchFn = SE.runSearch searchPs
+        searchPs = (SE.initSearchParamsE10k nq) { SE.sPrgU = prgU
+                                                , SE.sCostFn = costFn }
+    prgArgs <- case dummy of
+                True -> tapPrgArgs
+                False -> e10kPrgArgs
+
+    SS.instantiateFlows_ searchFn plAssignMerged prgArgs
+
+
+costFnParser = OA.str >>= doParse
+    where doParse :: String -> OA.ReadM (Int -> SE.CostQueueFn)
+          doParse x
+            | x == "balance" = return SE.balanceCost
+            | x == "priority" = return S1.priorityCost
+            | otherwise = OA.readerError "Unknown cost function"
+
+stackE10kParserInfo:: OA.ParserInfo StackE10kOpts
+stackE10kParserInfo = OA.info (OA.helper <*> parser) info
+    where parser = StackE10kOpts
+                <$> OA.argument OA.auto infoNq
+                <*> OA.argument costFnParser infoCostF
+                <*> OA.switch (OA.short 'd' OA.<> OA.help dummyTxt)
+          info = OA.fullDesc OA.<> OA.header "Instantiate the e10k stack"
+          infoNq = (OA.metavar "nqueues" OA.<> OA.help "number of queues")
+          infoCostF = (OA.metavar "costF" OA.<> OA.help "cost function")
+          dummyTxt = "Dummy instatiation: "
+                   ++ "(e10k graph for the search, "
+                   ++ "TAP for the network stack implementtation, "
+                   ++ "empty implementation function)"
+
+main = do
+    opts <- OA.execParser stackE10kParserInfo
+    putStrLn $ show opts
+    runStackE10k opts

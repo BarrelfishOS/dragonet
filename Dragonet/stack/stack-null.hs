@@ -1,20 +1,19 @@
 {-# LANGUAGE FlexibleInstances, UndecidableInstances,
                OverlappingInstances, ScopedTypeVariables #-}
 
-import qualified Dragonet.Configuration as C
-import qualified Dragonet.Optimization as O
-import qualified Dragonet.Pipelines as PL
-import qualified Dragonet.Pipelines.Implementation as PLI
-import qualified Dragonet.ProtocolGraph as PG
-import qualified Dragonet.ProtocolGraph.Utils as PGU
+import qualified Dragonet.Configuration            as  C
+import qualified Dragonet.Optimization             as  O
+import qualified Dragonet.Pipelines                as  PL
+import qualified Dragonet.Pipelines.Implementation as  PLI
+import qualified Dragonet.ProtocolGraph            as  PG
+import qualified Dragonet.ProtocolGraph.Utils      as  PGU
+import qualified Dragonet.Search                   as  SE
 
 import qualified Graphs.Null as Null
 import qualified Runner.NullControl as CTRL
 
 import qualified ReadArgs as RA
 
-import Stack
-import qualified Dragonet.Search as Search
 import qualified Stack as SS
 
 import Control.Monad (forever, forM_)
@@ -133,7 +132,7 @@ implCfg tcstate chan sh config = do
 
 
 -- Create separate pipelines for rx and tx per hardware queue
-plAssign :: StackState -> String -> PG.PGNode -> String
+plAssign :: SS.StackState -> String -> PG.PGNode -> String
 plAssign _ _ (_,n)
     | take 2 lbl == "Tx" = "Tx" ++ tag
     | otherwise = "Rx" ++ tag
@@ -142,10 +141,8 @@ plAssign _ _ (_,n)
         tag = PG.nTag n
 
 -- Only create one pipeline per hardware queue
-plAssignMerged :: StackState -> String -> PG.PGNode -> String
+plAssignMerged :: SS.StackState -> String -> PG.PGNode -> String
 plAssignMerged _ _ (_,n) = PG.nTag n
-
-llvm_helpers = "llvm_helpers_null"
 
 main = do
     ((nq,costfn) :: (Int,String)) <- RA.readArgs
@@ -162,18 +159,14 @@ main = do
     -- Prepare graphs and so on
     prgH@(prgU,_) <- Null.graphH
 
-    let e10kOracle = Search.E10kOracleSt {Search.nQueues = nq}
-        priFn      = S1.priorityCost nq
-        balFn      = Search.balanceCost nq
-        strategy   = Search.searchGreedyFlows
+    let priFn      = S1.priorityCost nq
+        balFn      = SE.balanceCost nq
         costFns    = [("balance", balFn), ("priority", priFn)]
         costFn     = case lookup costfn costFns of
                         Just x  -> x
                         Nothing -> error $ "Uknown cost function:" ++ costfn
-        sparams    = Search.initSearchParams {   Search.sOracle = e10kOracle
-                                               , Search.sPrgU   = prgU
-                                               , Search.sCostFn = costFn
-                                               , Search.sStrategy = strategy }
-        searchFn   = Search.runSearch sparams
-    instantiateFlows searchFn prgH llvm_helpers (implCfg tcstate chan) plAssignMerged
+        sparams    = (SE.initSearchParamsE10k nq) { SE.sPrgU   = prgU
+                                                  , SE.sCostFn = priFn}
+        searchFn   = SE.runSearch sparams
 
+    SS.instantiateFlows searchFn prgH "llvm-helpers-null" (implCfg tcstate chan) plAssignMerged

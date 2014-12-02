@@ -1,9 +1,11 @@
 module Stack (
     instantiateOpt,
-    instantiateFlows,
+    instantiateFlows, instantiateFlows_,
 
     StackState(..),
-    EndpointDesc(..),
+    StackArgs(..),
+    StackPrgArgs(..),
+
     AppDesc(..),
 ) where
 
@@ -16,9 +18,10 @@ import qualified Dragonet.Pipelines.Applications   as PLA
 import qualified Dragonet.ProtocolGraph            as PG
 import qualified Dragonet.ProtocolGraph.Utils      as PGU
 import qualified Dragonet.Semantics                as Sem
+import qualified Dragonet.Search                   as Srch
 
 import Dragonet.Endpoint (SocketId,AppId,EndpointDesc(..),epsDiff)
-import Dragonet.Flows (Flow(..), epToFlow)
+import Dragonet.Flows (Flow(..), epToFlow, flowStr)
 
 import Graphs.Cfg (e10kCfgEmpty)
 
@@ -46,9 +49,7 @@ type PlaConfigure = (StackState -> String -> PG.PGNode -> String)
 type GraphH = (PG.PGraph, Sem.Helpers)
 data StackArgs = StackArgs {
     -- NIC-specific fields
-      stPrgH      :: GraphH -- | (unconfigured) PRG (+sem helpers)
-    , stLlvmH     :: String -- | LLVM helpers filename
-    , stCfgImpl   :: PrgApplyCfg -- | implement given PRG conf
+      stPrg       :: StackPrgArgs -- | PRG args
     -- other fields
     , stLpgH      :: GraphH -- | (unconfigured) LPG (+sem helpers)
     , stCfgPLA    :: PlaConfigure -- | Group the LPG nodes into pipelines
@@ -57,15 +58,19 @@ data StackArgs = StackArgs {
     , stMergedH   :: Sem.Helpers -- | merged helpers
 }
 
+data StackPrgArgs = StackPrgArgs {
+      stPrgH      :: GraphH -- | (unconfigured) PRG (+sem helpers)
+    , stLlvmH     :: String -- | LLVM helpers filename
+    , stCfgImpl   :: PrgApplyCfg -- | implement given PRG conf
+}
+
 -- helper for constructing StackArgs
 stackArgsDefault :: IO StackArgs
 stackArgsDefault = do
     lpgH <- LPG.graphH -- default LPG
     return $ StackArgs {
     -- H/W specific fields: must be set by the caller
-      stPrgH      = undefined
-    , stLlvmH     = undefined
-    , stCfgImpl   = undefined
+      stPrg       = undefined
     -- fields with default values: may be set by the caller
     , stLpgH      = lpgH
     , stCfgPLA    = plAssignByTag
@@ -80,7 +85,7 @@ stackArgsDefault = do
 --   sets fields that are not set by the user
 initStackArgs :: StackArgs -> StackArgs
 initStackArgs args =  args {stMergedH =  mergedHelpers}
-    where (_,prgHelpers) = stPrgH args
+    where (_,prgHelpers) = stPrgH $ stPrg args
           (_,lpgHelpers) = stLpgH args
           mergedHelpers = prgHelpers `Sem.mergeHelpers` lpgHelpers
 
@@ -128,7 +133,7 @@ ssMakeGraph :: StackState -> StackArgs -> C.Configuration -> String
             -> IO PL.PLGraph
 ssMakeGraph ss args prgConf lbl = do
     let mergeH     = stMergedH args
-        (prgU,_)   = stPrgH args
+        (prgU,_)   = stPrgH $ stPrg args
         lpgC       = ssConfigureLpg ss args
         -- graph transformations
         implXForms = [IT.coupleTxSockets, IT.mergeSockets]
@@ -148,7 +153,7 @@ ssOptimize :: (Ord a, Show a)
            -> IO (PL.PLGraph, (String, C.Configuration), PG.PGraph)
 ssOptimize ss args costFun cfgOracle = do
     let mergeH    = stMergedH args
-        (prgU,_)  = stPrgH args
+        (prgU,_)  = stPrgH $ stPrg args
         lpgC      = ssConfigureLpg ss args
         -- graph transformations
         allEps     = M.elems $ ssEndpoints ss
@@ -366,7 +371,6 @@ eventHandler sstv ch ev = do
 --------------------------------------------------------------------------------
 -- Main
 
-
 initStackSt = StackState {
     -- need to be set by the caller
     ssUpdateGraphs = undefined,
@@ -465,7 +469,7 @@ ssCreatePL args ss plg pl = do
     putStrLn $ "Creating local pipeline: ##### " ++ pl
     -- Creates a thread to handle the pipeline
     --      NOTE: following function will actually create a thread
-    createPipeline plg (stName args) (stLlvmH args) pl
+    createPipeline plg (stName args) (stLlvmH $ stPrg args) pl
 
 -- updateGraph function that uses O.optimize
 updateGraphOpt
@@ -486,7 +490,7 @@ updateGraphOpt costFn cfgOracle args sstv = do
 
      -- STEP: apply PRG configuration
      --    This is the step where actually filters will be inserted in the NIC
-    (stCfgImpl args) (ssSharedState ss) pCfg
+    (stCfgImpl $ stPrg args) (ssSharedState ss) pCfg
 
     -- STEP: Run pipelines
     PLD.run (ssCtx ss) plConnect (ssCreatePL args ss plg) $ addMuxIds plg
@@ -499,7 +503,7 @@ updateGraphOpt costFn cfgOracle args sstv = do
 
 -- updateGraph function that uses Dragonet.Search functions
 updateGraphFlows
-    :: ([Flow] -> C.Configuration)
+    :: ([Flow] -> IO C.Configuration)
     -> StackArgs
     -> STM.TVar StackState
     -> IO ()
@@ -513,8 +517,11 @@ updateGraphFlows getConf args sstv = do
        --rmEps = epsDiff prevEps allEps
        --putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
        --putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
-       prgConf = getConf $ map epToFlow allEps
+       flows = map epToFlow allEps
        lbl = "updateGraphFlows"
+
+   putStrLn $ "Flows:\n" ++ (ppShow $ map flowStr flows)
+   prgConf <- getConf flows
 
    -- STEP: Create a new combined, but pipelined graph
    --          with both LPG and PRG with configuration applied
@@ -523,7 +530,7 @@ updateGraphFlows getConf args sstv = do
    -- STEP: apply PRG configuration
    -- NOTE: This is the step where actually filters will be inserted
    --      in the NIC
-   (stCfgImpl args) (ssSharedState ss) prgConf
+   (stCfgImpl $ stPrg args) (ssSharedState ss) prgConf
 
    -- STEP: Run each pipeline
    --   * Create pipeline in separate thread if it don't exist
@@ -538,11 +545,37 @@ updateGraphFlows getConf args sstv = do
    putStrLn "################### calling appendFile with app ready notice"
    appendFile("allAppslist.appready") $ "Application is ready!\n"
 
-
 -- OLD/Deprecated interface
 
+instantiateSearchIO :: (Srch.OracleSt o a)
+                    => Srch.SearchParams o a -> StackArgs -> IO ()
+instantiateSearchIO params args = do
+    -- initialize search state
+    searchSt <- Srch.initSearchIO params
+    let getConfIO :: [Flow] -> IO (C.Configuration)
+        getConfIO = Srch.runSearchIO searchSt
+        updFn = updateGraphFlows getConfIO args
+    instantiateStack args updFn
+
+
+instantiateFlows_ ::
+        -- | Function to get a configuration by searching using Oracle
+           ([Flow] -> C.Configuration)
+        -- | function to Group the LPG nodes into pipelines
+        -> (StackState -> String -> PG.PGNode -> String)
+        -> StackPrgArgs
+        -> IO ()
+instantiateFlows_ getConf cfgPLA prgArgs = do
+    args0 <- stackArgsDefault
+    let args = initStackArgs $ args0 { stPrg    = prgArgs
+                                     , stCfgPLA = cfgPLA }
+        updFn = updateGraphFlows getConf' args
+        getConf' flows = return $ getConf flows
+    instantiateStack args updFn
+
+
 -- instantiateFlows function that uses the new interface
--- DEPRECATED: Have the callers use the new interface
+-- TODO: remove this and have the calleres use the new interface
 instantiateFlows ::
         -- | Function to get a configuration by searching using Oracle
            ([Flow] -> C.Configuration)
@@ -556,17 +589,14 @@ instantiateFlows ::
         -> (StackState -> String -> PG.PGNode -> String)
         -> IO ()
 instantiateFlows getConf prgH llvmH cfgImpl cfgPLA = do
-    args0 <- stackArgsDefault
-    let args = initStackArgs $ args0 { stPrgH     = prgH
-                                     , stLlvmH   = llvmH
-                                     , stCfgImpl = cfgImpl
-                                     , stCfgPLA  = cfgPLA }
-    let updFn = updateGraphFlows getConf args
-    instantiateStack args updFn
+    let prgArgs = StackPrgArgs { stPrgH = prgH
+                               , stLlvmH = llvmH
+                               , stCfgImpl = cfgImpl }
+    instantiateFlows_ getConf cfgPLA prgArgs
 
 
 -- instantiateFlows function that uses the new interface:
--- DEPRECATED: Have the callers use the new interface
+-- TODO: remove this and have the callers use the new interface
 -- instantiate a stack using Dragonet.Optimization
 instantiateOpt :: (Ord a, Show a) =>
            (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
@@ -578,9 +608,10 @@ instantiateOpt :: (Ord a, Show a) =>
         -> IO ()
 instantiateOpt prgH llvmH costFun cfgOracle cfgImpl cfgPLA = do
     args0 <- stackArgsDefault
-    let args = initStackArgs $ args0 { stPrgH     = prgH
-                                     , stLlvmH   = llvmH
-                                     , stCfgImpl = cfgImpl
+    let prgArgs = StackPrgArgs { stPrgH = prgH
+                               , stLlvmH = llvmH
+                               , stCfgImpl = cfgImpl }
+    let args = initStackArgs $ args0 { stPrg     = prgArgs
                                      , stCfgPLA  = cfgPLA }
     let updFn = updateGraphOpt costFun cfgOracle args
     instantiateStack args updFn

@@ -9,12 +9,15 @@ module Dragonet.Search (
   initSearchSt,
   runSearch,
   OracleSt(..),
-  E10kOracleSt(..),
   sfOracleInit,
   searchGreedyFlows,
   balanceCost,
   priorityCost,
   test,
+  CostQueueFn,
+  SearchStIO, initSearchIO, runSearchIO,
+  E10kOracleSt(..),
+  initSearchParamsE10k,
 ) where
 
 import qualified Dragonet.Configuration       as C
@@ -247,9 +250,8 @@ instance OracleSt E10kOracleSt E10kConfChange where
         -- FIXME: FDir filters are not working properly with priority
         --      Commenting following line to avoid FDir filters will make
         --      everything work
-        [E10kInsertFDir $ mkFDirFromFl fl q |  q <- allQueues nq]
-        -- ++
-        -- [E10kInsert5T $ mk5TupleFromFl fl q |  q <- allQueues nq]
+        [E10kInsert5T $ mk5TupleFromFl fl q |  q <- allQueues nq]
+        -- ++ [E10kInsertFDir $ mkFDirFromFl fl q |  q <- allQueues nq]
 
     emptyConf _ = e10kCfgEmpty -- ^ Creates initial empty configuration
     showConf _  = e10kCfgStr -- ^ Converts conf to string
@@ -273,9 +275,12 @@ initSearchParams = SearchParams {
       sOracle = undefined
     , sPrgU   = undefined
     , sCostFn = undefined
-    , sStrategy = undefined
+    , sStrategy = searchGreedyFlows
     , sOrderFlows = id
 }
+
+initSearchParamsE10k nqueues = initSearchParams {sOracle = oracle}
+    where oracle = E10kOracleSt {nQueues = nqueues}
 
 type FlowCache s      = HB.HashTable s (PG.NLabel, Flow) PG.NPort
 
@@ -295,8 +300,22 @@ initSearchSt params = do
     }
 
 
+type SearchStIO o a = SearchSt ST.RealWorld o a
+
+initSearchIO :: (OracleSt o a)
+              => SearchParams o a
+              -> IO (SearchStIO o a)
+initSearchIO params = ST.stToIO $ initSearchSt params
+
+runSearchIO :: (OracleSt o a)
+            => SearchStIO o a
+            -> [Flow]
+            -> IO C.Configuration
+runSearchIO st flows = ST.stToIO $ doSearch st flows
+
+
 {-|
- - Runs the given Oracle, on given set of flows, and return the selected
+ - Runs the given Oracle, on given set of flows, and returns the selected
  -  configuration
  -}
 runSearch :: (OracleSt o a) =>

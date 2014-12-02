@@ -4,6 +4,9 @@ import qualified Dragonet.Pipelines as PL
 import qualified Dragonet.Pipelines.Implementation as PLI
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.ProtocolGraph.Utils as PGU
+import qualified Dragonet.Search as SR
+
+import Dragonet.Endpoint (EndpointDesc)
 
 import qualified Graphs.Tap as Tap
 
@@ -28,11 +31,8 @@ plAssignSplit _ _ (_,n)
     | ('R':'x':_) <- PG.nLabel n = "Rx"
     | otherwise = "Tx"
 
-
-
 main = do
     -- Prepare graphs and so on
     prgH <- Tap.graphH
-    instantiateOpt prgH "llvm-helpers-tap" costFunction optOracle implCfg plAssignSplit
-    --instantiateFlows (\_ -> []) prgH "llvm-helpers-tap" implCfg plAssignSplit
-
+    --instantiateOpt prgH "llvm-helpers-tap" costFunction optOracle implCfg plAssignSplit
+    instantiateFlows (\_ -> []) prgH "llvm-helpers-tap" implCfg plAssignSplit
