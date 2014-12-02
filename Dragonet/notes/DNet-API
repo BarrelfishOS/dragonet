@@ -1,4 +1,89 @@
+Application interface
+=====================
 
+Two concepts:
+-> socket (network endpoint)
+-> queue  (application endpoint)
+
+A socket is a protocol endpoint (similar to the Berkeley sockets interface).
+In UDP, for example, an application can bind a socket to a UDP port, which
+would allow it to receive (send) packets for (from) that port. For TCP, you
+have one socket for listening where new connections are redirected, and a
+socket for each connection.
+
+In traditional socket implementations, each socket is associated with a
+user-space file descriptor for sending and receiving packets from the
+application and a queue where the network stack places incoming packets. An
+application reading from the socket dequeues data from the buffer.
+
+Using a single queue for a socket can lead to scalability problems if multiple
+threads are accessing the same socket. One example is the TCP accept queue (see
+affinity accept paper). Another example is a UDP socket.
+
+There is, however, no inherent reason for a socket to use a single queue.
+Hence, we make a distinction between a socket and a queue (and decouple them).
+
+Queues are application interfaces that allow sending (Tx) and receiving (Rx)
+data. For simplicity, we do not separate the Tx and Rx part: queues provide
+both.
+
+Focusing on the Rx side, sockets essentially program the stack to place
+incoming data into application queues. Sockets are implemented as filter nodes
+in the LPG.
+
+In the traditional socket interface, a UDP socket binded on port 53 results in:
+
+   +------------+          +-----+
+   |Socket: *:53|--------->|APPQ1|
+   +------------+          +-----+
+
+In Dragonet, a socket can be spanned across multiple application queues. This results in:
+
+                           +------------+     +------+
+                         ->|Socket: *:53|---->| APPQ1|
+   +-------------+   ---/  +------------+     +------+
+   |Balance: *:53|--/-     +------------+     +------+
+   +-------------+    \--->|Socket: *:53|---->| APPQ2|
+                           +------------+     +------+
+
+
+Note that, typically different APPQs will be served by different NIC queues so
+the "balance" node will typically be optimized away.
+
+The socket is duplicated so that it can be used for sending packets.
+
+Furthermore, a socket node can be more specific than the local port/ip. This is
+somehow similar to how connect() works for UDP ports. Hence, a socket can, for
+example, specify the remote port/IP:
+
+  +-------------------------------+    +-----+
+  |Socket: 192.168.1.100:1000/*:53|--->|APPQ1|
+  +-------------------------------+    +-----+
+
+NOTE: having two sockets that match the same packet (e.g., *:*/*:53 and
+192.168.1.100:1000/*:53) might have unexpected result. In the current
+implementation, and given the current graph execution semantics, the packet
+might non-determenistically end up in either socket which might be undesirable.
+A hierarchical approach where a socket is created under an existing socket
+(e.g., 192.168.1.100:1000/*:53 is created under *:*/*:53) solves this issue.
+Another approach might be to construct the LPG so that the more specific option
+is always selected.
+
+
+Finally, an application queue might be associated with multiple sockets:
+
+  +--------------+
+  |Socket: *:53  |---
+  +--------------+   \----\   +-----+
+                           -->|APPQ1|
+  +--------------+   -----/   +-----+
+  |Socket: *:5000|--/
+  +--------------+
+
+
+
+OLD NOTES
+=========
 
 20140516.141819
 
