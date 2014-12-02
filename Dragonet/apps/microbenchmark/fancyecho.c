@@ -25,26 +25,38 @@ struct cfg_udpep {
     uint16_t             r_port;
 };
 
+// AFAICT:
+// - Each application queue (cfg_appq) has a number of sockets (cfg_socket)
+// - Each socket belongs to a single application queue
+// - Each socket has an endpoint (basically a 5-tuple)
+// - Multiple sockets may have the *same* endpoint
+// - For the sockets of the same endpoint:
+//   . one is the binding socket (->ep_socket)
+//   . all others are spanned sockets on the binding socket
+// - Each thread operates on a set of application queues
+// - An application queue might be shared across multuple threads
+//   (see ->num_threads)
+
 struct cfg_endpoint {
-    struct cfg_udpep     ep;
-    pthread_mutex_t      mutex;
-    void                *opaque;
-    struct cfg_endpoint *next;
+    struct cfg_udpep          ep;
+    pthread_mutex_t           mutex;
+    // binded socket for this endpoint
+    struct dnal_socket_handle *ep_socket;
+    struct cfg_endpoint       *next;
 };
 
 struct cfg_socket {
-    struct cfg_endpoint *ep;
-    void                *opaque;
-
-    struct cfg_socket   *next;
+    struct cfg_endpoint       *ep;
+    struct dnal_socket_handle *dnal_socket;
+    struct cfg_socket         *next;
 };
 
 struct cfg_appq {
-    const char        *label;
-    pthread_mutex_t    mutex;
-    unsigned int       num_threads;
-    struct cfg_socket *sockets;
-    void              *opaque;
+    const char            *label;
+    pthread_mutex_t       mutex;
+    unsigned int          num_threads;
+    struct cfg_socket     *sockets;
+    struct dnal_app_queue *dnal_appq;
 
     struct cfg_appq   *next;
 };
@@ -146,7 +158,7 @@ static void mksocket(struct cfg_appq  *caq, struct cfg_udpep *udp)
     if (cep == NULL) {
         cep = malloc(sizeof(*cep));
         cep->ep = *udp;
-        cep->opaque = NULL;
+        cep->ep_socket = NULL;
         cep->next = ceps;
         res = pthread_mutex_init(&cep->mutex, NULL);
         if (res != 0) {
@@ -158,8 +170,9 @@ static void mksocket(struct cfg_appq  *caq, struct cfg_udpep *udp)
     cs->ep = cep;
     cs->next = caq->sockets;
     caq->sockets = cs;
-
 }
+
+
 static struct cfg_appq *caq_find(const char *label)
 {
     struct cfg_appq *caq = caqs;
@@ -215,7 +228,7 @@ static void parse_params(int argc, char *argv[])
                 caq->label = strdup(optarg);
                 caq->num_threads = 0;
                 caq->sockets = NULL;
-                caq->opaque = NULL;
+                caq->dnal_appq = NULL;
 
                 res = pthread_mutex_init(&caq->mutex, NULL);
                 if (res != 0) {
@@ -371,7 +384,6 @@ static void *run_thread(void *arg)
     struct cfg_socket *cs;
     size_t i;
     struct dnal_app_queue *daq;
-    struct dnal_socket_handle *dsh;
     struct dnal_net_destination dnd;
     struct dnal_aq_event event;
     errval_t err;
@@ -389,34 +401,35 @@ static void *run_thread(void *arg)
         sched_yield();
     } // end while: your turn
 
-
-
     // Make sure everything is initialized
     for (i = 0; i < th->num_aqs; i++) {
         caq = th->aqs[i];
         pthread_mutex_lock(&caq->mutex);
-        if (caq->opaque == NULL) {
+        if (caq->dnal_appq == NULL) {
             err_expect_ok(dnal_aq_create("dragonet", caq->label, &daq));
-            caq->opaque = daq;
+            caq->dnal_appq = daq;
 
             // Create sockets
             cs = caq->sockets;
             while (cs != NULL) {
+                struct dnal_socket_handle *dsh;
                 err_expect_ok(dnal_socket_create(daq, &dsh));
                 pthread_mutex_lock(&cs->ep->mutex);
-                if (cs->ep->opaque == NULL) {
+                if (cs->ep->ep_socket == NULL) {
+                    // this is the first socket for this endpoint: bind it
                     dnd.type = DNAL_NETDSTT_IP4UDP;
                     dnd.data.ip4udp.ip_local = cs->ep->ep.l_ip;
                     dnd.data.ip4udp.ip_remote = cs->ep->ep.r_ip;
                     dnd.data.ip4udp.port_local = cs->ep->ep.l_port;
                     dnd.data.ip4udp.port_remote = cs->ep->ep.r_port;
                     err_expect_ok(dnal_socket_bind(dsh, &dnd));
-                    cs->ep->opaque = dsh;
+                    cs->ep->ep_socket = dsh;
                 } else {
-                    err_expect_ok(dnal_socket_span(cs->ep->opaque, daq, dsh));
+                    // a socket already exists for this endpoint: span it
+                    err_expect_ok(dnal_socket_span(cs->ep->ep_socket, daq, dsh));
                 }
                 pthread_mutex_unlock(&cs->ep->mutex);
-                cs->opaque = dsh;
+                cs->dnal_socket = dsh;
                 cs = cs->next;
             }
         }
@@ -438,13 +451,13 @@ static void *run_thread(void *arg)
                 locked = false;
             }
 
-            err = dnal_aq_poll(caq->opaque, &event);
+            err = dnal_aq_poll(caq->dnal_appq, &event);
             if (err == SYS_ERR_OK) {
                 // This needs to be inside the critical section, since we'll
                 // send out data through the AQ
                 // FIXME: NOW: pass struct dnal_app_queue daq; // dragonet application endpoint
                     // so that it can do allocation for sending out packet
-                handle_event(&event, th, caq->opaque);
+                handle_event(&event, th, caq->dnal_appq);
                 idle = 0;
             } else {
                 idle++;
