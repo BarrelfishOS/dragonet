@@ -9,7 +9,7 @@ import Dragonet.ProtocolGraph.Utils (getPGNodeByName)
 import qualified Dragonet.Configuration as C
 import qualified Dragonet.Semantics as SEM
 
-import Dragonet.Endpoint (EndpointDesc(..))
+import Dragonet.NetState (EndpointDesc(..))
 
 import qualified SMTLib2 as SMT
 import qualified SMTLib2.Core as SMTC

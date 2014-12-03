@@ -9,7 +9,7 @@ module Dragonet.Pipelines.Applications (
     sendMessage
 ) where
 
-import Dragonet.Endpoint (SocketId,AppId,IPv4Addr,UDPPort)
+import Dragonet.NetState (SocketId,AppId,IPv4Addr,UDPPort, UDPEndpoint)
 
 import Dragonet.Pipelines.Implementation (GraphHandle(..))
 
@@ -23,11 +23,6 @@ import Data.Word
 import Data.Int
 
 type ChanHandle = Int
---type SocketId = Word64
---type AppId = Word64
---type IPv4Addr = Word32
---type UDPPort = Word16
-type UDPEndpoint = (IPv4Addr,UDPPort)
 
 instance Show GraphHandle where
     show _ = "GraphHandle ()"

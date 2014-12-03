@@ -19,8 +19,9 @@ import qualified Dragonet.ProtocolGraph            as PG
 import qualified Dragonet.ProtocolGraph.Utils      as PGU
 import qualified Dragonet.Semantics                as Sem
 import qualified Dragonet.Search                   as Srch
+import qualified Dragonet.NetState                 as NS
 
-import Dragonet.Endpoint (SocketId,AppId,EndpointDesc(..),epsDiff)
+import Dragonet.NetState (NetState, SocketId,AppId,EndpointId,EndpointDesc(..),epsDiff)
 import Dragonet.Flows (Flow(..), epToFlow, flowStr)
 
 import Graphs.Cfg (e10kCfgEmpty)
@@ -97,16 +98,10 @@ data AppDesc = AppDesc {
 
 -- StackState: dynamic stack state (changes as flows come and go)
 -- TODO: Add StackArgs here
-type EndpointId = Int
 data StackState = StackState {
-    -- applications, channels, and endpoints
-      ssNextAppId      :: AppId  -- id for the next app that tries to connect
-    , ssNextSocketId   :: SocketId -- id for next socket
-    , ssNextEndpointId :: EndpointId -- id for next endpoint
+      ssNetState       :: NetState
     , ssApplications   :: M.Map AppId AppDesc
     , ssAppChans       :: M.Map PLA.ChanHandle AppId
-    , ssEndpoints      :: M.Map EndpointId EndpointDesc
-    , ssSockets        :: M.Map SocketId EndpointId
     -- quick hack to maintain the previous endpoints so that we can find the
     -- difference between the current and the old state. It is probably better
     -- to actually track the changes from the event handlers though.
@@ -120,6 +115,17 @@ data StackState = StackState {
     , ssStackHandle    :: PLI.StackHandle
     , ssSharedState    :: PLI.StateHandle
 }
+
+ssEndpoints ss = NS.nsEndpoints $ ssNetState ss
+
+ssRunNetState_ :: StackState -> NS.NetStateM a -> (a, NetState)
+ssRunNetState_ ss m = NS.runState m ns
+    where ns = ssNetState ss
+
+ssRunNetState :: StackState -> NS.NetStateM a -> (a, StackState)
+ssRunNetState ss m = (x,ss')
+    where (x,ns') = ssRunNetState_ ss m
+          ss' = ss { ssNetState = ns'}
 
 -- return a configured LPG based on endpoint information
 ssConfigureLpg :: StackState -> StackArgs -> PG.PGraph
@@ -222,13 +228,10 @@ eventHandler sstv ch (PLA.EvAppConnected gh) = do
     putStrLn $ "AppConnected: " ++ show ch
     STM.atomically $ do
         ss <- STM.readTVar sstv
-        let aid = ssNextAppId ss
-            app = AppDesc {
-                    adLabel = "",
-                    adGraphHandle = gh
-                }
+        let (aid, ns') = ssRunNetState_ ss NS.allocAppId
+            app = AppDesc {adLabel = "", adGraphHandle = gh}
         STM.writeTVar sstv $ ss {
-                    ssNextAppId = aid + 1,
+                    ssNetState = ns',
                     ssAppChans = M.insert ch aid $ ssAppChans ss,
                     ssApplications = M.insert aid app $ ssApplications ss
                 }
@@ -274,21 +277,7 @@ eventHandler sstv ch (PLA.EvSocketUDPListen (ip,port)) = do
         ss <- STM.readTVar sstv
         -- TODO: check overlapping
         let Just aid = M.lookup ch $ ssAppChans ss
-            sid = ssNextSocketId ss
-            eid = ssNextEndpointId ss
-            ep = EndpointUDPv4 {
-                    epSockets = [(sid,aid)],
-                    epLocalIp = if ip == 0 then Nothing else Just ip,
-                    epLocalPort = if port == 0 then Nothing else Just port,
-                    epRemoteIp = Nothing,
-                    epRemotePort = Nothing
-                }
-            ss' = ss {
-                ssNextSocketId = sid + 1,
-                ssNextEndpointId = eid + 1,
-                ssSockets = M.insert sid eid $ ssSockets ss,
-                ssEndpoints = M.insert eid ep $ ssEndpoints ss
-            }
+            ((sid,eid), ss') = ssRunNetState ss (NS.udpListen aid (ip,port))
         STM.writeTVar sstv $ ss'
         return (sid,ss')
     putStrLn $ "SocketUDPListen p=" ++ show (ip,port) ++ " -> " ++ show sid
@@ -298,28 +287,12 @@ eventHandler sstv ch (PLA.EvSocketUDPListen (ip,port)) = do
  -  Handing event SocketUDPFlow:
  -      This is prettymuch same as above execution (eventHandler UDPListen),
  -      except that it does not force having Nothing for remote IP and port
- -      TODO: This function can be written as specialized case of above.
  -}
-eventHandler sstv ch (PLA.EvSocketUDPFlow (lIp,lPort) (rIp,rPort)) = do
+eventHandler sstv ch (PLA.EvSocketUDPFlow le@(lIp,lPort) re@(rIp,rPort)) = do
     (sid,ss) <- STM.atomically $ do
         ss <- STM.readTVar sstv
-        -- TODO: check overlapping
         let Just aid = M.lookup ch $ ssAppChans ss
-            sid = ssNextSocketId ss
-            eid = ssNextEndpointId ss
-            ep = EndpointUDPv4 {
-                    epSockets = [(sid,aid)],
-                    epLocalIp =if lIp == 0 then Nothing else Just lIp,
-                    epRemoteIp = if rIp == 0 then Nothing else Just rIp,
-                    epLocalPort = if lPort == 0 then Nothing else Just lPort,
-                    epRemotePort = if rPort == 0 then Nothing else Just rPort
-                }
-            ss' = ss {
-                ssNextSocketId = sid + 1,
-                ssNextEndpointId = eid + 1,
-                ssSockets = M.insert sid eid $ ssSockets ss,
-                ssEndpoints = M.insert eid ep $ ssEndpoints ss
-            }
+            ((sid,eid), ss') = ssRunNetState ss (NS.newUdpSocket aid (le,re))
         STM.writeTVar sstv $ ss'
         return (sid,ss')
     putStrLn $ "SocketUDPFlow f=" ++ show (rIp,rPort) ++ "/"
@@ -342,17 +315,7 @@ eventHandler sstv ch (PLA.EvSocketSpan oldsid) = do
     (sid,ss) <- STM.atomically $ do
         ss <- STM.readTVar sstv
         let Just aid = M.lookup ch $ ssAppChans ss
-            -- get endpointID from old socket
-            Just eid = M.lookup oldsid $ ssSockets ss
-            sid = ssNextSocketId ss
-            Just ep = M.lookup eid $ ssEndpoints ss
-            -- add a new socket with appID and old endpointID to the list
-            ep' = ep { epSockets = (sid,aid):(epSockets ep)}
-            -- Update the stackState with:
-            ss' = ss {
-                ssNextSocketId = sid + 1, -- incremented SID
-                ssEndpoints = M.insert eid ep' $ ssEndpoints ss -- updated endpoints
-            }
+            (sid,ss') = ssRunNetState ss (NS.socketSpan aid oldsid)
         STM.writeTVar sstv $ ss'
         return (sid,ss')
     putStrLn $ "SocketSpan existing=" ++ show oldsid ++ " -> " ++ show sid
@@ -378,13 +341,9 @@ initStackSt = StackState {
     ssStackHandle = undefined,
     ssSharedState = undefined,
     -- initial values
-    ssNextAppId      = 1,
-    ssNextSocketId   = 1,
-    ssNextEndpointId = 1,
+    ssNetState       = NS.initNetSt,
     ssApplications   = M.empty,
     ssAppChans       = M.empty,
-    ssSockets        = M.empty,
-    ssEndpoints      = M.empty,
     ssPrevEndpoints  = M.empty,
     ssVersion        = 0
 }

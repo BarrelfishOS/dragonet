@@ -9,7 +9,7 @@ module Dragonet.Flows (
 
 import qualified Dragonet.Predicate as PR
 
-import Dragonet.Endpoint (EndpointDesc(..))
+import Dragonet.NetState (EndpointDesc(..))
 
 -- Flow definitions
 
