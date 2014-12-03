@@ -293,7 +293,8 @@ fi
 ##################################################################
 
 ./scripts/pravin/wait_for_dragonet.sh 10 ${STACKNAME}
-run_for_6_cores_6_flows
+run_memcached_2_cores_specific
+#run_for_6_cores_6_flows
 #run_for_1_cores
 #run_for_2_cores_full_filters_test
 #dpdk_debug_2_cores_test

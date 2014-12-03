@@ -48,7 +48,7 @@ echo "Waiting for Dragonet to start"
 sleep 4
 
 echo "Waiting for Dragonet to be ready"
-${SCRIPTDIR}/wait_for_dragonet.sh  ${HWQUEUES} ${STACKNAME}
+${SCRIPTDIR}/wait_for_dragonet.sh ${STACKNAME} ${HWQUEUES}
 #ls *.ready
 sleep 10
 echo "Dragonet is ready"
