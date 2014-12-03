@@ -1,5 +1,6 @@
 ## -*- mode: python; coding: utf-8 -*-
 
+
 AGGREGATOR="timeseries"
 TOTAL_LENGTH=LENGTH + 2
 
@@ -189,15 +190,17 @@ def genMemcachedParameters2(noPorts, threadsPerPort, createDedicatedFlows = True
 
 def SRV_CMDS(name):
 
-
     dragonet_container = {
                 "llvmSF":   ["./scripts/pravin/deployDragonetGen.sh", "stack-sf" , "sf"],
                 "llvmE10k": ["./scripts/pravin/deployDragonetGen.sh", "stack-e10k", "e10k"],
+                "dpdk": ["./scripts/pravin/deployDragonetGen.sh", "stack-dpdk", "dpdk"],
                 }
+
 
     dragonet_filter_selector = {
                 "llvmSF":   True,
                 "llvmE10k": True,
+                "dpdk": True,
             }
 
 
@@ -228,6 +231,7 @@ def SRV_CMDS(name):
                           HWQUEUES,
                           toCoreList2(range(0, (SERVERS_INSTANCES *SERVER_CORES)), separator=" ", prefix="t")
                             ),
+
                       "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
                         toCoreList2(range((20 - (SERVERS_INSTANCES*SERVER_CORES)), 20 )))
                         #toCoreList2(range((0 + SERVER_CORESHIFT), (SERVER_CORESHIFT + (SERVERS_INSTANCES*SERVER_CORES)))))

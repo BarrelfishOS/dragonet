@@ -16,14 +16,15 @@ ensure_running_process() {
 # the tool should get only one number as commandline arg
 if [ $# != 4 ] ; then
     echo "ERROR: incomplete agruments"
-    echo "USAGE: $0  <hw queues> <no. of application slots> <stack-name> <app-name>"
-    echo "EXAMPLE: $0 1 1 stack-sf bench-fancyecho"
-    echo "EXAMPLE: $0 4 4 stack-e10k memcached"
+    echo "USAGE: $0 <stack-name>  <hw queues> <no. of application slots> <app-name>"
+    echo "EXAMPLE: $0 stack-sf 1 1 bench-fancyecho"
+    echo "EXAMPLE: $0 stack-e10k 4 4  memcached"
+    echo "EXAMPLE: $0 stack-dpdk 4 4  memcached"
 fi
 
-hwQueue=${1}
-appSlots=${2}
-stackName=${3}
+stackName=${1}
+hwQueue=${2}
+appSlots=${3}
 appName=${4}
 
 echo "Waiting for ${hwQueue} hardware queues and ${appSlots} application slots"

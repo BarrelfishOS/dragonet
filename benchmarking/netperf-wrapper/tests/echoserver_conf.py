@@ -1,25 +1,13 @@
 ## -*- mode: python; coding: utf-8 -*-
 
-AGGREGATOR="timeseries"
-TOTAL_LENGTH=LENGTH + 2
+include('dragonet_stack.py')
 
-onload_prefix="onload --profile=latency --preload=/usr/lib64/libonload.so"
 
 SERVER_INITIAL_PORT =  888
 CLIENT_INITIAL_PORT =  8000
 
 UNIQUE_CLIENTS = list(set(CLIENTS))
-NETPERF_CMD="../netperf-2.6.0/src/netperf -fg -4"
 
-def toCoreList2(clist, separator=",", prefix=""):
-    ret = ""
-    for c in clist:
-        if ret == "" :
-            ret = "%s%d" % (prefix, c)
-        else :
-            ret = "%s%s%s%d" % (ret, separator, prefix, c)
-    #print "toCoreList2 %s" % (ret)
-    return ret
 
 def getClientPortList(clientList, startPort, noPorts=1) :
     portList = []
@@ -98,13 +86,8 @@ def endpoints_to_wait():
 MAX_CORES = 40 # when using hyperthreads in asiago
 MAX_CORES = 20
 
-def SRV_CMDS(name):
 
-    dragonet_container = {
-                "llvmSF":   ["./scripts/pravin/deployDragonetGen.sh", "stack-sf" , "sf"],
-                "llvmE10k": ["./scripts/pravin/deployDragonetGen.sh", "stack-e10k", "e10k"],
-                "dpdk": ["./scripts/pravin/deployDragonetGen.sh", "stack-dpdk", "dpdk"],
-                }
+def SRV_CMDS(name):
 
 
     if name in  dragonet_container.keys() :
@@ -113,43 +96,48 @@ def SRV_CMDS(name):
 
                     "init_cmd_special_unpinned" : [
                         #"init_cmd_special" : [
-                      "cd dragonet/Dragonet/ ; sudo %s %s %d %s" % (
-                          dragonet_container[name][0],
-                          dragonet_container[name][2],
+                      "cd %s ; %s %d %s" % (
+                          dragonet_container[name]['base_dir'],
+                          dragonet_container[name]['deploy_stack'],
                           HWQUEUES,
                           "priority"
                           #"balance"
                             ),
 
-                      "cd dragonet/Dragonet/ ; sudo  ./scripts/pravin/runBetterBg.sh 4 ./ ./fancyecho-out.log  "
+                      "cd %s ; sudo ./scripts/pravin/runBetterBg.sh 4 ./ ./fancyecho-out.log  " % (
+                          dragonet_container[name]['base_dir'])
                         + " ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
                             genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
-                                    ],
+                    ],
 
 
                     "init_cmd_special" : [
                         #"init_cmd_special_pinned" : [
-                      "cd dragonet/Dragonet/ ; sudo taskset -c %s %s %s %d %s" % (
+                      "cd %s ; sudo taskset -c %s %s %d %s" % (
+                          dragonet_container[name]['base_dir'],
                           toCoreList2(range(MAX_CORES - (HWQUEUES), MAX_CORES)),
-                          dragonet_container[name][0],
-                          dragonet_container[name][2],
+                          dragonet_container[name]['deploy_stack'],
                           HWQUEUES,
                           "priority"
                           #"balance"
                           ),
 
-                      "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
+                      "cd %s ; sudo taskset -c %s " % (
+                        dragonet_container[name]['base_dir'],
                         toCoreList2(range((0 + SERVER_CORESHIFT), (SERVER_CORESHIFT + (SERVERS_INSTANCES*SERVER_CORES)))))
                         + " ./scripts/pravin/runBetterBg.sh 10  ./ ./fancyecho-out.log  "
                         + " ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
                             genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
-                                    ],
+                    ],
 
                     "is_ready_cmd_special" : [
-                      "cd dragonet/Dragonet/ ; ./scripts/pravin/wait_for_dn_app.sh %d %d %s %s " % (
-                          HWQUEUES, endpoints_to_wait(),
-                            dragonet_container[name][1], "bench-fancyecho"),
-                                    ],
+                        "cd %s ; %s %d %d %s " % (
+                          dragonet_container[name]['base_dir'],
+                          dragonet_container[name]['is_stack_ready'],
+                          HWQUEUES,
+                          endpoints_to_wait(),
+                          "bench-fancyecho"),
+                     ],
 
                     "init_cmd" : [],
                     "exec_cmd" : "echo 'Server should already be running'" ,
@@ -158,7 +146,7 @@ def SRV_CMDS(name):
                                 "tail dragonet/Dragonet/fancyecho-out.log",
                                 #"sudo killall bench-fancyecho",
                                 # "sudo killall %s" % (dragonet_container[name][1]),
-                                 ],
+                     ],
                     "kill_cmd" : [],
                     "out_cmd" : [],
                 }
@@ -404,5 +392,112 @@ def SRV_CMDS(name):
                 }
 
     raise Exception("Invalid echo server name: [%s]" % (name))
+
+
+def get_proto_specific_server_ports():
+    """retuns values for to be used for ports at server end """
+    port_list = range(SERVER_INITIAL_PORT, (SERVER_INITIAL_PORT + (len(server_names))))
+
+    cl_port_list = range(CLIENT_INITIAL_PORT, (CLIENT_INITIAL_PORT +
+                ((len(CLIENTS)/len(UNIQUE_CLIENTS)) * len(server_names))
+                ))
+    port_list_empty = [0 for x in port_list]
+    port_list_for_clients = repeat_list_elem_n_times(port_list, len(CLIENTS))
+    #port_list_cl_src = repeat_list_elem_n_times(cl_port_list, (len(UNIQUE_CLIENTS)))
+    port_list_cl_src = []
+    for cidx in range(0, len(CLIENTS)):
+        prev_entries = [i for i, x in enumerate(CLIENTS[:cidx]) if x == CLIENTS[cidx]]
+        port_list_cl_src.append(CLIENT_INITIAL_PORT + len(prev_entries))
+
+    print "port_list_for_clients dst: %s" % (port_list_for_clients)
+    print "port_list_for_clients src: %s" % (port_list_cl_src)
+    if (USE_TCP) :
+        return (port_list_for_clients, port_list_cl_src,       port_list_empty, "")
+    else:
+        return (port_list_for_clients, port_list_cl_src, port_list,       " --udp ")
+
+NETPERF_CLIENT_DST_PORT, NETPERF_CLIENT_SRC_PORT, MEMCACHED_PORT_UDP, USING_UDP = get_proto_specific_server_ports()
+
+
+def get_cmd_server(id, cmd) :
+    """Returns special command when it is first server and there is special command present"""
+    special_cmd = "%s_special" % (cmd)
+    if id == 0 and special_cmd  in echo_server_cmds.keys() :
+            return echo_server_cmds[special_cmd]
+
+    if cmd in echo_server_cmds.keys() :
+        return echo_server_cmds[cmd]
+    return []
+
+
+def create_server(id):
+    srv = ('server-%d' % (id), {
+     'deployment_host': server_names[id],
+     'result_location': '%s_server%d' % (RESULT_LOCATION_BASE, id),
+     'tools_location': TOOLS_LOCATION1,
+     'is_server': True,
+     'TOOLS': o([
+
+       ( 'echoServer%d' % (id),
+       {
+           'command': 'sudo taskset -c %s %s %s ' % (
+                toCoreList(server_core_list[id]), server_onload,
+                echo_server_cmds['exec_cmd'],
+                ),
+
+           'runner': 'process',
+           'units': 'Gbits/s',
+           'wait_for': False,
+           'is_catastrophic': False,
+           'init_cmd': get_cmd_server(id, "init_cmd"),
+           'kill_cmd': get_cmd_server(id, "kill_cmd"),
+           'out_cmd': get_cmd_server(id, "out_cmd"),
+           'is_ready_cmd': get_cmd_server(id, "is_ready_cmd"),
+       }),
+
+       ('dstat',
+       {
+           'command': dstatCmd (mname = 'server%d' % (id),
+               cpus=toCoreList(server_core_list[id]), netdev=server_if[server_names[id]],
+               interrupts=getInterruptLines(MINFO_SERVER[server_names[id]])),
+           'runner': 'dstat_json',
+           'wait_for': True,
+           'delay': DELAY,
+           'is_catastrophic': True,
+           'init_cmd': [],
+           'out_cmd': [],
+           'kill_cmd': [],
+       }),
+
+
+#       ('ethtool',
+#       {
+#           'command': dstatCmd (mname = 'server%d' % (id),
+#               cpus=toCoreList(server_core_list[id]), netdev=server_if[server_names[id]],
+#               interrupts=getInterruptLines(MINFO_SERVER[server_names[id]])),
+#           'runner': 'ethtool_json',
+#           'wait_for': True,
+#           'is_catastrophic': True,
+#           'init_cmd': [],
+#           'out_cmd': [],
+#           'kill_cmd': [],
+#       }),
+
+       ])}
+    )
+    return srv
+
+def create_server_list(server_names, startid=SPECIAL_SERVERS_COUNT):
+    slist = []
+    if startid >= len(server_names):
+        return slist
+    for i in range(startid, len(server_names)):
+       slist.append(create_server(i))
+    return slist
+
+
+
+
+
 
 

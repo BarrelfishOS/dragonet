@@ -15,14 +15,15 @@ SCRIPTDIR="./scripts/pravin/"
 # the tool should get only one number as commandline arg
 if [ $# != 2 ] ; then
     echo "ERROR: This script expects two arguments, as number of HW queues, and stackname"
-    echo "USAGE: $0 <no. of HW queues> <stack-name>"
-    echo "EXAMPLE: $0 1 stack-sf"
-    echo "EXAMPLE: $0 4 stack-e10k"
+    echo "USAGE: $0  <stack-name> <no. of HW queues>"
+    echo "EXAMPLE: $0 stack-sf 1"
+    echo "EXAMPLE: $0 stack-e10k 4"
+    echo "EXAMPLE: $0 stack-dpdk 4"
 fi
 
-hwQcount=${1}
+stackName=${1}
+hwQcount=${2}
 pipelineCount=`expr 2 \* ${hwQcount}`
-stackName=${2}
 
 echo "Waiting for ${hwQcount} hw queues ( ${pipelineCount} pipelines)"
 

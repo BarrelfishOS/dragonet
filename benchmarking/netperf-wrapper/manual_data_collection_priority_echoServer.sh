@@ -9,7 +9,7 @@ mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift 0  ${ClientList} --servercores ${SRVCORES} \
 --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores 1   --packet ${PACKETSIZE} --concurrency 1 \
--I 1 -l 5 -H asiago -T ${SERVERIP} -c ${ECHO_SERVER} ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
+-I 1 -l 5 -H babybel2 -T ${SERVERIP} -c ${ECHO_SERVER} ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
 -t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
 exit 0
 }
@@ -22,7 +22,7 @@ mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift 0  ${ClientList} --servercores ${SRVCORES} \
 --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores 1 --packet ${PACKETSIZE} --concurrency ${CONCURRENTY} \
--I 1 -l 15 -H asiago -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
+-I 1 -l 15 -H babybel2 -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
 -t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
 exit 0
 }
@@ -37,15 +37,15 @@ mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift 0  ${ClientList} --servercores ${SRVCORES} \
 --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores 1 --packet ${PACKETSIZE} --concurrency ${CONCURRENTY} \
--I 3 -l 50 -H asiago -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
+-I 3 -l 50 -H babybel2 -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
 -t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
 
 }
 
-#ClientList="-C ziger1 -C ziger2 -C burrata -C gottardo -C appenzeller-e1000 -C sbrinz1 -C gruyere -C sbrinz2 "
+#ClientList="-C ziger1 -C ziger2 -C babybel3 -C gottardo -C appenzeller-e1000 -C sbrinz1 -C gruyere -C sbrinz2 "
 ClientList="-C ziger1 -C sbrinz1 "
+ClientList="-C ziger1 -C ziger2 -C babybel3 -C appenzeller -C sbrinz1 -C sbrinz2 "
 ClientList="-C appenzeller "
-ClientList="-C ziger1 -C ziger2 -C burrata -C appenzeller -C sbrinz1 -C sbrinz2 "
 
 NICTYPE="NIC_SF"
 ECHO_SERVER="llvmSF"
@@ -56,6 +56,7 @@ ECHO_SERVER="llvmE10k"
 ECHO_SERVER="dpdk"
 SERVERIP=10.113.4.95
 
+UDP_TEST_NAME="memcached_rr"
 UDP_TEST_NAME="udp_rr"
 HWQUEUE=10
 
@@ -67,23 +68,23 @@ PACKETSIZE=1024
 
 CLIENTCOUNT=8
 
-SRVCORES=2
 SRVCORES=6
 SRVCORES=10
+SRVCORES=2
 
 
 CLIENTCOUNT=24
 
 
 CLIENTCOUNT=32
-CLIENTCOUNT=2
 CLIENTCOUNT=6
-CLIENTCOUNT=40
+CLIENTCOUNT=10
+CLIENTCOUNT=2
 
 set -x
 set -e
 
-#startStack
+startStack
 
 #check_working_dummy
 
