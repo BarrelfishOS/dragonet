@@ -152,8 +152,6 @@ plAssign _ _ (_,n)
 plAssignMerged :: SS.StackState -> String -> PG.PGNode -> String
 plAssignMerged _ _ (_,n) = PG.nTag n
 
-llvm_helpers = "llvm-helpers-e10k"
-
 data StackE10kOpts = StackE10kOpts {
       optNq     :: Int
     , optCostFn :: Int -> SE.CostQueueFn
