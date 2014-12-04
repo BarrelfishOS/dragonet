@@ -14,6 +14,7 @@ module Graphs.E10k (
 
     QueueId, ConfChange(..),
     mk5TupleFromFl, mkFDirFromFl,
+    insert5tFromFl, insertFdirFromFl,
 
     graphH_, graphH,
 ) where
@@ -699,6 +700,12 @@ instance C.ConfChange ConfChange where
 
 cvMInt :: Integral a => Maybe a -> PG.ConfValue
 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
+
+insert5tFromFl :: Flow -> QueueId -> ConfChange
+insert5tFromFl fl qid = Insert5T $ mk5TupleFromFl fl qid
+
+insertFdirFromFl :: Flow -> QueueId -> ConfChange
+insertFdirFromFl fl qid = InsertFDir $ mkFDirFromFl fl qid
 
 mk5TupleFromFl :: Flow -> QueueId -> PG.ConfValue
 mk5TupleFromFl fl@(FlowUDPv4 {}) q =

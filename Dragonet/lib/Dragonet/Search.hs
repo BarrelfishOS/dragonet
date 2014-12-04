@@ -188,10 +188,9 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
     flowConfChanges E10kOracleSt { nQueues = nq } c fl =
         -- FIXME: get better algorithm for queue allocation
         -- FIXME: FDir filters are not working properly with priority
-        --      Commenting following line to avoid FDir filters will make
-        --      everything work
-        [E10k.Insert5T $ E10k.mk5TupleFromFl fl q |  q <- allQueues nq]
-        -- ++ [E10kInsertFDir $ E10k.mkFDirFromFl fl q |  q <- allQueues nq]
+        -- FIXME: detect when tables are full
+        [E10k.insert5tFromFl fl q | q <- allQueues nq]
+        -- ++ [E10k.insertFdirFromFl fl q |  q <- allQueues nq]
 
     emptyConf _ = e10kCfgEmpty -- ^ Creates initial empty configuration
     showConf _  = e10kCfgStr -- ^ Converts conf to string
