@@ -7,7 +7,7 @@ import Dragonet.Flows (Flow (..))
 
 import qualified Util.GraphHelpers as GH
 
-import Graphs.E10k (QueueID, C5Tuple(..), strToC5t)
+import Graphs.E10k (QueueId, C5Tuple(..), strToC5t)
 
 import Data.Char (isDigit)
 
@@ -16,7 +16,7 @@ import Text.Show.Pretty (ppShow)
 -- E10k version of flowQueue. Now deprecated for a generic flowQueue (see
 -- Dragonet.Search). Keep around for future reference.
 
-flowQueue :: PG.PGraph -> Flow -> QueueID
+flowQueue :: PG.PGraph -> Flow -> QueueId
 flowQueue prgC flow = ret
     where ret = doFlowQueue prgC node1 flow
           --node0_ = "RxIn"
@@ -33,7 +33,7 @@ flowQueue prgC flow = ret
             _   -> error $ "More than one connection matches for node:"
                            ++ node0_ ++ " port:" ++ port0
 
-doFlowQueue :: PG.PGraph -> PG.PGNode -> Flow -> QueueID
+doFlowQueue :: PG.PGraph -> PG.PGNode -> Flow -> QueueId
 doFlowQueue g node fl
     | Just q <- reachedQueue node = q
     | otherwise = ret
@@ -57,7 +57,7 @@ flowGetPort fl (_, nlbl)
     | otherwise = error $ "flowGetPort:"  ++ (PG.nLabel nlbl)
     where name = PG.nLabel nlbl
 
-reachedQueue :: PG.PGNode -> Maybe QueueID
+reachedQueue :: PG.PGNode -> Maybe QueueId
 reachedQueue (_,PG.ONode {PG.nLabel = name}) = ret
     where n = filter isDigit name
           ret = case length n of

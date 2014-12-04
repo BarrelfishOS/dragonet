@@ -7,12 +7,15 @@ module Graphs.E10k (
     CFDirTuple(..),
     prepareConf,
 
-    parse5tCFG, c5tString, c5tFullString,
-    parse5t, strToC5t,
-    parseFDirCFG, cFDtString, cFDtFullString,
-    parseFDT,
-    graphH, graphH_,
-    QueueID,
+    parse5tCFG, c5tString, c5tFullString, parse5t,
+    parseFDirCFG, cFDtString, cFDtFullString, parseFDT,
+
+    strToC5t,
+
+    QueueId, ConfChange(..),
+    mk5TupleFromFl, mkFDirFromFl,
+
+    graphH_, graphH,
 ) where
 
 import qualified Dragonet.ProtocolGraph       as PG
@@ -50,13 +53,8 @@ import Text.Show.Pretty (ppShow)
 tr = flip trace
 trN = \x  _ -> x
 
-type QueueID = Int
+type QueueId = Int
 
-
-isRxQValidN :: Int -> PG.PGNode -> Bool
-isRxQValidN i (_,n) =
-    (PG.nLabel n == "Q" ++ show i ++ "Valid") ||
-        (PG.nLabel n == "RxQ" ++ show i ++ "Valid")
 
 addCfgFun :: PG.Node -> C.ConfFunction
 addCfgFun n
@@ -90,7 +88,7 @@ type C5TIP   = Word32
 
 data C5Tuple = C5Tuple {
     c5tPriority :: Int,
-    c5tQueue    :: QueueID,
+    c5tQueue    :: QueueId,
     c5tL4Proto  :: Maybe C5TL4Proto,
     c5tL3Src    :: Maybe C5TIP,
     c5tL3Dst    :: Maybe C5TIP,
@@ -120,6 +118,7 @@ splitBy _ [] = []
 splitBy f list = first : splitBy f (dropWhile f rest) where
   (first, rest) = break f list
 
+-- NB: This is only used in E10k.flowQueue, which is deprecated
 strToC5t :: String -> C5Tuple
 strToC5t str = assert (check1 && check2) ret
     where check1 = (take 3 str) == "5T("
@@ -129,8 +128,8 @@ strToC5t str = assert (check1 && check2) ret
           xl = splitBy (==',') x
           ret = C5Tuple {
                   -- we do not care about the priority and the queue, this
-                  -- infromation should be encoded in the grap
-                  c5tPriority  = 999 -- the priority should be encoded in the graph
+                  -- infromation should be encoded in the graph
+                  c5tPriority  = 999
                 , c5tQueue     = 999
                 , c5tL4Proto   = c5prot (xl !! 0)
                 , c5tL3Src     = c5Ip   (xl !! 1)
@@ -229,11 +228,16 @@ nodeL5Tuple c = (PG.baseFNode (c5tString c) bports) {
             SMT.app "L4.Proto" [pkt] SMTC.=== SMT.app "L4P.UDP" []
             ]
 
+isRxQValidN :: Int -> PG.PGNode -> Bool
+isRxQValidN i (_,n) =
+    (PG.nLabel n == "Q" ++ show i ++ "Valid") ||
+        (PG.nLabel n == "RxQ" ++ show i ++ "Valid")
+
 -- Common helper for configuring 5-tuple and FD configuration nodes
 --  NB: Eventually, we might want to better abstract these "filter" nodes
 doConfigFilter :: (C.ConfValue -> [a])
                -> (a -> PG.Node)
-               -> (a -> QueueID)
+               -> (a -> QueueId)
                -> C.ConfFunction
 doConfigFilter parseConf mkNodeLabel getQueue _ _ inE outE cfg = do
     ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
@@ -247,7 +251,7 @@ doConfigFilter parseConf mkNodeLabel getQueue _ _ inE outE cfg = do
       defaultN :: DGI.Node
       (Just ((defaultN,_),_)) = L.find ((== "default") . PG.ePort . snd) outE
       -- Lookup node id for specified queue
-      queue :: QueueID -> DGI.Node
+      queue :: QueueId -> DGI.Node
       queue i = queueN
         where queueN = case L.find (isRxQValidN i . fst) outE of
                          Just ((x,_),_) -> x
@@ -286,7 +290,7 @@ configFDir = doConfigFilter parseConf mkNodeLabel getQueue
 
 
 data CFDirTuple = CFDirTuple {
-    cfdtQueue    :: QueueID,
+    cfdtQueue    :: QueueId,
     cfdtL4Proto  :: C5TL4Proto,
     cfdtL3Src    :: C5TIP,
     cfdtL3Dst    :: C5TIP,
@@ -626,6 +630,105 @@ c5TuplePredT (C5Tuple {c5tL4Proto = cProt,
 c5TuplePredF :: C5Tuple -> PR.PredExpr
 c5TuplePredF t5 = (PR.buildNOT bld) (c5TuplePredT t5)
     where bld = PR.predBuildFold
+
+
+--
+-- ConfChange
+--
+
+{-|
+  The 'E10kConfChange' type holds all the legal changes in the configuration
+  of the 82599 NIC.
+  This type is an instance of generic ConfChange.
+   TODO: It should also include E10KInsertFdir, and RemoveFilter,
+   Update filters, as we are introducing them
+ -}
+data ConfChange = Insert5T PG.ConfValue
+                | InsertFDir PG.ConfValue
+                | InsertSYN PG.ConfValue
+    deriving (Eq, Ord, Show) -- Not exactly needed, but good to have
+
+addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
+addToCVL (PG.CVList l) v = PG.CVList $ v:l
+
+-- Overwrite the old value(s) with new value
+overwriteCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
+overwriteCVL (PG.CVList l) v = PG.CVList $ [v]
+
+instance C.ConfChange ConfChange where
+    {-|
+      The function 'applyConfChange' will add the given 5tuple filter into
+      the list if existing 5tuple fitlers, while keeping everything else
+      in the configuration same.
+      TODO: Add code to add other type of actions as well (fdir, delete, update)
+     -}
+    --applyConfChange :: C.Configuration -> E10kConfChange -> C.Configuration
+    applyConfChange conf (Insert5T c5t) = ("RxC5TupleFilter", new5t):rest
+        where new5t :: PG.ConfValue
+              new5t = addToCVL old5t c5t
+              old5t :: PG.ConfValue
+              old5t = case L.lookup "RxC5TupleFilter" conf of
+                        Just l -> l
+                        Nothing -> error "add5TupleToConf: Did not find RxC5TupleFilter"
+
+              rest :: C.Configuration
+              rest  = L.filter ((/="RxC5TupleFilter") . fst) conf
+
+    applyConfChange conf (InsertFDir cFdir) = ("RxCFDirFilter", newFdir):rest
+        where newFdir :: PG.ConfValue
+              newFdir = addToCVL oldFdir cFdir
+              oldFdir :: PG.ConfValue
+              oldFdir = case L.lookup "RxCFDirFilter" conf of
+                        Just l -> l
+                        Nothing -> error "addFDirToConf: Did not find RxCFDirFilter"
+
+              rest :: C.Configuration
+              rest  = L.filter ((/="RxCFDirFilter") . fst) conf
+
+    applyConfChange conf (InsertSYN cSyn) = ("RxCSynFilter", newSyn):rest
+        where newSyn :: PG.ConfValue
+              -- Overwriting old filter value with new one
+              newSyn = overwriteCVL oldSyn cSyn
+              oldSyn :: PG.ConfValue
+              oldSyn = case L.lookup "RxCSynFilter" conf of
+                        Just l -> l
+                        Nothing -> error "addSynToConf: Did not find RxCSynFilter"
+
+              rest :: C.Configuration
+              rest  = L.filter ((/="RxCSynFilter") . fst) conf
+
+cvMInt :: Integral a => Maybe a -> PG.ConfValue
+cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
+
+mk5TupleFromFl :: Flow -> QueueId -> PG.ConfValue
+mk5TupleFromFl fl@(FlowUDPv4 {}) q =
+    PG.CVTuple [ cvMInt $ sIP,
+    cvMInt $ dIP,
+    PG.CVMaybe $ Just $ PG.CVEnum 1,
+    cvMInt $ sP,
+    cvMInt $ dP,
+    PG.CVInt prio,
+    PG.CVInt $ fromIntegral q]
+    where
+       sIP  = flSrcIp   fl
+       dIP  = flDstIp   fl
+       sP   = flSrcPort fl
+       dP   = flDstPort fl
+       prio = 1
+
+mkFDirFromFl :: Flow -> QueueId -> PG.ConfValue
+mkFDirFromFl fl@(FlowUDPv4 {}) q =
+    PG.CVTuple [ cvMInt $ sIP,
+    cvMInt $ dIP,
+    PG.CVMaybe $ Just $ PG.CVEnum 1,
+    cvMInt $ sP,
+    cvMInt $ dP,
+    PG.CVInt $ fromIntegral q]
+    where
+       sIP  = flSrcIp   fl
+       dIP  = flDstIp   fl
+       sP   = flSrcPort fl
+       dP   = flDstPort fl
 
 
 graphH_ :: FilePath -> IO (PG.PGraph, SEM.Helpers)

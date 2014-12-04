@@ -1,5 +1,7 @@
 module Dragonet.Configuration(
     Configuration,
+    ConfChange(..),
+
     ConfType(..),
     ConfValue(..),
     ConfFunction,
@@ -19,6 +21,13 @@ import qualified Control.Monad.State as ST
 import Data.Maybe
 
 type Configuration = [(String,ConfValue)]
+
+{-|
+  A class 'ConfChange' provides functionality to apply a changeset of generic
+  type 'a' to given configuration and return new configuration.
+ -}
+class ConfChange a where
+    applyConfChange :: Configuration -> a -> Configuration
 
 -- Get enumerator name from conf value and its type
 cvEnumName :: ConfType -> ConfValue -> String

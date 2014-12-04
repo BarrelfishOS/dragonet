@@ -31,7 +31,8 @@ import Dragonet.Conventions (rxQPref, isTruePort, isFalsePort)
 import Dragonet.Flows(Flow (..), flowPred, flowStr)
 
 import qualified Dragonet.ProtocolGraph.Utils as PGU
-import qualified Graphs.E10k as E10k
+import qualified Graphs.E10k                  as E10k
+
 import Graphs.Cfg (prgCfg, prgCfgEmpty, e10kCfgEmpty, e10kCfgStr)
 
 import qualified Data.List            as L
@@ -87,15 +88,9 @@ qmapStr flows = "QMAP:\n" ++ L.intercalate "\n" [ "  " ++ qmapStr_ f | f <- flow
 --   User-defined cost functions use this form
 type CostQueueFn = QMap -> Cost
 -- the basic form of a cost function for the search algorithms
-type CostFn a s = (ConfChange a)
+type CostFn a s = (C.ConfChange a)
                 => [Flow] -> C.Configuration -> a -> ST.ST s Cost
 
-{-|
-  A class 'ConfChange' provides functionality to apply a changeset of generic
-  type 'a' to given configuration and return new configuration.
- -}
-class ConfChange a where
-    applyConfChange :: C.Configuration -> a -> C.Configuration
 
 {-|
   Class 'OracleSt' is the NIC-specific implementation for an Oracle
@@ -105,7 +100,7 @@ class ConfChange a where
   TODO: Understand what '|' means in class declaration --PS
         see: https://www.haskell.org/haskellwiki/Functional_dependencies --AKK
 -}
-class (ConfChange a) => OracleSt o a | o -> a where
+class (C.ConfChange a) => OracleSt o a | o -> a where
     -- seems too OO, but not sure how to do it better
     -- | 'emptyConf' returns initial empty configuration
     emptyConf  ::       o -> C.Configuration
@@ -157,75 +152,20 @@ type SearchStrategy o a = (OracleSt o a) =>
   SearchSt s o a -> [Flow] -> ST.ST s C.Configuration
 
 
-flowConfs :: (ConfChange a, OracleSt o a)
+flowConfs :: (C.ConfChange a, OracleSt o a)
           => o -> C.Configuration -> Flow -> [C.Configuration]
-flowConfs x conf f = map (applyConfChange conf) changes
+flowConfs x conf f = map (C.applyConfChange conf) changes
     where changes = flowConfChanges x conf f
 
-flowsSingleConfChanges :: (ConfChange a, OracleSt o a)
+flowsSingleConfChanges :: (C.ConfChange a, OracleSt o a)
                        => o -> C.Configuration -> [Flow] -> [(Flow, a)]
 flowsSingleConfChanges x c flows = L.concat res
    where res = [ [(f,cc) | cc <- flowConfChanges x c f ] | f <- flows]
 
-flowsSingleConfs :: (ConfChange a, OracleSt o a)
+flowsSingleConfs :: (C.ConfChange a, OracleSt o a)
                  => o -> C.Configuration -> [Flow] -> [(Flow, C.Configuration)]
 flowsSingleConfs x conf fs =
-    [(fl, applyConfChange conf change) | (fl,change) <- flowsSingleConfChanges x conf fs]
-
-
-{-|
-  The 'E10kConfChange' type holds all the legal changes in the configuration
-  of the 82599 NIC.
-  This type is an instance of generic ConfChange.
-   TODO: It should also include E10KInsertFdir, and RemoveFilter,
-   Update filters, as we are introducing them
- -}
-data E10kConfChange = E10kInsert5T PG.ConfValue
-                | E10kInsertFDir PG.ConfValue
-                | E10kInsertSYN PG.ConfValue
-    deriving (Eq, Ord, Show) -- Not exactly needed, but good to have
-
-instance ConfChange E10kConfChange where
-    {-|
-      The function 'applyConfChange' will add the given 5tuple filter into
-      the list if existing 5tuple fitlers, while keeping everything else
-      in the configuration same.
-      TODO: Add code to add other type of actions as well (fdir, delete, update)
-     -}
-    --applyConfChange :: C.Configuration -> E10kConfChange -> C.Configuration
-    applyConfChange conf (E10kInsert5T c5t) = ("RxC5TupleFilter", new5t):rest
-        where new5t :: PG.ConfValue
-              new5t = addToCVL old5t c5t
-              old5t :: PG.ConfValue
-              old5t = case L.lookup "RxC5TupleFilter" conf of
-                        Just l -> l
-                        Nothing -> error "add5TupleToConf: Did not find RxC5TupleFilter"
-
-              rest :: C.Configuration
-              rest  = L.filter ((/="RxC5TupleFilter") . fst) conf
-
-    applyConfChange conf (E10kInsertFDir cFdir) = ("RxCFDirFilter", newFdir):rest
-        where newFdir :: PG.ConfValue
-              newFdir = addToCVL oldFdir cFdir
-              oldFdir :: PG.ConfValue
-              oldFdir = case L.lookup "RxCFDirFilter" conf of
-                        Just l -> l
-                        Nothing -> error "addFDirToConf: Did not find RxCFDirFilter"
-
-              rest :: C.Configuration
-              rest  = L.filter ((/="RxCFDirFilter") . fst) conf
-
-    applyConfChange conf (E10kInsertSYN cSyn) = ("RxCSynFilter", newSyn):rest
-        where newSyn :: PG.ConfValue
-              -- Overwriting old filter value with new one
-              newSyn = overwriteCVL oldSyn cSyn
-              oldSyn :: PG.ConfValue
-              oldSyn = case L.lookup "RxCSynFilter" conf of
-                        Just l -> l
-                        Nothing -> error "addSynToConf: Did not find RxCSynFilter"
-
-              rest :: C.Configuration
-              rest  = L.filter ((/="RxCSynFilter") . fst) conf
+    [(fl, C.applyConfChange conf change) | (fl,change) <- flowsSingleConfChanges x conf fs]
 
 
 -- E10K (simple for now) oracle
@@ -238,7 +178,7 @@ e10kDefaultQ = 0
   It will provide a way to generate initial empty configuation, showing
   configuration, and querying about affected queues from current configuration.
  -}
-instance OracleSt E10kOracleSt E10kConfChange where
+instance OracleSt E10kOracleSt E10k.ConfChange where
     {-|
      - Basic implementation which suggests a putting current flow in all
      - the queues, generating nQueue number of configurations.
@@ -250,8 +190,8 @@ instance OracleSt E10kOracleSt E10kConfChange where
         -- FIXME: FDir filters are not working properly with priority
         --      Commenting following line to avoid FDir filters will make
         --      everything work
-        [E10kInsert5T $ mk5TupleFromFl fl q |  q <- allQueues nq]
-        -- ++ [E10kInsertFDir $ mkFDirFromFl fl q |  q <- allQueues nq]
+        [E10k.Insert5T $ E10k.mk5TupleFromFl fl q |  q <- allQueues nq]
+        -- ++ [E10kInsertFDir $ E10k.mkFDirFromFl fl q |  q <- allQueues nq]
 
     emptyConf _ = e10kCfgEmpty -- ^ Creates initial empty configuration
     showConf _  = e10kCfgStr -- ^ Converts conf to string
@@ -259,10 +199,10 @@ instance OracleSt E10kOracleSt E10kConfChange where
     -- QUESTION: Is it assumed that there will be only one operation in
     --      conf change?
     -- affectedQueues E10kOracleSt { nQueues = nq } _ _ = allQueues nq
-    affectedQueues E10kOracleSt { nQueues = nq } conf (E10kInsert5T c5t) =
+    affectedQueues E10kOracleSt { nQueues = nq } conf (E10k.Insert5T c5t) =
         [e10kDefaultQ, xq]
         where xq = E10k.c5tQueue $ E10k.parse5t c5t
-    affectedQueues E10kOracleSt { nQueues = nq } conf (E10kInsertFDir cFdir) =
+    affectedQueues E10kOracleSt { nQueues = nq } conf (E10k.InsertFDir cFdir) =
         [e10kDefaultQ, xq]
         where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
 
@@ -344,7 +284,7 @@ qMap :: (OracleSt o a)
      => SearchSt s o a -> C.Configuration -> a -> [Flow] -> ST.ST s QMap
 qMap st conf confChange flows = do
     let prgU = sPrgU $ sParams st
-        newConf = applyConfChange conf confChange
+        newConf = C.applyConfChange conf confChange
         prgC = C.applyConfig newConf prgU
     qMap_ st prgC flows
 
@@ -358,7 +298,7 @@ qMapIncremental :: (OracleSt o a)
 qMapIncremental st conf confChange flows oldQmap_ = do
     let prgU      = sPrgU $ sParams st
         oracle    = sOracle $ sParams st
-        newConf   = applyConfChange conf confChange
+        newConf   = C.applyConfChange conf confChange
         prgC      = C.applyConfig newConf prgU
         invalidQs = affectedQueues oracle conf confChange
         flowC     = sFlowCache st
@@ -734,52 +674,6 @@ priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
 --          backEsReord = (sgbOrdEs st) backEs
 --          same_order  = backEs == backEsReord
 
-mk5TupleFromFl :: Flow -> QueueId -> PG.ConfValue
-mk5TupleFromFl fl@(FlowUDPv4 {}) q =
-    PG.CVTuple [ cvMInt $ sIP,
-    cvMInt $ dIP,
-    PG.CVMaybe $ Just $ PG.CVEnum 1,
-    cvMInt $ sP,
-    cvMInt $ dP,
-    PG.CVInt prio,
-    PG.CVInt $ fromIntegral q]
-    where
-       sIP  = flSrcIp   fl
-       dIP  = flDstIp   fl
-       sP   = flSrcPort fl
-       dP   = flDstPort fl
-       prio = 1
-
-mkFDirFromFl :: Flow -> QueueId -> PG.ConfValue
-mkFDirFromFl fl@(FlowUDPv4 {}) q =
-    PG.CVTuple [ cvMInt $ sIP,
-    cvMInt $ dIP,
-    PG.CVMaybe $ Just $ PG.CVEnum 1,
-    cvMInt $ sP,
-    cvMInt $ dP,
-    PG.CVInt $ fromIntegral q]
-    where
-       sIP  = flSrcIp   fl
-       dIP  = flDstIp   fl
-       sP   = flSrcPort fl
-       dP   = flDstPort fl
-
-addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
-addToCVL (PG.CVList l) v = PG.CVList $ v:l
-
-{-|
- - Overwrite the old value(s) with new value
- -}
-overwriteCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
-overwriteCVL (PG.CVList l) v = PG.CVList $ [v]
-
-
-cvMInt :: Integral a => Maybe a -> PG.ConfValue
-cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
-
----
-
-type FlowQSt = Int
 
 reachedQueue :: PG.PGNode -> Maybe QueueId
 reachedQueue (_,PG.ONode {PG.nLabel = name}) = ret
@@ -896,7 +790,7 @@ zQmap :: (OracleSt o a)
 zQmap st conf confChange flows = do
     let prgU      = sPrgU $ sParams st
         oracle    = sOracle $ sParams st
-        newConf   = applyConfChange conf confChange
+        newConf   = C.applyConfChange conf confChange
         prgC      = C.applyConfig newConf prgU
         flowC     = sFlowCache st
         d0        = flowQueueStart prgC
