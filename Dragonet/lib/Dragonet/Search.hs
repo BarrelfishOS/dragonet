@@ -326,9 +326,10 @@ runSearch params flows = ST.runST $ do
    st <- initSearchSt params
    doSearch st flows
 
+
 -- NOTE: There is still some code around trying to compute qmap with
 -- different ways:
---  - E10k.flowQueue: old E10k-specific version of flowQueue
+--  - E10k.FlowQueue.flowQueue: old E10k-specific version of flowQueue
 --  - yQmap and xQmap
 qMap_ :: (OracleSt o a) =>
          SearchSt s o a -> PG.PGraph -> [Flow] -> ST.ST s QMap
