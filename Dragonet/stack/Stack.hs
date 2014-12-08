@@ -211,7 +211,7 @@ muxId plg dNodeL dPL = i
 -- Handlers for app interface events
 {-|
  - This function handles the events received from the application.
- - The supported event-types are appConnected, AppRegister, UDPListen,
+ - The supported event-types are appConnected, AppRegister, UDPBind,
  -      UDPFlow, and Span
  -}
 
@@ -255,7 +255,7 @@ eventHandler sstv ch (PLA.EvAppRegister lbl) = do
     PLA.sendMessage ch $ PLA.MsgWelcome aid
 
 {-|
- -  Handing event SocketUDPListen:
+ -  Handing event SocketUDPBind:
  -      * Lookup appID
  -      * Use nextSocketID for this socket
  -      * Use nextEndpointID for this endpoint
@@ -270,15 +270,16 @@ eventHandler sstv ch (PLA.EvAppRegister lbl) = do
  -              + Insert filters in NIC if necessary
  -              + Inform running pipelines about the change
  -}
-eventHandler sstv ch (PLA.EvSocketUDPListen (ip,port)) = do
+eventHandler sstv ch (PLA.EvSocketUDPBind le@(lIp,lPort) re@(rIp,rPort)) = do
     (sid,ss) <- STM.atomically $ do
         ss <- STM.readTVar sstv
         -- TODO: check overlapping
         let Just aid = M.lookup ch $ ssAppChans ss
-            ((sid,eid), ss') = ssRunNetState ss (NS.udpListen aid (ip,port))
+            ((sid,eid), ss') = ssRunNetState ss (NS.udpBind aid (le,re))
         STM.writeTVar sstv $ ss'
         return (sid,ss')
-    putStrLn $ "SocketUDPListen p=" ++ show (ip,port) ++ " -> " ++ show sid
+    putStrLn $ "SocketUDPBind f=" ++ show (rIp,rPort) ++ "/"
+                ++ show (lIp,lPort) ++ " -> " ++ show sid
     PLA.sendMessage ch $ PLA.MsgSocketInfo sid
     ssUpdateGraphs ss sstv
 {-|
@@ -290,7 +291,7 @@ eventHandler sstv ch (PLA.EvSocketUDPFlow le@(lIp,lPort) re@(rIp,rPort)) = do
     (sid,ss) <- STM.atomically $ do
         ss <- STM.readTVar sstv
         let Just aid = M.lookup ch $ ssAppChans ss
-            ((sid,eid), ss') = ssRunNetState ss (NS.newUdpSocket aid (le,re))
+            ((sid,eid), ss') = ssRunNetState ss (NS.udpBind aid (le,re))
         STM.writeTVar sstv $ ss'
         return (sid,ss')
     putStrLn $ "SocketUDPFlow f=" ++ show (rIp,rPort) ++ "/"

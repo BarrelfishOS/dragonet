@@ -313,6 +313,19 @@ static errval_t sockh_from_sockinfo(struct dnal_socket_handle   *sh,
     return SYS_ERR_OK;
 }
 
+#if 0
+// TODO
+errval_t dnal_socket_udpflow(struct dnal_socket_handle *sh
+                             struct dnal_net_destination *dest)
+{
+            msg.type = APPCTRL_SOCKET_UDPFLOW;
+            msg.data.socket_udpflow.r_ip = dest->data.ip4udp.ip_remote;
+            msg.data.socket_udpflow.l_ip = dest->data.ip4udp.ip_local;
+            msg.data.socket_udpflow.r_port = dest->data.ip4udp.port_remote;
+            msg.data.socket_udpflow.l_port = dest->data.ip4udp.port_local;
+}
+#endif
+
 errval_t dnal_socket_bind(struct dnal_socket_handle   *sh,
                           struct dnal_net_destination *dest)
 {
@@ -324,19 +337,11 @@ errval_t dnal_socket_bind(struct dnal_socket_handle   *sh,
     }
 
     if (dest->type == DNAL_NETDSTT_IP4UDP) {
-        if (dest->data.ip4udp.ip_remote == 0 &&
-            dest->data.ip4udp.port_remote == 0)
-        {
-            msg.type = APPCTRL_SOCKET_UDPLISTEN;
-            msg.data.socket_udplisten.ip = dest->data.ip4udp.ip_local;
-            msg.data.socket_udplisten.port = dest->data.ip4udp.port_local;
-        } else {
-            msg.type = APPCTRL_SOCKET_UDPFLOW;
-            msg.data.socket_udpflow.r_ip = dest->data.ip4udp.ip_remote;
-            msg.data.socket_udpflow.l_ip = dest->data.ip4udp.ip_local;
-            msg.data.socket_udpflow.r_port = dest->data.ip4udp.port_remote;
-            msg.data.socket_udpflow.l_port = dest->data.ip4udp.port_local;
-        }
+        msg.type = APPCTRL_SOCKET_UDPBIND;
+        msg.data.socket_udpflow.r_ip   = dest->data.ip4udp.ip_remote;
+        msg.data.socket_udpflow.l_ip   = dest->data.ip4udp.ip_local;
+        msg.data.socket_udpflow.r_port = dest->data.ip4udp.port_remote;
+        msg.data.socket_udpflow.l_port = dest->data.ip4udp.port_local;
     } else {
         return DNERR_BADDEST;
     }

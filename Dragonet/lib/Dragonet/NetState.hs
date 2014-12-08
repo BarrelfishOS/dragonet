@@ -9,7 +9,7 @@ module Dragonet.NetState (
     allocAppId,
     runState, runState0,
     NetState(..), NetStateM, initNetSt,
-    udpListen, newUdpSocket, socketSpan
+    udpListen, udpBind, socketSpan
 ) where
 
 -- basic network state logic:
@@ -106,10 +106,10 @@ addEndpoint ep = do
 
 zeroAsNothing a = if a == 0 then Nothing else Just a
 
-newUdpSocket :: AppId
-             -> (LocalUDPEndpoint, RemoteUDPEndpoint)
-             -> NetStateM (SocketId, EndpointId)
-newUdpSocket aid ((lip,lport),(rip,rport)) = do
+udpBind :: AppId
+        -> (LocalUDPEndpoint, RemoteUDPEndpoint)
+        -> NetStateM (SocketId, EndpointId)
+udpBind aid ((lip,lport),(rip,rport)) = do
     sid <- allocSocketId
     let ep = EndpointUDPv4 {
           epSockets    = [(sid,aid)]
@@ -125,7 +125,7 @@ newUdpSocket aid ((lip,lport),(rip,rport)) = do
 udpListen :: AppId
            -> LocalUDPEndpoint
            -> NetStateM (SocketId, EndpointId)
-udpListen aid x = newUdpSocket aid (x,(0,0))
+udpListen aid x = udpBind aid (x,(0,0))
 
 socketSpan :: AppId -> SocketId -> NetStateM (SocketId)
 socketSpan aid sid = do

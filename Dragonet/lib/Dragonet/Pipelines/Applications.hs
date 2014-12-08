@@ -31,7 +31,7 @@ data Event =
     EvAppConnected GraphHandle |
     EvAppRegister String |
     EvAppStopped Bool | -- The boolean indicates regular termination
-    EvSocketUDPListen UDPEndpoint |
+    EvSocketUDPBind UDPEndpoint UDPEndpoint |
     EvSocketUDPFlow UDPEndpoint UDPEndpoint |
     EvSocketSpan SocketId |
     EvSocketClose SocketId
@@ -47,7 +47,10 @@ data TxMessage =
 type OpNewApp = ChanHandle -> GraphHandle -> IO ()
 type OpRegister = ChanHandle -> CString -> IO ()
 type OpStopApp = ChanHandle -> Bool -> IO ()
-type OpUDPListen = ChanHandle -> IPv4Addr -> UDPPort -> IO ()
+-- (bind: local ip, local port, remote ip, remote port)
+type OpUDPBind = ChanHandle -> IPv4Addr -> UDPPort
+                            -> IPv4Addr -> UDPPort
+                            -> IO ()
 -- (flow: local ip, local port, remote ip, remote port)
 type OpUDPFlow = ChanHandle -> IPv4Addr -> UDPPort -> IPv4Addr ->
                     UDPPort -> IO ()
@@ -57,7 +60,7 @@ type OpSocketClose = ChanHandle -> SocketId -> IO ()
 foreign import ccall "app_control_init"
     c_app_control_init ::
         CString -> FunPtr OpNewApp -> FunPtr OpRegister -> FunPtr OpStopApp ->
-            FunPtr OpUDPListen -> FunPtr OpUDPFlow -> FunPtr OpSocketSpan ->
+            FunPtr OpUDPBind -> FunPtr OpUDPFlow -> FunPtr OpSocketSpan ->
             FunPtr OpSocketClose -> IO ()
 foreign import ccall "app_control_send_welcome"
     c_app_control_send_welcome ::
@@ -77,7 +80,7 @@ foreign import ccall "wrapper"
 foreign import ccall "wrapper"
     mkOpStopApp :: OpStopApp -> IO (FunPtr OpStopApp)
 foreign import ccall "wrapper"
-    mkOpUDPListen :: OpUDPListen -> IO (FunPtr OpUDPListen)
+    mkOpUDPBind :: OpUDPBind -> IO (FunPtr OpUDPBind)
 foreign import ccall "wrapper"
     mkOpUDPFlow :: OpUDPFlow -> IO (FunPtr OpUDPFlow)
 foreign import ccall "wrapper"
@@ -90,13 +93,13 @@ foreign import ccall "wrapper"
  - NOTE: keep in mind that the C function has an infinite loop
  - handling event.  So, this function will never return.
  -}
-appControlInit :: String -> OpNewApp -> OpRegister -> OpStopApp -> OpUDPListen
+appControlInit :: String -> OpNewApp -> OpRegister -> OpStopApp -> OpUDPBind
         -> OpUDPFlow -> OpSocketSpan -> OpSocketClose -> IO ()
 appControlInit sn a b c d e f g = do
     a' <- mkOpNewApp a
     b' <- mkOpRegister b
     c' <- mkOpStopApp c
-    d' <- mkOpUDPListen d
+    d' <- mkOpUDPBind d
     e' <- mkOpUDPFlow e
     f' <- mkOpSocketSpan f
     g' <- mkOpSocketClose g
@@ -115,8 +118,9 @@ hOpRegister eh ch cs = do
 hOpStopApp :: (ChanHandle -> Event -> IO ()) -> OpStopApp
 hOpStopApp eh ch reg = eh ch $ EvAppStopped reg
 
-hOpUDPListen :: (ChanHandle -> Event -> IO ()) -> OpUDPListen
-hOpUDPListen eh ch ip port = eh ch $ EvSocketUDPListen (ip,port)
+hOpUDPBind :: (ChanHandle -> Event -> IO ()) -> OpUDPBind
+hOpUDPBind eh ch l_ip l_port r_ip r_port =
+    eh ch $ EvSocketUDPBind (l_ip, l_port) (r_ip, r_port)
 
 hOpUDPFlow :: (ChanHandle -> Event -> IO ()) -> OpUDPFlow
 hOpUDPFlow eh ch l_ip l_port r_ip r_port =
@@ -137,7 +141,7 @@ hOpSocketClose eh ch si = eh ch $ EvSocketClose si
 interfaceThread :: String -> (ChanHandle -> Event -> IO ()) -> IO ()
 interfaceThread stackname eh = do
     appControlInit stackname (hOpNewApp eh) (hOpRegister eh) (hOpStopApp eh)
-        (hOpUDPListen eh) (hOpUDPFlow eh) (hOpSocketSpan eh) (hOpSocketClose eh)
+        (hOpUDPBind eh) (hOpUDPFlow eh) (hOpSocketSpan eh) (hOpSocketClose eh)
 
 sendMessage :: ChanHandle -> TxMessage -> IO ()
 sendMessage ch (MsgWelcome appid) = c_app_control_send_welcome ch appid

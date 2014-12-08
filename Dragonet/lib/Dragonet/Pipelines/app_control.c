@@ -33,7 +33,7 @@ void app_control_init(
     void (*new_application)(int,struct dynr_client *),
     void (*register_app)(int,const char *),
     void (*stop_application)(int,bool),
-    void (*socket_udplisten)(int,uint32_t,uint16_t),
+    void (*socket_udpbind)(int,uint32_t,uint16_t,uint32_t,uint16_t),
     void (*socket_udpflow)(int,uint32_t,uint16_t,uint32_t,uint16_t),
     void (*socket_span)(int,socket_id_t),
     void (*socket_close)(int,socket_id_t))
@@ -151,14 +151,20 @@ void app_control_init(
                         = 0;
                     register_app(appfds[i], msg.data.register_app.label);
                     break;
-                case APPCTRL_SOCKET_UDPLISTEN:
-                    dprintf("APPCTRL_SOCKET_UDPLISTEN\n");
-                    socket_udplisten(appfds[i],
-                            msg.data.socket_udplisten.ip,
-                            msg.data.socket_udplisten.port);
+                case APPCTRL_SOCKET_UDPBIND:
+                    printf("APPCTRL_SOCKET_UDPBIND: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+                            msg.data.socket_udpbind.l_ip,
+                            msg.data.socket_udpbind.l_port,
+                            msg.data.socket_udpbind.r_ip,
+                            msg.data.socket_udpbind.r_port);
+                    socket_udpbind(appfds[i],
+                            msg.data.socket_udpbind.l_ip,
+                            msg.data.socket_udpbind.l_port,
+                            msg.data.socket_udpbind.r_ip,
+                            msg.data.socket_udpbind.r_port);
                     break;
                 case APPCTRL_SOCKET_UDPFLOW:
-                    dprintf("APPCTRL_SOCKET_UDPFLOW: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+                    printf("APPCTRL_SOCKET_UDPFLOW: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
                             msg.data.socket_udpflow.l_ip,
                             msg.data.socket_udpflow.l_port,
                             msg.data.socket_udpflow.r_ip,

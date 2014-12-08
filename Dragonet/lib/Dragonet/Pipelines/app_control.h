@@ -18,7 +18,7 @@ enum app_control_type {
     APPCTRL_SOCKET_INFO,        // Dragonet -> App
     APPCTRL_GRAPH_CMD,          // Dragonet -> App
     APPCTRL_REGISTER,           // App -> Dragonet
-    APPCTRL_SOCKET_UDPLISTEN,   // App -> Dragonet
+    APPCTRL_SOCKET_UDPBIND,     // App -> Dragonet
     APPCTRL_SOCKET_UDPFLOW,     // App -> Dragonet
     APPCTRL_SOCKET_SPAN,        // App -> Dragonet
     APPCTRL_SOCKET_CLOSE,       // App -> Dragonet
@@ -42,10 +42,13 @@ struct app_control_message {
         struct {
             char label[MAX_APPLBL];
         } register_app;
+        // local/remote UDP endpoints
         struct {
-            uint32_t ip;
-            uint16_t port;
-        } socket_udplisten;
+            uint32_t l_ip;
+            uint32_t r_ip;
+            uint16_t l_port;
+            uint16_t r_port;
+        } socket_udpbind;
         // local/remote UDP endpoints
         struct {
             uint32_t l_ip;
@@ -67,7 +70,7 @@ void app_control_init(
     void (*new_application)(int,struct dynr_client *),
     void (*register_app)(int,const char *),
     void (*stop_application)(int,bool),
-    void (*socket_udplisten)(int,uint32_t,uint16_t),
+    void (*socket_udpbind)(int,uint32_t,uint16_t,uint32_t,uint16_t),
     void (*socket_udpflow)(int,uint32_t,uint16_t,uint32_t,uint16_t),
     void (*socket_span)(int,socket_id_t),
     void (*socket_close)(int,socket_id_t));
