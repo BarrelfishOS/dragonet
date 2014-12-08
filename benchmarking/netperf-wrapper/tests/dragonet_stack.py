@@ -7,16 +7,6 @@
 
 onload_prefix="onload --profile=latency --preload=/usr/lib64/libonload.so"
 
-def toCoreList2(clist, separator=",", prefix=""):
-    ret = ""
-    for c in clist:
-        if ret == "" :
-            ret = "%s%d" % (prefix, c)
-        else :
-            ret = "%s%s%s%d" % (ret, separator, prefix, c)
-    #print "toCoreList2 %s" % (ret)
-    return ret
-
 dragonet_container_old = {
                 "llvmSF":   ["./scripts/pravin/deployDragonetGen.sh", "stack-sf" , "sf"],
                 "llvmE10k": ["./scripts/pravin/deployDragonetGen.sh", "stack-e10k", "e10k"],
@@ -31,8 +21,8 @@ dragonet_dir = "dragonet/Dragonet/"
 def dragonet_container_gen(sname):
     return {
             'base_dir'              : dragonet_dir,
-            'deploy_stack'          : ("%s %s" % (gen_deploy, sname)),
-            'deploy_stack_cmd'      : ("%s %s %d %s" % (
+            'deploy_stack'          : ("%s bg %s" % (gen_deploy, sname)),
+            'deploy_stack_cmd'      : ("%s bg %s %d %s" % (
                                             gen_deploy,
                                             sname,
                                             HWQUEUES,

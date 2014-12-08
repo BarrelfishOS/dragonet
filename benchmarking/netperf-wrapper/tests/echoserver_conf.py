@@ -2,21 +2,12 @@
 
 include('dragonet_stack.py')
 
-
-SERVER_INITIAL_PORT =  888
-CLIENT_INITIAL_PORT =  8000
-
-UNIQUE_CLIENTS = list(set(CLIENTS))
-
-
 def getClientPortList(clientList, startPort, noPorts=1) :
     portList = []
     for cl in range(0, len(clientList)):
         prev_entries = [i for i, x in enumerate(clientList[:cl]) if x == clientList[cl]]
         portList.append(startPort + len(prev_entries))
     return portList
-
-ENDPOINTS_TO_WAIT = 0
 
 def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True):
     ret = ""
@@ -42,9 +33,7 @@ def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True)
     if threadsPerPort == 1 :
 
         ret = ret + (" -a t%d -p %d " % (appID, SERVER_INITIAL_PORT))
-        ENDPOINTS_TO_WAIT = 1
     else :
-        ENDPOINTS_TO_WAIT = len(CLIENTS)
         alreadyCovered = 0
         for kk in range(0, threadsPerPort):
             ret = ret + (" -a t%d " % (kk))
@@ -83,10 +72,6 @@ def endpoints_to_wait():
         return 1
     return len(CLIENTS)
 
-MAX_CORES = 40 # when using hyperthreads in asiago
-MAX_CORES = 20
-
-
 def SRV_CMDS(name):
 
 
@@ -94,37 +79,22 @@ def SRV_CMDS(name):
         return {
                     "client_extra_opts" : "-N",
 
-                    "init_cmd_special_unpinned" : [
-                        #"init_cmd_special" : [
-                      "cd %s ; %s %d %s" % (
-                          dragonet_container[name]['base_dir'],
-                          dragonet_container[name]['deploy_stack'],
-                          HWQUEUES,
-                          "priority"
-                          #"balance"
-                            ),
-
-                      "cd %s ; sudo ./scripts/pravin/runBetterBg.sh 4 ./ ./fancyecho-out.log  " % (
-                          dragonet_container[name]['base_dir'])
-                        + " ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
-                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
-                    ],
-
-
                     "init_cmd_special" : [
-                        #"init_cmd_special_pinned" : [
-                      "cd %s ; sudo taskset -c %s %s %d %s" % (
-                          dragonet_container[name]['base_dir'],
-                          toCoreList2(range(MAX_CORES - (HWQUEUES), MAX_CORES)),
+
+                      # run stack
+                      "cd %s ; " % (dragonet_container[name]['base_dir'])
+                        + "sudo %s " % (get_isolation_container(is_server=False))
+                        + " %s %d %s " % (
                           dragonet_container[name]['deploy_stack'],
                           HWQUEUES,
                           "priority"
                           #"balance"
                           ),
 
-                      "cd %s ; sudo taskset -c %s " % (
+                      # run server
+                      "cd %s ; " % (
                         dragonet_container[name]['base_dir'],
-                        toCoreList2(range((0 + SERVER_CORESHIFT), (SERVER_CORESHIFT + (SERVERS_INSTANCES*SERVER_CORES)))))
+                        + "sudo %s " % (get_isolation_container(is_server=False))
                         + " ./scripts/pravin/runBetterBg.sh 10  ./ ./fancyecho-out.log  "
                         + " ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
                             genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
@@ -416,7 +386,6 @@ def get_proto_specific_server_ports():
     else:
         return (port_list_for_clients, port_list_cl_src, port_list,       " --udp ")
 
-NETPERF_CLIENT_DST_PORT, NETPERF_CLIENT_SRC_PORT, MEMCACHED_PORT_UDP, USING_UDP = get_proto_specific_server_ports()
 
 
 def get_cmd_server(id, cmd) :
