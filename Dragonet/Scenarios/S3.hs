@@ -15,6 +15,7 @@ import qualified Dragonet.Configuration as C
 import qualified Graphs.E10k as E10k
 import qualified Data.Maybe  as DM
 import qualified Data.List as DL
+import qualified Dragonet.ProtocolGraph       as PG
 
 import Control.Applicative ((<$>))
 
@@ -93,6 +94,7 @@ generateFlowsWrapper fperApp clcount = generateFlows serverIP srvPort  clients_i
     clients_ip_addr = map ( DM.fromJust . IP4.ipFromString ) $ getClientList clcount
     clientStartPort = 8000
 
+--                                       flow, queue-id, filtertype
 flowsToQueue :: [Flow] -> Int -> Int -> [(Flow, Int, Int)]
 flowsToQueue flist fpApp nq =  glFLows1  ++  glFLows2 ++ otherQmap'
     where
@@ -104,6 +106,24 @@ flowsToQueue flist fpApp nq =  glFLows1  ++  glFLows2 ++ otherQmap'
     npflows = DL.sort $ filter (not . (isGoldFl fpApp)) flist
     otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([3..nq] ++ [0]))
     otherQmap' = map (\(a, b) -> (a, b, 1)) otherQmap
+
+
+flowsToConfig :: [Flow] -> Int -> Int -> C.Configuration
+flowsToConfig flist fpApp nq =  [
+        ("RxC5TupleFilter", PG.CVList []),
+        ("RxCFDirFilter", PG.CVList allFlowsFdir)
+    ]
+    where
+    allFlowsFdir = glFLows1  ++  glFLows2 ++ otherQmap'
+    toFilterType = E10k.mkFDirFromFl
+    pflows = DL.sort $ filter (isGoldFl fpApp) flist
+    halfway = ((length pflows) `div` 2)
+    glFLows1 = map (\x -> toFilterType x 1) $ take halfway pflows
+    glFLows2 = map (\x -> toFilterType x 2) $ drop halfway pflows
+
+    npflows = DL.sort $ filter (not . (isGoldFl fpApp)) flist
+    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([3..nq] ++ [0]))
+    otherQmap' = map (\(a, b) -> toFilterType a b) otherQmap
 
 -- All flows are:
 realFlows fpApp clients = generateFlowsWrapper fpApp clients
@@ -117,6 +137,8 @@ e10kU = fst <$> e10kT
 hardcodedOracleMemcached fpApp clients nq  costfn prgU = params
     where
         qmap = flowsToQueue (sortedRealFlows fpApp clients) fpApp nq
+        --cnf0 = E10k.cfgEmpty
+        cnf0 = flowsToConfig (sortedRealFlows fpApp clients) fpApp nq
 
         oracle   = S.E10kOracleHardCoded {S.nnHardcoded = (nq, qmap)}
         --oracle   = S.E10kOracleSt {S.nQueues = nq}
@@ -126,10 +148,16 @@ hardcodedOracleMemcached fpApp clients nq  costfn prgU = params
         costFn     = case lookup costfn costFns of
                         Just x  -> x
                         Nothing -> error $ "Uknown cost function:" ++ costfn
+
+        --searchFNGreedy        = S.searchGreedyFlows
+
+        searchFNHardcoded      = S.hardcodedSearch cnf0
+
         params = S.initSearchParams {  S.sOracle = oracle
                                    , S.sPrgU   = prgU
                                    , S.sCostFn = priFn
-                                   , S.sStrategy = S.searchGreedyFlows}
+                                   , S.sStrategy =  searchFNHardcoded
+                                   }
 
 
 

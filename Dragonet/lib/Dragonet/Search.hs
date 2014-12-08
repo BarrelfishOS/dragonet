@@ -11,6 +11,7 @@ module Dragonet.Search (
   OracleSt(..),
   sfOracleInit,
   searchGreedyFlows,
+  hardcodedSearch,
   balanceCost,
   priorityCost,
   CostQueueFn,
@@ -409,6 +410,22 @@ doSearch st flows = do
     --ht_size <- length <$> H.toList flowC
     --return $ tr conf ("SIZE: " ++ (show ht_size))
 
+-- hardcodedSearch: return same conf irrespective of the current flow
+hardcodedSearch :: forall o a. C.ConfChange a =>
+                C.Configuration
+            ->  SearchStrategy o a
+hardcodedSearch hardConf st fs = return $ hardConf
+
+{-
+            return $ trN confChanges_head msg
+        where
+        cnf0                = C.emptyConfig (undefined::a)
+        oracle              = sOracle $ sParams st
+        confChanges         = flowConfChanges oracle cnf0 $ head fs
+        newConf             = C.applyConfChange cnf0 confChanges
+        confChanges_head    = head confChanges
+        msg                 = "hardcodedSearch: returning same conf"
+-}
 -- searchGreedyFlows: examine one flow at a time. Depends on the ordering of
 -- flows. We can use that as a heuristic
 searchGreedyFlows :: forall o a. C.ConfChange a => SearchStrategy o a
