@@ -24,6 +24,8 @@ import qualified Dragonet.NetState                 as NS
 import Dragonet.NetState (NetState, SocketId,AppId,EndpointId,EndpointDesc(..),epsDiff)
 import Dragonet.Flows (Flow(..), epToFlow, flowStr)
 
+import qualified Graphs.Cfg as GCFG
+
 import qualified Data.Graph.Inductive as DGI
 import Util.GraphHelpers (findNodeByL)
 
@@ -149,7 +151,7 @@ ssMakeGraph ss args prgConf lbl xforms = do
         -- graph transformations
         debug :: O.DbgFunction ()
         debug = O.dbgDotfiles $ "out/graphs-fff/" ++ (show $ ssVersion ss)
-        --dbg = O.dbgDummy
+        --dbg = O.dbgDummy lbl
         dbg    = debug lbl
         cfgPLA = stCfgPLA args
         pla    = (plAssign cfgPLA ss)
@@ -480,6 +482,8 @@ updateGraphOpt costFn cfgOracle args sstv = do
     appendFile "allAppslist.appready" "Application is ready!\n"
 
 
+flowTrigger = 6
+
 -- updateGraph function that uses Dragonet.Search functions
 updateGraphFlows
     :: ([Flow] -> IO C.Configuration)
@@ -497,7 +501,6 @@ updateGraphFlows getConf args sstv = do
        --rmEps = epsDiff prevEps allEps
        --putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
        --putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
-
        -- OLD implenetation: where flows are taken from endpoints
        --xforms = [IT.coupleTxSockets, IT.mergeSockets]
        --flows = map epToFlow $ M.elems $ ssEndpoints ss

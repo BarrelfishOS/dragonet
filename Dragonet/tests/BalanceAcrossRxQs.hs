@@ -62,6 +62,7 @@ debug :: O.DbgFunction ()
 debug = O.dbgDotfiles "out/xtest/"
 
 main = do
+--test = do
     (lpgU,lpgH) <- LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
     (prgU,prgH) <- E10k.graphH
     let lpgC = C.applyConfig (LPG.lpgConfig eps) lpgU

@@ -128,6 +128,7 @@ run ctx pconn pcreate plg = do
         forM_ outDel $ \(l,_) -> dplOutQRemove dpl l
         forM_ outAdd $ \(l,q) -> dplOutQAdd    dpl l q
         forM_ inAdd  $ \(l,q) -> dplInQAdd     dpl l q
+
         -- Update graph
         dplSetGraph dpl $ PL.plGraph pl
         -- Restart execution of pipeline
