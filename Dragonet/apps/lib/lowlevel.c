@@ -313,18 +313,36 @@ static errval_t sockh_from_sockinfo(struct dnal_socket_handle   *sh,
     return SYS_ERR_OK;
 }
 
-#if 0
-// TODO
-errval_t dnal_socket_udpflow(struct dnal_socket_handle *sh
-                             struct dnal_net_destination *dest)
+errval_t dnal_socket_register_flow(struct dnal_socket_handle *sh,
+                                   struct dnal_net_destination *flow)
 {
-            msg.type = APPCTRL_SOCKET_UDPFLOW;
-            msg.data.socket_udpflow.r_ip = dest->data.ip4udp.ip_remote;
-            msg.data.socket_udpflow.l_ip = dest->data.ip4udp.ip_local;
-            msg.data.socket_udpflow.r_port = dest->data.ip4udp.port_remote;
-            msg.data.socket_udpflow.l_port = dest->data.ip4udp.port_local;
+    struct app_control_message msg;
+    struct dnal_app_queue *aq = sh->aq;
+
+    // We can only register flows in bound sockets.
+    if (!sh->bound) {
+        return DNERR_SOCKETNOTBOUND;
+    }
+
+    // the flow destination type must be the same with the socket destination
+    // type
+    if (sh->dest.type == flow->type) {
+        // TODO: Furthermore the flow specification should be a subset of the
+        // socket destination specification. I.e., the flow should belong to
+        // this scoket
+        msg.type = APPCTRL_SOCKET_UDPFLOW;
+        msg.data.socket_udpflow.r_ip   = flow->data.ip4udp.ip_remote;
+        msg.data.socket_udpflow.l_ip   = flow->data.ip4udp.ip_local;
+        msg.data.socket_udpflow.r_port = flow->data.ip4udp.port_remote;
+        msg.data.socket_udpflow.l_port = flow->data.ip4udp.port_local;
+    } else {
+        return DNERR_BADDEST;
+    }
+
+    control_send(aq, &msg);
+    control_recv_nograph(aq, &msg);
+    return sockh_from_sockinfo(sh, &msg, flow);
 }
-#endif
 
 errval_t dnal_socket_bind(struct dnal_socket_handle   *sh,
                           struct dnal_net_destination *dest)

@@ -160,6 +160,15 @@ errval_t dnal_socket_bind(struct dnal_socket_handle   *sockethandle,
                           struct dnal_net_destination *destination);
 
 /**
+ *  Register flows in a socket
+ *
+ * @param sockethandle Socket handle
+ * @param flow  Flow to register
+ */
+errval_t dnal_socket_register_flow(struct dnal_socket_handle *sockhandle,
+                                   struct dnal_net_destination *flow);
+
+/**
  * Span socket to other queue.
  * Creates a new socket handle that can be used to receive packets that belong
  * to the specified socket on the specified application queue. The new socket
