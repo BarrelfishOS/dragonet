@@ -11,6 +11,13 @@
 #include <dragonet/app_lowlevel.h>
 #include <implementation.h>
 
+//#define FANCYECHO_PARSE_ARGS_DEBUG
+#if defined(FANCYECHO_PARSE_ARGS_DEBUG)
+    #define parse_debug_printf printf
+#else
+    #define parse_debug_printf(x...) do {} while (0)
+#endif
+
 // NOTE: Moved to c_impl/include/implementation.h
 //#define SHOW_INTERVAL_STATS  1
 //#define INTERVAL_STAT_FREQUENCY     1000
@@ -127,13 +134,13 @@ static void parse_flow(struct cfg_udpep *udp, char *str)
         goto parse_err;
     }
 
-    printf("lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+    printf("  lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
             udp->l_ip, udp->l_port, udp->r_ip, udp->r_port);
     return;
 parse_err:
     fprintf(stderr, "Parse error for flow specification (expect "
             "lip:lport/rip:rport)\n");
-    exit(-1);
+    exit(1);
 }
 
 static struct cfg_endpoint *cep_find(struct cfg_udpep *udp)
@@ -186,61 +193,22 @@ static struct cfg_appq *caq_find(const char *label)
 }
 
 
-
-static void parse_params(int argc, char *argv[])
+static void parse_sockets(struct cfg_appq *caq, int argc, char *argv[])
 {
     int res;
-    struct cfg_appq *caq = NULL;
     struct cfg_udpep udp;
-    struct cfg_thread *th = NULL;
 
-    while ((res = getopt(argc, argv, "a:p:f:tq:")) != -1) {
-        // Check state
+    // parse sockets for application queues
+    while (true) {
+        res = getopt(argc, argv, "p:f:at");
         switch (res) {
-            case 'p':
-            case 'f':
-                if (caq == NULL) {
-                    fprintf(stderr, "Error: Port specified before application "
-                            "queue\n");
-                    exit(-1);
-                }
-                // FALLTHRU
-            case 'a':
-                if (th != NULL) {
-                    fprintf(stderr, "Error: AppQ/Port/Flow parameter after "
-                            "thread parameter\n");
-                    exit(-1);
-                }
-                break;
-
-            case 'q':
-                if (th == NULL) {
-                    fprintf(stderr, "Error: AppQ reference before thread "
-                            "parameter\n");
-                    exit(-1);
-                }
-                break;
-        }
-
-        switch (res) {
-            case 'a':
-                caq = malloc(sizeof(*caq));
-                caq->label = strdup(optarg);
-                caq->num_threads = 0;
-                caq->sockets = NULL;
-                caq->dnal_appq = NULL;
-
-                res = pthread_mutex_init(&caq->mutex, NULL);
-                if (res != 0) {
-                    fprintf(stderr, "pttrhead_mutex_init failed: %s\n", strerror(res));
-                    abort();
-                }
-
-                caq->next = caqs;
-                caqs = caq;
-                break;
+            case -1:
+                parse_debug_printf(" socket parsing: end: resetting and returning\n");
+                optind--;
+                return;
 
             case 'p':
+                parse_debug_printf(" socket parsing: listen socket:%s\n", optarg);
                 udp.l_ip = 0;
                 udp.l_port = atoi(optarg);
                 udp.r_ip = 0;
@@ -249,61 +217,173 @@ static void parse_params(int argc, char *argv[])
                 break;
 
             case 'f':
+                parse_debug_printf(" socket parsing: flow socket:%s\n", optarg);
                 parse_flow(&udp, optarg);
                 mksocket(caq, &udp);
                 break;
 
+            case 'a':
+            case 't':
+                parse_debug_printf(" socket parsing: got -a/-t: resetting and returning\n");
+                optind--;
+                return;
+
+            case '?':
+                fprintf(stderr, "socket parsing: Unknown\n");
+                print_usage();
+                exit(1);
+
+            default:
+                fprintf(stderr, "socket parsing: Unexpected\n");
+                exit(1);
+        }
+    }
+}
+
+static void parse_thread(struct cfg_thread *th, int argc, char *argv[])
+{
+    int res;
+    struct cfg_appq *caq;
+
+    while (true) {
+        res = getopt(argc, argv, "tq:");
+        switch (res) {
+            case -1:
+                parse_debug_printf(" threads parsing: end: resetting and returning\n");
+                optind--;
+                return;
+
+            case 't':
+                parse_debug_printf(" threads parsing: -q: resetting and returning\n");
+                optind--;
+                return;
+
+            case 'q':
+                parse_debug_printf(" threads parsing: q:%s\n", optarg);
+                caq = caq_find(optarg);
+                if (caq == NULL) {
+                    fprintf(stderr, "Invalid appqueue reference: %s\n", optarg);
+                    exit(1);
+                }
+                caq->num_threads++;
+                th->aqs = realloc(th->aqs, (th->num_aqs+1)*sizeof(*th->aqs));
+                th->aqs[th->num_aqs] = caq;
+                th->num_aqs++;
+                break;
+
+            case '?':
+                fprintf(stderr, " thread parsing: Unknown\n");
+                print_usage();
+                exit(1);
+
+            default:
+                fprintf(stderr, " thread parsing: Unexpected\n");
+                exit(1);
+        }
+    }
+}
+
+static void parse_params(int argc, char *argv[])
+{
+    int res;
+    struct cfg_appq *caq = NULL;
+    struct cfg_thread *th = NULL;
+    bool done;
+
+    // first we parse application queues
+    done = false;
+    while (!done) {
+        res = getopt(argc, argv, "a:th");
+        switch (res) {
+            case 'a':
+                parse_debug_printf("Parsing application queue: %s\n", optarg);
+                caq = malloc(sizeof(*caq));
+                caq->label = strdup(optarg);
+                caq->num_threads = 0;
+                caq->sockets = NULL;
+                caq->dnal_appq = NULL;
+
+                res = pthread_mutex_init(&caq->mutex, NULL);
+                if (res != 0) {
+                    fprintf(stderr, "ptrhead_mutex_init failed: %s\n", strerror(res));
+                    abort();
+                }
+                // parse sockets for application queue
+                parse_sockets(caq, argc, argv);
+                caq->next = caqs;
+                caqs = caq;
+                break;
+
+            case 't':
+                parse_debug_printf("appq parsing: resetting and start parsing threads\n");
+                optind--;
+                done = true;
+                break;
+
+            case -1:
+                parse_debug_printf("appq parsing: error: no threads specified\n");
+                print_usage();
+                exit(1);
+
+            case 'h':
+                print_usage();
+                exit(0);
+
+            case '?':
+                print_usage();
+                exit(1);
+
+            default:
+                fprintf(stderr, "Unexpected return value from getopt: %d\n",
+                        res);
+                exit(1);
+        }
+    }
+
+    // next, we parse threads
+    done = false;
+    while (!done) {
+        res = getopt(argc, argv, "t");
+        switch (res) {
             case 't':
                 th = malloc(sizeof(*th));
                 th->aqs = NULL;
                 th->num_aqs = 0;
                 th->next = cthreads;
                 cthreads = th;
+                parse_thread(th, argc, argv);
                 break;
 
-            case 'q':
-                caq = caq_find(optarg);
-                if (caq == NULL) {
-                    fprintf(stderr, "Invalid appqueue reference: %s\n", optarg);
-                    exit(-1);
-                }
-                caq->num_threads++;
-                th->aqs = realloc(th->aqs,
-                        (th->num_aqs + 1) * sizeof(*th->aqs));
-                th->aqs[th->num_aqs] = caq;
-                th->num_aqs++;
+            case -1:
+                done = true;
+                parse_debug_printf("parsing threads: done\n");
                 break;
 
             case '?':
-                print_usage();
-                exit(-1);
-                break;
-
-            default:
-                fprintf(stderr, "Unexpected return value from getopt: %d\n",
-                        res);
-                exit(-1);
+                fprintf(stderr, "parsing threads: Uknown option\n");
+                exit(1);
         }
     }
+
     if (caqs == NULL) {
         fprintf(stderr, "No appqueues specified on commandline\n");
-        exit(-1);
+        exit(1);
     }
     if (cthreads == NULL) {
         fprintf(stderr, "No threads specified on commandline\n");
-        exit(-1);
+        exit(1);
     }
 
     caq = caqs;
     while (caq != NULL) {
         if (caq->sockets == NULL) {
             fprintf(stderr, "Appqueue without sockets: %s\n", caq->label);
-            exit(-1);
+            exit(1);
         }
         if (caq->num_threads == 0) {
             fprintf(stderr, "Appqueue not assigned to any thread: %s\n",
                     caq->label);
-            exit(-1);
+            exit(1);
         }
         caq = caq->next;
     }
@@ -312,7 +392,7 @@ static void parse_params(int argc, char *argv[])
     while (th != NULL) {
         if (th->num_aqs == 0) {
             fprintf(stderr, "Thread without appqueues\n");
-            exit(-1);
+            exit(1);
         }
         th = th->next;
     }
