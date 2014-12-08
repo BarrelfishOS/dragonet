@@ -49,8 +49,9 @@ struct app_control_message {
             uint16_t l_port;
             uint16_t r_port;
         } socket_udpbind;
-        // local/remote UDP endpoints
+        // register flow: socket id /local/remote UDP endpoints
         struct {
+            socket_id_t sid;
             uint32_t l_ip;
             uint32_t r_ip;
             uint16_t l_port;
@@ -71,7 +72,7 @@ void app_control_init(
     void (*register_app)(int,const char *),
     void (*stop_application)(int,bool),
     void (*socket_udpbind)(int,uint32_t,uint16_t,uint32_t,uint16_t),
-    void (*socket_udpflow)(int,uint32_t,uint16_t,uint32_t,uint16_t),
+    void (*socket_udpflow)(int,socket_id_t,uint32_t,uint16_t,uint32_t,uint16_t),
     void (*socket_span)(int,socket_id_t),
     void (*socket_close)(int,socket_id_t));
 

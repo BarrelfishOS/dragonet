@@ -2,14 +2,14 @@
 module Dragonet.NetState (
     EndpointId, SocketId, AppId,
     IPv4Addr,
-    UDPPort, UDPEndpoint,
+    UDPPort, UDPEndpoint, LocalUDPEndpoint, RemoteUDPEndpoint,
     EndpointDesc(..),
     epAddSocket,
     epsDiff,
     allocAppId,
     runState, runState0,
     NetState(..), NetStateM, initNetSt,
-    udpListen, udpBind, socketSpan
+    udpListen, udpBind, socketSpan, mkUdpEndpoint,
 ) where
 
 -- basic network state logic:
@@ -106,18 +106,23 @@ addEndpoint ep = do
 
 zeroAsNothing a = if a == 0 then Nothing else Just a
 
-udpBind :: AppId
-        -> (LocalUDPEndpoint, RemoteUDPEndpoint)
-        -> NetStateM (SocketId, EndpointId)
-udpBind aid ((lip,lport),(rip,rport)) = do
-    sid <- allocSocketId
-    let ep = EndpointUDPv4 {
-          epSockets    = [(sid,aid)]
+mkUdpEndpoint :: LocalUDPEndpoint -> RemoteUDPEndpoint -> EndpointDesc
+mkUdpEndpoint (lip,lport) (rip,rport)=
+    EndpointUDPv4 {
+          epSockets    = []
         , epLocalIp    = zeroAsNothing lip
         , epRemoteIp   = zeroAsNothing rip
         , epLocalPort  = zeroAsNothing lport
         , epRemotePort = zeroAsNothing rport
     }
+
+udpBind :: AppId
+        -> (LocalUDPEndpoint, RemoteUDPEndpoint)
+        -> NetStateM (SocketId, EndpointId)
+udpBind aid ((lip,lport),(rip,rport)) = do
+    sid <- allocSocketId
+    let ep = (mkUdpEndpoint (lip,lport) (rip,rport))
+             {epSockets = [(sid,aid)]}
     eid <- addEndpoint ep
     ST.modify $ \s -> s { nsSockets = M.insert sid eid $ nsSockets s }
     return (sid,eid)

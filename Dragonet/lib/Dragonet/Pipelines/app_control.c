@@ -34,7 +34,7 @@ void app_control_init(
     void (*register_app)(int,const char *),
     void (*stop_application)(int,bool),
     void (*socket_udpbind)(int,uint32_t,uint16_t,uint32_t,uint16_t),
-    void (*socket_udpflow)(int,uint32_t,uint16_t,uint32_t,uint16_t),
+    void (*socket_udpflow)(int,socket_id_t,uint32_t,uint16_t,uint32_t,uint16_t),
     void (*socket_span)(int,socket_id_t),
     void (*socket_close)(int,socket_id_t))
 {
@@ -164,12 +164,14 @@ void app_control_init(
                             msg.data.socket_udpbind.r_port);
                     break;
                 case APPCTRL_SOCKET_UDPFLOW:
-                    printf("APPCTRL_SOCKET_UDPFLOW: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+                    printf("APPCTRL_SOCKET_UDPFLOW: sid: %"PRIu64", lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+                            msg.data.socket_udpflow.sid,
                             msg.data.socket_udpflow.l_ip,
                             msg.data.socket_udpflow.l_port,
                             msg.data.socket_udpflow.r_ip,
                             msg.data.socket_udpflow.r_port);
                     socket_udpflow(appfds[i],
+                            msg.data.socket_udpflow.sid,
                             msg.data.socket_udpflow.l_ip,
                             msg.data.socket_udpflow.l_port,
                             msg.data.socket_udpflow.r_ip,

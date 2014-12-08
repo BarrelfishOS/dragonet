@@ -108,6 +108,8 @@ data StackState = StackState {
     , ssUpdateGraphs   :: STM.TVar StackState -> IO ()
     -- each stack state gets a new version number
     , ssVersion        :: Int
+    -- explicit registered flows
+    , ssFlows          :: [Flow]
     -- pipeline handlers
     , ssCtx            :: PLD.DynContext
     , ssStackHandle    :: PLI.StackHandle
@@ -284,19 +286,21 @@ eventHandler sstv ch (PLA.EvSocketUDPBind le@(lIp,lPort) re@(rIp,rPort)) = do
     ssUpdateGraphs ss sstv
 {-|
  -  Handing event SocketUDPFlow:
- -      This is prettymuch same as above execution (eventHandler UDPListen),
- -      except that it does not force having Nothing for remote IP and port
+ -      Registers a flow
  -}
-eventHandler sstv ch (PLA.EvSocketUDPFlow le@(lIp,lPort) re@(rIp,rPort)) = do
-    (sid,ss) <- STM.atomically $ do
+eventHandler sstv ch (PLA.EvSocketUDPFlow sid le@(lIp,lPort) re@(rIp,rPort)) = do
+    -- update ssFlows
+    ss <- STM.atomically $ do
         ss <- STM.readTVar sstv
-        let Just aid = M.lookup ch $ ssAppChans ss
-            ((sid,eid), ss') = ssRunNetState ss (NS.udpBind aid (le,re))
+        let oldFlows = ssFlows ss
+            fl = epToFlow $ NS.mkUdpEndpoint le re
+            ss' = ss { ssFlows = fl:oldFlows }
         STM.writeTVar sstv $ ss'
-        return (sid,ss')
+        return ss'
     putStrLn $ "SocketUDPFlow f=" ++ show (rIp,rPort) ++ "/"
-                ++ show (lIp,lPort) ++ " -> " ++ show sid
-    PLA.sendMessage ch $ PLA.MsgSocketInfo sid
+                ++ show (lIp,lPort)
+                ++ " for " ++ show sid
+    PLA.sendMessage ch $ PLA.MsgStatus True
     ssUpdateGraphs ss sstv
 
 {-|
@@ -317,7 +321,7 @@ eventHandler sstv ch (PLA.EvSocketSpan oldsid) = do
             (sid,ss') = ssRunNetState ss (NS.socketSpan aid oldsid)
         STM.writeTVar sstv $ ss'
         return (sid,ss')
-    putStrLn $ "SocketSpan existing=" ++ show oldsid ++ " -> " ++ show sid
+    putStrLn $ "SocketSpan existing=" ++ show oldsid ++ "for sid:" ++ show sid
     PLA.sendMessage ch $ PLA.MsgSocketInfo sid
     ssUpdateGraphs ss sstv
 {-|
@@ -344,7 +348,8 @@ initStackSt = StackState {
     ssApplications   = M.empty,
     ssAppChans       = M.empty,
     ssPrevEndpoints  = M.empty,
-    ssVersion        = 0
+    ssVersion        = 0,
+    ssFlows          = []
 }
 
 -- initialize stack state
@@ -469,7 +474,8 @@ updateGraphFlows getConf args sstv = do
    putStrLn "updateGraphFlows"
    (ss, prevEpsM) <- ssExecUpd sstv
    -- get list of all endpoints from stack-state
-   let allEps = M.elems $ ssEndpoints ss
+   let
+       allEps = M.elems $ ssEndpoints ss
        --prevEps = M.elems prevEpsM
        --newEps = epsDiff allEps prevEps
        --rmEps = epsDiff prevEps allEps

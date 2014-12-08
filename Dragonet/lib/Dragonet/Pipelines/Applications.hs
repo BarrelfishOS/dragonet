@@ -32,7 +32,7 @@ data Event =
     EvAppRegister String |
     EvAppStopped Bool | -- The boolean indicates regular termination
     EvSocketUDPBind UDPEndpoint UDPEndpoint |
-    EvSocketUDPFlow UDPEndpoint UDPEndpoint |
+    EvSocketUDPFlow SocketId UDPEndpoint UDPEndpoint |
     EvSocketSpan SocketId |
     EvSocketClose SocketId
     deriving (Show)
@@ -51,9 +51,11 @@ type OpStopApp = ChanHandle -> Bool -> IO ()
 type OpUDPBind = ChanHandle -> IPv4Addr -> UDPPort
                             -> IPv4Addr -> UDPPort
                             -> IO ()
--- (flow: local ip, local port, remote ip, remote port)
-type OpUDPFlow = ChanHandle -> IPv4Addr -> UDPPort -> IPv4Addr ->
-                    UDPPort -> IO ()
+-- (flow: socket id, local ip, local port, remote ip, remote port)
+type OpUDPFlow = ChanHandle -> SocketId
+                            -> IPv4Addr -> UDPPort
+                            -> IPv4Addr -> UDPPort
+                            -> IO ()
 type OpSocketSpan = ChanHandle -> SocketId -> IO ()
 type OpSocketClose = ChanHandle -> SocketId -> IO ()
 
@@ -123,8 +125,8 @@ hOpUDPBind eh ch l_ip l_port r_ip r_port =
     eh ch $ EvSocketUDPBind (l_ip, l_port) (r_ip, r_port)
 
 hOpUDPFlow :: (ChanHandle -> Event -> IO ()) -> OpUDPFlow
-hOpUDPFlow eh ch l_ip l_port r_ip r_port =
-    eh ch $ EvSocketUDPFlow (l_ip, l_port) (r_ip, r_port)
+hOpUDPFlow eh ch sid l_ip l_port r_ip r_port =
+    eh ch $ EvSocketUDPFlow sid (l_ip, l_port) (r_ip, r_port)
 
 hOpSocketSpan :: (ChanHandle -> Event -> IO ()) -> OpSocketClose
 hOpSocketSpan eh ch si = eh ch $ EvSocketSpan si

@@ -11,7 +11,7 @@
 #include <dragonet/app_lowlevel.h>
 #include <implementation.h>
 
-//#define FANCYECHO_PARSE_ARGS_DEBUG
+#define FANCYECHO_PARSE_ARGS_DEBUG
 #if defined(FANCYECHO_PARSE_ARGS_DEBUG)
     #define parse_debug_printf printf
 #else
@@ -43,6 +43,7 @@ struct cfg_udpep {
 // - Each thread operates on a set of application queues
 // - An application queue might be shared across multuple threads
 //   (see ->num_threads)
+// - Each socket can have mutiple "flows" (-F)
 
 struct cfg_endpoint {
     struct cfg_udpep          ep;
@@ -56,6 +57,12 @@ struct cfg_socket {
     struct cfg_endpoint       *ep;
     struct dnal_socket_handle *dnal_socket;
     struct cfg_socket         *next;
+    struct cfg_socket_flow    *sock_flows;
+};
+
+struct cfg_socket_flow {
+    struct cfg_udpep        sockfl_ep;
+    struct cfg_socket_flow *sockfl_next;
 };
 
 struct cfg_appq {
@@ -87,8 +94,14 @@ static int thread_count = 0;
 
 static void print_usage(void)
 {
-    fprintf(stderr, "fancyecho [-a label [-p port | -f lip:lport/rip:rport]+]+ "
-            "[-t [-q label]+]+\n");
+    fprintf(stderr, "fancyecho <application_queues> <threads>\n"
+                    "  application_queues: [-a label <flows>]+\n"
+                    "  flows: [<socket> <socket_flows>]+\n"
+                    "  socket: [-p port| -f lip:lport/rip:rport]\n"
+                    "  socket flows: [-F lip:lport/rip:rport]+\n"
+                    "  threads: [-t <thread_queues>]+\n"
+                    "  thread_queues [-q label]+\n"
+                    "  (label must mutch application queue label)\n");
 
     // For one thread listening on one socket
     //  sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0 -p 7 -t -q t0
@@ -155,7 +168,8 @@ static struct cfg_endpoint *cep_find(struct cfg_udpep *udp)
     return NULL;
 }
 
-static void mksocket(struct cfg_appq  *caq, struct cfg_udpep *udp)
+static struct cfg_socket *
+mksocket(struct cfg_appq  *caq, struct cfg_udpep *udp)
 {
     struct cfg_socket *cs = malloc(sizeof(*cs));
     struct cfg_endpoint *cep;
@@ -174,9 +188,14 @@ static void mksocket(struct cfg_appq  *caq, struct cfg_udpep *udp)
         }
         ceps = cep;
     }
+
     cs->ep = cep;
     cs->next = caq->sockets;
+    cs->sock_flows = NULL;
+
     caq->sockets = cs;
+
+    return cs;
 }
 
 
@@ -192,19 +211,63 @@ static struct cfg_appq *caq_find(const char *label)
     return NULL;
 }
 
+static void parse_socket_flows(struct cfg_socket *sock, int argc, char *argv[])
+{
+    int res;
+    struct cfg_socket_flow *sf;
+
+    while (true) {
+        res = getopt(argc, argv, "F:pfat");
+        switch (res) {
+            case -1:
+                parse_debug_printf("  socket flow parsing: end: returning\n");
+                return;
+
+            case 'p':
+            case 'f':
+            case 'a':
+            case 't':
+                parse_debug_printf("  socket flow parsing: got -a/-t/-p/-t: resetting and returning\n");
+                optind--;
+                return;
+
+            case 'F':
+                // TODO: check that flow matches socket
+                parse_debug_printf("  socket flow parsing: got flow:%s\n", optarg);
+                sf = malloc(sizeof(*sf));
+                if (!sf) {
+                    perror("malloc");
+                    exit(1);
+                }
+                parse_flow(&sf->sockfl_ep, optarg);
+                sf->sockfl_next = sock->sock_flows;
+                sock->sock_flows = sf;
+                break;
+
+            case '?':
+                fprintf(stderr, "socket flow parsing: Unknown\n");
+                print_usage();
+                exit(1);
+
+            default:
+                fprintf(stderr, "socket flow parsing: Unexpected\n");
+                exit(1);
+        }
+    }
+}
 
 static void parse_sockets(struct cfg_appq *caq, int argc, char *argv[])
 {
     int res;
     struct cfg_udpep udp;
+    struct cfg_socket *sock;
 
     // parse sockets for application queues
     while (true) {
         res = getopt(argc, argv, "p:f:at");
         switch (res) {
             case -1:
-                parse_debug_printf(" socket parsing: end: resetting and returning\n");
-                optind--;
+                parse_debug_printf(" socket parsing: end: returning\n");
                 return;
 
             case 'p':
@@ -213,13 +276,15 @@ static void parse_sockets(struct cfg_appq *caq, int argc, char *argv[])
                 udp.l_port = atoi(optarg);
                 udp.r_ip = 0;
                 udp.r_port = 0;
-                mksocket(caq, &udp);
+                sock = mksocket(caq, &udp);
+                parse_socket_flows(sock, argc, argv);
                 break;
 
             case 'f':
                 parse_debug_printf(" socket parsing: flow socket:%s\n", optarg);
                 parse_flow(&udp, optarg);
-                mksocket(caq, &udp);
+                sock = mksocket(caq, &udp);
+                parse_socket_flows(sock, argc, argv);
                 break;
 
             case 'a':
@@ -249,8 +314,7 @@ static void parse_thread(struct cfg_thread *th, int argc, char *argv[])
         res = getopt(argc, argv, "tq:");
         switch (res) {
             case -1:
-                parse_debug_printf(" threads parsing: end: resetting and returning\n");
-                optind--;
+                parse_debug_printf(" threads parsing: end: returning\n");
                 return;
 
             case 't':
@@ -508,6 +572,26 @@ static void *run_thread(void *arg)
                     // a socket already exists for this endpoint: span it
                     err_expect_ok(dnal_socket_span(cs->ep->ep_socket, daq, dsh));
                 }
+                // register flows
+                struct cfg_socket_flow *fl;
+                fl = cs->sock_flows;
+                while (fl != NULL) {
+                    struct dnal_net_destination flow;
+
+                    flow.type = DNAL_NETDSTT_IP4UDP;
+                    flow.data.ip4udp.ip_local    = fl->sockfl_ep.l_ip;
+                    flow.data.ip4udp.ip_remote   = fl->sockfl_ep.r_ip;
+                    flow.data.ip4udp.port_local  = fl->sockfl_ep.l_port;
+                    flow.data.ip4udp.port_remote = fl->sockfl_ep.r_port;
+
+                    err_expect_ok(
+                        dnal_socket_register_flow(dsh, &flow)
+                    );
+
+                    fl = fl->sockfl_next;
+                }
+
+
                 pthread_mutex_unlock(&cs->ep->mutex);
                 cs->dnal_socket = dsh;
                 cs = cs->next;
@@ -591,7 +675,6 @@ int main(int argc, char *argv[])
         fprintf(stderr, "pttrhead_mutex_init failed: %s\n", strerror(res));
         abort();
     }
-
 
     parse_params(argc, argv);
     start_threads();

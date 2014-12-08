@@ -8,8 +8,7 @@ module Dragonet.Flows (
 ) where
 
 import qualified Dragonet.Predicate as PR
-
-import Dragonet.NetState (EndpointDesc(..))
+import qualified Dragonet.NetState  as NS
 
 -- Flow definitions
 
@@ -52,10 +51,10 @@ instance Hashable Flow
 --     PRG to determine how these flows are mapped into the queues for a given
 --     configuration. Then, we evaluate these mappings using a cost function.
 --
-epToFlow EndpointUDPv4 {epLocalIp = lIp,
-                          epLocalPort = lPort,
-                          epRemoteIp = rIp,
-                          epRemotePort = rPort }
+epToFlow NS.EndpointUDPv4 {NS.epLocalIp = lIp,
+                           NS.epLocalPort = lPort,
+                           NS.epRemoteIp = rIp,
+                           NS.epRemotePort = rPort }
    = FlowUDPv4 {
           flSrcIp = rIp,
           flDstIp = lIp,

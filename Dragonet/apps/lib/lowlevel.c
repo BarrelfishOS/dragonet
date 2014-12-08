@@ -331,6 +331,7 @@ errval_t dnal_socket_register_flow(struct dnal_socket_handle *sh,
         // socket destination specification. I.e., the flow should belong to
         // this scoket
         msg.type = APPCTRL_SOCKET_UDPFLOW;
+        msg.data.socket_udpflow.sid    = sh->id;
         msg.data.socket_udpflow.r_ip   = flow->data.ip4udp.ip_remote;
         msg.data.socket_udpflow.l_ip   = flow->data.ip4udp.ip_local;
         msg.data.socket_udpflow.r_port = flow->data.ip4udp.port_remote;
@@ -341,7 +342,13 @@ errval_t dnal_socket_register_flow(struct dnal_socket_handle *sh,
 
     control_send(aq, &msg);
     control_recv_nograph(aq, &msg);
-    return sockh_from_sockinfo(sh, &msg, flow);
+
+    if (msg.type != APPCTRL_STATUS) {
+        fprintf(stderr, "dnal_socket_register_flow expects status reply\n");
+        return DNERR_UNKNOWN;
+    }
+
+    return (msg.data.status.success == true) ? SYS_ERR_OK : DNERR_UNKNOWN;
 }
 
 errval_t dnal_socket_bind(struct dnal_socket_handle   *sh,
