@@ -135,21 +135,24 @@ ssConfigureLpg ss args = C.applyConfig lpgCfg lpgU
           (lpgU,_) = stLpgH args
 
 -- wrapper for O.makegraph
-ssMakeGraph :: StackState -> StackArgs -> C.Configuration -> String
+ssMakeGraph :: StackState
+            -> StackArgs
+            -> C.Configuration
+            -> String
+            -> [PG.PGraph -> PG.PGraph]
             -> IO PL.PLGraph
-ssMakeGraph ss args prgConf lbl = do
+ssMakeGraph ss args prgConf lbl xforms = do
     let mergeH     = stMergedH args
         (prgU,_)   = stPrgH $ stPrg args
         lpgC       = ssConfigureLpg ss args
         -- graph transformations
-        implXForms = [IT.coupleTxSockets, IT.mergeSockets]
         debug :: O.DbgFunction ()
         debug = O.dbgDotfiles $ "out/graphs-fff/" ++ (show $ ssVersion ss)
         --dbg = O.dbgDummy
         dbg    = debug lbl
         cfgPLA = stCfgPLA args
         pla    = (plAssign cfgPLA ss)
-    O.makeGraph mergeH prgU lpgC implXForms (pla lbl) dbg prgConf
+    O.makeGraph mergeH prgU lpgC xforms (pla lbl) dbg prgConf
 
 -- wrapper for O.optimize
 ssOptimize :: (Ord a, Show a)
@@ -475,21 +478,22 @@ updateGraphFlows getConf args sstv = do
    (ss, prevEpsM) <- ssExecUpd sstv
    -- get list of all endpoints from stack-state
    let
-       allEps = M.elems $ ssEndpoints ss
+       lbl = "updateGraphFlows"
        --prevEps = M.elems prevEpsM
        --newEps = epsDiff allEps prevEps
        --rmEps = epsDiff prevEps allEps
        --putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
        --putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
-       flows = map epToFlow allEps
-       lbl = "updateGraphFlows"
+
+       xforms = [IT.coupleTxSockets, IT.mergeSockets]
+       flows = map epToFlow $ M.elems $ ssEndpoints ss
 
    putStrLn $ "Flows:\n" ++ (ppShow $ map flowStr flows)
    prgConf <- getConf flows
 
    -- STEP: Create a new combined, but pipelined graph
    --          with both LPG and PRG with configuration applied
-   plg <- ssMakeGraph ss args prgConf lbl
+   plg <- ssMakeGraph ss args prgConf lbl xforms
 
    -- STEP: apply PRG configuration
    -- NOTE: This is the step where actually filters will be inserted
