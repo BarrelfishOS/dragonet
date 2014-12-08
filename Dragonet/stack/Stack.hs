@@ -485,8 +485,15 @@ updateGraphFlows getConf args sstv = do
        --putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
        --putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
 
-       xforms = [IT.coupleTxSockets, IT.mergeSockets]
-       flows = map epToFlow $ M.elems $ ssEndpoints ss
+       -- OLD implenetation: where flows are taken from endpoints
+       --xforms = [IT.coupleTxSockets, IT.mergeSockets]
+       --flows = map epToFlow $ M.elems $ ssEndpoints ss
+       -- NEW implementations: flows are registered externally
+       --  NB: because there are no socket endpoints now, we use
+       --  balanceAcrossRxQs to distribute spanned sockets across pipelines
+       xforms = [IT.balanceAcrossRxQs, IT.coupleTxSockets]
+       flows = ssFlows ss
+
 
    putStrLn $ "Flows:\n" ++ (ppShow $ map flowStr flows)
    prgConf <- getConf flows
