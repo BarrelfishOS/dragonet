@@ -32,6 +32,7 @@ import Debug.Trace (trace)
 import Text.Show.Pretty (ppShow)
 
 import qualified Scenarios.S1 as S1
+import qualified Scenarios.S3 as S3
 
 tr a b = trace b a
 trN a b = a
@@ -400,9 +401,12 @@ cFDirFilters = CTRL.fdirCount
 
 
 main = do
-    ((nq,costfn) :: (Int,String)) <- RA.readArgs
+    ((nq,costfn,oraclefn,concurrency,clients) :: (Int,String,String,Int,Int)) <- RA.readArgs
     print $ "Number of queues used: " ++ show nq
     print $ "Cost function: " ++ show costfn
+    print $ "Oracle function: " ++ show oraclefn
+    print $ "Concurrency (only for hardcoded oracle) : " ++ show concurrency
+    print $ "clients (only for hardcoded oracle) : " ++ show clients
 
     let t5count :: Word8
         t5count = fromIntegral c5TupleFilters
@@ -430,11 +434,20 @@ main = do
         costFn     = case lookup costfn costFns of
                         Just x  -> x
                         Nothing -> error $ "Uknown cost function:" ++ costfn
-        sparams    = Search.initSearchParams {   Search.sOracle = e10kOracle
+        greedyParams    = Search.runSearch $ Search.initSearchParams {
+                                               Search.sOracle = e10kOracle
                                                , Search.sPrgU   = prgU
                                                , Search.sCostFn = costFn
                                                , Search.sStrategy = strategy }
-        searchFn   = Search.runSearch sparams
+
+        -- FIXME: pass the argument "priority" to hardcodedOracleMemcached
+        hardcodedParams = Search.runSearch $ S3.hardcodedOracleMemcached
+                        concurrency clients nq  costfn prgU    -- fpApp clients nq prgU
+
+        searchFns = [("greedy", greedyParams), ("hardcoded", hardcodedParams)]
+        searchFn        = case lookup oraclefn searchFns of
+                        Just x  -> x
+                        Nothing -> error $ "Uknown oracle function:" ++ oraclefn
 
     -- TODO: Create the driver-thread before you go and start flows
     --      This should speedup the initialization as driver will be ready

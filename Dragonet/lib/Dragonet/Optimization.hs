@@ -122,8 +122,8 @@ optimize hs prg lpg implTransforms pla dbg cf cfgs = do
             ++ " with cost " ++ (show minCost)
     return ( minPlg, lcfg, prgpc)
 
-dbgDummy :: DbgFunction a
-dbgDummy _ _ _ = return ()
+dbgDummy :: Show a => String -> DbgFunction a
+dbgDummy _ _ _ _ = return ()
 
 dbgDotfiles :: Show a => String -> DbgFunction a
 dbgDotfiles bdir cl gl d =

@@ -17,6 +17,7 @@ module Dragonet.Search (
   CostQueueFn,
   SearchStIO, initSearchIO, runSearchIO,
   E10kOracleSt(..),
+  E10kOracleHardCoded(..),
   initSearchParamsE10k,
 ) where
 
@@ -44,6 +45,7 @@ import Data.Maybe
 import Data.Int
 import Data.Function (on)
 import Data.Char (isDigit)
+import qualified Data.Word as DW
 
 import qualified Control.Monad.ST        as ST
 
@@ -189,8 +191,9 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
         -- FIXME: get better algorithm for queue allocation
         -- FIXME: FDir filters are not working properly with priority
         -- FIXME: detect when tables are full
-        [E10k.insert5tFromFl fl q | q <- allQueues nq]
-        -- ++ [E10k.insertFdirFromFl fl q |  q <- allQueues nq]
+        -- [E10k.insert5tFromFl fl q | q <- allQueues nq]
+        -- ++
+        [E10k.insertFdirFromFl fl q |  q <- allQueues nq]
 
     -- QUESTION: Is it assumed that there will be only one operation in
     --      conf change?
@@ -201,6 +204,57 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
     affectedQueues E10kOracleSt { nQueues = nq } conf (E10k.InsertFDir cFdir) =
         [e10kDefaultQ, xq]
         where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
+
+myThird (_,_,x) = x
+mySnd (_,x,_) = x
+
+-- E10K (simple for now) oracle
+newtype E10kOracleHardCoded = E10kOracleHardCoded {
+        nnHardcoded :: (Int, [(Flow, Int, Int)])
+                    -- (totalQueues, [(Flow, Qid, FilterType(1==fidr, 2 == Ftuple))])
+        }
+
+{-|
+  Making the type 'E10kOracleHardCoded' member of class "Oracle state" to work as
+  as Oracle for Intel 82599 NIC.
+  It will provide a way to generate initial empty configuation, showing
+  configuration, and querying about affected queues from current configuration.
+ -}
+instance OracleSt E10kOracleHardCoded E10k.ConfChange where
+    {-|
+     - Basic implementation which suggests a putting current flow in presicely
+     - fixed queue based on initial hardcoded values.
+    -}
+    flowConfChanges E10kOracleHardCoded { nnHardcoded = (nq, tbl) } c fl = ans
+        where
+        -- perform a lookup of a flow in the hardcoded table
+        -- the lookup should give a filter type and queue-no.
+        -- return that.
+            f = filter (\(f, q, fil) -> f == fl) $ tbl
+
+            ans
+              | length(f) > 1 = error ("ERROR: there must be repeat flow, as more than one flow matches.")
+              | length(f) == 0 = []
+              | (myThird $ head f) == 1 = [E10k.InsertFDir $ E10k.mkFDirFromFl fl (mySnd $ head f)]
+              | (myThird $ head f) == 2 = [E10k.Insert5T $ E10k.mkFDirFromFl fl (mySnd $ head f)]
+              | otherwise = error ("ERROR: wrong type of flow")
+
+
+--    emptyConf _ = e10kCfgEmpty -- ^ Creates initial empty configuration
+--    showConf _  = e10kCfgStr -- ^ Converts conf to string
+
+    -- QUESTION: Is it assumed that there will be only one operation in
+    --      conf change?
+    -- affectedQueues E10kOracleHardCoded { nnQueues = nq } _ _ = allQueues nq
+    affectedQueues E10kOracleHardCoded { nnHardcoded = nhw } conf (E10k.Insert5T c5t) =
+        [e10kDefaultQ, xq]
+        where xq = E10k.c5tQueue $ E10k.parse5t c5t
+    affectedQueues E10kOracleHardCoded { nnHardcoded = nhw } conf (E10k.InsertFDir cFdir) =
+        [e10kDefaultQ, xq]
+        where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
+
+
+
 
 type SFOracleSt = E10kOracleSt
 

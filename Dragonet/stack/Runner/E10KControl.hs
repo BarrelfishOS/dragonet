@@ -121,7 +121,7 @@ ftSet st idx (FTuple p q l3 l4 sIP dIP sP dP) = do
 
 -- NOTE: fdirCount is based on a value in prgE10kImpl for CFDirFilter
 -- TODO: Get this value by parsing NIC prg instead of hardcoding it
-fdirCount = 1024
+fdirCount = 2048
 
 foreign import ccall "e10k_ctrl_fdir_unset"
     c_fdirUnset :: PLI.StateHandle -> Word8 -> IO Bool
