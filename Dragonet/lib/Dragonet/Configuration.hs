@@ -1,6 +1,9 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Dragonet.Configuration(
     Configuration,
+
     ConfChange(..),
+    foldConfChanges,
 
     ConfType(..),
     ConfValue(..),
@@ -28,6 +31,19 @@ type Configuration = [(String,ConfValue)]
  -}
 class ConfChange a where
     applyConfChange :: Configuration -> a -> Configuration
+    --
+    -- NB: code below seems too OO, but not sure how to do it better These are
+    -- similar to static methods: the first argument is not used they can be
+    -- called as foo undefined::<class_instance>
+    --
+    -- initial empty configration
+    emptyConfig :: a -> Configuration
+    -- preety printer
+    showConfig  :: a -> Configuration -> String
+
+foldConfChanges :: forall a. (ConfChange a) => [a] -> Configuration
+foldConfChanges changes = foldl applyConfChange cnf0 changes
+    where cnf0 = emptyConfig (undefined::a)
 
 -- Get enumerator name from conf value and its type
 cvEnumName :: ConfType -> ConfValue -> String

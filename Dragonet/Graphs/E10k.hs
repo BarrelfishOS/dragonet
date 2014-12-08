@@ -16,6 +16,7 @@ module Graphs.E10k (
     mk5TupleFromFl, mkFDirFromFl,
     insert5tFromFl, insertFdirFromFl,
 
+    cfgEmpty, cfgStr,
     graphH_, graphH,
 ) where
 
@@ -664,6 +665,8 @@ instance C.ConfChange ConfChange where
       TODO: Add code to add other type of actions as well (fdir, delete, update)
      -}
     --applyConfChange :: C.Configuration -> E10kConfChange -> C.Configuration
+    emptyConfig _ = cfgEmpty
+    showConfig _ = cfgStr
     applyConfChange conf (Insert5T c5t) = ("RxC5TupleFilter", new5t):rest
         where new5t :: PG.ConfValue
               new5t = addToCVL old5t c5t
@@ -736,6 +739,26 @@ mkFDirFromFl fl@(FlowUDPv4 {}) q =
        dIP  = flDstIp   fl
        sP   = flSrcPort fl
        dP   = flDstPort fl
+
+
+cfgEmpty = [
+    ("RxC5TupleFilter", PG.CVList []),
+    ("RxCFDirFilter", PG.CVList [])
+ ]
+
+cfgStr :: C.Configuration -> String
+cfgStr cnf_ = ret
+    where  cnf :: [(String, PG.ConfValue)]
+           cnf = cnf_
+           ret = "CONF:\n" ++ L.intercalate "\n" (c5t ++ cfdt)
+           c5t = case L.lookup "RxC5TupleFilter" cnf of
+               Nothing -> []
+               Just c  -> map (((++) " ") . c5tFullString)
+                          $ parse5tCFG c
+           cfdt = case L.lookup "RxCFDirFilter" cnf of
+               Nothing -> []
+               Just c  -> map (((++) " ") . cFDtFullString)
+                          $ parseFDirCFG c
 
 
 graphH_ :: FilePath -> IO (PG.PGraph, SEM.Helpers)

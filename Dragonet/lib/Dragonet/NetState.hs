@@ -7,7 +7,7 @@ module Dragonet.NetState (
     epAddSocket,
     epsDiff,
     allocAppId,
-    runState,
+    runState, runState0,
     NetState(..), NetStateM, initNetSt,
     udpListen, newUdpSocket, socketSpan
 ) where
@@ -47,16 +47,6 @@ data EndpointDesc = EndpointUDPv4 {
     epRemotePort :: Maybe UDPPort
 } deriving (Show, Eq, Ord)
 
-runState :: NetStateM a -> NetState -> (a, NetState)
-runState m ns = ST.runState (unNetStateM m) ns
-
-epAddSocket :: (SocketId,AppId) -> EndpointDesc -> EndpointDesc
-epAddSocket (sid,aid) ep = ep {epSockets = (sid,aid):(epSockets ep)}
-
-epsDiff :: [EndpointDesc] -> [EndpointDesc] -> [EndpointDesc]
-epsDiff es1 es2 = S.toList $ S.difference (S.fromList es1) (S.fromList es2)
-
-
 data NetState = NetState {
       nsNextAppId      :: AppId  -- id for the next app that tries to connect
     , nsNextSocketId   :: SocketId -- id for next socket
@@ -67,6 +57,19 @@ data NetState = NetState {
 
 newtype NetStateM a = NetStateM { unNetStateM :: ST.State NetState a }
     deriving (Monad, ST.MonadState NetState, Functor)
+
+runState :: NetStateM a -> NetState -> (a, NetState)
+runState m ns = ST.runState (unNetStateM m) ns
+
+runState0 :: NetStateM a -> (a, NetState)
+runState0 m = runState m initNetSt
+
+epAddSocket :: (SocketId,AppId) -> EndpointDesc -> EndpointDesc
+epAddSocket (sid,aid) ep = ep {epSockets = (sid,aid):(epSockets ep)}
+
+epsDiff :: [EndpointDesc] -> [EndpointDesc] -> [EndpointDesc]
+epsDiff es1 es2 = S.toList $ S.difference (S.fromList es1) (S.fromList es2)
+
 
 initNetSt = NetState {
     nsNextAppId      = 1,

@@ -24,8 +24,6 @@ import qualified Dragonet.NetState                 as NS
 import Dragonet.NetState (NetState, SocketId,AppId,EndpointId,EndpointDesc(..),epsDiff)
 import Dragonet.Flows (Flow(..), epToFlow, flowStr)
 
-import Graphs.Cfg (e10kCfgEmpty)
-
 import qualified Data.Graph.Inductive as DGI
 import Util.GraphHelpers (findNodeByL)
 

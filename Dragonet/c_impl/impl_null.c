@@ -277,7 +277,7 @@ static node_out_t rx_queue(struct ctx_NullRxQueue0 *context,
     }
 
     // infinite loop instead of receiving
-    printf("%s:%s:%d:%d: infinite loop instead of receiving packets for queue %"PRIu8"\n",
+    printf("%s:%s:%d:%d: doing nothing instead of receiving packets for queue %"PRIu8"\n",
             __FILE__, __FUNCTION__, __LINE__, (int)pthread_self(), qi);
 
     while(1) {

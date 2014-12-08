@@ -1,10 +1,10 @@
 module Graphs.Cfg (
     lpgCfg,
-    prgCfgEmpty,
     prgCfg,
-    e10kCfgEmpty,
-    e10kCfgStr,
 ) where
+
+-- NB: This should be eventually deprecated. We have much better ways to build
+-- configurations now. -AKK
 
 import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.Configuration as C
@@ -50,26 +50,6 @@ lpgCfg = [
                 PG.CVMaybe $ Just $ PG.CVInt 3,
                 PG.CVMaybe $ Just $ PG.CVInt 3456 ]
         ])]
-
-prgCfgEmpty = e10kCfgEmpty
-e10kCfgEmpty = [
-    ("RxC5TupleFilter", PG.CVList []),
-    ("RxCFDirFilter", PG.CVList [])
-    ]
-
-e10kCfgStr :: C.Configuration -> String
-e10kCfgStr cnf_ = ret
-    where  cnf :: [(String, PG.ConfValue)]
-           cnf = cnf_
-           ret = "CONF:\n" ++ L.intercalate "\n" (c5t ++ cfdt)
-           c5t = case L.lookup "RxC5TupleFilter" cnf of
-               Nothing -> []
-               Just c  -> map (((++) " ") . E10k.c5tFullString)
-                          $ E10k.parse5tCFG c
-           cfdt = case L.lookup "RxCFDirFilter" cnf of
-               Nothing -> []
-               Just c  -> map (((++) " ") . E10k.cFDtFullString)
-                          $ E10k.parseFDirCFG c
 
 prgCfg = [
     ("RxC5TupleFilter", PG.CVList [

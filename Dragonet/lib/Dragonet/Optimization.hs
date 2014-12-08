@@ -165,9 +165,3 @@ dropHardwareNodes pg = DGI.delNodes (S.toList dropNodes) pg
         txNodes = [n | (n,l) <- DGI.labNodes pg,
                        "TxQueue" `L.isPrefixOf` PG.nLabel l]
         txHwNodes = S.fromList $ DGI.dfs txNodes nsepg
-
-
-
--------------------------------------------------------------------------------
--------------------------------------------------------------------------------
--------------------------------------------------------------------------------

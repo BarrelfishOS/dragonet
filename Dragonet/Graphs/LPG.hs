@@ -5,7 +5,7 @@ module Graphs.LPG (
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG
-import Dragonet.ProtocolGraph.Utils (getPGNodeByName)
+import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Dragonet.Configuration as C
 import qualified Dragonet.Semantics as SEM
 
@@ -48,10 +48,11 @@ lpgConfig eps = [("RxL4UDPCUDPSockets", PG.CVList cUdpSockets)]
 
 
 configLPGUDPSockets :: PG.ConfFunction
-configLPGUDPSockets _ _ inE outE cfg = concat <$> mapM addEndpoint tuples
+configLPGUDPSockets _ _ inE outE cfg = concat <$> mapM addEndpoint
+                                                       (zip [1..] epTuples)
     where
         esa_attrs = [PG.ESAttrPredicate "and(pred(EthType,IPv4),pred(IpProt,UDP))"] -- spawn edge attributes
-        PG.CVList tuples = cfg
+        PG.CVList epTuples = cfg
         hasL l n = l == PG.nLabel n
         findN ps l = (fst . fst) <$> L.find (hasL l . snd . fst) ps
         Just vN = findN inE "RxL4UDPValid"
@@ -70,26 +71,20 @@ configLPGUDPSockets _ _ inE outE cfg = concat <$> mapM addEndpoint tuples
             let appAttr = PG.NAttrCustom $ "appid=" ++ show (socketAppId socket)
             -- Create ToSocket Node
             (tsN,_) <- C.confMNewNode $
-                        PG.nAttrsAdd [appAttr,
-                            PG.NAttrCustom "sink",
-                            PG.NAttrCustom $ "tosocket=" ++ show sid] $
-                        PG.baseFNode ("ToSocket" ++ show sid) ["out","drop"]
+                       PG.nAttrAdd appAttr $ PGU.toSocketNode sid
             -- Create FromSocket Node
             (fsN,_) <- C.confMNewNode $
-                        PG.nAttrsAdd [appAttr,
-                            PG.NAttrCustom "source",
-                            PG.NAttrCustom $ "fromsocket=" ++ show sid] $
-                        PG.baseFNode ("FromSocket" ++ show sid) ["true"]
+                       PG.nAttrAdd appAttr $ PGU.fromSocketNode sid
             return [(inN,tsN,PG.Edge inP),
                     (fsN,fsN,PG.ESpawn "send" esa_attrs),
                     (fsN,outN,PG.Edge "true")]
 
-        addEndpoint (PG.CVTuple [
-                    PG.CVList sockets,
-                    PG.CVMaybe msIP,
-                    PG.CVMaybe msPort,
-                    PG.CVMaybe mdIP,
-                    PG.CVMaybe mdPort]) = do
+        addEndpoint (eid,(PG.CVTuple [
+                          PG.CVList sockets,
+                          PG.CVMaybe msIP,
+                          PG.CVMaybe msPort,
+                          PG.CVMaybe mdIP,
+                          PG.CVMaybe mdPort])) = do
             -- Filter/demultiplexing node
             (dxN,_) <- C.confMNewNode $ addFAttrs $ addFSemantics $
                         PG.baseFNode filterS bports
@@ -100,9 +95,8 @@ configLPGUDPSockets _ _ inE outE cfg = concat <$> mapM addEndpoint tuples
                 _ -> do
                     let sports = map (show . socketId) sockets
                     -- If we have more than one socket, add balance node
-                    (bN,_) <- C.confMNewNode $
-                        PG.nAttrAdd (PG.NAttrCustom "loadbalance") $
-                        PG.baseFNode (filterS ++ "Balance") sports
+                    (bN,_) <- C.confMNewNode
+                              $ PGU.balanceNodeEndpoint filterS eid sports
                     -- Add sockets
                     es <- forM sockets $ \s ->
                         addSocket (bN,show $ socketId s) irN s

@@ -93,16 +93,16 @@ buildDynNode' ds l
         Just fpln = mbFPL
         Just fqh = fpln `M.lookup` dsInQs ds
 
-        mbFS = PGU.getPGNAttr l "fromsocket"
+        mbFS = PGU.fromSocketId l
         isFS = isJust mbFS
         Just fsId = read <$> mbFS
 
-        mbTS = PGU.getPGNAttr l "tosocket"
+        mbTS = PGU.toSocketId l
         isTS = isJust mbTS
         Just tsId = read <$> mbTS
 
         isUDPDemux = PG.nAttrElem (PG.NAttrCustom "udpdemux") l
-        isBalance = PG.nAttrElem (PG.NAttrCustom "loadbalance") l
+        isBalance = PGU.isBalanceNode l
         udpSIP = maybe 0 read $ PGU.getPGNAttr l "srcip"
         udpDIP = maybe 0 read $ PGU.getPGNAttr l "dstip"
         udpSP = maybe 0 read $ PGU.getPGNAttr l "srcport"

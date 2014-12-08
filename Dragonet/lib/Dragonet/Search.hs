@@ -33,7 +33,7 @@ import Dragonet.Flows(Flow (..), flowPred, flowStr)
 import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Graphs.E10k                  as E10k
 
-import Graphs.Cfg (prgCfg, prgCfgEmpty, e10kCfgEmpty, e10kCfgStr)
+import Graphs.Cfg (prgCfg)
 
 import qualified Data.List            as L
 import qualified Data.Map.Strict      as M
@@ -102,10 +102,10 @@ type CostFn a s = (C.ConfChange a)
 -}
 class (C.ConfChange a) => OracleSt o a | o -> a where
     -- seems too OO, but not sure how to do it better
-    -- | 'emptyConf' returns initial empty configuration
-    emptyConf  ::       o -> C.Configuration
-    -- | 'showConf' converts the configuration to string for printing and debugging
-    showConf   ::       o -> C.Configuration -> String
+    -- sometimes we have an oracle instance, so it's much easier to use it
+    -- to print a configuration
+    showConf   :: o -> C.Configuration -> String
+    showConf _ c = C.showConfig (undefined::a) c
     -- iterators
     -- | 'flowConfChanges' returns configuration changes for a new flow
     flowConfChanges ::
@@ -191,9 +191,6 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
         -- FIXME: detect when tables are full
         [E10k.insert5tFromFl fl q | q <- allQueues nq]
         -- ++ [E10k.insertFdirFromFl fl q |  q <- allQueues nq]
-
-    emptyConf _ = e10kCfgEmpty -- ^ Creates initial empty configuration
-    showConf _  = e10kCfgStr -- ^ Converts conf to string
 
     -- QUESTION: Is it assumed that there will be only one operation in
     --      conf change?
@@ -347,9 +344,10 @@ doSearch st flows = do
 
 -- searchGreedyFlows: examine one flow at a time. Depends on the ordering of
 -- flows. We can use that as a heuristic
-searchGreedyFlows :: SearchStrategy o a
+searchGreedyFlows :: forall o a. C.ConfChange a => SearchStrategy o a
 searchGreedyFlows st flows = searchGreedyFlows_ st x0 flows
-    where x0 = (emptyConf $ sOracle $ sParams st, [], [])
+    where x0 = (cnf0, [], [])
+          cnf0 = C.emptyConfig (undefined::a)
 
 {-|
  - Recursive search in configuration space where
@@ -379,7 +377,8 @@ searchGreedyFlows_ :: (OracleSt o a)
  -  use the configuration built till now as solution configuration.
  -}
 searchGreedyFlows_ st (cnf,_,_) [] = return $ trN cnf msg
-    where msg = ("searchGreedyFlows_:" ++ (showConf (sOracle $ sParams st) cnf))
+    where msg = ("searchGreedyFlows_:" ++ (showConf oracle cnf))
+          oracle = sOracle $ sParams st
 
 {-|
  - Process single flow on top of the flow list
@@ -432,9 +431,10 @@ searchGreedyFlows_ st (curCnf, curFlows, curQmap) (f:fs) = do
 --  configuration value. Removes the flow that is paired with the configuration
 --  values and moves on. This can avoid some problems of the previous one
 --  (it really depends on the cost function), but is more expensive.
-searchGreedyConf :: SearchStrategy o a
+searchGreedyConf :: forall o a. C.ConfChange a => SearchStrategy o a
 searchGreedyConf st flows = searchGreedyConf_ st x0 flows
-    where x0 = (emptyConf $ sOracle $ sParams st, []) -- initial state
+    where x0 = (cnf0, [])
+          cnf0 = C.emptyConfig (undefined::a)
 
 searchGreedyConf_ :: OracleSt o a
                    => SearchSt s o a
@@ -443,7 +443,8 @@ searchGreedyConf_ :: OracleSt o a
                    -> ST.ST s C.Configuration
 
 searchGreedyConf_ st (cnf,_) [] = return $ trN cnf msg
-    where msg = ("searchGreedyConf_:" ++ (showConf (sOracle $ sParams st) cnf))
+    where msg = ("searchGreedyConf_:" ++ (showConf oracle cnf))
+          oracle = sOracle $ sParams st
 
 searchGreedyConf_ st (curCnf, curFlows) flows = do
     let oracle      = sOracle $ sParams st
@@ -467,7 +468,7 @@ searchGreedyConf_ st (curCnf, curFlows) flows = do
             ++ (show $ length curFlows)
             ++ " cost is " ++ (show xCost)
             ++ "\nSELECTED "
-            ++ (e10kCfgStr xCnf)
+            ++ (E10k.cfgStr xCnf)
             ++ "\nALL CONFS"
     return $ trN recurse msg
 

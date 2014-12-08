@@ -1,7 +1,7 @@
 module Dragonet.Conventions(
     rxQPref, txQPref, qTag,
     isTruePort, isFalsePort,
-    constTrueName, constFalseName
+    constTrueName, constFalseName,
 ) where
 
 import qualified Data.List as L
@@ -17,7 +17,6 @@ txQPref = "TxQueue"
 -- (e.g., Q1, Q2, etc.)
 qTag suffix = "Q" ++ suffix
 
-
 -- True/False ports in O-nodes
 isTruePort  = L.isSuffixOf "true"
 isFalsePort = L.isSuffixOf "false"
@@ -25,3 +24,4 @@ isFalsePort = L.isSuffixOf "false"
 -- constant nodes (used for optimization)
 constTrueName  = "_True"
 constFalseName = "_False"
+

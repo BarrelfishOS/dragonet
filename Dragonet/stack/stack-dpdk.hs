@@ -9,7 +9,6 @@ import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.ProtocolGraph.Utils as PGU
 
 import qualified Graphs.E10k as E10k
-import Graphs.Cfg (e10kCfgStr)
 import qualified Runner.E10KControl as CTRL
 
 import qualified ReadArgs as RA

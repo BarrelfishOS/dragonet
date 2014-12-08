@@ -12,7 +12,6 @@ import qualified Dragonet.Search                   as  SE
 import qualified Graphs.E10k as E10k
 import qualified Graphs.Tap as Tap
 
-import Graphs.Cfg (e10kCfgStr)
 import qualified Runner.E10KControl as CTRL
 
 import qualified Options.Applicative as OA
@@ -178,7 +177,7 @@ e10kPrgArgs = do
 
 dummyImplFn :: PLI.StateHandle -> C.Configuration -> IO ()
 dummyImplFn _ conf = do
-    putStrLn $ e10kCfgStr conf
+    putStrLn $ E10k.cfgStr conf
     return ()
 
 tapPrgArgs :: IO SS.StackPrgArgs

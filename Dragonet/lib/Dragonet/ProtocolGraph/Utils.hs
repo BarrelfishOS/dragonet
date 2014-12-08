@@ -19,6 +19,9 @@ module Dragonet.ProtocolGraph.Utils (
     isOnode_, isOnode, isFnode_, isFnode,
     getSinglePre, getSinglePrePort,
     dominates,
+
+    fromSocketId,toSocketId, toSocketNode, fromSocketNode,
+    balanceNode, balanceNodeEndpoint, balanceNodeEndpointId, isBalanceNode,
 ) where
 
 import Dragonet.ProtocolGraph
@@ -92,6 +95,62 @@ getPGNAttr node n = getVal <$> (find matches $ nAttributes node)
         matches _ = False
         getVal (NAttrCustom s) = drop (length n + 1) s
 
+-- {from,to}Socket/loadBalance Nodes
+
+fromSocketId :: Node -> Maybe String
+fromSocketId n = getPGNAttr n fromSocketAttr
+
+toSocketId :: Node -> Maybe String
+toSocketId n = getPGNAttr n toSocketAttr
+
+toSocketNode :: Integer -> Node
+toSocketNode sid =
+    nAttrsAdd [
+        NAttrCustom "sink",
+        NAttrCustom $ toSocketAttr ++ "=" ++ (show sid) ]
+    $ baseFNode ("ToSocket" ++ show sid) ["out","drop"]
+
+
+fromSocketNode :: Integer -> Node
+fromSocketNode sid =
+    nAttrsAdd [
+        NAttrCustom "source",
+        NAttrCustom $ fromSocketAttr ++ "=" ++ (show sid) ]
+    $ baseFNode ("FromSocket" ++ show sid) ["true"]
+
+
+--EndpointBalanceNode :: String -> Integer -> [NPort] -> Node
+--EndpointBalanceNode prefix eid ports =
+--    balanceNode
+
+-- toSocket/fromSocket nodes contain an attribute of the form
+-- tosocket=id, where id is the socket id
+toSocketAttr   = "tosocket"
+fromSocketAttr = "fromsocket"
+-- load balance node attributes
+-- (this is used when multiple nodes are connected to the same endpoint)
+loadBalanceAttr = "loadbalance"
+balanceEpAttr = "balanceEP"
+
+balanceNode :: String -> [NPort] -> Node
+balanceNode prefix ports = nAttrAdd attr $ baseFNode name ports
+    where name = prefix ++ "::Balance"
+          attr = NAttrCustom loadBalanceAttr
+
+isBalanceNode :: Node -> Bool
+isBalanceNode = nAttrElem (NAttrCustom loadBalanceAttr)
+
+balanceNodeEndpoint :: String -> Integer -> [NPort] -> Node
+balanceNodeEndpoint prefix eid ports =
+    let attr = NAttrCustom $ balanceEpAttr ++ "=" ++ (show eid)
+    in nAttrAdd attr $ balanceNode prefix ports
+
+
+balanceNodeEndpointId :: Node -> Maybe Integer
+balanceNodeEndpointId n = read <$> getPGNAttr n balanceEpAttr
+
+--
+
 isNormalEdge_ :: Edge -> Bool
 isNormalEdge_ e = case e of
     ESpawn _ _ -> False
@@ -149,7 +208,7 @@ lpreNE gr n = map mapFn $ filter filtFn $ DGI.inn gr n
     where filtFn (src,dst,edge) = isNormalEdge_ edge
           mapFn  (src,dst,edge) = case dst == n of
                    True -> (src,edge)
-                   False -> error "I'm doing something wrong!"
+                   False -> error "lpreNE: I'm doing something wrong!"
 
 sucNE :: PGraph -> DGI.Node -> [DGI.Node]
 sucNE gr n = map fst $ lsucNE gr n
@@ -159,7 +218,7 @@ lsucNE gr n = map mapFn $ filter filtFn $ DGI.out gr n
     where filtFn (src,dst,edge) = isNormalEdge_ edge
           mapFn  (src,dst,edge) = case src == n of
                     True -> (dst,edge)
-                    False -> error "I'm doing something wrong!"
+                    False -> error "lsucNE: I'm doing something wrong!"
 
 lsucPortNE :: PGraph -> DGI.Node -> NPort -> [(DGI.Node, Edge)]
 lsucPortNE g nid port = filter filtFn $ lsucNE g nid

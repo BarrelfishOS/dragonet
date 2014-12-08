@@ -12,7 +12,7 @@ import Dragonet.Embedding
 import Dragonet.DotGenerator (toDot, toDotHighlight)
 import Dragonet.Predicate (PredExpr, nodePred)
 import qualified Dragonet.Predicate as PR
-import Graphs.Cfg (lpgCfg,prgCfg,prgCfgEmpty)
+import Graphs.Cfg (lpgCfg,prgCfg)
 
 import qualified Scenarios.S2 as S2
 
@@ -647,7 +647,7 @@ e10kC_simple = (C.applyConfig prgCfg) <$> e10kU_simple
 e10kOffloadU = do
     (e10kU, e10kH) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl-minimal.unicorn"
     let --(nQueues, cnf) = (3, prgCfg)
-        (nQueues, cnf) = (1, prgCfgEmpty)
+        (nQueues, cnf) = (1, E10k.cfgEmpty)
         prgQConf = [("RxQueues", PG.CVInt nQueues), ("TxQueues", PG.CVInt nQueues)]
         ret = C.applyConfig prgQConf $  E10k.prepareConf e10kU
         ret' = C.applyConfig cnf ret

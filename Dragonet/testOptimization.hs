@@ -13,7 +13,7 @@ import qualified Dragonet.Optimization as O
 
 import qualified Graphs.E10k as E10k
 import qualified Graphs.LPG as LPG
-import Graphs.Cfg (lpgCfg, prgCfgEmpty, prgCfg)
+import Graphs.Cfg (lpgCfg, prgCfg)
 import qualified Graphs.ImplTransforms as IT
 
 import qualified Data.Graph.Inductive.Graph as DGI
@@ -24,7 +24,6 @@ import Data.Functor ((<$>))
 import Data.String (fromString)
 
 import qualified System.Directory as Dir
-
 
 
 plAssign _ (_,n)
@@ -74,7 +73,7 @@ main = do
 
 
     -- Evaluate configurations
-    let configs = [("cfg_empty_",prgCfgEmpty), ("cfg_test_", prgCfg)]
+    let configs = [("cfg_empty_",E10k.cfgEmpty), ("cfg_test_", prgCfg)]
 
     -- Evaluate graph
     let transforms = [IT.coupleTxSockets, IT.mergeSockets]
