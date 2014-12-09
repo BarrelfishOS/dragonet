@@ -363,10 +363,10 @@ errval_t dnal_socket_bind(struct dnal_socket_handle   *sh,
 
     if (dest->type == DNAL_NETDSTT_IP4UDP) {
         msg.type = APPCTRL_SOCKET_UDPBIND;
-        msg.data.socket_udpflow.r_ip   = dest->data.ip4udp.ip_remote;
-        msg.data.socket_udpflow.l_ip   = dest->data.ip4udp.ip_local;
-        msg.data.socket_udpflow.r_port = dest->data.ip4udp.port_remote;
-        msg.data.socket_udpflow.l_port = dest->data.ip4udp.port_local;
+        msg.data.socket_udpbind.r_ip   = dest->data.ip4udp.ip_remote;
+        msg.data.socket_udpbind.l_ip   = dest->data.ip4udp.ip_local;
+        msg.data.socket_udpbind.r_port = dest->data.ip4udp.port_remote;
+        msg.data.socket_udpbind.l_port = dest->data.ip4udp.port_local;
     } else {
         return DNERR_BADDEST;
     }
