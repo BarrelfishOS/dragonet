@@ -139,7 +139,11 @@ static errval_t map_metas(struct lsm_internal *internal, bool create, bool tx)
     debug_printf("shm_open(%s)\n", name);
     if (create) {
         fd = shm_open(name, O_CREAT | O_RDWR | O_EXCL, 0600);
-        assert_fix(fd != -1);
+        if (fd == -1) {
+            fprintf(stderr, "Failure in %s() %s:%d: ", __FUNCTION__, __FILE__, __LINE__);
+            perror(name);
+            abort();
+        }
         res = ftruncate(fd, size);
         assert_fix(res == 0);
     } else {

@@ -23,7 +23,11 @@ errval_t shmchan_create_(struct shm_channel *chan, const char *name,
 
     // Create and initialize shm area
     fd = shm_open(name, O_CREAT | O_RDWR | O_EXCL, 0600);
-    assert_fix(fd != -1);
+    if (fd == -1) {
+        fprintf(stderr, "%s: shm_open failed: ", __FUNCTION__);
+        perror(name);
+        abort();
+    }
     res = ftruncate(fd, num_slots * slotsz + SHM_CHAN_EXTRA);
     assert_fix(res == 0);
     meta = mmap(NULL, SHM_CHAN_EXTRA, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
@@ -79,11 +83,17 @@ errval_t shmchan_release_(struct shm_channel *chan, size_t slotsz)
     int res;
 
     res = munmap(chan->data, chan->size * slotsz);
-    assert_fix(res == 0);
+    if (res < 0) {
+        fprintf(stderr, "%s: channel:%p munmap failed:", __FUNCTION__, chan);
+        perror("munmap");
+    }
 
     if (chan->creator) {
         res = shm_unlink(chan->name);
-        assert_fix(res == 0);
+        if (res < 0) {
+            fprintf(stderr, "%s: channel:%p shm_unlink failed:", __FUNCTION__, chan);
+            perror(chan->name);
+        }
     }
 
     return SYS_ERR_OK;

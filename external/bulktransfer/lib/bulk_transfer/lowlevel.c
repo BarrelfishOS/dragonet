@@ -57,6 +57,12 @@ errval_t bulk_ll_channel_bind(struct bulk_ll_channel          *channel,
 errval_t bulk_ll_channel_destroy(struct bulk_ll_channel *channel,
                                  bulk_correlation_t      corr)
 {
+
+    if (channel->ep->f->channel_destroy == NULL) {
+        fprintf(stderr, "%s: channel_destroy not implemented\n", __FUNCTION__);
+        abort();
+    }
+
     return channel->ep->f->channel_destroy(channel, corr);
 }
 
