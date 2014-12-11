@@ -41,6 +41,9 @@ localIP :: Word32
 localIP = MD.asiagoIP_E10K
 --localIP = MD.burrataIP
 
+putStrLnDbg x = putStrLn x
+putStrLnDbgN x = return ()
+
 --------------------------------------------------
 
 --------------------------------------------------
@@ -99,7 +102,7 @@ controlThread chan sh = do
     -- Start working on chan
     forever $ do
         act <- STM.atomically $ STM.readTChan chan
-        putStrLn $ "e10k-driver-thread: received action request : " ++ (show act)
+        putStrLnDbgN $ "e10k-driver-thread: received action request : " ++ (show act)
         case act of
             CfgASet5Tuple idx ft ->
                 CTRL.ftSet sh idx ft
@@ -121,7 +124,7 @@ runDriverThread::
     -> PLI.StateHandle
     -> IO ()
 runDriverThread tcstate chan sh = do
-    putStrLn $ "e10k-driver-thread: "
+    putStrLnDbgN $ "e10k-driver-thread: "
     cstate <- STM.atomically $ STM.readTVar tcstate
     -- Ensure control thread is running
     -- If not, create a haskell-level thread (instead of OS-level thread)
@@ -155,7 +158,7 @@ implCfgFDir ::
 implCfgFDir tcstate chan sh config = do
     cstate' <- STM.atomically $ STM.readTVar tcstate
 
-    putStrLn $ "e10k-implCfgFDir: " ++ show config
+    putStrLnDbgN $ "e10k-implCfgFDir: " ++ show config
     -- Handling 5tuple filters
     let Just (PG.CVList tuples) = lookup "RxCFDirFilter" config
 
@@ -208,7 +211,7 @@ implCfgFDir tcstate chan sh config = do
                         csFDirs = ftm'' }
 
 
-    putStrLn $ "e10k-implFdir: adding flow " ++ (show toAddId)
+    putStrLnDbgN $ "e10k-implFdir: adding flow " ++ (show toAddId)
     -- Send the message to the driver thread to add the filters
     forM_ toAddId $ \(ft,i) ->
         STM.atomically $ STM.writeTChan chan $ CfgASetFDir i ft
@@ -263,7 +266,7 @@ implCfg5Tuple ::
 implCfg5Tuple tcstate chan sh config = do
     cstate' <- STM.atomically $ STM.readTVar tcstate
 
-    putStrLn $ "e10k-implCfg5Tuple: " ++ show config
+    putStrLnDbgN $ "e10k-implCfg5Tuple: " ++ show config
     -- Handling 5tuple filters
     let Just (PG.CVList tuples) = lookup "RxC5TupleFilter" config
 
@@ -317,12 +320,12 @@ implCfg5Tuple tcstate chan sh config = do
 
     -- Send the message to the driver thread to add the filters
 
-    putStrLn $ "e10k-impl5tpl: adding flow " ++ (show toAddId)
+    putStrLnDbgN $ "e10k-impl5tpl: adding flow " ++ (show toAddId)
     forM_ toAddId $ \(ft,i) ->
         STM.atomically $ STM.writeTChan chan $ CfgASet5Tuple i ft
     STM.atomically $ STM.writeTVar tcstate cstate''
     return ()
-    putStrLn $ "e10k-impl5tuple: filters to add " ++ (show toAddId)
+    putStrLnDbgN $ "e10k-impl5tuple: filters to add " ++ (show toAddId)
     where
         {-|
          - Function to parse the  configuration and return 5tuple filter
