@@ -32,6 +32,25 @@ struct cfg_udpep {
     uint16_t             r_port;
 };
 
+// ep2 "matches" ep1 if ep2's flows are a subset of ep1's flows
+bool
+cfg_ep_match(struct cfg_udpep *ep1, struct cfg_udpep *ep2)
+{
+	if (ep1->l_ip != 0 && ep1->l_ip != ep2->l_ip)
+		return false;
+
+	if (ep1->l_port !=0 &&  ep1->l_port != ep2->l_port)
+		return false;
+
+	if (ep1->r_ip != 0 && ep1->r_ip != ep2->r_ip)
+		return false;
+
+	if (ep1->r_port !=0 &&  ep1->r_port != ep2->r_port)
+		return false;
+
+	return true;
+}
+
 // AFAICT:
 // - Each application queue (cfg_appq) has a number of sockets (cfg_socket)
 // - Each socket belongs to a single application queue
@@ -243,7 +262,6 @@ static void parse_socket_flows(struct cfg_socket *sock, int argc, char *argv[])
                 return;
 
             case 'F':
-                // TODO: check that flow matches socket
                 parse_debug_printf("  socket flow parsing: got flow:%s\n", optarg);
                 sf = malloc(sizeof(*sf));
                 if (!sf) {
@@ -251,6 +269,13 @@ static void parse_socket_flows(struct cfg_socket *sock, int argc, char *argv[])
                     exit(1);
                 }
                 parse_flow(&sf->sockfl_ep, optarg);
+				// check that endpoints match
+				// TODO: make them match (i.e., fill-in non-wildcards from socket to flow)
+				if (!cfg_ep_match(&sock->ep->ep, &sf->sockfl_ep)) {
+					fprintf(stderr, "Error: Socket and Flow endpoint do not match\n");
+					exit(1);
+				}
+
                 sf->sockfl_next = sock->sock_flows;
                 sock->sock_flows = sf;
                 break;
