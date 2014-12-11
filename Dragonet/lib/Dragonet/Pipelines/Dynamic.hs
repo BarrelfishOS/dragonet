@@ -118,10 +118,16 @@ run ctx pconn pcreate plg = do
         -}
         let (inDel,inAdd) = diff ins $ PLI.pliInQs pli
             (outDel,outAdd) = diff outs $ PLI.pliOutQs pli
-        forM_ inDel $ \(l,_) -> dplInQRemove dpl l
+
+        putStrLn $ "pipeline: " ++ lbl ++ " inDel:" ++ (show inDel)
+        putStrLn $ "pipeline: " ++ lbl ++ " inAdd:" ++ (show inAdd)
+        putStrLn $ "pipeline: " ++ lbl ++ " outDel:" ++ (show outDel)
+        putStrLn $ "pipeline: " ++ lbl ++ " outAdd:" ++ (show outAdd)
+
+        forM_ inDel  $ \(l,_) -> dplInQRemove  dpl l
         forM_ outDel $ \(l,_) -> dplOutQRemove dpl l
-        forM_ outAdd $ \(l,q) -> dplOutQAdd dpl l q
-        forM_ inAdd $ \(l,q) -> dplInQAdd dpl l q
+        forM_ outAdd $ \(l,q) -> dplOutQAdd    dpl l q
+        forM_ inAdd  $ \(l,q) -> dplInQAdd     dpl l q
         -- Update graph
         dplSetGraph dpl $ PL.plGraph pl
         -- Restart execution of pipeline

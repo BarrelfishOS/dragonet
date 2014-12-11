@@ -638,6 +638,7 @@ pl_inqueue_destroy(pipeline_handle_t plh, queue_handle_t qh)
         abort();
     }
 
+    printf("%s: calling bulk_ll_channel_destroy on channel: %p\n", __FUNCTION__, chan);
     bulk_ll_channel_destroy(chan, 0);
 
     free(dq->epd);
@@ -656,7 +657,7 @@ queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name)
 
     int ret = asprintf(&dq->name, "%s_%s", pl->stackname, name);
     assert(ret > 0);
-    dprintf("pl_inqueue_bind: pl=%s q=%s\n", pl->name, dq->name);
+    printf("pl_inqueue_bind: pl=%s q=%s\n", pl->name, dq->name);
 
     dq->epd = malloc(sizeof(*dq->epd));
     err = bulk_linuxshm_ep_init(dq->epd, dq->name, QUEUE_SLOTS);

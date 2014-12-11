@@ -136,7 +136,7 @@ static errval_t map_metas(struct lsm_internal *internal, bool create, bool tx)
     }
     get_metas_name(internal, tx, name);
 
-    debug_printf("shm_open(%s)\n", name);
+    printf("%s: shm_open(%s) create=%d\n", __FUNCTION__, name, create);
     if (create) {
         fd = shm_open(name, O_CREAT | O_RDWR | O_EXCL, 0600);
         if (fd == -1) {
@@ -188,11 +188,13 @@ static errval_t destroy_metas(struct lsm_internal *internal, bool tx)
     char name[strlen(internal->name) + 5];
     int res;
 
+    printf("%s: Entry\n", __FUNCTION__);
     unmap_metas(internal, tx);
 
     if (internal->chan->meta_size != 0) {
         get_metas_name(internal, tx, name);
 
+    printf("%s: Unlinking %s\n", __FUNCTION__, name);
         res = shm_unlink(name);
         assert_fix(res == 0);
     }
@@ -220,6 +222,7 @@ static errval_t op_channel_create(struct bulk_ll_channel *channel,
     internal->creator = true;
 
     // Prepare meta buffers
+    printf("%s:%d %s() channel:%p\n", __FILE__, __LINE__, __FUNCTION__, channel);
     err = map_metas(internal, true, false);
     if (err_is_fail(err)) {
         goto fail_mrx;
@@ -244,6 +247,7 @@ static errval_t op_channel_create(struct bulk_ll_channel *channel,
         goto fail_tx;
     }
 
+    printf("%s:%d %s() channel:%p\n", __FILE__, __LINE__, __FUNCTION__, channel);
     channel->state = BULK_STATE_INITIALIZED;
     return SYS_ERR_OK;
 
@@ -305,6 +309,7 @@ static errval_t op_channel_bind(struct bulk_ll_channel *channel,
     msg->content.bind_request.role = channel->role;
     shm_chan_send(&internal->tx, msg);
 
+    printf("%s:%d %s() channel:%p\n", __FILE__, __LINE__, __FUNCTION__, channel);
     return BULK_TRANSFER_ASYNC;
 
 fail_tx:
@@ -319,17 +324,20 @@ static errval_t
 op_channel_destroy(struct bulk_ll_channel *channel,
                    bulk_correlation_t corr)
 {
+    printf("%s:%d %s() Entry: Channel:%p\n", __FILE__, __LINE__, __FUNCTION__, channel);
     struct lsm_internal *internal;
     // just guessing here...
     channel->state = BULK_STATE_TEARDOWN;
     internal = channel->impl_data;
     if (internal->creator) { // from op_channel_create()
+        printf("%s:%d %s() Creator\n", __FILE__, __LINE__, __FUNCTION__);
         shm_chan_release(&internal->tx);
         shm_chan_release(&internal->rx);
         destroy_metas(internal, true);
         destroy_metas(internal, false);
         internal_release(internal);
     } else { // from op_channel_bind()
+        printf("%s:%d %s() Binder\n", __FILE__, __LINE__, __FUNCTION__);
         shm_chan_release(&internal->tx);
         shm_chan_release(&internal->rx);
         internal_release(internal);
