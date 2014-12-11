@@ -254,7 +254,6 @@ fail_mrx:
     return err;
 }
 
-
 static errval_t op_channel_bind(struct bulk_ll_channel *channel,
                                 bulk_correlation_t      corr)
 {
@@ -310,6 +309,33 @@ fail_rx:
     internal_release(internal);
     return err;
 }
+
+// XXX: this might be buggy --AKK
+static errval_t
+op_channel_destroy(struct bulk_ll_channel *channel,
+                   bulk_correlation_t corr)
+{
+    struct lsm_internal *internal;
+    // just guessing here...
+    channel->state = BULK_STATE_TEARDOWN;
+    internal = channel->impl_data;
+    if (internal->creator) { // from op_channel_create()
+        shm_chan_release(&internal->tx);
+        shm_chan_release(&internal->rx);
+        destroy_metas(internal, true);
+        destroy_metas(internal, false);
+        internal_release(internal);
+    } else { // from op_channel_bind()
+        shm_chan_release(&internal->tx);
+        shm_chan_release(&internal->rx);
+        internal_release(internal);
+    }
+    channel->state = BULK_STATE_CLOSED;
+
+    return SYS_ERR_OK;
+}
+
+
 
 static errval_t do_pool_assign(struct lsm_internal *internal,
                                struct bulk_pool    *pool)
@@ -793,6 +819,7 @@ static errval_t op_event_done(struct bulk_ll_channel *channel,
 static struct bulk_implementation implementation = {
     .channel_create = op_channel_create,
     .channel_bind = op_channel_bind,
+    .channel_destroy = op_channel_destroy,
     .pool_assign = op_assign_pool,
     .buffer_move = op_move,
     .buffer_pass = op_pass,
@@ -803,9 +830,9 @@ static struct bulk_implementation implementation = {
 };
 
 
-errval_t bulk_linuxshm_ep_create(struct bulk_linuxshm_endpoint_descriptor *ep,
-                                 const char *name,
-                                 size_t      num_slots)
+errval_t bulk_linuxshm_ep_init(struct bulk_linuxshm_endpoint_descriptor *ep,
+                               const char *name,
+                               size_t      num_slots)
 {
     ep->generic.f = &implementation;
     ep->name = name;

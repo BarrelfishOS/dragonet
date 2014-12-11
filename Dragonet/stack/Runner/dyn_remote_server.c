@@ -45,12 +45,28 @@ static void queue_add(struct dynr_server *srv, struct dynrs_queue *q)
     HASH_ADD(hh, srv->queues, id, sizeof(dynr_queue_t), q);
 }
 
+static struct dynrs_queue *
+queue_remove(struct dynr_server *srv, dynr_queue_t id)
+{
+    struct dynrs_queue *q;
+    HASH_FIND(hh, srv->queues, &id, sizeof(id), q);
+    if (q)
+        HASH_DELETE(hh, srv->queues, q);
+    return q;
+}
+
 static struct dynrs_queue *queue_create(dynr_queue_t id, queue_handle_t qh)
 {
     struct dynrs_queue *q = malloc(sizeof(*q));
     q->id = id;
     q->qh = qh;
     return q;
+}
+
+static void
+queue_destroy(struct dynrs_queue *q)
+{
+    free(q);
 }
 
 
@@ -152,7 +168,6 @@ void dynrs_action(struct dynr_server *server,
                   struct dynr_action *a)
 {
     struct dynamic_graph *g = server->graph;
-    queue_handle_t qh;
     struct dynamic_node  *n;
     struct dynamic_edge  *e;
     struct dynamic_spawn *s;
@@ -306,21 +321,45 @@ void dynrs_action(struct dynr_server *server,
             dyn_add_init(g, rs->spawn);
             break;
 
-        case DYNR_ACT_ADDINQ:
-            dprintf("dynrs_action: DYNR_ACT_ADDINQ\n");
-            assert(queue_get(server, a->data.addqueue.queue) == NULL);
-            qh = pl_inqueue_create(g->plh, a->data.addqueue.endpoint);
-            queue_add(server, queue_create(a->data.addqueue.queue, qh));
-            break;
-        case DYNR_ACT_RMINQ:
-            fprintf(stderr, "TODO: DYNR_ACT_RMINQ\n");
-            break;
-        case DYNR_ACT_ADDOUTQ:
+        case DYNR_ACT_ADDINQ: {
+            dynr_queue_t qid = a->data.addqueue.queue;
+            const char *qname = a->data.addqueue.endpoint;
+            dprintf("dynrs_action: DYNR_ACT_ADDINQ id:%lu name=%s\n", qid, qname);
+            struct dynrs_queue *q;
+            queue_handle_t qh;
+
+            if (queue_get(server, qid) != NULL) {
+                fprintf(stderr, "DYNR_ACT_ADDINQ: queue already exists");
+                abort();
+            }
+
+            qh = pl_inqueue_create(g->plh, qname);
+            q = queue_create(qid, qh);
+            queue_add(server, q);
+        } break;
+
+        case DYNR_ACT_RMINQ: {
+            dprintf("dynrs_action: DYNR_ACT_RMINQ\n");
+            dynr_queue_t qid = a->data.rmqueue.queue;
+            struct dynrs_queue *q;
+
+            q = queue_remove(server, qid);
+            if (q == NULL) {
+                fprintf(stderr, "DYNR_ACT_RMINQ: error: queue does not exist");
+                abort();
+            }
+            pl_inqueue_destroy(g->plh, q->qh);
+            queue_destroy(q);
+        } break;
+
+        case DYNR_ACT_ADDOUTQ: {
             dprintf("dynrs_action: DYNR_ACT_ADDOUTQ\n");
+            queue_handle_t qh;
             assert(queue_get(server, a->data.addqueue.queue) == NULL);
             qh = pl_outqueue_bind(g->plh, a->data.addqueue.endpoint);
             queue_add(server, queue_create(a->data.addqueue.queue, qh));
-            break;
+        } break;
+
         case DYNR_ACT_RMOUTQ:
             fprintf(stderr, "TODO: DYNR_ACT_RMOUTQ\n");
             break;

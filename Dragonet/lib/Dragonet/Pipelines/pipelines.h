@@ -16,8 +16,12 @@ void stop_stack(void *handle);
 
 pipeline_handle_t pl_init(const char *stackname, const char *plname);
 struct state *pl_get_state(pipeline_handle_t plh);
+
 queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name);
 queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name);
+
+void pl_inqueue_destroy(pipeline_handle_t plh, queue_handle_t qh);
+
 void pl_wait_ready(pipeline_handle_t plh);
 int pl_enqueue(queue_handle_t queue, struct input *in);
 bool pl_process_event(queue_handle_t queue);

@@ -569,31 +569,53 @@ static bool poll_all(struct dragonet_pipeline *pl)
     return found;
 }
 
+static struct dragonet_queue *
+pl_remove_queue(struct dragonet_pipeline *pl, struct bulk_ll_channel *ch)
+{
+    struct dragonet_queue **qptr = &pl->queues, *q;
+
+    while ((q = *qptr) != NULL) {
+        if (q->chan == ch) {
+            *qptr = q->next;
+            return q;
+        }
+
+        qptr = &q->next;
+    }
+
+    return NULL;
+}
 
 queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name)
 {
     dprintf("pl_inqueue_create: enter\n");
+
     struct dragonet_pipeline *pl = plh;
-    struct bulk_ll_channel *chan = malloc(sizeof(*chan));
-    errval_t err;
-    struct bulk_channel_setup setup = { .direction = BULK_DIRECTION_RX,
-        .role = BULK_ROLE_SLAVE, .trust = BULK_TRUST_FULL,
+    struct bulk_channel_setup setup = {
+        .direction = BULK_DIRECTION_RX,
+        .role = BULK_ROLE_SLAVE,
+        .trust = BULK_TRUST_FULL,
         .meta_size = sizeof(struct dragonet_bulk_meta) };
+
+    struct bulk_ll_channel *chan = malloc(sizeof(*chan));
     struct dragonet_queue *dq = calloc(1, sizeof(*dq));
+    errval_t err;
 
     int ret = asprintf(&dq->name, "%s_%s", pl->stackname, name);
     assert(ret > 0);
     dprintf("pl_inqueue_create: pl=%s q=%s\n", pl->name, dq->name);
 
     dq->epd = malloc(sizeof(*dq->epd));
-    err = bulk_linuxshm_ep_create(dq->epd, dq->name, QUEUE_SLOTS);
+    err = bulk_linuxshm_ep_init(dq->epd, dq->name, QUEUE_SLOTS);
     err_expect_ok(err);
 
     dq->pl = pl;
     dq->chan = chan;
     dq->bound = false;
+
     dq->next = pl->queues;
     pl->queues = dq;
+
     chan->user_state = dq;
     err = bulk_ll_channel_create(chan, &dq->epd->generic, &setup, 0);
     err_expect_ok(err);
@@ -601,6 +623,28 @@ queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name)
     dprintf("pl_inqueue_create: exit\n");
     return chan;
 }
+
+// XXX: not sure how correct this one is
+void
+pl_inqueue_destroy(pipeline_handle_t plh, queue_handle_t qh)
+{
+    struct dragonet_pipeline *pl = plh;
+    struct bulk_ll_channel *chan = qh;
+    struct dragonet_queue *dq;
+
+    dq = pl_remove_queue(pl, chan);
+    if (dq == NULL) {
+        fprintf(stderr, "%s: queue not found\n", __FUNCTION__);
+        abort();
+    }
+
+    bulk_ll_channel_destroy(chan, 0);
+
+    free(dq->epd);
+    free(chan);
+    free(dq);
+}
+
 
 queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name)
 {
@@ -615,7 +659,7 @@ queue_handle_t pl_outqueue_bind(pipeline_handle_t plh, const char *name)
     dprintf("pl_inqueue_bind: pl=%s q=%s\n", pl->name, dq->name);
 
     dq->epd = malloc(sizeof(*dq->epd));
-    err = bulk_linuxshm_ep_create(dq->epd, dq->name, QUEUE_SLOTS);
+    err = bulk_linuxshm_ep_init(dq->epd, dq->name, QUEUE_SLOTS);
     err_expect_ok(err);
 
     dq->pl = pl;

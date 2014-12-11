@@ -10,9 +10,9 @@ struct bulk_linuxshm_endpoint_descriptor {
     size_t num_slots;
 };
 
-errval_t bulk_linuxshm_ep_create(struct bulk_linuxshm_endpoint_descriptor *ep,
-                                 const char *name,
-                                 size_t      num_slots);
+errval_t bulk_linuxshm_ep_init(struct bulk_linuxshm_endpoint_descriptor *ep,
+                               const char *name,
+                               size_t      num_slots);
 
 #endif
 
