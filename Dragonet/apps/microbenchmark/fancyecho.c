@@ -109,6 +109,17 @@ static void print_usage(void)
     //  sudo ./dist/build/bench-fancyecho/bench-fancyecho -a t0 -p 7 -a t1 -p 7 -t -q t0 -t -q t1
 }
 
+bool
+ip_from_string_wildcard(const char *ip, uint32_t *dst)
+{
+    if (ip[0] == '*' && ip[1] == '\0') {
+        *dst = 0;
+        return true;
+    }
+
+    return ip_from_string(ip,dst);
+}
+
 static void parse_flow(struct cfg_udpep *udp, char *str)
 {
     char *sep;
@@ -131,7 +142,7 @@ static void parse_flow(struct cfg_udpep *udp, char *str)
     port = sep + 1;
     *sep = 0;
     udp->l_port = atoi(port);
-    if (!ip_from_string(str, &udp->l_ip)) {
+    if (!ip_from_string_wildcard(str, &udp->l_ip)) {
         goto parse_err;
     }
 
@@ -143,7 +154,7 @@ static void parse_flow(struct cfg_udpep *udp, char *str)
     port = sep + 1;
     *sep = 0;
     udp->r_port = atoi(port);
-    if (!ip_from_string(rem, &udp->r_ip)) {
+    if (!ip_from_string_wildcard(rem, &udp->r_ip)) {
         goto parse_err;
     }
 
