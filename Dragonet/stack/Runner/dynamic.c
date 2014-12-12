@@ -377,15 +377,19 @@ void dyn_cleargraph(struct dynamic_graph *graph)
     struct dynamic_node *m;
     struct dynamic_spawn *s = graph->spawns;
 
+    while (s != NULL) {
+        fprintf(stderr, "******* %s(): canceling spawn task on node:%s\n",
+                        __FUNCTION__,  s->node->name);
+        s->node = NULL;
+        s = s->next;
+    }
+
     while (n != NULL) {
         m = n;
         n = n->prev;
         free_node(m);
     }
-    while (s != NULL) {
-        s->node = NULL;
-        s = s->next;
-    }
+
 
     free(graph->outqueues);
     graph->outqueues = NULL;
