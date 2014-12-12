@@ -222,7 +222,7 @@ static errval_t op_channel_create(struct bulk_ll_channel *channel,
     internal->creator = true;
 
     // Prepare meta buffers
-    printf("%s:%d %s() channel:%p\n", __FILE__, __LINE__, __FUNCTION__, channel);
+    //printf("%s:%d %s() channel:%p\n", __FILE__, __LINE__, __FUNCTION__, channel);
     err = map_metas(internal, true, false);
     if (err_is_fail(err)) {
         goto fail_mrx;
@@ -247,7 +247,7 @@ static errval_t op_channel_create(struct bulk_ll_channel *channel,
         goto fail_tx;
     }
 
-    printf("%s:%d %s() channel:%p\n", __FILE__, __LINE__, __FUNCTION__, channel);
+    printf("%s:%d %s() channel:%p DONE\n", __FILE__, __LINE__, __FUNCTION__, channel);
     channel->state = BULK_STATE_INITIALIZED;
     return SYS_ERR_OK;
 
@@ -272,6 +272,7 @@ static errval_t op_channel_bind(struct bulk_ll_channel *channel,
     char name[strlen(ep->name) + 5];
     struct shm_message *msg;
 
+    //printf("%s:%d %s() channel:%p\n", __FILE__, __LINE__, __FUNCTION__, channel);
     err = internal_init(channel);
     if (err_is_fail(err)) {
         return err;
@@ -309,7 +310,7 @@ static errval_t op_channel_bind(struct bulk_ll_channel *channel,
     msg->content.bind_request.role = channel->role;
     shm_chan_send(&internal->tx, msg);
 
-    printf("%s:%d %s() channel:%p\n", __FILE__, __LINE__, __FUNCTION__, channel);
+    printf("%s:%d %s() channel:%p DONE\n", __FILE__, __LINE__, __FUNCTION__, channel);
     return BULK_TRANSFER_ASYNC;
 
 fail_tx:

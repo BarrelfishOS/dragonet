@@ -220,6 +220,10 @@ muxId plg dNodeL dPL = i
  -      UDPFlow, and Span
  -}
 
+eventHandle sstv ch event = do
+    putStrLn $ "EventHandle => channel: " ++ (show ch) ++ " Event: " ++ (show event)
+    eventHandler sstv ch event
+
 {-|
  -  Handing event AppConnected:
  -      * Assign current appID as application-identifier
@@ -228,7 +232,6 @@ muxId plg dNodeL dPL = i
  -      * Insert applicationID in list of applications
  -}
 eventHandler sstv ch (PLA.EvAppConnected gh) = do
-    putStrLn $ "AppConnected: " ++ show ch
     STM.atomically $ do
         ss <- STM.readTVar sstv
         let (aid, ns') = ssRunNetState_ ss NS.allocAppId
@@ -334,7 +337,7 @@ eventHandler sstv ch (PLA.EvSocketSpan oldsid) = do
  -  TODO: Should I report error to an application here?
  -}
 eventHandler sstv ch ev = do
-    putStrLn $ "eventHandler " ++ show ch ++ " " ++ show ev
+    putStrLn $ "eventHandler: UKNOWN EVENT: " ++ show ch ++ " " ++ show ev
 
 
 --------------------------------------------------------------------------------
@@ -407,7 +410,7 @@ instantiateStack args updateGraph = do
     sstv <- ssInitialize updateGraph args
     updateGraph sstv
     putStrLn "Starting interface thread"
-    PLA.interfaceThread (stName args) (eventHandler sstv)
+    PLA.interfaceThread (stName args) (eventHandle sstv)
 
 --  Function: depending on userspace/driverspace pipeline
 --       create pipeline-threads

@@ -40,6 +40,7 @@ errval_t shmchan_create_(struct shm_channel *chan, const char *name,
     assert_fix(res == 0);
     close(fd);
 
+    printf("%s(): channel %s (%p) created\n", __FUNCTION__, name, chan);
     err = shmchan_bind_(chan, name, slotsz, sender);
     chan->creator = true;
     return err;
@@ -75,6 +76,7 @@ errval_t shmchan_bind_(struct shm_channel *chan, const char *name,
     res = munmap(meta, SHM_CHAN_EXTRA);
     assert_fix(res == 0);
 
+    printf("%s(): channel %s (%p) binded\n", __FUNCTION__, name, chan);
     return SYS_ERR_OK;
 }
 
