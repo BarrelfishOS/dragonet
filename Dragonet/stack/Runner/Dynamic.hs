@@ -452,7 +452,7 @@ dmNewQueueHandle = do
 dmDebugPrint :: String -> DynM ()
 dmDebugPrint s = do
     dsl <- dmDSGets dsLabel
-    liftIO $ putStrLn $ dsl ++ ": " ++ s
+    --liftIO $ putStrLn $ dsl ++ ": " ++ s
     return ()
 
 -------------------------------------------------------------------------------
