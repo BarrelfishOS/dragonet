@@ -339,6 +339,7 @@ void dynrs_action(struct dynr_server *server,
         } break;
 
         case DYNR_ACT_RMINQ: {
+            fprintf(stderr, "** DYNR_ACT_RMINQ might not work correctly\n");
             dynr_queue_t qid = a->data.rmqueue.queue;
             printf("dynrs_action: DYNR_ACT_RMINQ: id:%lu\n", qid);
             struct dynrs_queue *q;
@@ -368,9 +369,21 @@ void dynrs_action(struct dynr_server *server,
             queue_add(server, queue_create(qid, qh));
         } break;
 
-        case DYNR_ACT_RMOUTQ:
-            fprintf(stderr, "TODO: DYNR_ACT_RMOUTQ\n");
-            break;
+        case DYNR_ACT_RMOUTQ: {
+            fprintf(stderr, "** DYNR_ACT_RMOUTQ might not work correctly\n");
+            dynr_queue_t qid = a->data.rmqueue.queue;
+            printf("dynrs_action: DYNR_ACT_RMOUTQ: id:%lu\n", qid);
+            struct dynrs_queue *q;
+
+            q = queue_remove(server, qid);
+            if (q == NULL) {
+                fprintf(stderr, "DYNR_ACT_RMOUTQ: error: queue does not exist");
+                abort();
+            }
+            pl_inqueue_destroy(g->plh, q->qh);
+            queue_destroy(q);
+            dprintf("dynrs_action: DYNR_ACT_RMOUTQ: DONE\n");
+        } break;
 
         default:
             fprintf(stderr, "dynrs_action: Unknown action type!\n");
