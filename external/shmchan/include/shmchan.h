@@ -18,7 +18,7 @@ struct shm_channel {
     size_t current;
     bool sender;
     bool creator;
-    const char *name;
+    char *name;
 };
 
 struct shm_channel_wsstate {
