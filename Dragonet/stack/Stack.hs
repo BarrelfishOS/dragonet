@@ -220,6 +220,10 @@ muxId plg dNodeL dPL = i
  -      UDPFlow, and Span
  -}
 
+eventHandle sstv ch event = do
+    putStrLn $ "EventHandle => channel: " ++ (show ch) ++ " Event: " ++ (show event)
+    eventHandler sstv ch event
+
 {-|
  -  Handing event AppConnected:
  -      * Assign current appID as application-identifier
@@ -228,7 +232,6 @@ muxId plg dNodeL dPL = i
  -      * Insert applicationID in list of applications
  -}
 eventHandler sstv ch (PLA.EvAppConnected gh) = do
-    putStrLn $ "AppConnected: " ++ show ch
     STM.atomically $ do
         ss <- STM.readTVar sstv
         let (aid, ns') = ssRunNetState_ ss NS.allocAppId
@@ -334,7 +337,7 @@ eventHandler sstv ch (PLA.EvSocketSpan oldsid) = do
  -  TODO: Should I report error to an application here?
  -}
 eventHandler sstv ch ev = do
-    putStrLn $ "eventHandler " ++ show ch ++ " " ++ show ev
+    putStrLn $ "eventHandler: UKNOWN EVENT: " ++ show ch ++ " " ++ show ev
 
 
 --------------------------------------------------------------------------------
@@ -407,7 +410,7 @@ instantiateStack args updateGraph = do
     sstv <- ssInitialize updateGraph args
     updateGraph sstv
     putStrLn "Starting interface thread"
-    PLA.interfaceThread (stName args) (eventHandler sstv)
+    PLA.interfaceThread (stName args) (eventHandle sstv)
 
 --  Function: depending on userspace/driverspace pipeline
 --       create pipeline-threads
@@ -446,8 +449,8 @@ updateGraphOpt
     -> STM.TVar StackState
     -> IO ()
 updateGraphOpt costFn cfgOracle args sstv = do
-    putStrLn "updateGraphOpt"
     ss <- ssNewVer sstv
+    putStrLn $ "updateGraphOpt: v" ++ (show $ ssVersion ss)
     let lpgC = ssConfigureLpg ss args
 
     -- STEP: Generate an Optimize combined graph,
@@ -461,10 +464,10 @@ updateGraphOpt costFn cfgOracle args sstv = do
     -- STEP: Run pipelines
     PLD.run (ssCtx ss) plConnect (ssCreatePL args ss plg) $ addMuxIds plg
 
-    putStrLn "updateGraph exit"
+    --putStrLn "updateGraph exit"
     -- FIXME: Create file here.
-    putStrLn "################### calling appendFile with app ready notice"
-    appendFile("allAppslist.appready") $ "Application is ready!\n"
+    --putStrLn "################### calling appendFile with app ready notice"
+    appendFile "allAppslist.appready" "Application is ready!\n"
 
 
 -- updateGraph function that uses Dragonet.Search functions
@@ -474,8 +477,8 @@ updateGraphFlows
     -> STM.TVar StackState
     -> IO ()
 updateGraphFlows getConf args sstv = do
-   putStrLn "updateGraphFlows"
    (ss, prevEpsM) <- ssExecUpd sstv
+   putStrLn $ "updateGraphFlows: v" ++ (show $ ssVersion ss)
    -- get list of all endpoints from stack-state
    let
        lbl = "updateGraphFlows"
@@ -493,7 +496,6 @@ updateGraphFlows getConf args sstv = do
        --  balanceAcrossRxQs to distribute spanned sockets across pipelines
        xforms = [IT.balanceAcrossRxQs, IT.coupleTxSockets]
        flows = ssFlows ss
-
 
    putStrLn $ "Flows:\n" ++ (ppShow $ map flowStr flows)
    prgConf <- getConf flows
@@ -515,10 +517,10 @@ updateGraphFlows getConf args sstv = do
    -- NOTE: ctx is still an initial context, is that efficient?
    PLD.run (ssCtx ss) plConnect (ssCreatePL args ss plg) $ addMuxIds plg
 
-   putStrLn "updateGraph exit"
+   --putStrLn "updateGraph exit"
    -- FIXME: Create file here.
-   putStrLn "################### calling appendFile with app ready notice"
-   appendFile("allAppslist.appready") $ "Application is ready!\n"
+   --putStrLn "################### calling appendFile with app ready notice"
+   appendFile "allAppslist.appready" "Application is ready!\n"
 
 -- OLD/Deprecated interface
 

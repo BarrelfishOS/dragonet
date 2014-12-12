@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h> // strdup()
 
 #include <shmchan.h>
 
@@ -40,6 +41,7 @@ errval_t shmchan_create_(struct shm_channel *chan, const char *name,
     assert_fix(res == 0);
     close(fd);
 
+    //printf("%s(): channel %s (%p) created\n", __FUNCTION__, name, chan);
     err = shmchan_bind_(chan, name, slotsz, sender);
     chan->creator = true;
     return err;
@@ -69,12 +71,19 @@ errval_t shmchan_bind_(struct shm_channel *chan, const char *name,
     chan->sender = sender;
     chan->creator = false;
     chan->current = 0;
-    chan->name = name;
+
+    chan->name = strdup(name);
+    if (chan->name == NULL) {
+        fprintf(stderr, "%s: strdup failed:", __FUNCTION__);
+        perror("strdup");
+        abort();
+    }
 
     // Unmap meta area
     res = munmap(meta, SHM_CHAN_EXTRA);
     assert_fix(res == 0);
 
+    //printf("%s(): channel %s (%p) binded\n", __FUNCTION__, name, chan);
     return SYS_ERR_OK;
 }
 
@@ -95,6 +104,8 @@ errval_t shmchan_release_(struct shm_channel *chan, size_t slotsz)
             perror(chan->name);
         }
     }
+
+    free(chan->name);
 
     return SYS_ERR_OK;
 }

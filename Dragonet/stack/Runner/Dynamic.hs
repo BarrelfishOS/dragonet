@@ -45,6 +45,8 @@ newtype NodeHandle = NodeHandle Word64
 newtype EdgeHandle = EdgeHandle Word64
 newtype SpawnHandle = SpawnHandle Word64
 newtype QueueHandle = QueueHandle Word64
+    deriving (Show)
+
 type GraphHandle = PI.GraphHandle
 type NodeFun = FunPtr (PI.StateHandle -> PI.InputHandle -> IO Word32)
 type MuxId = Word32
@@ -203,14 +205,14 @@ hStop tds = runDynMWithTDS tds $ do
 hInQAdd :: TDynState -> PL.PLabel -> PI.PInput -> IO ()
 hInQAdd tds pl (PI.PIQueue iq) = do
     runDynMWithTDS tds $ do
-        dmDebugPrint "hInQAdd"
+        dmDebugPrint $ "hInQAdd " ++ pl
         addInQueue pl iq
     return ()
 
 hInQRemove :: TDynState -> PL.PLabel -> IO ()
 hInQRemove tds pl = runDynMWithTDS tds $ do
-    dmDebugPrint "hInQRemove"
-    ans <- dmDSGets $ M.lookup pl . dsOutQs
+    ans <- dmDSGets $ M.lookup pl . dsInQs
+    dmDebugPrint $ "hInQRemove to " ++ pl ++ ": " ++ (show ans)
     case (ans) of
         Just qh -> rmInQueue pl qh
             -- XXX: not sure if we need to do anything here
@@ -219,14 +221,14 @@ hInQRemove tds pl = runDynMWithTDS tds $ do
 hOutQAdd :: TDynState -> PL.PLabel -> PI.POutput -> IO ()
 hOutQAdd tds pl (PI.POQueue oq) = do
     runDynMWithTDS tds $ do
-        dmDebugPrint "hOutQAdd"
+        dmDebugPrint $ "hOutQAdd " ++ pl
         addOutQueue pl oq
     return ()
 
 hOutQRemove :: TDynState -> PL.PLabel -> IO ()
 hOutQRemove tds pl = runDynMWithTDS tds $ do
-    dmDebugPrint "hOutQRemove"
-    ans <- dmDSGets $ M.lookup pl . dsInQs
+    ans <- dmDSGets $ M.lookup pl . dsOutQs
+    dmDebugPrint $ "hOutQRemove to " ++ pl ++ ": " ++ (show ans)
     case (ans) of
         Just qh -> rmOutQueue pl qh
             -- XXX: not sure if we need to do anything here

@@ -339,8 +339,9 @@ void dynrs_action(struct dynr_server *server,
         } break;
 
         case DYNR_ACT_RMINQ: {
-            dprintf("dynrs_action: DYNR_ACT_RMINQ\n");
+            fprintf(stderr, "** WARNING: DYNR_ACT_RMINQ might not work correctly\n");
             dynr_queue_t qid = a->data.rmqueue.queue;
+            dprintf("dynrs_action: DYNR_ACT_RMINQ: id:%lu\n", qid);
             struct dynrs_queue *q;
 
             q = queue_remove(server, qid);
@@ -350,19 +351,39 @@ void dynrs_action(struct dynr_server *server,
             }
             pl_inqueue_destroy(g->plh, q->qh);
             queue_destroy(q);
+            dprintf("dynrs_action: DYNR_ACT_RMINQ: DONE\n");
         } break;
 
         case DYNR_ACT_ADDOUTQ: {
-            dprintf("dynrs_action: DYNR_ACT_ADDOUTQ\n");
+            dynr_queue_t qid = a->data.addqueue.queue;
+            const char *qname = a->data.addqueue.endpoint;
+            dprintf("dynrs_action: DYNR_ACT_ADDOUTQ id:%lu name=%s\n", qid, qname);
             queue_handle_t qh;
-            assert(queue_get(server, a->data.addqueue.queue) == NULL);
-            qh = pl_outqueue_bind(g->plh, a->data.addqueue.endpoint);
-            queue_add(server, queue_create(a->data.addqueue.queue, qh));
+
+            if (queue_get(server, qid) != NULL) {
+                fprintf(stderr, "DYNR_ACT_ADDOUTQ: queue already exists");
+                abort();
+            }
+
+            qh = pl_outqueue_bind(g->plh, qname);
+            queue_add(server, queue_create(qid, qh));
         } break;
 
-        case DYNR_ACT_RMOUTQ:
-            fprintf(stderr, "TODO: DYNR_ACT_RMOUTQ\n");
-            break;
+        case DYNR_ACT_RMOUTQ: {
+            fprintf(stderr, "** WARNING: DYNR_ACT_RMOUTQ might not work correctly\n");
+            dynr_queue_t qid = a->data.rmqueue.queue;
+            dprintf("dynrs_action: DYNR_ACT_RMOUTQ: id:%lu\n", qid);
+            struct dynrs_queue *q;
+
+            q = queue_remove(server, qid);
+            if (q == NULL) {
+                fprintf(stderr, "DYNR_ACT_RMOUTQ: error: queue does not exist");
+                abort();
+            }
+            pl_inqueue_destroy(g->plh, q->qh);
+            queue_destroy(q);
+            dprintf("dynrs_action: DYNR_ACT_RMOUTQ: DONE\n");
+        } break;
 
         default:
             fprintf(stderr, "dynrs_action: Unknown action type!\n");

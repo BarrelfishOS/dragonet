@@ -638,6 +638,7 @@ pl_inqueue_destroy(pipeline_handle_t plh, queue_handle_t qh)
         abort();
     }
 
+    dprintf("%s: calling bulk_ll_channel_destroy on channel: %p\n", __FUNCTION__, chan);
     bulk_ll_channel_destroy(chan, 0);
 
     free(dq->epd);
