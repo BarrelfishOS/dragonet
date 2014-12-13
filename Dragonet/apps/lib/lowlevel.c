@@ -152,7 +152,8 @@ static void process_graph_cmd(struct dnal_app_queue *aq,
 
 errval_t dnal_aq_create(const char  *stackname,
                         const char  *slotname,
-                        struct dnal_app_queue **appqueue)
+                        struct dnal_app_queue **appqueue,
+                        dnal_flags_t flags)
 {
     struct dnal_app_queue *aq;
     int s;
@@ -185,6 +186,7 @@ errval_t dnal_aq_create(const char  *stackname,
     // Send register message
     msg.type = APPCTRL_REGISTER;
     strcpy(msg.data.register_app.label, slotname);
+    msg.flags = flags;
     control_send(aq, &msg);
 
     // Get welcome message
@@ -314,7 +316,8 @@ static errval_t sockh_from_sockinfo(struct dnal_socket_handle   *sh,
 }
 
 errval_t dnal_socket_register_flow(struct dnal_socket_handle *sh,
-                                   struct dnal_net_destination *flow)
+                                   struct dnal_net_destination *flow,
+                                   dnal_flags_t flags)
 {
     struct app_control_message msg;
     struct dnal_app_queue *aq = sh->aq;
@@ -336,6 +339,7 @@ errval_t dnal_socket_register_flow(struct dnal_socket_handle *sh,
         msg.data.socket_udpflow.l_ip   = flow->data.ip4udp.ip_local;
         msg.data.socket_udpflow.r_port = flow->data.ip4udp.port_remote;
         msg.data.socket_udpflow.l_port = flow->data.ip4udp.port_local;
+        msg.flags = flags;
     } else {
         return DNERR_BADDEST;
     }
@@ -347,12 +351,12 @@ errval_t dnal_socket_register_flow(struct dnal_socket_handle *sh,
         fprintf(stderr, "dnal_socket_register_flow expects status reply\n");
         return DNERR_UNKNOWN;
     }
-
     return (msg.data.status.success == true) ? SYS_ERR_OK : DNERR_UNKNOWN;
 }
 
 errval_t dnal_socket_bind(struct dnal_socket_handle   *sh,
-                          struct dnal_net_destination *dest)
+                          struct dnal_net_destination *dest,
+                          dnal_flags_t flags)
 {
     struct app_control_message msg;
     struct dnal_app_queue *aq = sh->aq;
@@ -367,6 +371,7 @@ errval_t dnal_socket_bind(struct dnal_socket_handle   *sh,
         msg.data.socket_udpbind.l_ip   = dest->data.ip4udp.ip_local;
         msg.data.socket_udpbind.r_port = dest->data.ip4udp.port_remote;
         msg.data.socket_udpbind.l_port = dest->data.ip4udp.port_local;
+        msg.flags = flags;
     } else {
         return DNERR_BADDEST;
     }
@@ -378,7 +383,8 @@ errval_t dnal_socket_bind(struct dnal_socket_handle   *sh,
 
 errval_t dnal_socket_span(struct dnal_socket_handle *sh,
                           struct dnal_app_queue *naq,
-                          struct dnal_socket_handle *nsh)
+                          struct dnal_socket_handle *nsh,
+                          dnal_flags_t flags)
 {
     struct app_control_message msg;
 
@@ -387,9 +393,26 @@ errval_t dnal_socket_span(struct dnal_socket_handle *sh,
 
     msg.type = APPCTRL_SOCKET_SPAN;
     msg.data.socket_span.id = sh->id;
+    msg.flags = flags;
     control_send(naq, &msg);
     control_recv_nograph(naq, &msg);
     return sockh_from_sockinfo(nsh, &msg, &sh->dest);
+}
+
+errval_t dnal_noop(struct dnal_app_queue *naq, dnal_flags_t flags)
+{
+    struct app_control_message msg;
+    msg.type = APPCTRL_APPQ_NOP;
+    msg.flags = flags;
+
+    control_send(naq, &msg);
+    control_recv_nograph(naq, &msg);
+    if (msg.type != APPCTRL_STATUS) {
+        fprintf(stderr, "dnal_socket_register_flow expects status reply\n");
+        return DNERR_UNKNOWN;
+    }
+
+    return (msg.data.status.success == true) ? SYS_ERR_OK : DNERR_UNKNOWN;
 }
 
 errval_t dnal_socket_send(struct dnal_socket_handle   *sh,

@@ -36,6 +36,7 @@ import Runner.Dynamic (createPipeline, createPipelineClient)
 
 import qualified Control.Concurrent.STM as STM
 import qualified Data.Map as M
+import Data.Bits (testBit)
 
 import Util.XTimeIt (doTimeIt,dontTimeIt)
 import Text.Show.Pretty (ppShow)
@@ -220,10 +221,13 @@ muxId plg dNodeL dPL = i
  -      UDPFlow, and Span
  -}
 
+eventHandle :: STM.TVar StackState -> PLA.ChanHandle -> PLA.Event -> IO ()
 eventHandle sstv ch event = do
-    putStrLn $ "EventHandle => channel: " ++ (show ch) ++ " Event: " ++ (show event)
+    putStrLn $ "EventHandle => channel: "
+             ++ (show ch) ++ " Event: " ++ (show event)
     eventHandler sstv ch event
 
+eventHandler :: STM.TVar StackState -> PLA.ChanHandle -> PLA.Event -> IO ()
 {-|
  -  Handing event AppConnected:
  -      * Assign current appID as application-identifier
@@ -250,7 +254,7 @@ eventHandler sstv ch (PLA.EvAppConnected gh) = do
  -          its already done in AppConnected event)
  -      * Send welcome message back to the application with an applicationID
  -}
-eventHandler sstv ch (PLA.EvAppRegister lbl) = do
+eventHandler sstv ch (PLA.EvAppRegister lbl flags) = do
     aid <- STM.atomically $ do
         ss <- STM.readTVar sstv
         let Just aid = M.lookup ch $ ssAppChans ss
@@ -264,21 +268,11 @@ eventHandler sstv ch (PLA.EvAppRegister lbl) = do
 
 {-|
  -  Handing event SocketUDPBind:
- -      * Lookup appID
- -      * Use nextSocketID for this socket
- -      * Use nextEndpointID for this endpoint
- -      * Increment both nextSocketID, and nextEndpointID for future use.
- -      * Create an endpoint-descriptor with listening IPAddr and port number
- -              in endpoint descriptor
- -      * Create a socket-descriptor with this applicationID, endpoint
- -      * Insert endpoint-descriptor, socket-descriptor into proper lists
+ -      * Update network state
  -      * Send back a message to application with socketInfo and sid
- -      * Call updateGraph which will
- -              + Find best configuration to run
- -              + Insert filters in NIC if necessary
- -              + Inform running pipelines about the change
  -}
-eventHandler sstv ch (PLA.EvSocketUDPBind le@(lIp,lPort) re@(rIp,rPort)) = do
+eventHandler sstv ch
+             (PLA.EvSocketUDPBind le@(lIp,lPort) re@(rIp,rPort) flags) = do
     (sid,ss) <- STM.atomically $ do
         ss <- STM.readTVar sstv
         -- TODO: check overlapping
@@ -286,15 +280,19 @@ eventHandler sstv ch (PLA.EvSocketUDPBind le@(lIp,lPort) re@(rIp,rPort)) = do
             ((sid,eid), ss') = ssRunNetState ss (NS.udpBind aid (le,re))
         STM.writeTVar sstv $ ss'
         return (sid,ss')
-    putStrLn $ "SocketUDPBind f=" ++ show (rIp,rPort) ++ "/"
-                ++ show (lIp,lPort) ++ " -> " ++ show sid
+    putStrLn $ "SocketUDPBind f=" ++ show re ++ "/" ++ show le ++ "- "
+               ++ show sid
     PLA.sendMessage ch $ PLA.MsgSocketInfo sid
-    ssUpdateGraphs ss sstv
+    if testBit flags PLA.appFlagsMore
+        then return ()
+        else ssUpdateGraphs ss sstv
+
 {-|
  -  Handing event SocketUDPFlow:
  -      Registers a flow
  -}
-eventHandler sstv ch (PLA.EvSocketUDPFlow sid le@(lIp,lPort) re@(rIp,rPort)) = do
+eventHandler sstv ch
+             (PLA.EvSocketUDPFlow sid le@(lIp,lPort) re@(rIp,rPort) flags) = do
     -- update ssFlows
     ss <- STM.atomically $ do
         ss <- STM.readTVar sstv
@@ -303,11 +301,12 @@ eventHandler sstv ch (PLA.EvSocketUDPFlow sid le@(lIp,lPort) re@(rIp,rPort)) = d
             ss' = ss { ssFlows = fl:oldFlows }
         STM.writeTVar sstv $ ss'
         return ss'
-    putStrLn $ "SocketUDPFlow f=" ++ show (rIp,rPort) ++ "/"
-                ++ show (lIp,lPort)
+    putStrLn $ "SocketUDPFlow f=" ++ show re ++ "/" ++ show le
                 ++ " for " ++ show sid
     PLA.sendMessage ch $ PLA.MsgStatus True
-    ssUpdateGraphs ss sstv
+    if testBit flags PLA.appFlagsMore
+        then return ()
+        else ssUpdateGraphs ss sstv
 
 {-|
  -  Handling event SocketSpan:
@@ -320,16 +319,25 @@ eventHandler sstv ch (PLA.EvSocketUDPFlow sid le@(lIp,lPort) re@(rIp,rPort)) = d
  -      * It sends an application message with socket-info and new socket-id
  -      * It calls the updateGraph to reflect new changes
  -}
-eventHandler sstv ch (PLA.EvSocketSpan oldsid) = do
+eventHandler sstv ch (PLA.EvSocketSpan oldsid flags) = do
     (sid,ss) <- STM.atomically $ do
         ss <- STM.readTVar sstv
         let Just aid = M.lookup ch $ ssAppChans ss
             (sid,ss') = ssRunNetState ss (NS.socketSpan aid oldsid)
         STM.writeTVar sstv $ ss'
         return (sid,ss')
-    putStrLn $ "SocketSpan existing=" ++ show oldsid ++ "for sid:" ++ show sid
+    putStrLn $ "SocketSpan existing=" ++ show oldsid ++ " for sid:" ++ show sid
     PLA.sendMessage ch $ PLA.MsgSocketInfo sid
-    ssUpdateGraphs ss sstv
+    if testBit flags PLA.appFlagsMore
+        then return ()
+        else ssUpdateGraphs ss sstv
+
+eventHandler sstv ch (PLA.EvNop flags) = do
+    ss <- STM.atomically $ STM.readTVar sstv
+    if testBit flags PLA.appFlagsMore
+        then return ()
+        else ssUpdateGraphs ss sstv
+
 {-|
  -  Handling event "all other types":
  -      This is pretty much an error case.  Currently we are only printing
@@ -337,7 +345,7 @@ eventHandler sstv ch (PLA.EvSocketSpan oldsid) = do
  -  TODO: Should I report error to an application here?
  -}
 eventHandler sstv ch ev = do
-    putStrLn $ "eventHandler: UKNOWN EVENT: " ++ show ch ++ " " ++ show ev
+    putStrLn $ "eventHandler: UNHANDLED EVENT: " ++ show ch ++ " " ++ show ev
 
 
 --------------------------------------------------------------------------------

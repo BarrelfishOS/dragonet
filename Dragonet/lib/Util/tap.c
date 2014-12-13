@@ -77,6 +77,8 @@ tap_set_addr(struct tap_handler *tap, int cmd, const char *addr_str)
 void
 tap_set_ip(struct tap_handler *tap, const char *ip)
 {
+    // printf("IP: %s: %s\n", __FUNCTION__, ip);
+    // NB: That's not the stack's IP, that's the linux tap IP
 	if (tap_set_addr(tap, SIOCSIFADDR, ip) < 0)
 		err(1, "SIOCGIFFLAGS: %s", ip);
 }

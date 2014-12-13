@@ -8,6 +8,7 @@
 
 typedef uint64_t app_id_t;
 typedef uint64_t socket_id_t;
+typedef uint32_t app_flags_t;
 
 #define MAX_APPLBL 32
 #define MAX_QUEUELBL 32
@@ -22,7 +23,12 @@ enum app_control_type {
     APPCTRL_SOCKET_UDPFLOW,     // App -> Dragonet
     APPCTRL_SOCKET_SPAN,        // App -> Dragonet
     APPCTRL_SOCKET_CLOSE,       // App -> Dragonet
+    APPCTRL_APPQ_NOP,           // App -> Dragonet
 };
+
+// flags:
+//  MORE: more control messages comming (advise to stack)
+#define APPCTRL_MSG_FLAGS_MORE  (0x1)
 
 struct app_control_message {
     enum app_control_type type;
@@ -64,17 +70,19 @@ struct app_control_message {
             socket_id_t id;
         } socket_close;
     } data;
+    app_flags_t flags;
 };
 
 void app_control_init(
     const char *stackname,
     void (*new_application)(int,struct dynr_client *),
-    void (*register_app)(int,const char *),
+    void (*register_app)(int,const char *,app_flags_t),
     void (*stop_application)(int,bool),
-    void (*socket_udpbind)(int,uint32_t,uint16_t,uint32_t,uint16_t),
-    void (*socket_udpflow)(int,socket_id_t,uint32_t,uint16_t,uint32_t,uint16_t),
-    void (*socket_span)(int,socket_id_t),
-    void (*socket_close)(int,socket_id_t));
+    void (*socket_udpbind)(int,uint32_t, uint16_t, uint32_t, uint16_t,app_flags_t),
+    void (*socket_udpflow)(int,socket_id_t,uint32_t,uint16_t,uint32_t,uint16_t,app_flags_t),
+    void (*socket_span)(int,socket_id_t,app_flags_t),
+    void (*socket_close)(int,socket_id_t,app_flags_t),
+    void (*nop)(app_flags_t));
 
 void app_control_send_welcome(int fd, app_id_t id);
 void app_control_send_status(int fd, bool success);

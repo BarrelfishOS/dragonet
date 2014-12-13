@@ -104,16 +104,22 @@ struct cfg_thread {
     struct cfg_thread   *next;
 };
 
-static struct cfg_endpoint *ceps = NULL;
-static struct cfg_appq *caqs = NULL;
-static struct cfg_thread *cthreads = NULL;
+static struct {
+    struct cfg_endpoint  *ceps;
+    struct cfg_appq      *caqs;
+    struct cfg_thread    *cthreads;
+    unsigned             nthreads;
+    bool                 stack_wait;
+} Cfg = {0};
+
+static pthread_barrier_t thr_barrier;
 
 static pthread_mutex_t    stack_init_sequencer_mutex;
 static int thread_count = 0;
 
 static void print_usage(void)
 {
-    fprintf(stderr, "fancyecho <application_queues> <threads>\n"
+    fprintf(stderr, "fancyecho [-W] <application_queues> <threads>\n"
                     "  application_queues: [-a label <flows>]+\n"
                     "  flows: [<socket> <socket_flows>]+\n"
                     "  socket: [-p port| -f lip:lport/rip:rport]\n"
@@ -188,7 +194,7 @@ parse_err:
 
 static struct cfg_endpoint *cep_find(struct cfg_udpep *udp)
 {
-    struct cfg_endpoint *ep = ceps;
+    struct cfg_endpoint *ep = Cfg.ceps;
     while (ep != NULL) {
         if (!memcmp(&ep->ep, udp, sizeof(*udp))) {
             return ep;
@@ -210,13 +216,13 @@ mksocket(struct cfg_appq  *caq, struct cfg_udpep *udp)
         cep = malloc(sizeof(*cep));
         cep->ep = *udp;
         cep->ep_socket = NULL;
-        cep->next = ceps;
+        cep->next = Cfg.ceps;
         res = pthread_mutex_init(&cep->mutex, NULL);
         if (res != 0) {
             fprintf(stderr, "pttrhead_mutex_init failed: %s\n", strerror(res));
             abort();
         }
-        ceps = cep;
+        Cfg.ceps = cep;
     }
 
     cs->ep = cep;
@@ -231,7 +237,7 @@ mksocket(struct cfg_appq  *caq, struct cfg_udpep *udp)
 
 static struct cfg_appq *caq_find(const char *label)
 {
-    struct cfg_appq *caq = caqs;
+    struct cfg_appq *caq = Cfg.caqs;
     while (caq != NULL) {
         if (!strcmp(caq->label, label)) {
             return caq;
@@ -393,8 +399,13 @@ static void parse_params(int argc, char *argv[])
     // first we parse application queues
     done = false;
     while (!done) {
-        res = getopt(argc, argv, "a:th");
+        res = getopt(argc, argv, "Wa:th");
         switch (res) {
+
+            case 'W':
+                Cfg.stack_wait = true;
+                break;
+
             case 'a':
                 parse_debug_printf("Parsing application queue: %s\n", optarg);
                 caq = malloc(sizeof(*caq));
@@ -410,8 +421,8 @@ static void parse_params(int argc, char *argv[])
                 }
                 // parse sockets for application queue
                 parse_sockets(caq, argc, argv);
-                caq->next = caqs;
-                caqs = caq;
+                caq->next = Cfg.caqs;
+                Cfg.caqs = caq;
                 break;
 
             case 't':
@@ -449,8 +460,11 @@ static void parse_params(int argc, char *argv[])
                 th = malloc(sizeof(*th));
                 th->aqs = NULL;
                 th->num_aqs = 0;
-                th->next = cthreads;
-                cthreads = th;
+
+                th->next = Cfg.cthreads;
+                Cfg.cthreads = th;
+                Cfg.nthreads++;
+
                 parse_thread(th, argc, argv);
                 break;
 
@@ -465,16 +479,16 @@ static void parse_params(int argc, char *argv[])
         }
     }
 
-    if (caqs == NULL) {
+    if (Cfg.caqs == NULL) {
         fprintf(stderr, "No appqueues specified on commandline\n");
         exit(1);
     }
-    if (cthreads == NULL) {
+    if (Cfg.cthreads == NULL) {
         fprintf(stderr, "No threads specified on commandline\n");
         exit(1);
     }
 
-    caq = caqs;
+    caq = Cfg.caqs;
     while (caq != NULL) {
         if (caq->sockets == NULL) {
             fprintf(stderr, "Appqueue without sockets: %s\n", caq->label);
@@ -488,7 +502,7 @@ static void parse_params(int argc, char *argv[])
         caq = caq->next;
     }
 
-    th = cthreads;
+    th = Cfg.cthreads;
     while (th != NULL) {
         if (th->num_aqs == 0) {
             fprintf(stderr, "Thread without appqueues\n");
@@ -569,7 +583,10 @@ static void *run_thread(void *arg)
     errval_t err;
     bool locked;
     unsigned int idle = 0;
+    dnal_flags_t dnal_flags = Cfg.stack_wait ? DNAL_FLAGS_MORE : 0;
 
+    // XXX: If we are sequencing threads, why do we need locks in the
+    // initialization (and vice versa)? -AKK
     while (1) {
         pthread_mutex_lock(&stack_init_sequencer_mutex);
         if ( th->localtid == thread_count) {
@@ -586,7 +603,9 @@ static void *run_thread(void *arg)
         caq = th->aqs[i];
         pthread_mutex_lock(&caq->mutex);
         if (caq->dnal_appq == NULL) {
-            err_expect_ok(dnal_aq_create("dragonet", caq->label, &daq));
+            err_expect_ok(
+                dnal_aq_create("dragonet", caq->label, &daq, dnal_flags)
+            );
             caq->dnal_appq = daq;
 
             // Create sockets
@@ -602,11 +621,13 @@ static void *run_thread(void *arg)
                     dnd.data.ip4udp.ip_remote = cs->ep->ep.r_ip;
                     dnd.data.ip4udp.port_local = cs->ep->ep.l_port;
                     dnd.data.ip4udp.port_remote = cs->ep->ep.r_port;
-                    err_expect_ok(dnal_socket_bind(dsh, &dnd));
+                    err_expect_ok(dnal_socket_bind(dsh, &dnd, dnal_flags));
                     cs->ep->ep_socket = dsh;
                 } else {
                     // a socket already exists for this endpoint: span it
-                    err_expect_ok(dnal_socket_span(cs->ep->ep_socket, daq, dsh));
+                    err_expect_ok(
+                       dnal_socket_span(cs->ep->ep_socket, daq, dsh, dnal_flags)
+                    );
                 }
                 // register flows
                 struct cfg_socket_flow *fl;
@@ -621,7 +642,7 @@ static void *run_thread(void *arg)
                     flow.data.ip4udp.port_remote = fl->sockfl_ep.r_port;
 
                     err_expect_ok(
-                        dnal_socket_register_flow(dsh, &flow)
+                        dnal_socket_register_flow(dsh, &flow, dnal_flags)
                     );
 
                     fl = fl->sockfl_next;
@@ -639,6 +660,15 @@ static void *run_thread(void *arg)
     printf("Thread with id %d is done\n", th->localtid);
     ++thread_count;
     pthread_mutex_unlock(&stack_init_sequencer_mutex);
+
+    // wait until al threads are done and notify stack that we are done
+    if (Cfg.stack_wait) {
+        pthread_barrier_wait(&thr_barrier);
+        if (th->localtid == 0) {
+            dnal_noop(daq, 0);
+        }
+        pthread_barrier_wait(&thr_barrier);
+    }
 
 
     while (true) {
@@ -680,7 +710,7 @@ static void *run_thread(void *arg)
 static void start_threads(void)
 {
     int count = 0;
-    struct cfg_thread *th = cthreads;
+    struct cfg_thread *th = Cfg.cthreads;
     int res;
     while (th != NULL) {
         th->localtid = count++;
@@ -696,7 +726,7 @@ static void start_threads(void)
 
 static void wait_threads(void)
 {
-    struct cfg_thread *th = cthreads;
+    struct cfg_thread *th = Cfg.cthreads;
     while (th != NULL) {
         pthread_join(th->thread, NULL);
         th = th->next;
@@ -713,6 +743,12 @@ int main(int argc, char *argv[])
     }
 
     parse_params(argc, argv);
+
+    if ((res = pthread_barrier_init(&thr_barrier, NULL, Cfg.nthreads)) != 0) {
+        fprintf(stderr, "pttrhead_barrier_init failed: %s\n", strerror(res));
+        abort();
+    }
+
     start_threads();
     wait_threads();
     return 0;

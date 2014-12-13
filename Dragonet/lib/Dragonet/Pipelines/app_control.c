@@ -31,12 +31,14 @@ static void app_graph_send(struct dynr_action *act, void *data)
 void app_control_init(
     const char *stackname,
     void (*new_application)(int,struct dynr_client *),
-    void (*register_app)(int,const char *),
+    void (*register_app)(int,const char *, app_flags_t),
     void (*stop_application)(int,bool),
-    void (*socket_udpbind)(int,uint32_t,uint16_t,uint32_t,uint16_t),
-    void (*socket_udpflow)(int,socket_id_t,uint32_t,uint16_t,uint32_t,uint16_t),
-    void (*socket_span)(int,socket_id_t),
-    void (*socket_close)(int,socket_id_t))
+    void (*socket_udpbind)(int,uint32_t,uint16_t,uint32_t,uint16_t, app_flags_t),
+    void (*socket_udpflow)(int,socket_id_t,uint32_t,uint16_t,uint32_t,uint16_t, app_flags_t),
+    void (*socket_span)(int,socket_id_t,app_flags_t),
+    void (*socket_close)(int,socket_id_t,app_flags_t),
+    void (*nop)(app_flags_t)
+    )
 {
     int appfds[MAX_APPS];
     struct dynr_client *graph_clients[MAX_APPS];
@@ -149,48 +151,67 @@ void app_control_init(
                     dprintf("APPCTRL_REGISTER\n");
                     msg.data.register_app.label[MAX_APPLBL - 1]
                         = 0;
-                    register_app(appfds[i], msg.data.register_app.label);
+                    register_app(appfds[i],
+                                 msg.data.register_app.label,
+                                 msg.flags);
                     break;
                 case APPCTRL_SOCKET_UDPBIND:
-                    printf("APPCTRL_SOCKET_UDPBIND: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+                    printf("APPCTRL_SOCKET_UDPBIND: lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32" flags: %"PRIx32"\n",
                             msg.data.socket_udpbind.l_ip,
                             msg.data.socket_udpbind.l_port,
                             msg.data.socket_udpbind.r_ip,
-                            msg.data.socket_udpbind.r_port);
+                            msg.data.socket_udpbind.r_port,
+                            msg.flags);
                     socket_udpbind(appfds[i],
                             msg.data.socket_udpbind.l_ip,
                             msg.data.socket_udpbind.l_port,
                             msg.data.socket_udpbind.r_ip,
-                            msg.data.socket_udpbind.r_port);
+                            msg.data.socket_udpbind.r_port,
+                            msg.flags);
                     break;
                 case APPCTRL_SOCKET_UDPFLOW:
-                    printf("APPCTRL_SOCKET_UDPFLOW: sid: %"PRIu64", lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
+                    printf("APPCTRL_SOCKET_UDPFLOW: sid: %"PRIu64", lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32" flags: %"PRIx32"\n",
                             msg.data.socket_udpflow.sid,
                             msg.data.socket_udpflow.l_ip,
                             msg.data.socket_udpflow.l_port,
                             msg.data.socket_udpflow.r_ip,
-                            msg.data.socket_udpflow.r_port);
+                            msg.data.socket_udpflow.r_port,
+                            msg.flags);
                     socket_udpflow(appfds[i],
                             msg.data.socket_udpflow.sid,
                             msg.data.socket_udpflow.l_ip,
                             msg.data.socket_udpflow.l_port,
                             msg.data.socket_udpflow.r_ip,
-                            msg.data.socket_udpflow.r_port);
+                            msg.data.socket_udpflow.r_port,
+                            msg.flags);
                     break;
                 case APPCTRL_SOCKET_SPAN:
                     dprintf("APPCTRL_SOCKET_SPAN\n");
-                    socket_span(appfds[i], msg.data.socket_span.id);
+                    socket_span(appfds[i], msg.data.socket_span.id, msg.flags);
                     break;
                 case APPCTRL_SOCKET_CLOSE:
                     dprintf("APPCTRL_SOCKET_CLOSE\n");
-                    socket_close(appfds[i], msg.data.socket_close.id);
+                    socket_close(appfds[i], msg.data.socket_close.id, msg.flags);
                     break;
+
+                case APPCTRL_APPQ_NOP:
+                    nop(msg.flags);
+                break;
+
+
                 default:
                     fprintf(stderr, "app_control_init: invalid msg type\n");
             }
         }
     }
 }
+
+// Dragonet -> App message sends
+// (used from haskell code)
+// void app_control_send_welcome(int fd, app_id_t id);
+// void app_control_send_status(int fd, bool success)
+// void app_control_send_socket_info(int fd, socket_id_t id)
+// void app_control_send_graph_cmd(int fd, struct dynr_action *action)
 
 void app_control_send_welcome(int fd, app_id_t id)
 {

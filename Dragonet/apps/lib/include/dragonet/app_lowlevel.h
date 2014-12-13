@@ -7,6 +7,10 @@
 
 #include <implementation.h>
 
+#include <app_control.h> // for flags
+#define DNAL_FLAGS_MORE APPCTRL_MSG_FLAGS_MORE
+typedef app_flags_t dnal_flags_t; // uint32_t
+
 // The following structures are opaque to applications
 
 /**
@@ -76,10 +80,13 @@ struct dnal_net_destination {
  * @param slotname  Label for slot this queue connects to on Dragonet side
  *                    (can only connect one application queue to each slot)
  * @param appqueue  Location to store handle
+ *
+ * @param flags Flags
  */
 errval_t dnal_aq_create(const char  *stackname,
                         const char  *slotname,
-                        struct dnal_app_queue **appqueue);
+                        struct dnal_app_queue **appqueue,
+                        dnal_flags_t flags);
 
 /**
  * Destroy application queue (not implemented).
@@ -157,7 +164,8 @@ errval_t dnal_socket_create(struct dnal_app_queue      *appqueue,
  * @param destination  Network endpoint to bind to
  */
 errval_t dnal_socket_bind(struct dnal_socket_handle   *sockethandle,
-                          struct dnal_net_destination *destination);
+                          struct dnal_net_destination *destination,
+                          dnal_flags_t flags);
 
 /**
  *  Register flows in a socket
@@ -166,7 +174,8 @@ errval_t dnal_socket_bind(struct dnal_socket_handle   *sockethandle,
  * @param flow  Flow to register
  */
 errval_t dnal_socket_register_flow(struct dnal_socket_handle *sockhandle,
-                                   struct dnal_net_destination *flow);
+                                   struct dnal_net_destination *flow,
+                                   dnal_flags_t flags);
 
 /**
  * Span socket to other queue.
@@ -183,7 +192,8 @@ errval_t dnal_socket_register_flow(struct dnal_socket_handle *sockhandle,
  */
 errval_t dnal_socket_span(struct dnal_socket_handle *orig,
                           struct dnal_app_queue *newqueue,
-                          struct dnal_socket_handle *sockethandle);
+                          struct dnal_socket_handle *sockethandle,
+                          dnal_flags_t flags);
 
 /**
  * Close particular socket handle.
@@ -217,6 +227,12 @@ void *dnal_socket_opaque_get(struct dnal_socket_handle *sockethandle);
  */
 void dnal_socket_opaque_set(struct dnal_socket_handle *sockethandle,
                             void        *opaque);
+
+/**
+ * No-op
+ */
+errval_t dnal_noop(struct dnal_app_queue *appqueue,
+                   dnal_flags_t flags);
 
 #endif // ndef DRAGONET_APP_LOWLEVEL_H_
 

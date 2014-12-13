@@ -32,7 +32,7 @@ struct stack_handle *stack_init(const char *stackname, const char *name)
     struct dnal_app_queue *aq;
     errval_t err;
 
-    err = dnal_aq_create(stackname, name, &aq);
+    err = dnal_aq_create(stackname, name, &aq, 0);
     if (!err_is_ok(err)) {
         return NULL;
     }
@@ -114,7 +114,7 @@ bool socket_bind_udp_listen(socket_handle_t handle, uint32_t ip, uint16_t port)
     dest.data.ip4udp.port_local = port;
     dest.data.ip4udp.port_remote = 0;
 
-    return err_is_ok(dnal_socket_bind(handle->lsh, &dest));
+    return err_is_ok(dnal_socket_bind(handle->lsh, &dest, 0));
 }
 
 bool socket_bind_udp_flow(socket_handle_t handle,
@@ -129,7 +129,7 @@ bool socket_bind_udp_flow(socket_handle_t handle,
     dest.data.ip4udp.port_local = d_port;
     dest.data.ip4udp.port_remote = s_port;
 
-    return err_is_ok(dnal_socket_bind(handle->lsh, &dest));
+    return err_is_ok(dnal_socket_bind(handle->lsh, &dest, 0));
 }
 
 bool socket_send_udp(socket_handle_t handle, struct input *in,
