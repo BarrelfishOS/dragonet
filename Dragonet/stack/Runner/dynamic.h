@@ -5,6 +5,8 @@
 #include <implementation.h>
 #include <pipelines.h>
 
+#include <regex.h> // tracing white list (tr_wlist_re)
+
 #include "rt_queue.h"
 
 enum dynamic_node_type {
@@ -126,6 +128,9 @@ struct dynamic_graph {
     struct input         *cur_socket_buf;
     void                 *cur_socket;
 
+   // Tracing
+   regex_t              *tr_wlist_re;
+   size_t                tr_wlist_nr;
 };
 
 struct dynamic_spawn {

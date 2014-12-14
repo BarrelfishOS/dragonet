@@ -7,6 +7,8 @@
 #include <proto_ipv4.h>
 #include <udpproto.h>
 
+#include <regex.h> // debug_print_node() (for whitelist)
+
 #include "dynamic.h"
 
 #define INVALID_VERSION -1
@@ -66,6 +68,27 @@ struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh,
     node_stack_init(&g->nodestack);
     task_queue_init(&g->tqueue);
     pthread_mutex_init(&g->lock, NULL);
+
+    // node whitelist for tracing
+    static const char *tr_wlist[] = {".*UDP.*", ".*EtherClassified.*"};
+    static const size_t tr_wlist_nelems = sizeof(tr_wlist)/sizeof(char *);
+    g->tr_wlist_re = (regex_t *)malloc(sizeof(regex_t)*tr_wlist_nelems);
+    g->tr_wlist_nr = tr_wlist_nelems;
+    if (!g->tr_wlist_re) {
+        perror("malloc");
+        abort();
+    }
+
+    for (size_t i=0; i<tr_wlist_nelems; i++) {
+        regex_t *r = g->tr_wlist_re + i;
+        const char *str = tr_wlist[i];
+        int err = regcomp(r, str, 0);
+        if (err) {
+            fprintf(stderr, "Could not compile regex: %s\n", str);
+            abort();
+        }
+    }
+
     return g;
 }
 
@@ -243,6 +266,30 @@ static void reset_versions(struct dynamic_node *n)
     }
 }
 
+static void
+debug_print_node(struct dynamic_graph *g, struct dynamic_node *n, node_out_t out)
+{
+
+    if (g->tr_wlist_re == NULL) {
+            return;
+    }
+
+    for (size_t i=0; i<g->tr_wlist_nr; i++){
+        regex_t *re = g->tr_wlist_re + i;
+        int ret = regexec(re, n->name, 0, NULL, 0);
+        if (!ret) { // match
+            printf("%s node=%s (nports=%zu) out=%d\n",
+                    pl_name(g->plh), n->name, n->num_ports, out);
+            return;
+        } else if (ret != REG_NOMATCH) { // error
+            char msgbuf[128];
+            regerror(ret, re, msgbuf, sizeof(msgbuf));
+            fprintf(stderr, "NOTE: Regex match failed: %s\n", msgbuf);
+        }
+    }
+
+}
+
 void dyn_rungraph(struct dynamic_graph *graph)
 {
     dprintf("dyn_rungraph\n");
@@ -284,10 +331,10 @@ void dyn_rungraph(struct dynamic_graph *graph)
     count = 0;
     while ((n = node_stack_pop(ns)) != NULL) {
         count++;
-        dprintf("Execute: n=%p n->n=%p\n", n, n->name);
-        dprintf("Execute: %s, count: %zu \n", n->name, count);
+        dprintf("Execute: n=%p n->n=%s count:%zu\n", n, n->name, count);
         out = run_node(graph, n, plh, st, &in, version);
         dprintf("   port=%d\n", out);
+        //debug_print_node(graph, n, out);
         if (out >= 0 && n->num_ports == 0) {
             // Terminal node
             out = -2;
@@ -389,7 +436,6 @@ void dyn_cleargraph(struct dynamic_graph *graph)
         n = n->prev;
         free_node(m);
     }
-
 
     free(graph->outqueues);
     graph->outqueues = NULL;
