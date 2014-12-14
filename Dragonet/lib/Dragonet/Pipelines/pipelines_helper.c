@@ -586,6 +586,12 @@ pl_remove_queue(struct dragonet_pipeline *pl, struct bulk_ll_channel *ch)
     return NULL;
 }
 
+const char *
+pl_name(pipeline_handle_t plh)
+{
+    return ((struct dragonet_pipeline *)plh)->name;
+}
+
 queue_handle_t pl_inqueue_create(pipeline_handle_t plh, const char *name)
 {
     dprintf("pl_inqueue_create: enter\n");

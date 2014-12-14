@@ -39,5 +39,7 @@ void pl_buffer_free(pipeline_handle_t plh, buffer_handle_t buf);
 struct input *pl_input_alloc(pipeline_handle_t plh);
 void pl_input_free(pipeline_handle_t plh, struct input *);
 
+const char *pl_name(pipeline_handle_t plh);
+
 #endif
 
