@@ -1,6 +1,9 @@
 module Stack (
     instantiateOpt,
-    instantiateFlows, instantiateFlows_, instantiateFlowsIO_,
+    instantiateFlowsIO_,
+    instantiateFlows,
+    instantiateFlows',
+    instantiateFlows_,
 
     StackState(..),
     StackArgs(..),
@@ -482,15 +485,20 @@ updateGraphOpt costFn cfgOracle args sstv = do
     appendFile "allAppslist.appready" "Application is ready!\n"
 
 
-flowTrigger = 6
+--flowTrigger = 4
+flowTrigger = 0
+
+updateGraphFlows = (updateGraphFlows' flowTrigger)
 
 -- updateGraph function that uses Dragonet.Search functions
-updateGraphFlows
-    :: ([Flow] -> IO C.Configuration)
+updateGraphFlows'
+    :: (Int)
+    -> ([Flow] -> IO C.Configuration)
     -> StackArgs
     -> STM.TVar StackState
     -> IO ()
-updateGraphFlows getConf args sstv = do
+updateGraphFlows' ft getConf args sstv = do
+   putStrLn "updateGraphFlows'"
    (ss, prevEpsM) <- ssExecUpd sstv
    putStrLn $ "updateGraphFlows: v" ++ (show $ ssVersion ss)
    -- get list of all endpoints from stack-state
@@ -511,29 +519,39 @@ updateGraphFlows getConf args sstv = do
        flows = ssFlows ss
 
    putStrLn $ "Flows:\n" ++ (ppShow $ map flowStr flows)
-   prgConf <- getConf flows
+   putStrLn $ "Flow count: " ++ (show $ length flows)
+   --if ((length flows) < flowTrigger && (length flows) > 1)
+   if ((length flows) < ft)
+        then do
+           putStrLn "Waiting for more flows, so using old configuration"
+           --- TODO REMOVE TRIGGER!
+           --plg <- ssMakeGraph ss args oldConf lbl
+           --(stCfgImpl $ stPrg args) (ssSharedState ss) oldConf
+           --PLD.run (ssCtx ss) plConnect (ssCreatePL args ss plg) $ addMuxIds plg
+        else do
+           prgConf <- getConf flows
 
-   -- STEP: Create a new combined, but pipelined graph
-   --          with both LPG and PRG with configuration applied
-   plg <- ssMakeGraph ss args prgConf lbl xforms
+           -- STEP: Create a new combined, but pipelined graph
+           --          with both LPG and PRG with configuration applied
+           plg <- ssMakeGraph ss args prgConf lbl xforms
 
-   -- STEP: apply PRG configuration
-   -- NOTE: This is the step where actually filters will be inserted
-   --      in the NIC
-   (stCfgImpl $ stPrg args) (ssSharedState ss) prgConf
+           -- STEP: apply PRG configuration
+           -- NOTE: This is the step where actually filters will be inserted
+           --      in the NIC
+           (stCfgImpl $ stPrg args) (ssSharedState ss) prgConf
 
-   -- STEP: Run each pipeline
-   --   * Create pipeline in separate thread if it don't exist
-   --   * If pipeline exist then
-   --       + stop it
-   --       + Update the in/out connecting queues based on changes
-   -- NOTE: ctx is still an initial context, is that efficient?
-   PLD.run (ssCtx ss) plConnect (ssCreatePL args ss plg) $ addMuxIds plg
+           -- STEP: Run each pipeline
+           --   * Create pipeline in separate thread if it don't exist
+           --   * If pipeline exist then
+           --       + stop it
+           --       + Update the in/out connecting queues based on changes
+           -- NOTE: ctx is still an initial context, is that efficient?
+           PLD.run (ssCtx ss) plConnect (ssCreatePL args ss plg) $ addMuxIds plg
 
-   --putStrLn "updateGraph exit"
-   -- FIXME: Create file here.
-   --putStrLn "################### calling appendFile with app ready notice"
-   appendFile "allAppslist.appready" "Application is ready!\n"
+           putStrLn "updateGraph exit"
+           -- FIXME: Create file here.
+           putStrLn "################### calling appendFile with app ready notice"
+           appendFile("allAppslist.appready") $ "Application is ready!\n"
 
 -- OLD/Deprecated interface
 
@@ -562,27 +580,33 @@ instantiateFlowsIO_ getConfIO cfgPLA prgArgs = do
         updFn = updateGraphFlows getConfIO args
     instantiateStack args updFn
 
-instantiateFlows_ ::
+
+instantiateFlows_ =  (instantiateFlows__ flowTrigger)
+
+instantiateFlows__ ::
+        (Int)
         -- | Function to get a configuration by searching using Oracle
-           ([Flow] -> C.Configuration)
+        -> ([Flow] -> C.Configuration)
         -- | function to Group the LPG nodes into pipelines
         -> (StackState -> String -> PG.PGNode -> String)
         -> StackPrgArgs
         -> IO ()
-instantiateFlows_ getConf cfgPLA prgArgs = do
+instantiateFlows__ ft getConf cfgPLA prgArgs = do
     args0 <- stackArgsDefault
     let args = initStackArgs $ args0 { stPrg    = prgArgs
                                      , stCfgPLA = cfgPLA }
-        updFn = updateGraphFlows getConf' args
+        updFn = updateGraphFlows' ft getConf' args
         getConf' flows = return $ getConf flows
     instantiateStack args updFn
 
+instantiateFlows =  (instantiateFlows' flowTrigger)
 
 -- instantiateFlows function that uses the new interface
 -- TODO: remove this and have the calleres use the new interface
-instantiateFlows ::
+instantiateFlows' ::
+        (Int)
         -- | Function to get a configuration by searching using Oracle
-           ([Flow] -> C.Configuration)
+        ->   ([Flow] -> C.Configuration)
         -- | Unconfigured PRG + helpers
         -> (PG.PGraph,Sem.Helpers)
         -- | Name of llvm-helpers, needed for implementing the graph
@@ -592,18 +616,18 @@ instantiateFlows ::
         -- | function to Group the LPG nodes into pipelines
         -> (StackState -> String -> PG.PGNode -> String)
         -> IO ()
-instantiateFlows getConf prgH llvmH cfgImpl cfgPLA = do
+instantiateFlows' ft getConf prgH llvmH cfgImpl cfgPLA = do
     let prgArgs = StackPrgArgs { stPrgH = prgH
                                , stLlvmH = llvmH
                                , stCfgImpl = cfgImpl }
-    instantiateFlows_ getConf cfgPLA prgArgs
+    instantiateFlows__ ft getConf cfgPLA prgArgs
 
 
 -- instantiateFlows function that uses the new interface:
 -- TODO: remove this and have the callers use the new interface
 -- instantiate a stack using Dragonet.Optimization
 instantiateOpt :: (Ord a, Show a) =>
-           (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
+        (PG.PGraph,Sem.Helpers)                     -- | Unconf PRG + helpers
         -> String                                      -- | Name of llvm-helpers
         -> (StackState -> [EndpointDesc] -> O.CostFunction a) -- | Cost Function
         -> (StackState -> [(String,C.Configuration)]) -- | Oracle

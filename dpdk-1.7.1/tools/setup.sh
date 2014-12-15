@@ -97,7 +97,8 @@ setup_target()
 		fi
 	fi
 	if [ "$QUIT" == "0" ] ; then
-		make install T=${RTE_TARGET}
+		#make $TF install T=${RTE_TARGET}
+                echo "skipping installation as it is assumed to be already done"
 	fi
 	echo "------------------------------------------------------------------------------"
 	echo " RTE_TARGET exported as $RTE_TARGET"
@@ -385,6 +386,33 @@ set_numa_pages()
 }
 
 #
+# Creates hugepages on specific NUMA nodes. (hardcoded: 64 pages)
+#
+set_numa_pages_dragonet()
+{
+	clear_huge_pages
+
+	echo ""
+	echo "  Input the number of 2MB pages for each node"
+	echo "  Example: to have 128MB of hugepages available per node,"
+	echo "  enter '64' to reserve 64 * 2MB pages on each node"
+
+	echo > .echo_tmp
+	for d in /sys/devices/system/node/node? ; do
+		node=$(basename $d)
+		echo -n "Number of pages for $node: "
+		Pages=64
+		echo "echo $Pages > $d/hugepages/hugepages-2048kB/nr_hugepages" >> .echo_tmp
+	done
+	echo "Reserving hugepages"
+	sudo sh .echo_tmp
+	rm -f .echo_tmp
+
+	create_mnt_huge
+}
+
+
+#
 # Run unit test application.
 #
 run_test_app()
@@ -589,13 +617,35 @@ step5_func()
 	FUNC[6]="clear_huge_pages"
 }
 
+#
+# Options for cleaning up the system
+#
+dragonet_setup()
+{
+    TF=''
+    TF='TOOLCHAIN_CFLAGS=-msse4'
+    step1_func
+    setup_target 8
+    load_igb_uio_module
+    set_numa_pages_dragonet
+}
+
 STEPS[1]="step1_func"
 STEPS[2]="step2_func"
 STEPS[3]="step3_func"
 STEPS[4]="step4_func"
 STEPS[5]="step5_func"
 
+
 QUIT=0
+
+if [ "$1" == "dragonet" ] ;
+then
+    echo "Configuring the dpdk installation for Dragonet"
+    dragonet_setup
+    exit 0
+fi
+
 
 while [ "$QUIT" == "0" ]; do
 	OPTION_NUM=1

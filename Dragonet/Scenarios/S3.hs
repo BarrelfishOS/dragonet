@@ -79,16 +79,18 @@ getClientList clcount =  take clcount $ concat $ repeat clList
     clList = [
           "10.113.4.51"  --  ziger1:
           , "10.113.4.57"  --  ziger2:
-          , "10.113.4.26"  --  sbrinz1:
+--          , "10.113.4.26"  --  sbrinz1:
           , "10.113.4.29"  --  sbrinz2:
           , "10.113.4.20"  --  gruyere:
-          , "10.113.4.71"  --  appenzeller:
+--          , "10.113.4.71"  --  appenzeller:
       ]
 
 
 generateFlowsWrapper fperApp clcount = generateFlows serverIP srvPort  clients_ip_addr clientStartPort fperApp
     where
-    serverIP =  DM.fromJust $ IP4.ipFromString "10.113.4.95"
+    serverIP =  DM.fromJust $ IP4.ipFromString
+                -- "10.113.4.95"   -- Using asiago as server
+                "10.113.4.95"     -- Using sbrinz1 as server
 
     srvPort = 7777
     clients_ip_addr = map ( DM.fromJust . IP4.ipFromString ) $ getClientList clcount
@@ -114,7 +116,7 @@ flowsToConfig flist fpApp nq =  [
         ("RxCFDirFilter", PG.CVList allFlowsFdir)
     ]
     where
-    allFlowsFdir = glFLows1  ++  glFLows2 ++ otherQmap'
+    allFlowsFdir = map DM.fromJust $ glFLows1  ++  glFLows2 ++ otherQmap'
     toFilterType = E10k.mkFDirFromFl
     pflows = DL.sort $ filter (isGoldFl fpApp) flist
     halfway = ((length pflows) `div` 2)

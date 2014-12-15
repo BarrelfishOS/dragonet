@@ -37,13 +37,6 @@ import qualified Scenarios.S3 as S3
 tr a b = trace b a
 trN a b = a
 
-localIP :: Word32
-localIP = MD.asiagoIP_E10K
---localIP = MD.burrataIP
-
-putStrLnDbg x = putStrLn x
-putStrLnDbgN x = return ()
-
 --------------------------------------------------
 
 --------------------------------------------------
@@ -102,7 +95,7 @@ controlThread chan sh = do
     -- Start working on chan
     forever $ do
         act <- STM.atomically $ STM.readTChan chan
-        putStrLnDbgN $ "e10k-driver-thread: received action request : " ++ (show act)
+        --putStrLnDbgN $ "e10k-driver-thread: received action request : " ++ (show act)
         case act of
             CfgASet5Tuple idx ft ->
                 CTRL.ftSet sh idx ft
@@ -124,7 +117,7 @@ runDriverThread::
     -> PLI.StateHandle
     -> IO ()
 runDriverThread tcstate chan sh = do
-    putStrLnDbgN $ "e10k-driver-thread: "
+    --putStrLnDbgN $ "e10k-driver-thread: "
     cstate <- STM.atomically $ STM.readTVar tcstate
     -- Ensure control thread is running
     -- If not, create a haskell-level thread (instead of OS-level thread)
@@ -158,7 +151,7 @@ implCfgFDir ::
 implCfgFDir tcstate chan sh config = do
     cstate' <- STM.atomically $ STM.readTVar tcstate
 
-    putStrLnDbgN $ "e10k-implCfgFDir: " ++ show config
+    --putStrLnDbgN $ "e10k-implCfgFDir: " ++ show config
     -- Handling 5tuple filters
     let Just (PG.CVList tuples) = lookup "RxCFDirFilter" config
 
@@ -211,7 +204,7 @@ implCfgFDir tcstate chan sh config = do
                         csFDirs = ftm'' }
 
 
-    putStrLnDbgN $ "e10k-implFdir: adding flow " ++ (show toAddId)
+    --putStrLnDbgN $ "e10k-implFdir: adding flow " ++ (show toAddId)
     -- Send the message to the driver thread to add the filters
     forM_ toAddId $ \(ft,i) ->
         STM.atomically $ STM.writeTChan chan $ CfgASetFDir i ft
@@ -266,7 +259,7 @@ implCfg5Tuple ::
 implCfg5Tuple tcstate chan sh config = do
     cstate' <- STM.atomically $ STM.readTVar tcstate
 
-    putStrLnDbgN $ "e10k-implCfg5Tuple: " ++ show config
+    --putStrLnDbgN $ "e10k-implCfg5Tuple: " ++ show config
     -- Handling 5tuple filters
     let Just (PG.CVList tuples) = lookup "RxC5TupleFilter" config
 
@@ -320,12 +313,12 @@ implCfg5Tuple tcstate chan sh config = do
 
     -- Send the message to the driver thread to add the filters
 
-    putStrLnDbgN $ "e10k-impl5tpl: adding flow " ++ (show toAddId)
+    --putStrLnDbgN $ "e10k-impl5tpl: adding flow " ++ (show toAddId)
     forM_ toAddId $ \(ft,i) ->
         STM.atomically $ STM.writeTChan chan $ CfgASet5Tuple i ft
     STM.atomically $ STM.writeTVar tcstate cstate''
     return ()
-    putStrLnDbgN $ "e10k-impl5tuple: filters to add " ++ (show toAddId)
+    --putStrLnDbgN $ "e10k-impl5tuple: filters to add " ++ (show toAddId)
     where
         {-|
          - Function to parse the  configuration and return 5tuple filter
@@ -447,15 +440,20 @@ main = do
         hardcodedParams = Search.runSearch $ S3.hardcodedOracleMemcached
                         concurrency clients nq  costfn prgU    -- fpApp clients nq prgU
 
-        searchFns = [("greedy", greedyParams), ("hardcoded", hardcodedParams)]
-        searchFn        = case lookup oraclefn searchFns of
+        searchFns = [
+                        ("greedy", (greedyParams, 0)),
+                        ("hardcoded", (hardcodedParams, (concurrency * clients) ))
+                    ]
+        (searchFn, trigger) = case lookup oraclefn searchFns of
                         Just x  -> x
                         Nothing -> error $ "Uknown oracle function:" ++ oraclefn
+
 
     -- TODO: Create the driver-thread before you go and start flows
     --      This should speedup the initialization as driver will be ready
     --      before applications starts connecting in
-    instantiateFlows
+    instantiateFlows'
+        trigger
         searchFn                -- ^ returns configurations to evaluate
         prgH                    -- ^ PRG
         llvm_helpers            -- ^ llvm helpers

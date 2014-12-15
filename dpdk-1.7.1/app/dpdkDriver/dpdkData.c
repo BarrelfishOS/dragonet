@@ -388,7 +388,7 @@ int init_dpdk_setupV2(int queues)
     }
 
     const char *myArgs[ARGNOS] = {"./stack-dpdk",
-        "-c", "0xfffff",  // coremask
+        "-c", "0xff",  // coremask
         "-n", "1",  // no of mem chanels // FIXME: figure out proper value here
         "--file-prefix=dnetHuge",
 //        "--no-huge",
