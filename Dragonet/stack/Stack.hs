@@ -1,6 +1,6 @@
 module Stack (
     instantiateOpt,
-    instantiateFlows, instantiateFlows_,
+    instantiateFlows, instantiateFlows_, instantiateFlowsIO_,
 
     StackState(..),
     StackArgs(..),
@@ -409,7 +409,6 @@ ssExecUpd sstv = STM.atomically $ do
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
-
 type UpdateGraphFn = STM.TVar StackState -> IO ()
 instantiateStack :: StackArgs -> UpdateGraphFn -> IO ()
 instantiateStack args updateGraph = do
@@ -533,7 +532,9 @@ updateGraphFlows getConf args sstv = do
 -- OLD/Deprecated interface
 
 instantiateSearchIO :: (Srch.OracleSt o a)
-                    => Srch.SearchParams o a -> StackArgs -> IO ()
+                    => Srch.SearchParams o a
+                    -> StackArgs
+                    -> IO ()
 instantiateSearchIO params args = do
     -- initialize search state
     searchSt <- Srch.initSearchIO params
@@ -542,6 +543,18 @@ instantiateSearchIO params args = do
         updFn = updateGraphFlows getConfIO args
     instantiateStack args updFn
 
+
+instantiateFlowsIO_
+    :: ([Flow] -> IO (C.Configuration))
+    -> (StackState -> String -> PG.PGNode -> String)
+    -> StackPrgArgs
+    -> IO ()
+instantiateFlowsIO_ getConfIO cfgPLA prgArgs = do
+    args0 <- stackArgsDefault
+    let args = initStackArgs $ args0 { stPrg    = prgArgs
+                                     , stCfgPLA = cfgPLA }
+        updFn = updateGraphFlows getConfIO args
+    instantiateStack args updFn
 
 instantiateFlows_ ::
         -- | Function to get a configuration by searching using Oracle

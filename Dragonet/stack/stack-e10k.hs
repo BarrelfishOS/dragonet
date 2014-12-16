@@ -151,12 +151,6 @@ plAssign _ _ (_,n)
 plAssignMerged :: SS.StackState -> String -> PG.PGNode -> String
 plAssignMerged _ _ (_,n) = PG.nTag n
 
-data StackE10kOpts = StackE10kOpts {
-      optNq     :: Int
-    , optCostFn :: Int -> SE.CostQueueFn
-    , optDummy  :: Bool
-} deriving (Show)
-
 e10kImplFunction :: IO (PLI.StateHandle -> C.Configuration -> IO ())
 e10kImplFunction = do
     --  Channel and MVar with thread id of control thread
@@ -187,22 +181,34 @@ tapPrgArgs = do
                            , SS.stLlvmH = "llvm-helpers-tap"
                            , SS.stCfgImpl = dummyImplFn }
 
+data StackE10kOpts = StackE10kOpts {
+      optNq     :: Int
+    , optCostFn :: Int -> SE.CostQueueFn
+    , optDummy  :: Bool
+} deriving (Show)
+
+
 runStackE10k :: StackE10kOpts -> IO ()
 runStackE10k opts = do
     -- PRG
     (prgU,_) <- E10k.graphH
+    -- get options
     let nq       = optNq opts
         costFn   = (optCostFn opts) nq
         dummy    = optDummy opts
-        searchFn = SE.runSearch searchPs
-        searchPs = (SE.initSearchParamsE10k nq) { SE.sPrgU = prgU
-                                                , SE.sCostFn = costFn }
+
+    -- search for finding configuration
+    let sParams = (SE.initSearchParamsE10k nq)
+                        { SE.sPrgU = prgU
+                        , SE.sCostFn = costFn }
+    getConfIO <- SE.runSearchIO <$> SE.initSearchIO sParams
+
+    -- PRG
     prgArgs <- case dummy of
                 True -> tapPrgArgs
                 False -> e10kPrgArgs
 
-    SS.instantiateFlows_ searchFn plAssignMerged prgArgs
-
+    SS.instantiateFlowsIO_ getConfIO plAssignMerged prgArgs
 
 costFnParser = OA.str >>= doParse
     where doParse :: String -> OA.ReadM (Int -> SE.CostQueueFn)
