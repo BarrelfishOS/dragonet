@@ -277,7 +277,7 @@ static bool e10k_if_init(struct state *state, const char *pciaddr)
         }
     }
 
-    state->tap_handler = (void *) i;
+    state->st_driver_handle = (void *) i;
     return true;
 out_err:
     free(i);
@@ -290,7 +290,7 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
     struct state *state, struct input **in, uint8_t qi)
 {
     assert(qi < MAX_QUEUES);
-    struct dragonet_e10k *e10k = (struct dragonet_e10k *) state->tap_handler;
+    struct dragonet_e10k *e10k = (struct dragonet_e10k *) state->st_driver_handle;
     struct dragonet_e10k_queue *q;
     void *op;
     size_t len;
@@ -312,7 +312,7 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
         if (!e10k_if_init(state, CONFIG_PCI_ADDR)) {
             pl_panic(pipeline_handle, "Initializing e10k device failed\n");
         }
-        e10k = (struct dragonet_e10k *) state->tap_handler;
+        e10k = (struct dragonet_e10k *) state->st_driver_handle;
 
         // clear up the stats array
         memset(qstat, 0, sizeof(qstat));
@@ -402,7 +402,7 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
     struct input *qin = *in;
 
     do {
-        e10k = (struct dragonet_e10k *) state->tap_handler;
+        e10k = (struct dragonet_e10k *) state->st_driver_handle;
     } while (e10k == NULL);
     q = e10k->queues + qi;
     while (!q->populated);

@@ -27,7 +27,7 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
     assert(qi < MAX_QUEUES);
     struct dragonet_dpdk_queue *q;
 
-    struct dragonet_dpdk *e10k = (struct dragonet_dpdk *) state->tap_handler;
+    struct dragonet_dpdk *e10k = (struct dragonet_dpdk *) state->st_driver_handle;
     size_t len = 0;
     int last;
 
@@ -42,14 +42,14 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
         }
 
         // DPDK specific init
-        state->tap_handler = (void *)init_dpdk_wrapper_deleteme(IFNAME,
+        state->st_driver_handle = (void *)init_dpdk_wrapper_deleteme(IFNAME,
                 queues_to_use);
 
-        if (state->tap_handler == NULL) {
+        if (state->st_driver_handle == NULL) {
             printf("ERROR: Initializing dpdk e10k device failed\n");
             abort();
         }
-        e10k = (void *) state->tap_handler;
+        e10k = (void *) state->st_driver_handle;
 
         // clear up the stats array
         memset(qstat, 0, sizeof(qstat));
@@ -121,7 +121,7 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
             "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
             "######## received RX packet\n",
             __FILE__,  __func__, __LINE__, qi, q->rx_pkts,
-            state->tap_handler, e10k->e10kif,
+            state->st_driver_handle, e10k->e10kif,
             &e10k->queues[0], e10k->queues[0].queue,
             qi, q, q->queue);
 
@@ -159,7 +159,7 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
     // wait while you get proper handler.
     // FIXME: how do I make sure that this code is thread-safe?
     do {
-        e10k = (struct dragonet_dpdk *) state->tap_handler;
+        e10k = (struct dragonet_dpdk *) state->st_driver_handle;
     } while (e10k == NULL);
     q = e10k->queues + qi;
     // wait till queue is allocated
@@ -168,7 +168,7 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
     dprint("[QID:%"PRIu8"], [pktid:%d], dragonet_nic = %p, "
             "e10k_if = %p, (vq0 [%p, qstate %d], [vq-%"PRIu8": %p, qstate %d], "
             "######## Trying to send packet, data: %p, len:%"PRIu32"\n",
-            qi, q->tx_pkts, state->tap_handler, e10k->e10kif,
+            qi, q->tx_pkts, state->st_driver_handle, e10k->e10kif,
             &e10k->queues[0], e10k->queues[0].qstate,
             qi, q, q->qstate, (*in)->data, (*in)->len);
 

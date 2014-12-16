@@ -13,14 +13,14 @@ void e10k_ctrl_waitready(struct state *state)
 {
     struct dragonet_e10k *e10k;
     do {
-        e10k = (struct dragonet_e10k *) state->tap_handler;
+        e10k = (struct dragonet_e10k *) state->st_driver_handle;
         sched_yield();
     } while (e10k == NULL);
 }
 
 bool e10k_ctrl_5tuple_unset(struct state *state, uint8_t index)
 {
-    struct dragonet_e10k *e10k = (struct dragonet_e10k *) state->tap_handler;
+    struct dragonet_e10k *e10k = (struct dragonet_e10k *) state->st_driver_handle;
     struct e10k_5tfilter f;
 
     if (e10k == NULL) {
@@ -52,7 +52,7 @@ bool e10k_ctrl_5tuple_set(struct state *state,
         uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port,
         uint16_t l4_type, uint16_t mask)
 {
-    struct dragonet_e10k *e10k = (struct dragonet_e10k *) state->tap_handler;
+    struct dragonet_e10k *e10k = (struct dragonet_e10k *) state->st_driver_handle;
     struct e10k_5tfilter f;
 
     if (e10k == NULL) {

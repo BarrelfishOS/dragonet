@@ -99,18 +99,18 @@ int main(int argc, char *argv[])
 
 static void tap_init(struct state *state)
 {
-    if (state->tap_handler != NULL) {
+    if (state->st_driver_handle != NULL) {
         printf("SF driver Already intialized\n");
         return;
     }
 
     //struct vi *onload_dev = init_onload_wrapper(NULL);
     void *onload_dev = init_onload_wrapper(NULL);
-    state->tap_handler = onload_dev;
+    state->st_driver_handle = onload_dev;
     onload_driver.drv_handle = onload_dev;
     dprint("%s:%s:%d: %p == %p == %p ##########\n",
               __FILE__,  __func__, __LINE__,
-              onload_dev, state->tap_handler, onload_driver.drv_handle);
+              onload_dev, state->st_driver_handle, onload_driver.drv_handle);
 }
 
 
@@ -120,7 +120,7 @@ node_out_t do_pg__SFRxQueue(struct state *state, struct input *in)
 {
     int p_id = ++rx_pkts;
     pktoff_t maxlen;
-    if (state->tap_handler == NULL) {
+    if (state->st_driver_handle == NULL) {
         tap_init(state);
 
         state->local_mac = CONFIG_LOCAL_MAC_sf;
@@ -135,10 +135,10 @@ node_out_t do_pg__SFRxQueue(struct state *state, struct input *in)
 
     pkt_prepend(in, in->space_before);
 
-//    struct driver *onload_ptr = (struct driver *)state->tap_handler;
-    struct vi *onload_dev = (struct vi *) state->tap_handler;
+//    struct driver *onload_ptr = (struct driver *)state->st_driver_handle;
+    struct vi *onload_dev = (struct vi *) state->st_driver_handle;
     dprint("%s:%s:%d: [pktid:%d]: [drv: %p, %p], ############## Trying to receive packet\n",
-           __FILE__,  __func__, __LINE__, p_id, onload_dev, state->tap_handler);
+           __FILE__,  __func__, __LINE__, p_id, onload_dev, state->st_driver_handle);
     ssize_t len = onload_rx_wrapper(
             //onload_driver.drv_handle,
             //onload_ptr->drv_handle,
@@ -161,8 +161,8 @@ node_out_t do_pg__SFTxQueue(struct state *state, struct input *in)
     int p_id = ++tx_pkts;
     dprint("%s:%s:%d: [pktid:%d]: ############## Trying to send packet, data: %p, len:%"PRIu32"\n",
             __FILE__, __func__, __LINE__, p_id, in->data, in->len);
-    struct vi *onload_dev = (struct vi *) state->tap_handler;
-    //struct driver *onload_ptr = (struct driver *)state->tap_handler;
+    struct vi *onload_dev = (struct vi *) state->st_driver_handle;
+    //struct driver *onload_ptr = (struct driver *)state->st_driver_handle;
     onload_tx_wrapper(
             //onload_driver.drv_handle,
             //onload_ptr->drv_handle,

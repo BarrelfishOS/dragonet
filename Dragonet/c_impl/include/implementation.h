@@ -113,10 +113,9 @@ struct state {
     struct arp_cache   *arp_cache;
 
     uint64_t pkt_counter;
-    struct driver *driver_handler;
 
     // XXX: HACK
-    struct tap_handler *tap_handler;
+    void *st_driver_handle;
 
     void *udp_lock;
     void *udp_flow_ht;

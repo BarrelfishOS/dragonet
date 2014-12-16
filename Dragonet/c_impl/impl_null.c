@@ -225,7 +225,7 @@ static bool null_if_init(struct state *state, const char *pciaddr)
         }
     }
 
-    state->tap_handler = (void *) i;
+    state->st_driver_handle = (void *) i;
     return true;
 out_err:
     free(i);
@@ -242,7 +242,7 @@ static node_out_t rx_queue(struct ctx_NullRxQueue0 *context,
     assert(qi < MAX_QUEUES);
     assert(state != NULL);
 
-    struct dragonet_null *null = (struct dragonet_null *) state->tap_handler;
+    struct dragonet_null *null = (struct dragonet_null *) state->st_driver_handle;
     struct dragonet_null_queue *q;
     void *op;
     size_t len;
@@ -381,7 +381,7 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
     struct input *qin = *in;
 
     do {
-        null = (struct dragonet_null *) state->tap_handler;
+        null = (struct dragonet_null *) state->st_driver_handle;
     } while (null == NULL);
     q = null->queues + qi;
     while (!q->populated);

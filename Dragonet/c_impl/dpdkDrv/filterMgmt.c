@@ -8,7 +8,7 @@ void e10k_ctrl_waitready(struct state *state)
 {
     void *drv;
     do {
-        drv = (void *) state->tap_handler;
+        drv = (void *) state->st_driver_handle;
         sched_yield();
     } while (drv == NULL);
 }
@@ -31,7 +31,7 @@ bool e10k_ctrl_fdir_set(struct state *state,
         uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port,
         uint16_t l4_type, uint16_t mask)
 {
-    struct dragonet_dpdk *e10k_nic = (struct dragonet_dpdk *)state->tap_handler;
+    struct dragonet_dpdk *e10k_nic = (struct dragonet_dpdk *)state->st_driver_handle;
 
     if (e10k_nic == NULL) {
         return false;
@@ -65,7 +65,7 @@ bool e10k_ctrl_5tuple_set(struct state *state,
         uint16_t l4_type, uint16_t mask)
 {
 
-    struct dragonet_dpdk *e10k_nic = (struct dragonet_dpdk *)state->tap_handler;
+    struct dragonet_dpdk *e10k_nic = (struct dragonet_dpdk *)state->st_driver_handle;
 
     if (e10k_nic == NULL) {
         return false;

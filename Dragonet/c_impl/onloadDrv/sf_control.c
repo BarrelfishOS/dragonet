@@ -215,7 +215,7 @@ void sf_ctrl_waitready(struct state *state)
 {
     struct dragonet_sf *sf;
     do {
-        sf = (struct dragonet_sf *) state->tap_handler;
+        sf = (struct dragonet_sf *) state->st_driver_handle;
         sched_yield();
     } while (sf == NULL);
 }
@@ -226,7 +226,7 @@ bool sf_ctrl_5tuple_unset(struct state *state, uint8_t index)
     assert(!"NYI");
     // FIXME: figure out a way to lookup filters so that they can be deleted
     /*
-    struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
+    struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->st_driver_handle;
     struct dragonet_sf_queue *q;
     assert(qi < SF_MAX_QUEUES);
     assert(sf_driver != NULL);
@@ -236,7 +236,7 @@ bool sf_ctrl_5tuple_unset(struct state *state, uint8_t index)
             "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
             "######## unsetting filter\n",
             __FILE__,  __func__, __LINE__, qi, p_id,
-            state->tap_handler, sf_driver->sfif,
+            state->st_driver_handle, sf_driver->sfif,
             &sf_driver->queues[0], sf_driver->queues[0].queue_handle,
             qi, q, q->queue_handle);
     */
@@ -248,7 +248,7 @@ bool sf_ctrl_5tuple_set(struct state *state,
         uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port,
         uint16_t l4_type, uint16_t mask)
 {
-    struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
+    struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->st_driver_handle;
     struct dragonet_sf_queue *q;
     int ret;
     uint8_t qi = queue;
@@ -259,7 +259,7 @@ bool sf_ctrl_5tuple_set(struct state *state,
     dprint("%s:%s:%d: [QID:%"PRIu8"], dragonet_nic = %p, "
             "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
             "######## setting up 5tuple filter\n",
-            __FILE__,  __func__, __LINE__, qi, state->tap_handler,
+            __FILE__,  __func__, __LINE__, qi, state->st_driver_handle,
             sf_driver->sfif, &sf_driver->queues[0],
             sf_driver->queues[0].queue_handle,
             qi, q, q->queue_handle);

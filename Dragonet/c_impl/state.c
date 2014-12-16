@@ -17,7 +17,6 @@ void pg_state_init(struct state *st)
     st->arp_pending    = NULL;
     st->arp_cache      = NULL;
     st->pkt_counter    = 0;
-    st->driver_handler = 0;
     st->udp_flow_ht = NULL;
     st->udp_listen_ht = NULL;
     st->udp_lock = malloc(sizeof(pthread_rwlock_t));

@@ -629,15 +629,15 @@ int onload_tx_wrapper(struct dragonet_sf_queue *selected_vqueue,
 
 static void tap_init(struct state *state, char *dev_name)
 {
-    if (state->tap_handler != NULL) {
+    if (state->st_driver_handle != NULL) {
         printf("SF driver Already intialized\n");
         return;
     }
 
     void *onload_dev = init_onload_wrapper(dev_name);
-    state->tap_handler = onload_dev;
+    state->st_driver_handle = onload_dev;
 //    dprint("%s:%s:%d: %p == %p ##########\n",
-//              __FILE__,  __func__, __LINE__, onload_dev, state->tap_handler);
+//              __FILE__,  __func__, __LINE__, onload_dev, state->st_driver_handle);
 }
 // ############################################################
 // ####################### FOR RX and TX  #####################
@@ -653,7 +653,7 @@ static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
 {
     node_out_t out_decision = P_SFRxQueue0_drop;
     assert(qi < MAX_QUEUES);
-    struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
+    struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->st_driver_handle;
     struct dragonet_sf_queue *q;
 
     // Respawn this node
@@ -679,7 +679,7 @@ static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
         state->local_mac = CONFIG_LOCAL_MAC_sf;
         state->local_ip = CONFIG_LOCAL_IP_sf;
         dprint("%s:%s:%d: ############## Initializing driver %p done\n",
-              __FILE__,  __func__, __LINE__, state->tap_handler);
+              __FILE__,  __func__, __LINE__, state->st_driver_handle);
 
         *in = input_alloc();  // I am not sure if this is needed,
                 // but keeping there as there is similar line in e10k init code
@@ -713,7 +713,7 @@ static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
             "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
             "######## received RX packet\n",
             __FILE__,  __func__, __LINE__, qi, q->rx_pkts,
-            state->tap_handler, sf_driver->sfif,
+            state->st_driver_handle, sf_driver->sfif,
             &sf_driver->queues[0], sf_driver->queues[0].queue_handle,
             qi, q, q->queue_handle);
 
@@ -739,7 +739,7 @@ static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
 
 static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
 {
-    struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->tap_handler;
+    struct dragonet_sf *sf_driver = (struct dragonet_sf *) state->st_driver_handle;
     struct dragonet_sf_queue *q;
 
     // get handle on queue, and make sure that it is correct
@@ -753,7 +753,7 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
             "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
             "######## Trying to send packet, data: %p, len:%"PRIu32"\n",
             __FILE__,  __func__, __LINE__, qi, q->tx_pkts,
-            state->tap_handler, sf_driver->sfif,
+            state->st_driver_handle, sf_driver->sfif,
             &sf_driver->queues[0], sf_driver->queues[0].queue_handle,
             qi, q, q->queue_handle, (*in)->data, (*in)->len);
 

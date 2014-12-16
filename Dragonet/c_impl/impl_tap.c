@@ -3,31 +3,35 @@
 #include <packet_access.h>
 #include <inttypes.h>
 
-static int rx_pkts = 0;
-static int tx_pkts = 0;
 
 static void tap_init(struct state *state)
 {
-    if (state->tap_handler != NULL) {
+    struct tap_handle *h;
+    if (state->st_driver_handle != NULL) {
         printf("TAP Already intialized\n");
         return;
     }
-    state->tap_handler = tap_create("dragonet0");
-    tap_set_ip(state->tap_handler, "192.168.123.100");
-    tap_set_mask(state->tap_handler, "255.255.255.0");
-    tap_up(state->tap_handler);
+
+    h = tap_create("dragonet0");
+    tap_set_ip(h, "192.168.123.100");
+    tap_set_mask(h, "255.255.255.0");
+    tap_up(h);
+
+    state->st_driver_handle = h;
 }
 
 node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context,
         struct state *state, struct input **in)
 {
+    static int rx_pkts = 0;
     int p_id = ++rx_pkts;
     pktoff_t maxlen;
+    struct tap_handler *tap_handler = state->st_driver_handle;
 
     // Respawn this node
     spawn(context, NULL, S_TapRxQueue_poll, SPAWNPRIO_LOW);
 
-    if (state->tap_handler == NULL) {
+    if (tap_handler == NULL) {
         tap_init(state);
 
         state->local_mac = 0xf86954221b00ULL;
@@ -40,13 +44,12 @@ node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context,
         return P_RxQueue_init;
     }
 
-
     dprint("%s:%s:%d: [pktid:%d]: ############## Trying to receive packet\n",
            __FILE__,  __func__, __LINE__, p_id);
 
     *in = input_alloc();
     pkt_prepend(*in, (*in)->space_before);
-    ssize_t len = tap_read(state->tap_handler, (char *) (*in)->data, (*in)->len, 500);
+    ssize_t len = tap_read(tap_handler, (char *) (*in)->data, (*in)->len, 500);
     if (len == 0) {
         dprint("%s:%d: [pktid:%d]: pkt with zero len\n", __func__, __LINE__, p_id);
         return P_RxQueue_drop;
@@ -61,10 +64,13 @@ node_out_t do_pg__TapRxQueue(struct ctx_TapRxQueue *context,
 node_out_t do_pg__TapTxQueue(struct ctx_TapTxQueue *context,
         struct state *state, struct input **in)
 {
+    static int tx_pkts = 0;
+    struct tap_handler *tap_handler = state->st_driver_handle;
+
     int p_id = ++tx_pkts;
     dprint("%s:%s:%d: [pktid:%d]: ############## Trying to send packet, data: %p, len:%"PRIu32"\n",
             __FILE__, __func__, __LINE__, p_id, (*in)->data, (*in)->len);
-    tap_write(state->tap_handler, (*in)->data, (*in)->len);
+    tap_write(tap_handler, (*in)->data, (*in)->len);
     dprint("%s:%s:%d: [pktid:%d]: ##############  packet sent\n",
             __FILE__, __func__, __LINE__, p_id);
     return 0;

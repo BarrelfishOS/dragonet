@@ -15,14 +15,14 @@ void null_ctrl_waitready(struct state *state)
 {
     struct dragonet_null *null;
     do {
-        null = (struct dragonet_null *) state->tap_handler;
+        null = (struct dragonet_null *) state->st_driver_handle;
         sched_yield();
     } while (null == NULL);
 }
 
 bool null_ctrl_5tuple_unset(struct state *state, uint8_t index)
 {
-    struct dragonet_null *null = (struct dragonet_null *) state->tap_handler;
+    struct dragonet_null *null = (struct dragonet_null *) state->st_driver_handle;
 
     if (null == NULL) {
         return false;
@@ -40,7 +40,7 @@ bool null_ctrl_5tuple_set(struct state *state,
         uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port,
         uint16_t l4_type, uint16_t mask)
 {
-    struct dragonet_null *null = (struct dragonet_null *) state->tap_handler;
+    struct dragonet_null *null = (struct dragonet_null *) state->st_driver_handle;
     struct null_5tfilter f;
 
     if (null == NULL) {

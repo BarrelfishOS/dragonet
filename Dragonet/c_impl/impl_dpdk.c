@@ -35,7 +35,7 @@ int send_packet_wrapper(struct dpdk_info *dinf, char *pkt_tx, size_t len);*/
 
 static void dpdk_if_init(struct state *state)
 {
-    if (state->tap_handler != NULL) {
+    if (state->st_driver_handle != NULL) {
         printf("DPDK Already intialized\n");
         return;
     }
@@ -67,13 +67,13 @@ static void dpdk_if_init(struct state *state)
 
     assert(init_dpdk_setup_and_get_default_queue != NULL);
 
-    state->tap_handler = (struct tap_handler *)
+    state->st_driver_handle = (void *)
         init_dpdk_setup_and_get_default_queue(CONFIG_DPDK_IFNAME);
 }
 
 node_out_t do_pg__DPDKRxQueue(struct state *state, struct input *in)
 {
-    if (state->tap_handler == NULL) {
+    if (state->st_driver_handle == NULL) {
         dpdk_if_init(state);
 
         state->local_mac = CONFIG_LOCAL_MAC;
@@ -87,7 +87,7 @@ node_out_t do_pg__DPDKRxQueue(struct state *state, struct input *in)
     int (*get_packet_wrapper)(struct dpdk_info *dinf, char *pkt_tx, size_t len);
     get_packet_wrapper = dlsym(RTLD_DEFAULT, "get_packet_wrapper");
 
-    size_t len = get_packet_wrapper((struct dpdk_info *) state->tap_handler,
+    size_t len = get_packet_wrapper((struct dpdk_info *) state->st_driver_handle,
             (char *) tmpbuf, sizeof(tmpbuf));
     /*puts("\n\n\n---------------------------------------------------------");
     printf("Got packet! :-D\n");*/
@@ -99,7 +99,7 @@ node_out_t do_pg__DPDKTxQueue(struct state *state, struct input *in)
 {
     int (*send_packet_wrapper)(struct dpdk_info *dinf, char *pkt_tx, size_t len);
     send_packet_wrapper = dlsym(RTLD_DEFAULT, "send_packet_wrapper");
-    send_packet_wrapper((struct dpdk_info *) state->tap_handler, in->data,
+    send_packet_wrapper((struct dpdk_info *) state->st_driver_handle, in->data,
             in->len);
     /*printf("Sent packet! :-D\n");
     puts("---------------------------------------------------------\n\n\n");*/
