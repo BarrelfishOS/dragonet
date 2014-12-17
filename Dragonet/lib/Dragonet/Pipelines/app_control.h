@@ -82,7 +82,7 @@ void app_control_init(
     void (*socket_udpflow)(int,socket_id_t,uint32_t,uint16_t,uint32_t,uint16_t,app_flags_t),
     void (*socket_span)(int,socket_id_t,app_flags_t),
     void (*socket_close)(int,socket_id_t,app_flags_t),
-    void (*nop)(app_flags_t));
+    void (*nop)(int, app_flags_t));
 
 void app_control_send_welcome(int fd, app_id_t id);
 void app_control_send_status(int fd, bool success);

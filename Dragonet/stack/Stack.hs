@@ -264,6 +264,7 @@ eventHandler sstv ch (PLA.EvAppRegister lbl flags) = do
             }
         return aid
     putStrLn $ "AppRegister: " ++ lbl ++ "[" ++ show ch ++ "] -> " ++ show aid
+                            ++ ", flags: " ++ show flags
     PLA.sendMessage ch $ PLA.MsgWelcome aid
 
 {-|
@@ -281,11 +282,11 @@ eventHandler sstv ch
         STM.writeTVar sstv $ ss'
         return (sid,ss')
     putStrLn $ "SocketUDPBind f=" ++ show re ++ "/" ++ show le ++ "- "
-               ++ show sid
-    PLA.sendMessage ch $ PLA.MsgSocketInfo sid
+               ++ show sid ++ ", flags: " ++ show flags
     if testBit flags PLA.appFlagsMore
         then return ()
         else ssUpdateGraphs ss sstv
+    PLA.sendMessage ch $ PLA.MsgSocketInfo sid
 
 {-|
  -  Handing event SocketUDPFlow:
@@ -302,11 +303,11 @@ eventHandler sstv ch
         STM.writeTVar sstv $ ss'
         return ss'
     putStrLn $ "SocketUDPFlow f=" ++ show re ++ "/" ++ show le
-                ++ " for " ++ show sid
-    PLA.sendMessage ch $ PLA.MsgStatus True
+                ++ " for " ++ show sid ++ ", flags: " ++  show flags
     if testBit flags PLA.appFlagsMore
         then return ()
         else ssUpdateGraphs ss sstv
+    PLA.sendMessage ch $ PLA.MsgStatus True
 
 {-|
  -  Handling event SocketSpan:
@@ -327,17 +328,19 @@ eventHandler sstv ch (PLA.EvSocketSpan oldsid flags) = do
         STM.writeTVar sstv $ ss'
         return (sid,ss')
     putStrLn $ "SocketSpan existing=" ++ show oldsid ++ " for sid:" ++ show sid
-    PLA.sendMessage ch $ PLA.MsgSocketInfo sid
+                    ++ ", flags: " ++  show flags
     if testBit flags PLA.appFlagsMore
         then return ()
         else ssUpdateGraphs ss sstv
+    PLA.sendMessage ch $ PLA.MsgSocketInfo sid
 
 eventHandler sstv ch (PLA.EvNop flags) = do
     ss <- STM.atomically $ STM.readTVar sstv
+    putStrLn $ "#### NOOP called from " ++ show ch ++ " with flags " ++ show flags
     if testBit flags PLA.appFlagsMore
         then return ()
         else ssUpdateGraphs ss sstv
-
+    PLA.sendMessage ch $ PLA.MsgStatus True
 {-|
  -  Handling event "all other types":
  -      This is pretty much an error case.  Currently we are only printing
