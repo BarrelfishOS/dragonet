@@ -19,8 +19,10 @@ do
 	sudo ipcrm -m $i ;
 done
 
+sudo rm -rf ./out/*
 set +x
 set +e
+# unsetting so that I don't have to see the list of all the hugepages created
 # removing hugpages (assuming they are mounted on /mnt/huge/ location)
 sudo rm -rf /mnt/huge/dnetHugemap_*
 set -x

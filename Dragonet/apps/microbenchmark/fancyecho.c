@@ -665,15 +665,19 @@ static void *run_thread(void *arg)
     if (Cfg.stack_wait) {
         pthread_barrier_wait(&thr_barrier);
         if (th->localtid == 0) {
-            printf("Thread with id %d is triggering all changes ##############\n", th->localtid);
-            dnal_noop(daq, 0);
-            printf("Thread with id %d returned from noop ################\n", th->localtid);
+            printf("Thread with id %d is triggering all changes ##############\n",
+                    th->localtid);
+            err_expect_ok(dnal_noop(daq, 0));
+            printf("Thread with id %d returned from noop ################\n",
+                    th->localtid);
         }
         printf("Thread with id %d  waiting on barrier\n", th->localtid);
         pthread_barrier_wait(&thr_barrier);
     }
 
-    printf("Thread with id %d is starting execution of polling loop for %zu app  endpoints\n", th->localtid, th->num_aqs);
+    printf("TID[%d] is starting execution of polling loop for %zu app endpoints\n",
+            th->localtid, th->num_aqs);
+    printf("TID[%d], ready to handle client requests\n", th->localtid);
 
     while (true) {
         for (i = 0; i < th->num_aqs; i++) {

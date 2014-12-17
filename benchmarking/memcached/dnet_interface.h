@@ -15,6 +15,7 @@
 
 #ifdef MYDEBUG
 
+#ifdef DEBUG_WITH_TIMESTAMP
 static uint64_t get_tsc(void);
 __inline__ static uint64_t
 get_tsc(void) {
@@ -28,14 +29,18 @@ get_tsc(void) {
     __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
     return (uint64_t)hi << 32 | lo;
 }
-
-#define mmprint(x...)    do { printf("TID:%d:Cycle:%"PRIu64":", (int)pthread_self(), get_tsc()); printf(":debug:" x); } while(0)
+#define mmprint(x...)    do { printf("debug:%s:%s:%d:TID:%d:Cycle:%"PRIu64":", __FILE__, __FUNCTION__, __LINE__, (int)pthread_self(), get_tsc()); printf(x); } while(0)
+#else // DEBUG_WITH_TIMESTAMP
+#define mmprint(x...)    do { printf("debug:%s:%s:%d:TID:%d:", __FILE__, __FUNCTION__, __LINE__, (int)pthread_self()); printf(x); } while(0)
 //#define dprint(x...)    do { printf("TID:%d:", (int)pthread_self()); printf(":debug:" x); } while(0)
 //#define mmprint(x...)    printf("debug:" x)
-#else
-#define mmprint(x...)   ((void)0)
-#endif // MYDEBUG
+#endif // DEBUG_WITH_TIMESTAMP
 
+#else // MYDEBUG
+
+#define mmprint(x...)   ((void)0)
+
+#endif // MYDEBUG
 
 
 #ifdef DRAGONET
@@ -53,7 +58,7 @@ get_tsc(void) {
 //  memecached has its own copy of these variables in dnet_interface.h
 
 //#define SHOW_INTERVAL_STAT      1
-//#define INTERVAL_STAT_FREQUENCY     (1000)
+#define INTERVAL_STAT_FREQUENCY     (1000)
 //#define INTERVAL_STAT_FREQUENCY     (1)
 
 
@@ -90,6 +95,8 @@ struct dn_thread_state {
 extern int use_dragonet_stack;
 extern char *use_dragonet_stack_portmap;
 
+// barrier set for number of worker thread
+extern pthread_barrier_t        nthread_barrier;
 
 //int dn_stack_init_specific(char *slot_name, uint16_t uport);
 //int dn_stack_init(uint16_t uport);

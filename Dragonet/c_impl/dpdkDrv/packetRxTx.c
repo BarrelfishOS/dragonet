@@ -134,13 +134,13 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
 
     //printf("dpdk: Yay, we got a full packet!\n");
     if (qstat[qi] % INTERVAL_STAT_FREQUENCY == 0) {
-        //printf
-            dprint
+        printf
+            //dprint
             ("QueueID:%"PRIu8":[TID:%d]: RX:%-10"PRIu64", TX:%-10"PRIu64", RX_event\n",
              qi, (int)pthread_self(), qstat[qi], qstat_tx[qi]);
 
-        show_pkt_stats(&debug_pkt_stats);
-        print_stats_dpdk((void *)e10k, 0);
+        //show_pkt_stats(&debug_pkt_stats);
+        //print_stats_dpdk((void *)e10k, 0);
     }
 #endif // SHOW_INTERVAL_STATS
 
@@ -189,8 +189,8 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
             ("QueueID:%"PRIu8":[TID:%d]: RX:%-10"PRIu64", TX:%-10"PRIu64", TX_event\n",
                qi, (int)pthread_self(), qstat[qi], qstat_tx[qi]);
 
-    show_pkt_stats(&debug_pkt_stats);
-    print_stats_dpdk((void *)e10k, 0);
+    //show_pkt_stats(&debug_pkt_stats);
+    //print_stats_dpdk((void *)e10k, 0);
    }
 #endif // SHOW_INTERVAL_STATS
 

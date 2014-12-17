@@ -840,6 +840,15 @@ void thread_init(int nthreads, struct event_base *main_base) {
     pthread_mutex_init(&cqi_freelist_lock, NULL);
     cqi_freelist = NULL;
 
+    int res;
+
+#ifdef DRAGONET
+    if ((res = pthread_barrier_init(&nthread_barrier, NULL, nthreads)) != 0) {
+        fprintf(stderr, "pttrhead_barrier_init failed: %s\n", strerror(res));
+        abort();
+    }
+#endif // DRAGONET
+
     /* Want a wide lock table, but don't waste memory */
     if (nthreads < 3) {
         power = 10;
