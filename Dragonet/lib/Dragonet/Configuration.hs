@@ -32,9 +32,9 @@ type Configuration = [(String,ConfValue)]
 class ConfChange a where
     applyConfChange :: Configuration -> a -> Configuration
     --
-    -- NB: code below seems too OO, but not sure how to do it better These are
+    -- NB: code below seems too OO, but not sure how to do it better. These are
     -- similar to static methods: the first argument is not used they can be
-    -- called as foo undefined::<class_instance>
+    -- called as fn undefined::<class_instance>
     --
     -- initial empty configration
     emptyConfig :: a -> Configuration

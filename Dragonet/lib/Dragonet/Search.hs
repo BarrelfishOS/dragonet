@@ -103,13 +103,14 @@ type CostFn a s = (C.ConfChange a)
         see: https://www.haskell.org/haskellwiki/Functional_dependencies --AKK
 -}
 class (C.ConfChange a) => OracleSt o a | o -> a where
-    -- seems too OO, but not sure how to do it better
     -- sometimes we have an oracle instance, so it's much easier to use it
-    -- to print a configuration
+    -- to print a configuration that using C.showConfig
     showConf   :: o -> C.Configuration -> String
     showConf _ c = C.showConfig (undefined::a) c
-    -- iterators
-    -- | 'flowConfChanges' returns configuration changes for a new flow
+
+    -- | 'flowConfChanges' returns a list of configuration changes for a
+    -- flow. Note that the list may be empty, if there are no available
+    -- configuration changes that map to the given flow.
     flowConfChanges ::
         -- | Oracle
            o
@@ -187,13 +188,7 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
      - This implementation does not care for current state of queues,
      -  and counts on cost-function to help in selecting proper queue.
     -}
-    flowConfChanges E10kOracleSt { nQueues = nq } c fl =
-        -- FIXME: get better algorithm for queue allocation
-        -- FIXME: FDir filters are not working properly with priority
-        -- FIXME: detect when tables are full
-        -- [E10k.insert5tFromFl fl q | q <- allQueues nq]
-        -- ++
-        [E10k.insertFdirFromFl fl q |  q <- allQueues nq]
+    flowConfChanges = e10kFlowConfChanges
 
     -- QUESTION: Is it assumed that there will be only one operation in
     --      conf change?
@@ -204,6 +199,20 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
     affectedQueues E10kOracleSt { nQueues = nq } conf (E10k.InsertFDir cFdir) =
         [e10kDefaultQ, xq]
         where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
+
+-- FIXME: FDir filters are not working properly with priority
+-- TODO: avoid symmetric allocation
+-- TODO: smart-wildcard allocation if possible?
+e10kFlowConfChanges :: E10kOracleSt -> C.Configuration -> Flow
+                    -> [E10k.ConfChange]
+e10kFlowConfChanges E10kOracleSt {nQueues = nq} cnf fl
+    -- allocate 5-tuple filters first, if we can
+    | not rx5tFull  = [E10k.insert5tFromFl fl q | q <- allQs]
+    | not rxCfdFull = catMaybes $ [E10k.insertFdirFromFl fl q | q <- allQs]
+    | otherwise     = []
+    where allQs = allQueues nq
+          rx5tFull  = E10k.rx5tFilterTableFull cnf
+          rxCfdFull = E10k.rxCfdFilterTableFull cnf
 
 myThird (_,_,x) = x
 mySnd (_,x,_) = x
@@ -235,8 +244,8 @@ instance OracleSt E10kOracleHardCoded E10k.ConfChange where
             ans
               | length(f) > 1 = error ("ERROR: there must be repeat flow, as more than one flow matches.")
               | length(f) == 0 = []
-              | (myThird $ head f) == 1 = [E10k.InsertFDir $ E10k.mkFDirFromFl fl (mySnd $ head f)]
-              | (myThird $ head f) == 2 = [E10k.Insert5T $ E10k.mkFDirFromFl fl (mySnd $ head f)]
+              | (myThird $ head f) == 1 = [E10k.InsertFDir $ fromJust $ E10k.mkFDirFromFl fl (mySnd $ head f)]
+              | (myThird $ head f) == 2 = [E10k.Insert5T   $ fromJust $ E10k.mkFDirFromFl fl (mySnd $ head f)]
               | otherwise = error ("ERROR: wrong type of flow")
 
 
@@ -273,7 +282,6 @@ initSearchParamsE10k nqueues = initSearchParams {sOracle = oracle}
     where oracle = E10kOracleSt {nQueues = nqueues}
 
 type FlowCache s      = HB.HashTable s (PG.NLabel, Flow) PG.NPort
-
 data SearchSt s o a = (OracleSt o a) => SearchSt {
       sParams     :: SearchParams o a
     , sFlowCache  :: FlowCache s
@@ -338,8 +346,8 @@ qMap st conf confChange flows = do
         prgC = C.applyConfig newConf prgU
     qMap_ st prgC flows
 
-qmapHT :: QMap -> ST.ST s (HB.HashTable s Flow QueueId)
-qmapHT qmap = H.fromList qmap
+-- qmapHT :: QMap -> ST.ST s (HB.HashTable s Flow QueueId)
+-- qmapHT qmap = H.fromList qmap
 
 -- NOTE: This is not used, but is kept around for future reference
 qMapIncremental :: (OracleSt o a)

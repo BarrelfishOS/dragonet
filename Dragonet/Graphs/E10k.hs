@@ -16,6 +16,8 @@ module Graphs.E10k (
     mk5TupleFromFl, mkFDirFromFl,
     insert5tFromFl, insertFdirFromFl,
 
+    rx5tFilterTableFull,rxCfdFilterTableFull,
+
     cfgEmpty, cfgStr,
     graphH_, graphH,
 ) where
@@ -57,6 +59,23 @@ trN = \x  _ -> x
 
 type QueueId = Int
 
+cfgEmpty = [
+    ("RxC5TupleFilter", PG.CVList []),
+    ("RxCFDirFilter", PG.CVList [])
+ ]
+
+rx5tFilterTableFull :: C.Configuration -> Bool
+rx5tFilterTableSize  = 128
+rx5tFilterTableFull cnf = case L.lookup "RxC5TupleFilter" cnf of
+    Nothing            -> False
+    Just (PG.CVList l) -> length l >= rx5tFilterTableSize
+
+rxCfdFilterTableFull :: C.Configuration -> Bool
+rxCfdFilterTableSize = 1024
+rxCfdFilterTableFull cnf = case L.lookup "RxCFDirFilter" cnf of
+    Nothing            -> False
+    Just (PG.CVList l) -> length l >= rxCfdFilterTableSize
+
 
 addCfgFun :: PG.Node -> C.ConfFunction
 addCfgFun n
@@ -97,7 +116,6 @@ data C5Tuple = C5Tuple {
     c5tL4Src    :: Maybe C5TPort,
     c5tL4Dst    :: Maybe C5TPort
 } deriving (Eq,Show)
-
 
 c5tString :: C5Tuple -> String
 c5tString c = "5T("++l4p++","++l3s++","++l3d++","++l4s++","++l4d++")"
@@ -707,18 +725,15 @@ cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
 insert5tFromFl :: Flow -> QueueId -> ConfChange
 insert5tFromFl fl qid = Insert5T $ mk5TupleFromFl fl qid
 
-insertFdirFromFl :: Flow -> QueueId -> ConfChange
-insertFdirFromFl fl qid = InsertFDir $ mkFDirFromFl fl qid
-
 mk5TupleFromFl :: Flow -> QueueId -> PG.ConfValue
 mk5TupleFromFl fl@(FlowUDPv4 {}) q =
     PG.CVTuple [ cvMInt $ sIP,
-    cvMInt $ dIP,
-    PG.CVMaybe $ Just $ PG.CVEnum 1,
-    cvMInt $ sP,
-    cvMInt $ dP,
-    PG.CVInt prio,
-    PG.CVInt $ fromIntegral q]
+                 cvMInt $ dIP,
+                 PG.CVMaybe $ Just $ PG.CVEnum 1,
+                 cvMInt $ sP,
+                 cvMInt $ dP,
+                 PG.CVInt prio,
+                 PG.CVInt $ fromIntegral q]
     where
        sIP  = flSrcIp   fl
        dIP  = flDstIp   fl
@@ -726,25 +741,27 @@ mk5TupleFromFl fl@(FlowUDPv4 {}) q =
        dP   = flDstPort fl
        prio = 1
 
-mkFDirFromFl :: Flow -> QueueId -> PG.ConfValue
-mkFDirFromFl fl@(FlowUDPv4 {}) q =
-    PG.CVTuple [ cvMInt $ sIP,
-    cvMInt $ dIP,
-    PG.CVMaybe $ Just $ PG.CVEnum 1,
-    cvMInt $ sP,
-    cvMInt $ dP,
-    PG.CVInt $ fromIntegral q]
-    where
-       sIP  = flSrcIp   fl
-       dIP  = flDstIp   fl
-       sP   = flSrcPort fl
-       dP   = flDstPort fl
+insertFdirFromFl :: Flow -> QueueId -> Maybe ConfChange
+insertFdirFromFl fl qid = InsertFDir <$> mkFDirFromFl fl qid
+
+-- TODO: we might want to use CVInt instead of CVMaybe for {src,dst}/{ip,port}
+-- for these filters since they do not support wildcards
+mkFDirFromFl :: Flow -> QueueId -> Maybe PG.ConfValue
+mkFDirFromFl fl@(FlowUDPv4 { flSrcIp   = Just srcIp
+                           , flDstIp   = Just dstIp
+                           , flSrcPort = Just srcPort
+                           , flDstPort = Just dstPort }) q =
+    Just $ PG.CVTuple [ cvMInt $ Just $ fromIntegral srcIp,
+                        cvMInt $ Just $ fromIntegral dstIp,
+                        PG.CVMaybe $ Just $ PG.CVEnum 1,
+                        cvMInt $ Just  $ fromIntegral srcPort,
+                        cvMInt $ Just  $ fromIntegral dstPort,
+                        PG.CVInt  $ fromIntegral q ]
+-- flow director filters do not support wildcards
+mkFDirFromFl (FlowUDPv4 {}) _ = Nothing
 
 
-cfgEmpty = [
-    ("RxC5TupleFilter", PG.CVList []),
-    ("RxCFDirFilter", PG.CVList [])
- ]
+
 
 cfgStr :: C.Configuration -> String
 cfgStr cnf_ = ret
