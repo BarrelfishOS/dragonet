@@ -657,7 +657,7 @@ static void *run_thread(void *arg)
         pthread_mutex_unlock(&caq->mutex);
     }
 
-    printf("Thread with id %d is done\n", th->localtid);
+    printf("Thread with id %d is done ############### \n", th->localtid);
     ++thread_count;
     pthread_mutex_unlock(&stack_init_sequencer_mutex);
 
@@ -665,11 +665,15 @@ static void *run_thread(void *arg)
     if (Cfg.stack_wait) {
         pthread_barrier_wait(&thr_barrier);
         if (th->localtid == 0) {
+            printf("Thread with id %d is triggering all changes ##############\n", th->localtid);
             dnal_noop(daq, 0);
+            printf("Thread with id %d returned from noop ################\n", th->localtid);
         }
+        printf("Thread with id %d  waiting on barrier\n", th->localtid);
         pthread_barrier_wait(&thr_barrier);
     }
 
+    printf("Thread with id %d is starting execution of polling loop for %zu app  endpoints\n", th->localtid, th->num_aqs);
 
     while (true) {
         for (i = 0; i < th->num_aqs; i++) {

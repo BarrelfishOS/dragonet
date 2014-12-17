@@ -13,7 +13,7 @@
 
 #define INVALID_VERSION -1
 
-//#define dprintf(x...)    do { printf("TID:%d:%s:%s:%d: ", (int)pthread_self(), __FILE__, __FUNCTION__, __LINE__); printf(":" x); } while(0)
+//#define dprintf(x...)    do { printf("dynamic: TID:%d:%s:%s:%d: ", (int)pthread_self(), __FILE__, __FUNCTION__, __LINE__); printf(":" x); } while(0)
 #define dprintf(x...) do { } while (0)
 //#define dprintf printf
 
@@ -71,6 +71,7 @@ struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh,
 
     // node whitelist for tracing
     static const char *tr_wlist[] = {".*UDP.*", ".*EtherClassified.*"};
+
     static const size_t tr_wlist_nelems = sizeof(tr_wlist)/sizeof(char *);
     g->tr_wlist_re = (regex_t *)malloc(sizeof(regex_t)*tr_wlist_nelems);
     g->tr_wlist_nr = tr_wlist_nelems;
@@ -88,6 +89,7 @@ struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh,
             abort();
         }
     }
+
 
     return g;
 }
@@ -234,6 +236,24 @@ static node_out_t run_node(struct dynamic_graph *graph,
                     n->tdata.udpdemux.s_port == udp_hdr_sport_read(*in)) &&
                 (!n->tdata.udpdemux.d_port ||
                     n->tdata.udpdemux.d_port == udp_hdr_dport_read(*in)));
+
+           // printf
+           //clasify_msg
+           dprintf
+                ("performing DYN_UDPDEMUX on the packet sip [%" PRIu32" == "
+                 "%" PRIu32"] && \n",
+                n->tdata.udpdemux.s_ip, ipv4_srcIP_rd(*in));
+
+           // printf
+           // clasify_msg
+           dprintf
+                ("  dip [%" PRIu32" == %" PRIu32"] && sport [%" PRIu16" == "
+                    "%" PRIu16"] && dport [%" PRIu16" == %" PRIu16"] = %d\n",
+                    n->tdata.udpdemux.d_ip, ipv4_dstIP_rd(*in),
+                    n->tdata.udpdemux.s_port,  udp_hdr_sport_read(*in),
+                    n->tdata.udpdemux.d_port, udp_hdr_dport_read(*in),
+                    out
+                );
             return out;
 
         case DYN_BALANCE:
@@ -290,6 +310,7 @@ debug_print_node(struct dynamic_graph *g, struct dynamic_node *n, node_out_t out
 
 }
 
+
 void dyn_rungraph(struct dynamic_graph *graph)
 {
     dprintf("dyn_rungraph\n");
@@ -334,7 +355,7 @@ void dyn_rungraph(struct dynamic_graph *graph)
         dprintf("Execute: n=%p n->n=%s count:%zu\n", n, n->name, count);
         out = run_node(graph, n, plh, st, &in, version);
         dprintf("   port=%d\n", out);
-        //debug_print_node(graph, n, out);
+        debug_print_node(graph, n, out);
         if (out >= 0 && n->num_ports == 0) {
             // Terminal node
             out = -2;
@@ -598,7 +619,12 @@ static void update_sockspawn(struct dynamic_graph *graph,
                              struct dynamic_spawn *spawn)
 {
     if (graph->socket_set_spawn != NULL) {
-        graph->socket_set_spawn(sock_data, spawn, graph->socket_data);
+        if (spawn == NULL || sock_data == NULL) {
+            fprintf(stderr, "update_sockspawn: null spawn (%p) or sock_data (%p) given\n",
+                    spawn, sock_data);
+        } else {
+            graph->socket_set_spawn(sock_data, spawn, graph->socket_data);
+        }
     } else {
         fprintf(stderr, "update_sockspawn: socket_set_spawn not set\n");
     }
@@ -625,14 +651,14 @@ struct dynamic_spawn *dyn_mkspawn(struct dynamic_graph *graph,
 void dyn_updatespawn(struct dynamic_spawn *spawn,
                      struct dynamic_node *node)
 {
-    dprintf("dyn_updatespawn\n");
+    dprintf("dyn_updatespawn: %p\n", spawn);
     spawn->node = node;
 }
 
 void dyn_rmspawn(struct dynamic_graph *graph,
                  struct dynamic_spawn *spawn)
 {
-    dprintf("dyn_rmspawn\n");
+    dprintf("dyn_rmspawn %p\n", spawn);
     struct dynamic_spawn *s, *p;
 
     if (spawn->sock_data != NULL) {
