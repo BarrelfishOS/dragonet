@@ -11,12 +11,16 @@
 #include <sched.h>
 #include <errno.h>
 
+#include <pthread.h>
+
 #include <pipelines.h>
 #include <app_control.h>
 #include <implementation.h>
 
 #include <dragonet/app_lowlevel.h>
 
+//#define dprintf(x...)    do { printf("lowlevel: TID:%d:%s:%s:%d: ", (int)pthread_self(), __FILE__, __FUNCTION__, __LINE__); printf(":" x); } while(0)
+#define dprintf(x...) do { } while (0)
 
 struct dnal_app_queue {
     pipeline_handle_t pipeline_handle;
@@ -43,6 +47,7 @@ struct dnal_socket_handle {
 static void control_send(struct dnal_app_queue *aq,
                          struct app_control_message *msg)
 {
+    dprintf(" called\n");
     if (send(aq->control_fd, msg, sizeof(*msg), 0) != sizeof(*msg)) {
         perror("control_send: Incomplete send");
         abort();
@@ -62,6 +67,7 @@ static void control_recv(struct dnal_app_queue *aq,
         if (total == sizeof(*msg)) break;
         //printf("came here %d\n", (int)total);
     }
+    dprintf(" done\n");
 }
 
 /**
@@ -72,6 +78,7 @@ static void control_recv(struct dnal_app_queue *aq,
 static void control_recv_nograph(struct dnal_app_queue *aq,
                                  struct app_control_message *msg)
 {
+    dprintf(" called\n");
     bool first = true;
     do {
         if (!first) {
@@ -80,7 +87,10 @@ static void control_recv_nograph(struct dnal_app_queue *aq,
             first = false;
         }
         control_recv(aq, msg);
+        dprintf("msg received: type %d\n", msg->type);
+
     } while (msg->type == APPCTRL_GRAPH_CMD);
+    dprintf(" done\n");
 }
 
 static bool control_tryrecv(struct dnal_app_queue *aq,
@@ -94,10 +104,12 @@ static bool control_tryrecv(struct dnal_app_queue *aq,
 
     if (res == -1) {
         perror("control_tryrecv(1): recv failed");
+    dprintf(" done\n");
         abort();
     }
 
     if (res >= sizeof(*msg)) {
+        dprintf(" done\n");
         return true;
     }
 
@@ -107,24 +119,29 @@ static bool control_tryrecv(struct dnal_app_queue *aq,
         perror("control_tryrecv: Incomplete recv");
         abort();
     }
+    dprintf(" done\n");
     return true;
 }
 
 
 struct dnal_socket_handle *socket_by_id(struct dnal_app_queue *aq, uint64_t id)
 {
+    dprintf(" called\n");
     struct dnal_socket_handle *sh = aq->socks;
     while (sh != NULL) {
         if (id == sh->id) {
+            dprintf(" done\n");
             return sh;
         }
         sh = sh->next;
     }
+    dprintf(" done\n");
     return NULL;
 }
 
 static void *graph_socket_get(uint64_t socket_id, void *data)
 {
+    dprintf(" called\n");
     struct dnal_app_queue *aq = data;
     struct dnal_socket_handle *sh = socket_by_id(aq, socket_id);
     return sh;
@@ -134,6 +151,8 @@ static void graph_socket_set_spawn(void *sockdata,
                                    struct dynamic_spawn *spawn,
                                    void *data)
 {
+    dprintf(" called\n");
+    assert(spawn != NULL);
     struct dnal_socket_handle *sh = sockdata;
     sh->spawn = spawn;
 }
@@ -148,6 +167,7 @@ static void process_graph_cmd(struct dnal_app_queue *aq,
                               struct app_control_message *msg)
 {
 
+    dprintf(" called\n");
 }
 
 errval_t dnal_aq_create(const char  *stackname,
@@ -155,6 +175,7 @@ errval_t dnal_aq_create(const char  *stackname,
                         struct dnal_app_queue **appqueue,
                         dnal_flags_t flags)
 {
+    dprintf(" called\n");
     struct dnal_app_queue *aq;
     int s;
     struct sockaddr_un addr;
@@ -252,13 +273,14 @@ errval_t dnal_aq_poll(struct dnal_app_queue *aq,
     event->data.inpacket.socket = sh;
     event->data.inpacket.buffer = in;
 
-    dprint("debug:%s:%s:%d: done\n", __FILE__, __FUNCTION__, __LINE__);
+    dprintf("done\n");
     return SYS_ERR_OK;
 }
 
 errval_t dnal_aq_buffer_alloc(struct dnal_app_queue  *aq,
                               struct input **buffer)
 {
+    dprintf(" called\n");
     *buffer = input_alloc_plh(aq->pipeline_handle);
     if (buffer == NULL) {
         return DNERR_UNKNOWN;
@@ -270,6 +292,7 @@ errval_t dnal_aq_buffer_alloc(struct dnal_app_queue  *aq,
 errval_t dnal_aq_buffer_free(struct dnal_app_queue *aq,
                              struct input *buffer)
 {
+    dprintf(" called\n");
     input_free_plh(aq->pipeline_handle, buffer);
     return SYS_ERR_OK;
 }
@@ -284,6 +307,7 @@ errval_t dnal_socket_create(struct dnal_app_queue *aq,
 {
     struct dnal_socket_handle *sh;
 
+    dprintf(" called\n");
     sh = malloc(sizeof(*sh));
     assert(sh != NULL);
 
@@ -293,6 +317,9 @@ errval_t dnal_socket_create(struct dnal_app_queue *aq,
     sh->opaque = NULL;
 
     *sockethandle = sh;
+
+    dprintf("done\n");
+
     return SYS_ERR_OK;
 }
 
@@ -300,6 +327,7 @@ static errval_t sockh_from_sockinfo(struct dnal_socket_handle   *sh,
                                     struct app_control_message  *msg,
                                     struct dnal_net_destination *dest)
 {
+    dprintf(" called\n");
     struct dnal_app_queue *aq = sh->aq;
     if (msg->type == APPCTRL_SOCKET_INFO) {
         sh->bound = true;
@@ -319,6 +347,7 @@ errval_t dnal_socket_register_flow(struct dnal_socket_handle *sh,
                                    struct dnal_net_destination *flow,
                                    dnal_flags_t flags)
 {
+    dprintf(" called\n");
     struct app_control_message msg;
     struct dnal_app_queue *aq = sh->aq;
 
@@ -351,6 +380,8 @@ errval_t dnal_socket_register_flow(struct dnal_socket_handle *sh,
         fprintf(stderr, "dnal_socket_register_flow expects status reply\n");
         return DNERR_UNKNOWN;
     }
+
+    dprintf("done\n");
     return (msg.data.status.success == true) ? SYS_ERR_OK : DNERR_UNKNOWN;
 }
 
@@ -358,6 +389,7 @@ errval_t dnal_socket_bind(struct dnal_socket_handle   *sh,
                           struct dnal_net_destination *dest,
                           dnal_flags_t flags)
 {
+    dprintf(" called\n");
     struct app_control_message msg;
     struct dnal_app_queue *aq = sh->aq;
 
@@ -378,6 +410,7 @@ errval_t dnal_socket_bind(struct dnal_socket_handle   *sh,
 
     control_send(aq, &msg);
     control_recv_nograph(aq, &msg);
+    dprintf("done\n");
     return sockh_from_sockinfo(sh, &msg, dest);
 }
 
@@ -386,6 +419,7 @@ errval_t dnal_socket_span(struct dnal_socket_handle *sh,
                           struct dnal_socket_handle *nsh,
                           dnal_flags_t flags)
 {
+    dprintf(" called\n");
     struct app_control_message msg;
 
     assert(sh->bound);
@@ -396,11 +430,13 @@ errval_t dnal_socket_span(struct dnal_socket_handle *sh,
     msg.flags = flags;
     control_send(naq, &msg);
     control_recv_nograph(naq, &msg);
+    dprintf("done\n");
     return sockh_from_sockinfo(nsh, &msg, &sh->dest);
 }
 
 errval_t dnal_noop(struct dnal_app_queue *naq, dnal_flags_t flags)
 {
+    dprintf(" called\n");
     struct app_control_message msg;
     msg.type = APPCTRL_APPQ_NOP;
     msg.flags = flags;
@@ -412,6 +448,7 @@ errval_t dnal_noop(struct dnal_app_queue *naq, dnal_flags_t flags)
         return DNERR_UNKNOWN;
     }
 
+    dprintf(" done\n");
     return (msg.data.status.success == true) ? SYS_ERR_OK : DNERR_UNKNOWN;
 }
 
@@ -419,6 +456,7 @@ errval_t dnal_socket_send(struct dnal_socket_handle   *sh,
                           struct input                *buf,
                           struct dnal_net_destination *dest)
 {
+    dprintf(" called\n");
     uint16_t src_port, dst_port;
     uint32_t src_ip, dst_ip;
 
@@ -482,6 +520,7 @@ errval_t dnal_socket_send(struct dnal_socket_handle   *sh,
  */
 void *dnal_socket_opaque_get(struct dnal_socket_handle *sockethandle)
 {
+    dprintf(" called\n");
     return sockethandle->opaque;
 }
 
@@ -491,6 +530,7 @@ void *dnal_socket_opaque_get(struct dnal_socket_handle *sockethandle)
 void dnal_socket_opaque_set(struct dnal_socket_handle *sockethandle,
                             void        *opaque)
 {
+    dprintf(" called\n");
     sockethandle->opaque = opaque;
 }
 

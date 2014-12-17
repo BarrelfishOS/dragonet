@@ -296,14 +296,39 @@ else
     fi
 fi
 
+run_for_4_cores_ziger1() {
+    echo fancyEcho running on ${SERVERIP} with 4 application threads
+    lport=9000
+sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
+-W -a t0 -p 9000  \
+-F ${SERVERIP}:${lport}/10.113.4.51:8000 \
+-F ${SERVERIP}:${lport}/10.113.4.51:8001 \
+-F ${SERVERIP}:${lport}/10.113.4.51:8002 \
+-F ${SERVERIP}:${lport}/10.113.4.51:8003 \
+-t -q t0
+}
+
+run_for_4_cores_ziger1_working() {
+    echo fancyEcho running on ${SERVERIP} with 4 application threads
+    lport=9000
+sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
+-a t0 \
+-f ${SERVERIP}:${lport}/10.113.4.51:8000 \
+-f ${SERVERIP}:${lport}/10.113.4.51:8001 \
+-f ${SERVERIP}:${lport}/10.113.4.51:8002 \
+-f ${SERVERIP}:${lport}/10.113.4.51:8003 \
+-t -q t0
+}
 
 ##################################################################
         ## Main ##
 ##################################################################
 
 ./scripts/pravin/wait_for_dragonet.sh 10 ${STACKNAME}
+run_for_4_cores_ziger1_working
+#run_for_4_cores_ziger1
 #run_memcached_1conc_6clients
-run_memcached_cl20_flows4_6clients
+#run_memcached_cl20_flows4_6clients
 #run_for_6_cores_6_flows
 #run_for_1_cores
 #run_for_2_cores_full_filters_test
@@ -384,4 +409,6 @@ exit 0
 # sbrinz2 : 10.113.4.29
 
 
+
+#sudo ./dist/build/bench-fancyecho/bench-fancyecho -W -a t0 -p 4444 -a t1 -p 4444 -F 10.113.4.51:4444/10.113.4.26:1 -F 10.113.4.51:4444/10.113.4.26:2 -t -q t0 -t -q t1
 

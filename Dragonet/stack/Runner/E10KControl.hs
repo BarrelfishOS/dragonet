@@ -61,11 +61,23 @@ l4tUDP   = 1
 l4tTCP   = 2
 l4tSCTP  = 3
 
+{-
 maskL4Proto = 1
 maskSrcIP   = 2
 maskDstIP   = 4
 maskSrcPort = 8
 maskDstPort = 16
+-}
+
+-- FIXME: modifying the values for dpdk, maybe they are reverse for BF NIC
+
+maskSrcIP   = 0x08
+maskDstIP   = 0x04
+maskSrcPort = 0x02
+maskDstPort = 0x01
+maskL4Proto = 0x10
+
+
 
 ftCount = 128
 

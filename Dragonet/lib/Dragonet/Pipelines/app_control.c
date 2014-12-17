@@ -9,12 +9,14 @@
 #include <inttypes.h>
 #include <string.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include "app_control.h"
 
 #define MAX_APPS 20
 
 #define dprintf(x...) do {} while (0)
+//#define dprintf(x...)    do { printf("appControl: TID:%d:%s:%s:%d: ", (int)pthread_self(), __FILE__, __FUNCTION__, __LINE__); printf(":" x); } while(0)
 
 static void app_graph_send(struct dynr_action *act, void *data)
 {
@@ -37,7 +39,7 @@ void app_control_init(
     void (*socket_udpflow)(int,socket_id_t,uint32_t,uint16_t,uint32_t,uint16_t, app_flags_t),
     void (*socket_span)(int,socket_id_t,app_flags_t),
     void (*socket_close)(int,socket_id_t,app_flags_t),
-    void (*nop)(app_flags_t)
+    void (*nop)(int, app_flags_t)
     )
 {
     int appfds[MAX_APPS];
@@ -195,7 +197,7 @@ void app_control_init(
                     break;
 
                 case APPCTRL_APPQ_NOP:
-                    nop(msg.flags);
+                    nop(appfds[i], msg.flags);
                 break;
 
 
@@ -215,7 +217,8 @@ void app_control_init(
 
 void app_control_send_welcome(int fd, app_id_t id)
 {
-    dprintf("app_control_send_welcome\n");
+    dprintf("app_control_send_welcome, fd = %d, app_id = %d\n",
+            fd, (int)id);
     struct app_control_message msg;
     msg.type = APPCTRL_WELCOME;
     msg.data.welcome.id = id;
@@ -226,7 +229,8 @@ void app_control_send_welcome(int fd, app_id_t id)
 
 void app_control_send_status(int fd, bool success)
 {
-    dprintf("app_control_send_status\n");
+    dprintf("app_control_send_status: fd: %d, success: %d\n",
+            fd, success);
     struct app_control_message msg;
     msg.type = APPCTRL_STATUS;
     msg.data.status.success = success;
@@ -237,7 +241,8 @@ void app_control_send_status(int fd, bool success)
 
 void app_control_send_socket_info(int fd, socket_id_t id)
 {
-    dprintf("app_control_send_socket_info\n");
+    dprintf("app_control_send_socket_info, fd = %d, sock_id = %d\n",
+            fd, (int)id);
     struct app_control_message msg;
     msg.type = APPCTRL_SOCKET_INFO;
     msg.data.socket_info.id = id;
@@ -248,7 +253,7 @@ void app_control_send_socket_info(int fd, socket_id_t id)
 
 void app_control_send_graph_cmd(int fd, struct dynr_action *action)
 {
-    dprintf("app_control_send_graph_cmd\n");
+    dprintf("app_control_send_graph_cmd, fd = %d\n", fd);
     struct app_control_message msg;
     msg.type = APPCTRL_GRAPH_CMD;
     memcpy(&msg.data.graph_cmd.act, action, sizeof(*action));

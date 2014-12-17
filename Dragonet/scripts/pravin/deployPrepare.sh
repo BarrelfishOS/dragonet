@@ -19,8 +19,11 @@ do
 	sudo ipcrm -m $i ;
 done
 
+sudo rm -rf ./out/*
+
 # removing hugpages (assuming they are mounted on /mnt/huge/ location)
 sudo rm -rf /mnt/huge/dnetHugemap_*
+
 
 rm -f *.ready
 rm -f *.failed

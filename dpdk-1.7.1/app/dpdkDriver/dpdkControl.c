@@ -2003,10 +2003,11 @@ int set_5tuple_filter(
         filter.dst_port_mask = (mask & 0x01) ? 1 : 0;
         //filter.protocol_mask = (mask & 0x01) ? 1 : 0;
 
-        printf("\n\n### %s:%s:%d:  [#### IMP ####]"
+        printf("\n\n### %s:%s:%d:  [#### IMP ####] index: %"PRIu8", "
             "Priority: %"PRIu8", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
             "srcIP: %"PRIu32", srcPort: %"PRIu16",  dstIP: %"PRIu32", dstPort: %"PRIu16"\n\n",
             __FILE__, __FUNCTION__, __LINE__,
+            index_value,
             filter.priority,
             queue_id,
             mask,

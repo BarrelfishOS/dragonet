@@ -73,10 +73,11 @@ bool e10k_ctrl_5tuple_set(struct state *state,
 
     l4_type = 0x11; // FIXME: hardcoding the type to UDP
 
-    printf("\n\n### %s:%s:%d:  [#### IMP ####]"
+    printf("\n\n### %s:%s:%d:  [#### IMP ####] index %"PRIu8", "
             "Priority: %"PRIu8", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
             "srcIP: %"PRIu32", srcPort: %"PRIu16",  dstIP: %"PRIu32", dstPort: %"PRIu16"\n\n",
             __FILE__, __FUNCTION__, __LINE__,
+            index,
             priority,
             queue,
             mask,
@@ -93,7 +94,10 @@ bool e10k_ctrl_5tuple_set(struct state *state,
 
     int ret = set_5tuple_filter(e10k_nic, dst_ip, src_ip, dst_port, src_port,
             l4_type, mask, priority, queue, index);
-    if (ret < 0) return false;
+    if (ret < 0) {
+        assert(!"Failed in inserting 5tuple filter");
+        return false;
+    }
     return true;
 }
 
