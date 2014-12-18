@@ -37,6 +37,7 @@
 
 //#define dprintf printf
 #define dprintf dprint
+//#define dprintf(x...)  dbg_printf(x)
 //#define dprintf printf_dummy
 static inline void printf_dummy(const char *fmt, ...) { }
 
@@ -705,6 +706,10 @@ void pl_wait_ready(pipeline_handle_t plh)
                     if (err == BULK_TRANSFER_CHAN_NOTCREATED) {
                         // Just wait with this one
                     } else {
+                        if (err != BULK_TRANSFER_ASYNC) {
+                            printf("ERROR: bulk transfer error: %d\n", (err));
+                            printf("ERROR MSG: %s\n", err_str(err));
+                        }
                         assert(err == BULK_TRANSFER_ASYNC);
                         dq->bind_started = true;
                     }

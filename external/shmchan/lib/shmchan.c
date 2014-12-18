@@ -9,10 +9,12 @@
 #include <string.h> // strdup()
 
 #include <shmchan.h>
-
+#define CANARY_VAL      (0x34242c)
 #define SHM_CHAN_EXTRA 4096
 struct shm_chan_meta {
     size_t num_slots;
+    uint64_t canary;
+    uint8_t ready;
 };
 
 errval_t shmchan_create_(struct shm_channel *chan, const char *name,
@@ -33,16 +35,30 @@ errval_t shmchan_create_(struct shm_channel *chan, const char *name,
     assert_fix(res == 0);
     meta = mmap(NULL, SHM_CHAN_EXTRA, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
                 0);
+    if (meta == MAP_FAILED) {
+        perror("mmap meta create: ");
+    }
     assert_fix(meta != MAP_FAILED);
 
     meta->num_slots = num_slots;
+    meta->canary = CANARY_VAL;
+    meta->ready = 1;
+    __sync_synchronize();
+    syncfs(fd);
+    sync();
 
     res = munmap(meta, SHM_CHAN_EXTRA);
     assert_fix(res == 0);
     close(fd);
+    sync();
 
     //printf("%s(): channel %s (%p) created\n", __FUNCTION__, name, chan);
+
     err = shmchan_bind_(chan, name, slotsz, sender);
+    if (err == SHM_CHAN_NOTREADY) {
+        printf("Number of slots requested is %zu here\n", num_slots);
+        assert(!"failed in shmchan_create");
+    }
     chan->creator = true;
     return err;
 }
@@ -50,8 +66,8 @@ errval_t shmchan_create_(struct shm_channel *chan, const char *name,
 errval_t shmchan_bind_(struct shm_channel *chan, const char *name,
                        size_t slotsz, bool sender)
 {
-    int fd, res;
-    struct shm_chan_meta *meta;
+    int fd, res, i;
+    volatile struct shm_chan_meta *meta;
 
     fd = shm_open(name, O_RDWR, 0600);
     if (fd == -1 && errno == ENOENT) {
@@ -62,9 +78,38 @@ errval_t shmchan_bind_(struct shm_channel *chan, const char *name,
     // Map meta-data and data area
     meta = mmap(NULL, SHM_CHAN_EXTRA, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
                 0);
+    if (meta == MAP_FAILED) {
+        perror("mmap meta bind: ");
+    }
     assert_fix(meta != MAP_FAILED);
+    for (i = 0; i < 5; ++i) {
+        if ((meta->canary == CANARY_VAL) && (meta->ready == 1)) {
+            break;
+        }
+        printf("#### channel not ready!  shm_name %s, fd=%d, size = %zu (num_slots (%zu) * slotsz (%zu)), isSender=%d\n",
+                name, fd,  (size_t)(meta->num_slots * slotsz),
+                meta->num_slots, slotsz, sender);
+        printf("##### sleeping and trying again: %d < %d\n", i, 5);
+        sleep(1);
+    }
+    assert(meta->canary == CANARY_VAL);
+    assert(meta->ready == 1);
+    if (i > 0) {
+        printf("#### channel ready after %d attempts! (possible race condition) ... \n"
+                " ... shm_name %s, fd=%d, size = %zu (num_slots (%zu) * slotsz (%zu)), isSender=%d\n",
+                i, name, fd,  (size_t)(meta->num_slots * slotsz),
+                meta->num_slots, slotsz, sender);
+    }
+
     chan->data = mmap(NULL, meta->num_slots * slotsz,
                       PROT_READ | PROT_WRITE, MAP_SHARED, fd, SHM_CHAN_EXTRA);
+    if (chan->data == MAP_FAILED) {
+        perror("mmap data bind: ");
+        printf("args are: shm_name %s, fd=%d, size = %zu (num_slots (%zu) * slotsz (%zu)), isSender=%d\n",
+                name, fd,  (size_t)(meta->num_slots * slotsz),
+                meta->num_slots, slotsz, sender);
+        return SHM_CHAN_NOTREADY;
+    }
     assert_fix(chan->data != MAP_FAILED);
 
     chan->size = meta->num_slots;

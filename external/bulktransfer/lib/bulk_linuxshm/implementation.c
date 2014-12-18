@@ -287,6 +287,9 @@ static errval_t op_channel_bind(struct bulk_ll_channel *channel,
     if (err == SHM_CHAN_NOTCREATED) {
         err = BULK_TRANSFER_CHAN_NOTCREATED;
         goto fail_rx;
+    } else if (err == SHM_CHAN_NOTREADY) {
+        assert(!"op_chanel_bind failed for rx, txc");
+        goto fail_rx;
     } else if (err_is_fail(err)) {
         goto fail_rx;
     }
@@ -294,7 +297,10 @@ static errval_t op_channel_bind(struct bulk_ll_channel *channel,
     strcpy(name, internal->name);
     strcat(name, "_rxc");
     err = shm_chan_bind(&internal->tx, name, true);
-    if (err_is_fail(err)) {
+    if (err == SHM_CHAN_NOTREADY) {
+        assert(!"op_chanel_bind failed for tx, rxc");
+        goto fail_tx;
+    } else if (err_is_fail(err)) {
         goto fail_tx;
     }
 
