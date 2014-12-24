@@ -33,34 +33,125 @@ traceN a b = b
 -- *only* for sockets with the same AppId.
 balanceAcrossRxQs :: PG.PGraph -> PG.PGraph
 balanceAcrossRxQs g = foldl balEpAcrossRxQs g (M.toList balEpsMap)
-    where -- balance nodes
+    where
+          -- List of all balance nodes with their endpont-ID's
           balEps :: [(Integer, DGI.Node)]
           balEps = [ (eid,nid) |
                      (nid,nlbl) <- DGI.labNodes g,
                      let eid_ = PGU.balanceNodeEndpointId nlbl,
                      isJust eid_,
                      let Just eid = eid_]
-          -- map from endpoint id to balance nodes
+          -- map from endpoint-id to balance nodes
+          --    given endpoint can endup in multiple partitions, having
+          --    multiple balance nodes (one in each reachable partition).
+          --    Here, we are collecting all balance nodes associated with
+          --        same endpoint
           balEpsMap :: M.Map Integer [DGI.Node]
           balEpsMap = foldl foldFn M.empty balEps
           foldFn m (eid,nid) = M.alter alterF eid m
             where alterF Nothing        = Just $ [nid]
                   alterF (Just oldnids) = Just $ nid:oldnids
 
-balEpAcrossRxQs :: PG.PGraph -> (Integer, [DGI.Node]) -> PG.PGraph
-balEpAcrossRxQs g (eid,nids@(nid0:_)) = doBalEpAcrossRxQs g nids ports
-    where ports = PG.nPorts $ fromJust $ DGI.lab g nid0
 
-doBalEpAcrossRxQs :: PG.PGraph -> [DGI.Node] -> [PG.NPort] -> PG.PGraph
--- end: same number of balance nodes (i.e., pipelines) with ports
-doBalEpAcrossRxQs g [] [] = g
--- end: more pipelines than ports: remove bal nodes from these pipelines
-doBalEpAcrossRxQs g eps [] = DGI.delNodes eps g
--- end: more ports than pipelines: some nodes are going to be ignored
-doBalEpAcrossRxQs g [] ps = trace msg g
-            where msg = "dobalEpAcrossRxQs: ignoring ports:" ++ (show ps)
--- recurse: use a single port
-doBalEpAcrossRxQs g (epNid:eps) (port:ps) = doBalEpAcrossRxQs g' eps ps
+{-|
+ - Balance the given endpoint into all the sockets spanned with this endpoint
+ -  An endpoint can have multiple balance nodes (one in each reachable partition).
+ -  So, we try and distribute the reachable partitions evenly between related
+ -   sockets.
+ -}
+balEpAcrossRxQs ::
+    -- | Initial graph to be balanced
+       PG.PGraph
+    -- | (endpoint-id, list of balance nodes associated with the endpoint)
+    -> (Integer, [DGI.Node])
+    -- | Graph after applying the balancing
+    -> PG.PGraph
+balEpAcrossRxQs g (eid,nids@(nid0:_)) = enfoceEP2SocketsMapping g groupedNids
+    where
+    ports = PG.nPorts $ fromJust $ DGI.lab g nid0
+    balancedPorts = balancedChunks (length nids) ports
+    groupedNids :: [(DGI.Node, [PG.NPort])]
+    groupedNids = zip nids $ concat $ repeat balancedPorts
+    msg
+            | length nids == length ports = "one pipeline/queue per socket"
+            | length nids > length ports = "Multiple pipelines/queues per socket"
+            | otherwise = -- TODO: Add special balance nodes to allow
+                          -- single pipeline/queue to loadbalance to between multiple sockets
+                        "Warning: More sockets than pipelines/queues, ignoring few extra sockets"
+
+myIsNotEmpty [] = False
+myIsNotEmpty _ = True
+
+-- | Balance the given list l into balanced n sublists
+balancedChunks :: Int -> [a] -> [[a]]
+balancedChunks n l = emptyRemoved
+    where
+    validGroupIDs = [0..(n - 1)]
+    indexedList = zip l [0..]
+    -- Group/hash the list into sublist based on the position/index of the element
+    grouped = map (
+            \rem -> map fst $ (filter (\(_, idx) -> (mod idx n) == rem) indexedList)
+        ) validGroupIDs
+    -- There will be empty elements when (length l < n) so, lets remove them
+    emptyRemoved = filter myIsNotEmpty grouped
+
+
+-- | Given the mapping between pipeline and sockets, implement it by removing
+--      the generic balance node, and connecting the pipeline directly to the
+--      socket
+enfoceEP2SocketsMapping ::
+    -- | Initial graph on which mapping will be applied
+       PG.PGraph
+    -- | Mapping of pipeline/partition/queue to application sockets/output ports
+    -> [(DGI.Node, [PG.NPort])]
+    -- | Graph after applying the mapping on intial graph
+    -> PG.PGraph
+-- end: No mappings, returning initial graph as it is
+enfoceEP2SocketsMapping g [] = g
+-- end: No socket mapped to the endpoint: This is treated as error as all
+--      the incoming packets here will end up getting dropped
+--enfoceEP2SocketsMapping g (eps, []):xs = error "the endpoint does not have any socket connected"
+enfoceEP2SocketsMapping g (x:xs) = gAns
+    where
+    eps = fst x
+    ports = snd x
+    (p, msg)
+        | ports == [] = error "the endpoint does not have any socket connected"
+        | (length ports) == 1 = ((head ports), "")
+        | otherwise = ((head ports),
+            ("WARNING: pipeline mapped to multiple sockets is not supported, "
+             ++ "ignorming all but first socket: "
+             ++ " used {{{\n" ++ (show $ head ports) ++ "\n}}}"
+             ++ " ignored {{{\n" ++ (show $ tail ports) ++ "\n}}}"
+            )
+           )
+    g' = mapEPtoSinglePort g eps p
+    gAns = enfoceEP2SocketsMapping g' xs
+
+{-
+-- case: pipeline/EP mapped to single socket.  Just drop the balance node and
+--  connect the pipeline directly to the mapped single socket
+enfoceEP2SocketsMapping g (eps, p:[]):xs = enfoceEP2SocketsMapping g' xs
+    where
+    g' = mapEPtoSinglePort g eps p
+-- case: pipeline/EP mapped to list of sockets.
+--      ideally, we should replace the generic balance node with specific
+--      balancing node which will balance only between given sockets
+--  Currently, We are using only first socket and ignoring all other sockets
+enfoceEP2SocketsMapping g (eps, p:ps):xs = trace msg gAns
+    where
+    g' = mapEPtoSinglePort g eps p
+    gAns = enfoceEP2SocketsMapping g' xs
+    msg = "WARNING: pipeline mapped to multiple sockets is not supported, "
+             ++ "ignorming all but first socket: "
+             ++ " used {{{\n" ++ (show p) ++ "\n}}}"
+             ++ " ignored {{{\n" ++ (show ps) ++ "\n}}}"
+
+-}
+
+-- Maps single pipeline/EndPoint to single socket/port
+--  It removes the balance node and connects directly to the given socket
+mapEPtoSinglePort g epNid port =  g'
    where (prevNid,prevE) = case DGI.lpre g epNid of
              [x] -> x
              []  -> error "balEpAcrossRxQs: 0 predecessor"
@@ -76,6 +167,7 @@ doBalEpAcrossRxQs g (epNid:eps) (port:ps) = doBalEpAcrossRxQs g' eps ps
 
          delNs = [ nid | nid <- DFS.dfs [epNid] g, nid /= nextNid ]
          msg = ""
+
 
 -- Remove fromSocket nodes without a matching toSocket node
 --

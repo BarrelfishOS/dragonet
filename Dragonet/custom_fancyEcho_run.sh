@@ -10,6 +10,16 @@ run_memcached_for_8_cores() {
 sudo ../benchmarking/memcached/memcached -N T0.f[${SERVERIP}:7777/10.113.4.71:8000]T1.f[${SERVERIP}:7777/10.113.4.29:8000]T2.f[${SERVERIP}:7777/10.113.4.51:8000]T3.f[${SERVERIP}:7777/10.113.4.57:8000]T4.f[${SERVERIP}:7777/10.113.4.51:8001]T5.f[${SERVERIP}:7777/10.113.4.57:8001]T6.f[${SERVERIP}:7777/10.113.4.71:8001]T7.f[${SERVERIP}:7777/10.113.4.29:8001] -c 64000 -m 64000 -u root -p 0 -U  7777 -t 8 -l ${SERVERIP}
 }
 
+run_memcached_broken_case() {
+#sudo   \
+#taskset -c 0,1,2,3   \
+#./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log   \
+sudo ../benchmarking/memcached/memcached \
+-N T0.p[7777]F[10.113.4.26:7777/10.113.4.51:8000]F[10.113.4.26:7777/10.113.4.51:8001]F[10.113.4.26:7777/10.113.4.51:8002]F[10.113.4.26:7777/10.113.4.51:8003]F[10.113.4.26:7777/10.113.4.57:8000]F[10.113.4.26:7777/10.113.4.57:8001]F[10.113.4.26:7777/10.113.4.57:8002]F[10.113.4.26:7777/10.113.4.57:8003]F[10.113.4.26:7777/10.113.4.20:8000]F[10.113.4.26:7777/10.113.4.20:8001]F[10.113.4.26:7777/10.113.4.20:8002]F[10.113.4.26:7777/10.113.4.20:8003]F[10.113.4.26:7777/10.113.4.51:8004]F[10.113.4.26:7777/10.113.4.51:8005]F[10.113.4.26:7777/10.113.4.51:8006]F[10.113.4.26:7777/10.113.4.51:8007]  \
+-c 64000 -m 64000 -u root -p 0 -U  7777 -t 4 -l 10.113.4.26
+}
+
+
 run_memcached_single_core() {
 sudo ../benchmarking/memcached/memcached -N p[7777] -c 64000 -m 64000 -u root -p 0 -U  7777 -t 1 -l ${SERVERIP}
 }
@@ -340,7 +350,8 @@ sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
 #run_memcached_single_core_specific_two_flows
 #run_memcached_2_cores_specific
 #run_memcached_cl4_flows4
-run_memcached_cl20_flows4_6clients
+#run_memcached_cl20_flows4_6clients
+run_memcached_broken_case
 
 #run_for_4_cores_ziger1
 #run_memcached_4conc_4clients

@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <proto_ipv4.h>
 #include <udpproto.h>
-
 #include <regex.h> // debug_print_node() (for whitelist)
 
 #include "dynamic.h"
@@ -245,8 +244,8 @@ static node_out_t run_node(struct dynamic_graph *graph,
                 n->tdata.udpdemux.s_ip, ipv4_srcIP_rd(*in));
 
            // printf
-           // clasify_msg
-           dprintf
+            clasify_msg
+           //dprintf
                 ("  dip [%" PRIu32" == %" PRIu32"] && sport [%" PRIu16" == "
                     "%" PRIu16"] && dport [%" PRIu16" == %" PRIu16"] = %d\n",
                     n->tdata.udpdemux.d_ip, ipv4_dstIP_rd(*in),
@@ -446,7 +445,7 @@ void dyn_cleargraph(struct dynamic_graph *graph)
     struct dynamic_spawn *s = graph->spawns;
 
     while (s != NULL) {
-        fprintf(stderr, "******* %s(): cancelling spawn task on node:%s\n",
+        fprintf(stderr, " ###### %s(): cancelling spawn task on node:%s\n",
                         __FUNCTION__,  s->node->name);
         s->node = NULL;
         s = s->next;
