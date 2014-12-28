@@ -479,21 +479,22 @@ graphFoldConstSucc prevSrc@((prevNid,prevLbl), prevPort)
 -- ====================
 --
 --
---                                      |------> (X)
---                      +-----+-+       |
+--
+--                      +-----+-+
 --   +------+-+         |     |A|-------+------> (Y) [Alive connections]
 --   |      |X|-------->|Node +-+       |
 --   | Prev +-+         |     | |       -------> (W)
 --   |      | |         |     +-+
 --   +------+-+         |     |D|------|-------->(V)
 --                      +-----+-+      |              [Dead connections]
---                                     |-------->(W)
+--                                     |-------->(U)
 --
 --  Depending on the destination type of the nodes connected to Node's alive
 --  port (A) we need to perform a different operation:
---   i)  if it's an F-node, we introduce (Prev.X -> W) edge
---   ii) if it's an O-node, we introduce (Prev.X -> (CONST B) -> Y) edge
---       (i.e., we add a new CONST node)
+--   i)  if it's an F-node, we introduce (Prev.X -> {Y,W}) edges
+--   ii) if it's an O-node, we introduce (Prev.X -> (CONST B) -> {Y,W}) edge
+--       That is, we add a new CONST node because if A is, for example, "true",
+--       there is no guarantee that X is also "true"
 --
 shortCircuitNode_ :: (PG.PGNode, PG.NPort) -- Prev
                   -> (PG.PGNode, PG.NPort) -- Node
