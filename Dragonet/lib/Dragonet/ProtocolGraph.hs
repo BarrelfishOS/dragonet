@@ -146,14 +146,21 @@ type NSpawnHandle = String
 -------------------------------------------------------------------------------
 -- Configuration Types
 
+-- next id and set of new nodes
 type ConfMonad a = ST.State (Int,[PGNode]) a
 
+-- NB: The graph argument in the configuration function should *not* be
+-- generally used. Instead, functions should only consider the in/out edges.
+-- Note that normal configuration functions only add nodes/edges (never delete
+-- them).
+-- The graph argument is used in some special cases (queue configuration
+-- functions).
 type ConfFunction =
-    PGraph ->
-    PGNode ->
-    [(PGNode, Edge)] ->
-    [(PGNode, Edge)] ->
-    ConfValue ->
+    PGraph ->               -- graph
+    PGNode ->               -- configuration node
+    [(PGNode, Edge)] ->     -- configuration node in edges
+    [(PGNode, Edge)] ->     -- configuration node out edges
+    ConfValue ->            -- configuration value
     ConfMonad [PGEdge]
 
 data ConfType =
