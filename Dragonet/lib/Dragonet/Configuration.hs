@@ -14,7 +14,10 @@ module Dragonet.Configuration(
 
     applyConfig,
     confMNewNode,
-    replaceConfFunctions
+    replaceConfFunctions,
+
+    icPartiallyConfigure,
+    icFinalize,
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG
@@ -40,6 +43,8 @@ class ConfChange a where
     emptyConfig :: a -> Configuration
     -- preety printer
     showConfig  :: a -> Configuration -> String
+
+    -- For incremental config
 
 
 foldConfChanges :: forall a. (ConfChange a) => [a] -> Configuration
@@ -119,3 +124,54 @@ replaceConfFunctions m = DGI.nmap fixNode
         fixNode n@PG.CNode {} = n { PG.nConfFunction = m n }
         fixNode n = n
 
+--
+-- Incremental configuration
+--
+
+type UGraph = PG.PGraph -- unconfigured graph
+type CGraph = PG.PGraph -- configured graph
+
+-- The purpose of incremental configuration is to avoid recomputing the
+-- information on a graph when we search for an optimal configuration. The
+-- current information we compute is flow maps, but this might change.
+--
+-- In the traditional configuration scheme we need to recompute everything from
+-- scratch, because we always compute the configured graph from the fully
+-- unconfigured graph, so any information from previous steps is lost.
+--
+-- Incremental configuration supports two actions:
+-- . applying a partial configuration (represented as a configuration change)
+-- . finalizing the graph
+--
+-- With incremental configuration we allow for partially configured graphs
+-- (i.e., some configuration changes have been applied, but configuration nodes
+-- still exist) which allows to keep information from the previous steps.
+--
+-- Hence, contrarily to a full configuration, A partial configuration does _not_
+-- remove the C-node. It adds a sub-graph as a number of new nodes and edges.
+-- Similarly to the traditional  configuration invariants:
+--  . all new edges must have either:
+--     . a source and destination in the new nodes (internal edge)
+--     . a source node from the predecessors of the configuration node
+--       a destination node in the new nodes (in edge)
+--     . a source node in the new nodes
+--       a destination node that is either the c-node or a successor of the
+--       c-node (out edge)
+--
+-- One way to view this is to consider configuration nodes as boundaries, where
+-- computing predicate information is not possible. A partial configuration
+-- pushes the boundary further. After the partial configuration is done, we can
+-- try to compute more things beyond the boundary
+--
+
+-- partialy configuration:
+--  we return the new un-configured graph and the newly inserted DGI node-ides
+icPartiallyConfigure :: (ConfChange cc) => UGraph -> cc -> (UGraph, [DGI.Node])
+icPartiallyConfigure = error "NYI!"
+
+-- finalize the configuration, and get a configured graph
+icFinalize :: UGraph -> CGraph
+icFinalize = error "NYI!"
+
+
+--applyCNodeInc :: (ConfChange cc) =>
