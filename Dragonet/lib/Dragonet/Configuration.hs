@@ -5,10 +5,10 @@ module Dragonet.Configuration(
     ConfChange(..),
     foldConfChanges,
 
-    ConfType(..),
-    ConfValue(..),
-    ConfFunction,
-    ConfMonad,
+    PG.ConfMonad,
+    PG.ConfFunction,
+    PG.ConfType(..),
+    PG.ConfValue(..),
 
     cvEnumName,
 
@@ -23,14 +23,7 @@ import qualified Util.GraphHelpers as GH
 import qualified Control.Monad.State as ST
 import Data.Maybe
 
-type Configuration = [(String,ConfValue)]
-
---
-type ConfType     = PG.ConfType
-type ConfValue    = PG.ConfValue
-type ConfFunction = PG.ConfFunction
-type ConfMonad a  = PG.ConfMonad a
-
+type Configuration = [(String,PG.ConfValue)]
 
 {-|
   A class 'ConfChange' provides functionality to apply a changeset of generic
@@ -54,11 +47,11 @@ foldConfChanges changes = foldl applyConfChange cnf0 changes
     where cnf0 = emptyConfig (undefined::a)
 
 -- Get enumerator name from conf value and its type
-cvEnumName :: ConfType -> ConfValue -> String
+cvEnumName :: PG.ConfType -> PG.ConfValue -> String
 cvEnumName (PG.CTEnum enums) (PG.CVEnum v) = enums !! v
 
 -- Create new node
-confMNewNode :: PG.Node -> ConfMonad PG.PGNode
+confMNewNode :: PG.Node -> PG.ConfMonad PG.PGNode
 confMNewNode n = do
     (m,ns) <- ST.get
     let i = m + 1
@@ -67,7 +60,7 @@ confMNewNode n = do
     return node
 
 -- Add edges and nodes from configuration function to graph
-confMRun :: PG.PGraph -> ConfMonad [PG.PGEdge] -> PG.PGraph
+confMRun :: PG.PGraph -> PG.ConfMonad [PG.PGEdge] -> PG.PGraph
 confMRun g m = addEdges $ addNodes g
     where
         (_,maxId) = DGI.nodeRange g
@@ -82,7 +75,7 @@ confMRun g m = addEdges $ addNodes g
         addEdges g' = foldl (flip DGI.insEdge) g' newEdges
 
 -- Apply configuration for a single CNode
-doApplyCNode :: ConfValue -> PG.PGraph -> PG.PGContext -> PG.PGraph
+doApplyCNode :: PG.ConfValue -> PG.PGraph -> PG.PGContext -> PG.PGraph
 doApplyCNode conf g ctx@(_,nid,node,_) = confMRun g' newEM
     where
         fun = PG.nConfFunction node
@@ -94,7 +87,7 @@ doApplyCNode conf g ctx@(_,nid,node,_) = confMRun g' newEM
         inE = map lblPair $ DGI.lpre g nid
         outE = map lblPair $ DGI.lsuc g nid
         -- Get new edges (in conf monad)
-        newEM :: ConfMonad [PG.PGEdge]
+        newEM :: PG.ConfMonad [PG.PGEdge]
         newEM = fun g (nid,node) inE outE conf
 
         lblPair (m,a) = ((m,fromJust $ DGI.lab g m), a)
@@ -120,7 +113,7 @@ applyConfig cfg g =
 
 -- Add/replace config functions in graph. Calls passed function to get a config
 -- function for each CNode.
-replaceConfFunctions :: (PG.Node -> ConfFunction) -> PG.PGraph -> PG.PGraph
+replaceConfFunctions :: (PG.Node -> PG.ConfFunction) -> PG.PGraph -> PG.PGraph
 replaceConfFunctions m = DGI.nmap fixNode
     where
         fixNode n@PG.CNode {} = n { PG.nConfFunction = m n }
