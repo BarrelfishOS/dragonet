@@ -133,7 +133,7 @@ type CGraph = PG.PGraph -- configured graph
 
 -- The purpose of incremental configuration is to avoid recomputing the
 -- information on a graph when we search for an optimal configuration. The
--- current information we compute is flow maps, but this might change.
+-- information we currently compute is flow maps, but this might change.
 --
 -- In the traditional configuration scheme we need to recompute everything from
 -- scratch, because we always compute the configured graph from the fully
@@ -158,8 +158,8 @@ type CGraph = PG.PGraph -- configured graph
 --       a destination node that is either the c-node or a successor of the
 --       c-node (out edge)
 --
--- One way to view this is to consider configuration nodes as boundaries, where
--- computing predicate information is not possible. A partial configuration
+-- One way to view this is to consider configuration nodes as boundaries, beyond
+-- whcih computing predicate information is impossible. A partial configuration
 -- pushes the boundary further. After the partial configuration is done, we can
 -- try to compute more things beyond the boundary
 --

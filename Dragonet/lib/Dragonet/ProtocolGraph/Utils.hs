@@ -16,7 +16,7 @@ module Dragonet.ProtocolGraph.Utils (
     sucNE, preNE, lpreNE, lsucNE,
     lsucPortNE, sucPortNE,
     unconnectedPorts,
-    isOnode_, isOnode, isFnode_, isFnode,
+    isOnode_, isOnode, isFnode_, isFnode, isCnode_, isCnode,
     getSinglePre, getSinglePrePort,
     dominates,
 
@@ -285,6 +285,11 @@ isFnode_ :: Node -> Bool
 isFnode_ (FNode {}) = True
 isFnode_ _          = False
 isFnode             = isFnode_ . snd
+
+isCnode_ :: Node -> Bool
+isCnode_ (CNode {}) = True
+isCnode_ _          = False
+isCnode             = isCnode_ . snd
 
 -- Get the (single) predecssor.
 -- If there are more than one predecessors throw an error. Note that F-nodes
