@@ -10,4 +10,4 @@ cabal sandbox add-source ../external/dpdk
 cabal sandbox add-source ../external/smtLib
 cabal sandbox add-source ../external/Hsmtlib/src
 cabal sandbox add-source ./apps
-cabal install -j --only-dependencies
+cabal install -j --only-dependencies  --enable-documentation
