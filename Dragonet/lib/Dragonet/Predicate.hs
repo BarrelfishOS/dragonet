@@ -735,7 +735,7 @@ data PredCompSt = PredCompSt {
     , predInPort :: Maybe NPort
     , compStop   :: PG.PGNode -> Bool
     , predBld    :: PredBuild
-    , predCache  :: M.Map DGI.Node PredExpr
+    , predCache  :: PredCache
 } deriving (Show)
 
 -- initialize state
@@ -755,15 +755,15 @@ initPredCompSt gr node = initPredCompSt_ {
     , predDst   = getFNodeByName gr node
 }
 
-newtype PredComp a = PredComp {doPredComp :: ST.State PredCompSt a}
+newtype PredComp a = PredComp {unPredComp :: ST.State PredCompSt a}
     deriving (Monad, ST.MonadState PredCompSt, Functor)
 
 
-computePred st = ST.runState (doPredComp computePredM) st
+computePred st = ST.runState (unPredComp computePredM) st
 
 computePredMany :: PG.PGraph -> [PG.PGNode] -> [PredExpr]
 computePredMany gr nodes = ret
-    where (ret, st) = ST.runState (doPredComp $ cPred nodes) st0
+    where (ret, st) = ST.runState (unPredComp $ cPred nodes) st0
           st0 =  initPredCompSt_ { predGraph = gr }
           cPred :: [PG.PGNode] -> PredComp ([PredExpr])
           cPred nodes = do
@@ -798,7 +798,7 @@ depPredCache g (n,p) c = fst ret
     where st = initPredCompSt_ {
                   predGraph = g
                 , predCache = c}
-          ret = ST.runState (doPredComp $ depGetPred__ (n,p)) st
+          ret = ST.runState (unPredComp $ depGetPred__ (n,p)) st
 
 portPred :: PredBuild -> PG.PGNode -> PG.NPort -> PredExpr
 portPred bld (_,fnode@(FNode {})) port = portPred_ bld fnode port
@@ -807,9 +807,9 @@ portPred_ :: PredBuild -> PG.Node -> PG.NPort -> PredExpr
 portPred_ bld fnode@(FNode {}) port = pred
     where pred' = tr pred ("node:" ++ (PG.nLabel fnode) ++ " port:" ++ port ++ " port pred:" ++ (show pred))
           -- NB: In our current semantics, if predicates are defined for a
-          -- particular port, then the port selection predicates are ignored.
-          -- Note that, if needed, they can be added in the port predicates
-          -- (e.g., in the unicorn file)
+          -- particular port, then the default port selection predicates are
+          -- ignored.  Note that, if needed, they can be added in the port
+          -- predicates (e.g., in the unicorn file)
           pred  = case L.lookup port (PG.nPredicates fnode) of
                    Just x -> predDoBuild bld x
                    Nothing -> atom
