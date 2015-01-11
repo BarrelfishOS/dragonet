@@ -6,7 +6,7 @@ import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Dragonet.Search as SR
 
-import Dragonet.Endpoint (EndpointDesc)
+import Dragonet.NetState (EndpointDesc)
 
 import qualified Graphs.Tap as Tap
 
