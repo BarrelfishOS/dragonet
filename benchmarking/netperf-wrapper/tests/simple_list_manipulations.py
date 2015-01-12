@@ -165,11 +165,11 @@ def get_isolation_container(is_server):
     if not PIN_THREADS:
         return ""
 
-    if is_server:
+    if is_server == True:
         return " taskset -c %s " % (
              toCoreList2(range(
-                 (0                 + SERVER_CORESHIFT),
-                 (SERVER_CORESHIFT  + (SERVERS_INSTANCES*SERVER_CORES))
+                 (0                 ),
+                 ((SERVERS_INSTANCES*SERVER_CORES))
                )))
     else :
         return " taskset -c %s " % (

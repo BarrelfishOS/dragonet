@@ -1,7 +1,6 @@
 ## -*- mode: python; coding: utf-8 -*-
 
 
-include('dragonet_stack.py')
 
 
 def getClientPortList(clientList, startPort, noPorts=1) :
@@ -22,31 +21,11 @@ def flow2Str(f):
                             src_p
                         ))
 
-def flowMap_to_arg_memcached(flowMap):
-    ret = ""
-    for i in range(0, len(flowMap)):
-        ret = ret + ("T%d." % i)
-        for f in flowMap[i]:
-            ret = ret + ("f[%s]" % (flow2Str(f)) )
+def flows_to_arg_memcached(flows, listenPort):
+    ret = "T0.p[%d]" % (listenPort)
+    for f in flows:
+        ret = ret + ("F[%s]" % (flow2Str(f)) )
     return ret
-
-
-
-def balance_flows_sCores_memcached(sThreads, flowsList):
-    """ Map flows to server cores, and create proper arguments for it """
-    ret = ""
-
-    pp.pprint(flowsList)
-
-    print "%d Flows after balancing in %d threads" % (len(flowsList), sThreads)
-    flows_per_sThread = balanced_chunks(flowsList, sThreads)
-    pp.pprint(flows_per_sThread)
-
-    arglist = flowMap_to_arg_memcached(flows_per_sThread)
-    print "args are "
-    print arglist
-    #sys.exit(0)
-    return arglist
 
 
 # remnant of old code, can be deleted safely
@@ -61,6 +40,7 @@ def client_to_10G_IP(client) :
         # return "ANY"
     else :
         return client[isMultiNICMachine+2:]
+
 
 
 def SRV_CMDS(name):
@@ -87,35 +67,39 @@ def SRV_CMDS(name):
                       "cd %s ; " % (dragonet_container[name]['base_dir'])
                         + "sudo %s " % (get_isolation_container(is_server=False))
                         + " %s %d %s " % (
+                          #dragonet_container[name]['deploy_stack'],
+                          #HWQUEUES, "priority")
                           dragonet_container[name]['deploy_stack'],
-                          HWQUEUES,
-                          "priority"
-                          #"balance"
-                          ),
-
+                          HWQUEUES, "priority")
+                        + " %s %d %d " % ( "hardcoded", CONCURRENCY,
+                            len(client_names))
+                        ,
 
                       # run server
                       "cd %s ; " % (
                         dragonet_container[name]['base_dir'])
-                        + "sudo %s " % (get_isolation_container(is_server=False))
+                        + "sudo %s " % (get_isolation_container(is_server=True))
                         + " ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log  "
                         + " ../benchmarking/memcached/memcached -N %s " % (
-                            balance_flows_sCores_memcached(SERVER_CORES, FLOWS))
+                            flows_to_arg_memcached(FLOWS, SERVER_INITIAL_PORT))
                         + " -c 64000 -m 64000 -u root %s %d -t %d -l %s " % (
                             "-p 0 -U ",
-                            SERVER_INITIAL_PORT, SERVER_CORES, TARGET),
+                            SERVER_INITIAL_PORT, SERVER_CORES, TARGET)
+                        ,
 
                       "sleep 4",
                      ],
 
 
                     "is_ready_cmd_special" : [
-                        "cd %s ; %s %d %d %s " % (
+                        "cd %s ; %s %d %d %s %d" % (
                           dragonet_container[name]['base_dir'],
                           dragonet_container[name]['is_stack_ready'],
                           HWQUEUES,
-                          len(FLOWS),
-                          "memcached"),
+                          dragonet_container[name]['is_ready_wait_events'],
+                          "memcached",
+                          ((CONCURRENCY - 1) * len(client_names))
+                            ),
                      ],
 
 
@@ -245,30 +229,6 @@ def SRV_CMDS(name):
                 }
 
 
-def get_proto_specific_server_ports():
-    """retuns values for to be used for ports at server end """
-    port_list = range(SERVER_INITIAL_PORT, (SERVER_INITIAL_PORT + (len(server_names))))
-    port_list_empty = [0 for x in port_list]
-    port_list_for_clients = repeat_list_elem_n_times(port_list, len(CLIENTS))
-    port_list_cl_src = []
-    port_list_cl_lip = []
-    for cidx in range(0, len(CLIENTS)):
-        prev_entries = [i for i, x in enumerate(CLIENTS[:cidx]) if x == CLIENTS[cidx]]
-        port_list_cl_src.append(CLIENT_INITIAL_PORT + (len(prev_entries) * CONCURRENCY))
-        # if client name contains --, then use pafr after -- as ip
-        #      otherwise use "ANY"
-        port_list_cl_lip.append(client_to_10G_IP(CLIENTS[cidx]))
-
-    print "port_list_for_clients: %s" % (port_list_for_clients)
-    print "port_list_for_clients src: %s" % (port_list_cl_src)
-    print "local IP_list_for multiNIC_clients  %s" % (port_list_cl_lip)
-
-    if (USE_TCP) :
-        return (port_list_cl_lip, port_list_cl_src, port_list_for_clients, port_list,       port_list_empty, "")
-    else:
-        return (port_list_cl_lip, port_list_cl_src, port_list_for_clients, port_list_empty, port_list,       " --udp ")
-
-
 
 def get_cmd_server(id, cmd) :
     """Returns special command when it is first server and there is special command present"""
@@ -292,13 +252,13 @@ def create_server(id):
        ( 'memcached%d' % (id),
        {
 
-           'command': 'sudo taskset -c %s %s -p %d -U %d -t %d -l %s' % (
-                toCoreList(server_core_list[id]),
-                echo_server_cmds['exec_cmd'],
-                MEMCACHED_PORT_TCP[id],     # -p
-                MEMCACHED_PORT_UDP[id],     # -U
-                len(server_core_list[id]),  # -t (no of threads)
-                TARGET                      # -l (listen address)
+           'command':  'sudo %s ' % (get_isolation_container(is_server=True))
+                + ' %s -p %d -U %d -t %d -l %s ' % (
+                    echo_server_cmds['exec_cmd'],
+                    0,                          # -p (TCP)
+                    CLIENT_INITIAL_PORT,        # -U
+                    SERVER_CORES,
+                    TARGET                      # -l (listen address)
                 ),
 
            'runner': 'process',
@@ -314,7 +274,8 @@ def create_server(id):
        ('dstat',
        {
            'command': dstatCmd (mname = 'server%d' % (id),
-               cpus=toCoreList(server_core_list[id]), netdev=server_if[server_names[id]],
+               cpus=get_isolation_container(is_server=True)[len(' testset -c '):],
+               netdev=server_if[server_names[id]],
                interrupts=getInterruptLines(MINFO_SERVER[server_names[id]])),
            'runner': 'dstat_json',
            'wait_for': True,
@@ -329,7 +290,8 @@ def create_server(id):
 #       ('ethtool',
 #       {
 #           'command': dstatCmd (mname = 'server%d' % (id),
-#               cpus=toCoreList(server_core_list[id]), netdev=server_if[server_names[id]],
+#               cpus=get_isolation_container(is_server=True)[len(' testset -c '):]
+#               netdev=server_if[server_names[id]],
 #               interrupts=getInterruptLines(MINFO_SERVER[server_names[id]])),
 #           'runner': 'ethtool_json',
 #           'wait_for': True,

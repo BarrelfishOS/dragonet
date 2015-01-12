@@ -18,6 +18,9 @@ gen_deploy = "sudo ./scripts/pravin/deployDragonetGen.sh"
 gen_is_app_ready = "./scripts/pravin/wait_for_dn_app.sh"
 dragonet_dir = "dragonet/Dragonet/"
 
+app_ready_event_count = len(FLOWS)
+app_ready_event_count = 1
+
 def dragonet_container_gen(sname):
     return {
             'base_dir'              : dragonet_dir,
@@ -37,7 +40,8 @@ def dragonet_container_gen(sname):
                                             HWQUEUES
                                             # this command still needs app-endpoints and app-name
                                             # Which will be provided by the caller
-                                            ))
+                                            )),
+            'is_ready_wait_events'  :  app_ready_event_count,
            }
 
 dragonet_container = {
