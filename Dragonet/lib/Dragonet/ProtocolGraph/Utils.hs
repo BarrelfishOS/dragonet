@@ -20,6 +20,8 @@ module Dragonet.ProtocolGraph.Utils (
     getSinglePre, getSinglePrePort,
     dominates,
 
+    oNodeOperandsMap,
+
     fromSocketId,toSocketId, toSocketNode, fromSocketNode,
     balanceNode, balanceNodeEndpoint, balanceNodeEndpointId, isBalanceNode,
 ) where
@@ -36,11 +38,13 @@ import qualified Data.Graph.Inductive.Query.DFS as DFS
 import qualified Util.GraphHelpers as GH
 import Data.Functor ((<$>))
 
-import Dragonet.DotGenerator (toDot, toDotHighlight)
+import qualified Data.Map.Lazy as M
 
+import Dragonet.DotGenerator (toDot, toDotHighlight)
+import Dragonet.Conventions (isTruePort, isFalsePort)
+
+import Control.Exception (assert)
 import Debug.Trace (trace)
-tr = flip trace
-trN = \x  _ -> x
 
 -- Remove all spawn edges from the graph
 dropSpawnEdges :: PGraph -> PGraph
@@ -342,3 +346,27 @@ dominates g (src@(srcId,_), p) dst@(_, ONode { nOperator = op}) = comb_op $ map 
                      NOpAnd -> or   -- we only need one to dominate
                      NOpOr  -> and  -- we need all to dominate
                      otherwise -> error "NYI: not sure about the semantics. We might need to map with not"
+
+
+-- get the operands of an Onode: (operands, True map, False map)
+type PortMap = M.Map DGI.Node NPort
+oNodeOperandsMap :: PGraph -> (DGI.Node, Node)
+                 -> ([DGI.Node], PortMap, PortMap)
+oNodeOperandsMap g (nid, ONode {}) = assert checkEdges ret
+    where ret = (nids, truePMap, falsePMap)
+          prevs = lpreNE g nid
+          nids = map fst prevs
+          truePMap = M.fromListWithKey wt
+                     [(nid, port) | (nid,edge) <- prevs
+                                  , let port = edgePort_ edge
+                                  , isTruePort port]
+          falsePMap = M.fromListWithKey wf
+                      [(nid, port) | (nid,edge) <- prevs
+                                   , let port = edgePort_ edge
+                                   , isFalsePort port]
+
+          checkPort :: NPort -> Bool
+          checkPort p = (isFalsePort p) || (isTruePort p)
+          checkEdges = all checkPort [edgePort_ e | (_,e) <- prevs]
+          wt = error "oNodeOperandsMap: >1 true ports found for an operand"
+          wf = error "oNodeOperandsMap: >1 false ports found for an operand"
