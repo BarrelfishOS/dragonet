@@ -11,11 +11,12 @@ ensure_running_process() {
     fi
 }
 
+
 SCRIPTDIR="./scripts/pravin/"
 # the tool should get only one number as commandline arg
 if [ $# != 2 ] ; then
     echo "ERROR: This script expects two arguments, as number of HW queues, and stackname"
-    echo "USAGE: $0  <stack-name> <no. of HW queues>"
+    echo "USAGE: $0  <stack-name> <no. of HW queues> "
     echo "EXAMPLE: $0 stack-sf 1"
     echo "EXAMPLE: $0 stack-e10k 4"
     echo "EXAMPLE: $0 stack-dpdk 4"

@@ -81,7 +81,7 @@ getClientList clcount =  take clcount $ concat $ repeat clList
           , "10.113.4.57"  --  ziger2:
 --          , "10.113.4.26"  --  sbrinz1:
           , "10.113.4.29"  --  sbrinz2:
-          , "10.113.4.20"  --  gruyere:
+--          , "10.113.4.20"  --  gruyere:
 --          , "10.113.4.71"  --  appenzeller:
       ]
 

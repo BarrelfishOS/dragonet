@@ -49,6 +49,53 @@ struct lsm_internal {
     bulk_correlation_t   bind_corr;
 };
 
+static inline errval_t shm_chan_alloc_wrapper(
+//        struct bulk_ll_channel *channel,
+        struct shm_channel *chan,
+        struct shm_message **msg)
+{
+    errval_t err;
+//    struct lsm_internal *internal = channel->impl_data;
+//    struct shm_channel *chan = internal->tx;
+    int tries = 0;
+
+    for(tries = 0;  tries < 3; ++tries) {
+
+        err = shm_chan_alloc(chan, msg);
+        if (err_is_fail(err)) {
+            printf("%s:%d:ERROR: shm_chan_alloc failed. err=%d, %s\n",
+                    __FILE__, __LINE__, err, err_str(err));
+            printf("Details of TX channel\n");
+            shm_chan_show(chan);
+            //printf("Details of RX channel\n");
+            //shm_chan_show(&internal->rx);
+
+            if (err == SHM_CHAN_NOSPACE) {
+                printf("This is transient error, and attempt %d, so trying again\n",
+                        tries);
+                sleep(1);
+                // this is transient error.  sleep for short time and and try again
+            } else {
+                printf("This is serious error, and attempt %d. giving up\n",
+                        tries);
+                return err;
+
+            }
+        } else {
+            if (tries > 0) {
+                printf("shm_chan_alloc worked after %d tries. One of the entiy is slow!\n",
+                        tries);
+
+            }
+            return err;
+        }
+    } // end for: no. of tries
+    printf("shm_chan_alloc failed for %d times. giving up\n",
+                        tries);
+    return err;
+} // end function: shm_mem_alloc_wrapper
+
+
 
 static struct lsm_opstate *ops_alloc(struct lsm_internal *internal)
 {
@@ -308,7 +355,15 @@ static errval_t op_channel_bind(struct bulk_ll_channel *channel,
     internal->bind_corr = corr;
 
     // this part really shouldn't fail unless something is seriously wrong
-    err = shm_chan_alloc(&internal->tx, &msg);
+    err = shm_chan_alloc_wrapper(&internal->tx, &msg);
+    if (err_is_fail(err)) {
+        printf("%s:%d:ERROR: shm_chan_alloc failed. err=%d, %s\n",
+                __FILE__, __LINE__, err, err_str(err));
+        printf("Details of TX channel\n");
+        shm_chan_show(&internal->tx);
+        printf("Details of RX channel\n");
+        shm_chan_show(&internal->rx);
+    }
     err_expect_ok(err);
 
     channel->state = BULK_STATE_BINDING;
@@ -418,7 +473,15 @@ static errval_t op_assign_pool(struct bulk_ll_channel *channel,
     ops->state.assign.pool = pool;
     ops->op = BULK_ASYNC_POOL_ASSIGN;
 
-    err = shm_chan_alloc(&internal->tx, &msg);
+    err = shm_chan_alloc_wrapper(&internal->tx, &msg);
+    if (err_is_fail(err)) {
+        printf("%s:%d:ERROR: shm_chan_alloc failed. err=%d, %s\n",
+                __FILE__, __LINE__, err, err_str(err));
+        printf("Details of TX channel\n");
+        shm_chan_show(&internal->tx);
+        printf("Details of RX channel\n");
+        shm_chan_show(&internal->rx);
+    }
     if (err_is_fail(err)) {
         ops_free(ops);
         return err;
@@ -449,6 +512,11 @@ static errval_t buffer_op_helper(struct bulk_ll_channel  *channel,
 
     ops = ops_alloc(internal);
     if (ops == NULL) {
+        printf("%s:%d:ERROR: ops_alloc failed\n", __FILE__, __LINE__);
+        printf("Details of TX channel\n");
+        shm_chan_show(&internal->tx);
+        printf("Details of RX channel\n");
+        shm_chan_show(&internal->rx);
         return BULK_TRANSFER_MEM;
     }
     oid = ops_id(ops);
@@ -457,8 +525,14 @@ static errval_t buffer_op_helper(struct bulk_ll_channel  *channel,
     ops->corr = corr;
     ops->op = op;
 
-    err = shm_chan_alloc(&internal->tx, &msg);
+    err = shm_chan_alloc_wrapper(&internal->tx, &msg);
     if (err_is_fail(err)) {
+        printf("%s:%d:ERROR: shm_chan_alloc failed. err=%d, %s\n",
+                __FILE__, __LINE__, err, err_str(err));
+        printf("Details of TX channel\n");
+        shm_chan_show(&internal->tx);
+        printf("Details of RX channel\n");
+        shm_chan_show(&internal->rx);
         ops_free(ops);
         return err;
     }
@@ -535,7 +609,16 @@ static void done_status(struct lsm_internal  *internal,
     struct shm_message *out;
 
 
-    e = shm_chan_alloc(&internal->tx, &out);
+    e = shm_chan_alloc_wrapper(&internal->tx, &out);
+    if (err_is_fail(e)) {
+        printf("%s:%d:ERROR: shm_chan_alloc failed. err=%d, %s\n",
+                __FILE__, __LINE__, err, err_str(e));
+        printf("Details of TX channel\n");
+        shm_chan_show(&internal->tx);
+        printf("Details of RX channel\n");
+        shm_chan_show(&internal->rx);
+    }
+
     err_expect_ok(e); // FIXME
 
     out->type = SHM_MSG_STATUS;
@@ -555,7 +638,17 @@ static void done_bind(struct lsm_internal  *internal,
 
      // TODO: error handling in case the binding is not successful
 
-    e = shm_chan_alloc(&internal->tx, &out);
+    e = shm_chan_alloc_wrapper(&internal->tx, &out);
+    if (err_is_fail(e)) {
+        printf("%s:%d:ERROR: shm_chan_alloc failed. err=%d, %s\n",
+                __FILE__, __LINE__, err, err_str(e));
+        printf("Details of TX channel\n");
+        shm_chan_show(&internal->tx);
+        printf("Details of RX channel\n");
+        shm_chan_show(&internal->rx);
+    }
+
+
     err_expect_ok(e); // FIXME
 
     out->type = SHM_MSG_BIND_DONE;
@@ -674,7 +767,15 @@ static errval_t msg_assign(struct lsm_internal  *internal,
 fail_map:
     free(p);
 out:
-    e = shm_chan_alloc(&internal->tx, &out);
+    e = shm_chan_alloc_wrapper(&internal->tx, &out);
+    if (err_is_fail(e)) {
+        printf("%s:%d:ERROR: shm_chan_alloc failed. err=%d, %s\n",
+                __FILE__, __LINE__, err, err_str(e));
+        printf("Details of TX channel\n");
+        shm_chan_show(&internal->tx);
+        printf("Details of RX channel\n");
+        shm_chan_show(&internal->rx);
+    }
     err_expect_ok(e); // FIXME
 
     out->type = SHM_MSG_STATUS;
@@ -732,6 +833,15 @@ static errval_t msg_buffer(struct lsm_internal  *internal,
             break;
 
         default:
+            printf("Invalid msg_buffer: p=[%d,%d,%d] b=%d m=%d\n",
+            msg->content.buffer.pool.machine, msg->content.buffer.pool.dom,
+            msg->content.buffer.pool.local, msg->content.buffer.buffer,
+            (int) msg->content.buffer.meta);
+            printf("To be more specific, invalid type: %d\n",  (int)msg->type);
+            printf("Details of RX channel\n");
+            shm_chan_show(&internal->rx);
+            printf("Details of TX channel\n");
+            shm_chan_show(&internal->tx);
             assert(!"Invalid message type");
     }
     event->impl_data = (void *) (uintptr_t) msg->content.buffer.op;
@@ -740,7 +850,15 @@ static errval_t msg_buffer(struct lsm_internal  *internal,
 
     return SYS_ERR_OK;
 out_err:
-    e = shm_chan_alloc(&internal->tx, &out);
+    e = shm_chan_alloc_wrapper(&internal->tx, &out);
+    if (err_is_fail(e)) {
+        printf("%s:%d:ERROR: shm_chan_alloc failed. err=%d, %s\n",
+                __FILE__, __LINE__, err, err_str(e));
+        printf("Details of TX channel\n");
+        shm_chan_show(&internal->tx);
+        printf("Details of RX channel\n");
+        shm_chan_show(&internal->rx);
+    }
     err_expect_ok(e); // FIXME
 
     out->type = SHM_MSG_STATUS;

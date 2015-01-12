@@ -414,6 +414,11 @@ doSearch st flows = do
 hardcodedSearch :: forall o a. C.ConfChange a =>
                 C.Configuration
             ->  SearchStrategy o a
+hardcodedSearch hardConf st [] = return $
+    [
+        ("RxC5TupleFilter", PG.CVList []),
+        ("RxCFDirFilter", PG.CVList [])
+    ]
 hardcodedSearch hardConf st fs = return $ hardConf
 
 {-

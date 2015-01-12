@@ -63,6 +63,16 @@ errval_t shmchan_create_(struct shm_channel *chan, const char *name,
     return err;
 }
 
+// Shows the details about channel for debugging purposes
+void shmchan_show_(struct shm_channel *chan)
+{
+    assert(chan != NULL);
+    printf("CHANNEL_DETAILS: chan:%p: shm_name %s, no_of_slots = %zu, "
+            " current = %zu, dataLoc = %p, isSender=%d, isCreator=%d\n",
+                chan, chan->name, chan->size,
+                chan->current, chan->data, chan->sender, chan->creator);
+} // end function:shmchan_show_
+
 errval_t shmchan_bind_(struct shm_channel *chan, const char *name,
                        size_t slotsz, bool sender)
 {

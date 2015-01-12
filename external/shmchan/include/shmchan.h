@@ -34,6 +34,7 @@ errval_t shmchan_create_(struct shm_channel *chan, const char *name,
 errval_t shmchan_bind_(struct shm_channel *chan, const char *name,
                        size_t slotsz, bool sender);
 errval_t shmchan_release_(struct shm_channel *chan, size_t slotsz);
+void shmchan_show_(struct shm_channel *chan);
 void shmchan_waitset_register_(
                 struct shm_channel *chan,
                 size_t slotsz,
@@ -133,6 +134,7 @@ static inline errval_t shmchan_poll_(struct shm_channel  *chan,
         flags = prefix##slotflags(msg);                                        \
                                                                                \
         if ((*flags & SHM_FLAGS_TXDONE) != 0) {                                \
+            shmchan_show_(chan);                                               \
             return SHM_CHAN_NOSPACE;                                           \
         }                                                                      \
                                                                                \
@@ -171,6 +173,11 @@ static inline errval_t shmchan_poll_(struct shm_channel  *chan,
         assert((*flags & SHM_FLAGS_TXDONE) != 0);                              \
                                                                                \
         *flags &= ~SHM_FLAGS_TXDONE;                                           \
+    }                                                                          \
+    /** show debug information about channel */                                \
+    static inline void prefix##show(struct shm_channel  *chan)                 \
+    {                                                                          \
+        return shmchan_show_(chan);                                            \
     }                                                                          \
 
 #endif

@@ -34,6 +34,7 @@ bool e10k_ctrl_fdir_set(struct state *state,
     struct dragonet_dpdk *e10k_nic = (struct dragonet_dpdk *)state->st_driver_handle;
 
     if (e10k_nic == NULL) {
+        printf(" ################## NIC Not ready ############ \n");
         return false;
     }
 
@@ -68,6 +69,7 @@ bool e10k_ctrl_5tuple_set(struct state *state,
     struct dragonet_dpdk *e10k_nic = (struct dragonet_dpdk *)state->st_driver_handle;
 
     if (e10k_nic == NULL) {
+        printf(" ################## NIC Not ready ############ \n");
         return false;
     }
 

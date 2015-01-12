@@ -198,6 +198,9 @@ errval_t dnal_aq_create(const char  *stackname,
 
     if (connect(s, (struct sockaddr *) &addr, sizeof(addr)) == -1) {
         perror("stack_init: connecting socket failed");
+        printf("\n%s:%s(): connect failed for stack: %s, slot %s, "
+                "path, /tmp/%s_apps\n", __FILE__,  __FUNCTION__,
+                stackname, slotname, stackname);
         abort();
     }
 

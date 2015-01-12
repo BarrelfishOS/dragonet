@@ -364,7 +364,10 @@ map_all_hugepages(struct hugepage_file *hugepg_tbl,
 		if (virtaddr == MAP_FAILED) {
 			RTE_LOG(ERR, EAL, "%s(): mmap failed: %s\n", __func__,
 					strerror(errno));
+			RTE_LOG(ERR, EAL, "%s(): for %uth page, out of %u pages\n", __func__,
+					i, hpi->num_pages[0]);
 			close(fd);
+
 			return -1;
 		}
 

@@ -22,7 +22,7 @@ static uint64_t qstat_tx[MAX_QUEUES] = {0, 0};
 // number of queues that device will configure.
 // TODO: This number should be provided by the stack-dpdk commandline arg
 //      and should not be hardcoded here.
-static int queues_to_use = 16;
+static int queues_to_use = 10;
 
 static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
     struct state *state, struct input **in, uint8_t qi)
@@ -44,6 +44,7 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
             // We'll do the intialization on queue 0
             return P_E10kRxQueue0_drop;
         }
+        printf(" ############## Initializing the driver ############## \n");
 
         // DPDK specific init
         state->st_driver_handle = (void *)init_dpdk_wrapper_deleteme(IFNAME,
@@ -66,7 +67,7 @@ static node_out_t rx_queue(struct ctx_E10kRxQueue0 *context,
                 // but keeping there as there is similar line in e10k init code
 
         declare_dragonet_initialized(DN_READY_FNAME, "e10k driver started!\n");
-        printf("Initialized\n");
+        printf(" ############## Initialization done ############## \n");
     }
     q = e10k->queues + qi;
 

@@ -758,8 +758,34 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
     mmprint("%s:%s:%d: [TID:%d], releasing locks \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
     pthread_mutex_unlock(&dn_tstate->dn_lock);
 
+    printf("[TID:%d], waiting for the barriar\n",  dn_tstate->tindex);
+    // TODO: threads entering barriar saying they are done with configuration
+    pthread_barrier_wait(&nthread_barrier);
 
-    mmprint("%s:%s:%d: [TID:%d], \n", __FILE__, __FUNCTION__, __LINE__, dn_tstate->tindex);
+    printf("[TID:%d], barriar crossed\n",  dn_tstate->tindex);
+    // TODO: call noop
+    if (dn_tstate->tindex == 0) {
+        // ASSUMPTION: Its assumed that first thread is the main thread!
+        // This locking is an extra precaution
+        pthread_mutex_lock(&dn_init_lock);
+        pthread_mutex_lock(&dn_tstate->dn_lock);
+
+        printf("[TID:%d], main thread, calling NOOP\n",  dn_tstate->tindex);
+        // Tell Dragonet that you are done with sending flow information
+        err_expect_ok(dnal_noop(
+                        dn_tstate->daq, // application endpoint
+                        0               // flag saying no more changes
+                    ));
+
+        printf("[TID:%d], main thread, calling NOOP done\n",  dn_tstate->tindex);
+        pthread_mutex_unlock(&dn_init_lock);
+        pthread_mutex_unlock(&dn_tstate->dn_lock);
+    }
+    printf("[TID:%d], waiting for main thread to finish NOOP\n",  dn_tstate->tindex);
+    pthread_barrier_wait(&nthread_barrier);
+
+    // Stack is ready now, all threads can start with polling
+    printf("[TID:%d], ready to handle client requests\n",  dn_tstate->tindex);
     return ret;
 }
 

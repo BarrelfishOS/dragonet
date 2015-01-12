@@ -37,6 +37,10 @@ import qualified Scenarios.S3 as S3
 tr a b = trace b a
 trN a b = a
 
+putStrLnDbg x = putStrLn x
+--putStrLnDbgN x = return ()
+putStrLnDbgN x = putStrLn x
+
 --------------------------------------------------
 
 --------------------------------------------------
@@ -397,7 +401,11 @@ cFDirFilters = CTRL.fdirCount
 
 
 main = do
-    ((nq,costfn,oraclefn,concurrency,clients) :: (Int,String,String,Int,Int)) <- RA.readArgs
+    ((nq',costfn,oraclefn,concurrency,clients) :: (Int,String,String,Int,Int)) <- RA.readArgs
+
+    -- to avoid off by one error as most of the code assumes
+    let nq = nq' - 1
+
     print $ "Number of queues used: " ++ show nq
     print $ "Cost function: " ++ show costfn
     print $ "Oracle function: " ++ show oraclefn

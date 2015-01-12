@@ -387,12 +387,12 @@ int init_dpdk_setupV2(int queues)
         return -1;
     }
 
-    const char *myArgs[ARGNOS] = {"./stack-dpdk",
+    const char myArgs[255][255] = {"./stack-dpdk",
         "-c", "0xff",  // coremask
         "-n", "1",  // no of mem chanels // FIXME: figure out proper value here
         "--file-prefix=dnetHuge",
 //        "--no-huge",
-        "-m", "700",
+        "-m", "512",
         "--",
         "--pkt-filter-mode=perfect",
 //        "--pkt-filter-mode=signature",
