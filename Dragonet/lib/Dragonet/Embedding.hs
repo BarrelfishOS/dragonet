@@ -41,8 +41,8 @@ trN = \x  _ -> x
 type QTag = String
 
 qGetTag :: PG.Node -> QTag
-qGetTag qnode = if isTxQueueNode qnode      then txTag
-                else if isRxQueueNode qnode then rxTag
+qGetTag qnode = if PGU.isTxQueueNode qnode      then txTag
+                else if PGU.isRxQueueNode qnode then rxTag
                 else error "qGetTag called on a non-queue node"
     where name  = PG.nLabel qnode
           txTag = qTag $ drop (length txQPref) name
@@ -57,19 +57,10 @@ setOrigin origin = DGI.nmap f
     where f n@(PG.FNode {}) = n { PG.nOrigin = origin }
           f n               = n
 
-isTxQueueNode :: PG.Node -> Bool
-isTxQueueNode node = txQPref `L.isPrefixOf` (PG.nLabel node)
-
-isRxQueueNode :: PG.Node -> Bool
-isRxQueueNode node = rxQPref `L.isPrefixOf` (PG.nLabel node)
-
-isQueueNode :: PG.Node -> Bool
-isQueueNode node = isTxQueueNode node || isRxQueueNode node
-
 tagPrgQueues :: PG.PGraph -> PG.PGraph
 tagPrgQueues = DGI.nmap tagQueue
     where tagQueue n
-            | isQueueNode n = n {
+            | PGU.isQueueNode n = n {
                     PG.nTag = qTag $ drop (length rxQPref) $ PG.nLabel n }
             | otherwise = n
 
@@ -249,7 +240,7 @@ data EmbedSt = EmbedSt {
 -- have unconnected ports.
 prgRxNodes :: PG.PGraph -> [((PG.PGNode, [PG.NPort]), QTag)]
 prgRxNodes prg = L.concat $ map getQSinks rxQs
-    where rxQs = GH.filterNodesByL isRxQueueNode prg
+    where rxQs = GH.filterNodesByL PGU.isRxQueueNode prg
           getN n = (n, fromJust $ DGI.lab prg n)
           getQSinks :: PG.PGNode -> [((PG.PGNode, [PG.NPort]), QTag)]
           getQSinks qn =  [ ((node, lports), qtag)
@@ -267,7 +258,7 @@ prgRxNodes prg = L.concat $ map getQSinks rxQs
 prgTxNodes :: PG.PGraph -> [(PG.PGNode, QTag)]
 prgTxNodes prg = zip nodes tags
     where tags  = map (qGetTag . snd) nodes
-          nodes = map doCheck $ GH.filterNodesByL isTxQueueNode prg
+          nodes = map doCheck $ GH.filterNodesByL PGU.isTxQueueNode prg
           doCheck :: PG.PGNode -> PG.PGNode
           doCheck (nid,nlbl) = case PGU.isSource_ prg nid of
             True -> (nid,nlbl)
@@ -295,7 +286,7 @@ qTagNodes gr ntags = DGI.gmap mapfn gr
 -- lpg should have a single Rx node
 lpgRxNode :: PG.PGraph -> PG.PGNode
 lpgRxNode lpg = rxnode
-    where rxnodes = GH.filterNodesByL isRxQueueNode lpg
+    where rxnodes = GH.filterNodesByL PGU.isRxQueueNode lpg
           rxnode = case length rxnodes of
                      0 -> error "Did not found an rx queue node in lpg"
                      1 -> rxnodes !! 0
@@ -304,7 +295,7 @@ lpgRxNode lpg = rxnode
 -- lpg should have a single Tx node
 lpgTxNode :: PG.PGraph -> PG.PGNode
 lpgTxNode lpg = txnode
-    where txnodes = GH.filterNodesByL isTxQueueNode lpg
+    where txnodes = GH.filterNodesByL PGU.isTxQueueNode lpg
           txnode = case length txnodes of
                      0 -> error "Did not found an tx queue node in lpg"
                      1 -> txnodes !! 0
@@ -700,7 +691,7 @@ embOffloadTx = do
     lpg   <- ST.gets origLpg
     prg   <- ST.gets embPrg
     lpgTx <- ST.gets embLpgTx
-    let lpgTxNs = filter (not . isTxQueueNode . snd) $  PGU.pgRDfsNEs lpg [lpgTx]
+    let lpgTxNs = filter (not . PGU.isTxQueueNode . snd) $  PGU.pgRDfsNEs lpg [lpgTx]
         prgNs = DGI.labNodes prg
         -- NB: intersectBy keeps the element from the first list
         candidates_ = L.intersectBy ((==) `on` pgName) lpgTxNs prgNs
@@ -1169,8 +1160,8 @@ doEmbNode orig_ctx@(ins,nid,nlbl,outs) idx = do
         EmbRx -> doEmbRx orig_ctx idx
 
 embIsQueueNode :: EmbDirection -> PG.Node -> Bool
-embIsQueueNode EmbRx = isRxQueueNode
-embIsQueueNode EmbTx = isTxQueueNode
+embIsQueueNode EmbRx = PGU.isRxQueueNode
+embIsQueueNode EmbTx = PGU.isTxQueueNode
 
 -- check if two nodes have the same structure
 pgMatch :: PG.Node -> PG.Node -> Bool

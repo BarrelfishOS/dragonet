@@ -24,6 +24,8 @@ module Dragonet.ProtocolGraph.Utils (
 
     fromSocketId,toSocketId, toSocketNode, fromSocketNode,
     balanceNode, balanceNodeEndpoint, balanceNodeEndpointId, isBalanceNode,
+
+    isTxQueueNode, isRxQueueNode, isQueueNode
 ) where
 
 import Dragonet.ProtocolGraph
@@ -41,7 +43,7 @@ import Data.Functor ((<$>))
 import qualified Data.Map.Lazy as M
 
 import Dragonet.DotGenerator (toDot, toDotHighlight)
-import Dragonet.Conventions (isTruePort, isFalsePort)
+import Dragonet.Conventions (isTruePort, isFalsePort, txQPref, rxQPref)
 
 import Control.Exception (assert)
 import Debug.Trace (trace)
@@ -370,3 +372,14 @@ oNodeOperandsMap g (nid, ONode {}) = assert checkEdges ret
           checkEdges = all checkPort [edgePort_ e | (_,e) <- prevs]
           wt = error "oNodeOperandsMap: >1 true ports found for an operand"
           wf = error "oNodeOperandsMap: >1 false ports found for an operand"
+
+
+isTxQueueNode :: Node -> Bool
+isTxQueueNode node = txQPref `L.isPrefixOf` (nLabel node)
+
+isRxQueueNode :: Node -> Bool
+isRxQueueNode node = rxQPref `L.isPrefixOf` (nLabel node)
+
+isQueueNode :: Node -> Bool
+isQueueNode node = isTxQueueNode node || isRxQueueNode node
+
