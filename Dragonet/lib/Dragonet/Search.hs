@@ -28,7 +28,7 @@ import qualified Dragonet.Predicate           as PR
 import qualified Dragonet.Implementation.IPv4 as IP4
 
 import Dragonet.DotGenerator (toDot)
-import Dragonet.Conventions (rxQPref, isTruePort, isFalsePort)
+import Dragonet.Conventions (rxQPref, isTruePort, isFalsePort, QueueId)
 import Dragonet.Flows(Flow (..), flowPred, flowStr)
 
 import qualified Dragonet.ProtocolGraph.Utils as PGU
@@ -75,7 +75,6 @@ data Cost = CostOK         |
             CostReject Float -- reject value allows to rate rejected solutions
     deriving (Eq, Ord, Show)
 
-type QueueId     = Int
 type QMap        = [(Flow, QueueId)]
 --type QMap        = M.Map Flow QueueId
 

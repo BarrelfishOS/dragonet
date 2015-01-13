@@ -12,7 +12,7 @@ module Graphs.E10k (
 
     strToC5t,
 
-    QueueId, ConfChange(..),
+    ConfChange(..),
     mk5TupleFromFl, mkFDirFromFl,
     insert5tFromFl, insertFdirFromFl,
 
@@ -30,6 +30,7 @@ import qualified Dragonet.Implementation.IPv4 as IP4
 import qualified Dragonet.Semantics           as SEM
 
 import Dragonet.Flows (Flow (..))
+import Dragonet.Conventions (QueueId)
 
 import qualified Data.Graph.Inductive as DGI
 import qualified Data.Graph.Inductive.Query.DFS as DFS
@@ -56,8 +57,6 @@ import Text.Show.Pretty (ppShow)
 
 tr = flip trace
 trN = \x  _ -> x
-
-type QueueId = Int
 
 cfgEmpty = [
     ("RxC5TupleFilter", PG.CVList []),

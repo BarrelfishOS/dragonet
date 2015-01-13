@@ -2,6 +2,7 @@ module Dragonet.Conventions(
     rxQPref, txQPref, qTag,
     isTruePort, isFalsePort,
     constTrueName, constFalseName,
+    QueueId,
 ) where
 
 import qualified Data.List as L
@@ -25,3 +26,5 @@ isFalsePort = L.isSuffixOf "false"
 constTrueName  = "_True"
 constFalseName = "_False"
 
+
+type QueueId = Int

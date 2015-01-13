@@ -8,7 +8,7 @@ import qualified Dragonet.Configuration       as C
 import qualified Dragonet.Predicate           as PR
 
 import Dragonet.Flows (Flow, flowPred)
-import Dragonet.Conventions (isTruePort, isFalsePort)
+import Dragonet.Conventions (isTruePort, isFalsePort, QueueId)
 
 import qualified Data.Graph.Inductive         as DGI
 import qualified Data.Map.Strict              as M
