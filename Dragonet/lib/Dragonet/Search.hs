@@ -26,6 +26,7 @@ import qualified Dragonet.ProtocolGraph       as PG
 import qualified Util.GraphHelpers            as GH
 import qualified Dragonet.Predicate           as PR
 import qualified Dragonet.Implementation.IPv4 as IP4
+import qualified Dragonet.FlowMap             as FM
 
 import Dragonet.DotGenerator (toDot)
 import Dragonet.Conventions (rxQPref, isTruePort, isFalsePort, QueueId)
@@ -855,6 +856,7 @@ zQmap st conf confChange flows = do
         prgC      = C.applyConfig newConf prgU
         flowC     = sFlowCache st
         d0        = flowQueueStart prgC
+        -- flow tuple: (flow, flow predicate)
         flowTs    = [(fl, flowPred fl) | fl <- flows]
     qmap <- doZQmap flowC d0 flowTs
 
@@ -868,6 +870,7 @@ zQmap st conf confChange flows = do
 
     return (prgC, newConf, qmap)
 
+-- this is what we are currently using
 zQmapIncremental :: (OracleSt o a)
       => SearchSt s o a -> C.Configuration -> a -> [Flow] -> QMap
       -> ST.ST s (PG.PGraph, C.Configuration, QMap)
@@ -887,8 +890,8 @@ zQmapIncremental st conf confChange flows oldQmap_ = do
         (qmap0, restFlows) = L.foldl' foldFn ([],[]) flows
 
     (prgC, conf, qmap) <- zQmap st conf confChange restFlows
-
     return $ (prgC, conf, qmap0 ++ qmap)
+
 
 sucPortCtx_ :: PG.PGraph -> PG.PGContext -> PG.NPort -> DGI.Node
 sucPortCtx_ g ctx port = fst next
@@ -924,6 +927,79 @@ flowQueueStart prgC = d1
           d0 :: PG.PGGDecomp
           d0 = doMatch (fst node0) prgC
           d1 = sucPortDecomp d0 port0
+
+
+--------------------------------------------------------------------------------
+-- Incremental search
+-- [TODO: this file is getting too big]
+--  Eventually, we should be using a list of ConfChange everywhere so that
+--  we end up only applying in the driver the relevant configuration changes
+--------------------------------------------------------------------------------
+type IncrSearchStrategy o cc = (OracleSt o cc) =>
+    IncrSearchSt s o cc -> [Flow] -> ST.ST s C.Configuration
+
+data IncrSearchSt s o cc = (OracleSt o cc) =>
+    IncrSearchSt {
+          isParams     :: SearchParams o cc
+        -- we probably going to need to transform state into ST, so keep this
+        -- here
+        , isFlowCache  :: FlowCache s
+        -- incremental map is implemented by maintaing a flow map
+        -- here's its state
+        , isFlowMapSt  :: FM.FlowMapSt cc
+}
+
+incSearchGreedyFlows :: forall o cc. C.ConfChange cc => IncrSearchStrategy o cc
+incSearchGreedyFlows st flows_ = do
+    let uniqueFlows = (length flows_) == (length $ L.nub flows_)
+        dup_msg = "Duplicated flows in flow list:\n" ++ (ppShow flows_) ++ " This might cause problems"
+        flows = case uniqueFlows of
+            False -> trace dup_msg flows_
+            True  -> flows
+    st' <- incSearchGreedyFlows_ st flows
+    return $ C.foldConfChanges $ FM.fmCnfChanges $ isFlowMapSt st'
+
+incSearchGreedyFlows_ :: (OracleSt o cc)
+                      => IncrSearchSt s o cc
+                      -> [Flow]       -- remaining flows to examine
+                      -> ST.ST s (IncrSearchSt s o cc)
+-- no more flows: return configuration
+incSearchGreedyFlows_ st [] = return st
+-- process a single flow
+incSearchGreedyFlows_ st (flow:flows) = do
+    -- get basic information from current state
+    let oracle = sOracle $ isParams st
+        costFn = sCostFn $ isParams st
+        fmSt = isFlowMapSt st
+        ccs  = FM.fmCnfChanges fmSt
+        conf = C.foldConfChanges ccs
+    -- add flow to flow map state
+    let (_, fmSt') = FM.runFM (FM.addFlow flow) fmSt
+    -- get configuration changes for current state
+    let flowCCs = flowConfChanges oracle conf flow
+    -- compute new costs and minimum cost, and update state
+    let costs = [ (ccCost, ccFmSt)
+                        | cc <- flowCCs,
+                        let (ccQmap,ccFmSt) = incSearchQmap fmSt' cc,
+                        let ccCost = costFn ccQmap]
+        (lowerCost,fmSt'') = L.minimumBy (compare `on` fst) costs
+        st' = st { isFlowMapSt = fmSt''}
+    -- recurse
+    incSearchGreedyFlows_ st' flows
+
+incSearchQmapM :: (C.ConfChange cc)
+              => cc
+              -> (FM.FlowMapM cc) QMap
+incSearchQmapM cc = do
+    FM.incrConfigure cc
+    qmap <- FM.getRxQMap
+    return qmap
+
+incSearchQmap :: (C.ConfChange cc)
+              => FM.FlowMapSt cc
+              -> cc
+              -> (QMap, FM.FlowMapSt cc)
+incSearchQmap st cc = FM.runFM (incSearchQmapM cc) st
 
 -- Code for performing simple tests
 

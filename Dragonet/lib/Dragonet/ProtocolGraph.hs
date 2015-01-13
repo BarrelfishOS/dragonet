@@ -75,7 +75,8 @@ data Node =
         nAttributes     :: [NAttribute],
         nPorts          :: [NPort],
         nConfType       :: ConfType,
-        nConfFunction   :: ConfFunction
+        nConfFunction   :: ConfFunction,
+        nIncrConfFunction :: ConfFunction -- incremental configuration function
         }
     deriving (Show)
 
@@ -235,7 +236,8 @@ baseCNode label ports cType cFun =
         nAttributes     = [],
         nPorts          = ports,
         nConfType       = cType,
-        nConfFunction   = cFun
+        nConfFunction   = cFun,
+        nIncrConfFunction = error $ "Incremental conf function Not Implemented! for node:" ++ label
         }
 
 nAttrAdd :: NAttribute -> Node -> Node

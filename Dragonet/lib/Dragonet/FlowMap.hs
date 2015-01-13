@@ -1,5 +1,11 @@
-{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE ExistentialQuantification,GeneralizedNewtypeDeriving #-}
 module Dragonet.FlowMap (
+    FlowMapM(..),
+    FlowMapSt(..),
+    getRxQMap,
+    addFlow,
+    incrConfigure,
+    runFM,
 ) where
 
 import qualified Dragonet.ProtocolGraph       as PG
@@ -55,36 +61,50 @@ fmAddPortFlow fm nid port flow = fm'
 
 
 data FlowMapSt cc = (C.ConfChange cc) => FlowMapSt {
-      fmGraph      :: PG.PGraph -- graph
-    , fmCnfChanges :: [cc]      -- configuration changes already applied
-    , fmFlows      :: [Flow]
-    , fmFlowMap    :: FlowMap
-    , fmEntryNid   :: DGI.Node
+      fmGraph        :: PG.PGraph -- graph
+    , fmCnfChanges   :: [cc]      -- configuration changes already applied
+    , fmFlows        :: [Flow]
+    , fmFlowMap      :: FlowMap
+    , fmRxEntryNid   :: DGI.Node
+    , fmTxQueueNodes :: [(QueueId, DGI.Node)]
+    , fmRxQueueNodes :: [(QueueId, DGI.Node)]
 }
 
 newtype FlowMapM cc a = FlowMapM { unFlowMapM :: ST.State (FlowMapSt cc) a }
     deriving (Monad, ST.MonadState (FlowMapSt cc), Functor)
 
+runFM :: FlowMapM cc a -> FlowMapSt cc -> (a, FlowMapSt cc)
+runFM m ns = ST.runState (unFlowMapM m) ns
+
 initFlowMapSt g = FlowMapSt {
-      fmGraph      = g
-    , fmCnfChanges = []
-    , fmFlows      = []
-    , fmFlowMap    = fm
-    , fmEntryNid   = entryNid
+      fmGraph        = g
+    , fmCnfChanges   = []
+    , fmFlows        = []
+    , fmFlowMap      = fm
+    , fmRxEntryNid   = rxEntryNid
+    , fmTxQueueNodes = txQNs
+    , fmRxQueueNodes = rxQNs
 }
     where fm = initFlowMap g
           -- this gives us a place to start with a flow
-          entryNid = case S.toList $ PGU.entryNodes g of
+          isRxNode nid = "Rx" `L.isPrefixOf` nlbl
+               where nlbl = (PG.nLabel $ fromJust $ DGI.lab g nid)
+          rxEntryNid = case filter isRxNode (S.toList $ PGU.entryNodes g) of
             [x] -> x
             []  -> error "initFlowMapSt: no entry node found"
             _   -> error "initFlowMapSt: more than one entry node found"
+          lNodes = DGI.labNodes g
+          txQNs = [(nid,qid) | (nid, nlbl) <- lNodes,
+                               let Just qid = PGU.nodeTxQueueId nlbl]
+          rxQNs = [(nid,qid) | (nid, nlbl) <- lNodes,
+                               let Just qid = PGU.nodeRxQueueId nlbl]
 
 addFlow :: Flow -> (FlowMapM cc) ()
 addFlow flow = do
     g     <- ST.gets fmGraph
     fm    <- ST.gets fmFlowMap
     flows <- ST.gets fmFlows
-    entry <- ST.gets fmEntryNid
+    entry <- ST.gets fmRxEntryNid
     let fm' = flowMapAddFlow fm g entry flow
     ST.modify $ \s -> s {fmFlowMap = fm', fmFlows = flow:flows}
 
@@ -126,7 +146,7 @@ updateFlowMap fm g nids = ret'
           isReady :: DGI.Node -> Bool
           isReady nid = notCnode && prevsInFlowMap
               where nidPrevs = PGU.preNE g nid
-                    prevsInFlowMap =  all (\x -> M.member x fm) nidPrevs
+                    prevsInFlowMap = all (\x -> M.member x fm) nidPrevs
                     notCnode = PGU.isCnode_ $ fromJust $ DGI.lab g nid
 
           -- Assertions
@@ -269,3 +289,25 @@ flowMapAddFlow_ g doneMap nextNids fl fm = ret
            where isDone x = M.member x doneMap
        --
        nextNotFound = error "flowMapAddFlow_: Could not reach the end for flow"
+
+-- just copy them for now. TODO: put them in a single file (e.g., Cost.hs)
+type QMap        = [(Flow, QueueId)]
+getRxQMap :: (C.ConfChange cc) => (FlowMapM cc) (QMap)
+getRxQMap = do
+    g  <- ST.gets fmGraph
+    fm <- ST.gets fmFlowMap
+    rxQNodes <- ST.gets fmRxQueueNodes
+    -- apply the partial configuration and update the flow map
+    -- 1. finalize the graph (but do not update to state)
+    let (g', nids') = C.icFinalize g
+        fm' = updateFlowMap fm g' nids'
+
+    -- 2. compute qmap
+    let getFlows ::  DGI.Node -> [Flow]
+        getFlows nid = case fmGetFlow fm nid fmSinkPort of
+                                Left flows -> flows
+                                Right msg  -> error $ "getRxQmap: getFlows failed: " ++ msg
+        qmap  = L.concat [ [(f,qid) | f <- flows]
+                           | (qid, rxQNid) <- rxQNodes,
+                           let flows = getFlows rxQNid]
+    return qmap

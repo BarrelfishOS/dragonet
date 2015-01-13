@@ -25,7 +25,8 @@ module Dragonet.ProtocolGraph.Utils (
     fromSocketId,toSocketId, toSocketNode, fromSocketNode,
     balanceNode, balanceNodeEndpoint, balanceNodeEndpointId, isBalanceNode,
 
-    isTxQueueNode, isRxQueueNode, isQueueNode
+    isTxQueueNode, isRxQueueNode, isQueueNode,
+    nodeTxQueueId, nodeRxQueueId,
 ) where
 
 import Dragonet.ProtocolGraph
@@ -43,7 +44,7 @@ import Data.Functor ((<$>))
 import qualified Data.Map.Lazy as M
 
 import Dragonet.DotGenerator (toDot, toDotHighlight)
-import Dragonet.Conventions (isTruePort, isFalsePort, txQPref, rxQPref)
+import Dragonet.Conventions (isTruePort, isFalsePort, txQPref, rxQPref, QueueId)
 
 import Control.Exception (assert)
 import Debug.Trace (trace)
@@ -383,3 +384,7 @@ isRxQueueNode node = rxQPref `L.isPrefixOf` (nLabel node)
 isQueueNode :: Node -> Bool
 isQueueNode node = isTxQueueNode node || isRxQueueNode node
 
+nodeTxQueueId :: Node -> Maybe QueueId
+nodeTxQueueId n = read <$> L.stripPrefix txQPref (nLabel n)
+nodeRxQueueId :: Node -> Maybe QueueId
+nodeRxQueueId n = read <$> L.stripPrefix rxQPref (nLabel n)

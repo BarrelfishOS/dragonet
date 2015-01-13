@@ -82,9 +82,15 @@ addCfgFun n
     | l == "RxCFDirFilter"   = configFDir
     | l == "RxQueues"        = configRxQueues
     | l == "TxQueues"        = configTxQueues -- not a real configuration, but helpful for building PRGs
-    | otherwise = error $ "Unknown LPG CNode: '" ++ l ++ "'"
+    | otherwise = error $ "Unknown PRG CNode: '" ++ l ++ "'"
     where l = PG.nLabel n
 
+addIncrCfgFun :: PG.Node -> C.ConfFunction
+addIncrCfgFun n
+    | l == "RxC5TupleFilter" = incrConfig5tuple
+    | l == "RxCFDirFilter"   = incrConfigFDir
+    | otherwise              = error $ "Unknown PRG CNode: '" ++ l ++ "'"
+    where l = PG.nLabel n
 
 -------------------------------------------------------------------------------
 -- Implementation of configuration of 5-tuple filters
@@ -252,57 +258,119 @@ isRxQValidN i (_,n) =
     (PG.nLabel n == "Q" ++ show i ++ "Valid") ||
         (PG.nLabel n == "RxQ" ++ show i ++ "Valid")
 
--- Common helper for configuring 5-tuple and FD configuration nodes
---  NB: Eventually, we might want to better abstract these "filter" nodes
-doConfigFilter :: (C.ConfValue -> [a])
-               -> (a -> PG.Node)
-               -> (a -> QueueId)
-               -> C.ConfFunction
-doConfigFilter parseConf mkNodeLabel getQueue _ _ inE outE cfg = do
-    ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
-    let lastEdge = (endN,defaultN,endP)
-    return (edges ++ [lastEdge])
-    where
-      -- Node and Port for the incoming edge for the first node
-      start :: (DGI.Node, PG.Edge)
-      start = (fst $ fst $ head inE, snd $ head inE)
-      -- Node for default queue
-      defaultN :: DGI.Node
-      (Just ((defaultN,_),_)) = L.find ((== "default") . PG.ePort . snd) outE
-      -- Lookup node id for specified queue
-      queue :: QueueId -> DGI.Node
-      queue i = queueN
-        where queueN = case L.find (isRxQValidN i . fst) outE of
-                         Just ((x,_),_) -> x
-                         Nothing -> error errmsg
-              errmsg = "E10k.config5tuple: no RxQValid for queue=" ++ (show i)
-                        ++ " Does queue exist?"
-      cfgs = parseConf cfg
 
-      addFilter ((iN,iE),es) c = do
-         (n,_) <- C.confMNewNode $ mkNodeLabel c
-         let inEdge = (iN,n,iE)
-         let tEdge = (n,queue $ getQueue c,PG.Edge "true")
-         let fEdge = (n,queue $ getQueue c,PG.Edge "false")
+--
+-- Configuring Filter nodes
+--
+
+-- configure filter node helper #1:
+--   get the node id of a specific queue from the out edges
+filterQueueNid :: [(PG.PGNode, PG.Edge)] -> QueueId -> DGI.Node
+filterQueueNid outEs qid = case L.find (isRxQValidN qid . fst) outEs of
+        Just ((x,_),_) -> x
+        Nothing        -> error errmsg
+    where errmsg = "filterQueueNid: no RxQValid for queue=" ++ (show qid)
+                 ++ " Does the queue exist?"
+
+-- configure filter node helper #2:
+--   get the node id of the default queue
+filterDefaultNid :: [(PG.PGNode, PG.Edge)] -> DGI.Node
+filterDefaultNid outEs = case L.find ((== "default") . PG.ePort . snd) outEs of
+      (Just ((x,_),_)) -> x
+      Nothing          -> error "filterDefaultNid: could not find default queue nid"
+
+-- adds a single filter incrementally (i.e., C-node is re-added)
+-- Notes:
+--  - filter nodes expect a single in edge
+doConfigFilterInc
+  ::  (C.ConfValue -> a) -- filter from conf value
+  ->  (a -> PG.Node)     -- get filter node
+  ->  (a -> QueueId)     -- get queue id for this filter
+  -> C.ConfFunction
+doConfigFilterInc parseConf mkFiltLabel getQueue
+                  _ (_, cnodeLabel@(PG.CNode {}))
+                  (inE:[]) outEs cfg = do
+    let filter = parseConf cfg
+    -- add a filter node and a C-node node
+    (filterNid,_) <- C.confMNewNode $ mkFiltLabel filter
+    (cnodeNid, _) <- C.confMNewNode $ cnodeLabel
+    let filterQNid = filterQueueNid outEs $ getQueue filter
+        ((inNid,_), inEdgeLabel) = inE
+        -- in edge
+        inEdge    = (inNid, filterNid, inEdgeLabel)
+        -- out edges to Queue OR node (we do  not include the false edge)
+        tEdgeOR   = (filterNid, filterQNid, PG.Edge "true")
+        fEdgeOR   = (filterNid, filterQNid, PG.Edge "false")
+        -- false edge to (new) CNode
+        cnodeIn   = (filterNid, cnodeNid, PG.Edge "false")
+        cnodeOuts = [ (cnodeNid, xid, xedge) | ((xid,_),xedge) <- outEs ]
+        newEdges  = inEdge:tEdgeOR:cnodeIn:cnodeOuts
+    return newEdges
+
+-- Common helper for configuring 5-tuple and FD configuration nodes
+--  - filter nodes expect a *single* in edge
+doConfigFilter :: (C.ConfValue -> [a]) -- configuration value to filters
+               -> (a -> PG.Node)       -- get filter node
+               -> (a -> QueueId)       -- get queue for this filter
+               -> C.ConfFunction
+doConfigFilter parseConf mkFiltLabel getQueue _ _ (inE:[]) outEs cfg = do
+    -- inEs  :: [(PG.PGNode, PG.Edge)] -- CNode in edges
+    -- outEs :: [(PG.PGNode, PG.Edge)] -- CNode out edges
+    let filters = parseConf cfg
+        -- start: node and edge labe (i.e., port) for the first incoming edge
+        start :: (DGI.Node, PG.Edge)
+        start = (fst $ fst $ inE, snd inE)
+        -- initial state for the addFilter fold.
+        -- State holds:
+        --   . start node/edge labe -> where to add the (next) filter node
+        --   . list of edges to add to the graph
+        state0 = (start, [])
+
+    ((endN,endP),edges) <- foldM addFilter state0 filters
+
+    -- connect the last edge to the default node and return all new edges
+    let defaultNid = filterDefaultNid outEs
+        lastEdge = (endN,defaultNid,endP)
+
+    return (edges ++ [lastEdge])
+
+    where
+      -- add a filter to the graph
+      addFilter ((iN,iE),es) filter = do
+         -- create a new node for the filter
+         (filterNid,_) <- C.confMNewNode $ mkFiltLabel filter
+         let filterQNid = filterQueueNid outEs $ getQueue filter
+             -- in edge
+             inEdge = (iN, filterNid,iE)
+             -- out edges to Queue OR node
+             tEdge = (filterNid, filterQNid, PG.Edge "true")
+             fEdge = (filterNid, filterQNid, PG.Edge "false")
          -- NB: We do not include the false edge to the OR queue node, to make
          -- it easier to reason about where flows end up in things like
          -- flowQueue
-         -- return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
-         return ((n,PG.Edge "false"), es ++ [inEdge,tEdge])
+         -- return ((filterNid,Edge "false"), es ++ [inEdge,tEdge,fEdge])
+         return ((filterNid, PG.Edge "false"), es ++ [inEdge,tEdge])
 
+-- incrementally configure a 5-tuple
+-- XXX: this does not consider 5-tuple priorities (The oracle does not generate
+-- 5t filters with priorities, so it's good for now)
+incrConfig5tuple :: C.ConfFunction
+incrConfig5tuple = doConfigFilterInc parse5t nodeL5Tuple c5tQueue
+
+-- fully configure a 5-tuple
 config5tuple :: C.ConfFunction
-config5tuple = doConfigFilter parseConf mkNodeLabel getQueue
+config5tuple = doConfigFilter parseConf nodeL5Tuple c5tQueue
     where parseConf c = trN cfgs_ (ppShow cfgs_)
             where cmpPrio = compare `on` c5tPriority
                   cfgs_ = reverse $ L.sortBy cmpPrio $ parse5tCFG c
-          mkNodeLabel = nodeL5Tuple
-          getQueue    = c5tQueue
 
+-- incrementally configure a FD filter
+incrConfigFDir :: C.ConfFunction
+incrConfigFDir = doConfigFilterInc parseFDT nodeLFDir cfdtQueue
+
+-- fully configure a FD filter
 configFDir :: C.ConfFunction
-configFDir = doConfigFilter parseConf mkNodeLabel getQueue
-    where parseConf = parseFDirCFG
-          mkNodeLabel = nodeLFDir
-          getQueue    = cfdtQueue
+configFDir = doConfigFilter parseFDirCFG nodeLFDir cfdtQueue
 
 -------------------------------------------------------------------------------
 -- Implementation of configuration of the flow director filters
@@ -572,7 +640,8 @@ configTxQueues _ (_,cfgn) inE outE (C.CVInt qs) = do
 
 
 prepareConf :: PG.PGraph -> PG.PGraph
-prepareConf = C.replaceConfFunctions addCfgFun
+prepareConf g = C.replaceIncrConfFunctions addIncrCfgFun $
+                C.replaceConfFunctions addCfgFun g
 
 ----
 -- Try to figure out at  which queue a flow will end up.
