@@ -55,7 +55,7 @@ import qualified Data.Word as DW
 
 import qualified Control.Monad.ST        as ST
 
-import Control.Monad (forM)
+import Control.Monad (forM, foldM)
 import qualified Data.HashTable.ST.Basic as HB
 import qualified Data.HashTable.Class    as H
 
@@ -963,23 +963,18 @@ initIncrSearchParams = IncrSearchParams {
 data IncrSearchSt s o cc = (OracleSt o cc) =>
     IncrSearchSt {
           isParams     :: IncrSearchParams o cc
-        -- we probably going to need to transform state into ST, so keep this
-        -- here
-        , isFlowCache  :: FlowCache s
         -- incremental map is implemented by maintaing a flow map
         -- here's its state
-        , isFlowMapSt  :: FM.FlowMapSt cc
+        , isFlowMapSt  :: FM.FlowMapSt s cc
 }
 
 -- initialize search state (add default values when applicable)
 initIncrSearchSt :: (OracleSt o a) => IncrSearchParams o a -> ST.ST s (IncrSearchSt s o a)
 initIncrSearchSt params = do
-    --h <- H.newSized 100000
-    h <- H.new
+    fmSt <- FM.initFlowMapSt (isPrgU params)
     return $ IncrSearchSt {
           isParams     = params
-        , isFlowCache  = h
-        , isFlowMapSt  = FM.initFlowMapSt (isPrgU params)
+        , isFlowMapSt  = fmSt
     }
 
 runIncrSearch :: (OracleSt o a) =>
@@ -1001,12 +996,36 @@ doIncrSearch st flows = do
         oracle = isOracle params
         search = isStrategy params
         prgU   = isPrgU params
-        flowC  = isFlowCache st
-
     let flows' = sortFn flows
     conf <- search st flows'
     return conf
 
+incSearchMinCost :: forall s cc. C.ConfChange cc
+                 => CostQueueFn
+                 -> FM.FlowMapSt s cc
+                 -> Flow
+                 -> [cc]
+                 -> ST.ST s (FM.FlowMapSt s cc)
+incSearchMinCost costFn fmSt flow (cc0:restCC) = do
+
+
+    let foldFn :: (C.ConfChange cc)
+               => (Cost, FM.FlowMapSt s cc)
+               -> cc
+               -> ST.ST s (Cost, FM.FlowMapSt s cc)
+        foldFn (stCost, st) newCc = do
+            (newQmap, newSt) <- incSearchQmap fmSt newCc flow
+            let newCost_ = costFn newQmap
+                newCost = trN newCost_ $ "New cost=" ++ (show newCost_) ++ " newCc=" ++ (C.show newCc) ++ " for qmap=" ++ (qmapStr newQmap)
+            if newCost < stCost then return (newCost, newSt)
+            else return (stCost, st)
+
+    (cc0Qmap, cc0St) <- incSearchQmap fmSt cc0 flow
+    let cc0Cost = costFn cc0Qmap
+        x0 = (cc0Cost, cc0St)
+
+    (lowerCost, bestSt) <- foldM foldFn x0 restCC
+    return bestSt
 
 incSearchGreedyFlows :: forall o cc. C.ConfChange cc => IncrSearchStrategy o cc
 incSearchGreedyFlows st flows_ = do
@@ -1035,34 +1054,23 @@ incSearchGreedyFlows_ st (flow:flows) = do
     -- get configuration changes for current state
     let flowCCs = flowConfChanges oracle conf flow
     -- compute new costs and minimum cost, and update state
-    let costs = [ (ccCost, ccFmSt)
-                        | cc <- flowCCs,
-                        let (ccQmap,ccFmSt) = incSearchQmap fmSt cc flow,
-                        let ccCost = costFn ccQmap]
-        (lowerCost,fmSt') = L.minimumBy (compare `on` fst) costs
-        st' = st { isFlowMapSt = fmSt'}
+    bestFmSt <- incSearchMinCost costFn fmSt flow flowCCs
+    let st' = st { isFlowMapSt = bestFmSt }
     -- recurse
     incSearchGreedyFlows_ st' flows
 
-incSearchQmapM :: (C.ConfChange cc)
-              => cc
-              -> Flow
-              -> (FM.FlowMapM cc) QMap
-incSearchQmapM cc flow = do
-    -- add configuration option
-    FM.incrConfigure (trN cc (">>>>>>>> CONFIGURING: " ++ (C.show cc)))
-    -- add new flow
-    FM.addFlow (trN flow (">>>>>>>> ADDING FLOW: " ++ (show flow)))
-    -- get qmap
-    qmap <- FM.getRxQMap
-    return $ trN qmap (">>>>>> QMAP" ++ qmapStr qmap)
 
-incSearchQmap :: (C.ConfChange cc)
-              => FM.FlowMapSt cc
+incSearchQmap :: forall s cc . C.ConfChange cc
+              => FM.FlowMapSt s cc
               -> cc
               -> Flow
-              -> (QMap, FM.FlowMapSt cc)
-incSearchQmap st cc flow = FM.runFM (incSearchQmapM cc flow) st
+              -> ST.ST s (QMap, FM.FlowMapSt s cc)
+incSearchQmap st cc flow = do
+    st1_  <- FM.incrConfigure st cc -- add configuration option
+    let st1 = trN st1_ $ (C.showConfig (undefined::cc) (C.foldConfChanges $ FM.fmCnfChanges st1_))
+    st2  <- FM.addFlow st1 flow   -- add new flow
+    qmap <- FM.getRxQMap st2       -- get qmap
+    return $ (qmap, st2)
 
 -- Code for performing simple tests
 
@@ -1114,7 +1122,7 @@ test = do
                                    , sCostFn = costFn
                                    , sStrategy = searchGreedyFlows}
 
-        conflows = connectFlows 40
+        conflows = connectFlows 200
         conf = runSearch params conflows
         prgC = C.applyConfig conf prgU
         --conf = runSearch params $ connectFlows 10

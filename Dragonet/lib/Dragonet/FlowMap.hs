@@ -1,13 +1,11 @@
 {-# LANGUAGE ExistentialQuantification,GeneralizedNewtypeDeriving,
              ScopedTypeVariables #-}
 module Dragonet.FlowMap (
-    FlowMapM(..),
     FlowMapSt(..),
     initFlowMapSt,
     getRxQMap,
     addFlow,
     incrConfigure,
-    runFM,
     strFM,
 ) where
 
@@ -23,7 +21,13 @@ import qualified Data.Graph.Inductive         as DGI
 import qualified Data.Map.Strict              as M
 import qualified Data.List                    as L
 import qualified Data.Set                     as S
-import qualified Control.Monad.State.Strict   as ST
+
+import qualified Control.Monad.State.Strict   as SM
+
+-- mutable state hashtable
+import qualified Control.Monad.ST as ST
+import qualified Data.HashTable.ST.Basic as HB
+import qualified Data.HashTable.Class    as H
 
 import Data.Maybe
 import Data.Either
@@ -36,7 +40,6 @@ tr a b  = trace b a
 trN a b = a
 
 defBld = PR.predBuildDNF
-
 
 -- As a potential optimization, we might consider using:
 -- Data.IntMap and/or Data.Vector.
@@ -72,8 +75,9 @@ fmAddPortFlow fm (nid,nlbl) port flow = fm'
                                         (PG.ONode {}, "false") -> Just [("false", [flow]), ("true",  [])]
           --updateF Nothing        = error "fmAddPortFlow: node does not exist in flow map"
 
+type FlowCache s = HB.HashTable s (PG.NLabel, Flow) PG.NPort
 
-data FlowMapSt cc = (C.ConfChange cc) => FlowMapSt {
+data FlowMapSt s cc = (C.ConfChange cc) => FlowMapSt {
       fmGraph        :: PG.PGraph -- graph
     , fmCnfChanges   :: [cc]      -- configuration changes already applied
     , fmFlows        :: [Flow]
@@ -81,6 +85,7 @@ data FlowMapSt cc = (C.ConfChange cc) => FlowMapSt {
     , fmRxEntryNid   :: DGI.Node
     , fmTxQueueNodes :: [(QueueId, DGI.Node)]
     , fmRxQueueNodes :: [(QueueId, DGI.Node)]
+    , fmFlowCache    :: FlowCache s
 }
 
 qmapStr_ :: (Flow,QueueId) -> String
@@ -89,17 +94,18 @@ qmapStr_ (f,q) = (flowStr f) ++ "-> Q" ++ (show q)
 qmapStr :: [(Flow,QueueId)] -> String
 qmapStr flows = "QMAP:\n" ++ L.intercalate "\n" [ "  " ++ qmapStr_ f | f <- flows ]
 
-strFM :: forall cc. C.ConfChange cc => FlowMapSt cc -> String
-strFM st =  "STEP : " ++ (show (length $ fmCnfChanges st)) ++ " ------------------------------------------\n"
+strFM :: forall s cc. C.ConfChange cc => FlowMapSt s cc -> ST.ST s String
+strFM st =  return $
+         "STEP : " ++ (show (length $ fmCnfChanges st)) ++ " ------------------------------------------\n"
          ++ "CNF  : " ++ cnfStr ++ "\n"
          ++ "FLOWS: " ++ flsStr ++ "\n"
-         ++ "QMAP :"  ++ (qmapStr qmap) ++ "\n"
+         -- ++ "QMAP :"  ++ (qmapStr qmap) ++ "\n"
          ++ "FMAP SIZE :"  ++ (show $ length fmapL) ++ "\n"
          ++ "FMAP :"  ++ fmapS ++ "\n"
     where cnf    = C.foldConfChanges (fmCnfChanges st)
           cnfStr = C.showConfig (undefined::cc) cnf
           flsStr = L.intercalate "\n" [" " ++ (flowStr f) | f <- (fmFlows st)]
-          qmap   = fst $ runFM getRxQMap st
+          --qmap   = fst $ runFM getRxQMap st
           g      = fmGraph st
           fmapL  = M.toList $ fmFlowMap st
           fmapS  = "\n\t" ++ (L.intercalate "\n\t->" $ map flmapS fmapL)
@@ -107,11 +113,8 @@ strFM st =  "STEP : " ++ (show (length $ fmCnfChanges st)) ++ " ----------------
           flmapS (nid, portflows) = nlbl  ++ (ppShow portflows)
                 where nlbl = PG.nLabel $ fromJust $ DGI.lab g nid
 
-newtype FlowMapM cc a = FlowMapM { unFlowMapM :: ST.State (FlowMapSt cc) a }
-    deriving (Monad, ST.MonadState (FlowMapSt cc), Functor)
-
-runFM :: FlowMapM cc a -> FlowMapSt cc -> (a, FlowMapSt cc)
-runFM m ns = ST.runState (unFlowMapM m) ns
+--newtype FlowMapM cc a = FlowMapM { unFlowMapM :: SM.State (FlowMapSt cc) a }
+--    deriving (Monad, SM.MonadState (FlowMapSt cc), Functor)
 
 isRxNode_ :: PG.Node -> Bool
 isRxNode_ n = "Rx" `L.isPrefixOf` (PG.nLabel n)
@@ -120,15 +123,19 @@ isNidRxNode :: PG.PGraph -> DGI.Node -> Bool
 isNidRxNode g nid = isRxNode_ nlbl
     where nlbl = fromJust $ DGI.lab g nid
 
-initFlowMapSt g = FlowMapSt {
-      fmGraph        = g
-    , fmCnfChanges   = []
-    , fmFlows        = []
-    , fmFlowMap      = fm
-    , fmRxEntryNid   = rxEntryNid
-    , fmTxQueueNodes = txQNs
-    , fmRxQueueNodes = rxQNs
-}
+initFlowMapSt :: (C.ConfChange cc) => PG.PGraph -> ST.ST s (FlowMapSt s cc)
+initFlowMapSt g = do
+    h <- H.new
+    return $ FlowMapSt {
+            fmGraph        = g
+          , fmCnfChanges   = []
+          , fmFlows        = []
+          , fmFlowMap      = fm
+          , fmRxEntryNid   = rxEntryNid
+          , fmTxQueueNodes = txQNs
+          , fmRxQueueNodes = rxQNs
+          , fmFlowCache    = h
+   }
     where fm = initFlowMap [] g -- XXX: This call is not needed since flows are []
           -- this gives us a place to start with a flow
           entryNodes = [ nid | nid <- DGI.nodes g
@@ -148,32 +155,31 @@ initFlowMapSt g = FlowMapSt {
                              , isJust mqid
                              , let Just qid = mqid]
 
-addFlow :: Flow -> (FlowMapM cc) ()
-addFlow flow = do
-    g     <- ST.gets fmGraph
-    fm    <- ST.gets fmFlowMap
-    flows <- ST.gets fmFlows
-    entry <- ST.gets fmRxEntryNid
-    let fm' = flowMapAddFlow fm g entry flow
-    ST.modify $ \s -> s {fmFlowMap = fm', fmFlows = flow:flows}
+addFlow :: (C.ConfChange cc) => FlowMapSt s cc -> Flow -> ST.ST s (FlowMapSt s cc)
+addFlow st flow = do
+    let g     = fmGraph st
+        fm    = fmFlowMap st
+        flows = fmFlows st
+        entry = fmRxEntryNid st
+        fc    = fmFlowCache st
+    fm' <- flowMapAddFlow fc fm g entry flow
+    return $ st {fmFlowMap = fm', fmFlows = flow:flows}
 
 initFlowMap :: [Flow] -> PG.PGraph -> FlowMap
 initFlowMap flows g_ = trN ret "Exit initFlowMap"
     where ret = updateFlowMap flows M.empty g (DGI.nodes g)
           g = trN g_ "Entering initFlowMap"
 
-incrConfigure :: (C.ConfChange cc) => cc -> (FlowMapM cc) ()
-incrConfigure cc = do
-    g     <- ST.gets fmGraph
-    fm    <- ST.gets fmFlowMap
-    flows <- ST.gets fmFlows
-    ccs   <- ST.gets fmCnfChanges
+incrConfigure :: (C.ConfChange cc) => FlowMapSt s cc -> cc -> ST.ST s (FlowMapSt s cc)
+incrConfigure st cc = do
+    let g  = fmGraph st
+        fm = fmFlowMap st
+        flows = fmFlows st
+        ccs = fmCnfChanges st
     -- apply the partial configuration and update the flow map
     let (g', nids') = C.icPartiallyConfigure g cc
         fm' = updateFlowMap flows fm g' nids'
-    ST.modify $ \s -> s {fmFlowMap = fm',
-                         fmCnfChanges = cc:ccs,
-                         fmGraph = g'}
+    return $ st {fmFlowMap = fm', fmCnfChanges = cc:ccs, fmGraph = g'}
 
 updateFlowMapAll :: [Flow] -> FlowMap -> PG.PGraph -> FlowMap
 updateFlowMapAll flows fm g = ret
@@ -296,29 +302,38 @@ doUpdateFlowMap _ fm g node@(nid, (PG.ONode { PG.nOperator = op})) = fm'
                             PG.NOpOr  -> intersections falseFlowsIn
                             PG.NOpAnd -> S.unions falseFlowsIn
 
-
-getActivePort :: PG.PGraph
+getActivePort :: FlowCache s
+              -> PG.PGraph
               -> M.Map DGI.Node PG.NPort
               -> PG.PGNode
               -> Flow
-              -> PG.NPort
+              -> ST.ST s PG.NPort
 -- F-node: sink node
-getActivePort _ _ (_,(PG.FNode { PG.nPorts = [] })) _ = fmSinkPort
+getActivePort _ _ _ (_,(PG.FNode { PG.nPorts = [] })) _ = return fmSinkPort
 -- F-node
-getActivePort _ _ (_,node@(PG.FNode {PG.nPorts = ports})) flow= assert check retP
-    where fPred    = flowPred flow
-          portsSAT = [ (p, pSAT p) | p <- ports]
-          check    = 1 == (length $ filter snd portsSAT)
-          retP     = fst $ fromJust $ L.find snd portsSAT
+getActivePort fc _ _ (_,node@(PG.FNode {PG.nPorts = ports})) flow = do
+    let key = (PG.nLabel node, flow)
+    cachedRet <- H.lookup fc key
+    case cachedRet of
+        Just x  -> return $ trN x "HIT!"
+        Nothing -> do
+            H.insert fc key retP
+            return $ trN retP "MISS!"
+      where fPred    = flowPred flow
+            portsSAT = [ (p, pSAT p) | p <- ports]
+            -- for assertion
+            check    = 1 == (length $ filter snd portsSAT)
+            retP     = fst $ fromJust $ L.find snd portsSAT
 
-          -- is port p SAT-isfied for the given flow?
-          pSAT p   = isJust $ PR.dnfSAT andExpr
-            where andExpr = PR.buildAND defBld [pPred, fPred]
-                  pPred   = PR.portPred_ defBld node p
+            -- is port p SAT-isfied for the given flow?
+            pSAT p   = isJust $ PR.dnfSAT andExpr
+              where andExpr = PR.buildAND defBld [pPred, fPred]
+                    pPred   = PR.portPred_ defBld node p
 
 -- O-node: note that by this point, we have computed the mapping from all the
 -- previous nodes
-getActivePort g portmap node@(_, PG.ONode {PG.nOperator = op}) flow = ret
+getActivePort fc g portmap node@(_, PG.ONode {PG.nOperator = op}) flow =
+    return ret
     where ops :: [DGI.Node] -- operands
           (ops, _, _) = PGU.oNodeOperandsMap g node
           opVals = map getOpVal ops
@@ -335,49 +350,57 @@ getActivePort g portmap node@(_, PG.ONode {PG.nOperator = op}) flow = ret
                                       else if isFalsePort p then False
                                       else error "operand port is not T/F"
 
-getActivePort _ _ (_, PG.CNode {}) _ = error "getActiveProt called for a C-node"
+getActivePort _ _ _ (_, PG.CNode {}) _ = error "getActiveProt called for a C-node"
 
-flowMapAddFlow fm g entry flow = flowMapAddFlow_ g M.empty [entry] flow fm
+flowMapAddFlow fc fm g entry flow = flowMapAddFlow_ fc g M.empty [entry] flow fm
 
-flowMapAddFlow_ :: PG.PGraph
-               -> M.Map DGI.Node PG.NPort -- done nodes (nid -> active port)
-               -> [DGI.Node]  -- available successors
-               -> Flow
-               -> FlowMap
-               -> FlowMap
-flowMapAddFlow_ g _       []       fl fm = trN fm  $ "NO REMAINING NODES for flow: " ++ (flowStr fl)
-flowMapAddFlow_ g doneMap nextNids fl fm = ret
- where ret = case L.break isReady nextNids of
-               (ns1,nid:ns2) -> let nextNids' = ns1 ++ ns2 ++ sucs
-                                    nextN     = (nid, fromJust $ DGI.lab g nid)
-                                    activeP_  = getActivePort g doneMap nextN fl
-                                    activeP   = trN activeP_ $ "NEXT for flow: " ++ (flowStr fl) ++ " "  ++ (PG.nLabel $ snd  nextN) ++ " P:" ++ activeP_
-                                    doneMap'  = M.insert nid activeP doneMap
-                                    sucs      = PGU.sucPortNE g nid activeP
-                                    fm'       = fmAddPortFlow fm nextN activeP fl
-                                 in flowMapAddFlow_ g doneMap' nextNids' fl fm'
-               (xnids,[])    -> nextNotFound
-       -- a node is ready when all is predecessors are done
-       isReady :: DGI.Node -> Bool
-       isReady nid = ret
-           where ret_ = notCnode && prevsOK
-                 ret = trN ret_ $ "flowMapAddFlow_: node:" ++ (PG.nLabel nlbl) ++ " ready? " ++ (show ret_)
-                 isDone x = M.member x doneMap
-                 prevsOK = all isDone (PGU.preNE g nid)
-                 notCnode = not $ PGU.isCnode_ nlbl
-                 nlbl = fromJust $ DGI.lab g nid
-       --
-       nextNotFound = trN fm $ "NO VALID NODES for flow:" ++ (flowStr fl) -- error "flowMapAddFlow_: Could not reach the end for flow"
+flowMapAddFlow_ :: FlowCache s
+                -> PG.PGraph
+                -> M.Map DGI.Node PG.NPort -- done nodes (nid -> active port)
+                -> [DGI.Node]  -- available successors
+                -> Flow
+                -> FlowMap
+                -> ST.ST s FlowMap
+flowMapAddFlow_ _ g _       []       fl fm = return $ trN fm  $ "NO REMAINING NODES for flow: " ++ (flowStr fl)
+flowMapAddFlow_ fc g doneMap nextNids fl fm = do
+    let -- a node is ready when all is predecessors are done
+        isReady :: DGI.Node -> Bool
+        isReady nid = ret
+            where ret_ = notCnode && prevsOK
+                  ret = trN ret_ $ "flowMapAddFlow_: node:" ++ (PG.nLabel nlbl) ++ " ready? " ++ (show ret_)
+                  isDone x = M.member x doneMap
+                  prevsOK = all isDone (PGU.preNE g nid)
+                  notCnode = not $ PGU.isCnode_ nlbl
+                  nlbl = fromJust $ DGI.lab g nid
+        --
+        nextNotFound = trN fm $ "NO VALID NODES for flow:" ++ (flowStr fl) -- error "flowMapAddFlow_: Could not reach the end for flow"
+
+    case L.break isReady nextNids of
+               (ns1,nid:ns2) -> do
+
+                        let nextN     = (nid, fromJust $ DGI.lab g nid)
+
+                        activeP_ <- getActivePort fc g doneMap nextN fl
+
+                        let activeP   = trN activeP_ $ "NEXT for flow: " ++ (flowStr fl) ++ " "  ++ (PG.nLabel $ snd  nextN) ++ " P:" ++ activeP_
+                            doneMap'  = M.insert nid activeP doneMap
+                            sucs      = PGU.sucPortNE g nid activeP
+                            fm'       = fmAddPortFlow fm nextN activeP fl
+                            nextNids' = ns1 ++ ns2 ++ sucs
+                        flowMapAddFlow_ fc g doneMap' nextNids' fl fm'
+
+               (xnids,[])    -> return nextNotFound
 
 -- just copy them for now. TODO: put them in a single file (e.g., Cost.hs)
 type QMap        = [(Flow, QueueId)]
 
-getRxQMap :: forall cc. (C.ConfChange cc) => (FlowMapM cc) (QMap)
-getRxQMap = do
-    g     <- ST.gets fmGraph
-    fm    <- ST.gets fmFlowMap
-    flows <- ST.gets fmFlows
-    rxQNodes_ <- ST.gets fmRxQueueNodes
+getRxQMap :: forall s cc. (C.ConfChange cc) => FlowMapSt s cc -> ST.ST s QMap
+getRxQMap st = do
+    let g  = fmGraph st
+        fm = fmFlowMap st
+        flows_ = fmFlows st
+        flows = tr flows_ $ "getRxQMAP: FLOWS: " ++ (show flows_)
+        rxQNodes_  = fmRxQueueNodes st
     -- apply the partial configuration and update the flow map
     -- 1. finalize the graph (but do not update to state)
     let cfgEmpty = C.emptyConfig (undefined::cc)

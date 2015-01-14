@@ -47,7 +47,7 @@ priorityCost' = S.priorityCost isGoldFl goldFlPerQ
 main = do
     let nq = 10 -- number of queues
         --nflowsl = [1,5,10,20,40,80]
-        nflowsl = [10, 100,200,500]
+        nflowsl = [10, 100, 200, 500]
         samples = 3
         flows = connectFlows
     prgU <- e10kU_simple
@@ -71,7 +71,7 @@ main = do
         benchIncBal nflows = show $ S.runIncrSearch searchIncParams (flows nflows)
         benchIncNf nflows  = bench ("incremental search: " ++ (show nflows)) $ nf benchIncBal nflows
 
-        benchs = [benchNf x | x <- nflowsl] ++
+        benchs = --[benchNf x | x <- nflowsl] ++
                  [benchIncNf x | x <- nflowsl]
 
 

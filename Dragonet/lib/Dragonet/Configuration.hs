@@ -28,6 +28,7 @@ import qualified Data.Graph.Inductive as DGI
 import qualified Util.GraphHelpers as GH
 import qualified Control.Monad.State as ST
 import Data.Maybe
+import Debug.Trace (trace)
 
 type Configuration = [(String,PG.ConfValue)]
 
