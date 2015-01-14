@@ -350,7 +350,11 @@ doConfigFilter parseConf mkFiltLabel getQueue _ _ (inE:[]) outEs cfg = do
          -- flowQueue
          -- return ((filterNid,Edge "false"), es ++ [inEdge,tEdge,fEdge])
          return ((filterNid, PG.Edge "false"), es ++ [inEdge,tEdge])
-
+doConfigFilter a b c d e@(_, cnode) (x:xs) f g = trace msg ret
+    where ret = doConfigFilter a b c d e [x] f g
+          msg = "FIXME: Configuration node: " ++ (PG.nLabel cnode)
+              ++ " has more than one incoming edges."
+              ++ " Only using first!"
 -- incrementally configure a 5-tuple
 -- XXX: this does not consider 5-tuple priorities (The oracle does not generate
 -- 5t filters with priorities, so it's good for now)
@@ -786,6 +790,12 @@ instance C.ConfChange ConfChange where
 
               rest :: C.Configuration
               rest  = L.filter ((/="RxCSynFilter") . fst) conf
+
+    incrConf (Insert5T c5t)     = [("RxC5TupleFilter", c5t)]
+    incrConf (InsertFDir cFdir) = [("RxCFDirFilter", cFdir)]
+
+    -- ARGH :(
+    show = Prelude.show
 
 cvMInt :: Integral a => Maybe a -> PG.ConfValue
 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi

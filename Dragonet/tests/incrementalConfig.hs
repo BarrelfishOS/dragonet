@@ -34,10 +34,12 @@ main = do
     putStrLn "incrementalConfig"
     prgU <- e10kU_simple
     writeFile "tests/incrementalConfig-PRG-U.dot" $ toDot  prgU
-    let cnf1 = E10k.mk5TupleFromFl (testMkFlow "*" 1000) 2
-        cnf2 = E10k.mk5TupleFromFl (testMkFlow "*" 1001) 3
-        prgI_1 = C.applyConfigInc [("RxC5TupleFilter",cnf1)] prgU
-        prgI_2 = C.applyConfigInc [("RxC5TupleFilter",cnf2)] prgI_1
+    let cc1 = E10k.insert5tFromFl (testMkFlow "*" 1000) 2
+        cc2 = E10k.insert5tFromFl (testMkFlow "*" 1001) 3
+        (prgI_1, _) = C.icPartiallyConfigure prgU   cc1
+        (prgI_2, _) = C.icPartiallyConfigure prgI_1 cc2
+        prgC        = C.applyConfig E10k.cfgEmpty prgI_2
     writeFile "tests/incrementalConfig-PRG-I1.dot" $ toDot prgI_1
     writeFile "tests/incrementalConfig-PRG-I2.dot" $ toDot prgI_2
+    writeFile "tests/incrementalConfig-PRG-C.dot"  $ toDot prgC
     return ()

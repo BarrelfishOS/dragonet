@@ -20,10 +20,10 @@ module Dragonet.Configuration(
     replaceIncrConfFunctions,
 
     icPartiallyConfigure,
-    icFinalize,
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG
+import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Data.Graph.Inductive as DGI
 import qualified Util.GraphHelpers as GH
 import qualified Control.Monad.State as ST
@@ -47,8 +47,11 @@ class ConfChange a where
     -- preety printer
     showConfig  :: a -> Configuration -> String
 
-    -- For incremental config
+    -- This can be fed into applyConfigInc
+    incrConf :: a -> Configuration
 
+    -- There has to be a better way...
+    show :: a -> String
 
 foldConfChanges :: forall a. (ConfChange a) => [a] -> Configuration
 foldConfChanges changes = foldl applyConfChange cnf0 changes
@@ -68,8 +71,8 @@ confMNewNode n = do
     return node
 
 -- Add edges and nodes from configuration function to graph
-confMRun :: PG.PGraph -> PG.ConfMonad [PG.PGEdge] -> PG.PGraph
-confMRun g m = addEdges $ addNodes g
+confMRun :: PG.PGraph -> PG.ConfMonad [PG.PGEdge] -> (PG.PGraph, [DGI.Node])
+confMRun g m = (addEdges $ addNodes g, map fst newNodes)
     where
         (_,maxId) = DGI.nodeRange g
         startSt = (maxId,[])
@@ -83,7 +86,8 @@ confMRun g m = addEdges $ addNodes g
         addEdges g' = foldl (flip DGI.insEdge) g' newEdges
 
 -- Apply configuration for a single CNode
-doApplyCNode :: Bool -> PG.ConfValue -> PG.PGraph -> PG.PGContext -> PG.PGraph
+doApplyCNode :: Bool -> PG.ConfValue -> PG.PGraph -> PG.PGContext
+             -> (PG.PGraph, [DGI.Node])
 doApplyCNode isIncremental conf g ctx@(_,nid,node,_) = confMRun g' newEM
     where
         -- get NIC-specific configuration function
@@ -105,24 +109,31 @@ doApplyCNode isIncremental conf g ctx@(_,nid,node,_) = confMRun g' newEM
         lblPair (m,a) = ((m,fromJust $ DGI.lab g m), a)
 
 -- Apply configuration for a single CNode
-applyCNode_ :: Bool -> Configuration -> PG.PGraph -> PG.PGContext -> PG.PGraph
-applyCNode_ isIncremental config g ctx@(_,nid,node,_) = ret
+applyCNode_ :: Bool -> Configuration
+            -> (PG.PGraph, [DGI.Node])
+            -> PG.PGContext
+            -> (PG.PGraph, [DGI.Node])
+applyCNode_ isIncremental config (g,nodes) ctx@(_,nid,node,_) = ret
     where
         conf = lookup (PG.nLabel node) config
         ret = case conf of
-            Just x -> doApplyCNode isIncremental x g ctx
-            Nothing -> g
+            Just x -> let (g', nodes') = doApplyCNode isIncremental x g ctx
+                      in  (g', nodes ++ nodes')
+            Nothing -> (g, nodes)
 
 -- Apply specified configuration to graph
-applyConfig_ :: Bool -> Configuration -> PG.PGraph -> PG.PGraph
+applyConfig_ :: Bool -> Configuration -> PG.PGraph -> (PG.PGraph, [DGI.Node])
 applyConfig_ isIncremental cfg g =
-    foldl (applyCNode_ isIncremental cfg) g configNodes
+    foldl (applyCNode_ isIncremental cfg) (g, []) configNodes
     where
         isConfigNode (_,_,PG.CNode {},_) = True
         isConfigNode _ = False
         configNodes = GH.filterCtx isConfigNode g
 
-applyConfig    = applyConfig_ False
+applyConfig :: Configuration -> PG.PGraph -> PG.PGraph
+applyConfig c g = fst $ applyConfig_ False c g
+
+applyConfigInc :: Configuration -> PG.PGraph -> (PG.PGraph, [DGI.Node])
 applyConfigInc = applyConfig_ True
 
 
@@ -189,12 +200,7 @@ type CGraph = PG.PGraph -- configured graph
 -- partialy configuration:
 --  we return the new un-configured graph and the new node frontier
 icPartiallyConfigure :: (ConfChange cc) => UGraph -> cc -> (UGraph, [DGI.Node])
-icPartiallyConfigure = error "NYI!"
-
--- finalize the configuration, and get a configured graph and the new node
--- frontier
-icFinalize :: UGraph -> (CGraph, [DGI.Node])
-icFinalize = error "NYI!"
+icPartiallyConfigure g cc = applyConfigInc (incrConf cc) g
 
 --applyCNodeInc :: (ConfChange cc) =>
 -- similar to applyCnode and doApplyCnode for non-incremental configuration

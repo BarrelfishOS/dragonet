@@ -17,7 +17,7 @@ module Dragonet.ProtocolGraph.Utils (
     lsucPortNE, sucPortNE,
     unconnectedPorts,
     isOnode_, isOnode, isFnode_, isFnode, isCnode_, isCnode,
-    getSinglePre, getSinglePrePort,
+    getSinglePre, getSinglePrePort, getPrePort,
     dominates,
 
     oNodeOperandsMap,
@@ -308,6 +308,15 @@ getSinglePre g n = if len == 1 then (head ps) else error msg
           msg = "expecting single predecessor for node "
                 ++ (nLabel $ snd n) ++ " (has: " ++ (show len) ++ ")"
 
+
+getPrePort :: PGraph -> PGNode -> [(PGNode, NPort)]
+getPrePort gr (nid, nlbl) = ret
+    where lpres = DGI.lpre gr nid
+          ret = [ (prevNode, prevPort)
+                            | (prevNid,prevEdge) <- DGI.lpre gr nid
+                            , let prevNlbl = fromJust $ DGI.lab gr prevNid
+                            , let prevNode = (prevNid, prevNlbl)
+                            , let prevPort = edgePort_ prevEdge]
 
 -- Get the (single) predecssor and the port that it connects.
 getSinglePrePort :: PGraph -> PGNode -> (PGNode, NPort)

@@ -47,7 +47,7 @@ priorityCost' = S.priorityCost isGoldFl goldFlPerQ
 main = do
     let nq = 10 -- number of queues
         --nflowsl = [1,5,10,20,40,80]
-        nflowsl = [100,200]
+        nflowsl = [10, 100,200,500]
         samples = 3
         flows = connectFlows
     prgU <- e10kU_simple
@@ -56,14 +56,23 @@ main = do
         costFn = balFn
 
         oracle   = S.E10kOracleSt {S.nQueues = nq}
-        searchParams = S.initSearchParams {  S.sOracle  = oracle
+        searchParams = S.initSearchParams { S.sOracle  = oracle
                                           , S.sPrgU     = prgU
                                           , S.sCostFn   = costFn
                                           , S.sStrategy = S.searchGreedyFlows}
 
         benchBal nflows = show $ S.runSearch searchParams (flows nflows)
         benchNf nflows  = bench ("search: " ++ (show nflows)) $ nf benchBal nflows
-        benchs = [benchNf x | x <- nflowsl]
+
+        -- incremental
+        searchIncParams = S.initIncrSearchParams {  S.isOracle = oracle
+                                                 , S.isPrgU   = prgU
+                                                 , S.isCostFn = costFn }
+        benchIncBal nflows = show $ S.runIncrSearch searchIncParams (flows nflows)
+        benchIncNf nflows  = bench ("incremental search: " ++ (show nflows)) $ nf benchIncBal nflows
+
+        benchs = [benchNf x | x <- nflowsl] ++
+                 [benchIncNf x | x <- nflowsl]
 
 
     defaultMainWith
