@@ -70,7 +70,8 @@ def SRV_CMDS(name):
                           #dragonet_container[name]['deploy_stack'],
                           #HWQUEUES, "priority")
                           dragonet_container[name]['deploy_stack'],
-                          HWQUEUES, "priority")
+#                          HWQUEUES, "priority")
+                          HWQUEUES, "balance")
                         + " %s %d %d " % ( "hardcoded", CONCURRENCY,
                             len(client_names))
                         ,

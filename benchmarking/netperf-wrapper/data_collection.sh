@@ -1,32 +1,37 @@
 #!/bin/bash
 
+OUTPUTDIRPARENT="./dpdk_test_deleteme/"
+OUTPUTDIRPARENT="./dpdk_test_memcached_test_10Q/"
+OUTPUTDIRPARENT="./dpdk_test_memcached_test1_5Q/"
+OUTPUTDIRPARENT="./output_runs_balance/"
+
 startStack() {
 #./cleanupServer.sh
 
 initConcurrency=${CONCURRENCY}
 
 title="STARTSTACK_Priority_Test_${UDP_TEST_NAME},CONCUR_${initConcurrency},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-OUTDIR="${OUTPUTDIRPARENT}/STARTSTACK/priority/Test_${UDP_TEST_NAME}/CONCUR_${initConcurrency}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+OUTDIR="${OUTPUTDIRPARENT}/STARTSTACK/priority/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${initConcurrency}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift 0  ${ClientList} --servercores ${SRVCORES} \
---serverInstances 1 --hwqueues ${HWQUEUE} --clientcores 1   --packet ${PACKETSIZE} --concurrency ${initConcurrency} \
+--serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES}  --packet ${PACKETSIZE} --concurrency ${initConcurrency} \
 -I 1 -l 5 -H ${SERVERNAME} -T ${SERVERIP} -c ${ECHO_SERVER} ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
 -t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
-exit 0
+#exit 0
 }
 
 check_working_dummy() {
 
 title="DUMMY_Priority_Test_${UDP_TEST_NAME},CONCUR_${CONCURRENCY},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-OUTDIR="${OUTPUTDIRPARENT}/DUMMY/priority/Test_${UDP_TEST_NAME}/CONCUR_${CONCURRENCY}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+OUTDIR="${OUTPUTDIRPARENT}/DUMMY/priority/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${CONCURRENCY}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift 0  ${ClientList} --servercores ${SRVCORES} \
---serverInstances 1 --hwqueues ${HWQUEUE} --clientcores 1 --packet ${PACKETSIZE} --concurrency ${CONCURRENCY} \
+--serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES} --packet ${PACKETSIZE} --concurrency ${CONCURRENCY} \
 -I 1 -l 15 -H ${SERVERNAME} -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
 -t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
-exit 0
+#exit 0
 }
 
 
@@ -34,17 +39,15 @@ exit 0
 getData() {
 
 title="Priority_Test_${UDP_TEST_NAME},CONCUR_${CONCURRENCY},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-OUTDIR="${OUTPUTDIRPARENT}/priority/Test_${UDP_TEST_NAME}/CONCUR_${CONCURRENCY}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+OUTDIR="${OUTPUTDIRPARENT}/priority/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${CONCURRENCY}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift 0  ${ClientList} --servercores ${SRVCORES} \
---serverInstances 1 --hwqueues ${HWQUEUE} --clientcores 1 --packet ${PACKETSIZE} --concurrency ${CONCURRENCY} \
+--serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES} --packet ${PACKETSIZE} --concurrency ${CONCURRENCY} \
 -I 3 -l 50 -H ${SERVERNAME} -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
 -t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
 
 }
-
-OUTPUTDIRPARENT="./dpdk_test_deleteme/"
 
 #ClientList="-C ziger1 -C ziger2 -C babybel3 -C gottardo -C appenzeller-e1000 -C sbrinz1 -C gruyere -C sbrinz2 "
 ClientList="-C ziger1 -C sbrinz1 "
@@ -53,39 +56,47 @@ ClientList="-C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gruyere -C appenzeller"
 
 ClientList="-C ziger1 -C ziger2 -C gruyere"
 ClientList="-C ziger1 -C ziger2"
-ClientList="-C ziger1 -C ziger2 -C sbrinz2"
+ClientList="-C sbrinz1 -C sbrinz2"
+ClientList="-C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2"
+
+SERVERNAME="babybel2"
+
+CLIENTCORES=1
+
+NICTYPE="NIC_Intel"
+ECHO_SERVER="dpdk"
+SERVERIP=10.113.4.95
 
 NICTYPE="NIC_SF"
 ECHO_SERVER="llvmSF"
 SERVERIP=10.113.4.195
 
-NICTYPE="NIC_Intel"
-ECHO_SERVER="llvmE10k"
-ECHO_SERVER="dpdk"
-SERVERNAME="babybel2"
-SERVERIP=10.113.4.95
 
-SERVERNAME="sbrinz1"
-SERVERIP=10.113.4.26
 
+#SERVERNAME="sbrinz1"
+#SERVERIP=10.113.4.26
 
 UDP_TEST_NAME="udp_rr"
 UDP_TEST_NAME="memcached_rr"
-HWQUEUE=10
+
+
+######################
+PACKETSIZE=64
 PACKETSIZE=1024
 
 ######################
 
-CONCURRENCY=32
 CONCURRENCY=1
 CONCURRENCY=4
+CONCURRENCY=32
 ######################
 
+HWQUEUE=5
+HWQUEUE=10
+######################
 
-SRVCORES=2
-SRVCORES=6
+SRVCORES=5
 SRVCORES=10
-SRVCORES=4
 ######################
 
 
@@ -106,6 +117,7 @@ show_usage() {
         echo "           -s <n> -->  n server cores/threads"
         echo "           -S     -->  start stack"
         echo "           -d     -->  dummy run"
+        echo "           -r     -->  Real run"
         echo "           -x     -->  Cleanup involved machines"
         echo "           -X     -->  Delete output/log files"
         echo "           -h     -->  this help"
@@ -120,7 +132,7 @@ then
     exit 1
 fi
 
-while getopts ":c:C:s:SdhxX" opt; do
+while getopts ":c:C:s:SdhxXr" opt; do
   case $opt in
     c)
         echo "Setting client-count to $OPTARG (instead of default $CLIENTCOUNT)"
@@ -139,6 +151,9 @@ while getopts ":c:C:s:SdhxX" opt; do
       ;;
     d)
         RUNDUMMY="yes"
+      ;;
+    r)
+        RUNREAL="yes"
       ;;
     x)
         CLEANUP="yes"
@@ -182,13 +197,15 @@ if [ "${RUNDUMMY}" == "yes" ] ; then
     set +e
 fi
 
-if [ "${CLEANUP}" == "yes" ] ; then
-    echo "Cleaning up server: $SERVERNAME"
-    ./cleanup.sh $SERVERNAME
-    clist=$(echo $ClientList | sed 's/-C//g')
-    echo "Cleaning up clients: $clist"
-    ./cleanup.sh $clist
+if [ "${RUNREAL}" == "yes" ] ; then
+    echo "Assuming that stack is already running, doing real run"
+    set -x
+    set -e
+    getData
+    set +x
+    set +e
 fi
+
 
 if [ "${DELETEFILES}" == "yes" ] ; then
     echo "Deleting output and log files: ${OUTPUTDIRPARENT}"
@@ -202,5 +219,12 @@ if [ "${DELETEFILES}" == "yes" ] ; then
     else
         echo "You answered ${ANSWER}, so not deleting everything"
     fi
+fi
+if [ "${CLEANUP}" == "yes" ] ; then
+    echo "Cleaning up server: $SERVERNAME"
+    ./cleanup.sh $SERVERNAME
+    clist=$(echo $ClientList | sed 's/-C//g')
+    echo "Cleaning up clients: $clist"
+    ./cleanup.sh $clist
 fi
 

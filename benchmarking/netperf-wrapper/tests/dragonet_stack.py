@@ -18,7 +18,7 @@ gen_deploy = "sudo ./scripts/pravin/deployDragonetGen.sh"
 gen_is_app_ready = "./scripts/pravin/wait_for_dn_app.sh"
 dragonet_dir = "dragonet/Dragonet/"
 
-app_ready_event_count = len(FLOWS)
+#app_ready_event_count = len(FLOWS)
 app_ready_event_count = 1
 
 def dragonet_container_gen(sname):
@@ -29,8 +29,8 @@ def dragonet_container_gen(sname):
                                             gen_deploy,
                                             sname,
                                             HWQUEUES,
-                                            "priority"
-                                            #"balance"
+                                            #"priority"
+                                            "balance"
                                             )),
             'stack_process_name'    : ("stack-%s" % (sname)),
             'is_stack_ready'        : ("%s stack-%s" % (gen_is_app_ready, sname)),

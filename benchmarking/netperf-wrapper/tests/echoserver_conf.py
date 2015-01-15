@@ -85,19 +85,25 @@ def SRV_CMDS(name):
                       "cd %s ; " % (dragonet_container[name]['base_dir'])
                         + "sudo %s " % (get_isolation_container(is_server=False))
                         + " %s %d %s " % (
+                          #dragonet_container[name]['deploy_stack'],
+                          #HWQUEUES, "priority")
                           dragonet_container[name]['deploy_stack'],
-                          HWQUEUES,
-                          "priority"
-                          #"balance"
-                          ),
+                          HWQUEUES, "priority")
+#                        + " %s %d %d " % ( "hardcoded", CONCURRENCY,
+#                            len(client_names))
+                        ,
+
 
                       # run server
-                      "cd %s ; " % (
-                        dragonet_container[name]['base_dir'],
-                        + "sudo %s " % (get_isolation_container(is_server=False))
+                      "cd %s ; " % (dragonet_container[name]['base_dir'])
+                        + "sudo %s " % (get_isolation_container(is_server=True))
                         + " ./scripts/pravin/runBetterBg.sh 10  ./ ./fancyecho-out.log  "
                         + " ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
-                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True)),
+                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True))
+                        ,
+
+
+                      "sleep 4",
                     ],
 
                     "is_ready_cmd_special" : [
