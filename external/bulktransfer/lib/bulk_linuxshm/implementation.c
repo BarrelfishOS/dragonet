@@ -909,15 +909,15 @@ static errval_t op_event_poll(struct bulk_ll_channel *channel,
             err = msg_assign(internal, msg, event);
             break;
 
+        case SHM_MSG_STATUS:
+            err = msg_status(internal, msg, event);
+            break;
+
         case SHM_MSG_MOVE:
         case SHM_MSG_PASS:
         case SHM_MSG_COPY:
         case SHM_MSG_RELEASE:
             err = msg_buffer(internal, msg, event);
-            break;
-
-        case SHM_MSG_STATUS:
-            err = msg_status(internal, msg, event);
             break;
 
         default:

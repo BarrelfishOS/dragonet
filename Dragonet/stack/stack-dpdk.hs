@@ -95,7 +95,9 @@ controlThread ::
     -> IO ()
 controlThread chan sh = do
     -- Wait for card to be initialized
+    putStrLn "e10k-driver-thread: Started "
     CTRL.waitReady sh
+    putStrLn "e10k-driver-thread: Card ready "
     -- Start working on chan
     forever $ do
         act <- STM.atomically $ STM.readTChan chan
@@ -344,6 +346,23 @@ implCfg5Tuple tcstate chan sh config = do
                 CTRL.ftL4Src = parseIntegral <$> msP,
                 CTRL.ftL4Dst = parseIntegral <$> mdP
             }
+        parseTuple (PG.CVTuple [PG.CVMaybe msIP,
+                                PG.CVMaybe mdIP,
+                                PG.CVMaybe mProto,
+                                PG.CVMaybe msP,
+                                PG.CVMaybe mdP,
+                                PG.CVInt queue]) =
+            CTRL.FTuple {
+                CTRL.ftPriority = 1,
+                CTRL.ftQueue = fromIntegral $ queue,
+                CTRL.ftL3Proto = Just CTRL.L3IPv4,
+                CTRL.ftL4Proto = parseProto <$> mProto,
+                CTRL.ftL3Src = parseIntegral <$> msIP,
+                CTRL.ftL3Dst = parseIntegral <$> mdIP,
+                CTRL.ftL4Src = parseIntegral <$> msP,
+                CTRL.ftL4Dst = parseIntegral <$> mdP
+            }
+
         parseIntegral (PG.CVInt i) = fromIntegral i
         parseProto (PG.CVEnum 0) = CTRL.L4TCP
         parseProto (PG.CVEnum 1) = CTRL.L4UDP
@@ -445,7 +464,7 @@ main = do
                                                , Search.sStrategy = strategy }
 
         -- FIXME: pass the argument "priority" to hardcodedOracleMemcached
-        hardcodedParams = Search.runSearch $ S3.hardcodedOracleMemcached
+        hardcodedParams = Search.runSearch $ S3.hardcodedOracleMemcachedIntel
                         concurrency clients nq  costfn prgU    -- fpApp clients nq prgU
 
         searchFns = [

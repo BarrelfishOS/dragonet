@@ -32,15 +32,20 @@ import Debug.Trace (trace)
 import Text.Show.Pretty (ppShow)
 
 import qualified Scenarios.S1 as S1
+import qualified Scenarios.S3 as S3
+
 
 data CfgAction =
-    CfgASet5Tuple Word8 CTRL.FTuple |
-    CfgAClear5Tuple Word8
+    CfgASet5Tuple Int CTRL.FTuple |
+    CfgAClear5Tuple Int
     deriving (Eq,Show)
 
 controlThread :: STM.TChan CfgAction -> PLI.StateHandle -> IO ()
 controlThread chan sh = do
     -- Wait for card to be initialized
+    putStrLn "SF-driver-thread: Started "
+    CTRL.waitReady sh
+    putStrLn "SF-driver-thread: Card ready "
     CTRL.waitReady sh
     -- Start working on chan
     forever $ do
@@ -52,9 +57,9 @@ controlThread chan sh = do
 data CfgState = CfgState {
         csThread :: Maybe ThreadId,
         -- Maps 5-tuples to ids
-        cs5Tuples :: M.Map CTRL.FTuple Word8,
+        cs5Tuples :: M.Map CTRL.FTuple Int,
         -- Unused 5-tuple indexes
-        cs5TUnused :: [Word8]
+        cs5TUnused :: [Int]
     }
 
 -- Implement specified configuration
@@ -71,9 +76,10 @@ implCfg tcstate chan sh config = do
         Just _ -> return cstate
     let Just (PG.CVList tuples) = lookup "RxC5TupleFilter" config
     -- Make sure there are not too many entries
-    if length tuples > 128
-        then error "More than 128 5-tuples configured"
+    if length tuples > (fromIntegral c5TupleFilters)
+        then error ("More than " ++ (show c5TupleFilters) ++ " 5-tuples configured")
         else return ()
+
     let ftm = cs5Tuples cstate'
         -- Parse 5tuples into internal representation
         fts = S.fromList $ map parseTuple tuples
@@ -113,10 +119,11 @@ implCfg tcstate chan sh config = do
                                 PG.CVMaybe mProto,
                                 PG.CVMaybe msP,
                                 PG.CVMaybe mdP,
-                                PG.CVInt prio,
+                                --PG.CVInt prio,
                                 PG.CVInt queue]) =
             CTRL.FTuple {
-                CTRL.ftPriority = fromIntegral $ prio,
+                --CTRL.ftPriority = fromIntegral $ prio,
+                CTRL.ftPriority = fromIntegral $ 1,
                 CTRL.ftQueue = fromIntegral $ queue,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = parseProto <$> mProto,
@@ -148,15 +155,25 @@ plAssignMerged _ _ (_,n) = PG.nTag n
 
 llvm_helpers = "llvm-helpers-sf"
 
+-- | Number of 5tuple filters supported by hardware
+c5TupleFilters = CTRL.ftCount
+
 main = do
-    ((nq,costfn) :: (Int,String)) <- RA.readArgs
+    ((nq',costfn,oraclefn,concurrency,clients) :: (Int,String,String,Int,Int)) <- RA.readArgs
+    -- to avoid off by one error as most of the code assumes
+    let nq = nq' - 1
+
     print $ "Number of queues used: " ++ show nq
     print $ "Cost function: " ++ show costfn
+    print $ "Oracle function: " ++ show oraclefn
+    print $ "Concurrency (only for hardcoded oracle) : " ++ show concurrency
+    print $ "clients (only for hardcoded oracle) : " ++ show clients
 
-    let state = CfgState {
+    let t5count = fromIntegral c5TupleFilters
+        state = CfgState {
                     csThread = Nothing,
                     cs5Tuples = M.empty,
-                    cs5TUnused = [0..127]
+                    cs5TUnused = [0.. (t5count - 1)]
                 }
 
     -- Channel and MVar with thread id of control thread
@@ -173,10 +190,34 @@ main = do
         costFn     = case lookup costfn costFns of
                         Just x  -> x
                         Nothing -> error $ "Uknown cost function:" ++ costfn
-        sparams    = Search.initSearchParams {   Search.sOracle = sfOracle
+        greedyParams    = Search.runSearch $ Search.initSearchParams {
+                                               Search.sOracle = sfOracle
                                                , Search.sPrgU   = prgU
                                                , Search.sCostFn =  costFn
                                                , Search.sStrategy = strategy }
-        searchFn   = Search.runSearch sparams
 
-    instantiateFlows searchFn prgH llvm_helpers (implCfg tcstate chan) plAssignMerged
+        -- FIXME: pass the argument "priority" to hardcodedOracleMemcached
+        hardcodedParams = Search.runSearch $ S3.hardcodedOracleMemcachedSF
+                        concurrency clients nq  costfn prgU    -- fpApp clients nq prgU
+
+        searchFns = [
+                        ("greedy", (greedyParams, 0)),
+                        ("hardcoded", (hardcodedParams, (concurrency * clients) ))
+                    ]
+        (searchFn, trigger) = case lookup oraclefn searchFns of
+                        Just x  -> x
+                        Nothing -> error $ "Uknown oracle function:" ++ oraclefn
+
+    -- TODO: Create the driver-thread before you go and start flows
+    --      This should speedup the initialization as driver will be ready
+    --      before applications starts connecting in
+    instantiateFlows'
+        trigger
+        searchFn                -- ^ returns configurations to evaluate
+        prgH                    -- ^ PRG
+        llvm_helpers            -- ^ llvm helpers
+        (implCfg tcstate chan)  -- ^ Function to implement given conf
+        plAssignMerged          -- ^ classifies graph-nodes into pipelines based on node-tag
+
+
+--    instantiateFlows searchFn prgH llvm_helpers (implCfg tcstate chan) plAssignMerged

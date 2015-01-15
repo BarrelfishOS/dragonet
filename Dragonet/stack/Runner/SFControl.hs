@@ -29,8 +29,8 @@ instance Show L4Proto where
     show L4UDP = "UDP"
 
 data FTuple = FTuple {
-    ftPriority :: Word8,
-    ftQueue    :: Word8,
+    ftPriority :: Int,
+    ftQueue    :: Int,
     ftL3Proto  :: Maybe L3Proto,
     ftL4Proto  :: Maybe L4Proto,
     ftL3Src    :: Maybe Word32,
@@ -40,7 +40,7 @@ data FTuple = FTuple {
 } deriving (Eq,Show,Ord)
 
 data FDirTuple = FDirTuple {
-    fdtQueue   :: Word8,
+    fdtQueue   :: Int,
     fdtL3Proto :: L3Proto,
     fdtL4Proto :: L4Proto,
     fdtL3Src   :: Word32,
@@ -69,19 +69,19 @@ maskDstIP   = 4
 maskSrcPort = 8
 maskDstPort = 16
 
-ftCount = 128
+ftCount = 2048
 
 foreign import ccall "sf_ctrl_waitready"
     waitReady :: PLI.StateHandle -> IO ()
 
 foreign import ccall "sf_ctrl_5tuple_unset"
-    c_ftfUnset :: PLI.StateHandle -> Word8 -> IO Bool
+    c_ftfUnset :: PLI.StateHandle -> Int -> IO Bool
 
 foreign import ccall "sf_ctrl_5tuple_set"
-    c_ftfSet :: PLI.StateHandle -> Word8 -> Word8 -> Word8 -> Word32
+    c_ftfSet :: PLI.StateHandle -> Int -> Int -> Int -> Word32
         -> Word32 -> Word16 -> Word16 -> Word16 -> Word16 -> IO Bool
 
-ftUnset :: PLI.StateHandle -> Word8 -> IO ()
+ftUnset :: PLI.StateHandle -> Int -> IO ()
 ftUnset st idx = do
     waitReady st
     res <- c_ftfUnset st idx
@@ -89,7 +89,7 @@ ftUnset st idx = do
         then error "sf_ctrl_5tuple_unset failed"
         else return ()
 
-ftSet :: PLI.StateHandle -> Word8 -> FTuple -> IO ()
+ftSet :: PLI.StateHandle -> Int -> FTuple -> IO ()
 ftSet st idx (FTuple p q l3 l4 sIP dIP sP dP) = do
     if idx >= ftCount
         then error "FTQF index too high"

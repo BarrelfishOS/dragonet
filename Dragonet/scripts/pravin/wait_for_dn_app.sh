@@ -18,7 +18,7 @@ check_filters_inserted() {
     local fcountTries=1
     while true;
     do
-        filter_count=`cat some.log | grep "\[#### IMP ####\]index: " | wc -l`
+        filter_count=`cat some.log | grep "\[####-- IMP --####\]" | wc -l`
         if [ $filter_count -ge $fcount ] ;
         then
             echo "Found enough filters $filter_count (>= $fcount)"
@@ -32,6 +32,8 @@ check_filters_inserted() {
             echo "ERROR: filter count retries ${fcountTries} reached!, giving up on waiting"
             exit 1
         fi
+        echo "Only ${filter_count} filters are inserted, and we want around ${fcount}, sleeping.. "
+        sleep 1
     done
 }
 

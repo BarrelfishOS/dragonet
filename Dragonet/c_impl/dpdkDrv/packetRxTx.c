@@ -9,11 +9,11 @@
 
 #define MAX_QUEUES                     128
 
-//#define CONFIG_LOCAL_MAC  0x07459f671e00ULL // 00:1e:67:9f:45:07 // asiago - e10k
-//#define CONFIG_LOCAL_IP  0x0a71045f //   "10.113.4.95"
+#define CONFIG_LOCAL_MAC  0x07459f671e00ULL // 00:1e:67:9f:45:07 // asiago - e10k
+#define CONFIG_LOCAL_IP  0x0a71045f //   "10.113.4.95"
 
-#define CONFIG_LOCAL_MAC  0xc01a8f211b00ULL // 00:1B:21:8F:1A:C0 -- sbrinz1
-#define CONFIG_LOCAL_IP  0x0a71041a //   "10.113.4.26"  -- sbrinz1
+//#define CONFIG_LOCAL_MAC  0xc01a8f211b00ULL // 00:1B:21:8F:1A:C0 -- sbrinz1
+//#define CONFIG_LOCAL_IP  0x0a71041a //   "10.113.4.26"  -- sbrinz1
 
 
 static uint64_t qstat[MAX_QUEUES] = {0, 0};

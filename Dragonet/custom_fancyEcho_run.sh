@@ -353,8 +353,9 @@ sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
         ## Main ##
 ##################################################################
 
-./scripts/pravin/wait_for_dragonet.sh 10 ${STACKNAME}
-run_memcached_big
+./scripts/pravin/wait_for_dragonet.sh 4 ${STACKNAME}
+#run_memcached_big
+run_memcached_for_8_cores
 #run_memcached_single_core_specific_two_flows
 #run_memcached_2_cores_specific
 #run_memcached_cl4_flows4

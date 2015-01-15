@@ -218,6 +218,31 @@ parse5t (C.CVTuple
         convProto (C.CVEnum 3) = C5TPL4Other
         convInt (C.CVInt i) = fromIntegral i
 
+parse5t (C.CVTuple
+           [C.CVMaybe mSIP,
+            C.CVMaybe mDIP,
+            C.CVMaybe mProto,
+            C.CVMaybe mSPort,
+            C.CVMaybe mDPort,
+            C.CVInt queue]) =
+    C5Tuple {
+        c5tPriority = 1,
+        c5tQueue = fromIntegral $ queue,
+        c5tL4Proto = convProto <$> mProto,
+        c5tL3Src = convInt <$> mSIP,
+        c5tL3Dst = convInt <$> mDIP,
+        c5tL4Src = convInt <$> mSPort,
+        c5tL4Dst = convInt <$> mDPort
+    }
+    where
+        convProto (C.CVEnum 0) = C5TPL4TCP
+        convProto (C.CVEnum 1) = C5TPL4UDP
+        convProto (C.CVEnum 2) = C5TPL4SCTP
+        convProto (C.CVEnum 3) = C5TPL4Other
+        convInt (C.CVInt i) = fromIntegral i
+
+
+parse5t x = error ("this 5 tuple format not not supported: "  ++ (show x))
 {-|
  - Returns a PG.Node based on given 5Tuple configuration.
  -  - It creates a empty node with `c5tString c` as label and [true, false] as

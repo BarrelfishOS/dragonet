@@ -85,7 +85,7 @@ void app_control_init(
             }
             perror("app_control_init: select failed");
             abort();
-        }
+        } // end if: select returns
 
         // handle errors
         if (FD_ISSET(s, &errs)) {
@@ -93,6 +93,8 @@ void app_control_init(
             perror("app_control_init: Error on listening socket :-/");
             abort();
         }
+
+        // Cleanup the dead applications
         for (i = 0; cnt > 0 && i < num_apps; i++) {
             if (appfds[i] == -1 || !FD_ISSET(appfds[i], &errs)) {
                 continue;
@@ -105,7 +107,7 @@ void app_control_init(
             appfds[i] = -1;
         }
 
-        // handle new connections
+        // handle new connections (if there is an event on accept socket)
         if (cnt > 0 && FD_ISSET(s, &reads) ) {
             cnt--;
             if ((fd = accept(s, NULL, NULL)) < 0) {
@@ -125,7 +127,7 @@ void app_control_init(
                 FD_SET(fd, &reads_orig);
                 new_application(fd, graph);
             }
-        }
+        } // end if: event on accept socket
 
         // handle requests
         for (i = 0; cnt > 0 && i < num_apps; i++) {
@@ -136,6 +138,7 @@ void app_control_init(
 
             len = recv(appfds[i], &msg, sizeof(msg), MSG_WAITALL);
             if (len < sizeof(msg)) {
+                // Incomplete message: assume application is dead, remove it.
                 if (len > 0) {
                     fprintf(stderr, "app_control_init: incomplete recv\n");
                 } else if (len < 0) {
@@ -146,7 +149,7 @@ void app_control_init(
                 FD_CLR(appfds[i], &reads_orig);
                 appfds[i] = -1;
                 continue;
-            }
+            } // end if: incomplete message
 
             switch (msg.type) {
                 case APPCTRL_REGISTER:
@@ -203,9 +206,9 @@ void app_control_init(
 
                 default:
                     fprintf(stderr, "app_control_init: invalid msg type\n");
-            }
-        }
-    }
+            } // end switch: event type
+        } // end for: for each application
+    } // end while : true
 }
 
 // Dragonet -> App message sends

@@ -3,7 +3,8 @@ module Scenarios.S3 (
     , sortedRealFlows
     , realFlows
     , sortFlows
-    , hardcodedOracleMemcached
+    , hardcodedOracleMemcachedSF
+    , hardcodedOracleMemcachedIntel
 ) where
 
 import qualified Data.Word as DW
@@ -55,7 +56,7 @@ sortFlows isImp fl = sortedFlows
         otherList = filter (not . isImp) allFlows
         sortedFlows = impList ++  otherList
 
-sortedRealFlows fpApp clients = sortFlows (isGoldFl fpApp) (realFlows fpApp clients)
+sortedRealFlows serverIP fpApp clients = sortFlows (isGoldFl fpApp) (realFlows serverIP fpApp clients)
 
 generateFlows dstIP dstPort srcIP_list start_srcP conc = ff
     where
@@ -79,23 +80,26 @@ getClientList clcount =  take clcount $ concat $ repeat clList
     clList = [
           "10.113.4.51"  --  ziger1:
           , "10.113.4.57"  --  ziger2:
---          , "10.113.4.26"  --  sbrinz1:
+          , "10.113.4.26"  --  sbrinz1:
           , "10.113.4.29"  --  sbrinz2:
 --          , "10.113.4.20"  --  gruyere:
 --          , "10.113.4.71"  --  appenzeller:
       ]
 
 
-generateFlowsWrapper fperApp clcount = generateFlows serverIP srvPort  clients_ip_addr clientStartPort fperApp
-    where
-    serverIP =  DM.fromJust $ IP4.ipFromString
-                -- "10.113.4.95"   -- Using asiago as server
-                "10.113.4.95"     -- Using sbrinz1 as server
+asiagoSF_server = DM.fromJust $ IP4.ipFromString
+                "10.113.4.195"   -- Using asiago SF as server
 
+asiagoIntel_server = DM.fromJust $ IP4.ipFromString
+                "10.113.4.95"   -- Using asiago SF as server
+
+generateFlowsWrapper serverIP fperApp clcount = generateFlows serverIP srvPort  clients_ip_addr clientStartPort fperApp
+    where
     srvPort = 7777
     clients_ip_addr = map ( DM.fromJust . IP4.ipFromString ) $ getClientList clcount
     clientStartPort = 8000
 
+-- FIXME: This code is repeated with  allFlowsForConfigPrority
 --                                       flow, queue-id, filtertype
 flowsToQueue :: [Flow] -> Int -> Int -> [(Flow, Int, Int)]
 flowsToQueue flist fpApp nq =  glFLows1  ++  glFLows2 ++ otherQmap'
@@ -109,14 +113,18 @@ flowsToQueue flist fpApp nq =  glFLows1  ++  glFLows2 ++ otherQmap'
     otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([3..nq] ++ [0]))
     otherQmap' = map (\(a, b) -> (a, b, 1)) otherQmap
 
-
-flowsToConfig :: [Flow] -> Int -> Int -> C.Configuration
-flowsToConfig flist fpApp nq =  [
-        ("RxC5TupleFilter", PG.CVList []),
-        ("RxCFDirFilter", PG.CVList allFlowsFdir)
-    ]
+-- FIXME: This code is repeated with allFlowsForConfigBalance
+--                                       flow, queue-id, filtertype
+flowsToQueueBalance :: [Flow] -> Int -> Int -> [(Flow, Int, Int)]
+flowsToQueueBalance flist fpApp nq =  otherQmap'
     where
-    allFlowsFdir = map DM.fromJust $ glFLows1  ++  glFLows2 ++ otherQmap'
+    npflows = flist
+    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([1..nq] ++ [0]))
+    otherQmap' = map (\(a, b) -> (a, b, 1)) otherQmap
+
+allFlowsForConfigOld flist fpApp nq = allFlows
+    where
+    allFlows = glFLows1  ++  glFLows2 ++ otherQmap'
     toFilterType = E10k.mkFDirFromFl
     pflows = DL.sort $ filter (isGoldFl fpApp) flist
     halfway = ((length pflows) `div` 2)
@@ -127,20 +135,97 @@ flowsToConfig flist fpApp nq =  [
     otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([3..nq] ++ [0]))
     otherQmap' = map (\(a, b) -> toFilterType a b) otherQmap
 
+allFlowsForConfigPrority flist fpApp nq = allFlows
+    where
+    allFlows = glFLows1  ++  glFLows2 ++ otherQmap
+    pflows = DL.sort $ filter (isGoldFl fpApp) flist
+    halfway = ((length pflows) `div` 2)
+    glFLows1 = map (\x -> (x, 1)) $ take halfway pflows
+    glFLows2 = map (\x -> (x, 2)) $ drop halfway pflows
+
+    npflows = DL.sort $ filter (not . (isGoldFl fpApp)) flist
+    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([3..nq] ++ [0]))
+
+allFlowsForConfigBalance flist fpApp nq = allFlows
+    where
+    allFlows = otherQmap
+    npflows =  flist
+    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([1..nq] ++ [0]))
+
+
+flowsToConfigIntel :: [(Flow, Int)] -> Int -> Int -> C.Configuration
+flowsToConfigIntel flist fpApp nq =  [
+        ("RxC5TupleFilter", PG.CVList t5confChanges),
+        ("RxCFDirFilter", PG.CVList fdirflowsChanges)
+    ]
+    where
+    --allflows = allFlowsForConfig flist fpApp nq
+    allflows = flist
+    t5flows = take 100  allflows
+    fdirflows = drop 100  allflows
+    t5confChanges = map (\(a, b) -> DM.fromJust $ E10k.mkFDirFromFl a b) t5flows
+    fdirflowsChanges = map (\(a, b) -> DM.fromJust $ E10k.mkFDirFromFl a b) fdirflows
+
+
+flowsToConfigSF :: [(Flow, Int)] -> Int -> Int -> C.Configuration
+flowsToConfigSF flist fpApp nq =  [
+        ("RxC5TupleFilter", PG.CVList allflowsChanges),
+        ("RxCFDirFilter", PG.CVList [])
+        --("RxCFDirFilter", PG.CVList allFlowsFdir)
+    ]
+    where
+    --allflows = allFlowsForConfig flist fpApp nq
+    allflows = flist
+    allflowsChanges = map (\(a, b) -> DM.fromJust $ E10k.mkFDirFromFl a b)  allflows
+
 -- All flows are:
-realFlows fpApp clients = generateFlowsWrapper fpApp clients
+realFlows serverIP fpApp clients = generateFlowsWrapper serverIP fpApp clients
 
 priorityCost' fpApp  = S.priorityCost (isGoldFl fpApp) goldFlPerQ
 
 e10kT = E10k.graphH
 e10kU = fst <$> e10kT
 
-
-hardcodedOracleMemcached fpApp clients nq  costfn prgU = params
+hardcodedOracleMemcachedIntel fpApp clients nq costfn prgU =
+    hardcodedOracleMemcached' serverIP cnf0 fpApp clients nq  costfn prgU
     where
-        qmap = flowsToQueue (sortedRealFlows fpApp clients) fpApp nq
+        flowMapperFns = [("balance", allFlowsForConfigBalance),
+                         ("priority", allFlowsForConfigPrority)]
+        flowMapperFn    = case lookup costfn flowMapperFns of
+                        Just x  -> x
+                        Nothing -> error $ "Uknown cost function:" ++ costfn
+        flows = sortedRealFlows serverIP fpApp clients
+        flowsMap = flowMapperFn flows fpApp nq
+        cnf0 = flowsToConfigIntel flowsMap fpApp nq
+        serverIP = asiagoIntel_server
+
+
+
+hardcodedOracleMemcachedSF fpApp clients nq costfn prgU =
+    hardcodedOracleMemcached' serverIP cnf0 fpApp clients nq  costfn prgU
+    where
+
+        flowMapperFns = [("balance", allFlowsForConfigBalance),
+                         ("priority", allFlowsForConfigPrority)]
+        flowMapperFn    = case lookup costfn flowMapperFns of
+                        Just x  -> x
+                        Nothing -> error $ "Uknown cost function:" ++ costfn
+        flows = sortedRealFlows serverIP fpApp clients
+        flowsMap = flowMapperFn flows fpApp nq
+        cnf0 = flowsToConfigSF flowsMap fpApp nq
+        serverIP = asiagoSF_server
+
+hardcodedOracleMemcached' serverIP cnf0 fpApp clients nq  costfn prgU = params
+    where
+
+        flowMapperFns = [("balance", flowsToQueueBalance), ("priority", flowsToQueue)]
+        flowMapperFn    = case lookup costfn flowMapperFns of
+                        Just x  -> x
+                        Nothing -> error $ "Uknown cost function:" ++ costfn
+
+        qmap = flowMapperFn (sortedRealFlows serverIP fpApp clients) fpApp nq
         --cnf0 = E10k.cfgEmpty
-        cnf0 = flowsToConfig (sortedRealFlows fpApp clients) fpApp nq
+        --cnf0 = flowsToConfig (sortedRealFlows serverIP fpApp clients) fpApp nq
 
         oracle   = S.E10kOracleHardCoded {S.nnHardcoded = (nq, qmap)}
         --oracle   = S.E10kOracleSt {S.nQueues = nq}
@@ -168,13 +253,14 @@ test = do
     prgU <- e10kU
     --prgU <- e10kU_simple
     let nq = 5
+        serverIP = asiagoSF_server
         fpApp = 2 --16
         clients = 20
-        qmap_for_debug = flowsToQueue (sortedRealFlows fpApp clients) fpApp nq
+        qmap_for_debug = flowsToQueue (sortedRealFlows serverIP fpApp clients) fpApp nq
 
-        params = hardcodedOracleMemcached fpApp clients nq "priority" prgU
+        params = hardcodedOracleMemcachedIntel fpApp clients nq "priority" prgU
 
-        conflows = sortedRealFlows fpApp clients
+        conflows = sortedRealFlows serverIP fpApp clients
         conf = S.runSearch params  conflows
         prgC = C.applyConfig conf prgU
 

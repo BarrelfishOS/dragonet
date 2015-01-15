@@ -645,6 +645,7 @@ static void tap_init(struct state *state, char *dev_name)
 
 #define MAX_QUEUES                     128
 static uint64_t qstat[MAX_QUEUES] = {0, 0};  // for per queue packets stats
+static uint64_t qstat_tx[MAX_QUEUES] = {0, 0};  // for per queue packets stats
 
 static struct input *rx_in_staging[MAX_QUEUES];
 
@@ -664,6 +665,7 @@ static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
     if (sf_driver == NULL) {
         if (qi != 0) {
 
+        printf(" ############## Initializing the driver ############## \n");
             // We'll do the intialization on queue 0
             dprint("%s:%s:%d: [QID:%"PRIu8"], "
                 "initialization will be done on queue-0, returning\n",
@@ -675,6 +677,7 @@ static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
 
         // clear up the stats array
         memset(qstat, 0, sizeof(qstat));
+        memset(qstat_tx, 0, sizeof(qstat_tx));
 
         state->local_mac = CONFIG_LOCAL_MAC_sf;
         state->local_ip = CONFIG_LOCAL_IP_sf;
@@ -686,7 +689,7 @@ static node_out_t rx_queue_new_v1(struct ctx_SFRxQueue0 *context,
 
         declare_dragonet_initialized(DN_READY_FNAME, "SF driver started!\n");
         printf("Initialized\n");
-
+        printf(" ############## Initialization done ############## \n");
         return P_RxQueue_init;
     }
 
@@ -758,6 +761,17 @@ static node_out_t tx_queue(struct state *state, struct input **in, uint8_t qi)
             qi, q, q->queue_handle, (*in)->data, (*in)->len);
 
     onload_tx_wrapper(q, (*in)->data, (*in)->len, qi);
+
+#if SHOW_INTERVAL_STATS
+    if (qstat_tx[qi] % INTERVAL_STAT_FREQUENCY == 0) {
+        //dprint
+        printf
+            ("QueueID:%"PRIu8":[TID:%d]: has sent %"PRIu64" packets: TX\n",
+               qi, (int)pthread_self(), qstat_tx[qi]);
+    }
+#endif // SHOW_INTERVAL_STATS
+    ++qstat_tx[qi];
+
 
     dprint("%s:%s:%d: [QID:%"PRIu8"], [pktid:%d]:"
             "##############  packet sent, data: %p, len:%"PRIu32"\n",

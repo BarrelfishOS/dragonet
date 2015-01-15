@@ -40,7 +40,7 @@ bool e10k_ctrl_fdir_set(struct state *state,
 
     l4_type = 0x11; // FIXME: hardcoding the type to UDP
 
-    printf("\n\n### %s:%s:%d:  [#### IMP ####]"
+    printf("\n\n### %s:%s:%d:  [####-- IMP --####]"
             "index: %"PRIu16", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
             "srcIP: %"PRIu32", srcPort: %"PRIu16",  dstIP: %"PRIu32", dstPort: %"PRIu16"\n\n",
             __FILE__, __FUNCTION__, __LINE__,
@@ -75,7 +75,7 @@ bool e10k_ctrl_5tuple_set(struct state *state,
 
     l4_type = 0x11; // FIXME: hardcoding the type to UDP
 
-    printf("\n\n### %s:%s:%d:  [#### IMP ####] index %"PRIu8", "
+    printf("\n\n### %s:%s:%d:  [####-- IMP --####] index %"PRIu8", "
             "Priority: %"PRIu8", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
             "srcIP: %"PRIu32", srcPort: %"PRIu16",  dstIP: %"PRIu32", dstPort: %"PRIu16"\n\n",
             __FILE__, __FUNCTION__, __LINE__,

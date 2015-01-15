@@ -194,7 +194,29 @@ parse5t (CVTuple
         convProto (CVEnum 2) = C5TPL4SCTP
         convProto (CVEnum 3) = C5TPL4Other
         convInt (CVInt i) = fromIntegral i
-
+parse5t (CVTuple
+           [CVMaybe mSIP,
+            CVMaybe mDIP,
+            CVMaybe mProto,
+            CVMaybe mSPort,
+            CVMaybe mDPort,
+            CVInt queue]) =
+    C5Tuple {
+        c5tPriority = 1,
+        c5tQueue = fromIntegral $ queue,
+        c5tL4Proto = convProto <$> mProto,
+        c5tL3Src = convInt <$> mSIP,
+        c5tL3Dst = convInt <$> mDIP,
+        c5tL4Src = convInt <$> mSPort,
+        c5tL4Dst = convInt <$> mDPort
+    }
+    where
+        convProto (CVEnum 0) = C5TPL4TCP
+        convProto (CVEnum 1) = C5TPL4UDP
+        convProto (CVEnum 2) = C5TPL4SCTP
+        convProto (CVEnum 3) = C5TPL4Other
+        convInt (CVInt i) = fromIntegral i
+parse5t x = error ("this 5 tuple format not not supported: "  ++ (show x))
 
 
 nodeL5Tuple c = (baseFNode (c5tString c) bports) {
@@ -241,6 +263,7 @@ config5tuple _ _ inE outE cfg = do
         -- Get filter configurations ordered by priority
         cmpPrio = compare `on` c5tPriority
         cfgs = reverse $ L.sortBy cmpPrio $ parse5tCFG cfg
+        --cfgs = parse5tCFG cfg  -- without priority
 
         -- Generate node and edges for one filter
         addFilter ((iN,iE),es) c = do

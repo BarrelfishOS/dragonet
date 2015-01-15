@@ -140,7 +140,7 @@ int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
 
     //dprint
     printf
-        ("%s:%s:%d:[#### IMP ####] [vq:%p, vis:%p], [qid:%"PRIu8"], inserting listen filter proto [%d], "
+        ("%s:%s:%d:[####-- IMP --####] [vq:%p, vis:%p], [qid:%"PRIu8"], inserting listen filter proto [%d], "
             "localip [%"PRIx32"] localport[%"PRIx16"]\n",
             __FILE__, __func__, __LINE__, sfq, vis, sfq->qid,
             protocol, localip1, localport1);
@@ -187,7 +187,7 @@ int alloc_filter_full_ipv4(struct dragonet_sf_queue *sfq, int protocol,
 
     //dprint
     printf
-        ("%s:%s:%d: [#### IMP ###] [vq:%p, vis:%p], [qid:%"PRIu8"] inserting full filter proto [%d], "
+        ("%s:%s:%d: [####-- IMP --####] [vq:%p, vis:%p], [qid:%"PRIu8"] inserting full filter proto [%d], "
             "localip [%"PRIx32"] localport[%"PRIx16"], "
             "RemoteIP [%"PRIx32"] RemotePort[%"PRIx16"]\n",
             __FILE__, __func__, __LINE__, sfq, vis, sfq->qid,
@@ -256,7 +256,9 @@ bool sf_ctrl_5tuple_set(struct state *state,
     assert(sf_driver != NULL);
     q = sf_driver->queues + qi;
     assert(q->queue_handle != NULL);
-    dprint("%s:%s:%d: [QID:%"PRIu8"], dragonet_nic = %p, "
+    //dprint
+    printf
+        ("%s:%s:%d: [QID:%"PRIu8"], dragonet_nic = %p, "
             "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
             "######## setting up 5tuple filter\n",
             __FILE__,  __func__, __LINE__, qi, state->st_driver_handle,

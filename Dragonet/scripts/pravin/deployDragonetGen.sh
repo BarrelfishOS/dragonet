@@ -90,7 +90,8 @@ echo "Using commandline $RUNCMD"
 case ${RUNTYPE} in
     'bg')
         echo "running in background"
-        nohup ${INITCMD} ; sudo ${EXTRAENV} ${RUNCMD} > some.log 2>&1 < /dev/null  &
+        #nohup ${INITCMD} ; sudo ${EXTRAENV} ${RUNCMD} > some.log 2>&1 < /dev/null  &
+        nohup sudo ${EXTRAENV} ${RUNCMD} > some.log 2>&1 < /dev/null  &
         echo "Waiting for Dragonet to start"
         sleep 4
         ${SCRIPTDIR}/wait_for_dragonet.sh ${STACKNAME} ${HWQUEUES}
