@@ -479,8 +479,7 @@ main = do
     -- TODO: Create the driver-thread before you go and start flows
     --      This should speedup the initialization as driver will be ready
     --      before applications starts connecting in
-    instantiateFlows'
-        trigger
+    instantiateFlows
         searchFn                -- ^ returns configurations to evaluate
         prgH                    -- ^ PRG
         llvm_helpers            -- ^ llvm helpers
