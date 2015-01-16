@@ -69,7 +69,8 @@ struct dynamic_graph *dyn_mkgraph(pipeline_handle_t plh,
     pthread_mutex_init(&g->lock, NULL);
 
     // node whitelist for tracing
-    static const char *tr_wlist[] = {".*UDP.*", ".*EtherClassified.*"};
+    //static const char *tr_wlist[] = {".*UDP.*", ".*EtherClassified.*"};
+    static const char *tr_wlist[] = {};
 
     static const size_t tr_wlist_nelems = sizeof(tr_wlist)/sizeof(char *);
     g->tr_wlist_re = (regex_t *)malloc(sizeof(regex_t)*tr_wlist_nelems);

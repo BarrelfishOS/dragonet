@@ -101,6 +101,11 @@ case ${RUNTYPE} in
         exit 0
         ;;
 
+    'fgg')
+        echo "running in foreground"
+        ${INITCMD} ; sudo ${EXTRAENV} ${RUNCMD} | tee some.log
+        ;;
+
     'fg')
         echo "running in foreground"
         ${INITCMD} ; sudo ${EXTRAENV} ${RUNCMD}

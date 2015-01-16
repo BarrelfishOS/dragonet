@@ -69,7 +69,7 @@ do
 
         readyCount=$(cat "${AppslistFile}" 2> /dev/null | wc -l)
 
-        if [ "${readyCount}" == "${appSlots}"  ] ; then
+        if [ "${readyCount}" -ge "${appSlots}"  ] ; then
             ensure_running_process ${stackName}
             ensure_running_process ${appName}
             echo "All ${readyCount} apps connected and ready!"

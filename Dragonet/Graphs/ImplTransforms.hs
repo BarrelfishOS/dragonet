@@ -11,6 +11,7 @@ import qualified Util.GraphHelpers as GH
 import qualified Data.Graph.Inductive.Graph as DGI
 import qualified Data.Graph.Inductive.Query.DFS as DFS
 import qualified Data.Map as M
+import qualified Data.List as DL
 import qualified Data.Set as S
 import Data.Word (Word64)
 import Data.Functor ((<$>))
@@ -66,18 +67,21 @@ balEpAcrossRxQs ::
     -> (Integer, [DGI.Node])
     -- | Graph after applying the balancing
     -> PG.PGraph
-balEpAcrossRxQs g (eid,nids@(nid0:_)) = enfoceEP2SocketsMapping g groupedNids
+balEpAcrossRxQs g (eid,nids@(nid0:_)) = trace msg $ enfoceEP2SocketsMapping g groupedNids
     where
     ports = PG.nPorts $ fromJust $ DGI.lab g nid0
     balancedPorts = balancedChunks (length nids) ports
     groupedNids :: [(DGI.Node, [PG.NPort])]
-    groupedNids = zip nids $ concat $ repeat balancedPorts
+    nids' = nids
+    balancedPorts' = DL.sort balancedPorts
+    groupedNids = zip nids' $ concat $ repeat balancedPorts'
     msg
-            | length nids == length ports = "one pipeline/queue per socket"
-            | length nids > length ports = "Multiple pipelines/queues per socket"
+            | length nids == length ports = "############################### one pipeline/queue per socket"
+            | length nids > length ports = "############################### Multiple pipelines/queues per socket"
             | otherwise = -- TODO: Add special balance nodes to allow
                           -- single pipeline/queue to loadbalance to between multiple sockets
-                        "Warning: More sockets than pipelines/queues, ignoring few extra sockets"
+                        ("############################### Warning: More sockets than pipelines/queues, ignoring few extra sockets ports=[["
+                        ++ show ports ++ ",  nids=[[" ++ show nids ++ "]]")
 
 myIsNotEmpty [] = False
 myIsNotEmpty _ = True
@@ -111,10 +115,11 @@ enfoceEP2SocketsMapping g [] = g
 -- end: No socket mapped to the endpoint: This is treated as error as all
 --      the incoming packets here will end up getting dropped
 --enfoceEP2SocketsMapping g (eps, []):xs = error "the endpoint does not have any socket connected"
-enfoceEP2SocketsMapping g (x:xs) = gAns
+enfoceEP2SocketsMapping g (x:xs) = trace msg $ gAns
     where
     eps = fst x
-    ports = snd x
+    ports' = snd x
+    ports = DL.sort ports'
     (p, msg)
         | ports == [] = error "the endpoint does not have any socket connected"
         | (length ports) == 1 = ((head ports), "")
@@ -161,7 +166,7 @@ mapEPtoSinglePort g epNid port =  g'
             [x] -> x
             []  -> error $ "balEpAcrossRxQs: port " ++ (show port) ++ " 0 sucs"
             _   -> error $ "balEpAcrossRxQs: port " ++ (show port) ++ " >1 sucs"
-         g' = traceN msg
+         g' = trace msg
               $ DGI.insEdge (prevNid, nextNid, prevE)
               $ DGI.delNodes delNs g
 

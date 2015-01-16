@@ -13,9 +13,25 @@ T0.p[7777]F[10.113.4.26:7777/10.113.4.51:8000]F[10.113.4.26:7777/10.113.4.51:800
 
 
 
-run_memcached_for_8_cores() {
-sudo ../benchmarking/memcached/memcached -N T0.p[7777]F[${SERVERIP}:7777/10.113.4.71:8000]F[${SERVERIP}:7777/10.113.4.29:8000]F[${SERVERIP}:7777/10.113.4.51:8000]F[${SERVERIP}:7777/10.113.4.57:8000]F[${SERVERIP}:7777/10.113.4.51:8001]F[${SERVERIP}:7777/10.113.4.57:8001]F[${SERVERIP}:7777/10.113.4.71:8001]F[${SERVERIP}:7777/10.113.4.29:8001] -c 64000 -m 64000 -u root -p 0 -U  7777 -t 8 -l ${SERVERIP}
+run_memcached_for_1_cores() {
+sudo ../benchmarking/memcached/memcached -N T0.p[7777]F[${SERVERIP}:7777/10.113.4.71:8000]F[${SERVERIP}:7777/10.113.4.29:8000]F[${SERVERIP}:7777/10.113.4.51:8000]F[${SERVERIP}:7777/10.113.4.57:8000]F[${SERVERIP}:7777/10.113.4.51:8001]F[${SERVERIP}:7777/10.113.4.57:8001]F[${SERVERIP}:7777/10.113.4.71:8001]F[${SERVERIP}:7777/10.113.4.29:8001] -c 64000 -m 64000 -u root -p 0 -U  7777 -t 1 -l ${SERVERIP}
 }
+
+run_memcached_4_clients_2_load() {
+sudo ../benchmarking/memcached/memcached -N \
+T0.p[7777]F[10.113.4.95:7777/10.113.4.51:8000]F[10.113.4.95:7777/10.113.4.51:8001]F[10.113.4.95:7777/10.113.4.57:8000]F[10.113.4.95:7777/10.113.4.57:8001]F[10.113.4.95:7777/10.113.4.26:8000]F[10.113.4.95:7777/10.113.4.26:8001]F[10.113.4.95:7777/10.113.4.29:8000]F[10.113.4.95:7777/10.113.4.29:8001]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l 10.113.4.95
+}
+
+run_memcached_2_clients_2_load() {
+sudo ../benchmarking/memcached/memcached -N \
+T0.p[7777]F[10.113.4.95:7777/10.113.4.51:8000]F[10.113.4.95:7777/10.113.4.51:8001]F[10.113.4.95:7777/10.113.4.26:8000]F[10.113.4.95:7777/10.113.4.26:8001]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l 10.113.4.95
+}
+
+run_memcached_2_clients_3_load() {
+sudo ../benchmarking/memcached/memcached -N \
+T0.p[7777]F[10.113.4.95:7777/10.113.4.51:8000]F[10.113.4.95:7777/10.113.4.51:8001]F[10.113.4.95:7777/10.113.4.51:8002]F[10.113.4.95:7777/10.113.4.26:8000]F[10.113.4.95:7777/10.113.4.26:8001]F[10.113.4.95:7777/10.113.4.26:8002]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l 10.113.4.95
+}
+
 
 run_memcached_broken_case() {
 #sudo   \
@@ -349,13 +365,16 @@ sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
 -t -q t0
 }
 
+
 ##################################################################
         ## Main ##
 ##################################################################
 
 ./scripts/pravin/wait_for_dragonet.sh 4 ${STACKNAME}
 #run_memcached_big
-run_memcached_for_8_cores
+run_memcached_2_clients_3_load
+#run_memcached_4_clients_2_load
+#run_memcached_for_1_cores
 #run_memcached_single_core_specific_two_flows
 #run_memcached_2_cores_specific
 #run_memcached_cl4_flows4

@@ -840,9 +840,15 @@ void thread_init(int nthreads, struct event_base *main_base) {
     pthread_mutex_init(&cqi_freelist_lock, NULL);
     cqi_freelist = NULL;
 
-    int res;
 
 #ifdef DRAGONET
+    // Setup the flow table
+    myAssert(new_flows_ht == NULL);
+    new_flows_ht = xht_init(NEWFLOWSTABLE);
+    myAssert(new_flows_ht != NULL);
+
+    int res;
+    // initialize the barrier to synchronize the threads
     if ((res = pthread_barrier_init(&nthread_barrier, NULL, nthreads)) != 0) {
         fprintf(stderr, "pttrhead_barrier_init failed: %s\n", strerror(res));
         abort();

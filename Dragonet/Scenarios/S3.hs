@@ -74,8 +74,19 @@ generateFlows dstIP dstPort srcIP_list start_srcP conc = ff
            , flSrcIp    = Just  x
            , flSrcPort  = Just (fromIntegral y) }) f
 
-
 getClientList clcount =  take clcount $ concat $ repeat clList
+    where
+    clList = [
+          "10.113.4.51"  --  ziger1:
+          , "10.113.4.26"  --  sbrinz1:
+          , "10.113.4.57"  --  ziger2:
+          , "10.113.4.29"  --  sbrinz2:
+--          , "10.113.4.20"  --  gruyere:
+--          , "10.113.4.71"  --  appenzeller:
+      ]
+
+
+getClientList_real clcount =  take clcount $ concat $ repeat clList
     where
     clList = [
           "10.113.4.51"  --  ziger1:
@@ -86,6 +97,8 @@ getClientList clcount =  take clcount $ concat $ repeat clList
 --          , "10.113.4.71"  --  appenzeller:
       ]
 
+--defaultQueue = [0]
+defaultQueue = []
 
 asiagoSF_server = DM.fromJust $ IP4.ipFromString
                 "10.113.4.195"   -- Using asiago SF as server
@@ -110,7 +123,7 @@ flowsToQueue flist fpApp nq =  glFLows1  ++  glFLows2 ++ otherQmap'
     glFLows2 = map (\x -> (x, 2, 1) ) $ drop halfway pflows
 
     npflows = DL.sort $ filter (not . (isGoldFl fpApp)) flist
-    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([3..nq] ++ [0]))
+    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([3..nq] ++ defaultQueue))
     otherQmap' = map (\(a, b) -> (a, b, 1)) otherQmap
 
 -- FIXME: This code is repeated with allFlowsForConfigBalance
@@ -119,7 +132,7 @@ flowsToQueueBalance :: [Flow] -> Int -> Int -> [(Flow, Int, Int)]
 flowsToQueueBalance flist fpApp nq =  otherQmap'
     where
     npflows = flist
-    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([1..nq] ++ [0]))
+    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([1..nq] ++ defaultQueue))
     otherQmap' = map (\(a, b) -> (a, b, 1)) otherQmap
 
 allFlowsForConfigOld flist fpApp nq = allFlows
@@ -132,7 +145,7 @@ allFlowsForConfigOld flist fpApp nq = allFlows
     glFLows2 = map (\x -> toFilterType x 2) $ drop halfway pflows
 
     npflows = DL.sort $ filter (not . (isGoldFl fpApp)) flist
-    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([3..nq] ++ [0]))
+    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([3..nq] ++ defaultQueue))
     otherQmap' = map (\(a, b) -> toFilterType a b) otherQmap
 
 allFlowsForConfigPrority flist fpApp nq = allFlows
@@ -144,13 +157,13 @@ allFlowsForConfigPrority flist fpApp nq = allFlows
     glFLows2 = map (\x -> (x, 2)) $ drop halfway pflows
 
     npflows = DL.sort $ filter (not . (isGoldFl fpApp)) flist
-    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([3..nq] ++ [0]))
+    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([3..nq] ++ defaultQueue))
 
 allFlowsForConfigBalance flist fpApp nq = allFlows
     where
     allFlows = otherQmap
     npflows =  flist
-    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([1..nq] ++ [0]))
+    otherQmap = zip npflows $ take (length npflows) $ concat (map (\x-> take fpApp $ repeat x) $ concat $ repeat ([1..nq] ++ defaultQueue))
 
 
 flowsToConfigIntel :: [(Flow, Int)] -> Int -> Int -> C.Configuration

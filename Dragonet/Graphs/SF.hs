@@ -19,7 +19,7 @@ import qualified Dragonet.ProtocolGraph as PG
 import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Dragonet.Predicate as PR
 import Dragonet.Unicorn
-import Dragonet.Configuration
+import qualified Dragonet.Configuration       as C
 import Dragonet.Implementation.IPv4 as IP4
 import qualified Dragonet.Semantics as SEM
 import Dragonet.Flows (Flow (..))
@@ -59,7 +59,7 @@ isRxQValidN i (_,n) =
     (nLabel n == "Q" ++ show i ++ "Valid") ||
         (nLabel n == "RxQ" ++ show i ++ "Valid")
 
-addCfgFun :: Node -> ConfFunction
+addCfgFun :: Node -> C.ConfFunction
 addCfgFun n
     | l == "RxC5TupleFilter" = config5tuple
     | l == "RxCFDirFilter"   = configFDir
@@ -246,7 +246,7 @@ nodeL5Tuple c = (baseFNode (c5tString c) bports) {
             SMT.app "L4.Proto" [pkt] SMTC.=== SMT.app "L4P.UDP" []
             ]
 
-config5tuple :: ConfFunction
+config5tuple :: C.ConfFunction
 config5tuple _ _ inE outE cfg = do
     ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
     let lastEdge = (endN,defaultN,endP)
@@ -267,7 +267,7 @@ config5tuple _ _ inE outE cfg = do
 
         -- Generate node and edges for one filter
         addFilter ((iN,iE),es) c = do
-            (n,_) <- confMNewNode $ nodeL5Tuple c
+            (n,_) <- C.confMNewNode $ nodeL5Tuple c
             let inEdge = (iN,n,iE)
             let tEdge = (n,queue $ c5tQueue c,Edge "true")
             let fEdge = (n,queue $ c5tQueue c,Edge "false")
@@ -338,7 +338,7 @@ parseFDT (CVTuple
         convProto (CVEnum 3) = C5TPL4Other
         convInt (CVInt i) = fromIntegral i
 
-configFDir :: ConfFunction
+configFDir :: C.ConfFunction
 configFDir _ _ inE outE cfg = do
     ((endN,endP),edges) <- foldM addFilter (start,[]) cfgs
     let lastEdge = (endN,defaultN,endP)
@@ -361,7 +361,7 @@ configFDir _ _ inE outE cfg = do
                     nAttributes = cFDtAttr c
                     }
         addFilter ((iN,iE),es) c = do
-            (n,_) <- confMNewNode $ nodeL c
+            (n,_) <- C.confMNewNode $ nodeL c
             let inEdge = (iN,n,iE)
             let tEdge = (n,queue $ cfdtQueue c,Edge "true")
             let fEdge = (n,queue $ cfdtQueue c,Edge "false")
@@ -378,7 +378,7 @@ duplicateDFS g (nid,nlbl) nid' dupname = do
         dupNode :: Node -> Node
         dupNode n = n { nLabel = (dupname $ nLabel n) }
 
-    dupNodes <- forM (map (dupNode . snd) nodesDup) confMNewNode
+    dupNodes <- forM (map (dupNode . snd) nodesDup) C.confMNewNode
 
     let nodeMap :: [(DGI.Node,  DGI.Node)]
         nodeMap_ = [(nid, dupNid) | ((nid,_), (dupNid,_)) <- zip nodesDup dupNodes]
@@ -404,7 +404,7 @@ duplicateDFS g (nid,nlbl) nid' dupname = do
 -- Add an OR node in front of each Queue
 -- All nodes (and edges) after the queue are duplicated for each queue
 -- Incomming edges to the configuration queue node
-configRxQueues :: ConfFunction
+configRxQueues :: C.ConfFunction
 configRxQueues g (cfgnid,cfgn) inE outE (CVInt qs) = do
 
     -- first (default) queue
@@ -424,8 +424,8 @@ configRxQueues g (cfgnid,cfgn) inE outE (CVInt qs) = do
                 onode = baseONode oname ["true","false"] NOpOr {}
                 defQ = 0
 
-            (q_nid, _) <- confMNewNode node
-            (o_nid, _) <- confMNewNode onode
+            (q_nid, _) <- C.confMNewNode node
+            (o_nid, _) <- C.confMNewNode onode
 
             let edge_to_self :: (PGNode, Edge) -> Bool
                 edge_to_self ((_, CNode {nLabel = x}), _) = x == nLabel cfgn
@@ -466,7 +466,7 @@ configRxQueues g (cfgnid,cfgn) inE outE (CVInt qs) = do
             let newEdges = iE ++ sE ++ orE ++ dupEs
             return ((q_nid,o_nid),newEdges)
 
-configTxQueues :: ConfFunction
+configTxQueues :: C.ConfFunction
 configTxQueues _ (_,cfgn) inE outE (CVInt qs) = do
     ret <- foldM addNode [] [0..qs-1]
     return ret
@@ -480,7 +480,7 @@ configTxQueues _ (_,cfgn) inE outE (CVInt qs) = do
                                                 nImplementation = qimpl}
                 onode = baseONode name ["true","false"] NOpOr {}
 
-            (q_nid, _) <- confMNewNode node
+            (q_nid, _) <- C.confMNewNode node
             let edge_to_self :: (PGNode, Edge) -> Bool
                 edge_to_self ((_, CNode { nLabel = xlbl }), _) = xlbl == nLabel cfgn
                 edge_to_self _ = False
@@ -500,7 +500,7 @@ configTxQueues _ (_,cfgn) inE outE (CVInt qs) = do
 
 
 prepareConf :: PGraph -> PGraph
-prepareConf = replaceConfFunctions addCfgFun
+prepareConf = C.replaceConfFunctions addCfgFun
 
 ----
 -- Try to figure out at  which queue a flow will end up.

@@ -3,12 +3,12 @@
 SCRIPTDIR="./scripts/pravin/"
 set -x
 set -e
-sudo killall stack-tap || true
-sudo killall stack-dpdk || true
+sudo killall -9 stack-tap || true
+sudo killall -9 stack-dpdk || true
 sudo killall bench-fancyecho || true
 sudo killall bench-echo || true
-sudo killall stack-e10k || true
-sudo killall stack-sf || true
+sudo killall -9 stack-e10k || true
+sudo killall -9 stack-sf || true
 rm -f some.log
 sudo bash -c 'echo 700 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages'
 #sudo bash -c 'echo 32 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages'

@@ -18,7 +18,10 @@ memcached_SOURCES = memcached.c memcached.h \
                     util.c util.h \
                     trace.h cache.h sasl_defs.h \
 		    dnet_interface.c \
-		    dnet_interface.h
+		    dnet_interface.h \
+		    flowtable/xht.c \
+		    flowtable/xht.h \
+		    flowtable/misc.h
 
 if BUILD_CACHE
 memcached_SOURCES += cache.c

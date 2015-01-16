@@ -50,6 +50,7 @@ get_tsc(void) {
 #include <helpers.h>
 #include <dragonet/app_lowlevel.h>
 #include <udpproto.h>
+#include "flowtable/xht.h"
 
 #define MAX_SOCKETS_APP             (256)
 // Shows packet classification after every 'INTERVAL_STAT_FREQUENCY' packet.
@@ -57,7 +58,7 @@ get_tsc(void) {
 //  Currently supported by E10k queues,  sf queues, fancyecho
 //  memecached has its own copy of these variables in dnet_interface.h
 
-//#define SHOW_INTERVAL_STAT      1
+#define SHOW_INTERVAL_STAT      1
 #define INTERVAL_STAT_FREQUENCY     (1000)
 //#define INTERVAL_STAT_FREQUENCY     (1)
 
@@ -109,6 +110,12 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize);
 int send_dn(void *dn_state, uint8_t *buff, int bufsize);
 void event_handle_loop_dn(void *dn_state);
 void *parse_client_list(char *client_list_str, int thread_count);
+
+// Size of new flows hashtable
+#define NEWFLOWSTABLE           (2047)
+// Pointer to new flows hashtable
+extern xht_t *new_flows_ht;
+
 #endif // DRAGONET
 
 
