@@ -249,3 +249,15 @@ executable bench-fancyecho
     CC-options:         -Wall -Wno-unused-function
     default-language:   Haskell2010
 
+
+executable testflows
+    main-is:            microbenchmark/testflows.c
+    Hs-source-dirs:     apps
+    other-modules:      Dummy
+    build-depends:      base, apps
+    include-dirs:       apps/lib/include,
+                        c_impl/include/,
+                        lib/Dragonet/Pipelines/,
+                        stack/Runner
+    CC-options:         -Wall -Wno-unused-function -std=c99 -D_GNU_SOURCE
+    default-language:   Haskell2010
