@@ -44,13 +44,18 @@ errval_t shmchan_create_(struct shm_channel *chan, const char *name,
     meta->canary = CANARY_VAL;
     meta->ready = 1;
     __sync_synchronize();
-    syncfs(fd);
-    sync();
+    //
+    // Not sure about the above memory barrier, but the two calls below have to
+    // do with synchronizing to disk, which for a shm_open() file descriptor
+    // does not make a lot of sense -AKK
+    //syncfs(fd);
+    //sync();
 
     res = munmap(meta, SHM_CHAN_EXTRA);
     assert_fix(res == 0);
     close(fd);
-    sync();
+    // ditto
+    //sync();
 
     //printf("%s(): channel %s (%p) created\n", __FUNCTION__, name, chan);
 
