@@ -105,10 +105,6 @@ data StackState = StackState {
       ssNetState       :: NetState
     , ssApplications   :: M.Map AppId AppDesc
     , ssAppChans       :: M.Map PLA.ChanHandle AppId
-    -- quick hack to maintain the previous endpoints so that we can find the
-    -- difference between the current and the old state. It is probably better
-    -- to actually track the changes from the event handlers though.
-    , ssPrevEndpoints  :: M.Map EndpointId EndpointDesc
     -- callback to update the graph
     , ssUpdateGraphs   :: STM.TVar StackState -> IO ()
     -- each stack state gets a new version number
@@ -368,7 +364,6 @@ initStackSt = StackState {
     ssNetState       = NS.initNetSt,
     ssApplications   = M.empty,
     ssAppChans       = M.empty,
-    ssPrevEndpoints  = M.empty,
     ssVersion        = 0,
     ssFlows          = []
 }
@@ -399,19 +394,6 @@ ssNewVer sstv = STM.atomically $ do
     let ss' = ss { ssVersion = ssVersion ss + 1 }
     STM.writeTVar sstv ss'
     return ss'
-
--- Update:
---  bump the version number
---  update the prevEndpoints
---  return : new stack state, endpoints added, endpoints removed
-ssExecUpd :: STM.TVar StackState -> IO (StackState, M.Map EndpointId EndpointDesc)
-ssExecUpd sstv = STM.atomically $ do
-    ss <- STM.readTVar sstv
-    let prevEps = ssPrevEndpoints ss
-        newEps  = ssEndpoints ss
-        ss' = ss { ssVersion = ssVersion ss + 1, ssPrevEndpoints = newEps }
-    STM.writeTVar sstv ss'
-    return (ss', prevEps)
 
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -491,16 +473,11 @@ updateGraphFlows
     -> IO ()
 updateGraphFlows getConf args sstv = do
    putStrLn "updateGraphFlows"
-   (ss, prevEpsM) <- ssExecUpd sstv
+   ss <- ssNewVer sstv
    putStrLn $ "updateGraphFlows: v" ++ (show $ ssVersion ss)
    -- get list of all endpoints from stack-state
    let
        lbl = "updateGraphFlows"
-       --prevEps = M.elems prevEpsM
-       --newEps = epsDiff allEps prevEps
-       --rmEps = epsDiff prevEps allEps
-       --putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
-       --putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
        -- OLD implenetation: where flows are taken from endpoints
        --xforms = [IT.coupleTxSockets, IT.mergeSockets]
        --flows = map epToFlow $ M.elems $ ssEndpoints ss
