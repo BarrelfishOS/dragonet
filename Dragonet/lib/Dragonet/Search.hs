@@ -479,7 +479,10 @@ searchGreedyFlows_ st (curCnf, curFlows, curQmap) (f:fs) = do
         prgU        = sPrgU $ sParams st
 
         -- Configuration changes suggested by Oracle for adding single flow f
-        confChanges  = flowConfChanges oracle curCnf f
+        confChanges  = case flowConfChanges oracle curCnf f of
+                [] -> error "Oracle did not return any configurations, bailing out"
+                l  -> l
+
         newCurFs = xtr f:curFlows
         -- spew out a warning when processing the same flow more than once,
         -- because it might lead to problems. One example is that it breaks the
