@@ -2,6 +2,13 @@
 
 module Dragonet.Flows (
     Flow(..),
+
+    FlowsSt(..),
+    fsAddFlow,
+    fsRemFlow,
+    fsReset,
+    flowsStInit,
+
     flowPred,
     flowStr,
     epToFlow,
@@ -16,6 +23,8 @@ import Data.Word
 import Data.Maybe
 import Dragonet.Implementation.IPv4 as IP4
 import Control.Monad (liftM)
+
+import qualified Data.Set as S
 
 import GHC.Generics (Generic)
 import Data.Hashable
@@ -34,6 +43,43 @@ data Flow =
  deriving (Show, Eq, Ord, Generic)
 
 instance Hashable Flow
+
+data FlowsSt = FlowsSt {
+      fsCurrent   :: S.Set Flow
+    , fsAdded     :: S.Set Flow
+    , fsRemoved   :: S.Set Flow
+    , fsNext      :: S.Set Flow
+}
+
+flowsStInit = FlowsSt S.empty S.empty S.empty S.empty
+
+-- add a flow
+fsAddFlow :: FlowsSt -> Flow -> FlowsSt
+fsAddFlow st fl = st { fsRemoved = removed'
+                     , fsAdded   = added'
+                     , fsNext    = next' }
+    where removed   = fsRemoved st
+          added     = fsAdded   st
+          next      = fsNext    st
+          current   = fsCurrent st
+          flRemoved = S.member fl removed
+          added'    = S.insert fl added
+          next'     = S.insert fl next
+          removed'  = case flRemoved of
+                True  -> S.delete fl removed
+                False -> removed
+
+-- remove a flow
+fsRemFlow :: FlowsSt -> Flow -> FlowsSt
+fsRemFlow = error "fsRemFlow: NYI!"
+
+-- reset the state
+fsReset :: FlowsSt -> FlowsSt
+fsReset st = st {  fsRemoved = S.empty
+              , fsAdded   = S.empty
+              , fsCurrent = next
+              , fsNext    = next }
+    where next = fsNext st
 
 -- For endpoints, we use local/remote
 -- Should we use the same for flows (instead of Rx/Tx)?

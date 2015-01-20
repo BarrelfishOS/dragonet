@@ -22,6 +22,7 @@ import qualified Dragonet.ProtocolGraph.Utils      as PGU
 import qualified Dragonet.Semantics                as Sem
 import qualified Dragonet.Search                   as Srch
 import qualified Dragonet.NetState                 as NS
+import qualified Dragonet.Flows                    as FL
 
 import Dragonet.NetState (NetState, SocketId,AppId,EndpointId,EndpointDesc(..),epsDiff)
 import Dragonet.Flows (Flow(..), epToFlow, flowStr)
@@ -110,7 +111,10 @@ data StackState = StackState {
     -- each stack state gets a new version number
     , ssVersion        :: Int
     -- explicit registered flows
+    -- TODO: to be removed in favor of ssFlowsSt
     , ssFlows          :: [Flow]
+    -- state about registered flows
+    , ssFlowsSt        :: FL.FlowsSt
     -- pipeline handlers
     , ssCtx            :: PLD.DynContext
     , ssStackHandle    :: PLI.StackHandle
@@ -365,7 +369,8 @@ initStackSt = StackState {
     ssApplications   = M.empty,
     ssAppChans       = M.empty,
     ssVersion        = 0,
-    ssFlows          = []
+    ssFlows          = [],
+    ssFlowsSt        = FL.flowsStInit
 }
 
 -- initialize stack state

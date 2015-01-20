@@ -33,6 +33,7 @@ import qualified Util.GraphHelpers            as GH
 import qualified Dragonet.Predicate           as PR
 import qualified Dragonet.Implementation.IPv4 as IP4
 import qualified Dragonet.FlowMap             as FM
+import qualified Dragonet.Flows               as FL
 
 import Dragonet.DotGenerator (toDot)
 import Dragonet.Conventions (rxQPref, isTruePort, isFalsePort, QueueId)
@@ -289,8 +290,8 @@ initSearchParamsE10k nqueues = initSearchParams {sOracle = oracle}
 
 type FlowCache s      = HB.HashTable s (PG.NLabel, Flow) PG.NPort
 data SearchSt s o a = (OracleSt o a) => SearchSt {
-      sParams     :: SearchParams o a
-    , sFlowCache  :: FlowCache s
+      sParams        :: SearchParams o a
+    , sFlowCache     :: FlowCache s
 }
 
 -- initialize search state (add default values when applicable)
@@ -386,11 +387,7 @@ qMapIncremental st conf confChange flows oldQmap_ = do
     return (prgC, newConf, qmap)
 
 
-{-|
- - It sorts the flow list using the function 'sOrderFlows' from parameter
- - Then it applies the search strategy given in 'sStrategy' parameter
- -      with current search state to find a configuation
- -}
+-- main search function
 doSearch :: (OracleSt o a)
          => (SearchSt s o a)        -- ^ Current search state
          -> [Flow]                  -- ^ List of flows to evalaute
@@ -403,12 +400,25 @@ doSearch st flows = do
         search = sStrategy params
         prgU   = sPrgU params
         flowC  = sFlowCache st
-
+    -- order flows, and call search function
     let flows' = sortFn flows
     conf <- search st flows'
-    return conf
     --ht_size <- length <$> H.toList flowC
     --return $ tr conf ("SIZE: " ++ (show ht_size))
+    return conf
+
+-- An incremental version of search, i.e., one that operates on flow changes
+-- rather than a list of flows
+doSearchIncr :: (OracleSt o a)
+             => (SearchSt s o a)
+             -> FL.FlowsSt
+             -> ST.ST s C.Configuration
+doSearchIncr = error "NYI!"
+
+
+
+
+
 
 -- hardcodedSearch: return same conf irrespective of the current flow
 hardcodedSearch :: forall o a. C.ConfChange a =>
@@ -516,7 +526,7 @@ searchGreedyFlows_ st (curCnf, curFlows, curQmap) (f:fs) = do
 
     -- Apply same stragegy for rest of the flows, but with modified running conf
     recurse <- searchGreedyFlows_ st (best_cnf, newCurFs, qmap') fs
-    return $ trN recurse msg
+    return $ tr recurse msg
 
 -- searchGreedyConf :
 --  examines all flows, and determines a single
@@ -958,16 +968,54 @@ flowQueueStart prgC = d1
           d0 = doMatch (fst node0) prgC
           d1 = sucPortDecomp d0 port0
 
-
 --------------------------------------------------------------------------------
 -- Incremental search
 -- [TODO: this file is getting too big]
 --  Eventually, we should be using a list of ConfChange everywhere so that
 --  we end up only applying in the driver the relevant configuration changes
+--
+-- There are two aspects of incremental search:
+--  1. incremental computation of the flow map
+--  2. incremental search from the previous solution
+--
+-- For 2, instead of starting from [Flow], we start from a previous solution and
+-- a set of added and a set of removed flows.
+--
+-- A good way to represent a solution might be [(Flow,cc)]
+--
+-- There several approaches for 2, which can be combined to build more complex
+-- strategies:
+--
+--  i) start with the previous solution, and continue searching by adding the
+--  new flows. Note that this means that filters for deleted flows remain in the
+--  solution.
+--
+--  ii) filter solution, removing (Flow,cc) tuples that correspond to flows that
+--  are removed and start from the resulting solution and add the new flows.
+--  Note, that this might lead to weird solutions.
+--
+--  iii) Find the largest relevant part of the solution. Something like:
+--  L.takeWhile ( (f,cc) -> f `S.notMember` rmFlows ). and start from that In
+--  this case (contrarily to ii) starting solution from the search is one that
+--  we have arrived by actually evaluating a cost function, so in general it has
+--  better potential than the starting solution of ii
+--
+-- iv) Do a nic-specific jump in the search. This `jump` should be a part of the
+-- oracle. One example of a jump is make a queue available. We can take multiple
+-- jumps to reach a better solution. An extreme case of a jump is to start from
+-- scratch
+--
+-- Note that we can use the CostReject, CostAccept distinction to decide if a
+-- solution is good enough or try another approach.
 --------------------------------------------------------------------------------
-type IncrSearchStrategy o cc = (OracleSt o cc) =>
-    IncrSearchSt s o cc -> [Flow] -> ST.ST s C.Configuration
 
+type IncrSearchStrategy o cc = (OracleSt o cc)
+    => IncrSearchSt s o cc
+    -> FL.FlowsSt
+    -> ST.ST s C.Configuration
+
+
+--  incremental search parameters
 data IncrSearchParams o cc = (OracleSt o cc) => IncrSearchParams {
       isOracle     :: o
     , isPrgU       :: PG.PGraph
@@ -975,6 +1023,15 @@ data IncrSearchParams o cc = (OracleSt o cc) => IncrSearchParams {
     , isStrategy   :: IncrSearchStrategy o cc
     , isOrderFlows :: [Flow] -> [Flow]
 }
+
+-- incremental search state
+data IncrSearchSt s o cc = (OracleSt o cc) => IncrSearchSt {
+          isParams     :: IncrSearchParams o cc
+        -- incremental map is implemented by maintaing a flow map
+        -- here's its state
+        , isFlowMapSt  :: FM.FlowMapSt s cc
+}
+
 
 initIncrSearchParams :: (OracleSt o a) => IncrSearchParams o a
 initIncrSearchParams = IncrSearchParams {
@@ -985,13 +1042,6 @@ initIncrSearchParams = IncrSearchParams {
     , isOrderFlows = id
 }
 
-data IncrSearchSt s o cc = (OracleSt o cc) =>
-    IncrSearchSt {
-          isParams     :: IncrSearchParams o cc
-        -- incremental map is implemented by maintaing a flow map
-        -- here's its state
-        , isFlowMapSt  :: FM.FlowMapSt s cc
-}
 
 -- initialize search state (add default values when applicable)
 initIncrSearchSt :: (OracleSt o a) => IncrSearchParams o a -> ST.ST s (IncrSearchSt s o a)
@@ -1003,64 +1053,45 @@ initIncrSearchSt params = do
     }
 
 runIncrSearch :: (OracleSt o a) =>
-    IncrSearchParams o a    -- ^ Oracle: in form of a group of all relevant parameters
-    -> [Flow]           -- ^ List of flows for which configuration is to be searched
-    -> C.Configuration  -- ^ Selected configuration
+    IncrSearchParams o a
+    -> FL.FlowsSt
+    -> C.Configuration
 runIncrSearch params flows = ST.runST $ do
    st <- initIncrSearchSt params
    doIncrSearch st flows
 
 doIncrSearch :: (OracleSt o a)
-         => (IncrSearchSt s o a)        -- ^ Current search state
-         -> [Flow]                  -- ^ List of flows to evalaute
-         -> ST.ST s C.Configuration -- ^ selected configuration
-doIncrSearch st flows = do
+         => (IncrSearchSt s o a)
+         -> FL.FlowsSt
+         -> ST.ST s C.Configuration
+doIncrSearch st flowsSt = do
     let params = isParams st
         costFn = isCostFn params
         sortFn = isOrderFlows params
         oracle = isOracle params
         search = isStrategy params
         prgU   = isPrgU params
-    let flows' = sortFn flows
-    conf <- search st flows'
+    conf <- search st flowsSt
     return conf
 
-incSearchMinCost :: forall s cc. C.ConfChange cc
-                 => CostQueueFn
-                 -> FM.FlowMapSt s cc
-                 -> Flow
-                 -> [cc]
-                 -> ST.ST s (FM.FlowMapSt s cc)
-incSearchMinCost costFn fmSt flow (cc0:restCC) = do
+-- NB: This is not needed any more because we use sets for flows, but we keep it
+-- around for future reference.
+checkUniqueFlows :: [Flow] -> [Flow]
+checkUniqueFlows flows = case unique of
+        False -> trace dup_msg flows
+        True  -> flows
+    where unique = (length flows) == (length $ L.nub flows)
+          dup_msg = "Duplicated flows in flow list:\n" ++ (ppShow flows) ++ " This might cause problems"
 
-
-    let foldFn :: (C.ConfChange cc)
-               => (Cost, FM.FlowMapSt s cc)
-               -> cc
-               -> ST.ST s (Cost, FM.FlowMapSt s cc)
-        foldFn (stCost, st) newCc = do
-            (newQmap, newSt) <- incSearchQmap fmSt newCc flow
-            let newCost_ = costFn newQmap
-                newCost = trN newCost_ $ "New cost=" ++ (show newCost_) ++ " newCc=" ++ (C.show newCc) ++ " for qmap=" ++ (qmapStr newQmap)
-            if newCost < stCost then return (newCost, newSt)
-            else return (stCost, st)
-
-    (cc0Qmap, cc0St) <- incSearchQmap fmSt cc0 flow
-    let cc0Cost = costFn cc0Qmap
-        x0 = (cc0Cost, cc0St)
-
-    (lowerCost, bestSt) <- foldM foldFn x0 restCC
-    return bestSt
-
+-- entry for search algorithm
+-- NB: the current (i.e., the last) solution is in flowmap
 incSearchGreedyFlows :: forall o cc. C.ConfChange cc => IncrSearchStrategy o cc
-incSearchGreedyFlows st flows_ = do
-    let uniqueFlows = (length flows_) == (length $ L.nub flows_)
-        dup_msg = "Duplicated flows in flow list:\n" ++ (ppShow flows_) ++ " This might cause problems"
-        flows = case uniqueFlows of
-            False -> trace dup_msg flows_
-            True  -> flows_
+incSearchGreedyFlows st flowsSt = do
+    let flows = S.toList $ FL.fsNext flowsSt
     st' <- incSearchGreedyFlows_ st flows
     return $ C.foldConfChanges $ FM.fmCnfChanges $ isFlowMapSt st'
+
+
 
 incSearchGreedyFlows_ :: (OracleSt o cc)
                       => IncrSearchSt s o cc
@@ -1079,11 +1110,39 @@ incSearchGreedyFlows_ st (flow:flows) = do
     -- get configuration changes for current state
     let flowCCs = flowConfChanges oracle conf flow
     -- compute new costs and minimum cost, and update state
-    bestFmSt <- incSearchMinCost costFn fmSt flow flowCCs
+    (lowerCost, bestFmSt) <- incSearchMinCost costFn fmSt flow flowCCs
     let st' = st { isFlowMapSt = bestFmSt }
     -- recurse
     incSearchGreedyFlows_ st' flows
 
+-- return the flowmap the minimizes cost and the cost. NB: flowmap contains a
+-- list of configuration changes, i.e., the solution.
+incSearchMinCost :: forall s cc. C.ConfChange cc
+                 => CostQueueFn
+                 -> FM.FlowMapSt s cc
+                 -> Flow
+                 -> [cc]
+                 -> ST.ST s (Cost, FM.FlowMapSt s cc)
+incSearchMinCost costFn fmSt flow (cc0:restCC) = do
+    let foldFn :: (C.ConfChange cc)
+               => (Cost, FM.FlowMapSt s cc)
+               -> cc
+               -> ST.ST s (Cost, FM.FlowMapSt s cc)
+        foldFn (stCost, st) newCc = do
+            (newQmap, newSt) <- incSearchQmap fmSt newCc flow
+            let newCost_ = costFn newQmap
+                newCost = trN newCost_ msg
+                msg     =  "New cost=" ++ (show newCost_) ++
+                           " newCc=" ++ (C.show newCc) ++
+                           " for qmap=" ++ (qmapStr newQmap)
+            if newCost < stCost then return (newCost, newSt)
+            else return (stCost, st)
+    (cc0Qmap, cc0St) <- incSearchQmap fmSt cc0 flow
+    let cc0Cost = costFn cc0Qmap
+        x0 = (cc0Cost, cc0St)
+
+    (lowerCost, bestSt) <- foldM foldFn x0 restCC
+    return (lowerCost, bestSt)
 
 incSearchQmap :: forall s cc . C.ConfChange cc
               => FM.FlowMapSt s cc
@@ -1123,12 +1182,17 @@ isGoldFl FlowUDPv4 {flDstPort = Just port} = isJust $ L.find (==port) [1001,1002
 goldFlPerQ = 1
 priorityCost' = priorityCost isGoldFl goldFlPerQ
 
-connectFlows :: Int -> [Flow]
-connectFlows nflows = [ FlowUDPv4 {
+connectFlows_ :: Int -> [Flow]
+connectFlows_ nflows = [ FlowUDPv4 {
      flDstIp    = Just 127
    , flDstPort  = Just $ fromIntegral $ 1000 + i
    , flSrcIp    = Just 123
    , flSrcPort  = Just 7777 } | i <- [1..nflows] ]
+
+--connectFlows :: Int -> FL.FlowsSt
+connectFlows n = foldl FL.fsAddFlow st0 flows
+    where flows = connectFlows_ n
+          st0 = FL.flowsStInit
 
 test = do
     putStrLn $ "Running normal search!"
@@ -1147,7 +1211,7 @@ test = do
                                    , sCostFn = costFn
                                    , sStrategy = searchGreedyFlows}
 
-        conflows = connectFlows 200
+        conflows = connectFlows_ 200
         conf = runSearch params conflows
         prgC = C.applyConfig conf prgU
         --conf = runSearch params $ connectFlows 10
