@@ -6,6 +6,8 @@ module Dragonet.FlowMap (
     getRxQMap,
     addFlow,
     incrConfigure,
+    rmFlowConf,
+    rebuildFlowMapSt,
     strFM,
 ) where
 
@@ -33,6 +35,7 @@ import Data.Maybe
 import Data.Either
 import Control.Exception (assert)
 import Control.Applicative ((<$>))
+import Control.Monad (foldM)
 
 import Text.Show.Pretty (ppShow)
 import Debug.Trace (trace)
@@ -48,7 +51,8 @@ defBld = PR.predBuildDNF
 type FlowMap = M.Map DGI.Node [(PG.NPort, [Flow])] -- flow map
 
 -- Flow map state.
--- This essentially represents a current state of our solution
+-- This essentially represents a solution: it includes a list of configuration
+-- changes and the registered flows.
 type FlowCache s = HB.HashTable s (PG.NLabel, Flow) PG.NPort
 data FlowMapSt s cc = (C.ConfChange cc) => FlowMapSt {
       fmGraph        :: PG.PGraph -- graph (gets updated with every conf)
@@ -102,8 +106,6 @@ addFlowPort fm (nid,nlbl) port flow = fm'
        oNodeVal port_ fl_ = [(port_, [fl_]), (notPort port_, [])]
        notPort "true" = "false"
        notPort "false" = "true"
-
-
 
 -- update flow map traverses the graph starting from a set of given nodes and
 -- updates the flow map when possible.
@@ -250,6 +252,26 @@ initFlowMap flows g = updateFlowMap flows M.empty g (DGI.nodes g)
 -- FlowMapSt functions
 --
 
+resetFlowMapSt :: (C.ConfChange cc)
+               => (FlowMapSt s cc) -> ST.ST s (FlowMapSt s cc)
+resetFlowMapSt st = do
+    return $ st {
+            fmGraph        = g
+          , fmCnfChanges   = []
+          , fmFlows        = []
+          , fmFlowMap      = initFlowMap [] g
+   }
+   where g = fmOrigGraph st
+
+-- rebuild flowmap state using a new sate of flows and ccs
+rebuildFlowMapSt :: (C.ConfChange cc)
+                 => (FlowMapSt s cc) -> [Flow] -> [cc]
+                 -> ST.ST s (FlowMapSt s cc)
+rebuildFlowMapSt st flows ccs = do
+    st1 <- resetFlowMapSt st
+    st2 <- foldM addFlow st1 flows
+    foldM incrConfigure st2 ccs
+
 -- intitialize flow map state
 initFlowMapSt :: (C.ConfChange cc) => PG.PGraph -> ST.ST s (FlowMapSt s cc)
 initFlowMapSt g = do
@@ -285,7 +307,7 @@ initFlowMapSt g = do
                           , isJust mqid
                           , let Just qid = mqid]
 
--- Add a flow
+-- Add a flow: this will
 addFlow :: (C.ConfChange cc)
         => FlowMapSt s cc -> Flow -> ST.ST s (FlowMapSt s cc)
 addFlow st flow = do
@@ -297,16 +319,36 @@ addFlow st flow = do
     fm' <- flowMapAddFlow fc fm g entry flow
     return $ st {fmFlowMap = fm', fmFlows = flow:flows}
 
+-- Removing a flow: Each cc in fmCnfChanges has a corresponding flow
+-- There are two ways to remove a flow
+--  - we can remove a flow from .fmFlows, but keep the configuration
+--    around
+--  - we can remove the flow *and* the corresponding configuration change. In
+--  this case we need to recompute the flowmap.
+--  We do the latter here by rebuilding the flowmap
+rmFlowConf :: forall s cc. (C.ConfChange cc)
+           => FlowMapSt s cc -> Flow -> ST.ST s (FlowMapSt s cc)
+rmFlowConf st flow = do
+    let ts = L.zip (fmCnfChanges st) (fmFlows st)
+        (xt,ts') = case L.break ((==flow) . snd) ts of
+            (_,[])      -> error "rmFLowConf: flow not found"
+            (hs,(x:xs)) -> (x, hs++xs)
+        flows' = map snd ts'
+        ccs'   = map fst ts'
+    -- drop all configuration and flow map
+    rebuildFlowMapSt st flows' ccs'
 
 qmapStr_ :: (Flow,QueueId) -> String
 qmapStr_ (f,q) = (flowStr f) ++ "-> Q" ++ (show q)
 
 qmapStr :: [(Flow,QueueId)] -> String
-qmapStr flows = "QMAP:\n" ++ L.intercalate "\n" [ "  " ++ qmapStr_ f | f <- flows ]
+qmapStr flows = "QMAP:\n"
+              ++ L.intercalate "\n" [ "  " ++ qmapStr_ f | f <- flows ]
 
 strFM :: forall s cc. C.ConfChange cc => FlowMapSt s cc -> ST.ST s String
 strFM st =  return $
-         "STEP : " ++ (show (length $ fmCnfChanges st)) ++ " ------------------------------------------\n"
+         "STEP : " ++ (show $ length $ fmCnfChanges st)
+         ++ " ------------------------------------------\n"
          ++ "CNF  : " ++ cnfStr ++ "\n"
          ++ "FLOWS: " ++ flsStr ++ "\n"
          -- ++ "QMAP :"  ++ (qmapStr qmap) ++ "\n"
@@ -350,8 +392,6 @@ updateFlowMapAll flows fm g = ret
     where ret = updateFlowMap flows fm g nids
           nids = [nid | nid <- DGI.nodes g , M.notMember nid fm]
 
-
-
 getActivePort :: FlowCache s
               -> PG.PGraph
               -> M.Map DGI.Node PG.NPort
@@ -360,7 +400,7 @@ getActivePort :: FlowCache s
               -> ST.ST s PG.NPort
 -- F-node: sink node
 getActivePort _ _ _ (_,(PG.FNode { PG.nPorts = [] })) _ = return fmSinkPort
--- F-node
+-- F-node (we use the flowcache here)
 getActivePort fc _ _ (_,node@(PG.FNode {PG.nPorts = ports})) flow = do
     let key = (PG.nLabel node, flow)
     cachedRet <- H.lookup fc key
@@ -374,7 +414,6 @@ getActivePort fc _ _ (_,node@(PG.FNode {PG.nPorts = ports})) flow = do
             -- for assertion
             check    = 1 == (length $ filter snd portsSAT)
             retP     = fst $ fromJust $ L.find snd portsSAT
-
             -- is port p SAT-isfied for the given flow?
             pSAT p   = isJust $ PR.dnfSAT andExpr
               where andExpr = PR.buildAND defBld [pPred, fPred]
@@ -399,8 +438,7 @@ getActivePort fc g portmap node@(_, PG.ONode {PG.nOperator = op}) flow =
                            Just p  -> if      isTruePort  p then True
                                       else if isFalsePort p then False
                                       else error "operand port is not T/F"
-
-getActivePort _ _ _ (_, PG.CNode {}) _ = error "getActiveProt called for a C-node"
+getActivePort _ _ _ (_, PG.CNode {}) _ = error "getActiveProt called on C-node"
 
 -- Add a flow to a flow map (a wrapper for flowMapAddFlow_)
 flowMapAddFlow :: FlowCache s
@@ -415,46 +453,85 @@ flowMapAddFlow fc fm g entry flow =
 -- Add a flow to a flow map
 --  This works by traversing the graph, following nodes that will be visited by
 --  the given flow.
+--
+--  Done map is a map of nodes we have visited with this flow, and the port that
+--  the flow activated.
 flowMapAddFlow_ :: FlowCache s
                 -> PG.PGraph
-                -> M.Map DGI.Node PG.NPort -- done nodes (nid -> active port)
+                -> M.Map DGI.Node PG.NPort -- Done map (nid -> active port)
                 -> [DGI.Node]  -- available successors
                 -> Flow
                 -> FlowMap
                 -> ST.ST s FlowMap
-flowMapAddFlow_ _ g _       []       fl fm = return $ trN fm  $ "NO REMAINING NODES for flow: " ++ (flowStr fl)
+flowMapAddFlow_ _ g _       []       fl fm = return $ trN fm m
+    where m = "NO REMAINING NODES for flow: " ++ (flowStr fl)
 flowMapAddFlow_ fc g doneMap nextNids fl fm = do
-    let -- a node is ready when all is predecessors are done
+    let -- a node is ready when it is not a C-node, and we have visited all its
+        -- predecessors
         isReady :: DGI.Node -> Bool
         isReady nid = ret
             where ret_ = notCnode && prevsOK
-                  ret = trN ret_ $ "flowMapAddFlow_: node:" ++ (PG.nLabel nlbl) ++ " ready? " ++ (show ret_)
+                  ret = trN ret_ msgR
                   isDone x = M.member x doneMap
                   prevsOK = all isDone (PGU.preNE g nid)
                   notCnode = not $ PGU.isCnode_ nlbl
                   nlbl = fromJust $ DGI.lab g nid
+                  msgR ="flowMapAddFlow_: node:" ++ (PG.nLabel nlbl)
+                        ++ " ready? " ++ (show ret_)
         --
-        nextNotFound = trN fm $ "NO VALID NODES for flow:" ++ (flowStr fl) -- error "flowMapAddFlow_: Could not reach the end for flow"
-
+        nextNotFound = trN fm $ "NO VALID NODES for flow:" ++ (flowStr fl)
     case L.break isReady nextNids of
                (ns1,nid:ns2) -> do
-
                         let nextN     = (nid, fromJust $ DGI.lab g nid)
-
                         activeP_ <- getActivePort fc g doneMap nextN fl
-
-                        let activeP   = trN activeP_ $ "NEXT for flow: " ++ (flowStr fl) ++ " "  ++ (PG.nLabel $ snd  nextN) ++ " P:" ++ activeP_
+                        let activeP   = trN activeP_ pMsg
                             doneMap'  = M.insert nid activeP doneMap
                             sucs      = PGU.sucPortNE g nid activeP
                             fm'       = addFlowPort fm nextN activeP fl
                             nextNids' = ns1 ++ ns2 ++ sucs
+                            pMsg = "NEXT for flow: " ++ (flowStr fl)
+                                 ++ " "  ++ (PG.nLabel $ snd  nextN)
+                                 ++ " P:" ++ activeP_
+                        -- recurse
                         flowMapAddFlow_ fc g doneMap' nextNids' fl fm'
-
                (xnids,[])    -> return nextNotFound
 
 
 
+-- remove a flow from the flow map
+flowMapDelFlow :: FlowMap -> PG.PGraph -> DGI.Node -> Flow -> FlowMap
+flowMapDelFlow fm g entry f = flowMapDelFlow_ fm g [entry] f
 
+-- removes a flow from a flowmap value. Returns the new val and the port that
+-- corresponds to the flow
+flowMapValDelFlow :: [(PG.NPort, [Flow])]
+                  -> Flow
+                  -> (PG.NPort, [(PG.NPort, [Flow])])
+flowMapValDelFlow ((port,flows):rest) rmFlow = case xDel rmFlow flows of
+    (flows', True) -> (port, (port,flows'):rest)
+    (_, False)     -> (activeP, (port,flows):val')
+            where (activeP, val') = flowMapValDelFlow rest rmFlow
+    where xDel :: Flow -> [Flow] -> ([Flow], Bool)
+          xDel _ [] = ([], False)
+          xDel xflow (x:xs)
+               | x == xflow  = (xs, True)
+               | otherwise   = let (xs',ret) = xDel xflow xs in (x:xs',ret)
+flowMapValDelFlow [] _ = error "flowMapValDelFlow: flow was not found in val"
+
+flowMapDelFlow_ :: FlowMap -> PG.PGraph -> [DGI.Node] -> Flow -> FlowMap
+flowMapDelFlow_ fm _ [] _ = fm
+flowMapDelFlow_ fm g (nid:nids) flow = ret
+    where (p, v') = case M.lookup nid fm of
+                      Just v  -> flowMapValDelFlow v flow
+                      Nothing -> error "flowMapDelFlow_: mapping does not exist"
+          -- get successors that will be activated by this port
+          sucs = PGU.sucPortNE g nid p
+          nids' = nids ++ sucs
+          -- insert new value with removed flow
+          alterF Nothing   = error "flowMapDelFlow_: something's wrong..."
+          alterF (Just _)  =  Just v'
+          fm' = M.alter alterF nid fm
+          ret = flowMapDelFlow_ fm' g nids' flow
 
 -- just copy them for now. TODO: put them in a single file (e.g., Cost.hs)
 type QMap        = [(Flow, QueueId)]

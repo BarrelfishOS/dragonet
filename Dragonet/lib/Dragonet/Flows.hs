@@ -48,23 +48,19 @@ data FlowsSt = FlowsSt {
       fsCurrent   :: S.Set Flow
     , fsAdded     :: S.Set Flow
     , fsRemoved   :: S.Set Flow
-    , fsNext      :: S.Set Flow
 }
 
-flowsStInit = FlowsSt S.empty S.empty S.empty S.empty
+flowsStInit = FlowsSt S.empty S.empty S.empty
 
 -- add a flow
 fsAddFlow :: FlowsSt -> Flow -> FlowsSt
 fsAddFlow st fl = st { fsRemoved = removed'
-                     , fsAdded   = added'
-                     , fsNext    = next' }
+                     , fsAdded   = added'}
     where removed   = fsRemoved st
           added     = fsAdded   st
-          next      = fsNext    st
           current   = fsCurrent st
           flRemoved = S.member fl removed
           added'    = S.insert fl added
-          next'     = S.insert fl next
           removed'  = case flRemoved of
                 True  -> S.delete fl removed
                 False -> removed
@@ -76,10 +72,13 @@ fsRemFlow = error "fsRemFlow: NYI!"
 -- reset the state
 fsReset :: FlowsSt -> FlowsSt
 fsReset st = st {  fsRemoved = S.empty
-              , fsAdded   = S.empty
-              , fsCurrent = next
-              , fsNext    = next }
-    where next = fsNext st
+                 , fsAdded   = S.empty
+                 , fsCurrent = next }
+
+    where current = fsCurrent st
+          removed = fsRemoved st
+          added   = fsAdded st
+          next = (current `S.difference` removed) `S.union` added
 
 -- For endpoints, we use local/remote
 -- Should we use the same for flows (instead of Rx/Tx)?
