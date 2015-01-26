@@ -19,12 +19,13 @@ import qualified Dragonet.Predicate           as PR
 import Dragonet.Flows (Flow, flowPred, flowStr)
 import Dragonet.Conventions (isTruePort, isFalsePort, QueueId)
 
-import qualified Data.Graph.Inductive         as DGI
-import qualified Data.Map.Strict              as M
-import qualified Data.List                    as L
-import qualified Data.Set                     as S
+import qualified Data.Graph.Inductive           as DGI
+import qualified Data.Graph.Inductive.Query.DFS as DFS
+import qualified Data.Map.Strict                as M
+import qualified Data.List                      as L
+import qualified Data.Set                       as S
 
-import qualified Control.Monad.State.Strict   as SM
+import qualified Control.Monad.State.Strict     as SM
 
 -- mutable state hashtable
 import qualified Control.Monad.ST as ST
@@ -139,12 +140,14 @@ updateFlowMap flows fm g nids = trN ret "updateFlowMap"
                     prevsInFlowMap = all (\x -> M.member x fm) nidPrevs
                     nlbl = fromJust $ DGI.lab g nid
                     notCnode = not $ PGU.isCnode_ $ nlbl
-                    rxNode = isRxNode_ nlbl
+                    txNode = isTxNode_ nlbl
 
-                    ret_ = notCnode && rxNode && prevsInFlowMap
+                    ret_ = notCnode && (not txNode) && prevsInFlowMap
                     ret = trN ret_ rdMsg
                     rdMsg = "updateFlowMap: is node " ++ (PG.nLabel nlbl)
                             ++ " ready? " ++  (show ret_)
+                            ++ " prevsInFlowMap? " ++ (show prevsInFlowMap)
+                            ++ " PREVS:" ++ (show $ [ PG.nLabel $ fromJust $ DGI.lab g p | p <- nidPrevs])
           -- check1: all given nodes are keys in the (old) flowmap
           c1 = all (\nid -> M.notMember nid fm) nids
 
@@ -269,8 +272,9 @@ rebuildFlowMapSt :: (C.ConfChange cc)
                  -> ST.ST s (FlowMapSt s cc)
 rebuildFlowMapSt st flows ccs = do
     st1 <- resetFlowMapSt st
-    st2 <- foldM addFlow st1 flows
-    foldM incrConfigure st2 ccs
+    st2 <- foldM incrConfigure st1 ccs
+    st3 <- foldM addFlow st2 flows
+    return st3
 
 -- intitialize flow map state
 initFlowMapSt :: (C.ConfChange cc) => PG.PGraph -> ST.ST s (FlowMapSt s cc)
@@ -371,6 +375,9 @@ strFM st =  return $
 isRxNode_ :: PG.Node -> Bool
 isRxNode_ n = "Rx" `L.isPrefixOf` (PG.nLabel n)
 
+isTxNode_ :: PG.Node -> Bool
+isTxNode_ n = "Tx" `L.isPrefixOf` (PG.nLabel n)
+
 isNidRxNode :: PG.PGraph -> DGI.Node -> Bool
 isNidRxNode g nid = isRxNode_ nlbl
     where nlbl = fromJust $ DGI.lab g nid
@@ -387,10 +394,14 @@ incrConfigure st cc = do
         fm' = updateFlowMap flows fm g' nids'
     return $ st {fmFlowMap = fm', fmCnfChanges = cc:ccs, fmGraph = g'}
 
-updateFlowMapAll :: [Flow] -> FlowMap -> PG.PGraph -> FlowMap
-updateFlowMapAll flows fm g = ret
+updateFlowMapAll :: DGI.Node -> [Flow] -> FlowMap -> PG.PGraph -> FlowMap
+updateFlowMapAll entry flows fm g = ret
     where ret = updateFlowMap flows fm g nids
-          nids = [nid | nid <- DGI.nodes g , M.notMember nid fm]
+          --nids_ = [nid | nid <- DGI.nodes g, M.notMember nid fm]
+          --nids_ = [nid | nid <- DGI.nodes g, M.notMember nid fm]
+          nids_ = [nid | nid <- DFS.dfs [entry] g, M.notMember nid fm]
+          nids = trN nids_ $ "updateFlowMapAll: NIDS: " ++ (show nids_) ++
+                            " LABELS:" ++ (show $ [PG.nLabel $ fromJust $ DGI.lab g n | n <- nids_])
 
 getActivePort :: FlowCache s
               -> PG.PGraph
@@ -471,13 +482,16 @@ flowMapAddFlow_ fc g doneMap nextNids fl fm = do
         isReady :: DGI.Node -> Bool
         isReady nid = ret
             where ret_ = notCnode && prevsOK
-                  ret = trN ret_ msgR
+                  ret = tr ret_ msgR
                   isDone x = M.member x doneMap
-                  prevsOK = all isDone (PGU.preNE g nid)
+                  prevs = PGU.preNE g nid
+                  prevsOK = all isDone prevs
                   notCnode = not $ PGU.isCnode_ nlbl
                   nlbl = fromJust $ DGI.lab g nid
                   msgR ="flowMapAddFlow_: node:" ++ (PG.nLabel nlbl)
                         ++ " ready? " ++ (show ret_)
+                        -- ++ " prevsOK? " ++ (show prevsOK)
+                        -- ++ " PREVS:" ++ (show $ [ PG.nLabel $ fromJust $ DGI.lab g p | p <- prevs])
         --
         nextNotFound = trN fm $ "NO VALID NODES for flow:" ++ (flowStr fl)
     case L.break isReady nextNids of
@@ -543,11 +557,12 @@ getRxQMap st = do
         flows_ = fmFlows st
         flows = tr flows_ $ "getRxQMAP: FLOWS: " ++ (show flows_)
         rxQNodes_  = fmRxQueueNodes st
+        entry = fmRxEntryNid st
     -- apply the partial configuration and update the flow map
     -- 1. finalize the graph (but do not update to state)
     let cfgEmpty = C.emptyConfig (undefined::cc)
         g' = C.applyConfig cfgEmpty g
-        fm' = updateFlowMapAll flows fm g'
+        fm' = updateFlowMapAll entry flows fm g'
         rxQNodes = trN rxQNodes_ $ "rxQNODES:" ++ (show rxQNodes_)
 
     -- 2. compute qmap

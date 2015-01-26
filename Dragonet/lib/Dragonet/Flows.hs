@@ -10,7 +10,7 @@ module Dragonet.Flows (
     flowsStInit,
 
     flowPred,
-    flowStr,
+    flowStr, flowsStr,
     epToFlow,
 ) where
 
@@ -25,6 +25,7 @@ import Dragonet.Implementation.IPv4 as IP4
 import Control.Monad (liftM)
 
 import qualified Data.Set as S
+import qualified Data.List as L
 
 import GHC.Generics (Generic)
 import Data.Hashable
@@ -48,7 +49,7 @@ data FlowsSt = FlowsSt {
       fsCurrent   :: S.Set Flow
     , fsAdded     :: S.Set Flow
     , fsRemoved   :: S.Set Flow
-}
+} deriving (Show)
 
 flowsStInit = FlowsSt S.empty S.empty S.empty
 
@@ -144,3 +145,5 @@ flowStr (FlowUDPv4 {flSrcIp   = srcIp,
         l3d = maybe "*" showIP $ dstIp
         l4s = fromMaybe "*" $ liftM show $ srcPort
         l4d = fromMaybe "*" $ liftM show $ dstPort
+
+flowsStr flows = L.intercalate "\n" $ map flowStr flows

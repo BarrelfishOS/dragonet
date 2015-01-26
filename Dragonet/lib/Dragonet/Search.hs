@@ -25,7 +25,7 @@ module Dragonet.Search (
   runIncrSearch,
   IncrSearchStIO, initIncrSearchIO, runIncrSearchIO,
 
-  test, test_incr, test_incr_add
+  test, test_incr, test_incr_add, testFmCfdir
 ) where
 
 import qualified Dragonet.Configuration       as C
@@ -216,6 +216,8 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
         [e10kDefaultQ, xq]
         where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
 
+    confJump = e10kConfQueueJump
+
 -- FIXME: FDir filters are not working properly with priority
 -- TODO: avoid symmetric allocation
 -- TODO: smart-wildcard allocation if possible?
@@ -229,6 +231,16 @@ e10kFlowConfChanges E10kOracleSt {nQueues = nq} cnf fl
     where allQs = allQueues nq
           rx5tFull  = E10k.rx5tFilterTableFull cnf
           rxCfdFull = E10k.rxCfdFilterTableFull cnf
+
+
+e10kConfQueueJump :: E10kOracleSt -> [E10k.ConfChange] -> [Flow]
+                  -> ([(Flow, E10k.ConfChange)], [Flow])
+e10kConfQueueJump st ccs fs = (keep, map fst rm)
+    where rmQ = 9
+          (rm,keep) = L.partition (\t -> rmQ == E10k.ccQueue (snd t))
+                      $ zip fs ccs
+
+
 
 myThird (_,_,x) = x
 mySnd (_,x,_) = x
@@ -520,7 +532,7 @@ searchGreedyFlows_ st (curCnf, curFlows, curQmap) (f:fs) = do
 
     -- Apply same stragegy for rest of the flows, but with modified running conf
     recurse <- searchGreedyFlows_ st (best_cnf, newCurFs, qmap') fs
-    return $ tr recurse msg
+    return $ trN recurse msg
 
 -- searchGreedyConf :
 --  examines all flows, and determines a single
@@ -680,11 +692,12 @@ priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
     where (goldFls, beFls) = L.partition (isGold . fst) qmap
           goldQs = S.fromList $ [qid | (_,qid) <- goldFls]
           beQs   = S.fromList $ [qid | (_,qid) <- beFls]
-          allQs  = S.fromList (allQueues nq)
+          allQsL = allQueues nq
+          allQs  = S.fromList allQsL
           restQs = allQs `S.difference` goldQs
           goldQsExcl = goldQs `S.difference` beQs
           beQsExcl   = beQs `S.difference` goldQs
-          msg = "qmap:\n" ++ (ppShow qmap)
+          msg = "qmap:\n" ++ (qmapStr qmap)
                 ++ "\ngoldQs:" ++ (ppShow goldQs)
                 ++ "\ngoldQsExcl:" ++ (ppShow goldQsExcl)
                 ++ "\ngoldNQs:" ++ (ppShow goldNQs)
@@ -693,12 +706,19 @@ priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
           cost
             -- no gold flows: just balance best-effort across all queues
             | length goldFls == 0 = balanceCost_ (allQueues nq) beFls
-            -- no best effort flows: just balance gold across all queues
-            | length beFls   == 0 = balanceCost_ (allQueues nq)  goldFls
+            -- no best effort flows: penalize extra queues and
+            -- balance gold across all queues
+            | length beFls   == 0 =
+                let CostVal bcost = balanceCost_ allQsL goldFls
+                    extraCost = if goldExtra > 0 then goldExtra else 0
+                in CostVal $ bcost + (fromIntegral extraCost)
             -- we should have enough queues for the gold class
             | goldNeeded > 0 = CostReject $ 100*(fromIntegral goldNeeded)
             -- we should have enough queues for the best effort class
-            | beNeeded > 0 = CostReject $ (fromIntegral beNeeded)
+            -- | beNeeded > 0 = CostReject $ (fromIntegral beNeeded)
+            -- penalize needing more be queues, but do not reject solution
+            -- (it just means we have some slack for gold flows)
+            | beNeeded > 0 = CostVal $ 100*(fromIntegral beNeeded) + balBe
             -- if all is OK, it depends on how well the classes are balanced
             | otherwise               = CostVal $ balGold + balBe
 
@@ -707,8 +727,9 @@ priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
                    $ ceiling
                    $ (toRational $ length goldFls) / (toRational goldFlowsPerQ)
           goldNeeded = goldNQs - (S.size goldQsExcl)
-          -- number of best efforst queues
-          beNQs = nq - goldNQs
+          goldExtra  = -goldNeeded
+          -- number of best effort queues
+          beNQs = min (nq - goldNQs) (length beFls)
           beNeeded = beNQs - (S.size beQsExcl)
 
           CostVal balGold = balanceCost_ (S.toList goldQs) goldFls
@@ -1068,6 +1089,11 @@ runIncrSearchIO :: (OracleSt o cc)
             -> IO (C.Configuration, IncrSearchStIO o cc)
 runIncrSearchIO st flows = ST.stToIO $ doIncrSearch st flows
 
+incrSearchQmap :: (OracleSt o cc) => IncrSearchSt s o cc -> ST.ST s QMap
+incrSearchQmap st = FM.getRxQMap $ isFlowMapSt st
+
+incrSearchStFlows :: (OracleSt o cc) => IncrSearchSt s o cc -> [Flow]
+incrSearchStFlows st = FM.fmFlows $ isFlowMapSt st
 
 doIncrSearch :: (OracleSt o a)
          => (IncrSearchSt s o a)
@@ -1128,9 +1154,11 @@ incSearchGreedyFlows st flowsSt = do
                            flows = sortFn $ S.toList nextFlows
                        return $ tr (st', flows) "DELETED FLOWS"
     -- search
-    (st', cost') <- incSearchGreedyFlows_ searchSt searchFlows
+    let msg = "Search flows:\n" ++ (FL.flowsStr searchFlows)
+             ++ "\nState flows:\n" ++ (FL.flowsStr $ FM.fmFlows $ isFlowMapSt searchSt)
+    (st', cost') <- incSearchGreedyFlows_ searchSt $ trN searchFlows msg
 
-    case costAcceptable $ tr cost' ("SEARCH0: " ++ show cost') of
+    case costAcceptable $ trN cost' ("SEARCH: " ++ show cost') of
         True  -> let cnf = C.foldConfChanges $ FM.fmCnfChanges $ isFlowMapSt st'
                  in return (cnf, st')
         False -> do
@@ -1139,15 +1167,22 @@ incSearchGreedyFlows st flowsSt = do
             let fm = isFlowMapSt st
                 ccs = FM.fmCnfChanges fm
                 flows = FM.fmFlows fm
-                (keep, newFlows) = confJump oracle ccs flows
+                (keep, rmFlows_) = trace "JUMP!" confJump oracle ccs flows
+                rmFlows = trN rmFlows_ $ "Removed flows:\n" ++ (FL.flowsStr rmFlows_)
                 (keepFlows, keepCcs) = unzip keep
             fm' <- FM.rebuildFlowMapSt fm keepFlows keepCcs
             let st' = st { isFlowMapSt = fm' }
-                flowsSt' = L.foldl FL.fsAddFlow FL.flowsStInit newFlows
+                -- new flows state
+                flowsSt' = FL.FlowsSt {
+                      FL.fsCurrent  = S.fromList keepFlows
+                    , FL.fsAdded    = S.fromList rmFlows `S.union` addFlows
+                    , FL.fsRemoved  = S.empty
+                }
+            qmap' <- incrSearchQmap st'
             -- recurse
             case flows of
                 [] -> error "incSearchGreedyFlows: cannot find acceptable conf"
-                _  -> incSearchGreedyFlows st' flowsSt'
+                _  -> incSearchGreedyFlows (trN st' $ "JUMP QMAP=" ++ (qmapStr qmap')) flowsSt'
 
 incSearchGreedyFlows_ :: (OracleSt o cc)
                       => IncrSearchSt s o cc
@@ -1159,20 +1194,26 @@ incSearchGreedyFlows_ st (flow:flows) = do
     let oracle = isOracle $ isParams st
         costFn = isCostFn $ isParams st
         fmSt = isFlowMapSt st
+        fmFlows = FM.fmFlows fmSt
         ccs  = FM.fmCnfChanges fmSt
         conf = C.foldConfChanges ccs
     -- get configuration changes for current state
     let flowCCs = flowConfChanges oracle conf flow
     -- compute new costs and minimum cost, and update state
     (lowerCost, bestFmSt) <- incSearchMinCost costFn fmSt flow flowCCs
-    let st' = st { isFlowMapSt = bestFmSt }
+    let msg = "--\nLOWER COST:" ++ (show lowerCost)
+              ++ " Flows in state:" ++ (show $ length fmFlows)
+              ++ " Flow examined:" ++ (flowStr flow)
+              ++ " Remaining flows:" ++ (show $ length flows)
+              ++ "\n--\n"
+        st' = st { isFlowMapSt = trN bestFmSt msg }
     -- recurse
     case flows of
         -- no more flows: we are done
         [] -> return (st', lowerCost)
         _  -> incSearchGreedyFlows_ st' flows
 
--- return the flowmap the minimizes cost and the cost. NB: flowmap contains a
+-- return the flowmap that minimizes cost and the cost. NB: flowmap contains a
 -- list of configuration changes, i.e., the solution.
 incSearchMinCost :: forall s cc. C.ConfChange cc
                  => CostQueueFn
@@ -1194,8 +1235,13 @@ incSearchMinCost costFn fmSt flow (cc0:restCC) = do
                            " for qmap=" ++ (qmapStr newQmap)
             if newCost < stCost then return (newCost, newSt)
             else return (stCost, st)
+
     (cc0Qmap, cc0St) <- incSearchQmap fmSt cc0 flow
-    let cc0Cost = costFn cc0Qmap
+    let cc0Cost_ = costFn cc0Qmap
+        cc0Cost  = trN cc0Cost_ msg
+        msg     =  "New cost=" ++ (show cc0Cost_) ++
+                   "newCc=" ++ (C.show cc0) ++
+                   "for qmap=" ++ (qmapStr cc0Qmap)
         x0 = (cc0Cost, cc0St)
 
     (lowerCost, bestSt) <- foldM foldFn x0 restCC
@@ -1317,8 +1363,6 @@ test_incr_add = do
     prgU <- e10kU_simple
     let nq = 10
         -- initially 1 HP, 20 BE flows
-        initHpNr = 1
-        initBeNr = 100
         hpPort   = 6000
         bePort   = 1000
         e10kOracle = E10kOracleSt {nQueues = nq}
@@ -1334,22 +1378,67 @@ test_incr_add = do
 
     ss0 <- initIncrSearchIO params
 
+    let initHpNr = 1
+        initBeNr = 200
     (ss1, flst) <- doTimeIt ("INIT:" ++ (show initBeNr) ++ " BE Flows + 1 HP flow:") $ do
         let beFs = take initBeNr $ beFlows_ bePort
-            hpFs = take 1 $ hpFlows_ hpPort
+            hpFs = take initHpNr $ hpFlows_ hpPort
             flst0 = flAddedFlows beFs
             flst1 = foldl FL.fsAddFlow flst0 hpFs
         (conf, ss1) <- runIncrSearchIO ss0 flst1
-        --putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
         return (ss1, flst1)
 
-    let n2 = 100
-    doTimeIt ("Add:" ++ (show n2) ++ " be flow(s)") $ do
+    let n2 = 1
+    (ss2,flst2) <- doTimeIt ("Add:" ++ (show n2) ++ " be flow(s)") $ do
         let beFls = take n2 $ beFlows_ (bePort + initBeNr)
             flst2 = L.foldl FL.fsAddFlow (FL.fsReset flst) beFls
         (conf, ss2) <- runIncrSearchIO ss1 flst2
         --putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
-        return ()
+        return (ss2,flst2)
+    qmap <- ST.stToIO $ incrSearchQmap ss2
+    putStrLn $ qmapStr qmap
+
+    let n3 = 1
+    ss3 <- doTimeIt ("Add:" ++ (show n3) ++ " hp flow(s)") $ do
+        let hpFls = take n3 $ hpFlows_ (hpPort + initHpNr)
+            flst3 = L.foldl FL.fsAddFlow (FL.fsReset flst2) hpFls
+        (conf, ss3) <- runIncrSearchIO ss2 flst3
+        --putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
+        return (ss3)
+
+    qmap <- ST.stToIO $ incrSearchQmap ss3
+    putStrLn $ qmapStr qmap
+    --let flows = FM.fmFlows $ isFlowMapSt ss3
+    --putStrLn $ "Flows:\n" ++ (FL.flowsStr flows)
+    return ()
 
     --let prgC = C.applyConfig conf prgU
     --writeFile "tests/incr-search-prg-result.dot" $ toDot prgC
+    return ()
+
+
+-- there used to be a bug when configuring a 5t filter and then a cfdir filter
+testFmCfdir :: IO ()
+testFmCfdir = do
+    prgU <- e10kU_simple
+    let flows@(fl0:fl1:[]) = take 2 $ connectFlows 1000
+        cc0 = E10k.insert5tFromFl fl0 1
+        cc1 = fromJust $ E10k.insertFdirFromFl fl1 1
+
+    fmSt1 <- ST.stToIO $ do
+        s0 <- FM.initFlowMapSt prgU
+        s1 <- foldM FM.addFlow s0 flows
+        s2 <- FM.incrConfigure s1 cc0
+        s3 <- FM.incrConfigure s2 cc1
+        return s3
+
+    fmSt2 <- ST.stToIO $ do
+        s0 <- FM.initFlowMapSt prgU
+        s1 <- FM.incrConfigure s0 cc0
+        s2 <- FM.incrConfigure s1 cc1
+        s3 <- foldM FM.addFlow s2 flows
+        return s3
+
+    qmap  <- ST.stToIO $ FM.getRxQMap fmSt2
+    putStrLn $ qmapStr qmap
+    return ()

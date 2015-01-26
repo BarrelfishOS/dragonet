@@ -15,6 +15,7 @@ module Graphs.E10k (
     ConfChange(..),
     mk5TupleFromFl, mkFDirFromFl,
     insert5tFromFl, insertFdirFromFl,
+    ccQueue,
 
     rx5tFilterTableFull,rxCfdFilterTableFull,
 
@@ -375,7 +376,7 @@ doConfigFilter parseConf mkFiltLabel getQueue _ _ (inE:[]) outEs cfg = do
          -- flowQueue
          -- return ((filterNid,Edge "false"), es ++ [inEdge,tEdge,fEdge])
          return ((filterNid, PG.Edge "false"), es ++ [inEdge,tEdge])
-doConfigFilter a b c d e@(_, cnode) (x:xs) f g = trace msg ret
+doConfigFilter a b c d e@(_, cnode) (x:xs) f g = trN ret msg
     where ret = doConfigFilter a b c d e [x] f g
           msg = "FIXME: Configuration node: " ++ (PG.nLabel cnode)
               ++ " has more than one incoming edges."
@@ -824,6 +825,15 @@ instance C.ConfChange ConfChange where
 
 cvMInt :: Integral a => Maybe a -> PG.ConfValue
 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
+
+ccQueue :: ConfChange -> QueueId
+ccQueue (Insert5T c5t) = case c5t of
+                             PG.CVTuple (_:_:_:_:_:_:(PG.CVInt qid):[]) -> (fromIntegral qid)
+                             _ -> error $ "ccQeuue: could not match c5t=" ++ (ppShow c5t)
+ccQueue (InsertFDir cFdir) = case cFdir of
+                             PG.CVTuple (_:_:_:_:_:(PG.CVInt qid):[]) -> (fromIntegral qid)
+                             _ -> error "ccQeuue: cfdir"
+--ccQueue (InsertSYN cSyn)
 
 insert5tFromFl :: Flow -> QueueId -> ConfChange
 insert5tFromFl fl qid = Insert5T $ mk5TupleFromFl fl qid
