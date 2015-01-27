@@ -41,6 +41,7 @@ import Runner.Dynamic (createPipeline, createPipelineClient)
 
 import qualified Control.Concurrent.STM as STM
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Bits (testBit)
 
 import Util.XTimeIt (doTimeIt,dontTimeIt)
@@ -110,10 +111,7 @@ data StackState = StackState {
     , ssUpdateGraphs   :: STM.TVar StackState -> IO ()
     -- each stack state gets a new version number
     , ssVersion        :: Int
-    -- explicit registered flows
-    -- TODO: to be removed in favor of ssFlowsSt
-    , ssFlows          :: [Flow]
-    -- state about registered flows
+    -- state about (explicitly) registered flows
     , ssFlowsSt        :: FL.FlowsSt
     -- pipeline handlers
     , ssCtx            :: PLD.DynContext
@@ -298,12 +296,11 @@ eventHandler sstv ch
  -}
 eventHandler sstv ch
              (PLA.EvSocketUDPFlow sid le@(lIp,lPort) re@(rIp,rPort) flags) = do
-    -- update ssFlows
+    -- update flows state
     ss <- STM.atomically $ do
         ss <- STM.readTVar sstv
-        let oldFlows = ssFlows ss
-            fl = epToFlow $ NS.mkUdpEndpoint le re
-            ss' = ss { ssFlows = fl:oldFlows }
+        let fl = epToFlow $ NS.mkUdpEndpoint le re
+            ss' = ss {ssFlowsSt = FL.fsAddFlow (ssFlowsSt ss) fl}
         STM.writeTVar sstv $ ss'
         return ss'
     putStrLn $ "SocketUDPFlow f=" ++ show re ++ "/" ++ show le
@@ -369,7 +366,6 @@ initStackSt = StackState {
     ssApplications   = M.empty,
     ssAppChans       = M.empty,
     ssVersion        = 0,
-    ssFlows          = [],
     ssFlowsSt        = FL.flowsStInit
 }
 
@@ -399,6 +395,19 @@ ssNewVer sstv = STM.atomically $ do
     let ss' = ss { ssVersion = ssVersion ss + 1 }
     STM.writeTVar sstv ss'
     return ss'
+
+-- bumps version number and resets the flow state. Returns new stack state and
+-- old flow state
+ssUpdateGraph sstv = STM.atomically $ do
+    ss <- STM.readTVar sstv
+    let flowsSt = ssFlowsSt ss
+        flowsSt' = FL.fsReset flowsSt
+        ss' = ss {
+                ssVersion = ssVersion ss + 1,
+                ssFlowsSt = flowsSt'
+        }
+    STM.writeTVar sstv ss'
+    return (ss', flowsSt)
 
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -478,7 +487,7 @@ updateGraphFlows
     -> IO ()
 updateGraphFlows getConf args sstv = do
    putStrLn "updateGraphFlows"
-   ss <- ssNewVer sstv
+   (ss,flowStOld) <- ssUpdateGraph sstv
    putStrLn $ "updateGraphFlows: v" ++ (show $ ssVersion ss)
    -- get list of all endpoints from stack-state
    let
@@ -490,7 +499,9 @@ updateGraphFlows getConf args sstv = do
        --  NB: because there are no socket endpoints now, we use
        --  balanceAcrossRxQs to distribute spanned sockets across pipelines
        xforms = [IT.balanceAcrossRxQs, IT.coupleTxSockets]
-       flows = ssFlows ss
+       -- non-incremental version
+       -- we just use the new flowSt to calculate all flows
+       flows = S.toList $ FL.fsCurrent $ ssFlowsSt ss
 
    putStrLn $ "Flows:\n" ++ (ppShow $ map flowStr flows)
    putStrLn $ "Flow count: " ++ (show $ length flows)
