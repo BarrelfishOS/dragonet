@@ -13,10 +13,10 @@ module Dragonet.Search (
   searchGreedyFlows,
   hardcodedSearch,
   balanceCost,
-  priorityCost,
+  priorityCost, prioritySort,
   CostQueueFn,
   SearchStIO, initSearchIO, runSearchIO,
-  E10kOracleSt(..),
+  E10kOracleSt(..), initE10kOracle,
   E10kOracleHardCoded(..),
   initSearchParamsE10k,
 
@@ -196,6 +196,8 @@ flowsSingleConfs x conf fs =
 data E10kOracleSt = E10kOracleSt {nQueues :: Int, startQ :: Int}
 e10kDefaultQ = 0
 
+initE10kOracle nq = E10kOracleSt { nQueues = nq, startQ = 0 }
+
 {-|
   Making the type 'E10kOracleSt' member of class "Oracle state" to work as
   as Oracle for Intel 82599 NIC.
@@ -328,7 +330,7 @@ initSearchParams = SearchParams {
 }
 
 initSearchParamsE10k nqueues = initSearchParams {sOracle = oracle}
-    where oracle = E10kOracleSt {nQueues = nqueues, startQ = 0}
+    where oracle = initE10kOracle nqueues
 
 type FlowCache s      = HB.HashTable s (PG.NLabel, Flow) PG.NPort
 data SearchSt s o a = (OracleSt o a) => SearchSt {
@@ -709,6 +711,10 @@ dummyCost _ = CostVal 1.0
 
 balanceCost :: Int -> QMap -> Cost
 balanceCost nq fls = balanceCost_ (allQueues nq) fls
+
+prioritySort :: (Flow -> Bool) -> [Flow] -> [Flow]
+prioritySort isGold flows = let (hp,be) = L.partition isGold flows
+                           in hp ++ be
 
 -- gold/best-effort priorities
 priorityCost :: (Flow -> Bool) -> Integer -> Int -> QMap -> Cost
@@ -1180,7 +1186,9 @@ incSearchGreedyFlows st flowsSt = do
     -- search
     let msg = "Search flows:\n" ++ (FL.flowsStr searchFlows)
              ++ "\nState flows:\n" ++ (FL.flowsStr $ FM.fmFlows $ isFlowMapSt searchSt)
-    (st', cost') <- incSearchGreedyFlows_ searchSt $ trN searchFlows msg
+    (st', cost') <- case searchFlows of
+                     [] -> return (searchSt, CostOK)
+                     _  -> incSearchGreedyFlows_ searchSt (tr searchFlows msg)
 
     case costAcceptable $ trN cost' ("SEARCH: " ++ show cost') of
         True  -> let cnf = C.foldConfChanges $ FM.fmCnfChanges $ isFlowMapSt st'
@@ -1340,6 +1348,7 @@ beIp = 100
 hpFlowsPerQ = 2
 isHp FlowUDPv4 {flSrcIp = Just srcIp} = srcIp == hpIp
 priorityCost' = priorityCost isHp hpFlowsPerQ
+prioritySort' = prioritySort isHp
 
 beFlows_ :: Int -> [Flow]
 beFlows_ start = [ FlowUDPv4 {
@@ -1361,7 +1370,7 @@ test = do
     prgU <- e10kU_simple
     --prgU <- e10kU_simple
     let nq = 10
-        e10kOracle   = E10kOracleSt {nQueues = nq, startQ = 0}
+        e10kOracle   = initE10kOracle nq
         priFn        = priorityCost' nq
         balFn        = balanceCost nq
         dummyFn      = dummyCost
@@ -1385,7 +1394,7 @@ test_incr = do
     putStrLn $ "Running incremental search!"
     prgU <- e10kU_simple
     let nq = 10
-        e10kOracle   = E10kOracleSt {nQueues = nq, startQ = 0}
+        e10kOracle   = initE10kOracle nq
         priFn        = priorityCost' nq
         balFn        = balanceCost nq
         dummyFn      = dummyCost
@@ -1409,12 +1418,11 @@ test_incr_add = do
         -- initially 1 HP, 20 BE flows
         hpPort   = 6000
         bePort   = 1000
-        e10kOracle = E10kOracleSt {nQueues = nq, startQ = 0}
+        e10kOracle = initE10kOracle nq
         priFn = priorityCost' nq
         balFn = balanceCost nq
         costFn = priFn
-        sortFn l = let (hp,be) = L.partition isHp l
-                   in hp ++ be
+        sortFn = prioritySort'
         params = initIncrSearchParams {  isOracle = e10kOracle
                                        , isPrgU   = prgU
                                        , isCostFn = costFn

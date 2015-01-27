@@ -8,6 +8,7 @@ import qualified Dragonet.Pipelines.Implementation as  PLI
 import qualified Dragonet.ProtocolGraph            as  PG
 import qualified Dragonet.ProtocolGraph.Utils      as  PGU
 import qualified Dragonet.Search                   as  SE
+import qualified Dragonet.Flows                    as  FL
 
 import qualified Graphs.E10k as E10k
 import qualified Graphs.Tap as Tap
@@ -182,25 +183,61 @@ tapPrgArgs = do
                            , SS.stCfgImpl = dummyImplFn }
 
 data StackE10kOpts = StackE10kOpts {
-      optNq     :: Int
-    , optCostFn :: Int -> SE.CostQueueFn
-    , optDummy  :: Bool
+      optNq          :: Int
+    , optCostFn      :: (Int -> SE.CostQueueFn, [FL.Flow] -> [FL.Flow])
+    , optIncremental :: Bool
+    , optDummy       :: Bool
 } deriving (Show)
 
 
 runStackE10k :: StackE10kOpts -> IO ()
-runStackE10k opts = do
+runStackE10k opts@(StackE10kOpts {optIncremental = incremental}) = do
+    case incremental of
+        True  -> doRunStackE10kIncremental opts
+        False -> doRunStackE10k opts
+
+doRunStackE10kIncremental :: StackE10kOpts -> IO ()
+doRunStackE10kIncremental opts = do
+    -- PRG (use simple graph. Hope this works!)
+    (prgU,_) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl-simple.unicorn"
+    -- get options
+    let nq       = optNq opts
+        costFn   = (fst $ optCostFn opts) nq
+        sortFn   = snd $ optCostFn opts
+        dummy    = optDummy opts
+
+    -- search parameters
+    let sParams = SE.initIncrSearchParams {
+                          SE.isOracle = SE.initE10kOracle nq
+                        , SE.isPrgU = prgU
+                        , SE.isCostFn = costFn
+                        , SE.isOrderFlows = sortFn }
+
+    -- PRG
+    prgArgs <- case dummy of
+                True -> tapPrgArgs
+                False -> e10kPrgArgs
+
+    se0 <- SE.initIncrSearchIO sParams
+    SS.instantiateIncrFlowsIO_ SE.runIncrSearchIO se0 plAssignMerged prgArgs
+
+doRunStackE10k :: StackE10kOpts -> IO ()
+doRunStackE10k opts = do
     -- PRG
     (prgU,_) <- E10k.graphH
     -- get options
     let nq       = optNq opts
-        costFn   = (optCostFn opts) nq
+        costFn   = (fst $ optCostFn opts) nq
+        sortFn   = snd $ optCostFn opts
         dummy    = optDummy opts
 
-    -- search for finding configuration
+    -- search parameters
     let sParams = (SE.initSearchParamsE10k nq)
                         { SE.sPrgU = prgU
-                        , SE.sCostFn = costFn }
+                        , SE.sCostFn = costFn
+                        , SE.sOrderFlows = sortFn}
+
+    -- [Flow] -> IO C.Configuration
     getConfIO <- SE.runSearchIO <$> SE.initSearchIO sParams
 
     -- PRG
@@ -211,10 +248,10 @@ runStackE10k opts = do
     SS.instantiateFlowsIO_ getConfIO plAssignMerged prgArgs
 
 costFnParser = OA.str >>= doParse
-    where doParse :: String -> OA.ReadM (Int -> SE.CostQueueFn)
+    where doParse :: String -> OA.ReadM (Int -> SE.CostQueueFn, [FL.Flow] -> [FL.Flow])
           doParse x
-            | x == "balance" = return SE.balanceCost
-            | x == "priority" = return S1.priorityCost
+            | x == "balance" = return  (SE.balanceCost, id)
+            | x == "priority" = return (S1.priorityCost, S1.prioritySort)
             | otherwise = OA.readerError "Unknown cost function"
 
 stackE10kParserInfo:: OA.ParserInfo StackE10kOpts
@@ -222,6 +259,7 @@ stackE10kParserInfo = OA.info (OA.helper <*> parser) info
     where parser = StackE10kOpts
                 <$> OA.argument OA.auto infoNq
                 <*> OA.argument costFnParser infoCostF
+                <*> OA.switch (OA.short 'i' OA.<> OA.help incrTxt)
                 <*> OA.switch (OA.short 'd' OA.<> OA.help dummyTxt)
           info = OA.fullDesc OA.<> OA.header "Instantiate the e10k stack"
           infoNq = (OA.metavar "nqueues" OA.<> OA.help "number of queues")
@@ -230,6 +268,7 @@ stackE10kParserInfo = OA.info (OA.helper <*> parser) info
                    ++ "(e10k graph for the search, "
                    ++ "TAP for the network stack implementtation, "
                    ++ "empty implementation function)"
+          incrTxt = "Run Incremental stack"
 
 main = do
     opts <- OA.execParser stackE10kParserInfo

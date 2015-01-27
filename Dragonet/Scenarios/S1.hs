@@ -1,5 +1,5 @@
 module Scenarios.S1 (
-    priorityCost
+      priorityCost, prioritySort
     , sortedRealFlows
     , real40Flows
     , sortFlows
@@ -32,7 +32,7 @@ isGoldFl FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip} = ans
 isGoldFl _ = False
 
 priorityCost = Search.priorityCost isGoldFl goldFlPerQ
-
+prioritySort = Search.prioritySort isGoldFl
 
 
 sortFlows isImp fl = sortedFlows

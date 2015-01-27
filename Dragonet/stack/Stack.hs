@@ -1,8 +1,11 @@
+{-# LANGUAGE ExistentialQuantification #-}
 module Stack (
     instantiateOpt,
     instantiateFlowsIO_,
     instantiateFlows,
     instantiateFlows_,
+
+    instantiateIncrFlowsIO_,
 
     StackState(..),
     StackArgs(..),
@@ -20,7 +23,7 @@ import qualified Dragonet.Pipelines.Applications   as PLA
 import qualified Dragonet.ProtocolGraph            as PG
 import qualified Dragonet.ProtocolGraph.Utils      as PGU
 import qualified Dragonet.Semantics                as Sem
-import qualified Dragonet.Search                   as Srch
+import qualified Dragonet.Search                   as SE
 import qualified Dragonet.NetState                 as NS
 import qualified Dragonet.Flows                    as FL
 
@@ -529,19 +532,8 @@ updateGraphFlows getConf args sstv = do
    putStrLn "################### calling appendFile with app ready notice"
    appendFile("allAppslist.appready") $ "Application is ready!\n"
 
--- OLD/Deprecated interface
 
-instantiateSearchIO :: (Srch.OracleSt o a)
-                    => Srch.SearchParams o a
-                    -> StackArgs
-                    -> IO ()
-instantiateSearchIO params args = do
-    -- initialize search state
-    searchSt <- Srch.initSearchIO params
-    let getConfIO :: [Flow] -> IO (C.Configuration)
-        getConfIO = Srch.runSearchIO searchSt
-        updFn = updateGraphFlows getConfIO args
-    instantiateStack args updFn
+-- OLD/Deprecated interface
 
 
 instantiateFlowsIO_
@@ -555,6 +547,19 @@ instantiateFlowsIO_ getConfIO cfgPLA prgArgs = do
                                      , stCfgPLA = cfgPLA }
         updFn = updateGraphFlows getConfIO args
     instantiateStack args updFn
+
+instantiateSearchIO :: (SE.OracleSt o a)
+                    => SE.SearchParams o a
+                    -> StackArgs
+                    -> IO ()
+instantiateSearchIO params args = do
+    -- initialize search state
+    searchSt <- SE.initSearchIO params
+    let getConfIO :: [Flow] -> IO (C.Configuration)
+        getConfIO = SE.runSearchIO searchSt
+        updFn = updateGraphFlows getConfIO args
+    instantiateStack args updFn
+
 
 
 instantiateFlows_
@@ -612,4 +617,114 @@ instantiateOpt prgH llvmH costFun cfgOracle cfgImpl cfgPLA = do
     let args = initStackArgs $ args0 { stPrg     = prgArgs
                                      , stCfgPLA  = cfgPLA }
     let updFn = updateGraphOpt costFun cfgOracle args
+    instantiateStack args updFn
+
+
+---
+--- Incremental version
+---
+
+-- incremental state (includes search state to pass back and forth)
+data StackIncrSt s = StackIncrSt {
+      siSearchSt      :: s
+    , siUpdatingGraph :: Bool
+}
+
+siInitialize :: s -> IO (STM.TVar (StackIncrSt s))
+siInitialize st0 = do
+    STM.atomically $ STM.newTVar $ StackIncrSt {
+          siSearchSt = st0
+        , siUpdatingGraph = False
+    }
+
+-- So the graph may be updated in the event handlers (e.g., registering a flow).
+-- This is probably why the STM is used, but I'm not sure if it's actually
+-- needed.
+--
+-- In any case, the new state needs to include the new search state which is
+-- computed after the search. I'm wary of running the search inside the
+-- transaction, so instead I split the whole thing in to two parts and do a
+-- sanity check that nothing happened in between. If something tries to update
+-- the graph when the graph is updating we bail out.
+--
+--  Note: event handlers can run as the search is ongoing and they get to update
+--  the new state of flows, but cannot update the graph. For a more complete
+--  implentation we can have another flag that something triggered a graph
+--  update but doing control flow for this thing might get tricky.
+
+doUpdateGraphPrepare si ss =
+    let flowsSt  = ssFlowsSt ss
+        flowsSt' = FL.fsReset flowsSt
+        ss' = ss { ssVersion = ssVersion ss + 1, ssFlowsSt = flowsSt'}
+        si' = si {siUpdatingGraph = True}
+    in (si', ss', flowsSt)
+
+siUpdateGraphPrepare sitv sstv = STM.atomically $ do
+    si <- STM.readTVar sitv
+    ss <- STM.readTVar sstv
+    let mret = case siUpdatingGraph si of
+                 True  -> Nothing -- the graph is already updating!
+                 False -> Just $ doUpdateGraphPrepare si ss
+    case mret of
+        Nothing -> return Nothing
+        Just (si', ss', flowsSt) ->
+            do STM.writeTVar sitv si'
+               STM.writeTVar sstv ss'
+               return $ Just (si', ss', flowsSt)
+
+siUpdateGraphDone sitv searchSt = STM.atomically $ do
+    si <- STM.readTVar sitv
+    let si' = case siUpdatingGraph si of
+                    True -> si { siUpdatingGraph = False
+                                , siSearchSt = searchSt }
+                    False -> error "siUpdateGraphDone: this is not supposed to happen!"
+    STM.writeTVar sitv si'
+    return si'
+
+-- This is an incremental version of upateGraphFlows in that it allows passing
+-- state to and from the search function
+updateGraphFlowsIncr
+    :: (s -> FL.FlowsSt -> IO (C.Configuration, s))
+    -> StackArgs
+    -> STM.TVar (StackIncrSt s)
+    -> STM.TVar StackState
+    -> IO ()
+updateGraphFlowsIncr doSearch args sitv sstv = do
+   prep <- siUpdateGraphPrepare sitv sstv
+   case prep of
+     Nothing -> do
+         putStrLn "updateGraphFlowsIncr called when update in progress, baling out"
+         return ()
+     Just (si', ss', flowsSt) -> do
+        let searchSt = siSearchSt si'
+            xforms = [IT.balanceAcrossRxQs, IT.coupleTxSockets]
+            lbl = "updateGraphFlowsIncr"
+        (prgConf, searchSt') <- doSearch searchSt flowsSt
+        si'' <- siUpdateGraphDone sitv searchSt'
+        -- implement new configuration:
+        --- create a new graph
+        plg <- ssMakeGraph ss' args prgConf lbl xforms
+        --- apply PRG configuration
+        (stCfgImpl $ stPrg args) (ssSharedState ss') prgConf
+        --- run it
+        PLD.run (ssCtx ss') plConnect (ssCreatePL args ss' plg) $ addMuxIds plg
+        --
+        putStrLn "updateGraphFlowsIncr exit"
+        -- FIXME: Create file here.
+        putStrLn "################### calling appendFile with app ready notice"
+        appendFile("allAppslist.appready") $ "Application is ready!\n"
+        return ()
+
+instantiateIncrFlowsIO_
+    :: (s -> FL.FlowsSt -> IO (C.Configuration, s)) -- search function
+    -> s -- initial search state
+    -> (StackState -> String -> PG.PGNode -> String)
+    -> StackPrgArgs
+    -> IO ()
+instantiateIncrFlowsIO_ incSearchIO si0 cfgPLA prgArgs = do
+    args0 <- stackArgsDefault
+    sitv <- siInitialize si0
+    let args = initStackArgs $ args0 { stPrg    = prgArgs
+                                     , stCfgPLA = cfgPLA }
+        updFn = updateGraphFlowsIncr incSearchIO args sitv
     instantiateStack args updFn

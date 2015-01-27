@@ -38,6 +38,8 @@ connectFlows nflows = [ FlowUDPv4 {
    , flSrcPort  = Just 7777 } | i <- [1..nflows] ]
 
 
+flAddedFlows :: [Flow] -> FL.FlowsSt
+flAddedFlows flows = foldl FL.fsAddFlow FL.flowsStInit flows
 
 isGoldFl FlowUDPv4 {flDstPort = Just port} = isJust $ L.find (==port) [1001,1002]
 goldFlPerQ = 1
@@ -50,7 +52,7 @@ flAddedFlows flows = foldl FL.fsAddFlow FL.flowsStInit flows
 main = do
     let nq = 10 -- number of queues
         --nflowsl = [1,5,10,20,40,80]
-        nflowsl = [10, 100, 200, 500]
+        nflowsl = [200]
         samples = 3
         flows = connectFlows
     prgU <- e10kU_simple
