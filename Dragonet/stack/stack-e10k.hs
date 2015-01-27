@@ -287,10 +287,10 @@ stackE10kParserInfo = OA.info (OA.helper <*> parser) info
           infoCostF = (OA.metavar costMeta OA.<> OA.help costHelp)
           infoPrgArgs = (OA.metavar prgMeta OA.<> OA.help prgHelp)
           incrTxt = "Run Incremental stack"
-          costHelp = "cost function (" ++ (show $ map fst prgArgsL) ++")"
+          costHelp = "cost function"
           costMeta = "CostF (one of:" ++ (show $ map fst costFnL) ++")"
           prgMeta = "prgArgs (one of:" ++ (show $ map fst prgArgsL) ++")"
-          prgHelp = "PRG backend (one of:" ++ (show $ map fst prgArgsL) ++")"
+          prgHelp = "PRG backend"
 
 main = do
     opts <- OA.execParser stackE10kParserInfo
