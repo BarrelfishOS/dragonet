@@ -1,5 +1,6 @@
 module Scenarios.S1 (
       priorityCost, prioritySort
+    , priorityCost' , prioritySort'
     , sortedRealFlows
     , real40Flows
     , sortFlows
@@ -23,16 +24,30 @@ myFromMaybe (Just x) = x
 myFromMaybe _ = error "No IP address"
 
 goldFlPerQ = 1
-isGoldFl FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip} = ans
+isGoldFlOld FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip} = ans
     where
         ans
             | (sport == 8000) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
             | (sport == 8000) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
             | otherwise = False
-isGoldFl _ = False
+isGoldFlOld _ = False
 
-priorityCost = Search.priorityCost isGoldFl goldFlPerQ
-prioritySort = Search.prioritySort isGoldFl
+isGoldFl fPerApp FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip} = ans
+    where
+        ans
+            | (sport < 8000) && (sport >= (8000 - (fromIntegral fPerApp))) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
+            | (sport >= 8000) && (sport < (8000 + (fromIntegral fPerApp))) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
+            | (sport >= 8000) && (sport < (8000 + (fromIntegral fPerApp))) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
+            | otherwise = False
+isGoldFl _ _ = False
+
+
+
+priorityCost' fpApp  = Search.priorityCost (isGoldFl fpApp) fpApp
+prioritySort' fpApp = Search.prioritySort (isGoldFl fpApp)
+
+priorityCost = Search.priorityCost isGoldFlOld goldFlPerQ
+prioritySort = Search.prioritySort isGoldFlOld
 
 
 sortFlows isImp fl = sortedFlows
@@ -42,7 +57,7 @@ sortFlows isImp fl = sortedFlows
         otherList = filter (not . isImp) allFlows
         sortedFlows = impList ++  otherList
 
-sortedRealFlows = sortFlows isGoldFl real40Flows
+sortedRealFlows = sortFlows isGoldFlOld real40Flows
 
 -- All flows are:
 real40Flows = [FlowUDPv4 {flSrcIp = Just 175178803, flDstIp = Just 175178847, flDstPort = Just 7777, flSrcPort = Just 8000},

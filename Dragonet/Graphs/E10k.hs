@@ -21,6 +21,10 @@ module Graphs.E10k (
 
     cfgEmpty, cfgStr,
     graphH_, graphH,
+    ftCount,
+    fdirCount,
+
+
 ) where
 
 import qualified Dragonet.ProtocolGraph       as PG
@@ -64,14 +68,22 @@ cfgEmpty = [
     ("RxCFDirFilter", PG.CVList [])
  ]
 
+
+ftCount = 128
+
+-- NOTE: fdirCount is based on a value in prgE10kImpl for CFDirFilter
+-- TODO: Get this value by parsing NIC prg instead of hardcoding it
+fdirCount = 2048
+
+
 rx5tFilterTableFull :: C.Configuration -> Bool
-rx5tFilterTableSize  = 128
+rx5tFilterTableSize  = ftCount
 rx5tFilterTableFull cnf = case L.lookup "RxC5TupleFilter" cnf of
     Nothing            -> False
     Just (PG.CVList l) -> length l >= rx5tFilterTableSize
 
 rxCfdFilterTableFull :: C.Configuration -> Bool
-rxCfdFilterTableSize = 1024
+rxCfdFilterTableSize = fdirCount
 rxCfdFilterTableFull cnf = case L.lookup "RxCFDirFilter" cnf of
     Nothing            -> False
     Just (PG.CVList l) -> length l >= rxCfdFilterTableSize

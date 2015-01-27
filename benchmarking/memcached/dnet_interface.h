@@ -58,7 +58,7 @@ get_tsc(void) {
 //  Currently supported by E10k queues,  sf queues, fancyecho
 //  memecached has its own copy of these variables in dnet_interface.h
 
-#define SHOW_INTERVAL_STAT      1
+//#define SHOW_INTERVAL_STAT      1
 #define INTERVAL_STAT_FREQUENCY     (1000)
 //#define INTERVAL_STAT_FREQUENCY     (1)
 

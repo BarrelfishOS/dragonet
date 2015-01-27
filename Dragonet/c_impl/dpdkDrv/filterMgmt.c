@@ -32,6 +32,11 @@ bool e10k_ctrl_fdir_set(struct state *state,
         uint16_t l4_type, uint16_t mask)
 {
     struct dragonet_dpdk *e10k_nic = (struct dragonet_dpdk *)state->st_driver_handle;
+    char src_ip_str[IPv4_ADDR_STR_SIZE];
+    convert_ipv4(src_ip, src_ip_str);
+    char dst_ip_str[IPv4_ADDR_STR_SIZE];
+    convert_ipv4(dst_ip, dst_ip_str);
+
 
     if (e10k_nic == NULL) {
         printf(" ################## NIC Not ready ############ \n");
@@ -42,14 +47,16 @@ bool e10k_ctrl_fdir_set(struct state *state,
 
     printf("\n\n### %s:%s:%d:  [####-- IMP --####]"
             "index: %"PRIu16", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
-            "srcIP: %"PRIu32", srcPort: %"PRIu16",  dstIP: %"PRIu32", dstPort: %"PRIu16"\n\n",
+            "srcIP: %s -> %"PRIu32", srcPort: %"PRIu16",  dstIP: %s -> %"PRIu32", dstPort: %"PRIu16"\n\n",
             __FILE__, __FUNCTION__, __LINE__,
             index,
             queue,
             mask,
             l4_type,
+            src_ip_str,
             src_ip,
             src_port,
+            dst_ip_str,
             dst_ip,
             dst_port
             );
@@ -68,6 +75,11 @@ bool e10k_ctrl_5tuple_set(struct state *state,
 
     struct dragonet_dpdk *e10k_nic = (struct dragonet_dpdk *)state->st_driver_handle;
 
+    char src_ip_str[IPv4_ADDR_STR_SIZE];
+    convert_ipv4(src_ip, src_ip_str);
+    char dst_ip_str[IPv4_ADDR_STR_SIZE];
+    convert_ipv4(dst_ip, dst_ip_str);
+
     if (e10k_nic == NULL) {
         printf(" ################## NIC Not ready ############ \n");
         return false;
@@ -77,15 +89,17 @@ bool e10k_ctrl_5tuple_set(struct state *state,
 
     printf("\n\n### %s:%s:%d:  [####-- IMP --####] index %"PRIu8", "
             "Priority: %"PRIu8", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
-            "srcIP: %"PRIu32", srcPort: %"PRIu16",  dstIP: %"PRIu32", dstPort: %"PRIu16"\n\n",
+            "srcIP: %s = %"PRIu32", srcPort: %"PRIu16",  dstIP: %s =%"PRIu32", dstPort: %"PRIu16"\n\n",
             __FILE__, __FUNCTION__, __LINE__,
             index,
             priority,
             queue,
             mask,
             l4_type,
+            src_ip_str,
             src_ip,
             src_port,
+            dst_ip_str,
             dst_ip,
             dst_port
             );

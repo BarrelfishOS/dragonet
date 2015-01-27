@@ -37,7 +37,9 @@ balanceAcrossRxQs g = foldl balEpAcrossRxQs g (M.toList balEpsMap)
     where
           -- List of all balance nodes with their endpont-ID's
           balEps :: [(Integer, DGI.Node)]
-          balEps = [ (eid,nid) |
+          --balEps :: [(Integer, (DGI.Node, PG.NLabel))]
+          --balEps = [ (eid, (nid, (PG.nLabel nlbl))) |
+          balEps = [ (eid, nid) |
                      (nid,nlbl) <- DGI.labNodes g,
                      let eid_ = PGU.balanceNodeEndpointId nlbl,
                      isJust eid_,
@@ -47,9 +49,12 @@ balanceAcrossRxQs g = foldl balEpAcrossRxQs g (M.toList balEpsMap)
           --    multiple balance nodes (one in each reachable partition).
           --    Here, we are collecting all balance nodes associated with
           --        same endpoint
+
+          -- balEpsMap :: M.Map Integer [(DGI.Node, PG.NLabel)]
           balEpsMap :: M.Map Integer [DGI.Node]
           balEpsMap = foldl foldFn M.empty balEps
           foldFn m (eid,nid) = M.alter alterF eid m
+          --foldFn m (eid, (nid, nlbl)) = M.alter alterF eid m
             where alterF Nothing        = Just $ [nid]
                   alterF (Just oldnids) = Just $ nid:oldnids
 
@@ -65,14 +70,17 @@ balEpAcrossRxQs ::
        PG.PGraph
     -- | (endpoint-id, list of balance nodes associated with the endpoint)
     -> (Integer, [DGI.Node])
+    -- -> (Integer, [(DGI.Node, PG.NLabel)])
     -- | Graph after applying the balancing
     -> PG.PGraph
-balEpAcrossRxQs g (eid,nids@(nid0:_)) = trace msg $ enfoceEP2SocketsMapping g groupedNids
+--balEpAcrossRxQs g (eid,nids@((nid0,lab0):_)) = trace msg $ enfoceEP2SocketsMapping g groupedNids
+balEpAcrossRxQs g (eid,nids@((nid0):_)) = trace msg $ enfoceEP2SocketsMapping g groupedNids
     where
     ports = PG.nPorts $ fromJust $ DGI.lab g nid0
     balancedPorts = balancedChunks (length nids) ports
     groupedNids :: [(DGI.Node, [PG.NPort])]
     nids' = nids
+    --nids' = reverse nids  -- reversing to get deterministic ordering so that q0 will always go to socket-0, etc
     balancedPorts' = DL.sort balancedPorts
     groupedNids = zip nids' $ concat $ repeat balancedPorts'
     msg

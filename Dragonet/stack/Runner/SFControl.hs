@@ -7,7 +7,6 @@ module Runner.SFControl (
     waitReady,
     ftUnset,
     ftSet,
-    ftCount
 ) where
 
 import qualified Dragonet.Pipelines.Implementation as PLI
@@ -69,8 +68,6 @@ maskDstIP   = 4
 maskSrcPort = 8
 maskDstPort = 16
 
-ftCount = 2048
-
 foreign import ccall "sf_ctrl_waitready"
     waitReady :: PLI.StateHandle -> IO ()
 
@@ -89,8 +86,8 @@ ftUnset st idx = do
         then error "sf_ctrl_5tuple_unset failed"
         else return ()
 
-ftSet :: PLI.StateHandle -> Int -> FTuple -> IO ()
-ftSet st idx (FTuple p q l3 l4 sIP dIP sP dP) = do
+ftSet :: Int -> PLI.StateHandle -> Int -> FTuple -> IO ()
+ftSet ftCount st idx (FTuple p q l3 l4 sIP dIP sP dP) = do
     if idx >= ftCount
         then error "FTQF index too high"
         else return ()

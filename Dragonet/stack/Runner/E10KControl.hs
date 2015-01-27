@@ -8,11 +8,11 @@ module Runner.E10KControl (
     -- f5 filters
     ftUnset,
     ftSet,
-    ftCount,
+    --ftCount,
     -- fdir filters
     fdirUnset,
     fdirSet,
-    fdirCount
+    -- fdirCount
 ) where
 
 import qualified Dragonet.Pipelines.Implementation as PLI
@@ -78,8 +78,8 @@ maskDstPort = 0x01
 maskL4Proto = 0x10
 
 
-
-ftCount = 128
+-- Moved to E10k
+--ftCount = 128
 
 foreign import ccall "e10k_ctrl_waitready"
     waitReady :: PLI.StateHandle -> IO ()
@@ -99,8 +99,8 @@ ftUnset st idx = do
         then error "e10k_ctrl_5tuple_unset failed"
         else return ()
 
-ftSet :: PLI.StateHandle -> Word8 -> FTuple -> IO ()
-ftSet st idx (FTuple p q l3 l4 sIP dIP sP dP) = do
+ftSet :: Int -> PLI.StateHandle -> Word8 -> FTuple -> IO ()
+ftSet ftCount' st idx (FTuple p q l3 l4 sIP dIP sP dP) = do
     if idx >= ftCount
         then error "FTQF index too high"
         else return ()
@@ -116,6 +116,9 @@ ftSet st idx (FTuple p q l3 l4 sIP dIP sP dP) = do
         then error "e10k_ctrl_5tuple_set failed"
         else return ()
     where
+
+        ftCount :: Word8
+        ftCount = fromIntegral ftCount'
         mbFlag Nothing n _ = n
         mbFlag (Just _) _ j = j
         mask = (mbFlag l4 maskL4Proto 0) .|.
@@ -130,10 +133,6 @@ ftSet st idx (FTuple p q l3 l4 sIP dIP sP dP) = do
                 L4UDP -> l4tUDP
 
 -- ##################### fdir flow management ###################
-
--- NOTE: fdirCount is based on a value in prgE10kImpl for CFDirFilter
--- TODO: Get this value by parsing NIC prg instead of hardcoding it
-fdirCount = 2048
 
 foreign import ccall "e10k_ctrl_fdir_unset"
     c_fdirUnset :: PLI.StateHandle -> Word8 -> IO Bool
@@ -150,8 +149,8 @@ fdirUnset st idx = do
         then error "e10k_ctrl_fdir_unset failed"
         else return ()
 
-fdirSet :: PLI.StateHandle -> Int -> FDirTuple -> IO ()
-fdirSet st idx (FDirTuple q l3 l4 sIP dIP sP dP) = do
+fdirSet :: Int -> PLI.StateHandle -> Int -> FDirTuple -> IO ()
+fdirSet fdirCount st idx (FDirTuple q l3 l4 sIP dIP sP dP) = do
     if (fromIntegral idx) >= fdirCount
         then error ("################## ERROR: FdirQF index " ++ (show idx) ++ " too high " ++ (show fdirCount) ++ " ############")
         else return ()

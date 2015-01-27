@@ -6,6 +6,7 @@
 #include "dyn_remote.h"
 
 //#define dprintf printf
+//#define dprintf(x...)    do { printf("remote_server: TID:%d:%s:%s:%d: ", (int)pthread_self(), __FILE__, __FUNCTION__, __LINE__); printf(":" x); } while(0)
 #define dprintf(x...) do {} while (0)
 
 struct dynrs_queue {

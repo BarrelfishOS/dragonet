@@ -24,13 +24,27 @@ T0.p[7777]F[10.113.4.95:7777/10.113.4.51:8000]F[10.113.4.95:7777/10.113.4.51:800
 
 run_memcached_2_clients_2_load() {
 sudo ../benchmarking/memcached/memcached -N \
-T0.p[7777]F[10.113.4.95:7777/10.113.4.51:8000]F[10.113.4.95:7777/10.113.4.51:8001]F[10.113.4.95:7777/10.113.4.26:8000]F[10.113.4.95:7777/10.113.4.26:8001]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l 10.113.4.95
+ T0.p[7777]F[10.113.4.195:7777/10.113.4.57:8000]F[10.113.4.195:7777/10.113.4.57:8001]F[10.113.4.195:7777/10.113.4.57:8002]F[10.113.4.195:7777/10.113.4.57:8003]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l 10.113.4.195
+}
+
+run_memcached_1_clients_1_load() {
+sudo ../benchmarking/memcached/memcached -N \
+ T0.p[7777]F[10.113.4.195:7777/10.113.4.57:8000]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l 10.113.4.195
+}
+
+run_memcached_5_clients_2_load() {
+sudo ../benchmarking/memcached/memcached -N \
+T0.p[7777]F[10.113.4.195:7777/10.113.4.57:8000]F[10.113.4.195:7777/10.113.4.57:8001]F[10.113.4.195:7777/10.113.4.57:8002]F[10.113.4.195:7777/10.113.4.57:8003]F[10.113.4.195:7777/10.113.4.57:8004]F[10.113.4.195:7777/10.113.4.57:8005]F[10.113.4.195:7777/10.113.4.57:8006]F[10.113.4.195:7777/10.113.4.57:8007]F[10.113.4.195:7777/10.113.4.57:8008]F[10.113.4.195:7777/10.113.4.57:8009]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l 10.113.4.195
 }
 
 run_memcached_2_clients_3_load() {
+set -x
+set -e
 sudo ../benchmarking/memcached/memcached -N \
 T0.p[7777]F[10.113.4.95:7777/10.113.4.51:8000]F[10.113.4.95:7777/10.113.4.51:8001]F[10.113.4.95:7777/10.113.4.51:8002]F[10.113.4.95:7777/10.113.4.26:8000]F[10.113.4.95:7777/10.113.4.26:8001]F[10.113.4.95:7777/10.113.4.26:8002]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l 10.113.4.95
+echo "Done with running memcached"
 }
+
 
 
 run_memcached_broken_case() {
@@ -372,7 +386,11 @@ sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
 
 ./scripts/pravin/wait_for_dragonet.sh 4 ${STACKNAME}
 #run_memcached_big
-run_memcached_2_clients_3_load
+#run_memcached_1_clients_1_load
+#run_memcached_2_clients_2_load
+run_memcached_5_clients_2_load
+
+
 #run_memcached_4_clients_2_load
 #run_memcached_for_1_cores
 #run_memcached_single_core_specific_two_flows

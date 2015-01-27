@@ -14,6 +14,7 @@ import qualified Dragonet.Implementation.IPv4 as IP4
 import qualified Dragonet.Search as S
 import qualified Dragonet.Configuration as C
 import qualified Graphs.E10k as E10k
+import qualified Graphs.E10k as SF
 import qualified Data.Maybe  as DM
 import qualified Data.List as DL
 import qualified Dragonet.ProtocolGraph       as PG
@@ -74,13 +75,13 @@ generateFlows dstIP dstPort srcIP_list start_srcP conc = ff
            , flSrcIp    = Just  x
            , flSrcPort  = Just (fromIntegral y) }) f
 
-getClientList clcount =  take clcount $ concat $ repeat clList
+getClientList_single clcount =  take clcount $ concat $ repeat clList
     where
     clList = [
-          "10.113.4.51"  --  ziger1:
-          , "10.113.4.26"  --  sbrinz1:
-          , "10.113.4.57"  --  ziger2:
-          , "10.113.4.29"  --  sbrinz2:
+          "10.113.4.57"  --  ziger2:
+--          , "10.113.4.51"  --  ziger1:
+--          , "10.113.4.26"  --  sbrinz1:
+--          , "10.113.4.29"  --  sbrinz2:
 --          , "10.113.4.20"  --  gruyere:
 --          , "10.113.4.71"  --  appenzeller:
       ]
@@ -96,6 +97,8 @@ getClientList_real clcount =  take clcount $ concat $ repeat clList
 --          , "10.113.4.20"  --  gruyere:
 --          , "10.113.4.71"  --  appenzeller:
       ]
+
+getClientList clcount = getClientList_real clcount
 
 --defaultQueue = [0]
 defaultQueue = []
@@ -182,14 +185,14 @@ flowsToConfigIntel flist fpApp nq =  [
 
 flowsToConfigSF :: [(Flow, Int)] -> Int -> Int -> C.Configuration
 flowsToConfigSF flist fpApp nq =  [
-        ("RxC5TupleFilter", PG.CVList allflowsChanges),
-        ("RxCFDirFilter", PG.CVList [])
+        ("RxC5TupleFilter", PG.CVList allflowsChanges)
         --("RxCFDirFilter", PG.CVList allFlowsFdir)
     ]
     where
     --allflows = allFlowsForConfig flist fpApp nq
     allflows = flist
-    allflowsChanges = map (\(a, b) -> DM.fromJust $ E10k.mkFDirFromFl a b)  allflows
+    --allflowsChanges = map (\(a, b) -> DM.fromJust $ SF.mk5TupleFromFl a b)  allflows
+    allflowsChanges = map (\(a, b) -> SF.mk5TupleFromFl a b)  allflows
 
 -- All flows are:
 realFlows serverIP fpApp clients = generateFlowsWrapper serverIP fpApp clients
@@ -200,7 +203,7 @@ e10kT = E10k.graphH
 e10kU = fst <$> e10kT
 
 hardcodedOracleMemcachedIntel fpApp clients nq costfn prgU =
-    hardcodedOracleMemcached' serverIP cnf0 fpApp clients nq  costfn prgU
+    hardcodedOracleMemcached' oracle serverIP cnf0 fpApp clients nq  costfn prgU
     where
         flowMapperFns = [("balance", allFlowsForConfigBalance),
                          ("priority", allFlowsForConfigPrority)]
@@ -209,13 +212,16 @@ hardcodedOracleMemcachedIntel fpApp clients nq costfn prgU =
                         Nothing -> error $ "Uknown cost function:" ++ costfn
         flows = sortedRealFlows serverIP fpApp clients
         flowsMap = flowMapperFn flows fpApp nq
-        cnf0 = flowsToConfigIntel flowsMap fpApp nq
         serverIP = asiagoIntel_server
 
+        cnf0 = flowsToConfigIntel flowsMap fpApp nq
+        --oracle   = S.E10kOracleHardCoded {S.nnHardcoded = (nq, qmap)}
+        oracle a   = S.E10kOracleHardCoded {S.nnHardcoded = (nq, a)}
+        --oracle   = S.E10kOracleSt {S.nQueues = nq}
 
 
 hardcodedOracleMemcachedSF fpApp clients nq costfn prgU =
-    hardcodedOracleMemcached' serverIP cnf0 fpApp clients nq  costfn prgU
+    hardcodedOracleMemcached' oracle serverIP cnf0 fpApp clients nq  costfn prgU
     where
 
         flowMapperFns = [("balance", allFlowsForConfigBalance),
@@ -225,10 +231,17 @@ hardcodedOracleMemcachedSF fpApp clients nq costfn prgU =
                         Nothing -> error $ "Uknown cost function:" ++ costfn
         flows = sortedRealFlows serverIP fpApp clients
         flowsMap = flowMapperFn flows fpApp nq
-        cnf0 = flowsToConfigSF flowsMap fpApp nq
         serverIP = asiagoSF_server
 
-hardcodedOracleMemcached' serverIP cnf0 fpApp clients nq  costfn prgU = params
+        --cnf0 = SF.cfgEmpty
+        --cnf0 = flowsToConfig (sortedRealFlows serverIP fpApp clients) fpApp nq
+        cnf0 = flowsToConfigSF flowsMap fpApp nq
+
+        oracle a   = S.SFOracleHardCoded {S.nnHardcodedSF = (nq, a)}
+        --oracle   = S.SFOracleSt {S.nQueuesSF = nq}
+
+
+hardcodedOracleMemcached' oracle' serverIP cnf0 fpApp clients nq  costfn prgU = params
     where
 
         flowMapperFns = [("balance", flowsToQueueBalance), ("priority", flowsToQueue)]
@@ -237,11 +250,8 @@ hardcodedOracleMemcached' serverIP cnf0 fpApp clients nq  costfn prgU = params
                         Nothing -> error $ "Uknown cost function:" ++ costfn
 
         qmap = flowMapperFn (sortedRealFlows serverIP fpApp clients) fpApp nq
-        --cnf0 = E10k.cfgEmpty
-        --cnf0 = flowsToConfig (sortedRealFlows serverIP fpApp clients) fpApp nq
+        oracle = oracle' qmap
 
-        oracle   = S.E10kOracleHardCoded {S.nnHardcoded = (nq, qmap)}
-        --oracle   = S.E10kOracleSt {S.nQueues = nq}
         priFn        = (priorityCost' fpApp) nq
         balFn        = S.balanceCost nq
         costFns    = [("balance", balFn), ("priority", priFn)]

@@ -591,22 +591,43 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
             xht_insert(new_flows_ht, new_flow, val);
         } else {
             // if no, print the message, add the flow
+
+            // To print IP addresses
+            char s_ip_str[IPv4_ADDR_STR_SIZE];
+            convert_ipv4(in->attr->ip4_src, s_ip_str);
+            char d_ip_str[IPv4_ADDR_STR_SIZE];
+            convert_ipv4(in->attr->ip4_dst, d_ip_str);
+
             printf
             //mmprint
-                ("NOTE: %s:%s:%d,[TID:%d], New flow found: sport = %"PRIx16", dport=%"PRIx16", "
-            "srcip = %"PRIx32" dstip = %"PRIx32", len = %d \n",
-            __FILE__,__FILE__, __LINE__, dnt_state->tindex,
-            in->attr->udp_sport, in->attr->udp_dport, in->attr->ip4_src,
-            in->attr->ip4_dst, len);
+                ("NOTE: %s:%s:%d,[TID:%d], New flow found: "
+                 "sport = %"PRIx16", dport=%"PRIx16", "
+                 "srcip = %s -> %"PRIx32", dstip = %s -> %"PRIx32", len = %d \n",
+                    __FILE__,__FUNCTION__, __LINE__, dnt_state->tindex,
+                    in->attr->udp_sport, in->attr->udp_dport,
+                    s_ip_str, in->attr->ip4_src,
+                    d_ip_str, in->attr->ip4_dst,
+                    len);
+
             // Adding the flow into flowtable
             myAssert(insert_single_flow_flowtable(new_flow));
 
             // Sending the flow to Dragonet for mapping
             struct dnal_socket_handle *binded_socket = dnt_state->dshList[0];
             //dnal_flags_t dnal_flags = DNAL_FLAGS_MORE;
+            dnal_flags_t dnal_flags = 0;
             send_flow_to_dragonet(binded_socket,
                     &new_flow,
-                    0); // flag saying no more changes
+                    dnal_flags); // flag saying no more changes
+
+            printf("[TID:%d], calling NOOP to enforce flows\n",
+                    dnt_state->tindex);
+
+            // Tell Dragonet that you are done with sending flow information
+            err_expect_ok(dnal_noop(
+                        dnt_state->daq, // application endpoint
+                        0               // flag saying no more changes
+                    ));
 
             // Printing the flow table for debugging purposes
             xht_print(new_flows_ht);
@@ -745,11 +766,19 @@ static int insert_flow_info(struct dn_thread_state *dn_tstate)
 
         struct cfg_udpep *udp = sel_thread_cfg->flows_eplist[i];
         pthread_mutex_lock(&udp->ep_lock);
-
-        printf("[TID:%d] registering Flow(%d): ""lIP: %"PRIu32", "
-                "lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32",\n",
-                dn_tstate->tindex, i, udp->l_ip, udp->l_port,
-                udp->r_ip, udp->r_port);
+        char l_ip_str[IPv4_ADDR_STR_SIZE];
+        convert_ipv4(udp->l_ip, l_ip_str);
+        char r_ip_str[IPv4_ADDR_STR_SIZE];
+        convert_ipv4(udp->r_ip, r_ip_str);
+        printf("[TID:%d] registering Flow(%d): ""lIP: %s -> %"PRIu32", "
+                "lPort: %"PRIu32", rIP: %s -> %"PRIu32", rPort: %"PRIu32",\n",
+                dn_tstate->tindex, i,
+                l_ip_str,
+                udp->l_ip,
+                udp->l_port,
+                r_ip_str,
+                udp->r_ip,
+                udp->r_port);
 
         // Insert this flow into
         flow_entry_t new_flow;
@@ -767,11 +796,18 @@ static int insert_flow_info(struct dn_thread_state *dn_tstate)
         struct dnal_socket_handle *binded_socket = dn_tstate->dshList[0];
         send_flow_to_dragonet(binded_socket, &new_flow, dnal_flags);
 
+
         udp->orig_socket = binded_socket;
         // mark that socket is set and ready
         udp->state = 1;
         pthread_mutex_unlock(&udp->ep_lock);
     } // end for : for each filter in thread block
+
+    // Tell Dragonet that you are done with sending flow information
+    err_expect_ok(dnal_noop(
+                 dn_tstate->daq, // application endpoint
+                 0               // flag saying no more changes
+              ));
 
     flows_inserted = sel_thread_cfg->flows_endpoints_count;
     return sel_thread_cfg->flows_endpoints_count;
@@ -876,11 +912,6 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
 
         } // end for : for each filter in thread block
 
-        insert_flow_info(dn_tstate);
-
-        // Printing the flow table for debugging purposes
-        xht_print(new_flows_ht);
-
         // marking that this thread is done
         sel_thread_cfg->thread_done = 1;
         pthread_mutex_unlock(&sel_thread_cfg->thread_init_lock);
@@ -979,6 +1010,9 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
 
             // Insert the flows
             insert_flow_info(dn_tstate);
+
+            // Printing the flow table for debugging purposes
+            xht_print(new_flows_ht);
 
             // The flow information is sent, now we call noop to actually
             //      enforce the stack to apply the flows

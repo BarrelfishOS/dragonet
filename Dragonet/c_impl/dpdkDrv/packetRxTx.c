@@ -9,6 +9,7 @@
 
 #define MAX_QUEUES                     128
 
+// 00:1E:67:9F:45:07
 #define CONFIG_LOCAL_MAC  0x07459f671e00ULL // 00:1e:67:9f:45:07 // asiago - e10k
 #define CONFIG_LOCAL_IP  0x0a71045f //   "10.113.4.95"
 

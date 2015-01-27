@@ -495,20 +495,29 @@ updateGraphFlows getConf args sstv = do
    -- get list of all endpoints from stack-state
    let
        lbl = "updateGraphFlows"
-       -- OLD implenetation: where flows are taken from endpoints
-       --xforms = [IT.coupleTxSockets, IT.mergeSockets]
-       --flows = map epToFlow $ M.elems $ ssEndpoints ss
-       -- NEW implementations: flows are registered externally
-       --  NB: because there are no socket endpoints now, we use
-       --  balanceAcrossRxQs to distribute spanned sockets across pipelines
+--       allEps   = M.elems $ ssEndpoints ss
+--       prevEps = M.elems prevEpsM
+--       newEps = epsDiff allEps prevEps
+--       rmEps = epsDiff prevEps allEps
        xforms = [IT.balanceAcrossRxQs, IT.coupleTxSockets]
+
        -- non-incremental version
        -- we just use the new flowSt to calculate all flows
-       flows = S.toList $ FL.fsCurrent $ ssFlowsSt ss
+       flows' = S.toList $ FL.fsCurrent $ ssFlowsSt ss
+       -- Reversal of flows was needed in old code.  Let me see if I still need it
+       --flows = reverse $ flows'
+       flows =  flows'
 
    putStrLn $ "Flows:\n" ++ (ppShow $ map flowStr flows)
    putStrLn $ "Flow count: " ++ (show $ length flows)
+   -- These messages are very useful for debugging: PS
+--   putStrLn $ "=====> LAST EPS: " ++ (ppShow prevEps)
+--   putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
+--   putStrLn $ "=====> ADDED: " ++ (ppShow newEps)
+--   putStrLn $ "=====> CURRENT: " ++ (ppShow allEps)
+
    prgConf <- getConf flows
+   putStrLn $ "generated conf:\n" ++ (ppShow $ prgConf)
 
    -- STEP: Create a new combined, but pipelined graph
    --          with both LPG and PRG with configuration applied

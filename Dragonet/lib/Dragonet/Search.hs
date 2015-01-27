@@ -9,7 +9,7 @@ module Dragonet.Search (
   initSearchSt,
   runSearch,
   OracleSt(..),
-  sfOracleInit,
+  initSFOracle,
   searchGreedyFlows,
   hardcodedSearch,
   balanceCost,
@@ -18,7 +18,11 @@ module Dragonet.Search (
   SearchStIO, initSearchIO, runSearchIO,
   E10kOracleSt(..), initE10kOracle,
   E10kOracleHardCoded(..),
+  SFOracleSt(..),
+  SFOracleHardCoded(..),
+
   initSearchParamsE10k,
+  initSearchParamsSF,
 
   IncrSearchParams(..),
   initIncrSearchParams,
@@ -42,6 +46,7 @@ import Dragonet.Flows(Flow (..), flowPred, flowStr)
 
 import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Graphs.E10k                  as E10k
+import qualified Graphs.SF                    as SF
 
 import Graphs.Cfg (prgCfg)
 
@@ -192,6 +197,7 @@ flowsSingleConfs x conf fs =
     [(fl, C.applyConfChange conf change) | (fl,change) <- flowsSingleConfChanges x conf fs]
 
 
+-- ###################################### E10k Oracle ########################
 -- E10K (simple for now) oracle
 data E10kOracleSt = E10kOracleSt {nQueues :: Int, startQ :: Int}
 e10kDefaultQ = 0
@@ -224,21 +230,19 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
         [e10kDefaultQ, xq]
         where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
 
-    -- This is slower for some reason for a large number of flows :(
     confJump = e10kConfQueueJump
 
--- FIXME: FDir filters are not working properly with priority
 -- TODO: avoid symmetric allocation
 -- TODO: smart-wildcard allocation if possible?
 e10kFlowConfChanges :: E10kOracleSt -> C.Configuration -> Flow
                     -> [E10k.ConfChange]
 e10kFlowConfChanges E10kOracleSt {nQueues = nq} cnf fl
     -- allocate 5-tuple filters first, if we can
-    | not rx5tFull  = [E10k.insert5tFromFl fl q | q <- allQs]
+--    | not rx5tFull  = [E10k.insert5tFromFl fl q | q <- allQs]
     | not rxCfdFull = catMaybes $ [E10k.insertFdirFromFl fl q | q <- allQs]
     | otherwise     = []
     where allQs = allQueues nq
-          rx5tFull  = E10k.rx5tFilterTableFull cnf
+--          rx5tFull  = E10k.rx5tFilterTableFull cnf
           rxCfdFull = E10k.rxCfdFilterTableFull cnf
 
 
@@ -315,10 +319,115 @@ instance OracleSt E10kOracleHardCoded E10k.ConfChange where
         [e10kDefaultQ, xq]
         where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
 
--- TODO: Fixme
-type SFOracleSt = E10kOracleSt
+-- ###################################### SF Oracle ########################
 
-sfOracleInit nqueues = E10kOracleSt { nQueues = nqueues, startQ = 0 }
+
+-- SF (simple for now) oracle
+data SFOracleSt = SFOracleSt {nQueuesSF :: Int, startQSF :: Int}
+sfDefaultQ = 0
+
+initSFOracle nq = SFOracleSt { nQueuesSF = nq, startQSF = 0 }
+
+{-|
+  Making the type 'SFOracleSt' member of class "Oracle state" to work as
+  as Oracle for Intel 82599 NIC.
+  It will provide a way to generate initial empty configuation, showing
+  configuration, and querying about affected queues from current configuration.
+ -}
+instance OracleSt SFOracleSt SF.ConfChange where
+    {-|
+     - Basic implementation which suggests a putting current flow in all
+     - the queues, generating nQueue number of configurations.
+     - This implementation does not care for current state of queues,
+     -  and counts on cost-function to help in selecting proper queue.
+    -}
+    flowConfChanges = sfFlowConfChanges
+    flowConfChangesS = sfFlowConfChangesS
+
+    -- QUESTION: Is it assumed that there will be only one operation in
+    --      conf change?
+    -- affectedQueues SFOracleSt { nQueuesSF = nq } _ _ = allQueues nq
+    affectedQueues SFOracleSt { nQueuesSF = nq } conf (SF.Insert5T c5t) =
+        [sfDefaultQ, xq]
+        where xq = SF.c5tQueue $ SF.parse5t c5t
+
+    confJump = sfConfQueueJump
+
+-- TODO: avoid symmetric allocation
+-- TODO: smart-wildcard allocation if possible?
+sfFlowConfChanges :: SFOracleSt -> C.Configuration -> Flow
+                    -> [SF.ConfChange]
+sfFlowConfChanges SFOracleSt {nQueuesSF = nq} cnf fl
+    -- allocate 5-tuple filters first, if we can
+    | not rx5tFull  = [SF.insert5tFromFl fl q | q <- allQs]
+    | otherwise     = []
+    where allQs = allQueues nq
+          rx5tFull  = SF.rx5tFilterTableFull cnf
+
+-- TODO: see above
+sfFlowConfChangesS :: SFOracleSt -> C.Configuration -> Flow
+                    -> ([SF.ConfChange], SFOracleSt)
+sfFlowConfChangesS o@(SFOracleSt {nQueuesSF = nq, startQSF = startQ}) cnf fl
+    -- allocate 5-tuple filters first, if we can
+    | not rx5tFull  = ([SF.insert5tFromFl fl q | q <- allQs], o')
+    | otherwise     = ([], o)
+    where allQs = allQueues_ startQ nq
+          o' =  o { startQSF = startQ + 1}
+          rx5tFull  = SF.rx5tFilterTableFull cnf
+
+
+sfConfQueueJump :: SFOracleSt -> [SF.ConfChange] -> [Flow]
+                  -> ([(Flow, SF.ConfChange)], [Flow])
+sfConfQueueJump o ccs fs = (keep, map fst rm)
+    where -- rmQ = 9 -- this will not work for multiple jumps!
+          rmQ = startQSF o --  will this? maybe...
+          (rm,keep) = L.partition (\t -> rmQ == SF.ccQueue (snd t))
+                      $ zip fs ccs
+
+
+-- SF (simple for now) oracle
+newtype SFOracleHardCoded = SFOracleHardCoded {
+        nnHardcodedSF :: (Int, [(Flow, Int, Int)])
+                    -- (totalQueues, [(Flow, Qid, FilterType(1==fidr, 2 == Ftuple))])
+        }
+
+{-|
+  Making the type 'SFOracleHardCoded' member of class "Oracle state" to work as
+  as Oracle for SF NIC.
+  It will provide a way to generate initial empty configuation, showing
+  configuration, and querying about affected queues from current configuration.
+ -}
+instance OracleSt SFOracleHardCoded SF.ConfChange where
+    {-|
+     - Basic implementation which suggests a putting current flow in presicely
+     - fixed queue based on initial hardcoded values.
+    -}
+    flowConfChanges SFOracleHardCoded { nnHardcodedSF = (nq, tbl) } c fl = ans
+        where
+        -- perform a lookup of a flow in the hardcoded table
+        -- the lookup should give a filter type and queue-no.
+        -- return that.
+            f = filter (\(f, q, fil) -> f == fl) $ tbl
+
+            ans
+              | length(f) > 1 = error ("ERROR: there must be repeat flow, as more than one flow matches.")
+              | length(f) == 0 = []
+              | (myThird $ head f) == 1 = [SF.Insert5T $ SF.mk5TupleFromFl fl (mySnd $ head f)]
+              | otherwise = error ("ERROR: wrong type of flow")
+
+    flowConfChangesS = error "NYI!"
+
+    -- QUESTION: Is it assumed that there will be only one operation in
+    --      conf change?
+    -- affectedQueues SFOracleHardCoded { nnQueues = nq } _ _ = allQueues nq
+    affectedQueues SFOracleHardCoded { nnHardcodedSF = nhw } conf (SF.Insert5T c5t) =
+        [sfDefaultQ, xq]
+        where xq = SF.c5tQueue $ SF.parse5t c5t
+
+initSearchParamsSF nqueues = initSearchParams {sOracle = oracle}
+    where oracle = initSFOracle nqueues
+
+-- ###################################### END: SF Oracle ########################
 
 initSearchParams :: (OracleSt o a) => SearchParams o a
 initSearchParams = SearchParams {

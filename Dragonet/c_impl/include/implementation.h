@@ -59,7 +59,7 @@ get_tsc(void) {
 //  This is for debugging purpose to show where exactly packets are going
 //  Currently supported by E10k queues,  sf queues, fancyecho
 //  memecached has its own copy of these variables in dnet_interface.h
-#define SHOW_INTERVAL_STATS  1
+//#define SHOW_INTERVAL_STATS  1
 //#define INTERVAL_STAT_FREQUENCY     (1)
 #define INTERVAL_STAT_FREQUENCY     (1000)
 
@@ -302,6 +302,16 @@ struct pkt_stats {
 };
 extern struct pkt_stats debug_pkt_stats;
 void show_pkt_stats(struct pkt_stats *stats);
+
+#define IPv4_ADDR_STR_SIZE          (18)
+static inline char *convert_ipv4(uint32_t ip, char *str);
+static inline char *convert_ipv4(uint32_t ip, char *str)
+{
+   unsigned char *addr = (unsigned char*)&ip;
+   snprintf(str, (IPv4_ADDR_STR_SIZE - 1), "%hhu.%hhu.%hhu.%hhu",
+        addr[0], addr[1], addr[2], addr[3]);
+   return str;
+}
 
 
 #endif // IMPLEMENTATION_H_

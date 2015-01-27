@@ -7,11 +7,21 @@ module Graphs.SF (
     CFDirTuple(..),
     prepareConf,
 
-    parse5tCFG, c5tString, c5tFullString,
+    strToC5t,
+    ConfChange(..),
+    cfgStr,
+
+    parse5tCFG, c5tString, c5tFullString, parse5t,
     parseFDirCFG, cFDtString,
+    mk5TupleFromFl,
+    ccQueue,
 
     flowQueue,
-    graphH, graphH_
+    graphH, graphH_,
+    ftCount,
+    cfgEmpty,
+    rx5tFilterTableFull,
+    insert5tFromFl,
 ) where
 
 import Dragonet.ProtocolGraph
@@ -22,7 +32,9 @@ import Dragonet.Unicorn
 import qualified Dragonet.Configuration       as C
 import Dragonet.Implementation.IPv4 as IP4
 import qualified Dragonet.Semantics as SEM
+
 import Dragonet.Flows (Flow (..))
+import Dragonet.Conventions (QueueId)
 
 import qualified Data.Graph.Inductive as DGI
 import qualified Data.Graph.Inductive.Query.DFS as DFS
@@ -53,6 +65,9 @@ trN = \x  _ -> x
 
 type QueueID = Int
 
+-- FIXME: This number must match with number in prgSFImpl.unicorn
+--      I need a way to automatically getting number from PRG
+ftCount = 4048
 
 isRxQValidN :: Int -> PGNode -> Bool
 isRxQValidN i (_,n) =
@@ -62,11 +77,21 @@ isRxQValidN i (_,n) =
 addCfgFun :: Node -> C.ConfFunction
 addCfgFun n
     | l == "RxC5TupleFilter" = config5tuple
-    | l == "RxCFDirFilter"   = configFDir
+    | l == "RxCFDirFilterDel"   = configFDir
     | l == "RxQueues"        = configRxQueues
     | l == "TxQueues"        = configTxQueues -- not a real configuration, but helpful for building PRGs
     | otherwise = error $ "Unknown LPG CNode: '" ++ l ++ "'"
     where l = nLabel n
+
+cfgEmpty = [
+    ("RxC5TupleFilter", PG.CVList [])
+ ]
+
+rx5tFilterTableFull :: C.Configuration -> Bool
+rx5tFilterTableSize  = ftCount
+rx5tFilterTableFull cnf = case L.lookup "RxC5TupleFilter" cnf of
+    Nothing            -> False
+    Just (PG.CVList l) -> length l >= rx5tFilterTableSize
 
 
 -------------------------------------------------------------------------------
@@ -627,6 +652,89 @@ graphH_ fname = do
 graphH :: IO (PGraph,SEM.Helpers)
 graphH = graphH_ "Graphs/SF/prgSFImpl.unicorn"
 
+--
+-- ConfChange
+--
+
+{-|
+  The 'SFConfChange' type holds all the legal changes in the configuration
+  of the SF NIC.  This type is an instance of generic ConfChange.
+ -}
+data ConfChange = Insert5T PG.ConfValue
+    deriving (Eq, Ord, Show) -- Not exactly needed, but good to have
+
+addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
+addToCVL (PG.CVList l) v = PG.CVList $ v:l
+
+-- Overwrite the old value(s) with new value
+overwriteCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
+overwriteCVL (PG.CVList l) v = PG.CVList $ [v]
+
+instance C.ConfChange ConfChange where
+    {-|
+      The function 'applyConfChange' will add the given 5tuple filter into
+      the list if existing 5tuple fitlers, while keeping everything else
+      in the configuration same.
+      TODO: Add code to add other type of actions as well (fdir, delete, update)
+     -}
+    --applyConfChange :: C.Configuration -> E10kConfChange -> C.Configuration
+    emptyConfig _ = cfgEmpty
+    showConfig _ = cfgStr
+    applyConfChange conf (Insert5T c5t) = ("RxC5TupleFilter", new5t):rest
+        where new5t :: PG.ConfValue
+              new5t = addToCVL old5t c5t
+              old5t :: PG.ConfValue
+              old5t = case L.lookup "RxC5TupleFilter" conf of
+                        Just l -> l
+                        Nothing -> error "add5TupleToConf: Did not find RxC5TupleFilter"
+
+              rest :: C.Configuration
+              rest  = L.filter ((/="RxC5TupleFilter") . fst) conf
+
+    --applyConfChange conf _ = error "Invalid action!"
+
+    incrConf (Insert5T c5t)     = [("RxC5TupleFilter", c5t)]
+    --incrConf _     = error "Invalid incrConf action!"
+
+    -- ARGH :(
+    show = Prelude.show
+
+cvMInt :: Integral a => Maybe a -> PG.ConfValue
+cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
+
+ccQueue :: ConfChange -> QueueId
+ccQueue (Insert5T c5t) = case c5t of
+                             PG.CVTuple (_:_:_:_:_:_:(PG.CVInt qid):[]) -> (fromIntegral qid)
+                             _ -> error $ "ccQeuue: could not match c5t=" ++ (ppShow c5t)
 
 
+insert5tFromFl :: Flow -> QueueId -> ConfChange
+insert5tFromFl fl qid = Insert5T $ mk5TupleFromFl fl qid
+
+mk5TupleFromFl :: Flow -> QueueId -> PG.ConfValue
+mk5TupleFromFl fl@(FlowUDPv4 {}) q =
+    PG.CVTuple [ cvMInt $ sIP,
+                 cvMInt $ dIP,
+                 PG.CVMaybe $ Just $ PG.CVEnum 1,
+                 cvMInt $ sP,
+                 cvMInt $ dP,
+                 PG.CVInt prio,
+                 PG.CVInt $ fromIntegral q]
+    where
+       sIP  = flSrcIp   fl
+       dIP  = flDstIp   fl
+       sP   = flSrcPort fl
+       dP   = flDstPort fl
+       prio = 1
+
+
+cfgStr :: C.Configuration -> String
+cfgStr cnf_ = ret
+    where  cnf :: [(String, PG.ConfValue)]
+           cnf = cnf_
+           ret = "CONF:\n" ++ L.intercalate "\n" (c5t)
+           c5t = case L.lookup "RxC5TupleFilter" cnf of
+               Nothing -> []
+               Just c  -> map (((++) " ") . c5tFullString)
+                          $ parse5tCFG c
 

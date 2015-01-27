@@ -30,6 +30,7 @@ import qualified Util.GraphHelpers as GH
 import qualified Control.Monad.State as ST
 import Data.Maybe
 import Debug.Trace (trace)
+import Text.Show.Pretty (ppShow)
 
 type Configuration = [(String,PG.ConfValue)]
 
@@ -121,7 +122,10 @@ applyCNode_ isIncremental config (g,nodes) ctx@(_,nid,node,_) = ret
         ret = case conf of
             Just x -> let (g', nodes') = doApplyCNode isIncremental x g ctx
                       in  (g', nodes ++ nodes')
-            Nothing -> (g, nodes)
+            Nothing -> error ("ERROR: Configuration node "  ++ (ppShow config)
+                    ++ " was not found.\n"
+                    ++ "   Treating this as an error!!!")
+            --Nothing -> (g, nodes)
 
 -- Apply specified configuration to graph
 applyConfig_ :: Bool -> Configuration -> PG.PGraph -> (PG.PGraph, [DGI.Node])

@@ -98,18 +98,19 @@ controlThread chan sh = do
     putStrLn "e10k-driver-thread: Started "
     CTRL.waitReady sh
     putStrLn "e10k-driver-thread: Card ready "
+
     -- Start working on chan
     forever $ do
         act <- STM.atomically $ STM.readTChan chan
         --putStrLnDbgN $ "e10k-driver-thread: received action request : " ++ (show act)
         case act of
             CfgASet5Tuple idx ft ->
-                CTRL.ftSet sh idx ft
+                CTRL.ftSet c5TupleFilters sh idx ft
             CfgAClear5Tuple idx ->
                 CTRL.ftUnset sh idx
 
             CfgASetFDir idx ft ->
-                CTRL.fdirSet sh idx ft
+                CTRL.fdirSet cFDirFilters sh idx ft
             CfgAClearFDir idx ->
                 CTRL.fdirUnset sh idx
 
@@ -265,7 +266,7 @@ implCfg5Tuple ::
 implCfg5Tuple tcstate chan sh config = do
     cstate' <- STM.atomically $ STM.readTVar tcstate
 
-    --putStrLnDbgN $ "e10k-implCfg5Tuple: " ++ show config
+    putStrLnDbgN $ "e10k-implCfg5Tuple: " ++ (ppShow config)
     -- Handling 5tuple filters
     let Just (PG.CVList tuples) = lookup "RxC5TupleFilter" config
 
@@ -295,6 +296,15 @@ implCfg5Tuple tcstate chan sh config = do
         ftm' = foldl (flip M.delete) ftm toRemove
         ftm'' = foldl (flip $ uncurry M.insert) ftm' toAddId
 
+    putStrLnDbgN $ "e10k-impl5tpl: existing : " ++ (ppShow existing)
+    putStrLnDbgN $ "e10k-impl5tpl: toRemove : " ++ (ppShow toRemove)
+    putStrLnDbgN $ "e10k-impl5tpl: toAdd : " ++ (ppShow toAdd)
+
+    putStrLnDbgN $ "e10k-impl5tpl: toRemIDs : " ++ (show toRemIds)
+    putStrLnDbgN $ "e10k-impl5tpl: useableIDs : " ++ (show usableIds)
+    putStrLnDbgN $ "e10k-impl5tpl: toAddID : " ++ (show toAddId)
+
+
     -- If necessary, clear 5tuples in hardware
     cstate'' <- if length toAdd < length toRemIds
         then do
@@ -319,12 +329,12 @@ implCfg5Tuple tcstate chan sh config = do
 
     -- Send the message to the driver thread to add the filters
 
-    --putStrLnDbgN $ "e10k-impl5tpl: adding flow " ++ (show toAddId)
+    putStrLnDbgN $ "e10k-impl5tpl: adding flow " ++ (ppShow toAddId)
     forM_ toAddId $ \(ft,i) ->
         STM.atomically $ STM.writeTChan chan $ CfgASet5Tuple i ft
     STM.atomically $ STM.writeTVar tcstate cstate''
     return ()
-    --putStrLnDbgN $ "e10k-impl5tuple: filters to add " ++ (show toAddId)
+    putStrLnDbgN $ "e10k-impl5tuple: filters to add " ++ (ppShow toAddId)
     where
         {-|
          - Function to parse the  configuration and return 5tuple filter
@@ -411,12 +421,12 @@ llvm_helpers = "llvm-helpers-dpdk"
 
 
 -- | Number of 5tuple filters supported by hardware
-c5TupleFilters = CTRL.ftCount
+c5TupleFilters = E10k.ftCount
 
 -- | Number of FDir filters supported by hardware
 -- FIXME: It will not work for values more than 128 as somewhere we are using
 --      Word8 to store and pass these values
-cFDirFilters = CTRL.fdirCount
+cFDirFilters = E10k.fdirCount
 
 
 main = do
@@ -449,8 +459,11 @@ main = do
     -- Prepare graphs and so on
     prgH@(prgU,_) <- E10k.graphH
 
-    let e10kOracle = Search.E10kOracleSt {Search.nQueues = nq}
-        priFn      = S1.priorityCost nq
+    --let e10kOracle = Search.E10kOracleSt {Search.nQueues = nq}
+    let e10kOracle = Search.initE10kOracle nq
+
+        --priFn      = S1.priorityCost nq
+        priFn      = (S1.priorityCost' (fromIntegral concurrency)) nq
         balFn      = Search.balanceCost nq
         strategy   = Search.searchGreedyFlows
         costFns    = [("balance", balFn), ("priority", priFn)]

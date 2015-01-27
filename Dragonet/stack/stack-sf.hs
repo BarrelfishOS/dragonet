@@ -34,6 +34,13 @@ import Text.Show.Pretty (ppShow)
 import qualified Scenarios.S1 as S1
 import qualified Scenarios.S3 as S3
 
+tr a b = trace b a
+trN a b = a
+
+putStrLnDbg x = putStrLn x
+--putStrLnDbgN x = return ()
+putStrLnDbgN x = putStrLn x
+
 
 data CfgAction =
     CfgASet5Tuple Int CTRL.FTuple |
@@ -51,7 +58,7 @@ controlThread chan sh = do
     forever $ do
         act <- STM.atomically $ STM.readTChan chan
         case act of
-            CfgASet5Tuple idx ft -> CTRL.ftSet sh idx ft
+            CfgASet5Tuple idx ft -> CTRL.ftSet c5TupleFilters sh idx ft
             CfgAClear5Tuple idx -> CTRL.ftUnset sh idx
 
 data CfgState = CfgState {
@@ -74,7 +81,9 @@ implCfg tcstate chan sh config = do
             tid <- forkIO $ controlThread chan sh
             return $ cstate { csThread = Just tid }
         Just _ -> return cstate
-    let Just (PG.CVList tuples) = lookup "RxC5TupleFilter" config
+    let Just (PG.CVList tuples5t) = lookup "RxC5TupleFilter" config
+        tuples = tuples5t
+
     -- Make sure there are not too many entries
     if length tuples > (fromIntegral c5TupleFilters)
         then error ("More than " ++ (show c5TupleFilters) ++ " 5-tuples configured")
@@ -95,7 +104,17 @@ implCfg tcstate chan sh config = do
         -- Remove old 5ts from map and add new ones
         ftm' = foldl (flip M.delete) ftm toRemove
         ftm'' = foldl (flip $ uncurry M.insert) ftm' toAddId
+
+    putStrLnDbgN $ "sf-impl5tpl: existing : " ++ (ppShow existing)
+    putStrLnDbgN $ "sf-impl5tpl: toRemove : " ++ (ppShow toRemove)
+    putStrLnDbgN $ "sf-impl5tpl: toAdd : " ++ (ppShow toAdd)
+    putStrLnDbgN $ "sf-impl5tpl: toRemIDs : " ++ (show toRemIds)
+    putStrLnDbgN $ "sf-impl5tpl: useableIDs : " ++ ( show $ take 5 usableIds)
+    putStrLnDbgN $ "sf-impl5tpl: toAddID : " ++ (show toAddId)
+
+    putStrLnDbgN $ "implCfg: " ++ (ppShow fts)
     -- If necessary, clear 5tuples in hardware
+
     cstate'' <- if length toAdd < length toRemIds
         then do
             let toFree = drop (length toAdd) toRemIds
@@ -109,6 +128,9 @@ implCfg tcstate chan sh config = do
             return cstate' {
                         cs5TUnused = drop toAlloc $ cs5TUnused cstate',
                         cs5Tuples = ftm'' }
+
+    putStrLnDbgN $ "sf-impl: adding flow " ++ (show toAddId)
+    -- Send the message to the driver thread to add the filters
     forM_ toAddId $ \(ft,i) ->
         STM.atomically $ STM.writeTChan chan $ CfgASet5Tuple i ft
     STM.atomically $ STM.writeTVar tcstate cstate''
@@ -119,11 +141,10 @@ implCfg tcstate chan sh config = do
                                 PG.CVMaybe mProto,
                                 PG.CVMaybe msP,
                                 PG.CVMaybe mdP,
-                                --PG.CVInt prio,
+                                PG.CVInt prio,
                                 PG.CVInt queue]) =
             CTRL.FTuple {
-                --CTRL.ftPriority = fromIntegral $ prio,
-                CTRL.ftPriority = fromIntegral $ 1,
+                CTRL.ftPriority = fromIntegral $ prio,
                 CTRL.ftQueue = fromIntegral $ queue,
                 CTRL.ftL3Proto = Just CTRL.L3IPv4,
                 CTRL.ftL4Proto = parseProto <$> mProto,
@@ -137,7 +158,6 @@ implCfg tcstate chan sh config = do
         parseProto (PG.CVEnum 1) = CTRL.L4UDP
         -- parseProto PG.CVEnum 2 = CTRL.L4SCTP
         -- parseProto PG.CVEnum 3 = CTRL.L4Other
-
 
 
 -- Create separate pipelines for rx and tx per hardware queue
@@ -156,7 +176,7 @@ plAssignMerged _ _ (_,n) = PG.nTag n
 llvm_helpers = "llvm-helpers-sf"
 
 -- | Number of 5tuple filters supported by hardware
-c5TupleFilters = CTRL.ftCount
+c5TupleFilters = SF.ftCount
 
 main = do
     ((nq',costfn,oraclefn,concurrency,clients) :: (Int,String,String,Int,Int)) <- RA.readArgs
@@ -182,8 +202,9 @@ main = do
     -- Prepare graphs and so on
     prgH@(prgU,_) <- SF.graphH
 
-    let sfOracle = Search.sfOracleInit nq
-        priFn      = S1.priorityCost nq
+    let sfOracle = Search.initSFOracle nq
+        --priFn      = S1.priorityCost nq
+        priFn      = (S1.priorityCost' (fromIntegral concurrency)) nq
         balFn      = Search.balanceCost nq
         strategy   = Search.searchGreedyFlows
         costFns    = [("balance", balFn), ("priority", priFn)]
