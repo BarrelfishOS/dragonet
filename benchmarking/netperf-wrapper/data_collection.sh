@@ -4,50 +4,75 @@ OUTPUTDIRPARENT="./dpdk_test_deleteme/"
 OUTPUTDIRPARENT="./dpdk_test_memcached_test_10Q/"
 OUTPUTDIRPARENT="./dpdk_test_memcached_test1_5Q/"
 OUTPUTDIRPARENT="./output_runs_balance/"
+OUTPUTDIRPARENT="./output_runs_deletemev2/"
+OUTPUTDIRPARENT="./output_runs_posterV3/"
+OUTPUTDIRPARENT="./output_runs_8cores/"
+OUTPUTDIRPARENT="./output_runs_linuxTest/"
+OUTPUTDIRPARENT="./output_runs_linuxTest_deleteme/"
+
+# For debugging of dynamic connection detection
+OUTPUTDIRPARENT="./output_runs_dynamic_debug/"
+
+WORKLOADTYPE="priority"
+WORKLOADTYPE="priBal"
+WORKLOADTYPE="linux"
+WORKLOADTYPE="balance"
+WORKLOADTYPE="priBal"
+WORKLOADTYPE="priSmall"
+WORKLOADTYPE="dynamic"
 
 startStack() {
 #./cleanupServer.sh
 
-initConcurrency=${CONCURRENCY}
+initConcurrency=${LOAD}
 
-title="STARTSTACK_Priority_Test_${UDP_TEST_NAME},CONCUR_${initConcurrency},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-OUTDIR="${OUTPUTDIRPARENT}/STARTSTACK/priority/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${initConcurrency}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+title="STARTSTACK_${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${initConcurrency},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+OUTDIR="${OUTPUTDIRPARENT}/STARTSTACK/${WORKLOADTYPE}/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${initConcurrency}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift 0  ${ClientList} --servercores ${SRVCORES} \
 --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES}  --packet ${PACKETSIZE} --concurrency ${initConcurrency} \
 -I 1 -l 5 -H ${SERVERNAME} -T ${SERVERIP} -c ${ECHO_SERVER} ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
 -t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
+grep -e  'Runner: memaslap' -e 'Run time:'  "${OUTDIR}/${title}.runlog"
 #exit 0
 }
 
 check_working_dummy() {
 
-title="DUMMY_Priority_Test_${UDP_TEST_NAME},CONCUR_${CONCURRENCY},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-OUTDIR="${OUTPUTDIRPARENT}/DUMMY/priority/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${CONCURRENCY}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+dummyRT=1
+title="DUMMY_${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+OUTDIR="${OUTPUTDIRPARENT}/DUMMY/${WORKLOADTYPE}/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift 0  ${ClientList} --servercores ${SRVCORES} \
---serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES} --packet ${PACKETSIZE} --concurrency ${CONCURRENCY} \
--I 1 -l 15 -H ${SERVERNAME} -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
+--serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES} --packet ${PACKETSIZE} --concurrency ${LOAD} \
+-I 1 -l ${dummyRT} -H ${SERVERNAME} -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
 -t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
+grep -e  'Runner: memaslap' -e 'Run time:'  "${OUTDIR}/${title}.runlog"
 #exit 0
 }
 
 
-
 getData() {
 
-title="Priority_Test_${UDP_TEST_NAME},CONCUR_${CONCURRENCY},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-OUTDIR="${OUTPUTDIRPARENT}/priority/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${CONCURRENCY}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+title="${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
+REPEAT=3
 ./netperf-wrapper -d 0 --udp --serverCoreShift 0  ${ClientList} --servercores ${SRVCORES} \
---serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES} --packet ${PACKETSIZE} --concurrency ${CONCURRENCY} \
--I 3 -l 50 -H ${SERVERNAME} -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
+--serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES} --packet ${PACKETSIZE} --concurrency ${LOAD} \
+-I ${REPEAT} -l 50 -H ${SERVERNAME} -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
 -t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
-
+grep -e  'Runner: memaslap' -e 'Run time:'  "${OUTDIR}/${title}.runlog"
 }
+
+######################
+SERVERNAME="babybel2"
+CLIENTCORES=1
+######################
+
 
 #ClientList="-C ziger1 -C ziger2 -C babybel3 -C gottardo -C appenzeller-e1000 -C sbrinz1 -C gruyere -C sbrinz2 "
 ClientList="-C ziger1 -C sbrinz1 "
@@ -57,24 +82,36 @@ ClientList="-C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gruyere -C appenzeller"
 ClientList="-C ziger1 -C ziger2 -C gruyere"
 ClientList="-C ziger1 -C ziger2"
 ClientList="-C sbrinz1 -C sbrinz2"
+ClientList="-C ziger1 -C sbrinz1"
+
+ClientList="-C ziger2 -C sbrinz2"
 ClientList="-C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2"
+ClientList="-C ziger2 "
 
-SERVERNAME="babybel2"
+######################
 
-CLIENTCORES=1
+NICTYPE="NIC_SF"
+ECHO_SERVER="memcached_onload"
+SERVERIP=10.113.4.195
 
-NICTYPE="NIC_Intel"
-ECHO_SERVER="dpdk"
-SERVERIP=10.113.4.95
+NICTYPE="NIC_SF"
+ECHO_SERVER="memcached_linux"
+SERVERIP=10.113.4.195
 
 NICTYPE="NIC_SF"
 ECHO_SERVER="llvmSF"
 SERVERIP=10.113.4.195
 
+NICTYPE="NIC_Intel"
+ECHO_SERVER="dpdk"
+SERVERIP=10.113.4.95
 
+######################
 
 #SERVERNAME="sbrinz1"
 #SERVERIP=10.113.4.26
+
+######################
 
 UDP_TEST_NAME="udp_rr"
 UDP_TEST_NAME="memcached_rr"
@@ -86,17 +123,19 @@ PACKETSIZE=1024
 
 ######################
 
-CONCURRENCY=1
-CONCURRENCY=4
-CONCURRENCY=32
+LOAD=1
+LOAD=4
+LOAD=32
 ######################
 
-HWQUEUE=5
+HWQUEUE=8
 HWQUEUE=10
+HWQUEUE=5
 ######################
 
-SRVCORES=5
+SRVCORES=8
 SRVCORES=10
+SRVCORES=5
 ######################
 
 
@@ -111,9 +150,9 @@ CLIENTCOUNT=4
 
 show_usage() {
         echo "Please select what you want to run"
-        echo "Usage: ${0} [-c -s -C]"
+        echo "Usage: ${0} [-c -s -l]"
         echo "           -c <n> -->  client count (n clients)"
-        echo "           -C <n> -->  concurrency (n concurrent sessions per client)"
+        echo "           -l <n> -->  load (n concurrent sessions per client)"
         echo "           -s <n> -->  n server cores/threads"
         echo "           -S     -->  start stack"
         echo "           -d     -->  dummy run"
@@ -132,19 +171,20 @@ then
     exit 1
 fi
 
-while getopts ":c:C:s:SdhxXr" opt; do
+while getopts ":c:l:s:SdhxXr" opt; do
   case $opt in
     c)
         echo "Setting client-count to $OPTARG (instead of default $CLIENTCOUNT)"
         CLIENTCOUNT=$OPTARG
       ;;
-    C)
-        echo "Setting concurrency to $OPTARG (instead of default $CONCURRENCY)"
-        CONCURRENCY=$OPTARG
+    l)
+        echo "Setting load to $OPTARG (instead of default $LOAD)"
+        LOAD=$OPTARG
       ;;
     s)
         echo "Setting server-cores/threads to $OPTARG (instead of default $SRVCORES)"
         SRVCORES=$OPTARG
+        HWQUEUE=${SRVCORES}
       ;;
     S)
         RUNSTACK="yes"

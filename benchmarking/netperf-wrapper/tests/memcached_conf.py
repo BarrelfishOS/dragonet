@@ -42,6 +42,10 @@ def client_to_10G_IP(client) :
         return client[isMultiNICMachine+2:]
 
 
+COSTFN = "balance"
+COSTFN = "priority"
+ORACLE= "hardcoded"
+ORACLE= "greedy"
 
 def SRV_CMDS(name):
 
@@ -70,9 +74,8 @@ def SRV_CMDS(name):
                           #dragonet_container[name]['deploy_stack'],
                           #HWQUEUES, "priority")
                           dragonet_container[name]['deploy_stack'],
-#                          HWQUEUES, "priority")
-                          HWQUEUES, "balance")
-                        + " %s %d %d " % ( "hardcoded", CONCURRENCY,
+                          HWQUEUES, COSTFN)
+                        + " %s %d %d " % (ORACLE, CONCURRENCY,
                             len(client_names))
                         ,
 
@@ -129,19 +132,28 @@ def SRV_CMDS(name):
                 }
 
 
-    if name == "memcached_onload" :
+    if name == "memcached_linux" :
         return {
 
                     "init_cmd_special" : [
-                      "cd dragonet/Dragonet/ ; sudo taskset -c %s " % (
-                          toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))
+
+                      # run server
+                      "cd %s ; " % (
+                        "dragonet/Dragonet/ ")
+                        + "sudo %s " % (get_isolation_container(is_server=True))
                         + " ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log  "
-                        + " %s ../benchmarking/memcached/memcached -c 64000 -m 64000 -u root %s %d -t %d -l %s " % (
-                            onload_prefix, "-p 0 -U ",
-                            SERVER_INITIAL_PORT, SERVER_CORES, TARGET),
+                        + " ../benchmarking/memcached/memcached "
+                        + " -c 64000 -m 64000 -u root %s %d -t %d -l %s " % (
+                            "-p 0 -U ",
+                            SERVER_INITIAL_PORT, SERVER_CORES, TARGET)
+                        ,
+
                       "sleep 2",
+
                       "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
-                                    ],
+                     ],
+
+                    "is_ready_cmd_special" : [],
 
                     "init_cmd" : [],
                     "exec_cmd" : "echo 'memcached should be already running'",
@@ -151,8 +163,46 @@ def SRV_CMDS(name):
                            "./ethtool_out_1", "./ethtool_out_2"),
                        "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s 1000 | grep rx_packets " % (
                            "./ethtool_out_1", "./ethtool_out_2"),
-                       "sudo memcached || true",
+                       #"sudo killall memcached || true",
                                  ],
+                    "out_cmd" : [],
+                }
+
+
+
+    if name == "memcached_onload" :
+        return {
+
+
+                    "init_cmd_special" : [
+
+
+                      # run server
+                      "cd %s ; " % (
+                        "dragonet/Dragonet/ ")
+                        + "sudo %s " % (get_isolation_container(is_server=True))
+                        + " ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log  "
+                        + " %s ../benchmarking/memcached/memcached " % (onload_prefix)
+                        + " -c 64000 -m 64000 -u root %s %d -t %d -l %s " % (
+                            "-p 0 -U ",
+                            SERVER_INITIAL_PORT, SERVER_CORES, TARGET)
+                        ,
+
+                      "sleep 2",
+                      "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
+                     ],
+
+                    "init_cmd" : [],
+                    "exec_cmd" : "echo 'memcached should be already running'",
+                    "kill_cmd" : [
+                       "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_2"),
+                       "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s " % (
+                           "./ethtool_out_1", "./ethtool_out_2"),
+                       "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s 1000 | grep rx_packets " % (
+                           "./ethtool_out_1", "./ethtool_out_2"),
+                       #"sudo killall memcached || true",
+                     ],
+
                     "out_cmd" : [],
                 }
 
