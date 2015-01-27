@@ -53,7 +53,9 @@ controlThread chan sh = do
     forever $ do
         act <- STM.atomically $ STM.readTChan chan
         case act of
-            CfgASet5Tuple idx ft -> CTRL.ftSet sh idx ft
+            -- XXX: CHECKME
+            -- CfgASet5Tuple idx ft -> CTRL.ftSet sh idx ft
+            CfgASet5Tuple idx ft -> CTRL.ftSet E10k.ftCount sh idx ft
             CfgAClear5Tuple idx -> CTRL.ftUnset sh idx
 
 data CfgState = CfgState {
@@ -182,13 +184,22 @@ tapPrgArgs = do
                            , SS.stLlvmH = "llvm-helpers-tap"
                            , SS.stCfgImpl = dummyImplFn }
 
+dpdkPrgArgs :: IO SS.StackPrgArgs
+dpdkPrgArgs = do
+    prgH <- E10k.graphH
+    return SS.StackPrgArgs { SS.stPrgH = prgH
+                           , SS.stLlvmH = "llvm-helpers-dpdk"
+                           , SS.stCfgImpl = error "dpkdPrgArgs: FILLME!" }
+
 data StackE10kOpts = StackE10kOpts {
       optNq          :: Int
     , optCostFn      :: (Int -> SE.CostQueueFn, [FL.Flow] -> [FL.Flow])
+    , optPrgArgs     :: (String, IO SS.StackPrgArgs)
     , optIncremental :: Bool
-    , optDummy       :: Bool
 } deriving (Show)
 
+instance Show (String, IO SS.StackPrgArgs) where
+    show (x,_) = show x
 
 runStackE10k :: StackE10kOpts -> IO ()
 runStackE10k opts@(StackE10kOpts {optIncremental = incremental}) = do
@@ -204,7 +215,6 @@ doRunStackE10kIncremental opts = do
     let nq       = optNq opts
         costFn   = (fst $ optCostFn opts) nq
         sortFn   = snd $ optCostFn opts
-        dummy    = optDummy opts
 
     -- search parameters
     let sParams = SE.initIncrSearchParams {
@@ -214,9 +224,7 @@ doRunStackE10kIncremental opts = do
                         , SE.isOrderFlows = sortFn }
 
     -- PRG
-    prgArgs <- case dummy of
-                True -> tapPrgArgs
-                False -> e10kPrgArgs
+    prgArgs <- (snd $ optPrgArgs opts)
 
     se0 <- SE.initIncrSearchIO sParams
     SS.instantiateIncrFlowsIO_ SE.runIncrSearchIO se0 plAssignMerged prgArgs
@@ -229,46 +237,60 @@ doRunStackE10k opts = do
     let nq       = optNq opts
         costFn   = (fst $ optCostFn opts) nq
         sortFn   = snd $ optCostFn opts
-        dummy    = optDummy opts
 
     -- search parameters
-    let sParams = (SE.initSearchParamsE10k nq)
-                        { SE.sPrgU = prgU
-                        , SE.sCostFn = costFn
-                        , SE.sOrderFlows = sortFn}
+    let sParams = SE.initSearchParams {
+                        SE.sOracle = SE.initE10kOracle nq
+                      , SE.sPrgU   = prgU
+                      , SE.sCostFn = costFn
+                      , SE.sOrderFlows = sortFn }
 
     -- [Flow] -> IO C.Configuration
     getConfIO <- SE.runSearchIO <$> SE.initSearchIO sParams
 
     -- PRG
-    prgArgs <- case dummy of
-                True -> tapPrgArgs
-                False -> e10kPrgArgs
+    prgArgs <- (snd $ optPrgArgs opts)
 
     SS.instantiateFlowsIO_ getConfIO plAssignMerged prgArgs
 
+costFnL = [
+      ("balance",  (SE.balanceCost, id))
+    , ("priority", (S1.priorityCost, S1.prioritySort))
+ ]
 costFnParser = OA.str >>= doParse
     where doParse :: String -> OA.ReadM (Int -> SE.CostQueueFn, [FL.Flow] -> [FL.Flow])
-          doParse x
-            | x == "balance" = return  (SE.balanceCost, id)
-            | x == "priority" = return (S1.priorityCost, S1.prioritySort)
-            | otherwise = OA.readerError "Unknown cost function"
+          doParse x = case L.lookup x costFnL of
+                Nothing -> OA.readerError "Uknown cost function"
+                Just y  -> return y
+
+prgArgsL = [
+      ("e10k", ("e10k", e10kPrgArgs))
+    , ("dummy", ("dummy (tap)", tapPrgArgs))
+    , ("dpdk", ("dpdk", dpdkPrgArgs))
+ ]
+prgArgsParser  = OA.str >>= doParse
+    where doParse :: String -> OA.ReadM (String, IO SS.StackPrgArgs)
+          doParse x = case L.lookup x prgArgsL of
+                Nothing -> OA.readerError "Uknown prgArgs option"
+                Just y  -> return y
+
 
 stackE10kParserInfo:: OA.ParserInfo StackE10kOpts
 stackE10kParserInfo = OA.info (OA.helper <*> parser) info
     where parser = StackE10kOpts
                 <$> OA.argument OA.auto infoNq
                 <*> OA.argument costFnParser infoCostF
+                <*> OA.argument prgArgsParser infoPrgArgs
                 <*> OA.switch (OA.short 'i' OA.<> OA.help incrTxt)
-                <*> OA.switch (OA.short 'd' OA.<> OA.help dummyTxt)
           info = OA.fullDesc OA.<> OA.header "Instantiate the e10k stack"
           infoNq = (OA.metavar "nqueues" OA.<> OA.help "number of queues")
-          infoCostF = (OA.metavar "costF" OA.<> OA.help "cost function")
-          dummyTxt = "Dummy instatiation: "
-                   ++ "(e10k graph for the search, "
-                   ++ "TAP for the network stack implementtation, "
-                   ++ "empty implementation function)"
+          infoCostF = (OA.metavar costMeta OA.<> OA.help costHelp)
+          infoPrgArgs = (OA.metavar prgMeta OA.<> OA.help prgHelp)
           incrTxt = "Run Incremental stack"
+          costHelp = "cost function (" ++ (show $ map fst prgArgsL) ++")"
+          costMeta = "CostF (one of:" ++ (show $ map fst costFnL) ++")"
+          prgMeta = "prgArgs (one of:" ++ (show $ map fst prgArgsL) ++")"
+          prgHelp = "PRG backend (one of:" ++ (show $ map fst prgArgsL) ++")"
 
 main = do
     opts <- OA.execParser stackE10kParserInfo
