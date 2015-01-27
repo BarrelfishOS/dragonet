@@ -184,7 +184,7 @@ doUpdateFlowMap :: [Flow] -> FlowMap -> PG.PGraph -> PG.PGNode -> FlowMap
 doUpdateFlowMap allFlows fm g node@(nid,fnode@(PG.FNode {})) = fm'
   -- get flow map of previous node
   where fm' = M.insertWith errExists nid fmVal fm
-        errExists = error "doUpdateFlowMap: Node already exists in flow map"
+        errExists = error $ "doUpdateFlowMap: Node already exists in flow map: " ++  (PG.nLabel $ fromJust $ DGI.lab g nid )
         -- new flow map
         fmVal_ = mkFlowMapVal portPreds flowPreds
         fmVal = trN fmVal_ fmValMsg
@@ -272,8 +272,11 @@ rebuildFlowMapSt :: (C.ConfChange cc)
                  -> ST.ST s (FlowMapSt s cc)
 rebuildFlowMapSt st flows ccs = do
     st1 <- resetFlowMapSt st
-    st2 <- foldM incrConfigure st1 ccs
-    st3 <- foldM addFlow st2 flows
+    --st2 <- foldM incrConfigure st1 ccs
+    --st3 <- foldM addFlow st2 flows
+    -- this seems to be faster for some reason
+    st2 <- foldM addFlow st1 flows
+    st3 <- foldM incrConfigure st2 ccs
     return st3
 
 -- intitialize flow map state
@@ -394,13 +397,13 @@ incrConfigure st cc = do
         fm' = updateFlowMap flows fm g' nids'
     return $ st {fmFlowMap = fm', fmCnfChanges = cc:ccs, fmGraph = g'}
 
-updateFlowMapAll :: DGI.Node -> [Flow] -> FlowMap -> PG.PGraph -> FlowMap
-updateFlowMapAll entry flows fm g = ret
+updateFlowMapDfs :: DGI.Node -> [Flow] -> FlowMap -> PG.PGraph -> FlowMap
+updateFlowMapDfs entry flows fm g = ret
     where ret = updateFlowMap flows fm g nids
           --nids_ = [nid | nid <- DGI.nodes g, M.notMember nid fm]
           --nids_ = [nid | nid <- DGI.nodes g, M.notMember nid fm]
           nids_ = [nid | nid <- DFS.dfs [entry] g, M.notMember nid fm]
-          nids = trN nids_ $ "updateFlowMapAll: NIDS: " ++ (show nids_) ++
+          nids = trN nids_ $ "updateFlowMapDfs: NIDS: " ++ (show nids_) ++
                             " LABELS:" ++ (show $ [PG.nLabel $ fromJust $ DGI.lab g n | n <- nids_])
 
 getActivePort :: FlowCache s
@@ -482,7 +485,7 @@ flowMapAddFlow_ fc g doneMap nextNids fl fm = do
         isReady :: DGI.Node -> Bool
         isReady nid = ret
             where ret_ = notCnode && prevsOK
-                  ret = tr ret_ msgR
+                  ret = trN ret_ msgR
                   isDone x = M.member x doneMap
                   prevs = PGU.preNE g nid
                   prevsOK = all isDone prevs
@@ -550,8 +553,8 @@ flowMapDelFlow_ fm g (nid:nids) flow = ret
 -- just copy them for now. TODO: put them in a single file (e.g., Cost.hs)
 type QMap        = [(Flow, QueueId)]
 
-getRxQMap :: forall s cc. (C.ConfChange cc) => FlowMapSt s cc -> ST.ST s QMap
-getRxQMap st = do
+getRxQMap1 :: forall s cc. (C.ConfChange cc) => FlowMapSt s cc -> ST.ST s QMap
+getRxQMap1 st = do
     let g  = fmGraph st
         fm = fmFlowMap st
         flows_ = fmFlows st
@@ -562,7 +565,7 @@ getRxQMap st = do
     -- 1. finalize the graph (but do not update to state)
     let cfgEmpty = C.emptyConfig (undefined::cc)
         g' = C.applyConfig cfgEmpty g
-        fm' = updateFlowMapAll entry flows fm g'
+        fm' = updateFlowMapDfs entry flows fm g'
         rxQNodes = trN rxQNodes_ $ "rxQNODES:" ++ (show rxQNodes_)
 
     -- 2. compute qmap
@@ -574,3 +577,49 @@ getRxQMap st = do
                            | (rxQNid, qid) <- rxQNodes,
                            let flows = getFlows rxQNid]
     return qmap
+
+
+
+-- Finding the flowmap nodes from queues, seems to be a bit faster
+getRxQMap2 :: forall s cc. (C.ConfChange cc) => FlowMapSt s cc -> ST.ST s QMap
+getRxQMap2 st = do
+    let g         = fmGraph st
+        fm        = fmFlowMap st
+        flows_    = fmFlows st
+        flows     = tr flows_ $ "getRxQMAP2: FLOWS: " ++ (show flows_)
+        rxQNodes_ = fmRxQueueNodes st
+        entry     = fmRxEntryNid st
+
+    --let getQmap :: QueueId -> [Flow]
+    -- do a reverse dfs search for nodes that are not in the flow map
+    -- (the starting nodes are typically the Rx Queues)
+    let fmRDfs :: PG.PGraph -> [DGI.Node] -> [DGI.Node]
+        fmRDfs g start = DFS.xdfsWith getNext getResult start g
+            where getNext :: PG.PGContext -> [DGI.Node]
+                  getNext ctx@(ins, _, _, _) = [inNid | (_, inNid) <- ins,
+                                                      not $ M.member inNid fm ]
+                  getResult :: PG.PGContext -> DGI.Node
+                  getResult ctx@(_, nid, nlbl, _) = nid
+
+    -- apply the partial configuration and update the flow map
+    -- 1. finalize the graph (but do not update the state)
+    let cfgEmpty = C.emptyConfig (undefined::cc)
+        rxQNodes = trN rxQNodes_ $ "rxQNODES:" ++ (show rxQNodes_)
+        g' = C.applyConfig cfgEmpty g
+        updateNids = fmRDfs g' [ nid | (nid,qid) <- rxQNodes ]
+        fm' = updateFlowMap flows fm g' updateNids
+
+
+    -- 2. compute qmap
+    let getFlows ::  DGI.Node -> [Flow]
+        getFlows nid = case fmGetFlow fm' nid "out" of
+                                Left flows -> flows
+                                Right msg  -> [] -- error $ "getRxQmap: getFlows failed: " ++ msg
+        qmap  = L.concat [ [(f,qid) | f <- flows]
+                           | (rxQNid, qid) <- rxQNodes,
+                           let flows = getFlows rxQNid]
+    return qmap
+
+-- rxQmap2 seems a bit faster
+getRxQMap :: forall s cc. (C.ConfChange cc) => FlowMapSt s cc -> ST.ST s QMap
+getRxQMap = getRxQMap2

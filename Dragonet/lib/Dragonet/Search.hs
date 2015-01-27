@@ -75,6 +75,10 @@ trN a b = a
 allQueues :: Int -> [QueueId]
 allQueues nq = [1..(nq-1)] ++ [0] :: [QueueId]
 
+allQueues_ :: Int -> Int -> [QueueId]
+allQueues_ start nq =  [(i + start) `mod` nq | i <- [0..(nq-1)]]
+
+
 -- NB: due to ordering, costOK will always have the smaller value, and
 -- costReject will always have the highest value.
 -- NB: instead of using L.minimum we can implement a function that  can
@@ -121,15 +125,16 @@ class (C.ConfChange cc) => OracleSt o cc | o -> cc where
     -- | 'flowConfChanges' returns a list of configuration changes for a
     -- flow. Note that the list may be empty, if there are no available
     -- configuration changes that map to the given flow.
-    flowConfChanges ::
-        -- | Oracle
-           o
-        -- | Current configuration
-        -> C.Configuration
-        -- | New flow to consider
-        -> Flow
-        -- | A set of configuration changes
-        -> [cc]
+    flowConfChanges :: o -- | Oracle
+                    -> C.Configuration -- | Current configuration
+                    -> Flow -- | New flow to consider
+                    -> [cc] -- | A set of configuration changes
+
+    -- stupid name, but threading the state allows for some tricks
+    flowConfChangesS :: o
+                     -> C.Configuration
+                     -> Flow
+                     -> ([cc], o)
 
     -- affected queues: used for incremental update of qmap
     -- | Returns the queues that may get affected by this change.
@@ -188,7 +193,7 @@ flowsSingleConfs x conf fs =
 
 
 -- E10K (simple for now) oracle
-newtype E10kOracleSt = E10kOracleSt {nQueues :: Int }
+data E10kOracleSt = E10kOracleSt {nQueues :: Int, startQ :: Int}
 e10kDefaultQ = 0
 
 {-|
@@ -205,6 +210,7 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
      -  and counts on cost-function to help in selecting proper queue.
     -}
     flowConfChanges = e10kFlowConfChanges
+    flowConfChangesS = e10kFlowConfChangesS
 
     -- QUESTION: Is it assumed that there will be only one operation in
     --      conf change?
@@ -216,6 +222,7 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
         [e10kDefaultQ, xq]
         where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
 
+    -- This is slower for some reason for a large number of flows :(
     confJump = e10kConfQueueJump
 
 -- FIXME: FDir filters are not working properly with priority
@@ -233,10 +240,24 @@ e10kFlowConfChanges E10kOracleSt {nQueues = nq} cnf fl
           rxCfdFull = E10k.rxCfdFilterTableFull cnf
 
 
+-- TODO: see above
+e10kFlowConfChangesS :: E10kOracleSt -> C.Configuration -> Flow
+                    -> ([E10k.ConfChange], E10kOracleSt)
+e10kFlowConfChangesS o@(E10kOracleSt {nQueues = nq, startQ = startQ}) cnf fl
+    -- allocate 5-tuple filters first, if we can
+    | not rx5tFull  = ([E10k.insert5tFromFl fl q | q <- allQs], o')
+    | not rxCfdFull = (catMaybes $ [E10k.insertFdirFromFl fl q | q <- allQs], o')
+    | otherwise     = ([], o)
+    where allQs = allQueues_ startQ nq
+          o' =  o { startQ = startQ + 1}
+          rx5tFull  = E10k.rx5tFilterTableFull cnf
+          rxCfdFull = E10k.rxCfdFilterTableFull cnf
+
 e10kConfQueueJump :: E10kOracleSt -> [E10k.ConfChange] -> [Flow]
                   -> ([(Flow, E10k.ConfChange)], [Flow])
-e10kConfQueueJump st ccs fs = (keep, map fst rm)
-    where rmQ = 9
+e10kConfQueueJump o ccs fs = (keep, map fst rm)
+    where -- rmQ = 9 -- this will not work for multiple jumps!
+          rmQ = startQ o --  will this? maybe...
           (rm,keep) = L.partition (\t -> rmQ == E10k.ccQueue (snd t))
                       $ zip fs ccs
 
@@ -276,6 +297,8 @@ instance OracleSt E10kOracleHardCoded E10k.ConfChange where
               | (myThird $ head f) == 2 = [E10k.Insert5T   $ fromJust $ E10k.mkFDirFromFl fl (mySnd $ head f)]
               | otherwise = error ("ERROR: wrong type of flow")
 
+    flowConfChangesS = error "NYI!"
+
 
 --    emptyConf _ = e10kCfgEmpty -- ^ Creates initial empty configuration
 --    showConf _  = e10kCfgStr -- ^ Converts conf to string
@@ -290,9 +313,10 @@ instance OracleSt E10kOracleHardCoded E10k.ConfChange where
         [e10kDefaultQ, xq]
         where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
 
+-- TODO: Fixme
 type SFOracleSt = E10kOracleSt
 
-sfOracleInit nqueues = E10kOracleSt { nQueues = nqueues }
+sfOracleInit nqueues = E10kOracleSt { nQueues = nqueues, startQ = 0 }
 
 initSearchParams :: (OracleSt o a) => SearchParams o a
 initSearchParams = SearchParams {
@@ -304,7 +328,7 @@ initSearchParams = SearchParams {
 }
 
 initSearchParamsE10k nqueues = initSearchParams {sOracle = oracle}
-    where oracle = E10kOracleSt {nQueues = nqueues}
+    where oracle = E10kOracleSt {nQueues = nqueues, startQ = 0}
 
 type FlowCache s      = HB.HashTable s (PG.NLabel, Flow) PG.NPort
 data SearchSt s o a = (OracleSt o a) => SearchSt {
@@ -1145,7 +1169,7 @@ incSearchGreedyFlows st flowsSt = do
            -- no removed flows, keep state as is and return new flows
            True -> do
                       let flows = sortFn $ S.toList addFlows
-                      return $ tr (st, flows) "NO DELETED FLOWS"
+                      return $ trN (st, flows) "NO DELETED FLOWS"
            -- removed, rebuild the whole flow map
            -- TODO: remove only needed flows, not everything
            False -> do
@@ -1191,14 +1215,15 @@ incSearchGreedyFlows_ :: (OracleSt o cc)
 -- process a single flow
 incSearchGreedyFlows_ st (flow:flows) = do
     -- get basic information from current state
-    let oracle = isOracle $ isParams st
-        costFn = isCostFn $ isParams st
+    let params = isParams st
+        oracle = isOracle params
+        costFn = isCostFn params
         fmSt = isFlowMapSt st
         fmFlows = FM.fmFlows fmSt
         ccs  = FM.fmCnfChanges fmSt
         conf = C.foldConfChanges ccs
     -- get configuration changes for current state
-    let flowCCs = flowConfChanges oracle conf flow
+    let (flowCCs, oracle') = flowConfChangesS oracle conf flow
     -- compute new costs and minimum cost, and update state
     (lowerCost, bestFmSt) <- incSearchMinCost costFn fmSt flow flowCCs
     let msg = "--\nLOWER COST:" ++ (show lowerCost)
@@ -1206,15 +1231,30 @@ incSearchGreedyFlows_ st (flow:flows) = do
               ++ " Flow examined:" ++ (flowStr flow)
               ++ " Remaining flows:" ++ (show $ length flows)
               ++ "\n--\n"
-        st' = st { isFlowMapSt = trN bestFmSt msg }
+        params' = params { isOracle = oracle' }
+        st' = st {isFlowMapSt = trN bestFmSt msg, isParams = params'}
     -- recurse
     case flows of
         -- no more flows: we are done
         [] -> return (st', lowerCost)
         _  -> incSearchGreedyFlows_ st' flows
 
+-- M.foldM :: Monad m => (a -> b -> m a) -> a -> [b] -> m a
+stopFoldM :: Monad m => (a -> b -> m a)
+                   -> (a -> Bool)
+                   -> a
+                   -> [b]
+                   -> m a
+stopFoldM foldFn stopFn a0 (b:bs) = do
+    aNew <- foldFn a0 b
+    case stopFn aNew of
+        True -> return aNew
+        False -> stopFoldM foldFn stopFn aNew bs
+stopFoldM foldFn stopFn a0 [] = return a0
+
 -- return the flowmap that minimizes cost and the cost. NB: flowmap contains a
 -- list of configuration changes, i.e., the solution.
+-- NB: we might want to bail out early here if there is an accepted solution
 incSearchMinCost :: forall s cc. C.ConfChange cc
                  => CostQueueFn
                  -> FM.FlowMapSt s cc
@@ -1223,18 +1263,21 @@ incSearchMinCost :: forall s cc. C.ConfChange cc
                  -> ST.ST s (Cost, FM.FlowMapSt s cc)
 incSearchMinCost costFn fmSt flow (cc0:restCC) = do
     let foldFn :: (C.ConfChange cc)
-               => (Cost, FM.FlowMapSt s cc)
+               => (Cost, FM.FlowMapSt s cc, Int)
                -> cc
-               -> ST.ST s (Cost, FM.FlowMapSt s cc)
-        foldFn (stCost, st) newCc = do
+               -> ST.ST s (Cost, FM.FlowMapSt s cc, Int)
+        foldFn (stCost, st, cnt) newCc = do
             (newQmap, newSt) <- incSearchQmap fmSt newCc flow
             let newCost_ = costFn newQmap
                 newCost = trN newCost_ msg
+                cnt'    = cnt + 1
                 msg     =  "New cost=" ++ (show newCost_) ++
                            " newCc=" ++ (C.show newCc) ++
                            " for qmap=" ++ (qmapStr newQmap)
-            if newCost < stCost then return (newCost, newSt)
-            else return (stCost, st)
+            if newCost < stCost then return (newCost, newSt, cnt')
+            else return (stCost, st, cnt')
+
+        stopFn (cost, _, cnt) = costAcceptable cost && cnt >= 5
 
     (cc0Qmap, cc0St) <- incSearchQmap fmSt cc0 flow
     let cc0Cost_ = costFn cc0Qmap
@@ -1242,9 +1285,10 @@ incSearchMinCost costFn fmSt flow (cc0:restCC) = do
         msg     =  "New cost=" ++ (show cc0Cost_) ++
                    "newCc=" ++ (C.show cc0) ++
                    "for qmap=" ++ (qmapStr cc0Qmap)
-        x0 = (cc0Cost, cc0St)
+        x0 = (cc0Cost, cc0St, 0)
 
-    (lowerCost, bestSt) <- foldM foldFn x0 restCC
+    --(lowerCost, bestSt, _) <- foldM foldFn x0 restCC
+    (lowerCost, bestSt, _) <- stopFoldM foldFn stopFn x0 restCC
     return (lowerCost, bestSt)
 
 incSearchQmap :: forall s cc . C.ConfChange cc
@@ -1317,7 +1361,7 @@ test = do
     prgU <- e10kU_simple
     --prgU <- e10kU_simple
     let nq = 10
-        e10kOracle   = E10kOracleSt {nQueues = nq}
+        e10kOracle   = E10kOracleSt {nQueues = nq, startQ = 0}
         priFn        = priorityCost' nq
         balFn        = balanceCost nq
         dummyFn      = dummyCost
@@ -1341,7 +1385,7 @@ test_incr = do
     putStrLn $ "Running incremental search!"
     prgU <- e10kU_simple
     let nq = 10
-        e10kOracle   = E10kOracleSt {nQueues = nq}
+        e10kOracle   = E10kOracleSt {nQueues = nq, startQ = 0}
         priFn        = priorityCost' nq
         balFn        = balanceCost nq
         dummyFn      = dummyCost
@@ -1365,7 +1409,7 @@ test_incr_add = do
         -- initially 1 HP, 20 BE flows
         hpPort   = 6000
         bePort   = 1000
-        e10kOracle = E10kOracleSt {nQueues = nq}
+        e10kOracle = E10kOracleSt {nQueues = nq, startQ = 0}
         priFn = priorityCost' nq
         balFn = balanceCost nq
         costFn = priFn
@@ -1395,18 +1439,24 @@ test_incr_add = do
         (conf, ss2) <- runIncrSearchIO ss1 flst2
         --putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
         return (ss2,flst2)
-    qmap <- ST.stToIO $ incrSearchQmap ss2
-    putStrLn $ qmapStr qmap
 
     let n3 = 1
-    ss3 <- doTimeIt ("Add:" ++ (show n3) ++ " hp flow(s)") $ do
+    (ss3,flst3) <- doTimeIt ("Add:" ++ (show n3) ++ " hp flow(s)") $ do
         let hpFls = take n3 $ hpFlows_ (hpPort + initHpNr)
             flst3 = L.foldl FL.fsAddFlow (FL.fsReset flst2) hpFls
         (conf, ss3) <- runIncrSearchIO ss2 flst3
         --putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
-        return (ss3)
+        return (ss3,flst3)
 
-    qmap <- ST.stToIO $ incrSearchQmap ss3
+    let n4 = 1
+    ss4 <- doTimeIt ("Add:" ++ (show n4) ++ " hp flow(s)") $ do
+        let hpFls = take n4 $ hpFlows_ (hpPort + initHpNr + n3)
+            flst4 = L.foldl FL.fsAddFlow (FL.fsReset flst3) hpFls
+        (conf, ss4) <- runIncrSearchIO ss3 flst4
+        --putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
+        return (ss4)
+
+    qmap <- ST.stToIO $ incrSearchQmap ss4
     putStrLn $ qmapStr qmap
     --let flows = FM.fmFlows $ isFlowMapSt ss3
     --putStrLn $ "Flows:\n" ++ (FL.flowsStr flows)
@@ -1441,4 +1491,7 @@ testFmCfdir = do
 
     qmap  <- ST.stToIO $ FM.getRxQMap fmSt2
     putStrLn $ qmapStr qmap
+
+    let prg = FM.fmGraph fmSt2
+    writeFile "tests/incr-search-prg-result.dot" $ toDot prg
     return ()

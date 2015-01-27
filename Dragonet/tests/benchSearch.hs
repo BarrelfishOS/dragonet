@@ -6,6 +6,7 @@ import qualified Dragonet.Configuration as C
 import qualified Dragonet.Search as S
 
 import Dragonet.Flows (Flow(..))
+import qualified Dragonet.Flows as FL
 
 import Data.Maybe
 import Data.List as L
@@ -42,6 +43,8 @@ isGoldFl FlowUDPv4 {flDstPort = Just port} = isJust $ L.find (==port) [1001,1002
 goldFlPerQ = 1
 priorityCost' = S.priorityCost isGoldFl goldFlPerQ
 
+flAddedFlows :: [Flow] -> FL.FlowsSt
+flAddedFlows flows = foldl FL.fsAddFlow FL.flowsStInit flows
 
 --
 main = do
@@ -55,7 +58,7 @@ main = do
         balFn = S.balanceCost nq
         costFn = balFn
 
-        oracle   = S.E10kOracleSt {S.nQueues = nq}
+        oracle   = S.E10kOracleSt {S.nQueues = nq, S.startQ = 0}
         searchParams = S.initSearchParams { S.sOracle  = oracle
                                           , S.sPrgU     = prgU
                                           , S.sCostFn   = costFn
@@ -68,7 +71,7 @@ main = do
         searchIncParams = S.initIncrSearchParams {  S.isOracle = oracle
                                                  , S.isPrgU   = prgU
                                                  , S.isCostFn = costFn }
-        benchIncBal nflows = show $ S.runIncrSearch searchIncParams (flows nflows)
+        benchIncBal nflows = show $ S.runIncrSearch searchIncParams (flAddedFlows $ flows nflows)
         benchIncNf nflows  = bench ("incremental search: " ++ (show nflows)) $ nf benchIncBal nflows
 
         benchs = --[benchNf x | x <- nflowsl] ++

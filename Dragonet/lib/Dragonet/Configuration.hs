@@ -18,6 +18,7 @@ module Dragonet.Configuration(
     confMNewNode,
     replaceConfFunctions,
     replaceIncrConfFunctions,
+    replaceIncrConf,
 
     icPartiallyConfigure,
 ) where
@@ -151,6 +152,17 @@ replaceIncrConfFunctions :: (PG.Node -> PG.ConfFunction) -> PG.PGraph -> PG.PGra
 replaceIncrConfFunctions m = DGI.nmap fixNode
     where
         fixNode n@PG.CNode {} = n { PG.nIncrConfFunction = m n }
+        fixNode n = n
+
+-- this also replaces the incremental counter
+replaceIncrConf :: (PG.Node -> Int) -- get counter
+                -> (PG.Node -> PG.ConfFunction)  -- get function
+                -> PG.PGraph
+                -> PG.PGraph
+replaceIncrConf cFn mFn = DGI.nmap fixNode
+    where
+        fixNode n@PG.CNode {} = n { PG.nIncrConfFunction = mFn n
+                                  , PG.nIncrCounter = cFn n}
         fixNode n = n
 
 --

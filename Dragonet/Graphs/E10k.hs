@@ -56,8 +56,8 @@ import Graphs.Helpers
 import Control.Exception (assert)
 import Text.Show.Pretty (ppShow)
 
-tr = flip trace
-trN = \x  _ -> x
+tr a b  = trace b a
+trN a b = a
 
 cfgEmpty = [
     ("RxC5TupleFilter", PG.CVList []),
@@ -90,6 +90,13 @@ addIncrCfgFun :: PG.Node -> C.ConfFunction
 addIncrCfgFun n
     | l == "RxC5TupleFilter" = incrConfig5tuple
     | l == "RxCFDirFilter"   = incrConfigFDir
+    | otherwise              = error $ "Unknown PRG CNode: '" ++ l ++ "'"
+    where l = PG.nLabel n
+
+addIncrCfgCounter :: PG.Node -> Int
+addIncrCfgCounter n
+    | l == "RxC5TupleFilter" = rx5tFilterTableSize
+    | l == "RxCFDirFilter"   = rxCfdFilterTableSize
     | otherwise              = error $ "Unknown PRG CNode: '" ++ l ++ "'"
     where l = PG.nLabel n
 
@@ -314,12 +321,21 @@ doConfigFilterInc
   ->  (a -> QueueId)     -- get queue id for this filter
   -> C.ConfFunction
 doConfigFilterInc parseConf mkFiltLabel getQueue
-                  _ (_, cnodeLabel@(PG.CNode {}))
+                  _ (_, cnodeLabel_@(PG.CNode {}))
                   (inE:[]) outEs cfg = do
+
     let filter = parseConf cfg
+        count = PG.nIncrCounter cnodeLabel_
+        count' = count - 1
+        cnodeLabel = trN cnodeLabel_ ("IncrCounter=" ++ (ppShow count'))
     -- add a filter node and a C-node node
     (filterNid,_) <- C.confMNewNode $ mkFiltLabel filter
-    (cnodeNid, _) <- C.confMNewNode $ cnodeLabel
+    nextNid <- case count' of
+            0 -> return $ filterDefaultNid outEs
+            _ -> do (nid,_) <- C.confMNewNode
+                               $ cnodeLabel {PG.nIncrCounter = count'}
+                    return nid
+
     let filterQNid = filterQueueNid outEs $ getQueue filter
         ((inNid,_), inEdgeLabel) = inE
         -- in edge
@@ -328,10 +344,16 @@ doConfigFilterInc parseConf mkFiltLabel getQueue
         tEdgeOR   = (filterNid, filterQNid, PG.Edge "true")
         fEdgeOR   = (filterNid, filterQNid, PG.Edge "false")
         -- false edge to (new) CNode
-        cnodeIn   = (filterNid, cnodeNid, PG.Edge "false")
-        cnodeOuts = [ (cnodeNid, xid, xedge) | ((xid,_),xedge) <- outEs ]
-        newEdges  = inEdge:tEdgeOR:cnodeIn:cnodeOuts
+        nextIn   = (filterNid, nextNid, PG.Edge "false")
+        cnodeOuts = case count' of
+                0 -> []
+                _ -> [ (nextNid, xid, xedge) | ((xid,_),xedge) <- outEs ]
+        newEdges  = inEdge:tEdgeOR:nextIn:cnodeOuts
     return newEdges
+
+
+doConfigFilterInc _ _ _ _ (_,node) inE _ _ = do
+    return $ error $ "Error: doConfigFilterInc called on node with >1 in edges:" ++ (PG.nLabel node) ++ " " ++ (ppShow inE)
 
 -- Common helper for configuring 5-tuple and FD configuration nodes
 --  - filter nodes expect a *single* in edge
@@ -670,7 +692,7 @@ configTxQueues _ (_,cfgn) inE outE (C.CVInt qs) = do
 
 
 prepareConf :: PG.PGraph -> PG.PGraph
-prepareConf g = C.replaceIncrConfFunctions addIncrCfgFun $
+prepareConf g = C.replaceIncrConf addIncrCfgCounter addIncrCfgFun $
                 C.replaceConfFunctions addCfgFun g
 
 ----

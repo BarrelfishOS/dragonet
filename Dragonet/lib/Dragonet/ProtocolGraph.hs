@@ -70,13 +70,14 @@ data Node =
         nOperator       :: NOperator
         } |
     CNode {
-        nLabel          :: NLabel,
-        nTag            :: NTag,
-        nAttributes     :: [NAttribute],
-        nPorts          :: [NPort],
-        nConfType       :: ConfType,
-        nConfFunction   :: ConfFunction,
-        nIncrConfFunction :: ConfFunction -- incremental configuration function
+        nLabel            :: NLabel,
+        nTag              :: NTag,
+        nAttributes       :: [NAttribute],
+        nPorts            :: [NPort],
+        nConfType         :: ConfType,
+        nConfFunction     :: ConfFunction,
+        nIncrConfFunction :: ConfFunction, -- incremental configuration function
+        nIncrCounter      :: Int -- for removing incrementally configured C-nodes
         }
     deriving (Show)
 
@@ -237,7 +238,8 @@ baseCNode label ports cType cFun =
         nPorts          = ports,
         nConfType       = cType,
         nConfFunction   = cFun,
-        nIncrConfFunction = error $ "Incremental conf function Not Implemented! for node:" ++ label
+        nIncrConfFunction = error $ "Incremental conf function Not Implemented! for node:" ++ label,
+        nIncrCounter = error $ "Incremental conf counter Not Implemented! for node:" ++ label
         }
 
 nAttrAdd :: NAttribute -> Node -> Node
