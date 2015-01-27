@@ -73,6 +73,18 @@ cd ../libmemcached-1.0.18/
 }
 
 
+setup_work_env_pravin() {
+    cd ${HOME}
+    for f in  .bash_history  .bashrc  .gitconfig  .htoprc  .screenrc
+    do
+        cp /cdrom/casper/mount/bin/session_history/$f .
+    done
+    cp /cdrom/casper/mount/bin/session_history/.vimrc .
+    cp -r /cdrom/casper/mount/bin/session_history/.vim .
+}
+
+
+
 setup_vim_pravin() {
     cd ${HOME}
     tar -xvf /cdrom/casper/mount/bin/vimconf.tar
@@ -128,8 +140,9 @@ get_repository () {
     fi
     git clone /cdrom/casper/mount/repository/dragonet
     cd dragonet
+    git checkout master
     #git checkout execmodel
-    git checkout kkourt-nsdi15
+    #git checkout kkourt-nsdi15
 }
 
 
@@ -148,6 +161,24 @@ install_openonload() {
     setIPaddress.sh
 }
 
+clean_prepare_Dragonet() {
+    cd ${MYBASE}/dragonet/Dragonet/
+
+    export PATH="${HOME}/.cabal/bin:$PATH"
+
+    echo "Cleaning up old installation"
+    rm -rf ./dist
+    rm -rf .cabal_sandbox
+
+    echo "Preparing sandbox"
+    ./prepare_sandbox.sh
+
+    # FIXME: make sure that the z3 library exists
+
+    cabal install z3 --extra-include-dirs=/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/include/ --extra-lib-dirs=/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/bin/
+}
+
+
 install_Dragonet() {
 
 sudo apt-get install -y clang-3.4 clang-3.4-doc libclang-common-3.4-dev libclang-3.4-dev libclang1-3.4 libclang1-3.4-dbg libllvm-3.4-ocaml-dev libllvm3.4 libllvm3.4-dbg lldb-3.4 llvm-3.4 llvm-3.4-dev llvm-3.4-doc llvm-3.4-examples llvm-3.4-runtime clang-modernize-3.4 clang-format-3.4 python-clang-3.4 lldb-3.4-dev
@@ -161,21 +192,10 @@ sudo apt-get install -y ghc*-prof
     cabal install cabal-install
     export PATH="${HOME}/.cabal/bin:$PATH"
 
-    cd ${MYBASE}/dragonet/Dragonet/
-
-    echo "Cleaning up old installation"
-    rm -rf ./dist
-    rm -rf .cabal_sandbox
-
-    echo "Preparing sandbox"
-    ./prepare_sandbox.sh
-
-    # FIXME: make sure that the z3 library exists
-
-    cabal install z3 --extra-include-dirs=/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/include/ --extra-lib-dirs=/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/bin/
+    clean_prepare_Dragonet
 
     #cabal build llvm-cgen llvm-cgen-e10k bench-echo llvm-cgen-sf
-    cabal build bench-fancyecho stack-tap stack-e10k-dummy stack-sf stack-e10k
+    cabal build bench-fancyecho stack-dpdk stack-sf stack-e10k
 }
 
 
@@ -213,7 +233,8 @@ link_and_compile_z3() {
 }
 
 install_server_related() {
-    install_Dragonet
+    #install_Dragonet
+    install_z3_related
     install_memcached
 }
 
@@ -245,11 +266,13 @@ install_spark_nfs() {
 
 show_usage() {
         echo "Please specify what you want to install"
-        echo "Usage: ${0} [-g -s -c -o -d -v]"
+        echo "Usage: ${0} [-g -s -c -o -d -v -i]"
         echo "           -g -->  clone the git repository"
+        echo "           -i -->  install all tools"
         echo "           -d -->  install dpdk"
         echo "           -o -->  install onload"
         echo "           -c -->  compile and install client side of dragonet"
+        echo "           -C -->  Clean and re-prepare Dragonet cabal setup"
         echo "           -s -->  compile and install server side of dragonet"
         echo "           -v -->  setup vim configuration (pravin's configuration)"
         echo "           -z -->  install z3 related"
@@ -261,8 +284,12 @@ show_usage() {
         exit 1
 }
 
-while getopts ":gcsdovzprl" opt; do
+while getopts ":igcsdovzprlC" opt; do
   case $opt in
+    i)
+        echo "-i was triggered, installing all tools"
+        INSTALLT="yes"
+        ;;
     g)
         echo "-g was triggered, cloning git repo"
         CLONE="yes"
@@ -278,6 +305,10 @@ while getopts ":gcsdovzprl" opt; do
     d)
         echo "-d was triggered, setting for compilation of dpdk code"
         DPDK="yes"
+      ;;
+    C)
+        echo "-C Clean preparing cabal installation for Dragonet "
+        CABALCLEANPREPARE="yes"
       ;;
     o)
         echo "-o was triggered, setting for compilation of openonload code"
@@ -319,6 +350,10 @@ done
 
 
 MYBASE="$HOME"
+
+if [ "${INSTALLT}" == "yes" ] ; then
+install_new_tools
+fi
 
 if [ "${CLONE}" == "yes" ] ; then
     echo "cloning Dragonet repository"
@@ -377,6 +412,9 @@ else
     echo "Linking z3 and compiling it"
 fi
 
+if [ "${CABALCLEANPREPARE}" == "yes" ] ; then
+    clean_prepare_Dragonet
+fi
 
 
 if [ "${CLIENTCOMPILE}" == "yes" ] ; then
@@ -388,6 +426,7 @@ fi
 
 if [ "${VIMSETUP}" == "yes" ] ; then
     echo "Copying vim setup"
-    setup_vim_pravin
+    #setup_vim_pravin
+    setup_work_env_pravin
 fi
 

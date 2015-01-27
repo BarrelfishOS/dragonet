@@ -73,14 +73,27 @@ setIPaddr "90:e2:ba:3a:6d:21" "10.113.4.29" "sbrinz2" "intel2" "switch" "18" "00
 
 echo "for ziger1"
 setDHCPIPaddr "00:21:28:6B:98:ba" "10.110.4.51" "ziger1"
-setIPaddr "00:1b:21:8f:18:64" "10.22.4.51" "ziger1" "intel1" "direct" "appenzeller-sf1" "" "cable-144"
+#setIPaddr "00:1b:21:8f:18:64" "10.22.4.51" "ziger1" "intel1" "direct" "appenzeller-sf1" "" "cable-144"
+setIPaddr "00:1b:21:8f:18:64" "10.113.4.51" "ziger1" "intel1" "switch" "" "" ""  # for ASPLOS15 deadline
 #setIPaddr "00:1b:21:8f:18:64" "10.113.4.151" "ziger1" "intel1" "switch" "" "" "cable-144"  ## for NSDI paper
-setIPaddr "00:1b:21:8f:18:65" "10.113.4.51" "ziger1" "intel2" "switch" "17" "" "cable-2"
+#setIPaddr "00:1b:21:8f:18:65" "10.22.4.51" "ziger1" "intel2" "disconnected" "" "" ""
+
+echo "for babybel2"
+setDHCPIPaddr "00:1e:67:92:48:4a" "10.110.4.95" "babybel2"
+setIPaddr "00:1e:67:9f:45:06" "10.22.4.95" "babybel2" "intel1" "direct" "babybel3-intel2" "0000:04:00.0" ""
+#setIPaddr "00:1e:67:9f:45:07" "10.113.4.95" "babybel2" "intel2" "switch" "21" "0000:04:00.1" "cable-pat206309"
+setIPaddr "00:1e:67:9f:45:07" "10.113.4.95" "babybel2" "intel2" "direct" "ziger2-sf2" "0000:04:00.1" "cable-pat206309"
+setIPaddr "00:0f:53:07:4d:64" "10.113.4.195" "babybel2" "sf1" "direct" "ziger2-sf1" "" ""
+#setIPaddr "00:0f:53:07:4d:65" "10.23.4.195" "babybel2" "sf2" "direct" "babybel3-intel1" "" ""
+setIPaddr "00:0f:53:07:4d:65" "10.44.4.195" "babybel2" "sf2" "switch" "22" "" "cable-red"
+
 
 echo "for ziger2"
 setDHCPIPaddr "00:21:28:6B:98:a6" "10.110.4.57" "ziger2"
-setIPaddr "00:0f:53:07:48:d4" "10.113.4.57" "ziger2" "sf1" "switch" "19" "" "cable-3"
-setIPaddr "00:0f:53:07:48:d5" "10.44.4.57" "ziger2" "sf2" "no" "no" "" "cable-red-tag"
+setIPaddr "00:0f:53:07:48:d4" "10.113.4.57" "ziger2" "sf1" "switch" "" "" ""
+#setIPaddr "00:0f:53:07:48:d4" "10.113.4.57" "ziger2" "sf1" "direct" "babybel2-sf1" "" "cable-3"
+#setIPaddr "00:0f:53:07:48:d4" "10.113.4.57" "ziger2" "sf1" "direct" "babybel2-sf1" "" "cable-3"
+#setIPaddr "00:0f:53:07:48:d5" "10.113.4.157" "ziger2" "sf2" "direct" "babybel2-intel2" "" ""
 
 echo "for gottardo"
 setDHCPIPaddr "00:30:48:fe:58:1e"  "10.110.4.67" "gottardo"
@@ -104,20 +117,12 @@ setDHCPIPaddr "00:1e:67:92:53:17" "10.110.4.92" "babybel"
 setIPaddr "00:1e:67:9f:0c:ca" "10.113.4.82" "babybel" "intel1" "no" "no" "" ""
 setIPaddr "de:f2:f8:2f:80:f0" "10.113.4.81" "babybel" "intel2" "switch" "15" "" "cable-pat206310"
 
-echo "for asiago"
-setDHCPIPaddr "00:1e:67:92:48:4a" "10.110.4.95" "asiago"
-setIPaddr "00:1e:67:9f:45:06" "10.22.4.95" "asiago" "intel1" "direct" "burrata-intel2" "0000:04:00.0" ""
-setIPaddr "00:1e:67:9f:45:07" "10.113.4.95" "asiago" "intel2" "switch" "21" "0000:04:00.1" "cable-pat206309"
-setIPaddr "00:0f:53:07:4d:64" "10.113.4.195" "asiago" "sf1" "switch" "22" "" "cable-red"
-#setIPaddr "00:0f:53:07:4d:65" "10.23.4.195" "asiago" "sf2" "direct" "burrata-intel1" "" ""
-setIPaddr "00:0f:53:07:4d:65" "10.44.4.195" "asiago" "sf2" "no" "no" "" ""
-
-echo "for burrata"
-setDHCPIPaddr "00:1e:67:92:52:d1" "10.110.4.96" "burrata"
-#setIPaddr "00:1e:67:9f:4f:de" "10.22.4.96" "burrata" "intel1" "direct" "asiago-sf2" ""
-setIPaddr "00:1e:67:9f:4f:de" "10.113.4.96" "burrata" "intel1" "switch" "20" ""
-#setIPaddr "00:1e:67:9f:4f:df" "10.113.4.196" "burrata" "intel2" "switch" "" "" ## for NSDI
-setIPaddr "00:1e:67:9f:4f:df" "10.22.4.196" "burrata" "intel2" "direct" "asiago-intel1" ""
+echo "for babybel3"
+setDHCPIPaddr "00:1e:67:92:52:d1" "10.110.4.96" "babybel3"
+#setIPaddr "00:1e:67:9f:4f:de" "10.22.4.96" "babybel3" "intel1" "direct" "babybel2-sf2" ""
+setIPaddr "00:1e:67:9f:4f:de" "10.113.4.96" "babybel3" "intel1" "switch" "20" ""
+#setIPaddr "00:1e:67:9f:4f:df" "10.113.4.196" "babybel3" "intel2" "switch" "" "" ## for NSDI
+setIPaddr "00:1e:67:9f:4f:df" "10.22.4.196" "babybel3" "intel2" "direct" "babybel2-intel1" ""
 
 echo "for tomme1"
 setDHCPIPaddr "00:21:28:3b:3f:9e" "10.110.4.41" "tomme1"
