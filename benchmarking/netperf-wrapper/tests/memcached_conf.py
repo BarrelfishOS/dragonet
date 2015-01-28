@@ -42,10 +42,11 @@ def client_to_10G_IP(client) :
         return client[isMultiNICMachine+2:]
 
 
-COSTFN = "balance"
+ORACLE = "hardcoded"
+ORACLE = "greedy"
+
 COSTFN = "priority"
-ORACLE= "hardcoded"
-ORACLE= "greedy"
+COSTFN = "balance"
 
 def SRV_CMDS(name):
 
@@ -71,8 +72,6 @@ def SRV_CMDS(name):
                       "cd %s ; " % (dragonet_container[name]['base_dir'])
                         + "sudo %s " % (get_isolation_container(is_server=False))
                         + " %s %d %s " % (
-                          #dragonet_container[name]['deploy_stack'],
-                          #HWQUEUES, "priority")
                           dragonet_container[name]['deploy_stack'],
                           HWQUEUES, COSTFN)
                         + " %s %d %d " % (ORACLE, CONCURRENCY,
@@ -102,7 +101,7 @@ def SRV_CMDS(name):
                           HWQUEUES,
                           dragonet_container[name]['is_ready_wait_events'],
                           "memcached",
-                          ((CONCURRENCY - 1) * len(client_names))
+                          ((CONCURRENCY) * len(client_names))
                             ),
                      ],
 

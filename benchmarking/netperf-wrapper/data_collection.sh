@@ -85,8 +85,8 @@ ClientList="-C sbrinz1 -C sbrinz2"
 ClientList="-C ziger1 -C sbrinz1"
 
 ClientList="-C ziger2 -C sbrinz2"
-ClientList="-C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2"
 ClientList="-C ziger2 "
+ClientList="-C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2"
 
 ######################
 
@@ -103,7 +103,7 @@ ECHO_SERVER="llvmSF"
 SERVERIP=10.113.4.195
 
 NICTYPE="NIC_Intel"
-ECHO_SERVER="dpdk"
+ECHO_SERVER="dpdk2"
 SERVERIP=10.113.4.95
 
 ######################
@@ -113,8 +113,8 @@ SERVERIP=10.113.4.95
 
 ######################
 
-UDP_TEST_NAME="udp_rr"
 UDP_TEST_NAME="memcached_rr"
+UDP_TEST_NAME="udp_rr"
 
 
 ######################

@@ -2,6 +2,25 @@
 
 include('dragonet_stack.py')
 
+def flow2Str(f):
+    (dst_ip, dst_p, clName, src_p, srv_id, cli_id) = f
+    return ("%s:%d/%s:%d" % (
+                            dst_ip, dst_p,
+                            MINFO_CLIENT[clName]["EGRESS_INFO"]["src"],
+                            src_p
+                        ))
+
+def flows_to_arg_fancyEcho(flows, listenPort, threads):
+
+    ret = " -W "
+    for i in range(0, threads):
+        ret = ret + ( "-a T%d -p %d " % (i, listenPort))
+    for f in flows:
+        ret = ret + (" -F %s " % (flow2Str(f)) )
+    for i in range(0, threads):
+        ret = ret + ( "-t -q T%d " % (i))
+    return ret
+
 def getClientPortList(clientList, startPort, noPorts=1) :
     portList = []
     for cl in range(0, len(clientList)):
@@ -9,68 +28,11 @@ def getClientPortList(clientList, startPort, noPorts=1) :
         portList.append(startPort + len(prev_entries))
     return portList
 
-def genFancyEchoParameters(noPorts, threadsPerPort, createDedicatedFlows = True):
-    ret = ""
-    # socket info per slot
-    appID = 0
-    portNo = SERVER_INITIAL_PORT
-    sorted_clients = (CLIENTS)
-    sorted_clients.reverse()
-    sorted_clients_port_mapping = (getClientPortList(sorted_clients, CLIENT_INITIAL_PORT, noPorts))
-    sorted_clients_port_mapping.reverse()
+ORACLE = "hardcoded"
+ORACLE = "greedy"
 
-    # Make sure that number of unique clients is more than threadsPerPort
-    if createDedicatedFlows and len(sorted_clients ) < threadsPerPort :
-        raise Exception("Not enough unique clients (%d) for load balancing per threads %d" % (
-            len(sorted_clients),  threadsPerPort))
-    if noPorts > 1:
-        raise Exception("Multiport setup requested, which needs some more hacking  noPorts = %d" % (
-                noPorts))
-        sys.exit()
-
-    clientsPerThread = len(CLIENTS) / threadsPerPort
-
-    if threadsPerPort == 1 :
-
-        ret = ret + (" -a t%d -p %d " % (appID, SERVER_INITIAL_PORT))
-    else :
-        alreadyCovered = 0
-        for kk in range(0, threadsPerPort):
-            ret = ret + (" -a t%d " % (kk))
-            if createDedicatedFlows :
-                for ii in range(alreadyCovered, alreadyCovered + clientsPerThread):
-                    if (ii >= len(sorted_clients)) :
-                       break
-                    ret = ret + (" -f %s:%d/%s:%d " % (
-                            TARGET, SERVER_INITIAL_PORT,
-                            MINFO_CLIENT[sorted_clients[ii]]["EGRESS_INFO"]["src"],
-                            sorted_clients_port_mapping[ii]
-                        ))
-                alreadyCovered = alreadyCovered + clientsPerThread
-
-                # Handling case where number of clients cant equally balanced between threads
-                if kk < (len(CLIENTS) % threadsPerPort) :
-                    ret = ret + (" -f %s:%d/%s:%d " % (
-                            TARGET, SERVER_INITIAL_PORT,
-                            MINFO_CLIENT[sorted_clients[alreadyCovered]]["EGRESS_INFO"]["src"],
-                            sorted_clients_port_mapping[alreadyCovered]
-                        ))
-                    alreadyCovered = alreadyCovered + 1
-
-
-            else: # createDedicatedFlows
-                print "don't create dedicated flows %s" % (ret)
-                ret = ret + (" -p %d " % (SERVER_INITIAL_PORT))
-
-    for kk in range(0, threadsPerPort):
-        ret = ret + (" -t -q t%d " % (kk))
-    print "FancyEcho Parameters (updated) : %s" % (ret)
-    return ret
-
-def endpoints_to_wait():
-    if SERVER_CORES == 1:
-        return 1
-    return len(CLIENTS)
+COSTFN = "priority"
+COSTFN = "balance"
 
 def SRV_CMDS(name):
 
@@ -85,34 +47,31 @@ def SRV_CMDS(name):
                       "cd %s ; " % (dragonet_container[name]['base_dir'])
                         + "sudo %s " % (get_isolation_container(is_server=False))
                         + " %s %d %s " % (
-                          #dragonet_container[name]['deploy_stack'],
-                          #HWQUEUES, "priority")
                           dragonet_container[name]['deploy_stack'],
-                          HWQUEUES, "priority")
-#                        + " %s %d %d " % ( "hardcoded", CONCURRENCY,
-#                            len(client_names))
+                          HWQUEUES, COSTFN)
+                        + " %s %d %d " % (ORACLE, CONCURRENCY,
+                            len(client_names))
                         ,
-
 
                       # run server
                       "cd %s ; " % (dragonet_container[name]['base_dir'])
                         + "sudo %s " % (get_isolation_container(is_server=True))
                         + " ./scripts/pravin/runBetterBg.sh 10  ./ ./fancyecho-out.log  "
                         + " ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
-                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, True))
+                             flows_to_arg_fancyEcho(FLOWS, SERVER_INITIAL_PORT, SERVER_CORES))
                         ,
-
-
                       "sleep 4",
                     ],
 
                     "is_ready_cmd_special" : [
-                        "cd %s ; %s %d %d %s " % (
+                        "cd %s ; %s %d %d %s %d" % (
                           dragonet_container[name]['base_dir'],
                           dragonet_container[name]['is_stack_ready'],
                           HWQUEUES,
-                          endpoints_to_wait(),
-                          "bench-fancyecho"),
+                          dragonet_container[name]['is_ready_wait_events'],
+                          "bench-fancyecho",
+                          (len(FLOWS))
+                          ),
                      ],
 
                     "init_cmd" : [],
@@ -147,7 +106,7 @@ def SRV_CMDS(name):
                           toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))
                       + " ./scripts/pravin/runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
                       + "./fancyEchoLinux %s " % (
-                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, False)),
+                             flows_to_arg_fancyEcho(FLOWS, SERVER_INITIAL_PORT, SERVER_CORES)),
                         "sleep 2",
                         "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
                                     ],
@@ -173,7 +132,7 @@ def SRV_CMDS(name):
                           toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))
                       + " ./scripts/pravin/runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
                       + "%s ./fancyEchoLinux %s " % (onload_prefix,
-                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, False)),
+                             flows_to_arg_fancyEcho(FLOWS, SERVER_INITIAL_PORT, SERVER_CORES)),
                         "sleep 2",
                                     ],
                     "init_cmd" : [],
@@ -196,7 +155,7 @@ def SRV_CMDS(name):
                           toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))
                       + " ./scripts/pravin/runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
                       + "./fancyEchoLinux %s " % (
-                            genFancyEchoParameters(SERVERS_INSTANCES, SERVER_CORES, False)),
+                             flows_to_arg_fancyEcho(FLOWS, SERVER_INITIAL_PORT, SERVER_CORES)),
                         "sleep 2",
                         "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
                                     ],
@@ -469,10 +428,4 @@ def create_server_list(server_names, startid=SPECIAL_SERVERS_COUNT):
     for i in range(startid, len(server_names)):
        slist.append(create_server(i))
     return slist
-
-
-
-
-
-
 

@@ -10,7 +10,8 @@ onload_prefix="onload --profile=latency --preload=/usr/lib64/libonload.so"
 dragonet_container_old = {
                 "llvmSF":   ["./scripts/pravin/deployDragonetGen.sh", "stack-sf" , "sf"],
                 "llvmE10k": ["./scripts/pravin/deployDragonetGen.sh", "stack-e10k", "e10k"],
-                "dpdk": ["./scripts/pravin/deployDragonetGen.sh", "stack-dpdk", "dpdk"],
+                #"dpdk": ["./scripts/pravin/deployDragonetGen.sh", "stack-dpdk", "dpdk"],
+                "dpdk2": ["./scripts/pravin/deployDragonetGen.sh", "stack-dpdk2", "dpdk"],
                 }
 
 
@@ -47,7 +48,7 @@ def dragonet_container_gen(sname):
 dragonet_container = {
                 "llvmSF": dragonet_container_gen('sf'),
                 "llvmE10k": dragonet_container_gen('e10k'),
-                "dpdk": dragonet_container_gen('dpdk')
+                "dpdk2": dragonet_container_gen('dpdk2')
                 }
 
 
