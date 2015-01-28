@@ -149,7 +149,7 @@ class (C.ConfChange cc) => OracleSt o cc | o -> cc where
 
     -- Perform a jump on the configuration input. It accepts the current
     -- configuration and the flows that were configured.
-    -- It returns: A *partition* of the flows and configuration changes to keep,
+    -- It returns: A partition of the flows and configuration changes to keep,
     -- and the flows and configurations to discard.
     confJump :: o -> [(cc,Flow)] -> ([(cc,Flow)], [(cc,Flow)])
     confJump _ orig = ([], orig)
@@ -197,14 +197,24 @@ flowsSingleConfs x conf fs =
     [(fl, C.applyConfChange conf change) | (fl,change) <- flowsSingleConfChanges x conf fs]
 
 -- generic jump function that deallocates a queue
+-- (this treats the configuration changes as a stack, where you can only remove
+-- flows by popping)
+oracleQueueJumpStack :: (C.ConfChange cc)
+                => (cc -> QueueId)
+                -> [(cc,Flow)] -- initial configuration
+                -> ([(cc,Flow)], [(cc,Flow)]) -- keep, remove partition
+oracleQueueJumpStack ccQueue ts = L.splitAt splitIdx ts
+    where getQ = ccQueue . fst
+          lastQ = getQ $ last ts -- last queue
+          splitIdx = fromJust $ L.findIndex (\x -> getQ x == lastQ) ts
+
 oracleQueueJump :: (C.ConfChange cc)
                 => (cc -> QueueId)
                 -> [(cc,Flow)] -- initial configuration
                 -> ([(cc,Flow)], [(cc,Flow)]) -- keep, remove partition
-oracleQueueJump ccQueue ts = L.splitAt splitIdx ts
+oracleQueueJump ccQueue ts = L.partition ((/=lastQ) . getQ) ts
     where getQ = ccQueue . fst
           lastQ = getQ $ last ts -- last queue
-          splitIdx = fromJust $ L.findIndex (\x -> getQ x == lastQ) ts
 
 
 -- ###################################### E10k Oracle ########################
