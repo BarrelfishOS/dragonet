@@ -220,8 +220,9 @@ dpdkPrgArgs = do
 
 data StackE10kOpts = StackE10kOpts {
       optNq          :: Int
-    , optCostFn      :: (Int -> SE.CostQueueFn, [FL.Flow] -> [FL.Flow])
+    , optCostFn      :: (Integer -> Int -> SE.CostQueueFn, [FL.Flow] -> [FL.Flow])
     , optPrgArgs     :: (String, IO SS.StackPrgArgs)
+    , optFlowsPerApp :: Integer
     , optIncremental :: Bool
 } deriving (Show)
 
@@ -243,7 +244,8 @@ doRunStackE10kIncremental opts = do
 
     -- get options
     let nq       = optNq opts
-        costFn   = (fst $ optCostFn opts) nq
+        fpa      = optFlowsPerApp opts
+        costFn   = (fst $ optCostFn opts) fpa nq
         sortFn   = snd $ optCostFn opts
 
     -- search parameters
@@ -265,7 +267,8 @@ doRunStackE10k opts = do
     (prgU,_) <- E10k.graphH
     -- get options
     let nq       = optNq opts
-        costFn   = (fst $ optCostFn opts) nq
+        fpa      = optFlowsPerApp opts
+        costFn   = (fst $ optCostFn opts) fpa nq
         sortFn   = snd $ optCostFn opts
 
     -- search parameters
@@ -285,13 +288,12 @@ doRunStackE10k opts = do
 
 
 costFnL fPerq = [
-      ("balance",  (SE.balanceCost, id))
-    , ("priority", ((S1.priorityCost' fPerq), (S1.prioritySort' fPerq)))
-    , ("priority2", ((S1.priorityCost'' 2 fPerq), (S1.prioritySort'' 2)))
+      ("balance",  (\fpa nq qmap -> SE.balanceCost nq qmap, id))
+    , ("priority", (S1.priorityCost', (S1.prioritySort' fPerq)))
  ]
 
 costFnParser = OA.str >>= doParse
-    where doParse :: String -> OA.ReadM (Int -> SE.CostQueueFn, [FL.Flow] -> [FL.Flow])
+    where doParse :: String -> OA.ReadM (Integer -> Int -> SE.CostQueueFn, [FL.Flow] -> [FL.Flow])
           doParse x = case L.lookup x (costFnL fPerQ) of
                 Nothing -> OA.readerError "Uknown cost function"
                 Just y  -> return y
@@ -318,10 +320,12 @@ stackE10kParserInfo = OA.info (OA.helper <*> parser) info
                 <$> OA.argument OA.auto infoNq
                 <*> OA.argument costFnParser infoCostF
                 <*> OA.argument prgArgsParser infoPrgArgs
+                <*> OA.argument OA.auto infoFpA
                 <*> OA.switch (OA.short 'i' OA.<> OA.help incrTxt)
           --fPerQ = 2
           info = OA.fullDesc OA.<> OA.header "Instantiate the e10k stack"
           infoNq = (OA.metavar "nqueues" OA.<> OA.help "number of queues")
+          infoFpA = (OA.metavar "fpa" OA.<> OA.help "flows per App")
           infoCostF = (OA.metavar costMeta OA.<> OA.help costHelp)
           infoPrgArgs = (OA.metavar prgMeta OA.<> OA.help prgHelp)
           incrTxt = "Run Incremental stack"
