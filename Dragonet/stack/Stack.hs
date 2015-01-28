@@ -50,6 +50,11 @@ import Data.Bits (testBit)
 import Util.XTimeIt (doTimeIt,dontTimeIt)
 import Text.Show.Pretty (ppShow)
 
+putStrLnDbg x = putStrLn x
+putStrLnDbgN x = return ()
+--putStrLnDbgN x = putStrLn x
+
+
 -- StackArgs: static arguments for instantiating the stack
 --  Don't use StackArgs to construct it, use stackArgsDefault
 --  If you want to call it directly, read the comments at stackArgsDefault
@@ -228,7 +233,7 @@ muxId plg dNodeL dPL = i
 
 eventHandle :: STM.TVar StackState -> PLA.ChanHandle -> PLA.Event -> IO ()
 eventHandle sstv ch event = do
-    putStrLn $ "EventHandle => channel: "
+    putStrLnDbgN $ "EventHandle => channel: "
              ++ (show ch) ++ " Event: " ++ (show event)
     eventHandler sstv ch event
 
@@ -268,7 +273,7 @@ eventHandler sstv ch (PLA.EvAppRegister lbl flags) = do
                 ssApplications = M.insert aid app $ ssApplications ss
             }
         return aid
-    putStrLn $ "AppRegister: " ++ lbl ++ "[" ++ show ch ++ "] -> " ++ show aid
+    putStrLnDbgN $ "AppRegister: " ++ lbl ++ "[" ++ show ch ++ "] -> " ++ show aid
                             ++ ", flags: " ++ show flags
     PLA.sendMessage ch $ PLA.MsgWelcome aid
 
@@ -286,7 +291,7 @@ eventHandler sstv ch
             ((sid,eid), ss') = ssRunNetState ss (NS.udpBind aid (le,re))
         STM.writeTVar sstv $ ss'
         return (sid,ss')
-    putStrLn $ "SocketUDPBind f=" ++ show re ++ "/" ++ show le ++ "- "
+    putStrLnDbgN $ "SocketUDPBind f=" ++ show re ++ "/" ++ show le ++ "- "
                ++ show sid ++ ", flags: " ++ show flags
     if testBit flags PLA.appFlagsMore
         then return ()
@@ -306,7 +311,7 @@ eventHandler sstv ch
             ss' = ss {ssFlowsSt = FL.fsAddFlow (ssFlowsSt ss) fl}
         STM.writeTVar sstv $ ss'
         return ss'
-    putStrLn $ "SocketUDPFlow f=" ++ show re ++ "/" ++ show le
+    putStrLnDbgN $ "SocketUDPFlow f=" ++ show re ++ "/" ++ show le
                 ++ " for " ++ show sid ++ ", flags: " ++  show flags
     -- Sending message to app before we actually reflect this on stack
     PLA.sendMessage ch $ PLA.MsgStatus True
@@ -334,7 +339,7 @@ eventHandler sstv ch (PLA.EvSocketSpan oldsid flags) = do
             (sid,ss') = ssRunNetState ss (NS.socketSpan aid oldsid)
         STM.writeTVar sstv $ ss'
         return (sid,ss')
-    putStrLn $ "SocketSpan existing=" ++ show oldsid ++ " for sid:" ++ show sid
+    putStrLnDbgN $ "SocketSpan existing=" ++ show oldsid ++ " for sid:" ++ show sid
                     ++ ", flags: " ++  show flags
     if testBit flags PLA.appFlagsMore
         then return ()
@@ -343,7 +348,7 @@ eventHandler sstv ch (PLA.EvSocketSpan oldsid flags) = do
 
 eventHandler sstv ch (PLA.EvNop flags) = do
     ss <- STM.atomically $ STM.readTVar sstv
-    putStrLn $ "#### NOOP called from " ++ show ch ++ " with flags " ++ show flags
+    putStrLnDbgN $ "#### NOOP called from " ++ show ch ++ " with flags " ++ show flags
     if testBit flags PLA.appFlagsMore
         then return ()
         else ssUpdateGraphs ss sstv
@@ -355,7 +360,7 @@ eventHandler sstv ch (PLA.EvNop flags) = do
  -  TODO: Should I report error to an application here?
  -}
 eventHandler sstv ch ev = do
-    putStrLn $ "eventHandler: UNHANDLED EVENT: " ++ show ch ++ " " ++ show ev
+    putStrLnDbgN $ "eventHandler: UNHANDLED EVENT: " ++ show ch ++ " " ++ show ev
 
 
 --------------------------------------------------------------------------------
@@ -442,7 +447,7 @@ ssCreatePL
 ssCreatePL args ss plg pl@('A':'p':'p':aids) = do
     -- Creating application pipeline.  Untrusted zone
     --      in application address-space
-    putStrLn $ "Creating App pipeline: " ++ pl
+    putStrLnDbgN $ "Creating App pipeline: " ++ pl
     createPipelineClient agh pl
     where
       aid = read aids
@@ -451,7 +456,7 @@ ssCreatePL args ss plg pl@('A':'p':'p':aids) = do
 ssCreatePL args ss plg pl = do
     -- Creating stack-pipeline. Trusted zone
     --      in dragonet address-space
-    putStrLn $ "Creating local pipeline: ##### " ++ pl
+    putStrLnDbgN $ "Creating local pipeline: ##### " ++ pl
     -- Creates a thread to handle the pipeline
     --      NOTE: following function will actually create a thread
     createPipeline plg (stName args) (stLlvmH $ stPrg args) pl
@@ -466,7 +471,7 @@ updateGraphOpt
     -> IO ()
 updateGraphOpt costFn cfgOracle args sstv = do
     ss <- ssNewVer sstv
-    putStrLn $ "updateGraphOpt: v" ++ (show $ ssVersion ss)
+    putStrLnDbgN $ "updateGraphOpt: v" ++ (show $ ssVersion ss)
     let lpgC = ssConfigureLpg ss args
 
     -- STEP: Generate an Optimize combined graph,
@@ -492,7 +497,7 @@ updateGraphFlows
     -> STM.TVar StackState
     -> IO ()
 updateGraphFlows getConf args sstv = do
-   putStrLn "updateGraphFlows"
+   putStrLnDbgN "updateGraphFlows"
    (ss,flowStOld) <- ssUpdateGraph sstv
    putStrLn $ "updateGraphFlows: v" ++ (show $ ssVersion ss)
    -- get list of all endpoints from stack-state
@@ -511,8 +516,8 @@ updateGraphFlows getConf args sstv = do
        --flows = reverse $ flows'
        flows =  flows'
 
-   putStrLn $ "Flows:\n" ++ (ppShow $ map flowStr flows)
-   putStrLn $ "Flow count: " ++ (show $ length flows)
+   putStrLnDbgN $ "Flows:\n" ++ (ppShow $ map flowStr flows)
+   --putStrLn $ "Flow count: " ++ (show $ length flows)
    -- These messages are very useful for debugging: PS
 --   putStrLn $ "=====> LAST EPS: " ++ (ppShow prevEps)
 --   putStrLn $ "=====> REMOVED: " ++ (ppShow rmEps)
@@ -520,7 +525,7 @@ updateGraphFlows getConf args sstv = do
 --   putStrLn $ "=====> CURRENT: " ++ (ppShow allEps)
 
    prgConf <- getConf flows
-   putStrLn $ "generated conf:\n" ++ (ppShow $ prgConf)
+   --putStrLn $ "generated conf:\n" ++ (ppShow $ prgConf)
 
    -- STEP: Create a new combined, but pipelined graph
    --          with both LPG and PRG with configuration applied
@@ -539,9 +544,9 @@ updateGraphFlows getConf args sstv = do
    -- NOTE: ctx is still an initial context, is that efficient?
    PLD.run (ssCtx ss) plConnect (ssCreatePL args ss plg) $ addMuxIds plg
 
-   putStrLn "updateGraph exit"
+   putStrLnDbgN "updateGraph exit"
    -- FIXME: Create file here.
-   putStrLn "################### calling appendFile with app ready notice"
+   putStrLnDbgN "################### calling appendFile with app ready notice"
    appendFile("allAppslist.appready") $ "Application is ready!\n"
 
 
@@ -721,9 +726,9 @@ updateGraphFlowsIncr doSearch args sitv sstv = do
         --- run it
         PLD.run (ssCtx ss') plConnect (ssCreatePL args ss' plg) $ addMuxIds plg
         --
-        putStrLn "updateGraphFlowsIncr exit"
-        -- FIXME: Create file here.
-        putStrLn "################### calling appendFile with app ready notice"
+        putStrLnDbgN "updateGraphFlowsIncr exit"
+        -- Create file here.
+        putStrLnDbgN "################### calling appendFile with app ready notice"
         appendFile("allAppslist.appready") $ "Application is ready!\n"
         return ()
 

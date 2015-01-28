@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <pthread.h>
-
+#include <assert.h>
 #include <pipelines.h>
 
 
@@ -258,7 +258,26 @@ int main_loop(struct driver *drv);
 // This is a way to declare the dragonet stack is initialied
 #define DN_READY_FNAME       "stack.dnready"
 #define APP_READY_FNAME       ".appready"
+#define FILTER_MAN_FNAME       "stack.filtready"
 void declare_dragonet_initialized(char *fname, char *msg);
+
+static void filter_manipulation_log(char *fname, char *msg)
+{
+   int fid = open(fname, O_WRONLY | O_APPEND | O_CREAT, 0644);
+   if (fid < 0) {
+        perror("open filter_manipulation_log:");
+        assert(fid >= 0);
+        return;
+   }
+   int ret = write(fid, msg, strlen(msg));
+   if (ret < 0) {
+        perror("write filter_manipulation_log:");
+        close(fid);
+        assert(ret >= 0);
+        return;
+   }
+   close(fid);
+}
 
 #include "gencode.h"
 
@@ -304,8 +323,8 @@ extern struct pkt_stats debug_pkt_stats;
 void show_pkt_stats(struct pkt_stats *stats);
 
 #define IPv4_ADDR_STR_SIZE          (18)
-static inline char *convert_ipv4(uint32_t ip, char *str);
-static inline char *convert_ipv4(uint32_t ip, char *str)
+static char *convert_ipv4(uint32_t ip, char *str);
+static char *convert_ipv4(uint32_t ip, char *str)
 {
    unsigned char *addr = (unsigned char*)&ip;
    snprintf(str, (IPv4_ADDR_STR_SIZE - 1), "%hhu.%hhu.%hhu.%hhu",

@@ -44,8 +44,8 @@ tr a b = trace b a
 trN a b = a
 
 putStrLnDbg x = putStrLn x
---putStrLnDbgN x = return ()
-putStrLnDbgN x = putStrLn x
+putStrLnDbgN x = return ()
+--putStrLnDbgN x = putStrLn x
 
 --------------------------------------------------
 
@@ -307,7 +307,7 @@ implCfg5Tuple tcstate chan sh config = do
     putStrLnDbgN $ "e10k-impl5tpl: toAdd : " ++ (ppShow toAdd)
 
     putStrLnDbgN $ "e10k-impl5tpl: toRemIDs : " ++ (show toRemIds)
-    putStrLnDbgN $ "e10k-impl5tpl: useableIDs : " ++ (show usableIds)
+    putStrLnDbgN $ "e10k-impl5tpl: useableIDs : " ++ (show $ take 5 usableIds)
     putStrLnDbgN $ "e10k-impl5tpl: toAddID : " ++ (show toAddId)
 
 

@@ -90,6 +90,9 @@ int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
 #define IPROTO_UDP      17
 
 
+static char BIG_MSG_STR[4000];
+
+/*
 static int convert_u32_ip4_to_string(uint32_t ipAddress, char *addr, int len)
 {
     uint8_t  octet[4] = {0,0,0,0};
@@ -104,7 +107,7 @@ static int convert_u32_ip4_to_string(uint32_t ipAddress, char *addr, int len)
     //printf("IP address %"PRIu32" is converted to %s\n", ipAddress, addr);
     return ret;
 }
-
+*/
 
 
 int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
@@ -122,7 +125,8 @@ int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
         localip1 = CONFIG_LOCAL_IP_sf;
     }
 
-    convert_u32_ip4_to_string(localip1, localIPStr, sizeof(localIPStr));
+    convert_ipv4(localip1, localIPStr);
+    //convert_u32_ip4_to_string(localip1, localIPStr, sizeof(localIPStr));
 
 
  //{udp|tcp}:[vid=<vlan>,]<local-host>:<local-port>"
@@ -139,12 +143,14 @@ int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
     }
 
     //dprint
-    printf
-        ("%s:%s:%d:[####-- IMP --####] [vq:%p, vis:%p], [qid:%"PRIu8"], inserting listen filter proto [%d], "
+    //printf
+    snprintf(BIG_MSG_STR, sizeof(BIG_MSG_STR),
+        "%s:%s:%d:[####-- IMP --####] [vq:%p, vis:%p], [qid:%"PRIu8"], inserting listen filter proto [%d], "
             "localip [%"PRIx32"][%s] localport[%"PRIx16"]\n",
             __FILE__, __func__, __LINE__, sfq, vis, sfq->qid,
             protocol, localip1, localIPStr, localport1);
 
+    printf("%s", BIG_MSG_STR);
 //    TRY(ef_filter_spec_set_ip4_local(&filter_spec, protocol, localip,
 //                localport));
     TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
@@ -152,6 +158,7 @@ int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
     printf
         ("%s:%s:%d: [vq:%p], [qid:%"PRIu8"] done\n",
             __FILE__, __func__, __LINE__, sfq, sfq->qid);
+    filter_manipulation_log(FILTER_MAN_FNAME, BIG_MSG_STR);
     return 1;
 } // end function: alloc_filter_listen_ipv4
 
@@ -169,8 +176,10 @@ int alloc_filter_full_ipv4(struct dragonet_sf_queue *sfq, int protocol,
     char remoteIPStr[16];
     char filterStr[1024];
 
-    convert_u32_ip4_to_string(localip1, localIPStr, sizeof(localIPStr));
-    convert_u32_ip4_to_string(remoteip1, remoteIPStr, sizeof(remoteIPStr));
+    convert_ipv4(localip1, localIPStr);
+    convert_ipv4(remoteip1, remoteIPStr);
+    //convert_u32_ip4_to_string(localip1, localIPStr, sizeof(localIPStr));
+    //convert_u32_ip4_to_string(remoteip1, remoteIPStr, sizeof(remoteIPStr));
 
  //{udp|tcp}:[vid=<vlan>,]<local-host>:<local-port>"
 // "[,<remote-host>:<remote-port>]");
@@ -186,13 +195,16 @@ int alloc_filter_full_ipv4(struct dragonet_sf_queue *sfq, int protocol,
     }
 
     //dprint
-    printf
-        ("%s:%s:%d: [####-- IMP --####] [vq:%p, vis:%p], [qid:%"PRIu8"] inserting full filter proto [%d], "
+    //printf
+    snprintf(BIG_MSG_STR, sizeof(BIG_MSG_STR),
+        "%s:%s:%d: [####-- IMP --####] [vq:%p, vis:%p], [qid:%"PRIu8"] inserting full filter proto [%d], "
             "localip [%"PRIx32"][%s] localport[%"PRIu16"], "
             "RemoteIP [%"PRIx32"][%s] RemotePort[%"PRIu16"]\n",
             __FILE__, __func__, __LINE__, sfq, vis, sfq->qid,
             protocol, localip1, localIPStr, localport1,
             remoteip1, remoteIPStr, remoteport1);
+
+    printf("%s", BIG_MSG_STR);
 
 //    TRY(ef_filter_spec_set_ip4_full(&filter_spec, protocol,
 //                localip, localport, remoteip, remoteport));
@@ -202,6 +214,7 @@ int alloc_filter_full_ipv4(struct dragonet_sf_queue *sfq, int protocol,
     printf
         ("%s:%s:%d: [vq:%p], [qid:%"PRIu8"] done\n",
             __FILE__, __func__, __LINE__, sfq, sfq->qid);
+    filter_manipulation_log(FILTER_MAN_FNAME, BIG_MSG_STR);
     return 1;
 } // end function: alloc_filter_full_ipv4
 

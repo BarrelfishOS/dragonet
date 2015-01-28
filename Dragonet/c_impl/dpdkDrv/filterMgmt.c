@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <dpdk_backend.h>
 
+static char BIG_MSG_STR[4000];
 void e10k_ctrl_waitready(struct state *state)
 {
     void *drv;
@@ -45,9 +46,11 @@ bool e10k_ctrl_fdir_set(struct state *state,
 
     l4_type = 0x11; // FIXME: hardcoding the type to UDP
 
-    printf("\n\n### %s:%s:%d:  [####-- IMP --####]"
+    snprintf(BIG_MSG_STR, sizeof(BIG_MSG_STR),
+    //printf(
+        "### %s:%s:%d:  [####-- IMP --####]"
             "index: %"PRIu16", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
-            "srcIP: %s -> %"PRIu32", srcPort: %"PRIu16",  dstIP: %s -> %"PRIu32", dstPort: %"PRIu16"\n\n",
+            "srcIP: %s -> %"PRIu32", srcPort: %"PRIu16",  dstIP: %s -> %"PRIu32", dstPort: %"PRIu16"\n",
             __FILE__, __FUNCTION__, __LINE__,
             index,
             queue,
@@ -61,9 +64,11 @@ bool e10k_ctrl_fdir_set(struct state *state,
             dst_port
             );
 
+    printf("%s", BIG_MSG_STR);
     int ret = set_fdir_filter(e10k_nic, dst_ip, src_ip, dst_port, src_port,
             l4_type, mask, queue, index);
     if (ret < 0) return false;
+    filter_manipulation_log(FILTER_MAN_FNAME, BIG_MSG_STR);
     return true;
 }
 
@@ -87,9 +92,10 @@ bool e10k_ctrl_5tuple_set(struct state *state,
 
     l4_type = 0x11; // FIXME: hardcoding the type to UDP
 
-    printf("\n\n### %s:%s:%d:  [####-- IMP --####] index %"PRIu8", "
+    snprintf(BIG_MSG_STR, sizeof(BIG_MSG_STR),
+            "### %s:%s:%d:  [####-- IMP --####] index %"PRIu8", "
             "Priority: %"PRIu8", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
-            "srcIP: %s = %"PRIu32", srcPort: %"PRIu16",  dstIP: %s =%"PRIu32", dstPort: %"PRIu16"\n\n",
+            "srcIP: %s = %"PRIu32", srcPort: %"PRIu16",  dstIP: %s =%"PRIu32", dstPort: %"PRIu16"\n",
             __FILE__, __FUNCTION__, __LINE__,
             index,
             priority,
@@ -104,6 +110,7 @@ bool e10k_ctrl_5tuple_set(struct state *state,
             dst_port
             );
 
+    printf("%s", BIG_MSG_STR);
     // FIXME: just for testing fdir filters.  Remove this line after testing
 //    return e10k_ctrl_fdir_set(state, (uint16_t)index, queue,
 //            src_ip, dst_ip, src_port, dst_port, l4_type, mask);
@@ -114,6 +121,7 @@ bool e10k_ctrl_5tuple_set(struct state *state,
         assert(!"Failed in inserting 5tuple filter");
         return false;
     }
+    filter_manipulation_log(FILTER_MAN_FNAME, BIG_MSG_STR);
     return true;
 }
 

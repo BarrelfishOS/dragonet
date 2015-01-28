@@ -74,6 +74,10 @@ import Text.Show.Pretty (ppShow)
 
 import Util.XTimeIt (doTimeIt, dontTimeIt)
 
+putStrLnDbg x = putStrLn x
+putStrLnDbgN x = return ()
+--putStrLnDbgN x = putStrLn x
+
 tr a b  = trace b a
 trN a b = a
 
@@ -685,7 +689,7 @@ searchGreedyConf_ :: OracleSt o a
                    -> [Flow]
                    -> ST.ST s C.Configuration
 
-searchGreedyConf_ st (cnf,_) [] = return $ trN cnf msg
+searchGreedyConf_ st (cnf,_) [] = return $ tr cnf msg
     where msg = ("searchGreedyConf_:" ++ (showConf oracle cnf))
           oracle = sOracle $ sParams st
 
