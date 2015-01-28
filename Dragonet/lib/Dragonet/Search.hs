@@ -29,7 +29,7 @@ module Dragonet.Search (
   runIncrSearch,
   IncrSearchStIO, initIncrSearchIO, runIncrSearchIO,
 
-  test, test_incr, test_incr_add, testFmCfdir
+  test, test_incr, test_incr_add, testFmCfdir, test_incr_pravin_testcase
 ) where
 
 import qualified Dragonet.Configuration       as C
@@ -149,10 +149,10 @@ class (C.ConfChange cc) => OracleSt o cc | o -> cc where
 
     -- Perform a jump on the configuration input. It accepts the current
     -- configuration and the flows that were configured.
-    -- It returns: the flows and configuration changes to keep, and the flows
-    -- needed to be considered again.
-    confJump :: o -> [cc] -> [Flow] -> ([(Flow, cc)], [Flow])
-    confJump _ cc flows = ([], flows)
+    -- It returns: A *partition* of the flows and configuration changes to keep,
+    -- and the flows and configurations to discard.
+    confJump :: o -> [(cc,Flow)] -> ([(cc,Flow)], [(cc,Flow)])
+    confJump _ orig = ([], orig)
 
 {-|
  The class 'SearchParams' contains the search parameters
@@ -196,6 +196,16 @@ flowsSingleConfs :: (C.ConfChange a, OracleSt o a)
 flowsSingleConfs x conf fs =
     [(fl, C.applyConfChange conf change) | (fl,change) <- flowsSingleConfChanges x conf fs]
 
+-- generic jump function that deallocates a queue
+oracleQueueJump :: (C.ConfChange cc)
+                => (cc -> QueueId)
+                -> [(cc,Flow)] -- initial configuration
+                -> ([(cc,Flow)], [(cc,Flow)]) -- keep, remove partition
+oracleQueueJump ccQueue ts = L.splitAt splitIdx ts
+    where getQ = ccQueue . fst
+          lastQ = getQ $ last ts -- last queue
+          splitIdx = fromJust $ L.findIndex (\x -> getQ x == lastQ) ts
+
 
 -- ###################################### E10k Oracle ########################
 -- E10K (simple for now) oracle
@@ -230,7 +240,7 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
         [e10kDefaultQ, xq]
         where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
 
-    confJump = e10kConfQueueJump
+    confJump o = oracleQueueJump E10k.ccQueue
 
 -- TODO: avoid symmetric allocation
 -- TODO: smart-wildcard allocation if possible?
@@ -255,19 +265,9 @@ e10kFlowConfChangesS o@(E10kOracleSt {nQueues = nq, startQ = startQ}) cnf fl
     | not rxCfdFull = (catMaybes $ [E10k.insertFdirFromFl fl q | q <- allQs], o')
     | otherwise     = ([], o)
     where allQs = allQueues_ startQ nq
-          o' =  o { startQ = startQ + 1}
+          o' =  o { startQ = (startQ + 1) `mod` nq}
           rx5tFull  = E10k.rx5tFilterTableFull cnf
           rxCfdFull = E10k.rxCfdFilterTableFull cnf
-
-e10kConfQueueJump :: E10kOracleSt -> [E10k.ConfChange] -> [Flow]
-                  -> ([(Flow, E10k.ConfChange)], [Flow])
-e10kConfQueueJump o ccs fs = (keep, map fst rm)
-    where -- rmQ = 9 -- this will not work for multiple jumps!
-          rmQ = startQ o --  will this? maybe...
-          (rm,keep) = L.partition (\t -> rmQ == E10k.ccQueue (snd t))
-                      $ zip fs ccs
-
-
 
 myThird (_,_,x) = x
 mySnd (_,x,_) = x
@@ -351,7 +351,7 @@ instance OracleSt SFOracleSt SF.ConfChange where
         [sfDefaultQ, xq]
         where xq = SF.c5tQueue $ SF.parse5t c5t
 
-    confJump = sfConfQueueJump
+    confJump o = oracleQueueJump SF.ccQueue
 
 -- TODO: avoid symmetric allocation
 -- TODO: smart-wildcard allocation if possible?
@@ -372,18 +372,8 @@ sfFlowConfChangesS o@(SFOracleSt {nQueuesSF = nq, startQSF = startQ}) cnf fl
     | not rx5tFull  = ([SF.insert5tFromFl fl q | q <- allQs], o')
     | otherwise     = ([], o)
     where allQs = allQueues_ startQ nq
-          o' =  o { startQSF = startQ + 1}
+          o' =  o { startQSF = startQ + 1 `mod` nq}
           rx5tFull  = SF.rx5tFilterTableFull cnf
-
-
-sfConfQueueJump :: SFOracleSt -> [SF.ConfChange] -> [Flow]
-                  -> ([(Flow, SF.ConfChange)], [Flow])
-sfConfQueueJump o ccs fs = (keep, map fst rm)
-    where -- rmQ = 9 -- this will not work for multiple jumps!
-          rmQ = startQSF o --  will this? maybe...
-          (rm,keep) = L.partition (\t -> rmQ == SF.ccQueue (snd t))
-                      $ zip fs ccs
-
 
 -- SF (simple for now) oracle
 newtype SFOracleHardCoded = SFOracleHardCoded {
@@ -1308,9 +1298,10 @@ incSearchGreedyFlows st flowsSt = do
             let fm = isFlowMapSt st
                 ccs = FM.fmCnfChanges fm
                 flows = FM.fmFlows fm
-                (keep, rmFlows_) = trace "JUMP!" confJump oracle ccs flows
-                rmFlows = trN rmFlows_ $ "Removed flows:\n" ++ (FL.flowsStr rmFlows_)
-                (keepFlows, keepCcs) = unzip keep
+                (keep, discard) = trace "JUMP!" confJump oracle (zip ccs flows)
+                (_,rmFlows_) = unzip discard
+                rmFlows = tr rmFlows_ $ "Removed flows:\n" ++ (FL.flowsStr rmFlows_)
+                (keepCcs,keepFlows) = unzip keep
             fm' <- FM.rebuildFlowMapSt fm keepFlows keepCcs
             let st' = st { isFlowMapSt = fm' }
                 -- new flows state
