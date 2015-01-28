@@ -300,7 +300,7 @@ initFlowMapSt g = do
        entryNodes = [nid | nid <- DGI.nodes g, length (DGI.pre g nid) == 0]
        rxEntryNid = case filter (isNidRxNode g) entryNodes of
          [x] -> trN x $ "Entry node: " ++ PG.nLabel (fromJust $ DGI.lab g x)
-         []  -> error "initFlowMapSt: no entry node found"
+         []  -> error ("initFlowMapSt: no entry node found")
          _   -> error "initFlowMapSt: more than one entry node found"
        lNodes = DGI.labNodes g
        -- Rx Queue nodes (we use those to calculate qmap)

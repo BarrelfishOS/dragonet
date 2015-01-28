@@ -79,8 +79,15 @@ balEpAcrossRxQs g (eid,nids@((nid0):_)) = trace msg $ enfoceEP2SocketsMapping g 
     ports = PG.nPorts $ fromJust $ DGI.lab g nid0
     balancedPorts = balancedChunks (length nids) ports
     groupedNids :: [(DGI.Node, [PG.NPort])]
-    nids' = nids
-    --nids' = reverse nids  -- reversing to get deterministic ordering so that q0 will always go to socket-0, etc
+    {- Reversing to get deterministic ordering so that q0 will always go to socket-0, etc
+     -  I don't know if this ordering is assured or not, and most probably this will break
+     -  if embedding or node insertion code changes the way these nodes are inserted
+     -  Cleaner fix will be to use the associated queue/partition attribute
+     -  for sorting and making sure that sockets are deterministically used
+     -}
+    nids' = reverse nids
+    -- nids' = nids
+
     balancedPorts' = DL.sort balancedPorts
     groupedNids = zip nids' $ concat $ repeat balancedPorts'
     msg

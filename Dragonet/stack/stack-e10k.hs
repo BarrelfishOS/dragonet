@@ -19,6 +19,10 @@ import qualified Options.Applicative as OA
 
 import qualified Stack as SS
 
+-- For DPDK based implementation of E10K NIC
+import qualified DpdkImpl as DPDKIMPL
+
+
 import Control.Monad (forever, forM_)
 import Control.Applicative ((<$>),(<*>))
 import Control.Concurrent(forkIO, ThreadId)
@@ -164,6 +168,28 @@ e10kImplFunction = do
     chan    <- STM.newTChanIO
     return $ implCfg tcstate chan
 
+{-
+dpdkImplFunction :: IO (PLI.StateHandle -> C.Configuration -> IO ())
+dpdkImplFunction = do
+    let t5count :: Word8
+        t5count = fromIntegral c5TupleFilters
+        cfcount = fromIntegral cFDirFilters
+
+    --  Channel and MVar with thread id of control thread
+        state = CfgState {
+                    csThread = Nothing,
+                    cs5Tuples = M.empty,
+                    cs5TUnused = [0..(t5count - 1)],
+                    csFDirs = M.empty,
+                    csFDirsUnused = [0..(cfcount - 1)]
+                    }
+
+    tcstate <- STM.newTVarIO state
+    chan    <- STM.newTChanIO
+
+    return $ implCfg tcstate chan
+-}
+
 e10kPrgArgs :: IO SS.StackPrgArgs
 e10kPrgArgs = do
     prgH <- E10k.graphH
@@ -187,9 +213,10 @@ tapPrgArgs = do
 dpdkPrgArgs :: IO SS.StackPrgArgs
 dpdkPrgArgs = do
     prgH <- E10k.graphH
+    implFn <- DPDKIMPL.dpdkImplFunction
     return SS.StackPrgArgs { SS.stPrgH = prgH
-                           , SS.stLlvmH = "llvm-helpers-dpdk"
-                           , SS.stCfgImpl = error "dpkdPrgArgs: FILLME!" }
+                           , SS.stLlvmH = DPDKIMPL.llvm_helpers
+                           , SS.stCfgImpl = implFn }
 
 data StackE10kOpts = StackE10kOpts {
       optNq          :: Int
@@ -211,6 +238,9 @@ doRunStackE10kIncremental :: StackE10kOpts -> IO ()
 doRunStackE10kIncremental opts = do
     -- PRG (use simple graph. Hope this works!)
     (prgU,_) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl-simple.unicorn"
+    -- FIXME: Using full graph did not worked (atleast with incremental run)
+    --prgH@(prgU,_) <- E10k.graphH
+
     -- get options
     let nq       = optNq opts
         costFn   = (fst $ optCostFn opts) nq
@@ -253,13 +283,16 @@ doRunStackE10k opts = do
 
     SS.instantiateFlowsIO_ getConfIO plAssignMerged prgArgs
 
-costFnL = [
+
+costFnL fPerq = [
       ("balance",  (SE.balanceCost, id))
-    , ("priority", (S1.priorityCost, S1.prioritySort))
+    , ("priority", ((S1.priorityCost' fPerq), (S1.prioritySort' fPerq)))
+    , ("priority2", ((S1.priorityCost'' 2 fPerq), (S1.prioritySort'' 2)))
  ]
+
 costFnParser = OA.str >>= doParse
     where doParse :: String -> OA.ReadM (Int -> SE.CostQueueFn, [FL.Flow] -> [FL.Flow])
-          doParse x = case L.lookup x costFnL of
+          doParse x = case L.lookup x (costFnL fPerQ) of
                 Nothing -> OA.readerError "Uknown cost function"
                 Just y  -> return y
 
@@ -274,6 +307,10 @@ prgArgsParser  = OA.str >>= doParse
                 Nothing -> OA.readerError "Uknown prgArgs option"
                 Just y  -> return y
 
+-- Number of flows in single gold queue allowed.
+--      Typically it should equal to  lows per application
+-- TODO: Read this from commandline args
+fPerQ = 1
 
 stackE10kParserInfo:: OA.ParserInfo StackE10kOpts
 stackE10kParserInfo = OA.info (OA.helper <*> parser) info
@@ -282,13 +319,14 @@ stackE10kParserInfo = OA.info (OA.helper <*> parser) info
                 <*> OA.argument costFnParser infoCostF
                 <*> OA.argument prgArgsParser infoPrgArgs
                 <*> OA.switch (OA.short 'i' OA.<> OA.help incrTxt)
+          --fPerQ = 2
           info = OA.fullDesc OA.<> OA.header "Instantiate the e10k stack"
           infoNq = (OA.metavar "nqueues" OA.<> OA.help "number of queues")
           infoCostF = (OA.metavar costMeta OA.<> OA.help costHelp)
           infoPrgArgs = (OA.metavar prgMeta OA.<> OA.help prgHelp)
           incrTxt = "Run Incremental stack"
           costHelp = "cost function"
-          costMeta = "CostF (one of:" ++ (show $ map fst costFnL) ++")"
+          costMeta = "CostF (one of:" ++ (show $ map fst (costFnL fPerQ)) ++")"
           prgMeta = "prgArgs (one of:" ++ (show $ map fst prgArgsL) ++")"
           prgHelp = "PRG backend"
 

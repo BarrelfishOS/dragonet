@@ -1452,9 +1452,9 @@ connectFlows start = [ FlowUDPv4 {
 flAddedFlows :: [Flow] -> FL.FlowsSt
 flAddedFlows flows = foldl FL.fsAddFlow FL.flowsStInit flows
 
-hpIp = 666
+hpIp = 111
 beIp = 100
-hpFlowsPerQ = 2
+hpFlowsPerQ = 1
 isHp FlowUDPv4 {flSrcIp = Just srcIp} = srcIp == hpIp
 priorityCost' = priorityCost isHp hpFlowsPerQ
 prioritySort' = prioritySort isHp
@@ -1498,6 +1498,39 @@ test = do
     writeFile "tests/search-prg-result.dot" $ toDot prgC
 
     return ()
+
+test_normal_pravin = do
+    putStrLn $ "Running normal search testcase!"
+    -- unconfigured PRG
+    prgU <- e10kU_simple
+    --prgU <- e10kU_simple
+    let nq = 5
+        hpPort   = 6000
+        bePort   = 1000
+
+        e10kOracle   = initE10kOracle nq
+        priFn        = priorityCost' nq
+        sortFn       = prioritySort'
+        balFn        = balanceCost nq
+        dummyFn      = dummyCost
+        costFn       = priFn
+
+        params = initSearchParams {  sOracle = e10kOracle
+                                   , sPrgU   = prgU
+                                   , sCostFn = costFn
+                                   , sOrderFlows = sortFn }
+
+        initHpNr = 3
+        initBeNr = 8
+        beFs = take initBeNr $ beFlows_ bePort
+        hpFs = take initHpNr $ hpFlows_ hpPort
+        flows = beFs ++ hpFs
+        conf = runSearch params (flows)
+        prgC = C.applyConfig conf prgU
+    print $ "connected flows : " ++ (ppShow flows)
+    putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
+    return ()
+
 
 test_incr = do
     putStrLn $ "Running incremental search!"
@@ -1582,6 +1615,57 @@ test_incr_add = do
     --let prgC = C.applyConfig conf prgU
     --writeFile "tests/incr-search-prg-result.dot" $ toDot prgC
     return ()
+
+
+
+test_incr_pravin_testcase = do
+    putStrLn $ "Running incremental search usecase that is cause problem!"
+    prgU <- e10kU_simple
+    let nq = 5
+        -- initially 2 HP, 8 BE flows
+        hpPort   = 6000
+        bePort   = 1000
+        e10kOracle = initE10kOracle nq
+        priFn = priorityCost' nq
+        balFn = balanceCost nq
+        costFn = priFn
+        sortFn = prioritySort'
+        params = initIncrSearchParams {  isOracle = e10kOracle
+                                       , isPrgU   = prgU
+                                       , isCostFn = costFn
+                                       , isOrderFlows = sortFn}
+
+    ss0 <- initIncrSearchIO params
+
+    let initHpNr = 2
+        initBeNr = 8
+    (ss1, flst) <- doTimeIt ("INIT:" ++ (show initBeNr) ++
+                " BE Flows ++ " ++ (show initHpNr) ++ " HP flow:") $ do
+        let beFs = take initBeNr $ beFlows_ bePort
+            hpFs = take initHpNr $ hpFlows_ hpPort
+            flst0 = flAddedFlows beFs
+            flst1 = foldl FL.fsAddFlow flst0 hpFs
+        (conf, ss1) <- runIncrSearchIO ss0 flst1
+        return (ss1, flst1)
+
+    let n2 = 1
+    (ss2,flst2) <- doTimeIt ("Add:" ++ (show n2) ++ " HP flow(s)") $ do
+        let hpFls = take n2 $ hpFlows_ (hpPort + initHpNr)
+            flst2 = L.foldl FL.fsAddFlow (FL.fsReset flst) hpFls
+        (conf, ss2) <- runIncrSearchIO ss1 flst2
+        --putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
+        return (ss2,flst2)
+
+    qmap <- ST.stToIO $ incrSearchQmap ss2
+    putStrLn $ qmapStr qmap
+    --let flows = FM.fmFlows $ isFlowMapSt ss2
+    --putStrLn $ "Flows:\n" ++ (FL.flowsStr flows)
+    return ()
+
+    --let prgC = C.applyConfig conf prgU
+    --writeFile "tests/incr-search-prg-result.dot" $ toDot prgC
+    return ()
+
 
 
 -- there used to be a bug when configuring a 5t filter and then a cfdir filter

@@ -1,6 +1,7 @@
 module Scenarios.S1 (
       priorityCost, prioritySort
     , priorityCost' , prioritySort'
+    , priorityCost'' , prioritySort''
     , sortedRealFlows
     , real40Flows
     , sortFlows
@@ -41,13 +42,17 @@ isGoldFl fPerApp FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip} = ans
             | otherwise = False
 isGoldFl _ _ = False
 
+priorityCost'' goldRange fperQ = Search.priorityCost (isGoldFl goldRange) fperQ
+prioritySort'' goldRange = Search.prioritySort (isGoldFl goldRange)
 
 
-priorityCost' fpApp  = Search.priorityCost (isGoldFl fpApp) fpApp
-prioritySort' fpApp = Search.prioritySort (isGoldFl fpApp)
+-- Using flow per queue as range for gold flows
+priorityCost' fperQ =  priorityCost'' fperQ fperQ
+prioritySort' fperQ =  prioritySort'' fperQ
 
-priorityCost = Search.priorityCost isGoldFlOld goldFlPerQ
-prioritySort = Search.prioritySort isGoldFlOld
+-- Using 1 flow per queue as range for gold flows
+priorityCost = priorityCost'' 1 1
+prioritySort = prioritySort'' 1
 
 
 sortFlows isImp fl = sortedFlows

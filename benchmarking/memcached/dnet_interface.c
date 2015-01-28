@@ -598,8 +598,8 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
             char d_ip_str[IPv4_ADDR_STR_SIZE];
             convert_ipv4(in->attr->ip4_dst, d_ip_str);
 
-            printf
-            //mmprint
+            //printf
+            mmprint
                 ("NOTE: %s:%s:%d,[TID:%d], New flow found: "
                  "sport = %"PRIx16", dport=%"PRIx16", "
                  "srcip = %s -> %"PRIx32", dstip = %s -> %"PRIx32", len = %d \n",
@@ -620,17 +620,21 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
                     &new_flow,
                     dnal_flags); // flag saying no more changes
 
-            printf("[TID:%d], calling NOOP to enforce flows\n",
+            //printf
+            mmprint
+                ("[TID:%d], calling NOOP to enforce flows\n",
                     dnt_state->tindex);
 
             // Tell Dragonet that you are done with sending flow information
-            err_expect_ok(dnal_noop(
-                        dnt_state->daq, // application endpoint
-                        0               // flag saying no more changes
-                    ));
+            //      Not needed as we are doing it as part of
+            //      send_flow_to_dragonet, by setting dnal_flags to zero
+            //err_expect_ok(dnal_noop(
+            //            dnt_state->daq, // application endpoint
+            //            0               // flag saying no more changes
+            //        ));
 
             // Printing the flow table for debugging purposes
-            xht_print(new_flows_ht);
+            //xht_print(new_flows_ht);
 
         } // end else: flow not present
     }
@@ -760,7 +764,9 @@ static int insert_flow_info(struct dn_thread_state *dn_tstate)
     struct cfg_thread *sel_thread_cfg = &th_cfg_list[dn_tstate->tindex];
     myAssert(sel_thread_cfg != NULL);
 
-    printf("[state:%p], Trying to insert the flows\n", dn_tstate);
+    //printf
+    mmprint
+        ("[state:%p], Trying to insert the flows\n", dn_tstate);
     // TODO: Add flows
     for (int i = 0 ; i < sel_thread_cfg->flows_endpoints_count; ++i) {
 
@@ -770,7 +776,9 @@ static int insert_flow_info(struct dn_thread_state *dn_tstate)
         convert_ipv4(udp->l_ip, l_ip_str);
         char r_ip_str[IPv4_ADDR_STR_SIZE];
         convert_ipv4(udp->r_ip, r_ip_str);
-        printf("[TID:%d] registering Flow(%d): ""lIP: %s -> %"PRIu32", "
+        //printf
+        mmprint
+            ("[TID:%d] registering Flow(%d): ""lIP: %s -> %"PRIu32", "
                 "lPort: %"PRIu32", rIP: %s -> %"PRIu32", rPort: %"PRIu32",\n",
                 dn_tstate->tindex, i,
                 l_ip_str,

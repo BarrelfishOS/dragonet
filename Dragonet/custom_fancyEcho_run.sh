@@ -24,17 +24,12 @@ T0.p[7777]F[10.113.4.95:7777/10.113.4.51:8000]F[10.113.4.95:7777/10.113.4.51:800
 
 run_memcached_2_clients_2_load() {
 sudo ../benchmarking/memcached/memcached -N \
- T0.p[7777]F[10.113.4.195:7777/10.113.4.57:8000]F[10.113.4.195:7777/10.113.4.57:8001]F[10.113.4.195:7777/10.113.4.57:8002]F[10.113.4.195:7777/10.113.4.57:8003]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l 10.113.4.195
+ T0.p[7777]F[${SERVERIP}:7777/10.113.4.57:8000]F[${SERVERIP}:7777/10.113.4.57:8001]F[${SERVERIP}:7777/10.113.4.57:8002]F[${SERVERIP}:7777/10.113.4.57:8003]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l ${SERVERIP}
 }
 
 run_memcached_1_clients_1_load() {
 sudo ../benchmarking/memcached/memcached -N \
- T0.p[7777]F[10.113.4.195:7777/10.113.4.57:8000]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l 10.113.4.195
-}
-
-run_memcached_5_clients_2_load() {
-sudo ../benchmarking/memcached/memcached -N \
-T0.p[7777]F[10.113.4.195:7777/10.113.4.57:8000]F[10.113.4.195:7777/10.113.4.57:8001]F[10.113.4.195:7777/10.113.4.57:8002]F[10.113.4.195:7777/10.113.4.57:8003]F[10.113.4.195:7777/10.113.4.57:8004]F[10.113.4.195:7777/10.113.4.57:8005]F[10.113.4.195:7777/10.113.4.57:8006]F[10.113.4.195:7777/10.113.4.57:8007]F[10.113.4.195:7777/10.113.4.57:8008]F[10.113.4.195:7777/10.113.4.57:8009]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l 10.113.4.195
+ T0.p[7777]F[${SERVERIP}:7777/10.113.4.57:8000]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l ${SERVERIP}
 }
 
 run_memcached_2_clients_3_load() {
@@ -147,7 +142,7 @@ sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
 run_for_40_cores_10threads_debug_echoserver() {
     echo fancyEcho running on ${SERVERIP} with 10 application thread and 10 HW queues
 sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
--a t0  -f 10.113.4.195:888/10.113.4.29:8004  -f 10.113.4.195:888/10.113.4.20:8004  -f 10.113.4.195:888/10.113.4.26:8004  -f 10.113.4.195:888/10.113.4.71:8004  -a t1  -f 10.113.4.195:888/10.113.4.67:8004  -f 10.113.4.195:888/10.113.4.96:8004  -f 10.113.4.195:888/10.113.4.57:8004  -f 10.113.4.195:888/10.113.4.51:8004  -a t2  -f 10.113.4.195:888/10.113.4.29:8003  -f 10.113.4.195:888/10.113.4.20:8003  -f 10.113.4.195:888/10.113.4.26:8003  -f 10.113.4.195:888/10.113.4.71:8003  -a t3  -f 10.113.4.195:888/10.113.4.67:8003  -f 10.113.4.195:888/10.113.4.96:8003  -f 10.113.4.195:888/10.113.4.57:8003  -f 10.113.4.195:888/10.113.4.51:8003  -a t4  -f 10.113.4.195:888/10.113.4.29:8002  -f 10.113.4.195:888/10.113.4.20:8002  -f 10.113.4.195:888/10.113.4.26:8002  -f 10.113.4.195:888/10.113.4.71:8002  -a t5  -f 10.113.4.195:888/10.113.4.67:8002  -f 10.113.4.195:888/10.113.4.96:8002  -f 10.113.4.195:888/10.113.4.57:8002  -f 10.113.4.195:888/10.113.4.51:8002  -a t6  -f 10.113.4.195:888/10.113.4.29:8001  -f 10.113.4.195:888/10.113.4.20:8001  -f 10.113.4.195:888/10.113.4.26:8001  -f 10.113.4.195:888/10.113.4.71:8001  -a t7  -f 10.113.4.195:888/10.113.4.67:8001  -f 10.113.4.195:888/10.113.4.96:8001  -f 10.113.4.195:888/10.113.4.57:8001  -f 10.113.4.195:888/10.113.4.51:8001  -a t8  -f 10.113.4.195:888/10.113.4.29:8000  -f 10.113.4.195:888/10.113.4.20:8000  -f 10.113.4.195:888/10.113.4.26:8000  -f 10.113.4.195:888/10.113.4.71:8000  -a t9  -f 10.113.4.195:888/10.113.4.67:8000  -f 10.113.4.195:888/10.113.4.96:8000  -f 10.113.4.195:888/10.113.4.57:8000  -f 10.113.4.195:888/10.113.4.51:8000  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9
+-a t0  -f ${SERVERIP}:888/10.113.4.29:8004  -f ${SERVERIP}:888/10.113.4.20:8004  -f ${SERVERIP}:888/10.113.4.26:8004  -f ${SERVERIP}:888/10.113.4.71:8004  -a t1  -f ${SERVERIP}:888/10.113.4.67:8004  -f ${SERVERIP}:888/10.113.4.96:8004  -f ${SERVERIP}:888/10.113.4.57:8004  -f ${SERVERIP}:888/10.113.4.51:8004  -a t2  -f ${SERVERIP}:888/10.113.4.29:8003  -f ${SERVERIP}:888/10.113.4.20:8003  -f ${SERVERIP}:888/10.113.4.26:8003  -f ${SERVERIP}:888/10.113.4.71:8003  -a t3  -f ${SERVERIP}:888/10.113.4.67:8003  -f ${SERVERIP}:888/10.113.4.96:8003  -f ${SERVERIP}:888/10.113.4.57:8003  -f ${SERVERIP}:888/10.113.4.51:8003  -a t4  -f ${SERVERIP}:888/10.113.4.29:8002  -f ${SERVERIP}:888/10.113.4.20:8002  -f ${SERVERIP}:888/10.113.4.26:8002  -f ${SERVERIP}:888/10.113.4.71:8002  -a t5  -f ${SERVERIP}:888/10.113.4.67:8002  -f ${SERVERIP}:888/10.113.4.96:8002  -f ${SERVERIP}:888/10.113.4.57:8002  -f ${SERVERIP}:888/10.113.4.51:8002  -a t6  -f ${SERVERIP}:888/10.113.4.29:8001  -f ${SERVERIP}:888/10.113.4.20:8001  -f ${SERVERIP}:888/10.113.4.26:8001  -f ${SERVERIP}:888/10.113.4.71:8001  -a t7  -f ${SERVERIP}:888/10.113.4.67:8001  -f ${SERVERIP}:888/10.113.4.96:8001  -f ${SERVERIP}:888/10.113.4.57:8001  -f ${SERVERIP}:888/10.113.4.51:8001  -a t8  -f ${SERVERIP}:888/10.113.4.29:8000  -f ${SERVERIP}:888/10.113.4.20:8000  -f ${SERVERIP}:888/10.113.4.26:8000  -f ${SERVERIP}:888/10.113.4.71:8000  -a t9  -f ${SERVERIP}:888/10.113.4.67:8000  -f ${SERVERIP}:888/10.113.4.96:8000  -f ${SERVERIP}:888/10.113.4.57:8000  -f ${SERVERIP}:888/10.113.4.51:8000  -t -q t0  -t -q t1  -t -q t2  -t -q t3  -t -q t4  -t -q t5  -t -q t6  -t -q t7  -t -q t8  -t -q t9
 }
 
 run_for_16_cores() {
@@ -328,15 +323,15 @@ else
     # For intel
     if [ "$STACKNAME" ==  "stack-e10k" ] ; then
         SERVERIP="10.113.4.96"  # For burrata as server
-        SERVERIP="10.113.4.95"  # For asiago as server
         SERVERIP="10.113.4.26"  # For sbrinz1 as server
+        SERVERIP="10.113.4.95"  # For asiago as server
         echo "NOTE: using ${SERVERIP} as server-IP address"
     else
 
-        if [ "$STACKNAME" ==  "stack-dpdk" ] ; then
+        if [ "$STACKNAME" ==  "stack-dpdk" -o "$STACKNAME" ==  "stack-dpdk2" ] ; then
             SERVERIP="10.113.4.96"  # For burrata as server
-            SERVERIP="10.113.4.95"  # For asiago as server
             SERVERIP="10.113.4.26"  # For sbrinz1 as server
+            SERVERIP="10.113.4.95"  # For asiago as server
             echo "NOTE: using ${SERVERIP} as server-IP address"
         else
 
@@ -354,31 +349,24 @@ else
         fi
     fi
 fi
+##################################################################
 
-run_for_4_cores_ziger1() {
+run_echo_for_4_cores_ziger2() {
     echo fancyEcho running on ${SERVERIP} with 4 application threads
     lport=9000
 sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
--W -a t0 -p 9000  \
--F ${SERVERIP}:${lport}/10.113.4.51:8000 \
--F ${SERVERIP}:${lport}/10.113.4.51:8001 \
--F ${SERVERIP}:${lport}/10.113.4.51:8002 \
--F ${SERVERIP}:${lport}/10.113.4.51:8003 \
--t -q t0
+-W -a t0 -p ${lport} -a t1 -p ${lport} -a t2 -p ${lport} -a t3 -p ${lport} \
+-F ${SERVERIP}:${lport}/10.113.4.57:8000 \
+-F ${SERVERIP}:${lport}/10.113.4.57:8001 \
+-F ${SERVERIP}:${lport}/10.113.4.57:8002 \
+-F ${SERVERIP}:${lport}/10.113.4.57:8003 \
+-t -q t0 -t -q t1 -t -q t2 -t -q t3
 }
 
-run_for_4_cores_ziger1_working() {
-    echo fancyEcho running on ${SERVERIP} with 4 application threads
-    lport=9000
-sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
--a t0 \
--f ${SERVERIP}:${lport}/10.113.4.51:8000 \
--f ${SERVERIP}:${lport}/10.113.4.51:8001 \
--f ${SERVERIP}:${lport}/10.113.4.51:8002 \
--f ${SERVERIP}:${lport}/10.113.4.51:8003 \
--t -q t0
+run_memcached_5_clients_2_load() {
+sudo ../benchmarking/memcached/memcached -N \
+T0.p[7777]F[${SERVERIP}:7777/10.113.4.57:8000]F[${SERVERIP}:7777/10.113.4.57:8001]F[${SERVERIP}:7777/10.113.4.57:8002]F[${SERVERIP}:7777/10.113.4.57:8003]F[${SERVERIP}:7777/10.113.4.57:8004]F[${SERVERIP}:7777/10.113.4.57:8005]F[${SERVERIP}:7777/10.113.4.57:8006]F[${SERVERIP}:7777/10.113.4.57:8007]F[${SERVERIP}:7777/10.113.4.57:8008]F[${SERVERIP}:7777/10.113.4.57:8009]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l ${SERVERIP}
 }
-
 
 ##################################################################
         ## Main ##
@@ -389,7 +377,7 @@ sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
 #run_memcached_1_clients_1_load
 #run_memcached_2_clients_2_load
 run_memcached_5_clients_2_load
-
+#run_echo_for_4_cores_ziger2
 
 #run_memcached_4_clients_2_load
 #run_memcached_for_1_cores

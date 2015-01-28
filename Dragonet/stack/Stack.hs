@@ -308,10 +308,13 @@ eventHandler sstv ch
         return ss'
     putStrLn $ "SocketUDPFlow f=" ++ show re ++ "/" ++ show le
                 ++ " for " ++ show sid ++ ", flags: " ++  show flags
+    -- Sending message to app before we actually reflect this on stack
+    PLA.sendMessage ch $ PLA.MsgStatus True
     if testBit flags PLA.appFlagsMore
         then return ()
         else ssUpdateGraphs ss sstv
-    PLA.sendMessage ch $ PLA.MsgStatus True
+    -- Sending message to app after  we reflect this on stack
+    --PLA.sendMessage ch $ PLA.MsgStatus True
 
 {-|
  -  Handling event SocketSpan:
@@ -504,7 +507,7 @@ updateGraphFlows getConf args sstv = do
        -- non-incremental version
        -- we just use the new flowSt to calculate all flows
        flows' = S.toList $ FL.fsCurrent $ ssFlowsSt ss
-       -- Reversal of flows was needed in old code.  Let me see if I still need it
+       -- Reversal of flows was needed in old code.  Let me see if I still need it -PS
        --flows = reverse $ flows'
        flows =  flows'
 
