@@ -16,15 +16,23 @@ ensure_running_process() {
 check_filters_inserted() {
     fcount=${1}
     local fcountTries=1
+    local filterLogFile="stack.filtready"
     while true;
     do
-        filter_count=`cat some.log | grep "\[####-- IMP --####\]" | wc -l`
-        if [ $filter_count -ge $fcount ] ;
+        if [ -f "${filterLogFile}" ] ;
         then
-            echo "Found enough filters $filter_count (>= $fcount)"
-            echo "  assuming that all filters are inserted, continuing ..."
-            return
-            break
+
+            filter_count=`cat ${filterLogFile} | grep "\[####-- IMP --####\]" | wc -l`
+            if [ $filter_count -ge $fcount ] ;
+            then
+                echo "Found enough filters $filter_count (>= $fcount)"
+                echo "  assuming that all filters are inserted, continuing ..."
+                return
+                break
+            fi
+            echo "Only ${filter_count} filters are inserted, and we want around ${fcount}, sleeping.. "
+        else
+            echo "The file ${filterLogFile} is not there yet, so no application is connected yet. sleeping.. "
         fi
 
         fcountTries=`expr 1 + ${fcountTries}`
@@ -32,7 +40,6 @@ check_filters_inserted() {
             echo "ERROR: filter count retries ${fcountTries} reached!, giving up on waiting"
             exit 1
         fi
-        echo "Only ${filter_count} filters are inserted, and we want around ${fcount}, sleeping.. "
         sleep 1
     done
 }

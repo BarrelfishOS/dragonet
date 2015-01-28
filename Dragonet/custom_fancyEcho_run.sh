@@ -368,17 +368,29 @@ sudo ../benchmarking/memcached/memcached -N \
 T0.p[7777]F[${SERVERIP}:7777/10.113.4.57:8000]F[${SERVERIP}:7777/10.113.4.57:8001]F[${SERVERIP}:7777/10.113.4.57:8002]F[${SERVERIP}:7777/10.113.4.57:8003]F[${SERVERIP}:7777/10.113.4.57:8004]F[${SERVERIP}:7777/10.113.4.57:8005]F[${SERVERIP}:7777/10.113.4.57:8006]F[${SERVERIP}:7777/10.113.4.57:8007]F[${SERVERIP}:7777/10.113.4.57:8008]F[${SERVERIP}:7777/10.113.4.57:8009]  -c 64000 -m 64000 -u root -p 0 -U  7777 -t 5 -l ${SERVERIP}
 }
 
+run_echo_for_5_cores() {
+sudo ./dist/build/bench-fancyecho/bench-fancyecho  \
+-W  -a T0 -p 888 -a T1 -p 888 -a T2 -p 888 -a T3 -p 888 -a T4 -p 888 \
+ -F 10.113.4.95:888/10.113.4.51:5000  -F 10.113.4.95:888/10.113.4.57:5000 \
+ -F 10.113.4.95:888/10.113.4.26:5000  -F 10.113.4.95:888/10.113.4.29:5000 \
+ -F 10.113.4.95:888/10.113.4.51:5001 \
+ -t -q T0 -t -q T1 -t -q T2 -t -q T3 -t -q T4
+}
+
 ##################################################################
         ## Main ##
 ##################################################################
 
 ./scripts/pravin/wait_for_dragonet.sh 4 ${STACKNAME}
+run_echo_for_5_cores
+#run_echo_for_4_cores_ziger2
+
+#run_memcached_5_clients_2_load
+
 #run_memcached_big
 #run_memcached_1_clients_1_load
 #run_memcached_2_clients_2_load
-run_memcached_5_clients_2_load
 #run_echo_for_4_cores_ziger2
-
 #run_memcached_4_clients_2_load
 #run_memcached_for_1_cores
 #run_memcached_single_core_specific_two_flows
