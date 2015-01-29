@@ -89,8 +89,8 @@ RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN} ${ORACLE} $
 if [ ${STACKNAME} == "stack-dpdk2" ] ; then
 echo "Using dpdk library"
 INITCMD="export LD_LIBRARY_PATH=/home/ubuntu/dragonet/dpdk-1.7.1/build/lib/ "
-#RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN} dpdk ${CONC} -i "
-RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN} dpdk  ${CONC} "
+RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN} dpdk ${CONC} -i "
+#RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN} dpdk  ${CONC} "
 fi
 
 
