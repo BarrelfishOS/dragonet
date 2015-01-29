@@ -1699,6 +1699,7 @@ test_incr_add = do
 
 
 test_incr_pravin_testcase_mixed = do
+
     putStrLn $ "Running incremental search usecase used for mixed benchmarking"
     prgU <- e10kU_simple
     let nq = 10
@@ -1726,7 +1727,7 @@ test_incr_pravin_testcase_mixed = do
             hpFs = take initHpNr $ hpFlows_ hpPort
             flst0 = flAddedFlows beFs
             flst1 = foldl FL.fsAddFlow flst0 hpFs
-        (conf, ss1) <- runIncrSearchIO ss0 flst1
+        (conf, _, ss1) <- runIncrSearchIO ss0 flst1
         return (ss1, flst1)
 
     -- now 64 HP, 10 BE flows
@@ -1735,7 +1736,7 @@ test_incr_pravin_testcase_mixed = do
 
         let beFls = take n2 $ beFlows_ (bePort + initBeNr)
             flst2 = L.foldl FL.fsAddFlow (FL.fsReset flst) beFls
-        (conf, ss2) <- runIncrSearchIO ss1 flst2
+        (conf, _, ss2) <- runIncrSearchIO ss1 flst2
         putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
         return (ss2,flst2)
 
