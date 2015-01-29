@@ -5,3 +5,4 @@ main = do
     --S.test_incr
     S.test_incr_add
     --S.testFmCfdir
+    --S.test_incr_pravin_testcase

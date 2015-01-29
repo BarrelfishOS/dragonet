@@ -700,8 +700,8 @@ siUpdateGraphDone sitv searchSt = STM.atomically $ do
 
 -- This is an incremental version of upateGraphFlows in that it allows passing
 -- state to and from the search function
-updateGraphFlowsIncr
-    :: (s -> FL.FlowsSt -> IO (C.Configuration, s))
+updateGraphFlowsIncr :: (C.ConfChange cc)
+    => (s -> FL.FlowsSt -> IO (C.Configuration, SE.IncrConf cc, s))
     -> StackArgs
     -> STM.TVar (StackIncrSt s)
     -> STM.TVar StackState
@@ -716,12 +716,13 @@ updateGraphFlowsIncr doSearch args sitv sstv = do
         let searchSt = siSearchSt si'
             xforms = [IT.balanceAcrossRxQs, IT.coupleTxSockets]
             lbl = "updateGraphFlowsIncr"
-        (prgConf, searchSt') <- doSearch searchSt flowsSt
+        (prgConf, prgIncrConf, searchSt') <- doSearch searchSt flowsSt
         si'' <- siUpdateGraphDone sitv searchSt'
         -- implement new configuration:
         --- create a new graph
         plg <- ssMakeGraph ss' args prgConf lbl xforms
         --- apply PRG configuration
+        -- TODO: use prgIncrConf instead of prgConf
         (stCfgImpl $ stPrg args) (ssSharedState ss') prgConf
         --- run it
         PLD.run (ssCtx ss') plConnect (ssCreatePL args ss' plg) $ addMuxIds plg
@@ -732,8 +733,8 @@ updateGraphFlowsIncr doSearch args sitv sstv = do
         appendFile("allAppslist.appready") $ "Application is ready!\n"
         return ()
 
-instantiateIncrFlowsIO_
-    :: (s -> FL.FlowsSt -> IO (C.Configuration, s)) -- search function
+instantiateIncrFlowsIO_ :: (C.ConfChange cc)
+    => (s -> FL.FlowsSt -> IO (C.Configuration, SE.IncrConf cc, s)) -- search function
     -> s -- initial search state
     -> (StackState -> String -> PG.PGNode -> String)
     -> StackPrgArgs
