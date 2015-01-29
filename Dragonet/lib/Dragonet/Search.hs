@@ -1330,7 +1330,7 @@ incSearchGreedyFlows st flowsSt = do
     (ic', st') <- doIncSearchGreedyFlows ic0 st flowsSt
     let cnf' = C.foldConfChanges $ FM.fmCnfChanges $ isFlowMapSt st'
         ret_ = (cnf', ic', st')
-        ret  = tr ret_ $ "incSearchGreedyFlows:" ++ (show ic')
+        ret  = trN ret_ $ "incSearchGreedyFlows:" ++ (show ic')
     return ret
 
 -- entry for search algorithm
@@ -1422,7 +1422,9 @@ incSearchGreedyFlows_ st addedCcs (flow:flows) = do
         ccs  = FM.fmCnfChanges fmSt
         conf = C.foldConfChanges ccs
     -- get configuration changes for current state
-    let (flowCCs, oracle') = flowConfChangesS oracle conf flow
+    let (flowCCs, oracle') = case False of
+               True -> flowConfChangesS oracle conf flow
+               False -> (flowConfChanges oracle conf flow, oracle)
     -- compute new costs and minimum cost, and update state
     (lowerCost, bestFmSt) <- incSearchMinCost costFn fmSt flow flowCCs
     let msg = "--\nLOWER COST:" ++ (show lowerCost)
@@ -1480,7 +1482,7 @@ incSearchMinCost costFn fmSt flow (cc0:restCC) = do
             if newCost < stCost then return (newCost, newSt, cnt')
             else return (stCost, st, cnt')
 
-        stopFn (cost, _, cnt) = costAcceptable cost && cnt >= 5
+        stopFn (cost, _, cnt) = costAcceptable cost -- && cnt >= 5
 
     (cc0Qmap, cc0St) <- incSearchQmap fmSt cc0 flow
     let cc0Cost_ = costFn cc0Qmap
@@ -1490,8 +1492,8 @@ incSearchMinCost costFn fmSt flow (cc0:restCC) = do
                    "for qmap=" ++ (qmapStr cc0Qmap)
         x0 = (cc0Cost, cc0St, 0)
 
-    --(lowerCost, bestSt, _) <- foldM foldFn x0 restCC
-    (lowerCost, bestSt, _) <- stopFoldM foldFn stopFn x0 restCC
+    (lowerCost, bestSt, _) <- foldM foldFn x0 restCC
+    --(lowerCost, bestSt, _) <- stopFoldM foldFn stopFn x0 restCC
     return (lowerCost, bestSt)
 
 incSearchQmap :: forall s cc . C.ConfChange cc
@@ -1734,6 +1736,9 @@ test_incr_pravin_testcase_mixed = do
             flst1 = foldl FL.fsAddFlow flst0 hpFs
         (conf, _, ss1) <- runIncrSearchIO ss0 flst1
         return (ss1, flst1)
+
+    qmap <- ST.stToIO $ incrSearchQmap ss1
+    putStrLn $ qmapStr qmap
 
     -- now 64 HP, 10 BE flows
     let n2 = 10
