@@ -31,7 +31,8 @@ module Dragonet.Search (
 
   IncrConf,
 
-  test, test_incr, test_incr_add, testFmCfdir, test_incr_pravin_testcase
+  test, test_incr, test_incr_add, testFmCfdir, test_incr_pravin_testcase,
+  test_incr_pravin_testcase_mixed
 ) where
 
 import qualified Dragonet.Configuration       as C
@@ -860,7 +861,9 @@ priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
                     extraCost = if goldExtra > 0 then goldExtra else 0
                 in CostVal $ bcost + (fromIntegral extraCost)
             -- we should have enough queues for the gold class
-            | goldNeeded > 0 = CostReject $ 100*(fromIntegral goldNeeded)
+            | goldNeeded  > 0 = CostReject $ 100*(fromIntegral goldNeeded)
+            -- we should not have non-gold exclusive queues
+            | goldNonExcl > 0 = CostReject $ (fromIntegral goldNonExcl)
             -- we should have enough queues for the best effort class
             -- | beNeeded > 0 = CostReject $ (fromIntegral beNeeded)
             -- penalize needing more be queues, but do not reject solution
@@ -874,6 +877,8 @@ priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
                    $ ceiling
                    $ (toRational $ length goldFls) / (toRational goldFlowsPerQ)
           goldNeeded = goldNQs - (S.size goldQsExcl)
+          -- gold non-exclusive queues
+          goldNonExcl = (S.size goldQs) - (S.size goldQsExcl)
           goldExtra  = -goldNeeded
           -- number of best effort queues
           beNQs = min (nq - goldNQs) (length beFls)
