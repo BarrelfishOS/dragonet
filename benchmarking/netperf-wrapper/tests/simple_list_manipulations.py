@@ -168,8 +168,8 @@ def get_isolation_container(is_server):
     if is_server == True:
         return " taskset -c %s " % (
              toCoreList2(range(
-                 (0                 ),
-                 ((SERVERS_INSTANCES*SERVER_CORES))
+                 (SERVER_CORESHIFT ),
+                 ((SERVERS_INSTANCES*SERVER_CORES) + SERVER_CORESHIFT)
                )))
     else :
         return " taskset -c %s " % (
@@ -177,6 +177,4 @@ def get_isolation_container(is_server):
                  MAX_CORES - (HWQUEUES),
                  MAX_CORES
                )))
-
-
 

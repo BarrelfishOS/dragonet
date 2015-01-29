@@ -48,8 +48,9 @@ ORACLE = "greedy"
 COSTFN = "priority"
 COSTFN = "balance"
 
-def SRV_CMDS(name):
 
+
+def SRV_CMDS(name):
 
     if name == "memcached" :
         return {
@@ -68,15 +69,7 @@ def SRV_CMDS(name):
 
                     "init_cmd_special" : [
 
-                      # run stack
-                      "cd %s ; " % (dragonet_container[name]['base_dir'])
-                        + "sudo %s " % (get_isolation_container(is_server=False))
-                        + " %s %d %s " % (
-                          dragonet_container[name]['deploy_stack'],
-                          HWQUEUES, COSTFN)
-                        + " %s %d %d " % (ORACLE, CONCURRENCY,
-                            len(client_names))
-                        ,
+                     get_stack_cmd(name),
 
                       # run server
                       "cd %s ; " % (

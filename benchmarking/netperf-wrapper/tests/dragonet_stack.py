@@ -51,4 +51,20 @@ dragonet_container = {
                 "dpdk2": dragonet_container_gen('dpdk2')
                 }
 
+def get_stack_cmd(name):
+    # Ugly hack to overload SERVER_CORESHIFT function to decide
+    #   if we should start the stack
+    if SERVER_CORESHIFT == 5:
+        return ""
+
+    # run stack
+    cmd = ("cd %s ; " % (dragonet_container[name]['base_dir'])
+            + "sudo %s " % (get_isolation_container(is_server=False))
+            + " %s %d %s " % (
+                dragonet_container[name]['deploy_stack'],
+                HWQUEUES, COSTFN)
+            + " %s %d %d " % (ORACLE, CONCURRENCY,
+                len(client_names)))
+    return cmd
+
 
