@@ -1533,7 +1533,7 @@ connectFlows start = [ FlowUDPv4 {
 flAddedFlows :: [Flow] -> FL.FlowsSt
 flAddedFlows flows = foldl FL.fsAddFlow FL.flowsStInit flows
 
-hpIp = 111
+hpIp = 222
 beIp = 100
 hpFlowsPerQ = 1
 isHp FlowUDPv4 {flSrcIp = Just srcIp} = srcIp == hpIp
@@ -1696,6 +1696,59 @@ test_incr_add = do
     --let prgC = C.applyConfig conf prgU
     --writeFile "tests/incr-search-prg-result.dot" $ toDot prgC
     return ()
+
+
+test_incr_pravin_testcase_mixed = do
+    putStrLn $ "Running incremental search usecase used for mixed benchmarking"
+    prgU <- e10kU_simple
+    let nq = 10
+        flowsPerGQ   = 32
+        -- initially 64 HP, 0 BE flows
+        hpPort   = 6000
+        bePort   = 1000
+        e10kOracle = initE10kOracle nq
+        priFn = (priorityCost isHp flowsPerGQ) nq
+        balFn = balanceCost nq
+        costFn = priFn
+        sortFn = prioritySort'
+        params = initIncrSearchParams {  isOracle = e10kOracle
+                                       , isPrgU   = prgU
+                                       , isCostFn = costFn
+                                       , isOrderFlows = sortFn}
+
+    ss0 <- initIncrSearchIO params
+
+    let initHpNr = 64
+        initBeNr = 0
+    (ss1, flst) <- doTimeIt ("INIT:" ++ (show initBeNr) ++
+                " BE Flows ++ " ++ (show initHpNr) ++ " HP flow:") $ do
+        let beFs = take initBeNr $ beFlows_ bePort
+            hpFs = take initHpNr $ hpFlows_ hpPort
+            flst0 = flAddedFlows beFs
+            flst1 = foldl FL.fsAddFlow flst0 hpFs
+        (conf, ss1) <- runIncrSearchIO ss0 flst1
+        return (ss1, flst1)
+
+    -- now 64 HP, 10 BE flows
+    let n2 = 10
+    (ss2,flst2) <- doTimeIt ("Add:" ++ (show n2) ++ " LP flow(s)") $ do
+
+        let beFls = take n2 $ beFlows_ (bePort + initBeNr)
+            flst2 = L.foldl FL.fsAddFlow (FL.fsReset flst) beFls
+        (conf, ss2) <- runIncrSearchIO ss1 flst2
+        putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
+        return (ss2,flst2)
+
+    qmap <- ST.stToIO $ incrSearchQmap ss2
+    putStrLn $ qmapStr qmap
+    --let flows = FM.fmFlows $ isFlowMapSt ss2
+    --putStrLn $ "Flows:\n" ++ (FL.flowsStr flows)
+    return ()
+
+    --let prgC = C.applyConfig conf prgU
+    --writeFile "tests/incr-search-prg-result.dot" $ toDot prgC
+    return ()
+
 
 
 
