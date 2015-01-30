@@ -260,7 +260,8 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
         [e10kDefaultQ, xq]
         where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
 
-    confJump o = oracleQueueJump E10k.ccQueue
+    -- 
+    --confJump o = e10kQueueJump
 
 -- TODO: avoid symmetric allocation
 -- TODO: smart-wildcard allocation if possible?
@@ -281,13 +282,26 @@ e10kFlowConfChangesS :: E10kOracleSt -> C.Configuration -> Flow
                     -> ([E10k.ConfChange], E10kOracleSt)
 e10kFlowConfChangesS o@(E10kOracleSt {nQueues = nq, startQ = startQ}) cnf fl
     -- allocate 5-tuple filters first, if we can
-    -- | not rx5tFull  = ([E10k.insert5tFromFl fl q | q <- allQs], o')
+    | not rx5tFull  = ([E10k.insert5tFromFl fl q | q <- allQs], o')
     | not rxCfdFull = (catMaybes $ [E10k.insertFdirFromFl fl q | q <- allQs], o')
     | otherwise     = ([], o)
     where allQs = allQueues_ startQ nq
           o' =  o { startQ = (startQ + 1) `mod` nq}
-          -- rx5tFull  = E10k.rx5tFilterTableFull cnf
+          rx5tFull  = E10k.rx5tFilterTableFull cnf
           rxCfdFull = E10k.rxCfdFilterTableFull cnf
+
+--e10kQueueJump :: [(E10k.ConfChange,Flow)] -- initial configuration
+--               -> ([(E10k.ConfChange,Flow)], [(E10k.ConfChange,Flow)]) -- keep, remove partition
+--e10kQueueJump ts = tr ret $ "e10kQueueJump removing flows from q=" ++ (show rmQ)
+--    where ret = L.partition keepF ts
+--          getQ = E10k.ccQueue . fst
+--          lastQ = getQ $ last ts -- last queue
+--          firstQ = getQ $ head ts -- last queue
+--          rmQ = 5
+--          -- remove non-5t filters, because otherwise the incremental flowmap
+--          -- will not work
+--          keepF :: (E10k.ConfChange,Flow) -> Bool
+--          keepF (cc,fl) = ((E10k.ccQueue cc) /= rmQ) && (E10k.ccIs5t cc)
 
 myThird (_,_,x) = x
 mySnd (_,x,_) = x
@@ -889,6 +903,34 @@ priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
           CostVal balGold = balanceCost_ (S.toList goldQs) goldFls
           CostVal balBe   = balanceCost_ (S.toList restQs) beFls
 
+
+
+-- flows that match predicate get a static number of queues
+staticCost ::  (Flow -> Bool) -> Int -> Int -> QMap -> Cost
+staticCost isGold nGoldQs nq qmap = trN cost msg
+    where
+          assignedGoldQsL = take nGoldQs $ allQueues nq -- static gold queues
+          assignedGoldQsS = S.fromList assignedGoldQsL
+
+          assignedRestQsL = drop nGoldQs $ allQueues nq -- static rest queues
+          assignedRestQsS = S.fromList assignedRestQsL
+
+          (goldFls, restFls) = L.partition (isGold . fst) qmap
+
+          goldOK = and [ qid `S.member` assignedGoldQsS | (_,qid) <- goldFls ]
+          restOK = and [ qid `S.member` assignedRestQsS | (_,qid) <- restFls ]
+
+          CostVal balGold = balanceCost_ assignedGoldQsL goldFls
+          CostVal balRest = balanceCost_ assignedRestQsL restFls
+          msg = (qmapStr qmap) ++ " \n" ++ (show cost)
+          cost
+               | not goldOK = CostReject 1
+               | not restOK = CostReject 1
+               | length goldFls == 0 = CostVal balRest
+               | length restFls == 0 = CostVal balGold
+               | otherwise = CostVal $ balGold + balRest
+
+
 ---- greedy back-track search. Nothing is returned if no suitable configuration is
 ---- found
 --data SearchGBSt = SearchGBSt {
@@ -1394,7 +1436,7 @@ doIncSearchGreedyFlows ic st flowsSt = do
                 -- new flows state
                 flowsSt' = FL.FlowsSt {
                       FL.fsCurrent  = S.fromList keepFlows
-                    , FL.fsAdded    = S.fromList rmFlows `S.union` addFlows
+                    , FL.fsAdded    = (S.fromList rmFlows) `S.union` addFlows
                     , FL.fsRemoved  = S.empty
                 }
                 ic' = ic { icRmCCs = (icRmCCs ic) ++ rmCcs }
@@ -1419,14 +1461,17 @@ incSearchGreedyFlows_ st addedCcs (flow:flows) = do
     let params = isParams st
         oracle = isOracle params
         costFn = isCostFn params
-        fmSt = isFlowMapSt st
+        fmSt = trN (isFlowMapSt st) ("flow=" ++ (FL.flowStr flow))
         fmFlows = FM.fmFlows fmSt
         ccs  = FM.fmCnfChanges fmSt
         conf = C.foldConfChanges ccs
     -- get configuration changes for current state
-    let (flowCCs, oracle') = case False of
+    let (flowCCs_, oracle') = case True of
                True -> flowConfChangesS oracle conf flow
                False -> (flowConfChanges oracle conf flow, oracle)
+    let flowCCs = case flowCCs_ of
+                [] -> error "Run out of CCs"
+                ccs -> ccs
     -- compute new costs and minimum cost, and update state
     (lowerCost, bestFmSt) <- incSearchMinCost costFn fmSt flow flowCCs
     let msg = "--\nLOWER COST:" ++ (show lowerCost)
@@ -1484,7 +1529,7 @@ incSearchMinCost costFn fmSt flow (cc0:restCC) = do
             if newCost < stCost then return (newCost, newSt, cnt')
             else return (stCost, st, cnt')
 
-        stopFn (cost, _, cnt) = costAcceptable cost -- && cnt >= 5
+        stopFn (cost, _, cnt) = costAcceptable cost && cnt >= 5
 
     (cc0Qmap, cc0St) <- incSearchQmap fmSt cc0 flow
     let cc0Cost_ = costFn cc0Qmap
@@ -1548,6 +1593,8 @@ hpFlowsPerQ = 1
 isHp FlowUDPv4 {flSrcIp = Just srcIp} = srcIp == hpIp
 priorityCost' = priorityCost isHp hpFlowsPerQ
 prioritySort' = prioritySort isHp
+
+staticCost' = staticCost isHp 4
 
 beFlows_ :: Int -> [Flow]
 beFlows_ start = [ FlowUDPv4 {
@@ -1647,24 +1694,24 @@ test_incr_add = do
     putStrLn $ "Running incremental search!"
     prgU <- e10kU_simple
     let nq = 10
-        -- initially 1 HP, 20 BE flows
         hpPort   = 6000
         bePort   = 1000
         e10kOracle = initE10kOracle nq
-        priFn = priorityCost' nq
-        balFn = balanceCost nq
-        costFn = priFn
-        sortFn = prioritySort'
+        pri = (priorityCost' nq, prioritySort')
+        bal = (balanceCost nq, id)
+        sta = (staticCost' nq, id)
+
+        fns = sta
         params = initIncrSearchParams {  isOracle = e10kOracle
                                        , isPrgU   = prgU
-                                       , isCostFn = costFn
-                                       , isOrderFlows = sortFn}
+                                       , isCostFn = fst fns
+                                       , isOrderFlows = snd fns}
 
     ss0 <- initIncrSearchIO params
 
-    let initHpNr = 1
-        initBeNr = 20
-    (ss1, flst) <- doTimeIt ("INIT:" ++ (show initBeNr) ++ " BE Flows + 1 HP flow:") $ do
+    let initHpNr = 64
+        initBeNr = 0
+    (ss1, flst) <- doTimeIt ("INIT:" ++ (show initBeNr) ++ " BE Flows, " ++ (show initHpNr) ++ " HP flows") $ do
         let beFs = take initBeNr $ beFlows_ bePort
             hpFs = take initHpNr $ hpFlows_ hpPort
             flst0 = flAddedFlows beFs
@@ -1672,7 +1719,7 @@ test_incr_add = do
         (conf, _, ss1) <- runIncrSearchIO ss0 flst1
         return (ss1, flst1)
 
-    let n2 = 1
+    let n2 = 64
     (ss2,flst2) <- doTimeIt ("Add:" ++ (show n2) ++ " be flow(s)") $ do
         let beFls = take n2 $ beFlows_ (bePort + initBeNr)
             flst2 = L.foldl FL.fsAddFlow (FL.fsReset flst) beFls
@@ -1680,7 +1727,7 @@ test_incr_add = do
         --putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
         return (ss2,flst2)
 
-    let n3 = 1
+    let n3 = 0
     (ss3,flst3) <- doTimeIt ("Add:" ++ (show n3) ++ " hp flow(s)") $ do
         let hpFls = take n3 $ hpFlows_ (hpPort + initHpNr)
             flst3 = L.foldl FL.fsAddFlow (FL.fsReset flst2) hpFls
@@ -1688,7 +1735,7 @@ test_incr_add = do
         --putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
         return (ss3,flst3)
 
-    let n4 = 5
+    let n4 = 0
     ss4 <- doTimeIt ("Add:" ++ (show n4) ++ " hp flow(s)") $ do
         let hpFls = take n4 $ hpFlows_ (hpPort + initHpNr + n3)
             flst4 = L.foldl FL.fsAddFlow (FL.fsReset flst3) hpFls
@@ -1769,7 +1816,6 @@ test_incr_pravin_testcase = do
     putStrLn $ "Running incremental search usecase that is cause problem!"
     prgU <- e10kU_simple
     let nq = 5
-        -- initially 2 HP, 8 BE flows
         hpPort   = 6000
         bePort   = 1000
         e10kOracle = initE10kOracle nq
@@ -1784,6 +1830,7 @@ test_incr_pravin_testcase = do
 
     ss0 <- initIncrSearchIO params
 
+    -- initially 2 HP, 8 BE flows
     let initHpNr = 2
         initBeNr = 8
     (ss1, flst) <- doTimeIt ("INIT:" ++ (show initBeNr) ++
@@ -1815,8 +1862,6 @@ test_incr_pravin_testcase = do
     --let prgC = C.applyConfig conf prgU
     --writeFile "tests/incr-search-prg-result.dot" $ toDot prgC
     return ()
-
-
 
 -- there used to be a bug when configuring a 5t filter and then a cfdir filter
 testFmCfdir :: IO ()

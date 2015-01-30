@@ -618,7 +618,7 @@ getRxQMap2 st = do
         qmap  = L.concat [ [(f,qid) | f <- flows]
                            | (rxQNid, qid) <- rxQNodes,
                            let flows = getFlows rxQNid]
-    return qmap
+    return $ trN qmap ("RxQMap2: qmap size: " ++ (show $ length qmap))
 
 -- rxQmap2 seems a bit faster
 getRxQMap :: forall s cc. (C.ConfChange cc) => FlowMapSt s cc -> ST.ST s QMap

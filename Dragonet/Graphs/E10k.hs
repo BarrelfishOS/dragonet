@@ -15,7 +15,7 @@ module Graphs.E10k (
     ConfChange(..),
     mk5TupleFromFl, mkFDirFromFl,
     insert5tFromFl, insertFdirFromFl,
-    ccQueue,
+    ccQueue, ccIs5t,
 
     rx5tFilterTableFull,rxCfdFilterTableFull,
 
@@ -802,6 +802,9 @@ data ConfChange = Insert5T PG.ConfValue
 
 addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
 addToCVL (PG.CVList l) v = PG.CVList $ v:l
+
+ccIs5t (Insert5T _) = True
+ccIs5t _  = False
 
 -- Overwrite the old value(s) with new value
 overwriteCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
