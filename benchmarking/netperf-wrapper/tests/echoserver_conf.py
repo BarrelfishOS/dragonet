@@ -28,12 +28,6 @@ def getClientPortList(clientList, startPort, noPorts=1) :
         portList.append(startPort + len(prev_entries))
     return portList
 
-ORACLE = "hardcoded"
-ORACLE = "greedy"
-
-COSTFN = "priority"
-COSTFN = "balance"
-
 def SRV_CMDS(name):
 
 
@@ -47,7 +41,8 @@ def SRV_CMDS(name):
 
                       # run server
                       "cd %s ; " % (dragonet_container[name]['base_dir'])
-                        + "sudo %s " % (get_isolation_container(is_server=True))
+                        + "sudo %s " % (
+                            get_isolation_container(is_server=True, cores_needed=(SERVER_CORES * SERVERS_INSTANCES)))
                         + " ./scripts/pravin/runBetterBg.sh 10  ./ ./fancyecho-out.log  "
                         + " ./dist/build/bench-fancyecho/bench-fancyecho %s " % (
                              flows_to_arg_fancyEcho(FLOWS, SERVER_INITIAL_PORT, SERVER_CORES))

@@ -15,6 +15,38 @@ OUTPUTDIRPARENT="./output_runs_dynamic_debug/"
 OUTPUTDIRPARENT="./output_runs_dynamic_debug3/"
 
 OUTPUTDIRPARENT="./output_runs_mixed_static/"
+OUTPUTDIRPARENT="./output_runs_mixed_static2/"
+OUTPUTDIRPARENT="./output_runs_mixed_static_priority/"
+
+OUTPUTDIRPARENT="./output_runs_mixed_static_priority_test/"
+OUTPUTDIRPARENT="./output_runs_mixed_static_balance_test/"
+
+OUTPUTDIRPARENT="./deleteme_output_runs_mixed_static_balance/"
+OUTPUTDIRPARENT="./deleteme_output_runs_mixed_static_priority5/"
+OUTPUTDIRPARENT="./deleteme_output_runs_mixed_static_priority6/"
+
+OUTPUTDIRPARENT="./deleteme_output_runs_mixed_static_priority7/"
+OUTPUTDIRPARENT="./deleteme_output_runs_mixed_static_balance7/"
+
+# Testing with disjoint client sets
+OUTPUTDIRPARENT="./deleteme_disjoint_clients_balance/"
+OUTPUTDIRPARENT="./deleteme_disjoint_clients_priority4/"
+
+# Fixed the issue of using old variables
+OUTPUTDIRPARENT="./deleteme_disjoint_clients_priority5/"
+
+# Aparantly there is still issue of gap in performance of two clients
+
+OUTPUTDIRPARENT="./deleteme_disjoint_clients_priority6/"
+
+OUTPUTDIRPARENT="./output_somewhat_working_priority/"
+OUTPUTDIRPARENT="./output_somewhat_working_balance_v4/"
+OUTPUTDIRPARENT="./output_somewhat_working_priority_v2/"
+OUTPUTDIRPARENT="./output_somewhat_working_balance_30clients/"
+
+OUTPUTDIRPARENT="./output_somewhat_working_priority_big3/"
+OUTPUTDIRPARENT="./output_somewhat_working_balance_big3/"
+OUTPUTDIRPARENT="./output_debugging_softfiltering_2/"
 
 WORKLOADTYPE="priority"
 WORKLOADTYPE="priBal"
@@ -38,15 +70,18 @@ mkdir -p "${OUTDIR}"
 ./netperf-wrapper -d 0 --udp --serverCoreShift ${SRVCORESHIFT} ${ClientList} --servercores ${SRVCORES} \
 --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES}  --packet ${PACKETSIZE} --concurrency ${initConcurrency} \
 -I 1 -l 5 -H ${SERVERNAME} -T ${SERVERIP} -c ${ECHO_SERVER} ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
--t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
+-t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
+
 
 if [ "${UDP_TEST_NAME}" == "udp_rr" ];
 then
-    grep -e  'Runner: netperf' -e ' TRANSACTION_RATE='  -e ' THROUGHPUT=' "${OUTDIR}/${title}.runlog"
+    grep -e  'Runner: netperf' -e ' TRANSACTION_RATE='  -e ' THROUGHPUT=' "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
+
 fi
 if [ "${UDP_TEST_NAME}" == "memcached_rr" ];
 then
-    grep -e  'Runner: memaslap' -e 'Run time:'  "${OUTDIR}/${title}.runlog"
+    grep -e  'Runner: memaslap' -e 'Run time:'  "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
+
 fi
 
 #exit 0
@@ -54,7 +89,7 @@ fi
 
 check_working_dummy() {
 
-local dummyRT=10
+local dummyRT=30
 local title="DUMMY_${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
 local OUTDIR="${OUTPUTDIRPARENT}/DUMMY/${WORKLOADTYPE}/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
@@ -62,15 +97,17 @@ mkdir -p "${OUTDIR}"
 ./netperf-wrapper -d 0 --udp --serverCoreShift ${SRVCORESHIFT}  ${ClientList} --servercores ${SRVCORES} \
 --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES} --packet ${PACKETSIZE} --concurrency ${LOAD} \
 -I 1 -l ${dummyRT} -H ${SERVERNAME} -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
--t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
+-t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
 
 if [ "${UDP_TEST_NAME}" == "udp_rr" ];
 then
-    grep -e  'Runner: netperf' -e ' TRANSACTION_RATE='  -e ' THROUGHPUT=' "${OUTDIR}/${title}.runlog"
+    grep -e  'Runner: netperf' -e ' TRANSACTION_RATE='  -e ' THROUGHPUT=' "${OUTDIR}/${title}.runlog"  2>&1 | tee "${OUTDIR}/${title}.output"
+
 fi
 if [ "${UDP_TEST_NAME}" == "memcached_rr" ];
 then
-    grep -e  'Runner: memaslap' -e 'Run time:'  "${OUTDIR}/${title}.runlog"
+    grep -e  'Runner: memaslap' -e 'Run time:'  "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
+
 fi
 
 
@@ -84,19 +121,22 @@ local title="${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSI
 local OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
-REPEAT=3
+REPEAT=1
 ./netperf-wrapper -d 0 --udp --serverCoreShift ${SRVCORESHIFT}  ${ClientList} --servercores ${SRVCORES} \
 --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES} --packet ${PACKETSIZE} --concurrency ${LOAD} \
 -I ${REPEAT} -l 50 -H ${SERVERNAME} -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
--t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
+-t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
+
 
 if [ "${UDP_TEST_NAME}" == "udp_rr" ];
 then
-    grep -e  'Runner: netperf' -e ' TRANSACTION_RATE='  -e ' THROUGHPUT=' "${OUTDIR}/${title}.runlog"
+    grep -e  'Runner: netperf' -e ' TRANSACTION_RATE='  -e ' THROUGHPUT=' "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
+
 fi
 if [ "${UDP_TEST_NAME}" == "memcached_rr" ];
 then
-    grep -e  'Runner: memaslap' -e 'Run time:'  "${OUTDIR}/${title}.runlog"
+    grep -e  'Runner: memaslap' -e 'Run time:'  "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
+
 fi
 }
 
@@ -144,12 +184,12 @@ SERVERIP=10.113.4.95
 #SERVERIP=10.113.4.26
 
 ######################
-SRVCORESHIFT=5
 UDP_TEST_NAME="memcached_rr"
+SRVCORESHIFT=0
 
 ######################
 UDP_TEST_NAME="udp_rr"
-SRVCORESHIFT=0
+SRVCORESHIFT=5
 
 ######################
 PACKETSIZE=64
@@ -182,9 +222,32 @@ CLIENTCOUNT=40
 CLIENTCOUNT=4
 ######################
 
+set_echo_test() {
+    SRVCORESHIFT=3
+    #SRVCORES=7
+    SRVCORES=7
+    UDP_TEST_NAME="udp_rr"
+    LOAD=64
+    CLIENTCOUNT=10
+    #ClientList="-C sbrinz1 -C sbrinz2 -C ziger1"
+    ClientList="-C sbrinz1 -C sbrinz2"
+}
+
+set_memcached_test() {
+    SRVCORESHIFT=0
+    SRVCORES=2
+    UDP_TEST_NAME="memcached_rr"
+    LOAD=32
+    CLIENTCOUNT=2
+    ClientList="-C ziger1 -C ziger2"
+    #ClientList="-C ziger2 "
+}
+
+
 show_usage() {
         echo "Please select what you want to run"
         echo "Usage: ${0} [-c -s -l]"
+        echo "           -t E/M -->  Test type (E --> Echo server, M --> memcached)"
         echo "           -c <n> -->  client count (n clients)"
         echo "           -l <n> -->  load (n concurrent sessions per client)"
         echo "           -s <n> -->  n server cores/threads"
@@ -206,17 +269,49 @@ then
     exit 1
 fi
 
-while getopts ":c:l:s:SdhxXrb" opt; do
+OPTTEST="no"
+
+while getopts ":c:l:s:SdhxXrbt:" opt; do
   case $opt in
+    t)
+        echo "Setting up test $OPTARG"
+        OPTTEST="yes"
+        if [ "$OPTARG" == "E" ] ;
+        then
+            set_echo_test
+        elif [ "$OPTARG" == "M" ] ;
+        then
+            set_memcached_test
+        else
+            echo "Error: Invalid test name given"
+            show_usage
+            exit 1
+        fi
+      ;;
     c)
+        if [ "$OPTTEST" == "yes" ] ;
+        then
+            echo "ERROR: clientcount is hardcoded by -t option, so you can't change it!"
+            exit 1
+        fi
         echo "Setting client-count to $OPTARG (instead of default $CLIENTCOUNT)"
         CLIENTCOUNT=$OPTARG
       ;;
     l)
+        if [ "$OPTTEST" == "yes" ] ;
+        then
+            echo "ERROR: load is hardcoded by -t option, so you can't change it!"
+            exit 1
+        fi
         echo "Setting load to $OPTARG (instead of default $LOAD)"
         LOAD=$OPTARG
       ;;
     s)
+        if [ "$OPTTEST" == "yes" ] ;
+        then
+            echo "ERROR: servercores are hardcoded by -t option, so you can't change it!"
+            exit 1
+        fi
         echo "Setting server-cores/threads to $OPTARG (instead of default $SRVCORES)"
         SRVCORES=$OPTARG
         HWQUEUE=${SRVCORES}
@@ -263,21 +358,27 @@ if [ "${RUNSTACK}" == "yes" ] ; then
         set +x
         set -e
 
-        WORKLOADTYPE="SingleRun"
+        WORKLOADTYPE="SRunSS"
 
         ######################
-        UDP_TEST_NAME="udp_rr"
-        SRVCORESHIFT=0
-        startStack 2>&1 | tee deleteme_echo_stackstart_out.txt
-
-        ######################
-        echo "Starting  second server"
-        SRVCORESHIFT=5
-        UDP_TEST_NAME="memcached_rr"
+        set_memcached_test
+        echo "Starting first server ${UDP_TEST_NAME} with stack"
         startStack 2>&1 | tee deleteme_memcached_stackstart_out.txt
+
+        ######################
+        set_echo_test
+        echo "Starting second server ${UDP_TEST_NAME} without stack"
+        startStack 2>&1 | tee deleteme_echo_stackstart_out.txt
         set +x
         set +e
     else
+
+        if [ "$OPTTEST" == "no" ] ;
+        then
+            echo "ERROR: Test specific options are not set using '-t'"
+            exit 1
+        fi
+
         echo "Running only one type: ${UDP_TEST_NAME}"
         set -x
         set -e
@@ -299,21 +400,32 @@ if [ "${RUNDUMMY}" == "yes" ] ; then
         WORKLOADTYPE="MixedRun"
 
         ######################
-        UDP_TEST_NAME="udp_rr"
-        SRVCORESHIFT=0
+
+        set_memcached_test
+        echo "Starting first server ${UDP_TEST_NAME} for dummyRun"
+        check_working_dummy 2>&1 > deleteme_memcached_dummy_out.txt &
+        ######################
+
+        set_echo_test
+        echo "Starting second server ${UDP_TEST_NAME} for dummyRun"
         check_working_dummy 2>&1 > deleteme_echo_dummy_out.txt &
 
-        ######################
-        SRVCORESHIFT=5
-        UDP_TEST_NAME="memcached_rr"
-        check_working_dummy 2>&1 > deleteme_memcached_dummy_out.txt &
         echo "waiting for benchmark to finish"
         wait
         echo "done with benchmarking"
+        cat deleteme_echo_dummy_out.txt
+        cat deleteme_memcached_dummy_out.txt
 
         set +x
         set +e
     else
+        if [ "$OPTTEST" == "no" ] ;
+        then
+            echo "ERROR: Test specific options are not set using '-t'"
+            exit 1
+        fi
+
+
         echo "Running only one type: ${UDP_TEST_NAME}"
         set -x
         set -e
@@ -333,21 +445,33 @@ if [ "${RUNREAL}" == "yes" ] ; then
 
         WORKLOADTYPE="MixedRun"
         ######################
-        UDP_TEST_NAME="udp_rr"
-        SRVCORESHIFT=0
-        getData 2>&1 > deleteme_udp_out.txt &
+
+        set_memcached_test
+        echo "Starting first server ${UDP_TEST_NAME} for realrun"
+        getData 2>&1 > deleteme_memcached_out.txt &
 
         ######################
-        SRVCORESHIFT=5
-        UDP_TEST_NAME="memcached_rr"
-        getData 2>&1 > deleteme_memcached_out.txt &
+        set_echo_test
+        echo "Starting second server ${UDP_TEST_NAME} for realrun"
+        getData 2>&1 > deleteme_echo_out.txt &
+
         echo "waiting for benchmark to finish"
         wait
         echo "done with benchmarking"
 
+        cat deleteme_echo_out.txt
+        cat deleteme_memcached_out.txt
+
         set +x
         set +e
     else
+        if [ "$OPTTEST" == "no" ] ;
+        then
+            echo "ERROR: Test specific options are not set using '-t'"
+            exit 1
+        fi
+
+
         echo "Running only one type: ${UDP_TEST_NAME}"
         WORKLOADTYPE="SingleRun"
         set -x
@@ -356,7 +480,6 @@ if [ "${RUNREAL}" == "yes" ] ; then
         set +x
         set +e
     fi
-
 
     set +x
     set +e

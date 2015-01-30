@@ -42,13 +42,6 @@ def client_to_10G_IP(client) :
         return client[isMultiNICMachine+2:]
 
 
-ORACLE = "hardcoded"
-ORACLE = "greedy"
-
-COSTFN = "priority"
-COSTFN = "balance"
-
-
 
 def SRV_CMDS(name):
 
@@ -74,7 +67,12 @@ def SRV_CMDS(name):
                       # run server
                       "cd %s ; " % (
                         dragonet_container[name]['base_dir'])
-                        + "sudo %s " % (get_isolation_container(is_server=True))
+                        + "sudo %s " % (
+                            get_isolation_container(is_server=True,
+                                # giving an extra core for polling queue-0
+                                cores_needed=((SERVERS_INSTANCES*SERVER_CORES) + 1)
+                                #cores_needed=((SERVERS_INSTANCES*SERVER_CORES))
+                                    ))
                         + " ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log  "
                         + " ../benchmarking/memcached/memcached -N %s " % (
                             flows_to_arg_memcached(FLOWS, SERVER_INITIAL_PORT))
@@ -104,6 +102,7 @@ def SRV_CMDS(name):
                     "kill_cmd" : [
                                 "tail dragonet/Dragonet/some.log",
                                 "tail dragonet/Dragonet/memcached-out.log",
+                                "cat dragonet/Dragonet/stack.filtready || true",
                                 #"sudo killall memcached || true",
                                 #"sudo killall %s || true" % (dragonet_container[name][1]),
                                  ],
@@ -132,7 +131,9 @@ def SRV_CMDS(name):
                       # run server
                       "cd %s ; " % (
                         "dragonet/Dragonet/ ")
-                        + "sudo %s " % (get_isolation_container(is_server=True))
+                        + "sudo %s " % (get_isolation_container(is_server=True,
+                                cores_needed=((SERVERS_INSTANCES*SERVER_CORES)))
+                            )
                         + " ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log  "
                         + " ../benchmarking/memcached/memcached "
                         + " -c 64000 -m 64000 -u root %s %d -t %d -l %s " % (
@@ -172,7 +173,9 @@ def SRV_CMDS(name):
                       # run server
                       "cd %s ; " % (
                         "dragonet/Dragonet/ ")
-                        + "sudo %s " % (get_isolation_container(is_server=True))
+                        + "sudo %s " % (get_isolation_container(is_server=True,
+                                cores_needed=((SERVERS_INSTANCES*SERVER_CORES)))
+                            )
                         + " ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log  "
                         + " %s ../benchmarking/memcached/memcached " % (onload_prefix)
                         + " -c 64000 -m 64000 -u root %s %d -t %d -l %s " % (
@@ -267,7 +270,9 @@ def SRV_CMDS(name):
         return {
                     "init_cmd" : [],
                     "exec_cmd" : "echo 'test output'",
-                    "kill_cmd" : [],
+                    "kill_cmd" : [
+                                "cat dragonet/Dragonet/stack.filtready || true",
+                        ],
                     "out_cmd" : [],
                 }
 
@@ -295,7 +300,8 @@ def create_server(id):
        ( 'memcached%d' % (id),
        {
 
-           'command':  'sudo %s ' % (get_isolation_container(is_server=True))
+           'command':  'sudo %s ' % (get_isolation_container(is_server=True,
+                            cores_needed=((SERVERS_INSTANCES*SERVER_CORES))))
                 + ' %s -p %d -U %d -t %d -l %s ' % (
                     echo_server_cmds['exec_cmd'],
                     0,                          # -p (TCP)
@@ -317,7 +323,9 @@ def create_server(id):
        ('dstat',
        {
            'command': dstatCmd (mname = 'server%d' % (id),
-               cpus=get_isolation_container(is_server=True)[len(' testset -c '):],
+               cpus=get_isolation_container(is_server=True,
+                       cores_needed=((SERVERS_INSTANCES*SERVER_CORES))
+                       )[len(' testset -c '):],
                netdev=server_if[server_names[id]],
                interrupts=getInterruptLines(MINFO_SERVER[server_names[id]])),
            'runner': 'dstat_json',
@@ -333,7 +341,9 @@ def create_server(id):
 #       ('ethtool',
 #       {
 #           'command': dstatCmd (mname = 'server%d' % (id),
-#               cpus=get_isolation_container(is_server=True)[len(' testset -c '):]
+#               cpus=get_isolation_container(is_server=True,
+#                       cores_needed=((SERVERS_INSTANCES*SERVER_CORES))
+#                        )[len(' testset -c '):]
 #               netdev=server_if[server_names[id]],
 #               interrupts=getInterruptLines(MINFO_SERVER[server_names[id]])),
 #           'runner': 'ethtool_json',

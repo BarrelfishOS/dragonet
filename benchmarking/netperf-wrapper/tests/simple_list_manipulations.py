@@ -161,20 +161,21 @@ def gen_core_list(mlist, cores_to_alloc, cores_per_machine, starting_core=2):
 
 
 
-def get_isolation_container(is_server):
+def get_isolation_container(is_server, cores_needed):
     if not PIN_THREADS:
         return ""
 
     if is_server == True:
         return " taskset -c %s " % (
              toCoreList2(range(
-                 (SERVER_CORESHIFT ),
-                 ((SERVERS_INSTANCES*SERVER_CORES) + SERVER_CORESHIFT)
+                 (SERVER_CORESHIFT),
+                 (cores_needed + SERVER_CORESHIFT)
                )))
     else :
+        # Assuming this is the dragonet stack.  Giving cores from end of the cores list
         return " taskset -c %s " % (
              toCoreList2(range(
-                 MAX_CORES - (HWQUEUES),
+                 MAX_CORES - (cores_needed),
                  MAX_CORES
                )))
 
