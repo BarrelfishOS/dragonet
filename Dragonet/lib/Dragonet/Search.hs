@@ -90,7 +90,8 @@ allQueues :: Int -> [QueueId]
 allQueues nq = [1..(nq-1)] :: [QueueId]
 
 allQueues_ :: Int -> Int -> [QueueId]
-allQueues_ start nq =  [(i + start) `mod` nq | i <- [0..(nq-1)]]
+--allQueues_ start nq =  [(i + start) `mod` nq | i <- [0..(nq-1)]]
+allQueues_ start nq = filter (/= 0) $ [(i + start) `mod` nq | i <- [1..(nq-1)]]
 
 
 -- NB: due to ordering, costOK will always have the smaller value, and
@@ -260,7 +261,7 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
         [e10kDefaultQ, xq]
         where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
 
-    -- 
+    --
     --confJump o = e10kQueueJump
 
 -- TODO: avoid symmetric allocation
