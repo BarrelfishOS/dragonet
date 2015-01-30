@@ -50,8 +50,10 @@ struct cfg_thread {
 //      with number of threads
 pthread_barrier_t        nthread_barrier;
 
+#if DETECT_NEW_FLOWS
 // The list of new flows
 xht_t *new_flows_ht = NULL;
+#endif // DETECT_NEW_FLOWS
 
 // We have a thread list, and every thread gets client list
 
@@ -346,6 +348,8 @@ parse_client_list(char *client_list_str, int thread_count)
 } // end function: parse_client_list
 
 
+#if DETECT_NEW_FLOWS
+
 // Insert a new flow into flowtable
 static bool insert_single_flow_flowtable(flow_entry_t new_flow)
 {
@@ -370,6 +374,7 @@ static bool insert_single_flow_flowtable(flow_entry_t new_flow)
    // If exist, update the counter, timestamp
    // Else, set counter to 1 and insert the record
 } // end function: insert_single_flow
+#endif // DETECT_NEW_FLOWS
 
 // Requests insertion of given flow into dragonet optimization
 static int send_flow_to_dragonet(
@@ -572,6 +577,7 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
             );
 
 
+#if DETECT_NEW_FLOWS
     // check if you are thread-0
     if (dnt_state->tindex == 0) {
         flow_entry_t new_flow;
@@ -638,7 +644,7 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
 
         } // end else: flow not present
     }
-
+#endif // DETECT_NEW_FLOWS
     dnt_state->udp_sport = in->attr->udp_sport;
     dnt_state->udp_dport = in->attr->udp_dport;
     dnt_state->ip4_src = in->attr->ip4_src;
@@ -677,8 +683,11 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
             in->attr->udp_sport, in->attr->udp_dport, in->attr->ip4_src,
             in->attr->ip4_dst, len);
 
+#if DETECT_NEW_FLOWS
             // showing flow stats
             xht_print(new_flows_ht);
+#endif // DETECT_NEW_FLOWS
+
     }
 #endif // SHOW_INTERVAL_STAT
 
@@ -795,7 +804,10 @@ static int insert_flow_info(struct dn_thread_state *dn_tstate)
         new_flow.dst_ip = udp->l_ip;
         new_flow.src_port = udp->r_port;
         new_flow.dst_port = udp->l_port;
+
+#if DETECT_NEW_FLOWS
         myAssert(insert_single_flow_flowtable(new_flow));
+#endif // DETECT_NEW_FLOWS
 
         // find the binded socket to which this flow belongs
         // ASSUMPTION: currently assumed to be the first listen socket
@@ -1019,8 +1031,10 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
             // Insert the flows
             insert_flow_info(dn_tstate);
 
+#if DETECT_NEW_FLOWS
             // Printing the flow table for debugging purposes
             xht_print(new_flows_ht);
+#endif // DETECT_NEW_FLOWS
 
             // The flow information is sent, now we call noop to actually
             //      enforce the stack to apply the flows

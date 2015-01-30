@@ -842,10 +842,13 @@ void thread_init(int nthreads, struct event_base *main_base) {
 
 
 #ifdef DRAGONET
+
+#if DETECT_NEW_FLOWS
     // Setup the flow table
     myAssert(new_flows_ht == NULL);
     new_flows_ht = xht_init(NEWFLOWSTABLE);
     myAssert(new_flows_ht != NULL);
+#endif // DETECT_NEW_FLOWS
 
     int res;
     // initialize the barrier to synchronize the threads

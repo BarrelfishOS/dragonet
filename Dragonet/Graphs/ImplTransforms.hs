@@ -20,6 +20,14 @@ import Data.Maybe
 import Debug.Trace (trace)
 traceN a b = b
 
+
+--balanceAcrossRxQs :: PG.PGraph -> PG.PGraph
+--balanceAcrossRxQs =  balanceAcrossRxQsDummy
+balanceAcrossRxQs = balanceAcrossRxQsReal
+
+balanceAcrossRxQsDummy :: PG.PGraph -> PG.PGraph
+balanceAcrossRxQsDummy g = g
+
 -- At this point (i.e., when transformation functions are called), only the
 -- valid RxQueues remain (i.e., the ones that will receive packets). Each of
 -- this queue might contain balance nodes that steers packets from the same
@@ -32,8 +40,8 @@ traceN a b = b
 --
 -- For this to make more sense in the general case, we might want to do that
 -- *only* for sockets with the same AppId.
-balanceAcrossRxQs :: PG.PGraph -> PG.PGraph
-balanceAcrossRxQs g = foldl balEpAcrossRxQs g (M.toList balEpsMap)
+balanceAcrossRxQsReal :: PG.PGraph -> PG.PGraph
+balanceAcrossRxQsReal g = foldl balEpAcrossRxQs g (M.toList balEpsMap)
     where
           -- List of all balance nodes with their endpont-ID's
           balEps :: [(Integer, DGI.Node)]
@@ -74,22 +82,34 @@ balEpAcrossRxQs ::
     -- | Graph after applying the balancing
     -> PG.PGraph
 --balEpAcrossRxQs g (eid,nids@((nid0,lab0):_)) = trace msg $ enfoceEP2SocketsMapping g groupedNids
-balEpAcrossRxQs g (eid,nids@((nid0):_)) = trace msg $ enfoceEP2SocketsMapping g groupedNids
+balEpAcrossRxQs g (eid,nidss@((nid0):_)) =
+    --trace msg $ enfoceEP2SocketsMapping g ([] ++ groupedNids)
+    trace msg $ enfoceEP2SocketsMapping g ([defaultQMap] ++ groupedNids)
     where
-    ports = PG.nPorts $ fromJust $ DGI.lab g nid0
-    balancedPorts = balancedChunks (length nids) ports
-    groupedNids :: [(DGI.Node, [PG.NPort])]
+    ports' = PG.nPorts $ fromJust $ DGI.lab g nid0
+
     {- Reversing to get deterministic ordering so that q0 will always go to socket-0, etc
      -  I don't know if this ordering is assured or not, and most probably this will break
      -  if embedding or node insertion code changes the way these nodes are inserted
      -  Cleaner fix will be to use the associated queue/partition attribute
      -  for sorting and making sure that sockets are deterministically used
      -}
-    nids' = reverse nids
-    -- nids' = nids
+
+    nidss' = reverse nidss
+
+    ports = drop 1 ports'
+    nids = drop 1 nidss'
+
+    balancedPorts = balancedChunks (length nids) ports
+    groupedNids :: [(DGI.Node, [PG.NPort])]
+
+    -- Doing explicit mapping for queue-0 to socket-0
+    defaultQMap :: (DGI.Node, [PG.NPort])
+    defaultQMap = ((head nidss'), [(head ports')])
+
 
     balancedPorts' = DL.sort balancedPorts
-    groupedNids = zip nids' $ concat $ repeat balancedPorts'
+    groupedNids = zip nids $ concat $ repeat balancedPorts'
     msg
             | length nids == length ports = "############################### one pipeline/queue per socket"
             | length nids > length ports = "############################### Multiple pipelines/queues per socket"

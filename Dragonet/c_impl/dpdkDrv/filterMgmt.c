@@ -47,24 +47,23 @@ bool e10k_ctrl_fdir_set(struct state *state,
     l4_type = 0x11; // FIXME: hardcoding the type to UDP
 
     snprintf(BIG_MSG_STR, sizeof(BIG_MSG_STR),
-    //printf(
-        "### %s:%s:%d:  [####-- IMP --####]"
-            "index: %"PRIu16", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
-            "srcIP: %s -> %"PRIu32", srcPort: %"PRIu16",  dstIP: %s -> %"PRIu32", dstPort: %"PRIu16"\n",
-            __FILE__, __FUNCTION__, __LINE__,
+            "ID %"PRIu8", Q: %"PRIu8", "
+            "sIP: %s, sPort: %"PRIu16",  dIP: %s,  dPort: %"PRIu16", "
+            "M: %"PRIu16", l4Type: %"PRIu16"\n",
             index,
             queue,
-            mask,
-            l4_type,
             src_ip_str,
-            src_ip,
             src_port,
             dst_ip_str,
-            dst_ip,
-            dst_port
+            dst_port,
+            mask,
+            l4_type
             );
 
-    printf("%s", BIG_MSG_STR);
+    printf("### %s:%s:%d:  [####-- IMP --####] %s",
+            __FILE__, __FUNCTION__, __LINE__,
+            BIG_MSG_STR);
+
     int ret = set_fdir_filter(e10k_nic, dst_ip, src_ip, dst_port, src_port,
             l4_type, mask, queue, index);
     if (ret < 0) return false;
@@ -93,24 +92,24 @@ bool e10k_ctrl_5tuple_set(struct state *state,
     l4_type = 0x11; // FIXME: hardcoding the type to UDP
 
     snprintf(BIG_MSG_STR, sizeof(BIG_MSG_STR),
-            "### %s:%s:%d:  [####-- IMP --####] index %"PRIu8", "
-            "Priority: %"PRIu8", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
-            "srcIP: %s = %"PRIu32", srcPort: %"PRIu16",  dstIP: %s =%"PRIu32", dstPort: %"PRIu16"\n",
-            __FILE__, __FUNCTION__, __LINE__,
+            "ID %"PRIu8", Q: %"PRIu8", "
+            "sIP: %s, sPort: %"PRIu16",  dIP: %s,  dPort: %"PRIu16", "
+            "Pri: %"PRIu8",  M: %"PRIu16", l4Type: %"PRIu16"\n",
             index,
-            priority,
             queue,
-            mask,
-            l4_type,
             src_ip_str,
-            src_ip,
             src_port,
             dst_ip_str,
-            dst_ip,
-            dst_port
+            dst_port,
+            priority,
+            mask,
+            l4_type
             );
 
-    printf("%s", BIG_MSG_STR);
+    printf("### %s:%s:%d:  [####-- IMP --####] %s",
+            __FILE__, __FUNCTION__, __LINE__,
+            BIG_MSG_STR);
+
     // FIXME: just for testing fdir filters.  Remove this line after testing
 //    return e10k_ctrl_fdir_set(state, (uint16_t)index, queue,
 //            src_ip, dst_ip, src_port, dst_port, l4_type, mask);

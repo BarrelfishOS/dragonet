@@ -73,13 +73,15 @@ static inline errval_t shm_chan_alloc_wrapper(
             if (err == SHM_CHAN_NOSPACE) {
                 printf("This is transient error, and attempt %d, so trying again\n",
                         tries);
+
+                assert(err_is_ok(err));
                 sleep(1);
                 // this is transient error.  sleep for short time and and try again
             } else {
                 printf("This is serious error, and attempt %d. giving up\n",
                         tries);
+                assert(err_is_ok(err));
                 return err;
-
             }
         } else {
             if (tries > 0) {

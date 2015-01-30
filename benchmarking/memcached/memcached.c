@@ -5136,6 +5136,7 @@ int main (int argc, char **argv) {
                 fprintf(stderr, "Number of threads must be greater than 0\n");
                 return 1;
             }
+
             /* There're other problems when you get above 64 threads.
              * In the future we should portably detect # of cores for the
              * default.
@@ -5145,13 +5146,6 @@ int main (int argc, char **argv) {
                                 "threads is not recommended.\n"
                                 " Set this value to the number of cores in"
                                 " your machine or less.\n");
-            }
-            if (settings.num_threads >= MAX_THREADS) {
-                fprintf(stderr, "ERROR: too many worker threads"
-                        "Dragonet currently supports only upto %d threads.\n",
-                        MAX_THREADS);
-                exit(1);
-                return -1;
             }
 
             break;
@@ -5306,18 +5300,18 @@ int main (int argc, char **argv) {
             exit(1);
         }
 
-    parse_client_list(use_dragonet_stack_portmap, settings.num_threads);
-
-#if 0
-        // call init dragonet interface
-        int ret = dn_stack_init(settings.udpport);
-        if (ret < 0) {
-            printf("Dragonet stack initialization failed."
-                   "Make sure you have started the Dragonet stack\n");
+        // Increasing number of threads by one for dragonet as we need
+        //  a special thread to listen on queue-0
+        ++settings.num_threads;
+        if ((settings.num_threads) >= MAX_THREADS) {
+            fprintf(stderr, "ERROR: too many worker threads"
+                    "Dragonet currently supports only upto %d threads.\n",
+                    MAX_THREADS);
             exit(1);
+            return -1;
         }
-        printf("memcached Dragonet: end\n");
-#endif // 0
+
+        parse_client_list(use_dragonet_stack_portmap, settings.num_threads);
 
     } else {
         printf("memcached with Dragonet disabled with option -N\n");

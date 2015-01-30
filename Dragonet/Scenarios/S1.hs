@@ -33,14 +33,26 @@ isGoldFlOld FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip} = ans
             | otherwise = False
 isGoldFlOld _ = False
 
-isGoldFl fPerApp FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip} = ans
+isGoldFl =  isGoldFlv2
+
+isGoldFlv2 fPerApp FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip, flDstPort = Just dstPort} = ans
+    where
+        fpa = fromIntegral fPerApp
+        ans
+            -- This is essentially a hole to add a special HP flow later
+            | (sport < 8000) && (sport >= (8000 - fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
+            | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
+            | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
+            | otherwise = False
+isGoldFlv2 _ _ = False
+
+isGoldFlOnlyPort fPerApp FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip, flDstPort = Just dstPort} = ans
     where
         ans
-            | (sport < 8000) && (sport >= (8000 - (fromIntegral fPerApp))) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
-            | (sport >= 8000) && (sport < (8000 + (fromIntegral fPerApp))) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
-            | (sport >= 8000) && (sport < (8000 + (fromIntegral fPerApp))) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
+            | (dstPort == 7777)  =  True
             | otherwise = False
-isGoldFl _ _ = False
+isGoldFlOnlyPort _ _ = False
+
 
 priorityCost'' goldRange fperQ = Search.priorityCost (isGoldFl goldRange) fperQ
 prioritySort'' goldRange = Search.prioritySort (isGoldFl goldRange)

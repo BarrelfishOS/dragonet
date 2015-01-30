@@ -85,7 +85,9 @@ tr a b  = trace b a
 trN a b = a
 
 allQueues :: Int -> [QueueId]
-allQueues nq = [1..(nq-1)] ++ [0] :: [QueueId]
+--allQueues nq = [1..(nq-1)] ++ [0] :: [QueueId]
+-- Not considering queue-0 here
+allQueues nq = [1..(nq-1)] :: [QueueId]
 
 allQueues_ :: Int -> Int -> [QueueId]
 allQueues_ start nq =  [(i + start) `mod` nq | i <- [0..(nq-1)]]

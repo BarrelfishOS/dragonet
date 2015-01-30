@@ -22,7 +22,8 @@ check_filters_inserted() {
         if [ -f "${filterLogFile}" ] ;
         then
 
-            filter_count=`cat ${filterLogFile} | grep "\[####-- IMP --####\]" | wc -l`
+            #filter_count=`cat ${filterLogFile} | grep "\[####-- IMP --####\]" | wc -l`
+            filter_count=`cat ${filterLogFile} | wc -l`
             if [ $filter_count -ge $fcount ] ;
             then
                 echo "Found enough filters $filter_count (>= $fcount)"
