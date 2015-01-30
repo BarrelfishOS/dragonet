@@ -328,7 +328,7 @@ static char *convert_ipv4(uint32_t ip, char *str)
 {
    unsigned char *addr = (unsigned char*)&ip;
    snprintf(str, (IPv4_ADDR_STR_SIZE - 1), "%hhu.%hhu.%hhu.%hhu",
-        addr[0], addr[1], addr[2], addr[3]);
+        addr[3], addr[2], addr[1], addr[0]);
    return str;
 }
 

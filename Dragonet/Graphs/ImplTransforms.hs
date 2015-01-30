@@ -81,10 +81,10 @@ balEpAcrossRxQs ::
     -- -> (Integer, [(DGI.Node, PG.NLabel)])
     -- | Graph after applying the balancing
     -> PG.PGraph
---balEpAcrossRxQs g (eid,nids@((nid0,lab0):_)) = trace msg $ enfoceEP2SocketsMapping g groupedNids
+--balEpAcrossRxQs g (eid,nids@((nid0,lab0):_)) = traceN msg $ enfoceEP2SocketsMapping g groupedNids
 balEpAcrossRxQs g (eid,nidss@((nid0):_)) =
-    --trace msg $ enfoceEP2SocketsMapping g ([] ++ groupedNids)
-    trace msg $ enfoceEP2SocketsMapping g ([defaultQMap] ++ groupedNids)
+    --traceN msg $ enfoceEP2SocketsMapping g ([] ++ groupedNids)
+    traceN msg $ enfoceEP2SocketsMapping g ([defaultQMap] ++ groupedNids)
     where
     ports' = PG.nPorts $ fromJust $ DGI.lab g nid0
 
@@ -97,7 +97,10 @@ balEpAcrossRxQs g (eid,nidss@((nid0):_)) =
 
     nidss' = reverse nidss
 
-    ports = drop 1 ports'
+    portForQ0 = head $ reverse ports'
+    ports = reverse $ tail $ reverse ports'
+
+    partitionForQ0 = head nidss'
     nids = drop 1 nidss'
 
     balancedPorts = balancedChunks (length nids) ports
@@ -105,8 +108,8 @@ balEpAcrossRxQs g (eid,nidss@((nid0):_)) =
 
     -- Doing explicit mapping for queue-0 to socket-0
     defaultQMap :: (DGI.Node, [PG.NPort])
-    defaultQMap = ((head nidss'), [(head ports')])
-
+    --defaultQMap = ((head nidss'), [(head ports')])
+    defaultQMap = (partitionForQ0, [portForQ0])
 
     balancedPorts' = DL.sort balancedPorts
     groupedNids = zip nids $ concat $ repeat balancedPorts'
@@ -150,7 +153,7 @@ enfoceEP2SocketsMapping g [] = g
 -- end: No socket mapped to the endpoint: This is treated as error as all
 --      the incoming packets here will end up getting dropped
 --enfoceEP2SocketsMapping g (eps, []):xs = error "the endpoint does not have any socket connected"
-enfoceEP2SocketsMapping g (x:xs) = trace msg $ gAns
+enfoceEP2SocketsMapping g (x:xs) = traceN msg $ gAns
     where
     eps = fst x
     ports' = snd x
@@ -178,7 +181,7 @@ enfoceEP2SocketsMapping g (eps, p:[]):xs = enfoceEP2SocketsMapping g' xs
 --      ideally, we should replace the generic balance node with specific
 --      balancing node which will balance only between given sockets
 --  Currently, We are using only first socket and ignoring all other sockets
-enfoceEP2SocketsMapping g (eps, p:ps):xs = trace msg gAns
+enfoceEP2SocketsMapping g (eps, p:ps):xs = traceN msg gAns
     where
     g' = mapEPtoSinglePort g eps p
     gAns = enfoceEP2SocketsMapping g' xs
@@ -201,7 +204,7 @@ mapEPtoSinglePort g epNid port =  g'
             [x] -> x
             []  -> error $ "balEpAcrossRxQs: port " ++ (show port) ++ " 0 sucs"
             _   -> error $ "balEpAcrossRxQs: port " ++ (show port) ++ " >1 sucs"
-         g' = trace msg
+         g' = traceN msg
               $ DGI.insEdge (prevNid, nextNid, prevE)
               $ DGI.delNodes delNs g
 

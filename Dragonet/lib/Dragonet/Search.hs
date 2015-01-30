@@ -269,11 +269,11 @@ e10kFlowConfChanges :: E10kOracleSt -> C.Configuration -> Flow
                     -> [E10k.ConfChange]
 e10kFlowConfChanges E10kOracleSt {nQueues = nq} cnf fl
     -- allocate 5-tuple filters first, if we can
---    | not rx5tFull  = [E10k.insert5tFromFl fl q | q <- allQs]
+    | not rx5tFull  = [E10k.insert5tFromFl fl q | q <- allQs]
     | not rxCfdFull = catMaybes $ [E10k.insertFdirFromFl fl q | q <- allQs]
     | otherwise     = []
     where allQs = allQueues nq
---          rx5tFull  = E10k.rx5tFilterTableFull cnf
+          rx5tFull  = E10k.rx5tFilterTableFull cnf
           rxCfdFull = E10k.rxCfdFilterTableFull cnf
 
 

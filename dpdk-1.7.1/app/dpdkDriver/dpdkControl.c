@@ -1975,7 +1975,7 @@ int set_5tuple_filter(
 	int ret = 0;
 	struct rte_5tuple_filter filter;
 
-        printf("Trying to set a 5tuple filter\n");
+        //printf("Trying to set a 5tuple filter\n");
         assert(nic_handle != NULL);
 	memset(&filter, 0, sizeof(struct rte_5tuple_filter));
 
@@ -2002,7 +2002,7 @@ int set_5tuple_filter(
         filter.src_port_mask = (mask & 0x02) ? 1 : 0;
         filter.dst_port_mask = (mask & 0x01) ? 1 : 0;
         //filter.protocol_mask = (mask & 0x01) ? 1 : 0;
-
+/*
         printf("\n\n### %s:%s:%d:  [#### IMP ####] index: %"PRIu8", "
             "Priority: %"PRIu8", Queue: %"PRIu8", mask: %"PRIu16", l4Type: %"PRIu16", "
             "srcIP: %"PRIu32", srcPort: %"PRIu16",  dstIP: %"PRIu32", dstPort: %"PRIu16"\n\n",
@@ -2017,16 +2017,19 @@ int set_5tuple_filter(
             filter.dst_ip,
             filter.dst_port
             );
-
+*/
         // FIXME: what is index_value??
 	ret = rte_eth_dev_add_5tuple_filter(port_id, index_value,
                         &filter, queue_id);
         if (ret < 0) {
             printf("5tuple filter setting error: (%s)\n", strerror(-ret));
 
-        } else {
+        }
+/*
+        else {
             printf("5tuple filter success!!\n");
         }
+*/
         return ret;
 } // end function: set_5tuple_filter
 
@@ -2174,6 +2177,7 @@ bool set_fdir_filter(void *nic_p, uint32_t dst_ip, uint32_t src_ip,
 
 	//fdir_filter.flex_bytes = rte_cpu_to_be_16(flexbytes_value);
 
+        /*
         printf("\n\n### %s:%s:%d:  [#### IMP ####]"
             "soft-index: %"PRIu16", Queue: %"PRIu8", mask: %"PRIu16", "
             "(protocol: %"PRIu16",  l4Type: %"PRIu16"), "
@@ -2190,7 +2194,7 @@ bool set_fdir_filter(void *nic_p, uint32_t dst_ip, uint32_t src_ip,
             fdir_filter.ip_dst.ipv4_addr,
             fdir_filter.port_dst
             );
-
+*/
         // make sure that mask matches the global mask
         bool verify_mask = verify_fdir_mask(nic_p, mask);
         if (!verify_mask) {

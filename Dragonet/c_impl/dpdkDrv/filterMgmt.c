@@ -60,7 +60,9 @@ bool e10k_ctrl_fdir_set(struct state *state,
             l4_type
             );
 
-    printf("### %s:%s:%d:  [####-- IMP --####] %s",
+    //printf
+    dprint
+        ("### %s:%s:%d:  [####-- IMP --####] %s",
             __FILE__, __FUNCTION__, __LINE__,
             BIG_MSG_STR);
 
@@ -106,7 +108,9 @@ bool e10k_ctrl_5tuple_set(struct state *state,
             l4_type
             );
 
-    printf("### %s:%s:%d:  [####-- IMP --####] %s",
+    //printf
+    dprint
+        ("### %s:%s:%d:  [####-- IMP --####] %s",
             __FILE__, __FUNCTION__, __LINE__,
             BIG_MSG_STR);
 

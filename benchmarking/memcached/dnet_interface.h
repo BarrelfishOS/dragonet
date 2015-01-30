@@ -53,7 +53,7 @@ get_tsc(void) {
 #include "flowtable/xht.h"
 
 
-//#define DETECT_NEW_FLOWS        (1)
+#define DETECT_NEW_FLOWS        (1)
 
 #define MAX_SOCKETS_APP             (256)
 // Shows packet classification after every 'INTERVAL_STAT_FREQUENCY' packet.

@@ -175,7 +175,9 @@ void app_control_init(
                             msg.flags);
                     break;
                 case APPCTRL_SOCKET_UDPFLOW:
-                    printf("APPCTRL_SOCKET_UDPFLOW: sid: %"PRIu64", lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32" flags: %"PRIx32"\n",
+                    //printf
+                    dprintf
+                        ("APPCTRL_SOCKET_UDPFLOW: sid: %"PRIu64", lIP: %"PRIu32", lPort: %"PRIu32", rIP: %"PRIu32", rPort: %"PRIu32" flags: %"PRIx32"\n",
                             msg.data.socket_udpflow.sid,
                             msg.data.socket_udpflow.l_ip,
                             msg.data.socket_udpflow.l_port,

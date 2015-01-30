@@ -73,19 +73,23 @@ makeGraph' helpers prgC lpg embed_fn implTransforms pla debug = do
     let emb = embed_fn prgC lpg
     debug "embed" $ DbgPGraph emb
     -- Reduce graph
-    reduced <- doTimeIt "makeGraph.REDUCE" $ SS.reducePG emb helpers
+    reduced <- doTimeIt "makeGraph.REDUCE:" $ SS.reducePG emb helpers
     debug "reduced" $ DbgPGraph reduced
     -- Clean-up graph
     let cleanedUp = PGU.cleanupGraph reduced
+    --cleanedUp <- doTimeIt "makeGraph.cleanup:" $ PGU.cleanupGraph reduced
     debug "cleanup" $ DbgPGraph cleanedUp
     -- Apply implementation transforms
     let implGraph = PGU.cleanupGraph $ foldl (\g t -> t g) cleanedUp implTransforms
+    --implGraph <- doTimeIt "makeGraph.implGraph:" $ PGU.cleanupGraph $ foldl (\g t -> t g) cleanedUp implTransforms
     debug "implT" $ DbgPGraph implGraph
     -- Drop hardware nodes
     let nohwGraph = dropHardwareNodes implGraph
+    --nohwGraph <- doTimeIt "makeGraph.nohwGraph:" $ dropHardwareNodes implGraph
     debug "nohw" $ DbgPGraph nohwGraph
     -- Partition graph
     let plg = PL.generatePLG pla nohwGraph
+    --plg  <- doTimeIt "makeGraph.generatePLG:" $ PL.generatePLG pla nohwGraph
     debug "pipelines" $ DbgPLGraph plg
     return plg
 

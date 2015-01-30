@@ -40,9 +40,10 @@ isGoldFlv2 fPerApp FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip, flDstP
         fpa = fromIntegral fPerApp
         ans
             -- This is essentially a hole to add a special HP flow later
+            | (sport < 8000) && (sport >= (8000 - fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
+            | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
             | (sport < 8000) && (sport >= (8000 - fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
             | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
-            | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
             | otherwise = False
 isGoldFlv2 _ _ = False
 

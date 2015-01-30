@@ -26,6 +26,7 @@ import qualified Dragonet.Semantics                as Sem
 import qualified Dragonet.Search                   as SE
 import qualified Dragonet.NetState                 as NS
 import qualified Dragonet.Flows                    as FL
+import qualified Data.Maybe                        as DMB
 
 import Dragonet.NetState (NetState, SocketId,AppId,EndpointId,EndpointDesc(..),epsDiff)
 import Dragonet.Flows (Flow(..), epToFlow, flowStr)
@@ -125,6 +126,8 @@ data StackState = StackState {
     , ssCtx            :: PLD.DynContext
     , ssStackHandle    :: PLI.StackHandle
     , ssSharedState    :: PLI.StateHandle
+    -- current graph of network state
+    , ssCurrGraph      :: Maybe PL.PLGraph
 }
 
 ssEndpoints ss = NS.nsEndpoints $ ssNetState ss
@@ -158,7 +161,8 @@ ssMakeGraph ss args prgConf lbl xforms = do
         lpgC       = ssConfigureLpg ss args
         -- graph transformations
         debug :: O.DbgFunction ()
-        debug = O.dbgDotfiles $ "out/graphs-fff/" ++ (show $ ssVersion ss)
+        --debug = O.dbgDotfiles $ "out/graphs-fff/" ++ (show $ ssVersion ss)
+        debug = O.dbgDummy $ "will not be called!"
         --dbg = O.dbgDummy lbl
         dbg    = debug lbl
         cfgPLA = stCfgPLA args
@@ -317,7 +321,7 @@ eventHandler sstv ch
     PLA.sendMessage ch $ PLA.MsgStatus True
     if testBit flags PLA.appFlagsMore
         then return ()
-        else ssUpdateGraphs ss sstv
+        else doTimeIt ("socketUDPFLow: ssUpdateGraphs: ") $ do ssUpdateGraphs ss sstv
     -- Sending message to app after  we reflect this on stack
     --PLA.sendMessage ch $ PLA.MsgStatus True
 
@@ -351,7 +355,7 @@ eventHandler sstv ch (PLA.EvNop flags) = do
     putStrLnDbgN $ "#### NOOP called from " ++ show ch ++ " with flags " ++ show flags
     if testBit flags PLA.appFlagsMore
         then return ()
-        else ssUpdateGraphs ss sstv
+        else doTimeIt ("NOOP: ssUpdateGraphs: ") $ do ssUpdateGraphs ss sstv
     PLA.sendMessage ch $ PLA.MsgStatus True
 {-|
  -  Handling event "all other types":
@@ -377,7 +381,8 @@ initStackSt = StackState {
     ssApplications   = M.empty,
     ssAppChans       = M.empty,
     ssVersion        = 0,
-    ssFlowsSt        = FL.flowsStInit
+    ssFlowsSt        = FL.flowsStInit,
+    ssCurrGraph      = Nothing
 }
 
 -- initialize stack state
@@ -698,6 +703,15 @@ siUpdateGraphDone sitv searchSt = STM.atomically $ do
     STM.writeTVar sitv si'
     return si'
 
+needNewGraph :: StackState -> Bool
+needNewGraph ss = ans
+    where
+    ans
+        | DMB.isNothing (ssCurrGraph ss) = True
+        | (ssVersion ss) < 5             = True
+        | otherwise                      = False
+
+
 -- This is an incremental version of upateGraphFlows in that it allows passing
 -- state to and from the search function
 updateGraphFlowsIncr :: (C.ConfChange cc)
@@ -716,21 +730,33 @@ updateGraphFlowsIncr doSearch args sitv sstv = do
         let searchSt = siSearchSt si'
             xforms = [IT.balanceAcrossRxQs, IT.coupleTxSockets]
             lbl = "updateGraphFlowsIncr"
-        (prgConf, prgIncrConf, searchSt') <- doSearch searchSt flowsSt
+        (prgConf, prgIncrConf, searchSt') <- doTimeIt ("doSearch: ") $ do doSearch searchSt flowsSt
         si'' <- siUpdateGraphDone sitv searchSt'
         -- implement new configuration:
         --- create a new graph
-        plg <- ssMakeGraph ss' args prgConf lbl xforms
+        -- TODO: get version number and print it here
+        --
+        let curVersion = ssVersion ss'
+        putStrLn $ "Current version no. is " ++ (show $ curVersion)
+        plg <- if needNewGraph ss' then
+                    doTimeIt ("ssMakeGraph: ") $ do ssMakeGraph ss' args prgConf lbl xforms
+               else
+                    return (DMB.fromJust $ ssCurrGraph ss')
+
+        --plg <- doTimeIt ("ssMakeGraph: ") $ do ssMakeGraph ss' args prgConf lbl xforms
+
         --- apply PRG configuration
         -- TODO: use prgIncrConf instead of prgConf
-        (stCfgImpl $ stPrg args) (ssSharedState ss') prgConf
+        doTimeIt ("apply prgConf: ") $ do (stCfgImpl $ stPrg args) (ssSharedState ss') prgConf
         --- run it
-        PLD.run (ssCtx ss') plConnect (ssCreatePL args ss' plg) $ addMuxIds plg
+        doTimeIt ("run pipelines: ") $ do PLD.run (ssCtx ss') plConnect (ssCreatePL args ss' plg) $ addMuxIds plg
         --
         putStrLnDbgN "updateGraphFlowsIncr exit"
         -- Create file here.
         putStrLnDbgN "################### calling appendFile with app ready notice"
         appendFile("allAppslist.appready") $ "Application is ready!\n"
+        let ss'' = ss' { ssCurrGraph = Just plg }
+        doTimeIt ("updating graph STM") $ STM.atomically $ STM.writeTVar sstv ss''
         return ()
 
 instantiateIncrFlowsIO_ :: (C.ConfChange cc)
