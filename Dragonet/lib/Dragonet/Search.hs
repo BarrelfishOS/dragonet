@@ -31,7 +31,7 @@ module Dragonet.Search (
 
   IncrConf,
 
-  test, test_incr, test_incr_add, testFmCfdir, test_incr_pravin_testcase,
+  test, test_incr, test_incr_add, test_incr_pravin_testcase,
   test_incr_pravin_testcase_mixed
 ) where
 
@@ -161,7 +161,7 @@ class (C.ConfChange cc) => OracleSt o cc | o -> cc where
     -- configuration and the flows that were configured.
     -- It returns: A partition of the flows and configuration changes to keep,
     -- and the flows and configurations to discard.
-    confJump :: o -> [(cc,Flow)] -> ([(cc,Flow)], [(cc,Flow)])
+    confJump :: o -> [(cc, Maybe Flow)] -> ([(cc, Maybe Flow)], [(cc, Maybe Flow)])
     confJump _ orig = ([], orig)
 
 {-|
@@ -386,7 +386,7 @@ instance OracleSt SFOracleSt SF.ConfChange where
         [sfDefaultQ, xq]
         where xq = SF.c5tQueue $ SF.parse5t c5t
 
-    confJump o = oracleQueueJump SF.ccQueue
+    --confJump o = oracleQueueJump SF.ccQueue
 
 -- TODO: avoid symmetric allocation
 -- TODO: smart-wildcard allocation if possible?
@@ -1289,9 +1289,6 @@ runIncrSearchIO st flows = ST.stToIO $ doIncrSearch st flows
 incrSearchQmap :: (OracleSt o cc) => IncrSearchSt s o cc -> ST.ST s QMap
 incrSearchQmap st = FM.getRxQMap $ isFlowMapSt st
 
-incrSearchStFlows :: (OracleSt o cc) => IncrSearchSt s o cc -> [Flow]
-incrSearchStFlows st = FM.fmFlows $ isFlowMapSt st
-
 doIncrSearch :: (OracleSt o cc)
          => (IncrSearchSt s o cc)
          -> FL.FlowsSt
@@ -1373,7 +1370,7 @@ incSearchGreedyFlows :: forall s o cc. (C.ConfChange cc, OracleSt o cc)
 incSearchGreedyFlows st flowsSt = do
     let ic0 = initIncrConf
     (ic', st') <- doIncSearchGreedyFlows ic0 st flowsSt
-    let cnf' = C.foldConfChanges $ FM.fmCnfChanges $ isFlowMapSt st'
+    let cnf' = C.foldConfChanges $ FM.fmGetCCs $ isFlowMapSt st'
         ret_ = (cnf', ic', st')
         ret  = trN ret_ $ "incSearchGreedyFlows:" ++ (show ic')
     return ret
@@ -1402,16 +1399,15 @@ doIncSearchGreedyFlows ic st flowsSt = do
                       let flows = sortFn $ S.toList addFlows
                       return $ trN (st, flows) "NO DELETED FLOWS"
            -- removed, rebuild the whole flow map
-           -- TODO: remove only needed flows, not everything
-           False -> do -- XXX: Note sure how well this works, needs testing
-                       fm' <- FM.rebuildFlowMapSt (isFlowMapSt st) [] []
+           False -> do -- removed flows
+                       fm' <- FM.rebuildFlowMapSt (isFlowMapSt st) []
                        let st' = st {isFlowMapSt = fm'}
                            flows = sortFn $ S.toList nextFlows
                        return $ tr (st', flows) "DELETED FLOWS"
     -- search
     let msg = "Search flows:\n" ++ (FL.flowsStr searchFlows)
              ++ "\nState flows:\n"
-             ++ (FL.flowsStr $ FM.fmFlows $ isFlowMapSt searchSt)
+             ++ (FL.flowsStr $ catMaybes $ map snd $ FM.fmCnfState $ isFlowMapSt searchSt)
     (st', cost', newCCs') <- case searchFlows of
                      [] -> return (searchSt, CostOK, [])
                      _  -> incSearchGreedyFlows_ searchSt [] (trN searchFlows msg)
@@ -1425,25 +1421,24 @@ doIncSearchGreedyFlows ic st flowsSt = do
             -- confJump
             --  check if we reached the end!
             let fm = isFlowMapSt st
-                ccs = FM.fmCnfChanges fm
-                flows = FM.fmFlows fm
-                (keep, discard) = confJump oracle (zip ccs flows)
+                confS = [(fromJust mcc, mfl) | (mcc, mfl) <- FM.fmCnfState fm,
+                                               isJust mcc]
+                (keep, discard) = confJump oracle confS
                 (rmCcs, rmFlows_) = unzip discard
                 rmFlows = tr rmFlows_ $ "JUMP: Removed flows:\n"
-                                      ++ (FL.flowsStr rmFlows_)
-                (keepCcs,keepFlows) = unzip keep
-            fm' <- FM.rebuildFlowMapSt fm keepFlows keepCcs
+                                      ++ (FL.flowsStr $ catMaybes rmFlows_)
+            fm' <- FM.rebuildFlowMapSt fm keep
             let st'_ = st { isFlowMapSt = fm' }
                 -- new flows state
                 flowsSt' = FL.FlowsSt {
-                      FL.fsCurrent  = S.fromList keepFlows
-                    , FL.fsAdded    = (S.fromList rmFlows) `S.union` addFlows
+                      FL.fsCurrent  = S.fromList $ catMaybes $ map snd $ keep
+                    , FL.fsAdded    = (S.fromList $ catMaybes $ rmFlows) `S.union` addFlows
                     , FL.fsRemoved  = S.empty
                 }
                 ic' = ic { icRmCCs = (icRmCCs ic) ++ rmCcs }
                 st' = (trN st'_ $ "JUMP QMAP="++ (qmapStr qmap'))
             -- recurse
-            case flows of
+            case confS of
                 [] -> error "incSearchGreedyFlows: cannot find acceptable conf"
                 _  -> doIncSearchGreedyFlows ic' st' flowsSt'
 
@@ -1463,9 +1458,7 @@ incSearchGreedyFlows_ st addedCcs (flow:flows) = do
         oracle = isOracle params
         costFn = isCostFn params
         fmSt = trN (isFlowMapSt st) ("flow=" ++ (FL.flowStr flow))
-        fmFlows = FM.fmFlows fmSt
-        ccs  = FM.fmCnfChanges fmSt
-        conf = C.foldConfChanges ccs
+        conf = C.foldConfChanges $ FM.fmGetCCs fmSt
     -- get configuration changes for current state
     let (flowCCs_, oracle') = case True of
                True -> flowConfChangesS oracle conf flow
@@ -1476,7 +1469,7 @@ incSearchGreedyFlows_ st addedCcs (flow:flows) = do
     -- compute new costs and minimum cost, and update state
     (lowerCost, bestFmSt) <- incSearchMinCost costFn fmSt flow flowCCs
     let msg = "--\nLOWER COST:" ++ (show lowerCost)
-              ++ " Flows in state:" ++ (show $ length fmFlows)
+              ++ " Flows in state:" ++ (show $ length $ FM.fmCnfState fmSt)
               ++ " Flow examined:" ++ (flowStr flow)
               ++ " Remaining flows:" ++ (show $ length flows)
               ++ "\n--\n"
@@ -1484,7 +1477,7 @@ incSearchGreedyFlows_ st addedCcs (flow:flows) = do
         st' = st {isFlowMapSt = trN bestFmSt msg, isParams = params'}
         -- this is fragile: we know that the newly added cc is in the top of the
         -- list (see incrConfigure)
-        addedCc = head $ FM.fmCnfChanges $ isFlowMapSt st'
+        addedCc = head $ FM.fmGetCCs $ isFlowMapSt st'
         addedCcs' = addedCcs ++ [addedCc]
     -- recurse
     case flows of
@@ -1550,11 +1543,11 @@ incSearchQmap :: forall s cc . C.ConfChange cc
               -> Flow
               -> ST.ST s (QMap, FM.FlowMapSt s cc)
 incSearchQmap st cc flow = do
-    st1_  <- FM.incrConfigure st cc -- add configuration option
-    let st1 = trN st1_ $ (C.showConfig (undefined::cc) (C.foldConfChanges $ FM.fmCnfChanges st1_))
-    st2  <- FM.addFlow st1 flow   -- add new flow
-    qmap <- FM.getRxQMap st2       -- get qmap
-    return $ (qmap, st2)
+    st_  <- FM.incrConfigure st (cc, Just flow) -- add configuration option and flow
+    let ccs = FM.fmGetCCs st_
+        st = trN st_ $ (C.showConfig (undefined::cc) (C.foldConfChanges $ ccs))
+    qmap <- FM.getRxQMap st       -- get qmap
+    return $ (qmap, st)
 
 -- Code for performing simple tests
 
@@ -1854,8 +1847,8 @@ test_incr_pravin_testcase = do
         --putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
         return (ss2,flst2)
 
-    qmap <- ST.stToIO $ incrSearchQmap ss2
-    putStrLn $ qmapStr qmap
+    qmap2 <- ST.stToIO $ incrSearchQmap ss2
+    putStrLn $ qmapStr qmap2
     --let flows = FM.fmFlows $ isFlowMapSt ss2
     --putStrLn $ "Flows:\n" ++ (FL.flowsStr flows)
     return ()
@@ -1865,30 +1858,30 @@ test_incr_pravin_testcase = do
     return ()
 
 -- there used to be a bug when configuring a 5t filter and then a cfdir filter
-testFmCfdir :: IO ()
-testFmCfdir = do
-    prgU <- e10kU_simple
-    let flows@(fl0:fl1:[]) = take 2 $ connectFlows 1000
-        cc0 = E10k.insert5tFromFl fl0 1
-        cc1 = fromJust $ E10k.insertFdirFromFl fl1 1
-
-    fmSt1 <- ST.stToIO $ do
-        s0 <- FM.initFlowMapSt prgU
-        s1 <- foldM FM.addFlow s0 flows
-        s2 <- FM.incrConfigure s1 cc0
-        s3 <- FM.incrConfigure s2 cc1
-        return s3
-
-    fmSt2 <- ST.stToIO $ do
-        s0 <- FM.initFlowMapSt prgU
-        s1 <- FM.incrConfigure s0 cc0
-        s2 <- FM.incrConfigure s1 cc1
-        s3 <- foldM FM.addFlow s2 flows
-        return s3
-
-    qmap  <- ST.stToIO $ FM.getRxQMap fmSt2
-    putStrLn $ qmapStr qmap
-
-    let prg = FM.fmGraph fmSt2
-    writeFile "tests/incr-search-prg-result.dot" $ toDot prg
-    return ()
+--testFmCfdir :: IO ()
+--testFmCfdir = do
+--    prgU <- e10kU_simple
+--    let flows@(fl0:fl1:[]) = take 2 $ connectFlows 1000
+--        cc0 = E10k.insert5tFromFl fl0 1
+--        cc1 = fromJust $ E10k.insertFdirFromFl fl1 1
+--
+--    fmSt1 <- ST.stToIO $ do
+--        s0 <- FM.initFlowMapSt prgU
+--        s1 <- foldM FM.addFlow s0 flows
+--        s2 <- FM.incrConfigure s1 cc0
+--        s3 <- FM.incrConfigure s2 cc1
+--        return s3
+--
+--    fmSt2 <- ST.stToIO $ do
+--        s0 <- FM.initFlowMapSt prgU
+--        s1 <- FM.incrConfigure s0 cc0
+--        s2 <- FM.incrConfigure s1 cc1
+--        s3 <- foldM FM.addFlow s2 flows
+--        return s3
+--
+--    qmap  <- ST.stToIO $ FM.getRxQMap fmSt2
+--    putStrLn $ qmapStr qmap
+--
+--    let prg = FM.fmGraph fmSt2
+--    writeFile "tests/incr-search-prg-result.dot" $ toDot prg
+--    return ()

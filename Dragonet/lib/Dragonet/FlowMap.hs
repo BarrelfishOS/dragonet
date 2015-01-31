@@ -4,10 +4,10 @@ module Dragonet.FlowMap (
     FlowMapSt(..),
     initFlowMapSt,
     getRxQMap,
-    addFlow,
     rmFlow,
     incrConfigure,
     rebuildFlowMapSt,
+    fmGetCCs,
     strFM,
 ) where
 
@@ -58,8 +58,11 @@ type FlowCache s = HB.HashTable s (PG.NLabel, Flow) PG.NPort
 data FlowMapSt s cc = (C.ConfChange cc) => FlowMapSt {
       fmGraph        :: PG.PGraph -- graph (gets updated with every conf)
     , fmOrigGraph    :: PG.PGraph -- fully unconfigured PRG
-    , fmCnfChanges   :: [cc]      -- configuration changes applied
-    , fmFlows        :: [Flow]
+    -- each configuration change typically corresponds to a new flow, and we
+    -- maintain this information here.
+    -- We can add ccs that are not associated with flows as (Just cc, Nothing)
+    -- and vice-versa
+    , fmCnfState     :: [(Maybe cc, Maybe Flow)]
     , fmFlowMap      :: FlowMap
     , fmRxEntryNid   :: DGI.Node
     , fmTxQueueNodes :: [(QueueId, DGI.Node)]
@@ -155,10 +158,10 @@ fmUpdateNewNodes flows fm g nids = trN ret "fmUpdateNewNodes"
           -- check1: all given nodes are keys in the (old) flowmap
           c1 = all (\nid -> M.notMember nid fm) nids
 
-fmUpdateModNodes :: [Flow] -> FlowMap -> PG.PGraph -> [(DGI.Node, (PG.Node, PG.Node))]
+fmUpdateModNodes :: FlowMap -> PG.PGraph -> [(DGI.Node, (PG.Node, PG.Node))]
                   -> FlowMap
-fmUpdateModNodes _ fm _ [] = fm
-fmUpdateModNodes _ _ _ _ = error "fmUpdateModeNodes: NYI!"
+fmUpdateModNodes fm _ [] = fm
+fmUpdateModNodes _ _ _ = error "fmUpdateModeNodes: NYI!"
 
 
 -- low level function for computing a flow map value
@@ -269,24 +272,19 @@ resetFlowMapSt :: (C.ConfChange cc)
                => (FlowMapSt s cc) -> ST.ST s (FlowMapSt s cc)
 resetFlowMapSt st = do
     return $ st {
-            fmGraph        = g
-          , fmCnfChanges   = []
-          , fmFlows        = []
-          , fmFlowMap      = initFlowMap [] g
+            fmGraph    = g
+          , fmCnfState = []
+          , fmFlowMap  = initFlowMap [] g
    }
    where g = fmOrigGraph st
 
 -- rebuild flowmap state using a new sate of flows and ccs
 rebuildFlowMapSt :: (C.ConfChange cc)
-                 => (FlowMapSt s cc) -> [Flow] -> [cc]
+                 => (FlowMapSt s cc) -> [(cc, Maybe Flow)]
                  -> ST.ST s (FlowMapSt s cc)
-rebuildFlowMapSt st flows ccs = do
+rebuildFlowMapSt st ccflows = do
     st1 <- resetFlowMapSt st
-    --st2 <- foldM incrConfigure st1 ccs
-    --st3 <- foldM addFlow st2 flows
-    -- this seems to be faster for some reason
-    st2 <- foldM addFlow st1 flows
-    st3 <- foldM incrConfigure st2 ccs
+    st3 <- foldM incrConfigure st1 ccflows
     return st3
 
 -- intitialize flow map state
@@ -296,8 +294,7 @@ initFlowMapSt g = do
     return $ FlowMapSt {
             fmGraph        = g
           , fmOrigGraph    = g
-          , fmCnfChanges   = []
-          , fmFlows        = []
+          , fmCnfState     = []
           , fmFlowMap      = fm
           , fmRxEntryNid   = rxEntryNid
           , fmTxQueueNodes = txQNs
@@ -325,17 +322,31 @@ initFlowMapSt g = do
                           , let Just qid = mqid]
 
 -- Add a flow
-addFlow :: (C.ConfChange cc)
+addFlowOnly :: (C.ConfChange cc)
         => FlowMapSt s cc -> Flow -> ST.ST s (FlowMapSt s cc)
-addFlow st flow = do
+addFlowOnly st flow = do
     let g     = fmGraph st
         fm    = fmFlowMap st
-        flows = fmFlows st
+        cst   = fmCnfState st
         entry = fmRxEntryNid st
         fc    = fmFlowCache st
     fm' <- flowMapAddFlow fc fm g entry flow
     return $ st {fmFlowMap = fm',
-                 fmFlows = flow:flows}
+                 fmCnfState = (Nothing, Just flow):cst}
+
+cnfStRemoveFlow :: forall s cc. (C.ConfChange cc)
+                => Flow -> [(Maybe cc, Maybe Flow)]
+                -> [(Maybe cc, Maybe Flow)]
+cnfStRemoveFlow fl [] = error "cnfStRemoveFlow: flow not found"
+cnfStRemoveFlow fl ((_,Nothing):xs) = cnfStRemoveFlow fl xs
+cnfStRemoveFlow fl (x@(mcc, Just xfl):xs) =
+    case fl == xfl of
+       True  ->  (mcc, Nothing):xs
+       False ->  x:(cnfStRemoveFlow fl xs)
+
+fmGetCCs :: forall s cc. (C.ConfChange cc)
+         => FlowMapSt s cc -> [cc]
+fmGetCCs st = catMaybes $ map fst $ fmCnfState  st
 
 -- Removing a flow: Each cc in fmCnfChanges has a corresponding flow
 -- There are two ways to remove a flow
@@ -346,12 +357,12 @@ addFlow st flow = do
 --  We do the former here by rebuilding the flowmap
 rmFlow :: forall s cc. (C.ConfChange cc)
        => FlowMapSt s cc -> Flow -> ST.ST s (FlowMapSt s cc)
-rmFlow st fl = return $ st { fmFlows = flows', fmFlowMap = fm' }
-    where flows    = fmFlows st
+rmFlow st fl = return $ st { fmCnfState = cnfs', fmFlowMap = fm' }
+    where cnfs     = fmCnfState st
           fm       = fmFlowMap st
           g        = fmGraph st
           entryNid = fmRxEntryNid st
-          flows' = L.delete fl flows
+          cnfs'  = cnfStRemoveFlow fl cnfs
           fm'    = fmDelFlow fm g entryNid fl
 
 qmapStr_ :: (Flow,QueueId) -> String
@@ -363,16 +374,16 @@ qmapStr flows = "QMAP:\n"
 
 strFM :: forall s cc. C.ConfChange cc => FlowMapSt s cc -> ST.ST s String
 strFM st =  return $
-         "STEP : " ++ (show $ length $ fmCnfChanges st)
+         "STEP : " ++ (show $ length $ fmCnfState st)
          ++ " ------------------------------------------\n"
-         ++ "CNF  : " ++ cnfStr ++ "\n"
-         ++ "FLOWS: " ++ flsStr ++ "\n"
+         -- ++ "CNF  : " ++ cnfStr ++ "\n"
+         -- ++ "FLOWS: " ++ flsStr ++ "\n"
          -- ++ "QMAP :"  ++ (qmapStr qmap) ++ "\n"
          ++ "FMAP SIZE :"  ++ (show $ length fmapL) ++ "\n"
          ++ "FMAP :"  ++ fmapS ++ "\n"
-    where cnf    = C.foldConfChanges (fmCnfChanges st)
-          cnfStr = C.showConfig (undefined::cc) cnf
-          flsStr = L.intercalate "\n" [" " ++ (flowStr f) | f <- (fmFlows st)]
+    where --cnf    = C.foldConfChanges (fmCnfState st)
+          --cnfStr = C.showConfig (undefined::cc) cnf
+          --flsStr = L.intercalate "\n" [" " ++ (flowStr f) | f <- (fmFlows st)]
           --qmap   = fst $ runFM getRxQMap st
           g      = fmGraph st
           fmapL  = M.toList $ fmFlowMap st
@@ -394,20 +405,27 @@ isNidRxNode :: PG.PGraph -> DGI.Node -> Bool
 isNidRxNode g nid = isRxNode_ nlbl
     where nlbl = fromJust $ DGI.lab g nid
 
+-- Add an incremental configuration and an associated flow
 incrConfigure :: (C.ConfChange cc)
-              => FlowMapSt s cc -> cc -> ST.ST s (FlowMapSt s cc)
-incrConfigure st cc = do
+              => FlowMapSt s cc -> (cc, Maybe Flow) -> ST.ST s (FlowMapSt s cc)
+incrConfigure st (cc, mflow) = do
     let g  = fmGraph st
         fm = fmFlowMap st
-        flows = fmFlows st
-        ccs = fmCnfChanges st
+        cnfs = fmCnfState st
+        flows = catMaybes $ map snd cnfs
+        fc    = fmFlowCache st
+        entry = fmRxEntryNid st
     -- apply the partial configuration and update the flow map
     let (g', cnfSt) = C.icPartiallyConfigure g cc
-        fm1 = fmUpdateModNodes flows fm g' (PG.csModNodes cnfSt)
+        fm1 = fmUpdateModNodes fm g' (PG.csModNodes cnfSt)
         fm2 = fmUpdateNewNodes flows fm1 g' (map fst $ PG.csNewNodes cnfSt)
-    return $ st {fmFlowMap = fm2,
-                 fmCnfChanges = cc:ccs,
-                 fmGraph = g'}
+    -- add flow to the flow map
+    fm3 <- case  mflow of
+        Just flow -> flowMapAddFlow fc fm2 g' entry flow
+        Nothing   -> return fm2
+    return $ st { fmFlowMap = fm3
+                , fmCnfState = (Just cc, mflow):cnfs
+                , fmGraph = g'}
 
 fmUpdateNewNodesDfs :: DGI.Node -> [Flow] -> FlowMap -> PG.PGraph -> FlowMap
 fmUpdateNewNodesDfs entry flows fm g = ret
@@ -569,7 +587,7 @@ getRxQMap1 :: forall s cc. (C.ConfChange cc) => FlowMapSt s cc -> ST.ST s QMap
 getRxQMap1 st = do
     let g  = fmGraph st
         fm = fmFlowMap st
-        flows_ = fmFlows st
+        flows_ = catMaybes $ map snd $ fmCnfState st
         flows = tr flows_ $ "getRxQMAP: FLOWS: " ++ (show flows_)
         rxQNodes_  = fmRxQueueNodes st
         entry = fmRxEntryNid st
@@ -596,7 +614,7 @@ getRxQMap2 :: forall s cc. (C.ConfChange cc) => FlowMapSt s cc -> ST.ST s QMap
 getRxQMap2 st = do
     let g         = fmGraph st
         fm        = fmFlowMap st
-        flows_    = fmFlows st
+        flows_    = catMaybes $ map snd $ fmCnfState st
         flows     = tr flows_ $ "getRxQMAP2: FLOWS: " ++ (show $ length flows_)
         rxQNodes_ = fmRxQueueNodes st
         entry     = fmRxEntryNid st
