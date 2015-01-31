@@ -5,8 +5,8 @@ module Dragonet.FlowMap (
     initFlowMapSt,
     getRxQMap,
     addFlow,
+    rmFlow,
     incrConfigure,
-    rmFlowConf,
     rebuildFlowMapSt,
     strFM,
 ) where
@@ -324,7 +324,7 @@ initFlowMapSt g = do
                           , isJust mqid
                           , let Just qid = mqid]
 
--- Add a flow: this will
+-- Add a flow
 addFlow :: (C.ConfChange cc)
         => FlowMapSt s cc -> Flow -> ST.ST s (FlowMapSt s cc)
 addFlow st flow = do
@@ -343,18 +343,16 @@ addFlow st flow = do
 --    around
 --  - we can remove the flow *and* the corresponding configuration change. In
 --  this case we need to recompute the flowmap.
---  We do the latter here by rebuilding the flowmap
-rmFlowConf :: forall s cc. (C.ConfChange cc)
-           => FlowMapSt s cc -> Flow -> ST.ST s (FlowMapSt s cc)
-rmFlowConf st flow = do
-    let ts = L.zip (fmCnfChanges st) (fmFlows st)
-        (xt,ts') = case L.break ((==flow) . snd) ts of
-            (_,[])      -> error "rmFLowConf: flow not found"
-            (hs,(x:xs)) -> (x, hs++xs)
-        flows' = map snd ts'
-        ccs'   = map fst ts'
-    -- drop all configuration and flow map
-    rebuildFlowMapSt st flows' ccs'
+--  We do the former here by rebuilding the flowmap
+rmFlow :: forall s cc. (C.ConfChange cc)
+       => FlowMapSt s cc -> Flow -> ST.ST s (FlowMapSt s cc)
+rmFlow st fl = return $ st { fmFlows = flows', fmFlowMap = fm' }
+    where flows    = fmFlows st
+          fm       = fmFlowMap st
+          g        = fmGraph st
+          entryNid = fmRxEntryNid st
+          flows' = L.delete fl flows
+          fm'    = fmDelFlow fm g entryNid fl
 
 qmapStr_ :: (Flow,QueueId) -> String
 qmapStr_ (f,q) = (flowStr f) ++ "-> Q" ++ (show q)
@@ -530,39 +528,39 @@ flowMapAddFlow_ fc g doneMap nextNids fl fm = do
 
 
 -- remove a flow from the flow map
-flowMapDelFlow :: FlowMap -> PG.PGraph -> DGI.Node -> Flow -> FlowMap
-flowMapDelFlow fm g entry f = flowMapDelFlow_ fm g [entry] f
+fmDelFlow :: FlowMap -> PG.PGraph -> DGI.Node -> Flow -> FlowMap
+fmDelFlow fm g entry f = fmDelFlow_ fm g [entry] f
 
 -- removes a flow from a flowmap value. Returns the new val and the port that
 -- corresponds to the flow
-flowMapValDelFlow :: [(PG.NPort, [Flow])]
-                  -> Flow
-                  -> (PG.NPort, [(PG.NPort, [Flow])])
-flowMapValDelFlow ((port,flows):rest) rmFlow = case xDel rmFlow flows of
+fmValDelFlow :: [(PG.NPort, [Flow])]
+             -> Flow
+             -> (PG.NPort, [(PG.NPort, [Flow])])
+fmValDelFlow ((port,flows):rest) rmFlow = case xDel rmFlow flows of
     (flows', True) -> (port, (port,flows'):rest)
     (_, False)     -> (activeP, (port,flows):val')
-            where (activeP, val') = flowMapValDelFlow rest rmFlow
+            where (activeP, val') = fmValDelFlow rest rmFlow
     where xDel :: Flow -> [Flow] -> ([Flow], Bool)
           xDel _ [] = ([], False)
           xDel xflow (x:xs)
                | x == xflow  = (xs, True)
                | otherwise   = let (xs',ret) = xDel xflow xs in (x:xs',ret)
-flowMapValDelFlow [] _ = error "flowMapValDelFlow: flow was not found in val"
+fmValDelFlow [] _ = error "fmValDelFlow: flow was not found in val"
 
-flowMapDelFlow_ :: FlowMap -> PG.PGraph -> [DGI.Node] -> Flow -> FlowMap
-flowMapDelFlow_ fm _ [] _ = fm
-flowMapDelFlow_ fm g (nid:nids) flow = ret
+fmDelFlow_ :: FlowMap -> PG.PGraph -> [DGI.Node] -> Flow -> FlowMap
+fmDelFlow_ fm _ [] _ = fm
+fmDelFlow_ fm g (nid:nids) flow = ret
     where (p, v') = case M.lookup nid fm of
-                      Just v  -> flowMapValDelFlow v flow
-                      Nothing -> error "flowMapDelFlow_: mapping does not exist"
+                      Just v  -> fmValDelFlow v flow
+                      Nothing -> error "fmDelFlow_: mapping does not exist"
           -- get successors that will be activated by this port
           sucs = PGU.sucPortNE g nid p
           nids' = nids ++ sucs
           -- insert new value with removed flow
-          alterF Nothing   = error "flowMapDelFlow_: something's wrong..."
-          alterF (Just _)  =  Just v'
+          alterF Nothing  = error "fmDelFlow_: something's wrong..."
+          alterF (Just _) = Just v'
           fm' = M.alter alterF nid fm
-          ret = flowMapDelFlow_ fm' g nids' flow
+          ret = fmDelFlow_ fm' g nids' flow
 
 -- just copy them for now. TODO: put them in a single file (e.g., Cost.hs)
 type QMap        = [(Flow, QueueId)]
