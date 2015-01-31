@@ -44,26 +44,28 @@ nsTest = do
     return ()
 
 testMkFlow rip rport = FlowUDPv4 {
-      flSrcIp   = Just $ fromJust $ IPv4.ipFromString rip
+      flSrcIp   = case rip of
+                     "*" -> Nothing
+                     otherwise -> Just $ fromJust $ IPv4.ipFromString rip
     , flSrcPort = Just rport
     , flDstIp   = Nothing
     , flDstPort = Just udpLocalPort
 }
 
 conf_ = [
-      (("1.1.1.1", 1001), 1)
-    , (("1.1.1.2", 1002), 2)
+      (("*", 1000), 1)
+    , (("*", 1001), 2)
  ]
 prgConf = C.foldConfChanges $
           [ E10k.insert5tFromFl fl q | ((i,p),q) <- conf_,
                                      let fl = testMkFlow i p]
 
 debug :: O.DbgFunction ()
-debug = O.dbgDotfiles "out/xtest/"
+debug = O.dbgDotfiles "out/tests-BalanceAcrossRxQs/"
 
 main = do
---test = do
-    (lpgU,lpgH) <- LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
+    --(lpgU,lpgH) <- LPG.graphH_ "Graphs/LPG/lpgConfImpl-offload.unicorn"
+    (lpgU,lpgH) <- LPG.graphH
     (prgU,prgH) <- E10k.graphH
     let lpgC = C.applyConfig (LPG.lpgConfig eps) lpgU
         helpers = prgH `Sem.mergeHelpers` lpgH
