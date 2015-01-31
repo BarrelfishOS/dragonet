@@ -45,14 +45,10 @@ isGoldFl FlowUDPv4 {flDstPort = Just port} = isJust $ L.find (==port) [1001,1002
 goldFlPerQ = 1
 priorityCost' = S.priorityCost isGoldFl goldFlPerQ
 
-flAddedFlows :: [Flow] -> FL.FlowsSt
-flAddedFlows flows = foldl FL.fsAddFlow FL.flowsStInit flows
-
---
 main = do
     let nq = 10 -- number of queues
         --nflowsl = [1,5,10,20,40,80]
-        nflowsl = [200]
+        nflowsl = [100]
         samples = 3
         flows = connectFlows
     prgU <- e10kU_simple
@@ -76,7 +72,7 @@ main = do
         benchIncBal nflows = show $ S.runIncrSearch searchIncParams (flAddedFlows $ flows nflows)
         benchIncNf nflows  = bench ("incremental search: " ++ (show nflows)) $ nf benchIncBal nflows
 
-        benchs = --[benchNf x | x <- nflowsl] ++
+        benchs = [benchNf x | x <- nflowsl] ++
                  [benchIncNf x | x <- nflowsl]
 
 

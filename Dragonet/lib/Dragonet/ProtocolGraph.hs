@@ -26,6 +26,7 @@ module Dragonet.ProtocolGraph (
     ConfFunction,
     ConfType(..),
     ConfValue(..),
+    csFold,
 
     baseFNode,
     baseONode,
@@ -166,6 +167,14 @@ initConfState maxNid = ConfState {
       csLastNid = maxNid
     , csNewNodes = []
     , csModNodes = []
+}
+
+-- this is stupid, TODO: use foldM
+csFold :: ConfState -> ConfState -> ConfState
+csFold cs1 cs2 = ConfState {
+      csLastNid  = csLastNid cs2
+    , csNewNodes = (csNewNodes cs2) ++ (csNewNodes cs1)
+    , csModNodes = (csModNodes cs2) ++ (csModNodes cs1)
 }
 
 -- next id and set of new nodes

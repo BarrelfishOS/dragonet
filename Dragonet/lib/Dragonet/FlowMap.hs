@@ -118,17 +118,17 @@ addFlowPort fm (nid,nlbl) port flow = fm'
 --    in the flowmap => we know its predicates and they will not change if we
 --    add more configuration changes
 --    not in the flowmap => we do not know its predicates
-updateFlowMap :: [Flow] -> FlowMap -> PG.PGraph -> [DGI.Node] -> FlowMap
---updateFlowMap [] _ _ _ = fm -- TODO: no flows, no update needed
-updateFlowMap flows fm _ [] = fm
-updateFlowMap flows fm g nids = trN ret "updateFlowMap"
+fmUpdateNewNodes :: [Flow] -> FlowMap -> PG.PGraph -> [DGI.Node] -> FlowMap
+--fmUpdateNewNodes [] _ _ _ = fm -- TODO: no flows, no update needed
+fmUpdateNewNodes flows fm _ [] = fm
+fmUpdateNewNodes flows fm g nids = trN ret "fmUpdateNewNodes"
     where ret' = assert c1 ret
           ret = case L.break isReady nids of
               -- we found a node: compute new flow map and recurse
               (xs1,xNid:xs2) ->
                     let xNode = fromJust $ DGI.lab g xNid
                         fm'   = doUpdateFlowMap flows fm g (xNid, xNode)
-                     in updateFlowMap flows fm' g (xs1 ++ xs2)
+                     in fmUpdateNewNodes flows fm' g (xs1 ++ xs2)
               -- no node found
               (before,[]) -> fm
           -- check if a node is ready to be inserted into the flowmap:
@@ -144,12 +144,18 @@ updateFlowMap flows fm g nids = trN ret "updateFlowMap"
 
                     ret_ = notCnode && (not txNode) && prevsInFlowMap
                     ret = trN ret_ rdMsg
-                    rdMsg = "updateFlowMap: is node " ++ (PG.nLabel nlbl)
+                    rdMsg = "fmUpdateNewNodes: is node " ++ (PG.nLabel nlbl)
                             ++ " ready? " ++  (show ret_)
                             ++ " prevsInFlowMap? " ++ (show prevsInFlowMap)
                             ++ " PREVS:" ++ (show $ [ PG.nLabel $ fromJust $ DGI.lab g p | p <- nidPrevs])
           -- check1: all given nodes are keys in the (old) flowmap
           c1 = all (\nid -> M.notMember nid fm) nids
+
+fmUpdateModNodes :: [Flow] -> FlowMap -> PG.PGraph -> [(DGI.Node, (PG.Node, PG.Node))]
+                  -> FlowMap
+fmUpdateModNodes _ fm _ [] = fm
+fmUpdateModNodes _ _ _ _ = error "fmUpdateModeNodes: NYI!"
+
 
 -- low level function for computing a flow map value
 mkFlowMapVal :: [(PG.NPort, PR.PredExpr)]  -- (port, predicate)
@@ -249,7 +255,7 @@ doUpdateFlowMap _ fm g node@(nid, (PG.ONode { PG.nOperator = op})) = fm'
 
 -- compute a flowmap from scratch
 initFlowMap :: [Flow] -> PG.PGraph -> FlowMap
-initFlowMap flows g = updateFlowMap flows M.empty g (DGI.nodes g)
+initFlowMap flows g = fmUpdateNewNodes flows M.empty g (DGI.nodes g)
 
 --
 -- FlowMapSt functions
@@ -324,7 +330,8 @@ addFlow st flow = do
         entry = fmRxEntryNid st
         fc    = fmFlowCache st
     fm' <- flowMapAddFlow fc fm g entry flow
-    return $ st {fmFlowMap = fm', fmFlows = flow:flows}
+    return $ st {fmFlowMap = fm',
+                 fmFlows = flow:flows}
 
 -- Removing a flow: Each cc in fmCnfChanges has a corresponding flow
 -- There are two ways to remove a flow
@@ -393,17 +400,20 @@ incrConfigure st cc = do
         flows = fmFlows st
         ccs = fmCnfChanges st
     -- apply the partial configuration and update the flow map
-    let (g', nids') = C.icPartiallyConfigure g cc
-        fm' = updateFlowMap flows fm g' nids'
-    return $ st {fmFlowMap = fm', fmCnfChanges = cc:ccs, fmGraph = g'}
+    let (g', cnfSt) = C.icPartiallyConfigure g cc
+        fm1 = fmUpdateModNodes flows fm g' (PG.csModNodes cnfSt)
+        fm2 = fmUpdateNewNodes flows fm1 g' (map fst $ PG.csNewNodes cnfSt)
+    return $ st {fmFlowMap = fm2,
+                 fmCnfChanges = cc:ccs,
+                 fmGraph = g'}
 
-updateFlowMapDfs :: DGI.Node -> [Flow] -> FlowMap -> PG.PGraph -> FlowMap
-updateFlowMapDfs entry flows fm g = ret
-    where ret = updateFlowMap flows fm g nids
+fmUpdateNewNodesDfs :: DGI.Node -> [Flow] -> FlowMap -> PG.PGraph -> FlowMap
+fmUpdateNewNodesDfs entry flows fm g = ret
+    where ret = fmUpdateNewNodes flows fm g nids
           --nids_ = [nid | nid <- DGI.nodes g, M.notMember nid fm]
           --nids_ = [nid | nid <- DGI.nodes g, M.notMember nid fm]
           nids_ = [nid | nid <- DFS.dfs [entry] g, M.notMember nid fm]
-          nids = trN nids_ $ "updateFlowMapDfs: NIDS: " ++ (show nids_) ++
+          nids = trN nids_ $ "fmUpdateNewNodesDfs: NIDS: " ++ (show nids_) ++
                             " LABELS:" ++ (show $ [PG.nLabel $ fromJust $ DGI.lab g n | n <- nids_])
 
 getActivePort :: FlowCache s
@@ -565,7 +575,7 @@ getRxQMap1 st = do
     -- 1. finalize the graph (but do not update to state)
     let cfgEmpty = C.emptyConfig (undefined::cc)
         g' = C.applyConfig cfgEmpty g
-        fm' = updateFlowMapDfs entry flows fm g'
+        fm' = fmUpdateNewNodesDfs entry flows fm g'
         rxQNodes = trN rxQNodes_ $ "rxQNODES:" ++ (show rxQNodes_)
 
     -- 2. compute qmap
@@ -579,14 +589,13 @@ getRxQMap1 st = do
     return qmap
 
 
-
 -- Finding the flowmap nodes from queues, seems to be a bit faster
 getRxQMap2 :: forall s cc. (C.ConfChange cc) => FlowMapSt s cc -> ST.ST s QMap
 getRxQMap2 st = do
     let g         = fmGraph st
         fm        = fmFlowMap st
         flows_    = fmFlows st
-        flows     = tr flows_ $ "getRxQMAP2: FLOWS: " ++ (show flows_)
+        flows     = tr flows_ $ "getRxQMAP2: FLOWS: " ++ (show $ length flows_)
         rxQNodes_ = fmRxQueueNodes st
         entry     = fmRxEntryNid st
 
@@ -604,10 +613,10 @@ getRxQMap2 st = do
     -- apply the partial configuration and update the flow map
     -- 1. finalize the graph (but do not update the state)
     let cfgEmpty = C.emptyConfig (undefined::cc)
-        rxQNodes = trN rxQNodes_ $ "rxQNODES:" ++ (show rxQNodes_)
+        rxQNodes = trN rxQNodes_ $ "rxQNODES:" ++ (show $ length rxQNodes_)
         g' = C.applyConfig cfgEmpty g
         updateNids = fmRDfs g' [ nid | (nid,qid) <- rxQNodes ]
-        fm' = updateFlowMap flows fm g' updateNids
+        fm' = fmUpdateNewNodes flows fm g' updateNids
 
 
     -- 2. compute qmap
