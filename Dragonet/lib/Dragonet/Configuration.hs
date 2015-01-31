@@ -28,6 +28,7 @@ import qualified Dragonet.ProtocolGraph.Utils as PGU
 import qualified Data.Graph.Inductive as DGI
 import qualified Util.GraphHelpers as GH
 import qualified Control.Monad.State as ST
+import qualified Data.List as L
 import Data.Maybe
 import Debug.Trace (trace)
 import Text.Show.Pretty (ppShow)
@@ -67,24 +68,34 @@ cvEnumName (PG.CTEnum enums) (PG.CVEnum v) = enums !! v
 -- Create new node
 confMNewNode :: PG.Node -> PG.ConfMonad PG.PGNode
 confMNewNode n = do
-    (m,ns) <- ST.get
-    let i = m + 1
+    cnfSt <- ST.get
+    let lastNid  = PG.csLastNid cnfSt
+        newNodes = PG.csNewNodes cnfSt
+    let i = (PG.csLastNid cnfSt) + 1
     let node = (i,n)
-    ST.put (i,node:ns)
+    ST.modify $ \s -> s { PG.csLastNid = i, PG.csNewNodes = node:newNodes }
     return node
 
 -- Add edges and nodes from configuration function to graph
 confMRun :: PG.PGraph -> PG.ConfMonad [PG.PGEdge] -> (PG.PGraph, [DGI.Node])
-confMRun g m = (addEdges $ addNodes g, map fst newNodes)
+confMRun g m = (addEdges $ modifyNodes $ addNodes g, map fst newNodes)
     where
         (_,maxId) = DGI.nodeRange g
-        startSt = (maxId,[])
+        startSt = PG.initConfState maxId
 
         (newEdges,endSt) = ST.runState m startSt
-        (_,newNodes) = endSt
+        newNodes = PG.csNewNodes endSt
+        modNodes = PG.csModNodes endSt
 
         -- Add new nodes to graph
         addNodes g' = foldl (flip DGI.insNode) g' newNodes
+        -- modify nodes
+        modifyNodes g' = DGI.gmap mapF g'
+            where mapF ctx@(a1,nid,nlbl,a2) =
+                        case L.lookup nid modNodes of
+                          Nothing -> ctx
+                          -- TODO: verify that oldL == nlbl
+                          Just (oldL, newL) -> (a1,nid,newL,a2)
         -- Add new edges
         addEdges g' = foldl (flip DGI.insEdge) g' newEdges
 

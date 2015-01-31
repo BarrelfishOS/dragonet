@@ -21,6 +21,8 @@ module Dragonet.ProtocolGraph (
     ESAttribute(..),
 
     ConfMonad,
+    ConfState(..),
+    initConfState,
     ConfFunction,
     ConfType(..),
     ConfValue(..),
@@ -148,8 +150,26 @@ type NSpawnHandle = String
 -------------------------------------------------------------------------------
 -- Configuration Types
 
+-- TODO: should we add delete here?
+-- NB: new edges are returned and not carried in the state, but we might want to
+-- put them here
+data ConfState = ConfState {
+       csLastNid :: DGI.Node
+     -- nodes/edges added
+     , csNewNodes :: [PGNode]
+     -- nodes modified: node id, old label, new label
+     -- (should have the same structure)
+     , csModNodes :: [(DGI.Node, (Node, Node))]
+}
+
+initConfState maxNid = ConfState {
+      csLastNid = maxNid
+    , csNewNodes = []
+    , csModNodes = []
+}
+
 -- next id and set of new nodes
-type ConfMonad a = ST.State (Int,[PGNode]) a
+type ConfMonad a = ST.State ConfState a
 
 -- NB: The graph argument in the configuration function should *not* be
 -- generally used. Instead, functions should only consider the in/out edges.
