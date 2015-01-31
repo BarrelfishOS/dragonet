@@ -65,6 +65,10 @@ data FlowMapSt s cc = (C.ConfChange cc) => FlowMapSt {
     , fmTxQueueNodes :: [(QueueId, DGI.Node)]
     , fmRxQueueNodes :: [(QueueId, DGI.Node)]
     , fmFlowCache    :: FlowCache s
+    -- incremental qmap
+    -- , fmQmapOld     :: QMap -- old qmap
+    -- , fmQmapNewCc   :: [cc]
+    -- , fmQmapNewFls  :: [Flow]
 }
 
 -- convention: some nodes (typically sink nodes) do not have ports, so we add
