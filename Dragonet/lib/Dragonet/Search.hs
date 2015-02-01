@@ -91,7 +91,8 @@ allQueues nq = [1..(nq-1)] :: [QueueId]
 
 allQueues_ :: Int -> Int -> [QueueId]
 --allQueues_ start nq =  [(i + start) `mod` nq | i <- [0..(nq-1)]]
-allQueues_ start nq = filter (/= 0) $ [(i + start) `mod` nq | i <- [1..(nq-1)]]
+-- this does not allocate queue 0
+allQueues_ start nq = [ 1 + ((start+i) `mod` (nq-1)) | i <- [0..(nq-2)] ]
 
 
 -- NB: due to ordering, costOK will always have the smaller value, and
