@@ -287,11 +287,11 @@ e10kFlowConfChangesS :: E10kOracleSt
                      -> Flow
                      -> ([E10k.ConfChange], E10kOracleSt)
 e10kFlowConfChangesS o@(E10kOracleSt {nQueues = nq, startQ = startQ}) cnf fl
-    | not $ null replaced = trN (replaced, o') $ "ALLOCATED REPLACED FILTER:"
-                                               ++ (E10k.ccString $ head replaced)
-                                               ++ "\n"
-                                               ++ "ALL:\n"
-                                               ++ sAddPr " :" (L.intercalate "\n" $ map (E10k.ccString . fst) unusedFs)
+    | not $ null replaced = trN (replaced', o') $ "ALLOCATED REPLACED FILTERS:\n"
+                                               ++ (sAddPr ". " $  ppShow $ map E10k.ccString replaced')
+                                               -- ++ "\n"
+                                               -- ++ "ALL:\n"
+                                               -- ++ sAddPr " :" (L.intercalate "\n" $ map (E10k.ccString . fst) unusedFs)
     -- allocate 5-tuple filters first, if we can
     | not rx5tFull  = (alloc5t, o')
     | not rxCfdFull = (allocCfd, o')
@@ -307,28 +307,38 @@ e10kFlowConfChangesS o@(E10kOracleSt {nQueues = nq, startQ = startQ}) cnf fl
           allocCfd  = catMaybes $ [E10k.insertFdirFromFl rxCfdId fl q | q <- allQs]
 
           unusedFs  = filter (isNothing . snd) cnf
-          mMatching = L.find (E10k.flowMatchesCc fl . fst) unusedFs
-          mUnused   = L.find (isNothing . snd) cnf
-          replaced  = case mMatching of
-                        Just (cc, mflow) -> replacements cc
-                        Nothing -> case mUnused of
-                                    Nothing -> []
-                                    Just (cc, mflow) -> replacements cc
-          replacements cc = catMaybes
-                          $ [E10k.replaceCcFromFl cc fl q | q <- allQs]
+          mMatching_ = L.find (E10k.flowMatchesCc fl . fst) unusedFs
+          mMatching = Nothing
+          -- Due to limitations:
+          --  - use only the matching if there is a match
+          --  - queue should be the same
+          replacedQs = S.fromList $ [ E10k.ccQueue cc | cc <- replaced ]
+          replacedMissingQs = (S.fromList allQs) `S.difference` replacedQs
+          replaced'
+            | not rx5tFull =  replaced
+                           ++ [E10k.insert5tFromFl rx5tId fl q | q <- S.toList replacedMissingQs]
+            | otherwise = replaced
 
---e10kQueueJump :: [(E10k.ConfChange,Flow)] -- initial configuration
---               -> ([(E10k.ConfChange,Flow)], [(E10k.ConfChange,Flow)]) -- keep, remove partition
---e10kQueueJump ts = tr ret $ "e10kQueueJump removing flows from q=" ++ (show rmQ)
---    where ret = L.partition keepF ts
---          getQ = E10k.ccQueue . fst
---          lastQ = getQ $ last ts -- last queue
---          firstQ = getQ $ head ts -- last queue
---          rmQ = 5
---          -- remove non-5t filters, because otherwise the incremental flowmap
---          -- will not work
---          keepF :: (E10k.ConfChange,Flow) -> Bool
---          keepF (cc,fl) = ((E10k.ccQueue cc) /= rmQ) && (E10k.ccIs5t cc)
+          replaced  = case mMatching of
+                        Just (cc, mflow) -> catMaybes
+                                         $ [E10k.replaceCcFromFl cc fl]
+                        Nothing -> catMaybes
+                                   $ [E10k.replaceCcFromFl cc fl
+                                     | (cc,mflow) <- unusedFs]
+
+e10kQueueJump :: [(E10k.ConfChange,Maybe Flow)] -- initial configuration
+              -> ([(E10k.ConfChange,Maybe Flow)], [(E10k.ConfChange, Maybe Flow)]) -- keep, remove partition
+e10kQueueJump ts = tr ret $ "e10kQueueJump removing flows from q=" ++ (show rmQ)
+    where ret = L.partition keepF ts
+          --rmQ = 5
+          rmQ = lastQ
+          -- remove non-5t filters, because otherwise the incremental flowmap
+          -- will not work
+          lastQ  = getQ $ last $ filter (isJust . snd) ts
+          firstQ = getQ $ head $ filter (isJust . snd) ts
+          getQ = E10k.ccQueue . fst
+          keepF :: (E10k.ConfChange, Maybe Flow) -> Bool
+          keepF (cc,fl) = ((E10k.ccQueue cc) /= rmQ) && (E10k.ccIs5t cc)
 
 myThird (_,_,x) = x
 mySnd (_,x,_) = x
@@ -1453,7 +1463,9 @@ doIncSearchGreedyFlows ic st flowsSt_ = do
                                                isJust mcc]
                 (keep, discard) = confJump oracle confS
                 (rmCcs, rmFlows_) = unzip discard
-                rmFlows = tr rmFlows_ $ "JUMP"
+                rmFlows = case catMaybes rmFlows_ of 
+                            [] -> error "JUMPED but no flows removed"
+                            _  -> tr rmFlows_ $ "JUMP!"
                                       ++ "\nRemoved flows:\n"
                                       ++ (FL.flowsStr $ catMaybes rmFlows_)
             --fm' <- FM.rebuildFlowMapSt fm keep
@@ -1496,12 +1508,13 @@ incSearchGreedyFlows_ st (flow:flows) = do
                False -> (flowConfChanges oracle conf flow, oracle)
     let flowCCs = case flowCCs_ of
                 [] -> error "Run out of CCs"
-                ccs -> trN ccs $ "flowCCs:" ++ (ppShow ccs)
+                ccs -> trN ccs $ "flowCCs:\n" ++ (ppShow [ C.ccShow x | x <- flowCCs_ ])
     -- compute new costs and minimum cost, and update state
-    (lowerCost, bestFmSt) <- incSearchMinCost costFn fmSt flow flowCCs
-    let msg = "--\nLOWER COST:" ++ (show lowerCost)
-              ++ " Flows in state:" ++ (show $ length $ FM.fmCnfState fmSt)
-              ++ " Flow examined:" ++ (flowStr flow)
+    (lowerCost, bestFmSt, bestCc) <- incSearchMinCost costFn fmSt flow flowCCs
+    let msg = "--\nLOWER COST:" ++ (show lowerCost) ++ "\n"
+              ++ " Best CC:" ++ (C.ccShow bestCc) ++ "\n"
+              ++ " Flows in state:" ++ (show $ length $ FM.fmCnfState fmSt) ++ "\n"
+              ++ " Flow examined:" ++ (flowStr flow) ++ "\n"
               ++ " Remaining flows:" ++ (show $ length flows)
               -- ++ " resulting FM: \n" ++ (FM.strFlowMap bestFmSt)
               -- ++ " resulting CnfSt: \n" ++ (sAddPr " >" $ ppShow $ FM.fmCnfState bestFmSt)
@@ -1536,36 +1549,37 @@ incSearchMinCost :: forall s cc. C.ConfChange cc
                  -> FM.FlowMapSt s cc
                  -> Flow
                  -> [cc]
-                 -> ST.ST s (Cost, FM.FlowMapSt s cc)
+                 -> ST.ST s (Cost, FM.FlowMapSt s cc, cc)
 incSearchMinCost costFn fmSt flow (cc0:restCC) = do
+
     let foldFn :: (C.ConfChange cc)
-               => (Cost, FM.FlowMapSt s cc, Int)
+               => (Cost, FM.FlowMapSt s cc, Int, cc)
                -> cc
-               -> ST.ST s (Cost, FM.FlowMapSt s cc, Int)
-        foldFn (stCost, st, cnt) newCc = do
+               -> ST.ST s (Cost, FM.FlowMapSt s cc, Int, cc)
+        foldFn (stCost, st, cnt, oldCc) newCc = do
             (newQmap, newSt) <- incSearchQmap fmSt newCc flow
             let newCost_ = costFn newQmap
                 newCost = trN newCost_ msg
                 cnt'    = cnt + 1
                 msg     =  "New cost=" ++ (show newCost_) ++
-                           " newCc=" ++ (C.show newCc) ++
+                           " newCc=" ++ (C.ccShow newCc) ++
                            " for qmap=" ++ (qmapStr newQmap)
-            if newCost < stCost then return (newCost, newSt, cnt')
-            else return (stCost, st, cnt')
+            if newCost < stCost then return (newCost, newSt, cnt', newCc)
+            else return (stCost, st, cnt', oldCc)
 
-        stopFn (cost, _, cnt) = costAcceptable cost && cnt >= 5
+        stopFn (cost, _, cnt, _) = costAcceptable cost && cnt >= 5
 
     (cc0Qmap, cc0St) <- incSearchQmap fmSt cc0 flow
     let cc0Cost_ = costFn cc0Qmap
         cc0Cost  = trN cc0Cost_ msg
         msg     =  "New cost=" ++ (show cc0Cost_) ++
-                   "newCc=" ++ (C.show cc0) ++
+                   "newCc=" ++ (C.ccShow cc0) ++
                    "for qmap=" ++ (qmapStr cc0Qmap)
-        x0 = (cc0Cost, cc0St, 0)
+        x0 = (cc0Cost, cc0St, 0, cc0)
 
-    (lowerCost, bestSt, _) <- foldM foldFn x0 restCC
-    --(lowerCost, bestSt, _) <- stopFoldM foldFn stopFn x0 restCC
-    return (lowerCost, bestSt)
+    --(lowerCost, bestSt, _, bestCc) <- foldM foldFn x0 restCC
+    (lowerCost, bestSt, _, bestCc) <- (stopFoldM foldFn stopFn) x0 restCC
+    return (lowerCost, bestSt, bestCc)
 
 incSearchQmap :: forall s cc . C.ConfChange cc
               => FM.FlowMapSt s cc
@@ -1972,8 +1986,8 @@ tisDoOp ss tis op = do
         return (ss', st'', conf)
 
     --putStrLn $ "tisDoOP result:\n" ++ (sAddPr "| " $ ppShow newConf)
-    qmap <- ST.stToIO $ incrSearchQmap newSS
-    putStrLn $ qmapStr qmap
+    --qmap <- ST.stToIO $ incrSearchQmap newSS
+    --putStrLn $ qmapStr qmap
 
     return (newSS, newSt)
 
@@ -1989,7 +2003,7 @@ test_incr_var = do
         bal = (balanceCost nq, id)
         sta = (staticCost' nq, id)
 
-        fns = pri
+        fns = sta
         params = initIncrSearchParams {  isOracle = e10kOracle
                                        , isPrgU   = prgU
                                        , isCostFn = fst fns
@@ -1998,9 +2012,10 @@ test_incr_var = do
     ss0 <- initIncrSearchIO params
     let tis0 = initTestIncrSearch
 
-    (ss1,tis1) <- tisDoOp ss0 tis0 $ TisAddBeFlows 18
+    (ss1,tis1) <- tisDoOp ss0 tis0 $ TisAddBeFlows 500
     (ss2,tis2) <- tisDoOp ss1 tis1 $ TisAddHpFlows 1
-    --(ss3,tis3) <- tisDoOp ss2 tis2 $ TisAddHpFlows 10
-    --(ss4,tis4) <- tisDoOp ss3 tis3 $ TisRemFlows [0]
+    (ss3,tis3) <- tisDoOp ss2 tis2 $ TisRemFlows [250]
+    --qmap <- ST.stToIO $ incrSearchQmap ss2
+    --putStrLn $ qmapStr qmap
 
     return ()

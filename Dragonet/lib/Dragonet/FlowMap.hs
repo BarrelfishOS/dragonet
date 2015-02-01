@@ -332,7 +332,7 @@ addFlowOnly st flow = do
         cst   = fmCnfState st
         entry = fmRxEntryNid st
         fc    = fmFlowCache st
-    fm' <- flowMapAddFlow fc fm g entry flow
+    fm' <- flowMapAddFlow fc g entry fm flow
     return $ st {fmFlowMap = fm',
                  fmCnfState = (Nothing, Just flow):cst}
 
@@ -371,7 +371,7 @@ rmFlow st fl = return $ st { fmCnfState = cnfs', fmFlowMap = fm' }
           g        = fmGraph st
           entryNid = fmRxEntryNid st
           cnfs'  = cnfStRemoveFlow fl cnfs
-          fm'    = fmDelFlow fm g entryNid fl
+          fm'    = fmDelFlow g entryNid fm fl
 
 qmapStr_ :: (Flow,QueueId) -> String
 qmapStr_ (f,q) = (flowStr f) ++ "-> Q" ++ (show q)
@@ -456,8 +456,8 @@ doIncrReplace st (ccNew, mflowNew) = do
         -- replace cc in the graph
         (g', replacedNodes, newNodes) = C.icReplace g (ccNew, nodes)
         -- propage potential changes in flow map
-        fm' = L.foldl fmUpdateNodeReplace fm replacedNodes
-        cnfs'_ = replaceCnfState cnfs
+    fm' <- foldM (fmUpdateNodeReplace g' fc) fm replacedNodes
+    let cnfs'_ = replaceCnfState cnfs
         cnfs' = trN cnfs'_ $  ("ccOld= " ++ (C.ccShow ccOld)) ++ "\n"
                           ++ "OLD CONFIGURATION STATE:\n"
                           ++ (unlines $ map fmCnfStateStr_ cnfs)
@@ -475,7 +475,7 @@ doIncrReplace st (ccNew, mflowNew) = do
 
     -- update flowmap with new flow
     fm'' <- case mflowNew of
-            Just flow -> flowMapAddFlow fc fm' g' entry flow
+            Just flow -> flowMapAddFlow fc g' entry fm' flow
             Nothing -> return fm'
 
     return $ st { fmFlowMap = fm''
@@ -486,17 +486,23 @@ doIncrReplace st (ccNew, mflowNew) = do
                                  $ fmCCNodesMap st}
 
 -- update the flow map based on replaced nodes
-fmUpdateNodeReplace :: FlowMap -> (DGI.Node, (PG.Node, PG.Node)) -> FlowMap
-fmUpdateNodeReplace fm x@(nid,(oldL,newL)) = ret
+fmUpdateNodeReplace :: PG.PGraph
+                    -> FlowCache s
+                    -> FlowMap
+                    -> (DGI.Node, (PG.Node, PG.Node))
+                    -> ST.ST s FlowMap
+fmUpdateNodeReplace g fc fm x@(nid,(oldL,newL)) = ret
     where ret = case M.lookup nid fm of
-                Nothing -> fm -- old flowmap empty, nothing to do!
-                Just v  -> fmUpdateNodeReplace_ fm v x
+                Nothing -> return fm -- old flowmap empty, nothing to do!
+                Just v  -> fmUpdateNodeReplace_ g fc fm v x
 
-fmUpdateNodeReplace_ :: FlowMap
+fmUpdateNodeReplace_ :: PG.PGraph
+                     -> FlowCache s
+                     -> FlowMap
                      -> [(PG.NPort, [Flow])]
                      -> (DGI.Node, (PG.Node, PG.Node))
-                     -> FlowMap
-fmUpdateNodeReplace_ fm fmVal x@(nid,(oldL,newL)) = fm'
+                     -> ST.ST s FlowMap
+fmUpdateNodeReplace_ g fc fm fmVal x@(nid,(oldL,newL)) = ret
     where newFnode = case newL of
                 n@(PG.FNode {}) -> n
                 _ -> error "fmUpdateNodeReplace: not an F-node"
@@ -505,9 +511,27 @@ fmUpdateNodeReplace_ fm fmVal x@(nid,(oldL,newL)) = fm'
           flowPreds = [(f, flowPred f) | f <- allFlows]
           portPreds = [(p, (PR.portPred_ defBld newFnode) p) | p <- ports]
           fmVal' = mkFlowMapVal portPreds flowPreds
-          fm' = L.foldl updatePort fm ports
+          needUpdate = any (needUpdateP fm) ports
+          ret = case needUpdate of
+             True -> do
+                let xfm1 = foldl (fmDelFlow g nid) fm allFlows
+                xfm2 <- foldM (flowMapAddFlow fc g nid) fm allFlows
+                return xfm2
+             False -> return fm
 
-          updatePort :: FlowMap -> PG.NPort -> FlowMap
+          needUpdateP fm p = ret
+           where flsOld = S.fromList $ case L.lookup p fmVal of
+                    Nothing -> error "fmUpdateNodeReplace_: port does not exist"
+                    Just x  -> x
+                 flsNew = S.fromList $ case L.lookup p fmVal' of
+                       Nothing -> error "fmUpdateNodeReplace_: port does not exist"
+                       Just x  -> x
+                 ret
+                    | flsOld == flsNew = False
+                    | otherwise = True
+
+          {--
+          --updatePort :: FlowMap -> PG.NPort -> ST.ST s FlowMap
           updatePort fm p = fm'
             where
                   flsOld = S.fromList $ case L.lookup p fmVal of
@@ -517,18 +541,11 @@ fmUpdateNodeReplace_ fm fmVal x@(nid,(oldL,newL)) = fm'
                         Nothing -> error "fmUpdateNodeReplace_: port does not exist"
                         Just x  -> x
                   fm'
-                     | flsOld == flsNew = fm
-                     | otherwise = xfm
-                        where xfm = error $ "fmUpdateNodeReplace_: NYI!\n"
-                                          ++  " old Node: " ++ (PG.nLabel oldL) ++ "\n"
-                                          ++  " new Node: " ++ (PG.nLabel newL) ++ "\n"
-                                          ++  " Port: " ++ p ++ "\n"
-                                          ++  " new flows: " ++ (ppShow flsNew) ++ "\n"
-                                          ++  " old flows: " ++ (ppShow flsOld)
-                              toRemoveFls = S.toList $ flsOld `S.difference` flsNew
-                              toAddFls    = S.toList $ flsNew `S.difference` flsOld
-                              -- TODO: add new flows to fm and propage
-                              -- toRemoveFls, toAddFls
+                     | flsOld == flsNew = return fm
+                     | otherwise = do
+                            xfm1 <- foldM (flowMapAddFlow fc g nid) fm toAddFls
+                            return die
+        --}
 
 -- Add an incremental configuration and an associated flow
 doIncrConfigure :: (C.ConfChange cc)
@@ -546,7 +563,7 @@ doIncrConfigure st (cc, mflow) = do
         fm' = fmUpdateNewNodes flows fm g' (map fst confNodes)
     -- add flow to the flow map
     fm3 <- case  mflow of
-        Just flow -> flowMapAddFlow fc fm' g' entry flow
+        Just flow -> flowMapAddFlow fc g' entry fm' flow
         Nothing   -> return fm'
     return $ st { fmFlowMap = fm3
                 , fmCnfState = (Just cc, mflow):cnfs
@@ -612,12 +629,12 @@ getActivePort _ _ _ (_, PG.CNode {}) _ = error "getActiveProt called on C-node"
 
 -- Add a flow to a flow map (a wrapper for flowMapAddFlow_)
 flowMapAddFlow :: FlowCache s
-               -> FlowMap
                -> PG.PGraph
                -> DGI.Node
+               -> FlowMap
                -> Flow
                 -> ST.ST s FlowMap
-flowMapAddFlow fc fm g entry flow =
+flowMapAddFlow fc g entry fm flow =
     flowMapAddFlow_ fc g M.empty [entry] flow fm
 
 -- Add a flow to a flow map
@@ -672,8 +689,8 @@ flowMapAddFlow_ fc g doneMap nextNids fl fm = do
 
 
 -- remove a flow from the flow map
-fmDelFlow :: FlowMap -> PG.PGraph -> DGI.Node -> Flow -> FlowMap
-fmDelFlow fm g entry f = fmDelFlow_ fm g [entry] f
+fmDelFlow :: PG.PGraph -> DGI.Node -> FlowMap -> Flow -> FlowMap
+fmDelFlow g entry fm f = fmDelFlow_ fm g [entry] f
 
 -- removes a flow from a flowmap value. Returns the new val and the port that
 -- corresponds to the flow

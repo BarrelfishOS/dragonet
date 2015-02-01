@@ -832,9 +832,12 @@ data ConfChange = Insert5T   (FilterId, PG.ConfValue)
 ccString :: ConfChange -> String
 ccString (Insert5T (fid,cnf))   = c5tFullString  $ parse5t cnf
 ccString (InsertFDir (fid,cnf)) = cFDtFullString $ parseFDT cnf
-ccString (CcReplace (Insert5T (fid,cnf)) cnf') = "REPLACE:" ++ s1 ++ " __TO__ " ++ s2
+ccString (CcReplace (Insert5T (fid,cnf)) cnf') = "REPLACE: OLD:" ++ s1 ++ " NEW:" ++ s2
     where s1 =  c5tFullString  $ parse5t cnf
           s2 =  c5tFullString  $ parse5t cnf'
+ccString (CcReplace (InsertFDir (fid,cnf)) cnf') = "REPLACE: OLD:" ++ s1 ++ " NEW:" ++ s2
+    where s1 =  cFDtFullString $ parseFDT cnf
+          s2 =  cFDtFullString $ parseFDT cnf'
 
 addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
 addToCVL (PG.CVList l) v = PG.CVList $ v:l
@@ -967,10 +970,21 @@ cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
 ccQueue :: ConfChange -> QueueId
 ccQueue (Insert5T (_,c5t)) = case c5t of
                              PG.CVTuple (_:_:_:_:_:_:(PG.CVInt qid):[]) -> (fromIntegral qid)
-                             _ -> error $ "ccQeuue: could not match c5t=" ++ (ppShow c5t)
+                             _ -> error $ "ccQueue: could not match c5t=" ++ (ppShow c5t)
 ccQueue (InsertFDir (_,cFdir)) = case cFdir of
                              PG.CVTuple (_:_:_:_:_:(PG.CVInt qid):[]) -> (fromIntegral qid)
-                             _ -> error "ccQeuue: cfdir"
+                             _ -> error "ccQueue: cfdir"
+
+ccQueue (CcReplace (Insert5T (_,_)) c5t)
+    = case c5t of
+        PG.CVTuple (_:_:_:_:_:_:(PG.CVInt qid):[]) -> (fromIntegral qid)
+        _ -> error $ "ccQueue: could not match replace c5t=" ++ (ppShow c5t)
+
+ccQueue (CcReplace (InsertFDir (_,_)) cFdir)
+    = case cFdir of
+        PG.CVTuple (_:_:_:_:_:(PG.CVInt qid):[]) -> (fromIntegral qid)
+        _ -> error "ccQueue: replacement cfdir"
+
 --ccQueue (InsertSYN cSyn)
 
 insert5tFromFl :: Int -> Flow -> QueueId -> ConfChange
@@ -985,13 +999,15 @@ flowMatchesCc fl cc = ret
                                                  Nothing -> False
                                                  Just x  -> x == cfd
 
-replaceCcFromFl :: ConfChange -> Flow -> QueueId -> Maybe ConfChange
-replaceCcFromFl cc@(Insert5T (_,_)) fl qid = Just $ CcReplace cc c5t'
+replaceCcFromFl :: ConfChange -> Flow -> Maybe ConfChange
+replaceCcFromFl cc@(Insert5T (_,_)) fl = Just $ CcReplace cc c5t'
     where c5t' = mk5TupleFromFl fl qid
-replaceCcFromFl cc@(InsertFDir (_,_)) fl qid =
+          qid = ccQueue cc -- XXX: queue has to be the same for now
+replaceCcFromFl cc@(InsertFDir (_,_)) fl =
     case mkFDirFromFl fl qid of
-        Nothing ->  Nothing
-        Just cfdir'  -> Just $ CcReplace cc cfdir'
+           Nothing ->  Nothing
+           Just cfdir'  -> Just $ CcReplace cc cfdir'
+ where qid = ccQueue cc -- XXX: queue has to be the same for now
 
 mk5TupleFromFl :: Flow -> QueueId -> PG.ConfValue
 mk5TupleFromFl fl@(FlowUDPv4 {}) q =
