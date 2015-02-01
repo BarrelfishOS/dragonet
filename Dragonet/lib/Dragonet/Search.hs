@@ -32,7 +32,7 @@ module Dragonet.Search (
   IncrConf,
 
   test, test_incr, test_incr_add, test_incr_pravin_testcase,
-  test_incr_pravin_testcase_mixed
+  test_incr_pravin_testcase_mixed, test_incr_var
 ) where
 
 import qualified Dragonet.Configuration       as C
@@ -147,7 +147,7 @@ class (C.ConfChange cc) => OracleSt o cc | o -> cc where
 
     -- stupid name, but threading the state allows for some tricks
     flowConfChangesS :: o
-                     -> C.Configuration
+                     -> [(cc, Maybe  Flow)]
                      -> Flow
                      -> ([cc], o)
 
@@ -248,18 +248,18 @@ instance OracleSt E10kOracleSt E10k.ConfChange where
      - This implementation does not care for current state of queues,
      -  and counts on cost-function to help in selecting proper queue.
     -}
-    flowConfChanges = e10kFlowConfChanges
+    flowConfChanges  = e10kFlowConfChanges
     flowConfChangesS = e10kFlowConfChangesS
 
     -- QUESTION: Is it assumed that there will be only one operation in
     --      conf change?
-    -- affectedQueues E10kOracleSt { nQueues = nq } _ _ = allQueues nq
+    --affectedQueues E10kOracleSt { nQueues = nq } _ _ = allQueues nq
     affectedQueues E10kOracleSt { nQueues = nq } conf (E10k.Insert5T c5t) =
         [e10kDefaultQ, xq]
-        where xq = E10k.c5tQueue $ E10k.parse5t c5t
+        where xq = E10k.c5tQueue $ E10k.parse5t (snd c5t)
     affectedQueues E10kOracleSt { nQueues = nq } conf (E10k.InsertFDir cFdir) =
         [e10kDefaultQ, xq]
-        where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
+        where xq = E10k.cfdtQueue $ E10k.parseFDT (snd cFdir)
 
     --
     --confJump o = e10kQueueJump
@@ -270,26 +270,42 @@ e10kFlowConfChanges :: E10kOracleSt -> C.Configuration -> Flow
                     -> [E10k.ConfChange]
 e10kFlowConfChanges E10kOracleSt {nQueues = nq} cnf fl
     -- allocate 5-tuple filters first, if we can
-    | not rx5tFull  = [E10k.insert5tFromFl fl q | q <- allQs]
-    | not rxCfdFull = catMaybes $ [E10k.insertFdirFromFl fl q | q <- allQs]
+    | not rx5tFull  = [E10k.insert5tFromFl rx5tId fl q | q <- allQs]
+    | not rxCfdFull = catMaybes $ [E10k.insertFdirFromFl rxCfdId fl q | q <- allQs]
     | otherwise     = []
     where allQs = allQueues nq
           rx5tFull  = E10k.rx5tFilterTableFull cnf
+          rx5tId    = E10k.rx5tFilterTableLen cnf
           rxCfdFull = E10k.rxCfdFilterTableFull cnf
+          rxCfdId   = E10k.rxCfdFilterTableLen cnf
 
 
 -- TODO: see above
-e10kFlowConfChangesS :: E10kOracleSt -> C.Configuration -> Flow
-                    -> ([E10k.ConfChange], E10kOracleSt)
+e10kFlowConfChangesS :: E10kOracleSt
+                     -> [(E10k.ConfChange, Maybe Flow)]
+                     -> Flow
+                     -> ([E10k.ConfChange], E10kOracleSt)
 e10kFlowConfChangesS o@(E10kOracleSt {nQueues = nq, startQ = startQ}) cnf fl
+    | not $ null replaced = (replaced, o')
     -- allocate 5-tuple filters first, if we can
-    | not rx5tFull  = ([E10k.insert5tFromFl fl q | q <- allQs], o')
-    | not rxCfdFull = (catMaybes $ [E10k.insertFdirFromFl fl q | q <- allQs], o')
+    | not rx5tFull  = (alloc5t, o')
+    | not rxCfdFull = (allocCfd, o')
     | otherwise     = ([], o)
     where allQs = allQueues_ startQ nq
           o' =  o { startQ = (startQ + 1) `mod` nq}
-          rx5tFull  = E10k.rx5tFilterTableFull cnf
-          rxCfdFull = E10k.rxCfdFilterTableFull cnf
+          conf = C.foldConfChanges $ map fst cnf
+          rx5tFull  = E10k.rx5tFilterTableFull conf
+          rx5tId    = E10k.rx5tFilterTableLen conf
+          alloc5t   = [E10k.insert5tFromFl rx5tId fl q | q <- allQs]
+          rxCfdFull = E10k.rxCfdFilterTableFull conf
+          rxCfdId   = E10k.rxCfdFilterTableLen conf
+          allocCfd  = catMaybes $ [E10k.insertFdirFromFl rxCfdId fl q | q <- allQs]
+          mUnused   = L.find (isNothing . snd) cnf
+          replaced  = case mUnused of
+                        Nothing -> []
+                        Just (cc, mflow) ->
+                                   catMaybes $
+                                   [E10k.replaceCcFromFl cc fl q | q <- allQs]
 
 --e10kQueueJump :: [(E10k.ConfChange,Flow)] -- initial configuration
 --               -> ([(E10k.ConfChange,Flow)], [(E10k.ConfChange,Flow)]) -- keep, remove partition
@@ -330,29 +346,30 @@ instance OracleSt E10kOracleHardCoded E10k.ConfChange where
         -- the lookup should give a filter type and queue-no.
         -- return that.
             f = filter (\(f, q, fil) -> f == fl) $ tbl
-
+            fId = 0 -- TODO: FIXME (proper filter id)
             ans
               | length(f) > 1 = error ("ERROR: there must be repeat flow, as more than one flow matches.")
               | length(f) == 0 = []
-              | (myThird $ head f) == 1 = [E10k.InsertFDir $ fromJust $ E10k.mkFDirFromFl fl (mySnd $ head f)]
-              | (myThird $ head f) == 2 = [E10k.Insert5T   $ fromJust $ E10k.mkFDirFromFl fl (mySnd $ head f)]
+              | (myThird $ head f) == 1 = [E10k.InsertFDir $ (fId, fromJust $ E10k.mkFDirFromFl fl (mySnd $ head f))]
+              | (myThird $ head f) == 2 = [E10k.Insert5T   $ (fId, fromJust $ E10k.mkFDirFromFl fl (mySnd $ head f))]
               | otherwise = error ("ERROR: wrong type of flow")
 
-    flowConfChangesS = error "NYI!"
+    flowConfChangesS = error "E10kOracleHardCoded: NYI flowConfChangesS!"
 
 
 --    emptyConf _ = e10kCfgEmpty -- ^ Creates initial empty configuration
 --    showConf _  = e10kCfgStr -- ^ Converts conf to string
 
+    affectedQueues = error "E10kOracleHardCoded: NYI affectedQueues"
     -- QUESTION: Is it assumed that there will be only one operation in
     --      conf change?
     -- affectedQueues E10kOracleHardCoded { nnQueues = nq } _ _ = allQueues nq
-    affectedQueues E10kOracleHardCoded { nnHardcoded = nhw } conf (E10k.Insert5T c5t) =
-        [e10kDefaultQ, xq]
-        where xq = E10k.c5tQueue $ E10k.parse5t c5t
-    affectedQueues E10kOracleHardCoded { nnHardcoded = nhw } conf (E10k.InsertFDir cFdir) =
-        [e10kDefaultQ, xq]
-        where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
+    --affectedQueues E10kOracleHardCoded { nnHardcoded = nhw } conf (E10k.Insert5T c5t) =
+    --    [e10kDefaultQ, xq]
+    --    where xq = E10k.c5tQueue $ E10k.parse5t c5t
+    --affectedQueues E10kOracleHardCoded { nnHardcoded = nhw } conf (E10k.InsertFDir cFdir) =
+    --    [e10kDefaultQ, xq]
+    --    where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
 
 -- ###################################### SF Oracle ########################
 
@@ -377,7 +394,7 @@ instance OracleSt SFOracleSt SF.ConfChange where
      -  and counts on cost-function to help in selecting proper queue.
     -}
     flowConfChanges = sfFlowConfChanges
-    flowConfChangesS = sfFlowConfChangesS
+    flowConfChangesS = error "SFOracleSt: flowConfChangesS: NYI!"
 
     -- QUESTION: Is it assumed that there will be only one operation in
     --      conf change?
@@ -440,7 +457,7 @@ instance OracleSt SFOracleHardCoded SF.ConfChange where
               | (myThird $ head f) == 1 = [SF.Insert5T $ SF.mk5TupleFromFl fl (mySnd $ head f)]
               | otherwise = error ("ERROR: wrong type of flow")
 
-    flowConfChangesS = error "NYI!"
+    flowConfChangesS = error "SFOracleHardCoded: flowConfChangesS: NYI!"
 
     -- QUESTION: Is it assumed that there will be only one operation in
     --      conf change?
@@ -1382,15 +1399,15 @@ doIncSearchGreedyFlows :: forall s o cc. (C.ConfChange cc, OracleSt o cc)
                      -> IncrSearchSt s o cc
                      -> FL.FlowsSt
                      -> ST.ST s (IncrConf cc, IncrSearchSt s o cc)
-doIncSearchGreedyFlows ic st flowsSt = do
+doIncSearchGreedyFlows ic st flowsSt_ = do
     let params    = isParams st
         oracle    = isOracle params
         sortFn    = isOrderFlows params
 
+        flowsSt   = trN flowsSt_ ("==============> FLOWS ST:" ++ (ppShow flowsSt_))
         curFlows  = FL.fsCurrent flowsSt
         delFlows  = FL.fsRemoved flowsSt
         addFlows  = FL.fsAdded flowsSt
-        nextFlows = FL.fsCurrent $ FL.fsReset flowsSt
 
     -- search arguments
     (searchSt, searchFlows) <- case S.null delFlows of
@@ -1400,10 +1417,11 @@ doIncSearchGreedyFlows ic st flowsSt = do
                       return $ trN (st, flows) "NO DELETED FLOWS"
            -- removed, rebuild the whole flow map
            False -> do -- removed flows
-                       fm' <- FM.rebuildFlowMapSt (isFlowMapSt st) []
+                       --fm' <- FM.rebuildFlowMapSt (isFlowMapSt st) []
+                       fm' <- foldM FM.rmFlow (isFlowMapSt st) (S.toList delFlows)
                        let st' = st {isFlowMapSt = fm'}
-                           flows = sortFn $ S.toList nextFlows
-                       return $ tr (st', flows) "DELETED FLOWS"
+                           flows = sortFn $ S.toList addFlows
+                       return $ trN (st', flows) "DELETED FLOWS"
     -- search
     let msg = "Search flows:\n" ++ (FL.flowsStr searchFlows)
              ++ "\nState flows:\n"
@@ -1461,7 +1479,7 @@ incSearchGreedyFlows_ st addedCcs (flow:flows) = do
         conf = C.foldConfChanges $ FM.fmGetCCs fmSt
     -- get configuration changes for current state
     let (flowCCs_, oracle') = case True of
-               True -> flowConfChangesS oracle conf flow
+               True -> flowConfChangesS oracle (FM.fmGetConf fmSt) flow
                False -> (flowConfChanges oracle conf flow, oracle)
     let flowCCs = case flowCCs_ of
                 [] -> error "Run out of CCs"
@@ -1695,7 +1713,7 @@ test_incr_add = do
         bal = (balanceCost nq, id)
         sta = (staticCost' nq, id)
 
-        fns = sta
+        fns = pri
         params = initIncrSearchParams {  isOracle = e10kOracle
                                        , isPrgU   = prgU
                                        , isCostFn = fst fns
@@ -1804,8 +1822,6 @@ test_incr_pravin_testcase_mixed = do
     return ()
 
 
-
-
 test_incr_pravin_testcase = do
     putStrLn $ "Running incremental search usecase that is cause problem!"
     prgU <- e10kU_simple
@@ -1885,3 +1901,87 @@ test_incr_pravin_testcase = do
 --    let prg = FM.fmGraph fmSt2
 --    writeFile "tests/incr-search-prg-result.dot" $ toDot prg
 --    return ()
+
+
+data TestIncrSearch = TestIncrSearch {
+      tisHpPort   :: Int
+    , tisBePort   :: Int
+    , tisHpCount  :: Int
+    , tisBeCount  :: Int
+    , tisFlowsSt  :: FL.FlowsSt
+}
+
+initTestIncrSearch = TestIncrSearch {
+      tisHpPort   = 6000
+    , tisBePort   = 1000
+    , tisHpCount  = 0
+    , tisBeCount  = 0
+    , tisFlowsSt  = FL.flowsStInit }
+
+data TestIncrSearchOp = TisAddHpFlows Int
+                      | TisAddBeFlows Int
+                      | TisRemFlows [Int]
+    deriving (Show)
+
+tisOpFlowsSt :: TestIncrSearch -> TestIncrSearchOp
+             -> (TestIncrSearch, FL.FlowsSt)
+
+tisOpFlowsSt tis (TisAddHpFlows x) = (tis', flst')
+    where hpPort = tisHpPort tis
+          hpFs = take x $ hpFlows_ hpPort
+          flst' = foldl FL.fsAddFlow (tisFlowsSt tis) hpFs
+          tis' = tis { tisHpPort = hpPort + x,
+                       tisFlowsSt = flst'}
+
+tisOpFlowsSt tis (TisAddBeFlows x) = (tis', flst')
+    where bePort = tisBePort tis
+          beFs = take x $ beFlows_ bePort
+          flst' = foldl FL.fsAddFlow (tisFlowsSt tis) beFs
+          tis' = tis { tisBePort = bePort + x,
+                       tisFlowsSt = flst'}
+
+tisOpFlowsSt tis (TisRemFlows []) = (tis, tisFlowsSt tis)
+tisOpFlowsSt tis (TisRemFlows (x:xs)) = tisOpFlowsSt tis' (TisRemFlows xs)
+    where flst = tisFlowsSt tis
+          flows = S.toList $ FL.fsCurrent flst
+          flow = flows !! x
+          flst' = FL.fsRemFlow flst flow
+          tis' = tis { tisFlowsSt = flst' }
+
+sAddPr p str = L.unlines $ [ p ++ s | s <- L.lines str ]
+
+tisDoOp ss tis op = do
+    let (st', flst) = tisOpFlowsSt tis op
+        st'' = st' { tisFlowsSt = FL.fsReset (tisFlowsSt st') }
+    doTimeIt ("tisDoOp:" ++ (show op)) $ do
+        (conf, ic, ss') <- runIncrSearchIO ss flst
+        putStrLn $ "tisDoOP result:\n" ++ (sAddPr "| " $ ppShow conf)
+        return (ss', st'')
+
+
+test_incr_var = do
+    putStrLn $ "Running incremental search!"
+    prgU <- e10kU_simple
+    let nq = 10
+        hpPort   = 6000
+        bePort   = 1000
+        e10kOracle = initE10kOracle nq
+        pri = (priorityCost' nq, prioritySort')
+        bal = (balanceCost nq, id)
+        sta = (staticCost' nq, id)
+
+        fns = pri
+        params = initIncrSearchParams {  isOracle = e10kOracle
+                                       , isPrgU   = prgU
+                                       , isCostFn = fst fns
+                                       , isOrderFlows = snd fns}
+
+    ss0 <- initIncrSearchIO params
+    let tis0 = initTestIncrSearch
+
+    (ss1,tis1) <- tisDoOp ss0 tis0 $ TisAddHpFlows 10
+    (ss2,tis2) <- tisDoOp ss1 tis1 $ TisRemFlows [5]
+    (ss3,tis3) <- tisDoOp ss2 tis2 $ TisAddHpFlows 1
+    (ss4,tis4) <- tisDoOp ss3 tis3 $ TisRemFlows [2]
+
+    return ()

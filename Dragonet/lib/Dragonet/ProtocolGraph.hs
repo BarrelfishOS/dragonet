@@ -158,15 +158,11 @@ data ConfState = ConfState {
        csLastNid :: DGI.Node
      -- nodes/edges added
      , csNewNodes :: [PGNode]
-     -- nodes modified: node id, old label, new label
-     -- (should have the same structure)
-     , csModNodes :: [(DGI.Node, (Node, Node))]
 }
 
 initConfState maxNid = ConfState {
       csLastNid = maxNid
     , csNewNodes = []
-    , csModNodes = []
 }
 
 -- this is stupid, TODO: use foldM
@@ -174,7 +170,6 @@ csFold :: ConfState -> ConfState -> ConfState
 csFold cs1 cs2 = ConfState {
       csLastNid  = csLastNid cs2
     , csNewNodes = (csNewNodes cs2) ++ (csNewNodes cs1)
-    , csModNodes = (csModNodes cs2) ++ (csModNodes cs1)
 }
 
 -- next id and set of new nodes

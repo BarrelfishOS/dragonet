@@ -15,16 +15,16 @@ module Graphs.E10k (
     ConfChange(..),
     mk5TupleFromFl, mkFDirFromFl,
     insert5tFromFl, insertFdirFromFl,
+    replaceCcFromFl,
     ccQueue, ccIs5t,
 
     rx5tFilterTableFull,rxCfdFilterTableFull,
+    rx5tFilterTableLen, rxCfdFilterTableLen,
 
     cfgEmpty, cfgStr,
     graphH_, graphH,
     ftCount,
     fdirCount,
-
-
 ) where
 
 import qualified Dragonet.ProtocolGraph       as PG
@@ -82,11 +82,20 @@ rx5tFilterTableFull cnf = case L.lookup "RxC5TupleFilter" cnf of
     Nothing            -> False
     Just (PG.CVList l) -> length l >= rx5tFilterTableSize
 
+rx5tFilterTableLen cnf = case L.lookup "RxCC5tFilter" cnf of
+    Nothing -> 0
+    Just (PG.CVList l) -> length l
+
+
 rxCfdFilterTableFull :: C.Configuration -> Bool
 rxCfdFilterTableSize = fdirCount
 rxCfdFilterTableFull cnf = case L.lookup "RxCFDirFilter" cnf of
     Nothing            -> False
     Just (PG.CVList l) -> length l >= rxCfdFilterTableSize
+
+rxCfdFilterTableLen cnf = case L.lookup "RxCFDirFilter" cnf of
+    Nothing -> 0
+    Just (PG.CVList l) -> length l
 
 
 addCfgFun :: PG.Node -> C.ConfFunction
@@ -214,7 +223,20 @@ parse5tCFG :: C.ConfValue -> [C5Tuple]
 parse5tCFG (C.CVList l) = map parse5t l
 
 parse5t :: C.ConfValue -> C5Tuple
-parse5t (C.CVTuple
+parse5t cv = case parse5t_ cv of
+    Just x -> x
+    Nothing -> error $ "this 5 tuple format not not supported: "  ++ (show cv)
+
+-- parse a replace configuration variable
+parse5tReplace_ :: C.ConfValue -> Maybe (C5Tuple, C5Tuple)
+parse5tReplace_ (C.CVTuple [cnf1, cnf2]) =
+    case (parse5t_ cnf1, parse5t_ cnf2) of
+        (Just c5t1, Just c5t2) -> Just (c5t1, c5t2)
+        _ -> Nothing
+parse5tReplace_ _ = Nothing
+
+parse5t_ :: C.ConfValue -> Maybe C5Tuple
+parse5t_ (C.CVTuple
            [C.CVMaybe mSIP,
             C.CVMaybe mDIP,
             C.CVMaybe mProto,
@@ -222,7 +244,7 @@ parse5t (C.CVTuple
             C.CVMaybe mDPort,
             C.CVInt prio,
             C.CVInt queue]) =
-    C5Tuple {
+    Just $ C5Tuple {
         c5tPriority = fromIntegral $ prio,
         c5tQueue = fromIntegral $ queue,
         c5tL4Proto = convProto <$> mProto,
@@ -237,15 +259,15 @@ parse5t (C.CVTuple
         convProto (C.CVEnum 2) = C5TPL4SCTP
         convProto (C.CVEnum 3) = C5TPL4Other
         convInt (C.CVInt i) = fromIntegral i
-
-parse5t (C.CVTuple
+-- w/o priority
+parse5t_ (C.CVTuple
            [C.CVMaybe mSIP,
             C.CVMaybe mDIP,
             C.CVMaybe mProto,
             C.CVMaybe mSPort,
             C.CVMaybe mDPort,
             C.CVInt queue]) =
-    C5Tuple {
+    Just $ C5Tuple {
         c5tPriority = 1,
         c5tQueue = fromIntegral $ queue,
         c5tL4Proto = convProto <$> mProto,
@@ -260,9 +282,8 @@ parse5t (C.CVTuple
         convProto (C.CVEnum 2) = C5TPL4SCTP
         convProto (C.CVEnum 3) = C5TPL4Other
         convInt (C.CVInt i) = fromIntegral i
+parse5t_ _ = Nothing
 
-
-parse5t x = error ("this 5 tuple format not not supported: "  ++ (show x))
 {-|
  - Returns a PG.Node based on given 5Tuple configuration.
  -  - It creates a empty node with `c5tString c` as label and [true, false] as
@@ -419,7 +440,10 @@ doConfigFilter a b c d e@(_, cnode) (x:xs) f g = trN ret msg
 -- XXX: this does not consider 5-tuple priorities (The oracle does not generate
 -- 5t filters with priorities, so it's good for now)
 incrConfig5tuple :: C.ConfFunction
-incrConfig5tuple = doConfigFilterInc parse5t nodeL5Tuple c5tQueue
+incrConfig5tuple a b c d cfgV =
+    case parse5t_ cfgV of
+        Just _  -> doConfigFilterInc parse5t nodeL5Tuple c5tQueue a b c d cfgV
+        Nothing -> error "incrConfig5tuple: NYI!"
 
 -- fully configure a 5-tuple
 config5tuple :: C.ConfFunction
@@ -795,13 +819,26 @@ c5TuplePredF t5 = (PR.buildNOT bld) (c5TuplePredT t5)
    TODO: It should also include E10KInsertFdir, and RemoveFilter,
    Update filters, as we are introducing them
  -}
-data ConfChange = Insert5T PG.ConfValue
-                | InsertFDir PG.ConfValue
-                | InsertSYN PG.ConfValue
-    deriving (Eq, Ord, Show) -- Not exactly needed, but good to have
+type FilterId = Int -- we do not use it right now, but it might be helpful
+data ConfChange = Insert5T   (FilterId, PG.ConfValue)
+                | InsertFDir (FilterId, PG.ConfValue)
+                | InsertSYN  PG.ConfValue
+                | CcReplace  ConfChange PG.ConfValue
+    deriving (Eq, Ord, Show)
 
 addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
 addToCVL (PG.CVList l) v = PG.CVList $ v:l
+
+replaceCVL :: PG.ConfValue -> (PG.ConfValue,  PG.ConfValue) -> PG.ConfValue
+replaceCVL (PG.CVList l) (old,new) = PG.CVList $ doReplace l
+    where doReplace :: [PG.ConfValue] -> [PG.ConfValue]
+          doReplace (x:xs) = case x == old of
+                               True  -> new:xs
+                               False -> x:(doReplace xs)
+          doReplace [] = error $ "replaceCVL: value to replace not found!\n"
+                               ++ " list: " ++ (ppShow l) ++ "\n"
+                               ++ " old:  " ++ (ppShow old) ++ "\n"
+                               ++ " new: " ++ (ppShow new) ++ "\n"
 
 ccIs5t (Insert5T _) = True
 ccIs5t _  = False
@@ -820,18 +857,33 @@ instance C.ConfChange ConfChange where
     --applyConfChange :: C.Configuration -> E10kConfChange -> C.Configuration
     emptyConfig _ = cfgEmpty
     showConfig _ = cfgStr
-    applyConfChange conf (Insert5T c5t) = ("RxC5TupleFilter", new5t):rest
+
+    -- 5t filters
+    applyConfChange conf (Insert5T (_,c5t)) = ("RxC5TupleFilter", new5t):rest
         where new5t :: PG.ConfValue
               new5t = addToCVL old5t c5t
               old5t :: PG.ConfValue
               old5t = case L.lookup "RxC5TupleFilter" conf of
                         Just l -> l
-                        Nothing -> error "add5TupleToConf: Did not find RxC5TupleFilter"
+                        Nothing -> error "Insert5t: Did not find RxC5TupleFilter"
 
               rest :: C.Configuration
               rest  = L.filter ((/="RxC5TupleFilter") . fst) conf
 
-    applyConfChange conf (InsertFDir cFdir) = ("RxCFDirFilter", newFdir):rest
+    applyConfChange conf (CcReplace (Insert5T (_,c5t)) c5t') =
+       ("RxC5TupleFilter", new5t):rest
+        where new5t :: PG.ConfValue
+              new5t = replaceCVL old5t (c5t,c5t')
+              old5t :: PG.ConfValue
+              old5t = case L.lookup "RxC5TupleFilter" conf of
+                        Just l -> l
+                        Nothing -> error "Replace5t: Did not find RxC5TupleFilter"
+
+              rest :: C.Configuration
+              rest  = L.filter ((/="RxC5TupleFilter") . fst) conf
+
+    -- cf filters
+    applyConfChange conf (InsertFDir (_,cFdir)) = ("RxCFDirFilter", newFdir):rest
         where newFdir :: PG.ConfValue
               newFdir = addToCVL oldFdir cFdir
               oldFdir :: PG.ConfValue
@@ -842,6 +894,19 @@ instance C.ConfChange ConfChange where
               rest :: C.Configuration
               rest  = L.filter ((/="RxCFDirFilter") . fst) conf
 
+    applyConfChange conf (CcReplace (InsertFDir (_,cFdir)) cFdir') =
+       ("RxCFDirFilter", newFdir):rest
+        where newFdir :: PG.ConfValue
+              newFdir = replaceCVL oldFdir (cFdir, cFdir')
+              oldFdir :: PG.ConfValue
+              oldFdir = case L.lookup "RxCFDirFilter" conf of
+                        Just l -> l
+                        Nothing -> error "addFDirToConf: Did not find RxCFDirFilter"
+
+              rest :: C.Configuration
+              rest  = L.filter ((/="RxCFDirFilter") . fst) conf
+
+    -- SYN filter
     applyConfChange conf (InsertSYN cSyn) = ("RxCSynFilter", newSyn):rest
         where newSyn :: PG.ConfValue
               -- Overwriting old filter value with new one
@@ -854,26 +919,59 @@ instance C.ConfChange ConfChange where
               rest :: C.Configuration
               rest  = L.filter ((/="RxCSynFilter") . fst) conf
 
-    incrConf (Insert5T c5t)     = [("RxC5TupleFilter", c5t)]
-    incrConf (InsertFDir cFdir) = [("RxCFDirFilter", cFdir)]
+    -- incrmental configuration values: This is what gets passed to
+    -- nIncrConfFunction
+    incrConf (Insert5T c5t)     = [("RxC5TupleFilter", snd $ c5t)]
+    incrConf (InsertFDir cFdir) = [("RxCFDirFilter", snd $ cFdir)]
 
     -- ARGH :(
     show = Prelude.show
+
+    ccIsReplace (Insert5T (_,_))   = False
+    ccIsReplace (InsertFDir (_,_)) = False
+    ccIsReplace (InsertSYN _)      = False
+    ccIsReplace (CcReplace _ _)    = True
+
+    ccReplacedCc (CcReplace cc _)  = Just cc
+    ccReplacedCc _ = Nothing
+
+    ccReplaceNewCc (CcReplace (Insert5T (fid,oldval)) newval)   = Insert5T (fid,newval)
+    ccReplaceNewCc (CcReplace (InsertFDir (fid,oldval)) newval) = InsertFDir (fid,newval)
+    ccReplaceNewCc _ = error "ccReplaceNewCc undefined"
+
+    ccReplace (CcReplace (Insert5T (_,oldCnf)) newCnf) nodes = case nodes of
+        [(nid,oldLbl)] -> case parse5t_ newCnf of
+                            Nothing  -> error $ "E10k: ccReplace: Insert5T: cannot parse:"++ (ppShow oldCnf)
+                            Just c5t -> [Just $ nodeL5Tuple c5t]
+        otherwise -> error $ "E10k: ccReplace: c5t: expecting single node, got:" ++ (ppShow nodes)
+
+    ccReplace (CcReplace (InsertFDir (_,oldCnf)) newCnf) nodes = case nodes of
+        [(nid,oldLbl)] -> [ Just $ nodeLFDir $ parseFDT newCnf ]
+        otherwise -> error $ "E10k: ccReplace: fdir: expecting single node, got:" ++ (ppShow nodes)
+
 
 cvMInt :: Integral a => Maybe a -> PG.ConfValue
 cvMInt mi =  PG.CVMaybe $ (PG.CVInt . fromIntegral) <$> mi
 
 ccQueue :: ConfChange -> QueueId
-ccQueue (Insert5T c5t) = case c5t of
+ccQueue (Insert5T (_,c5t)) = case c5t of
                              PG.CVTuple (_:_:_:_:_:_:(PG.CVInt qid):[]) -> (fromIntegral qid)
                              _ -> error $ "ccQeuue: could not match c5t=" ++ (ppShow c5t)
-ccQueue (InsertFDir cFdir) = case cFdir of
+ccQueue (InsertFDir (_,cFdir)) = case cFdir of
                              PG.CVTuple (_:_:_:_:_:(PG.CVInt qid):[]) -> (fromIntegral qid)
                              _ -> error "ccQeuue: cfdir"
 --ccQueue (InsertSYN cSyn)
 
-insert5tFromFl :: Flow -> QueueId -> ConfChange
-insert5tFromFl fl qid = Insert5T $ mk5TupleFromFl fl qid
+insert5tFromFl :: Int -> Flow -> QueueId -> ConfChange
+insert5tFromFl fid fl qid = Insert5T (fid, (mk5TupleFromFl fl qid))
+
+replaceCcFromFl :: ConfChange -> Flow -> QueueId -> Maybe ConfChange
+replaceCcFromFl cc@(Insert5T (_,_)) fl qid = Just $ CcReplace cc c5t'
+    where c5t' = mk5TupleFromFl fl qid
+replaceCcFromFl cc@(InsertFDir (_,_)) fl qid =
+    case mkFDirFromFl fl qid of
+        Nothing ->  Nothing
+        Just cfdir'  -> Just $ CcReplace cc cfdir'
 
 mk5TupleFromFl :: Flow -> QueueId -> PG.ConfValue
 mk5TupleFromFl fl@(FlowUDPv4 {}) q =
@@ -891,8 +989,12 @@ mk5TupleFromFl fl@(FlowUDPv4 {}) q =
        dP   = flDstPort fl
        prio = 1
 
-insertFdirFromFl :: Flow -> QueueId -> Maybe ConfChange
-insertFdirFromFl fl qid = InsertFDir <$> mkFDirFromFl fl qid
+insertFdirFromFl :: Int -> Flow -> QueueId -> Maybe ConfChange
+insertFdirFromFl fid fl qid =
+    case mkFDirFromFl fl qid of
+        Nothing -> Nothing
+        Just  x -> Just $ InsertFDir (fid, x)
+
 
 -- TODO: we might want to use CVInt instead of CVMaybe for {src,dst}/{ip,port}
 -- for these filters since they do not support wildcards

@@ -13,7 +13,6 @@ module Dragonet.Configuration(
     cvEnumName,
 
     applyConfig,
-    applyConfigInc,
 
     confMNewNode,
     replaceConfFunctions,
@@ -21,6 +20,7 @@ module Dragonet.Configuration(
     replaceIncrConf,
 
     icPartiallyConfigure,
+    icReplace,
 ) where
 
 import qualified Dragonet.ProtocolGraph as PG
@@ -33,13 +33,16 @@ import Data.Maybe
 import Debug.Trace (trace)
 import Text.Show.Pretty (ppShow)
 
+tr a b  = trace b a
+trN a b = a
+
 type Configuration = [(String,PG.ConfValue)]
 
 {-|
   A class 'ConfChange' provides functionality to apply a changeset of generic
   type 'a' to given configuration and return new configuration.
  -}
-class ConfChange a where
+class (Ord a, Show a) => ConfChange a where
     applyConfChange :: Configuration -> a -> Configuration
     --
     -- NB: code below seems too OO, but not sure how to do it better. These are
@@ -51,15 +54,34 @@ class ConfChange a where
     -- preety printer
     showConfig  :: a -> Configuration -> String
 
+    -- There has to be a better way...
+    -- It seems there is... (see above)
+    show :: a -> String
+
+    -- Incremental configuration
     -- This can be fed into applyConfigInc
     incrConf :: a -> Configuration
 
-    -- There has to be a better way...
-    show :: a -> String
+    -- replace (we might want a second class for that)
+    ccIsReplace :: a -> Bool
+    ccIsReplace _ = False
+    -- this is a replace configuration change: it replaces the nodes created
+    -- from a previous configuration change
+    ccReplace :: a -> [(DGI.Node,PG.Node)] -> [Maybe PG.Node]
+    ccReplace _ _ = []
+    --
+    ccReplacedCc :: a -> Maybe a
+    ccReplacedCc _ = Nothing
+    --
+    ccReplaceNewCc :: a -> a
+    ccReplaceNewCc  = error "ccReplaceNewCc: default method"
+
 
 foldConfChanges :: forall a. (ConfChange a) => [a] -> Configuration
-foldConfChanges changes = foldl applyConfChange cnf0 changes
+foldConfChanges changes = trN ret ("foldConfChanges:" ++ ppShow changes)
     where cnf0 = emptyConfig (undefined::a)
+          -- NB: reverse is to deal with replace ccs
+          ret = foldl applyConfChange cnf0 (L.reverse changes)
 
 -- Get enumerator name from conf value and its type
 cvEnumName :: PG.ConfType -> PG.ConfValue -> String
@@ -78,24 +100,16 @@ confMNewNode n = do
 
 -- Add edges and nodes from configuration function to graph
 confMRun :: PG.PGraph -> PG.ConfMonad [PG.PGEdge] -> (PG.PGraph, PG.ConfState)
-confMRun g m = (addEdges $ modifyNodes $ addNodes g, endSt)
+confMRun g m = (addEdges $ addNodes g, endSt)
     where
         (_,maxId) = DGI.nodeRange g
         startSt = PG.initConfState maxId
 
         (newEdges,endSt) = ST.runState m startSt
         newNodes = PG.csNewNodes endSt
-        modNodes = PG.csModNodes endSt
 
         -- Add new nodes to graph
         addNodes g' = foldl (flip DGI.insNode) g' newNodes
-        -- modify nodes
-        modifyNodes g' = DGI.gmap mapF g'
-            where mapF ctx@(a1,nid,nlbl,a2) =
-                        case L.lookup nid modNodes of
-                          Nothing -> ctx
-                          -- TODO: verify that oldL == nlbl
-                          Just (oldL, newL) -> (a1,nid,newL,a2)
         -- Add new edges
         addEdges g' = foldl (flip DGI.insEdge) g' newEdges
 
@@ -230,10 +244,38 @@ type CGraph = PG.PGraph -- configured graph
 -- partialy configuration:
 --  we return the new un-configured graph and the new node frontier
 icPartiallyConfigure :: (ConfChange cc) => UGraph -> cc -> (UGraph, PG.ConfState)
-icPartiallyConfigure g cc = applyConfigInc (incrConf cc) g
+icPartiallyConfigure g cc = case ccIsReplace cc of
+                            False -> applyConfigInc (incrConf cc) g
+                            True  -> error "Call icReplace"
 
--- input
--- icRemoveCC :: (ConfChange cc) => UGraph -> cc -> [DGI.Node] -> Maybe [DGI.Node]
-
---applyCNodeInc :: (ConfChange cc) =>
--- similar to applyCnode and doApplyCnode for non-incremental configuration
+-- NOTES:
+--  We might want to have a mecnahism to disable the "removed" (to be replaced)
+--  filters. This ensures that packets of flows not considered are going to be
+--  delivered as expected (e.g., in queue 0). FlowMap should be able to deal
+--  with this incrementally.
+--
+--  Taking this to extreme, we can unfold the *whole* graph and have each node
+--  "disabled" and perform incremental operations there. Obviously, there is a
+--  tradeoff there in terms of size of the graph -- and what part of it is
+--  actually used.
+icReplace :: (ConfChange cc)
+          => UGraph -> (cc, [(DGI.Node,PG.Node)])
+          -> (UGraph, [(DGI.Node,(PG.Node,PG.Node))], [(DGI.Node, PG.Node)])
+icReplace g (cc,nodes) = (g', modNodes, newNodes)
+    where replacements :: [Maybe PG.Node]
+          replacements = ccReplace cc nodes
+          newNodes = [ case mlbl' of
+                         Nothing    -> (nid, nlbl)
+                         Just nlbl' -> (nid, nlbl')
+                       | ((nid,nlbl), mlbl') <- zip nodes replacements]
+          modNodes = catMaybes $
+                     [ case mlbl' of
+                         Nothing   -> Nothing
+                         Just nlbl' -> Just (nid,(nlbl,nlbl'))
+                       | ((nid,nlbl), mlbl') <- zip nodes replacements]
+          g' = DGI.gmap mapF g
+          mapF ctx@(a1,nid,nlbl,a2) =
+                case L.lookup nid modNodes of
+                        Nothing -> ctx
+                        -- TODO: verify that oldL == nlbl
+                        Just (oldL, newL) -> (a1,nid,newL,a2)

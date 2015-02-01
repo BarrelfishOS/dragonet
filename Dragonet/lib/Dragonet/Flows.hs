@@ -61,14 +61,26 @@ fsAddFlow st fl = st { fsRemoved = removed'
           added     = fsAdded   st
           current   = fsCurrent st
           flRemoved = S.member fl removed
-          added'    = S.insert fl added
+          added'    = case flRemoved of
+                True  -> added
+                False -> S.insert fl added
           removed'  = case flRemoved of
                 True  -> S.delete fl removed
                 False -> removed
 
 -- remove a flow
 fsRemFlow :: FlowsSt -> Flow -> FlowsSt
-fsRemFlow = error "fsRemFlow: NYI!"
+fsRemFlow st fl = st { fsRemoved = removed'
+                     , fsAdded = added'}
+    where removed  = fsRemoved st
+          added    = fsAdded   st
+          flAdded  = S.member fl added
+          added' = case flAdded of
+                True  -> S.delete fl added
+                False -> added
+          removed' = case flAdded of
+                True  -> removed
+                False -> S.insert fl removed
 
 -- reset the state
 fsReset :: FlowsSt -> FlowsSt
