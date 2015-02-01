@@ -545,8 +545,8 @@ def forPoster():
 def plot_boxplot_gen(fids, pid, metric, config, y_log_scale = None):
 
     outputFileList = [
-            #( plot_save_location + pid + "-%s-%s.png" % (app,metric)),
-            ( plot_save_location + pid + "-%s.pdf" % (metric)),
+            ( plot_save_location + pid + "-%s.png" % (metric)),
+            #( plot_save_location + pid + "-%s.pdf" % (metric)),
         ]
 
     print "DOING: " + pid
@@ -643,6 +643,7 @@ def plot_boxplot_gen(fids, pid, metric, config, y_log_scale = None):
         u =""
     ylabel = metric_expl.get(metric,metric) + u
     ax2.set_ylabel(ylabel, fontsize=11)
+    ax2.set_ylim(ymin=0)
 
     plt.grid()
 
@@ -771,14 +772,54 @@ def mixedWorkload():
 
     nic = "Intel"
     pktsize = 1024
+    concurrency = 16
+
+    clients = 20
+    baseDir="./data/output_debugging_online_20Clients_10Q_5Cores/"
+    baseDiroffline="./data/output_debugging_online_20Clients_10Q_5Cores_v2/"
+
+    clients = 20
+    baseDir="./data/output_debugging_online_automated_v7/"  # 5queue
+
+    clients = 40
+    baseDir="./data/output_debugging_online_40Clients_10Q/" # 10queue
+
+    clients = 20
+    concurrency = 32
+    baseDir="./data/output_debugging_online_20Clients_32F_10Q_s/"
+    myprefix="20Clients_32F_10Q_s_"
+
+    clients = 40
+    concurrency = 16
+    baseDir="./data/output_debugging_online_40Clients_16F_10Q_allLong/"
+    myprefix="allLong_40Clients_16F_10Q"
+
+    clients = 20
+    concurrency = 32
+    baseDir="./data/output_debugging_online_20Clients_32F_10Q_4P_t1/"
+    myprefix="4PQ_20Clients_32F_10Q"
+
     clients = 20
     concurrency = 16
+    baseDir="./data/output_debugging_online_20Clients_16F_10Q_4P_t1_s/"
+
+    clients = 20
+    concurrency = 16
+    caseName="20Clients_16F_10Q_4P"
+    baseDir="./data/allResults/%s/" % (caseName)
+
+    workloadType="MixedRun"
+    workloadType="TOGETHER"
+    workloadType="MixedRunStatic"
+    workloadType="MixedRunDynamic"
+
+    myprefix="%s_%s_" % (workloadType, caseName)
 
     confsToPlot = {
         "stable" : {
             'title': "stable",
             'flist': get_files(
-                    resultDir =  "./data/output_debugging_online_automated_v2/MixedRun/LONG/",
+                    resultDir =  ("%s/%s/LONG/" % (baseDir, workloadType)),
                     workload = "",
                     testType = "memcached_rr",
                     concurrency = concurrency,
@@ -793,7 +834,7 @@ def mixedWorkload():
         "dynamicHP" : {
             'title': "DynamicHP",
             'flist': get_files(
-                    resultDir =  "./data/output_debugging_online_automated_v2/MixedRun/SHORTHP/",
+                    resultDir =  ("%s/%s/SHORTHP/" % (baseDir, workloadType)),
                     workload = "",
                     testType = "memcached_rr",
                     concurrency = concurrency,
@@ -805,10 +846,12 @@ def mixedWorkload():
             'highPrio' : None,
            },
 
+
+
         "dynamicLP" : {
             'title': "DynamicLP",
             'flist': get_files(
-                    resultDir =  "./data/output_debugging_online_automated_v2/MixedRun/SHORTLP/",
+                    resultDir =  ("%s/%s/SHORTLP/" % (baseDir, workloadType)),
                     workload = "",
                     testType = "memcached_rr",
                     concurrency = concurrency,
@@ -823,19 +866,18 @@ def mixedWorkload():
     }
 
 
-
-
-
     def plot_memcached(pprefix, metric, config):
         #fids = sorted(config.keys())
         #fids = ["linux", "onload", "dnet-pr", "dnet-pronly", "dnet-bal" ]
+        #fids = ["stable", "dynamicHP", "dynamicHPoffline", "dynamicLPoffline", "dynamicLP"]
         fids = ["stable", "dynamicHP", "dynamicLP"]
 
         plot_boxplot_gen(fids, pprefix, metric, config, y_log_scale=False)
 
     for metric in ("TPS", "Total_Avg"):
         plot_memcached(
-            ("memcached-%s-pkt-%d-cl-%d-load-%d" % (nic, pktsize, clients, concurrency)),
+            ("%s-memcached-%s-pkt-%d-cl-%d-load-%d" % (myprefix, nic, pktsize,
+                    clients, concurrency)),
                 metric, confsToPlot)
 
     print "done with everything"
@@ -850,6 +892,6 @@ if __name__ == "__main__":
     #plot_save_location = "./memcachedLoadPlotsLinux/"
     #linuxNumbers()
     #memcachedPriorityResultsPaper()
-    plot_save_location = "./memcachedLoadPlotsOnline/"
+    plot_save_location = "./memcachedLoadPlots_dumping_ground/"
     mixedWorkload()
 
