@@ -287,7 +287,11 @@ e10kFlowConfChangesS :: E10kOracleSt
                      -> Flow
                      -> ([E10k.ConfChange], E10kOracleSt)
 e10kFlowConfChangesS o@(E10kOracleSt {nQueues = nq, startQ = startQ}) cnf fl
-    | not $ null replaced = (replaced, o')
+    | not $ null replaced = trN (replaced, o') $ "ALLOCATED REPLACED FILTER:"
+                                               ++ (E10k.ccString $ head replaced)
+                                               ++ "\n"
+                                               ++ "ALL:\n"
+                                               ++ sAddPr " :" (L.intercalate "\n" $ map (E10k.ccString . fst) unusedFs)
     -- allocate 5-tuple filters first, if we can
     | not rx5tFull  = (alloc5t, o')
     | not rxCfdFull = (allocCfd, o')
@@ -301,12 +305,17 @@ e10kFlowConfChangesS o@(E10kOracleSt {nQueues = nq, startQ = startQ}) cnf fl
           rxCfdFull = E10k.rxCfdFilterTableFull conf
           rxCfdId   = E10k.rxCfdFilterTableLen conf
           allocCfd  = catMaybes $ [E10k.insertFdirFromFl rxCfdId fl q | q <- allQs]
+
+          unusedFs  = filter (isNothing . snd) cnf
+          mMatching = L.find (E10k.flowMatchesCc fl . fst) unusedFs
           mUnused   = L.find (isNothing . snd) cnf
-          replaced  = case mUnused of
-                        Nothing -> []
-                        Just (cc, mflow) ->
-                                   catMaybes $
-                                   [E10k.replaceCcFromFl cc fl q | q <- allQs]
+          replaced  = case mMatching of
+                        Just (cc, mflow) -> replacements cc
+                        Nothing -> case mUnused of
+                                    Nothing -> []
+                                    Just (cc, mflow) -> replacements cc
+          replacements cc = catMaybes
+                          $ [E10k.replaceCcFromFl cc fl q | q <- allQs]
 
 --e10kQueueJump :: [(E10k.ConfChange,Flow)] -- initial configuration
 --               -> ([(E10k.ConfChange,Flow)], [(E10k.ConfChange,Flow)]) -- keep, remove partition
@@ -1427,14 +1436,14 @@ doIncSearchGreedyFlows ic st flowsSt_ = do
     let msg = "Search flows:\n" ++ (FL.flowsStr searchFlows)
              ++ "\nState flows:\n"
              ++ (FL.flowsStr $ catMaybes $ map snd $ FM.fmCnfState $ isFlowMapSt searchSt)
-    (st', cost', newCCs') <- case searchFlows of
-                     [] -> return (searchSt, CostOK, [])
-                     _  -> incSearchGreedyFlows_ searchSt [] (trN searchFlows msg)
+    (st', cost') <- case searchFlows of
+                     [] -> return (searchSt, CostOK)
+                     _  -> incSearchGreedyFlows_ searchSt (trN searchFlows msg)
 
     qmap' <- incrSearchQmap st'
     case costAcceptable $ trN cost' ("SEARCH: " ++ (show cost')
                                   ++ " QMAP:" ++ (qmapStr qmap')) of
-        True  -> let ic' = ic { icAddCCs = (icAddCCs ic) ++ newCCs'}
+        True  -> let ic' = error "incremental configuration: NYI!"
                  in return (ic', st')
         False -> do
             -- confJump
@@ -1444,9 +1453,13 @@ doIncSearchGreedyFlows ic st flowsSt_ = do
                                                isJust mcc]
                 (keep, discard) = confJump oracle confS
                 (rmCcs, rmFlows_) = unzip discard
-                rmFlows = tr rmFlows_ $ "JUMP: Removed flows:\n"
+                rmFlows = tr rmFlows_ $ "JUMP"
+                                      ++ "\nRemoved flows:\n"
                                       ++ (FL.flowsStr $ catMaybes rmFlows_)
-            fm' <- FM.rebuildFlowMapSt fm keep
+            --fm' <- FM.rebuildFlowMapSt fm keep
+            fm'_ <- foldM FM.rmFlow fm $ catMaybes rmFlows
+            let fm' = trN fm'_ $ " AFTER JUMP CnfSt: \n" ++ (sAddPr " >" $ ppShow $ FM.fmCnfState fm'_) ++ "\n"
+                              ++ "BEFORE JUMP CnfSt:\n" ++ (sAddPr " >" $ ppShow $ FM.fmCnfState fm)
             let st'_ = st { isFlowMapSt = fm' }
                 -- new flows state
                 flowsSt' = FL.FlowsSt {
@@ -1467,11 +1480,10 @@ doIncSearchGreedyFlows ic st flowsSt_ = do
 --  . accumulated configuration changes
 incSearchGreedyFlows_ :: (OracleSt o cc)
                       => IncrSearchSt s o cc
-                      -> [cc]         -- added configuration changes
                       -> [Flow]       -- remaining flows to examine
-                      -> ST.ST s (IncrSearchSt s o cc, Cost, [cc])
+                      -> ST.ST s (IncrSearchSt s o cc, Cost)
 -- process a single flow
-incSearchGreedyFlows_ st addedCcs (flow:flows) = do
+incSearchGreedyFlows_ st (flow:flows) = do
     -- get basic information from current state
     let params = isParams st
         oracle = isOracle params
@@ -1484,25 +1496,24 @@ incSearchGreedyFlows_ st addedCcs (flow:flows) = do
                False -> (flowConfChanges oracle conf flow, oracle)
     let flowCCs = case flowCCs_ of
                 [] -> error "Run out of CCs"
-                ccs -> ccs
+                ccs -> trN ccs $ "flowCCs:" ++ (ppShow ccs)
     -- compute new costs and minimum cost, and update state
     (lowerCost, bestFmSt) <- incSearchMinCost costFn fmSt flow flowCCs
     let msg = "--\nLOWER COST:" ++ (show lowerCost)
               ++ " Flows in state:" ++ (show $ length $ FM.fmCnfState fmSt)
               ++ " Flow examined:" ++ (flowStr flow)
               ++ " Remaining flows:" ++ (show $ length flows)
-              ++ "\n--\n"
+              -- ++ " resulting FM: \n" ++ (FM.strFlowMap bestFmSt)
+              -- ++ " resulting CnfSt: \n" ++ (sAddPr " >" $ ppShow $ FM.fmCnfState bestFmSt)
+              -- ++ " original  CnfSt: \n" ++ (sAddPr " >" $ ppShow $ FM.fmCnfState fmSt)
+              ++ "\n--"
         params' = params { isOracle = oracle' }
         st' = st {isFlowMapSt = trN bestFmSt msg, isParams = params'}
-        -- this is fragile: we know that the newly added cc is in the top of the
-        -- list (see incrConfigure)
-        addedCc = head $ FM.fmGetCCs $ isFlowMapSt st'
-        addedCcs' = addedCcs ++ [addedCc]
     -- recurse
     case flows of
         -- no more flows: we are done
-        [] -> return (st', lowerCost, addedCcs')
-        _  -> incSearchGreedyFlows_ st' addedCcs' flows
+        [] -> return (st', lowerCost)
+        _  -> incSearchGreedyFlows_ st' flows
 
 -- M.foldM :: Monad m => (a -> b -> m a) -> a -> [b] -> m a
 stopFoldM :: Monad m => (a -> b -> m a)
@@ -1721,6 +1732,7 @@ test_incr_add = do
                                        , isOrderFlows = snd fns}
 
     ss0 <- initIncrSearchIO params
+    qmap <- ST.stToIO $ incrSearchQmap ss0
 
     let initHpNr = 64
         initBeNr = 0
@@ -1954,10 +1966,16 @@ sAddPr p str = L.unlines $ [ p ++ s | s <- L.lines str ]
 tisDoOp ss tis op = do
     let (st', flst) = tisOpFlowsSt tis op
         st'' = st' { tisFlowsSt = FL.fsReset (tisFlowsSt st') }
-    doTimeIt ("tisDoOp:" ++ (show op)) $ do
+
+    (newSS, newSt, newConf) <- doTimeIt ("tisDoOp:" ++ (show op)) $ do
         (conf, ic, ss') <- runIncrSearchIO ss flst
-        putStrLn $ "tisDoOP result:\n" ++ (sAddPr "| " $ ppShow conf)
-        return (ss', st'')
+        return (ss', st'', conf)
+
+    --putStrLn $ "tisDoOP result:\n" ++ (sAddPr "| " $ ppShow newConf)
+    qmap <- ST.stToIO $ incrSearchQmap newSS
+    putStrLn $ qmapStr qmap
+
+    return (newSS, newSt)
 
 
 test_incr_var = do
@@ -1980,9 +1998,9 @@ test_incr_var = do
     ss0 <- initIncrSearchIO params
     let tis0 = initTestIncrSearch
 
-    (ss1,tis1) <- tisDoOp ss0 tis0 $ TisAddHpFlows 10
-    (ss2,tis2) <- tisDoOp ss1 tis1 $ TisRemFlows [5]
-    (ss3,tis3) <- tisDoOp ss2 tis2 $ TisAddHpFlows 1
-    (ss4,tis4) <- tisDoOp ss3 tis3 $ TisRemFlows [2]
+    (ss1,tis1) <- tisDoOp ss0 tis0 $ TisAddBeFlows 18
+    (ss2,tis2) <- tisDoOp ss1 tis1 $ TisAddHpFlows 1
+    --(ss3,tis3) <- tisDoOp ss2 tis2 $ TisAddHpFlows 10
+    --(ss4,tis4) <- tisDoOp ss3 tis3 $ TisRemFlows [0]
 
     return ()

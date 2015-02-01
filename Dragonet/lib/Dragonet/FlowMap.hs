@@ -8,7 +8,7 @@ module Dragonet.FlowMap (
     incrConfigure,
     rebuildFlowMapSt,
     fmGetCCs, fmGetConf,
-    strFM,
+    strFM,strFlowMap
 ) where
 
 import qualified Dragonet.ProtocolGraph       as PG
@@ -74,6 +74,12 @@ data FlowMapSt s cc = (C.ConfChange cc) => FlowMapSt {
     -- , fmQmapNewCc   :: [cc]
     -- , fmQmapNewFls  :: [Flow]
 }
+
+fmCnfStateStr_ :: (C.ConfChange cc) => (Maybe cc, Maybe Flow) -> String
+fmCnfStateStr_ (Just cc, Nothing) = "(" ++ (C.ccShow cc) ++ " [NO FLOW])"
+fmCnfStateStr_ (Just cc, Just fl) = "(" ++ (C.ccShow cc) ++ " [" ++ flowStr fl ++ "])"
+fmCnfStateStr_ (Nothing, Nothing) = "([NO CONF]" ++ " [NO FLOW])"
+fmCnfStateStr_ (Nothing, Just fl) = "([NO CONF]" ++ " [" ++ flowStr fl ++ "])"
 
 -- convention: some nodes (typically sink nodes) do not have ports, so we add
 -- them to the flowMap using sinkPort
@@ -334,7 +340,7 @@ cnfStRemoveFlow :: forall s cc. (C.ConfChange cc)
                 => Flow -> [(Maybe cc, Maybe Flow)]
                 -> [(Maybe cc, Maybe Flow)]
 cnfStRemoveFlow fl [] = error "cnfStRemoveFlow: flow not found"
-cnfStRemoveFlow fl ((_,Nothing):xs) = cnfStRemoveFlow fl xs
+cnfStRemoveFlow fl (x@(cc,Nothing):xs) = x:cnfStRemoveFlow fl xs
 cnfStRemoveFlow fl (x@(mcc, Just xfl):xs) =
     case fl == xfl of
        True  ->  (mcc, Nothing):xs
@@ -373,6 +379,19 @@ qmapStr_ (f,q) = (flowStr f) ++ "-> Q" ++ (show q)
 qmapStr :: [(Flow,QueueId)] -> String
 qmapStr flows = "QMAP:\n"
               ++ L.intercalate "\n" [ "  " ++ qmapStr_ f | f <- flows ]
+
+sAddPr p str = L.unlines $ [ p ++ s | s <- L.lines str ]
+
+strFlowMap :: forall s cc. C.ConfChange cc => FlowMapSt s cc -> String
+strFlowMap st = unlines strs
+    where g = fmGraph st
+          strs = [ n ++ ":" ++ (getM nid)
+                        | (nid,nlbl) <- DGI.labNodes g,
+                        let n = PG.nLabel nlbl,
+                        not $ isTxNode_ nlbl]
+          getM nid = case M.lookup nid (fmFlowMap st) of
+                  Nothing -> " Empty!"
+                  Just x  -> "\n" ++ (sAddPr "\t" $ ppShow x)
 
 strFM :: forall s cc. C.ConfChange cc => FlowMapSt s cc -> ST.ST s String
 strFM st =  return $
@@ -422,32 +441,51 @@ doIncrReplace :: (C.ConfChange cc)
 doIncrReplace st (ccNew, mflowNew) = do
     let g  = fmGraph st
         fm = fmFlowMap st
+        fc    = fmFlowCache st
+        entry = fmRxEntryNid st
+        cnfs  = fmCnfState st
         -- get cc to replace
         ccOld = case C.ccReplacedCc ccNew of
              Nothing -> error "doIncrReplace: ccReplacedNode returned Nothing"
              Just cc -> cc
         -- get nodes created from old cc
         nodes = case M.lookup ccOld (fmCCNodesMap st) of
-             Nothing -> error "doIncrReplace: did not find old nodes"
+             Nothing -> error $ "doIncrReplace: did not find old nodes"
+                              ++ " for ccOld=" ++ (ppShow ccOld)
              Just ns -> filter (not . PGU.isCnode_ . snd) ns
         -- replace cc in the graph
         (g', replacedNodes, newNodes) = C.icReplace g (ccNew, nodes)
         -- propage potential changes in flow map
         fm' = L.foldl fmUpdateNodeReplace fm replacedNodes
-        cnfs' = replaceCnfState (fmCnfState st)
+        cnfs'_ = replaceCnfState cnfs
+        cnfs' = trN cnfs'_ $  ("ccOld= " ++ (C.ccShow ccOld)) ++ "\n"
+                          ++ "OLD CONFIGURATION STATE:\n"
+                          ++ (unlines $ map fmCnfStateStr_ cnfs)
+                          ++ "NEW CONFIGURATION STATE:\n"
+                          ++ (unlines $ map fmCnfStateStr_ cnfs'_)
+
 
         replaceCnfState (x:xs) = case x of
-            (Just ccOld, Nothing) -> (Just (C.ccReplaceNewCc ccNew), mflowNew):xs
+            (Just cc', Nothing) ->
+                case cc' == ccOld of
+                  True  -> (Just (C.ccReplaceNewCc ccNew), mflowNew):xs
+                  False -> x:(replaceCnfState xs)
             otherwise ->             x:(replaceCnfState xs)
         replaceCnfState [] = error "doIncrReplace: did not find oldCc in conf state"
 
-    return $ st { fmFlowMap = fm'
+    -- update flowmap with new flow
+    fm'' <- case mflowNew of
+            Just flow -> flowMapAddFlow fc fm' g' entry flow
+            Nothing -> return fm'
+
+    return $ st { fmFlowMap = fm''
                 , fmGraph = g'
                 , fmCnfState = cnfs'
                 , fmCCNodesMap =   M.insert ccNew newNodes
                                  $ M.delete ccOld
-                                 $ (fmCCNodesMap st)}
+                                 $ fmCCNodesMap st}
 
+-- update the flow map based on replaced nodes
 fmUpdateNodeReplace :: FlowMap -> (DGI.Node, (PG.Node, PG.Node)) -> FlowMap
 fmUpdateNodeReplace fm x@(nid,(oldL,newL)) = ret
     where ret = case M.lookup nid fm of
@@ -481,7 +519,12 @@ fmUpdateNodeReplace_ fm fmVal x@(nid,(oldL,newL)) = fm'
                   fm'
                      | flsOld == flsNew = fm
                      | otherwise = xfm
-                        where xfm = error "fmUpdateNodeReplace_: NYI!"
+                        where xfm = error $ "fmUpdateNodeReplace_: NYI!\n"
+                                          ++  " old Node: " ++ (PG.nLabel oldL) ++ "\n"
+                                          ++  " new Node: " ++ (PG.nLabel newL) ++ "\n"
+                                          ++  " Port: " ++ p ++ "\n"
+                                          ++  " new flows: " ++ (ppShow flsNew) ++ "\n"
+                                          ++  " old flows: " ++ (ppShow flsOld)
                               toRemoveFls = S.toList $ flsOld `S.difference` flsNew
                               toAddFls    = S.toList $ flsNew `S.difference` flsOld
                               -- TODO: add new flows to fm and propage

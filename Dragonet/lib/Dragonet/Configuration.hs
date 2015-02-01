@@ -76,6 +76,9 @@ class (Ord a, Show a) => ConfChange a where
     ccReplaceNewCc :: a -> a
     ccReplaceNewCc  = error "ccReplaceNewCc: default method"
 
+    ccShow :: a -> String
+    ccShow = Prelude.show
+
 
 foldConfChanges :: forall a. (ConfChange a) => [a] -> Configuration
 foldConfChanges changes = trN ret ("foldConfChanges:" ++ ppShow changes)

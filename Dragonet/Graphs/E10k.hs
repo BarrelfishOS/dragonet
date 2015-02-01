@@ -20,11 +20,14 @@ module Graphs.E10k (
 
     rx5tFilterTableFull,rxCfdFilterTableFull,
     rx5tFilterTableLen, rxCfdFilterTableLen,
+    flowMatchesCc,
 
     cfgEmpty, cfgStr,
     graphH_, graphH,
     ftCount,
     fdirCount,
+
+    ccString,
 ) where
 
 import qualified Dragonet.ProtocolGraph       as PG
@@ -826,6 +829,13 @@ data ConfChange = Insert5T   (FilterId, PG.ConfValue)
                 | CcReplace  ConfChange PG.ConfValue
     deriving (Eq, Ord, Show)
 
+ccString :: ConfChange -> String
+ccString (Insert5T (fid,cnf))   = c5tFullString  $ parse5t cnf
+ccString (InsertFDir (fid,cnf)) = cFDtFullString $ parseFDT cnf
+ccString (CcReplace (Insert5T (fid,cnf)) cnf') = "REPLACE:" ++ s1 ++ " __TO__ " ++ s2
+    where s1 =  c5tFullString  $ parse5t cnf
+          s2 =  c5tFullString  $ parse5t cnf'
+
 addToCVL :: PG.ConfValue -> PG.ConfValue -> PG.ConfValue
 addToCVL (PG.CVList l) v = PG.CVList $ v:l
 
@@ -857,6 +867,7 @@ instance C.ConfChange ConfChange where
     --applyConfChange :: C.Configuration -> E10kConfChange -> C.Configuration
     emptyConfig _ = cfgEmpty
     showConfig _ = cfgStr
+    ccShow = ccString
 
     -- 5t filters
     applyConfChange conf (Insert5T (_,c5t)) = ("RxC5TupleFilter", new5t):rest
@@ -964,6 +975,15 @@ ccQueue (InsertFDir (_,cFdir)) = case cFdir of
 
 insert5tFromFl :: Int -> Flow -> QueueId -> ConfChange
 insert5tFromFl fid fl qid = Insert5T (fid, (mk5TupleFromFl fl qid))
+
+flowMatchesCc :: Flow -> ConfChange -> Bool
+flowMatchesCc fl cc = ret
+    where ccQ = ccQueue cc
+          ret = case cc of
+                  Insert5T   (_,c5t) -> (mk5TupleFromFl fl ccQ) == c5t
+                  InsertFDir (_,cfd) -> case mkFDirFromFl fl ccQ of
+                                                 Nothing -> False
+                                                 Just x  -> x == cfd
 
 replaceCcFromFl :: ConfChange -> Flow -> QueueId -> Maybe ConfChange
 replaceCcFromFl cc@(Insert5T (_,_)) fl qid = Just $ CcReplace cc c5t'
