@@ -48,8 +48,9 @@ dragonet_container = {
 ORACLE = "hardcoded"
 ORACLE = "greedy"
 
-COSTFN = "priority"
 COSTFN = "balance"
+COSTFN = "static"
+COSTFN = "priority"
 
 
 def get_stack_cmd(name):

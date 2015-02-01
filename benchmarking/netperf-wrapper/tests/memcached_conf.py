@@ -74,14 +74,15 @@ def SRV_CMDS(name):
                                 #cores_needed=((SERVERS_INSTANCES*SERVER_CORES))
                                     ))
                         + " ./scripts/pravin/runBetterBg.sh 2 ./ ./memcached-out.log  "
-                        + " ../benchmarking/memcached/memcached -N %s " % (
-                            flows_to_arg_memcached(FLOWS, SERVER_INITIAL_PORT))
+                        + " ../benchmarking/memcached/memcached -N %s -Z %d " % (
+                            flows_to_arg_memcached(FLOWS, SERVER_INITIAL_PORT),
+                            CONCURRENCY)
                         + " -c 64000 -m 64000 -u root %s %d -t %d -l %s " % (
                             "-p 0 -U ",
                             SERVER_INITIAL_PORT, SERVER_CORES, TARGET)
                         ,
 
-                      "sleep 4",
+                      "sleep 10",
                      ],
 
 

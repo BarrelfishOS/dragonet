@@ -48,13 +48,49 @@ OUTPUTDIRPARENT="./output_somewhat_working_priority_big3/"
 OUTPUTDIRPARENT="./output_somewhat_working_balance_big3/"
 OUTPUTDIRPARENT="./output_debugging_softfiltering_2/"
 
+# First results which worked for online setup
+OUTPUTDIRPARENT="./output_debugging_online/"
+OUTPUTDIRPARENT="./output_debugging_online2/"
+
+OUTPUTDIRPARENT="./output_debugging_online_automated/"
+OUTPUTDIRPARENT="./output_debugging_online_automated_v2/"
+OUTPUTDIRPARENT="./output_debugging_online_automated_v4/"
+OUTPUTDIRPARENT="./output_debugging_online_automated_v5/"
+OUTPUTDIRPARENT="./output_debugging_online_automated_v6/"
+
+
+
+OUTPUTDIRPARENT="./output_debugging_online_automated_10Q/"
+
+OUTPUTDIRPARENT="./output_debugging_online_automated_v7/"  # keep this one
+
+OUTPUTDIRPARENT="./output_debugging_online_20Clients_10Q_5Cores/"
+OUTPUTDIRPARENT="./output_debugging_online_20Clients_10Q_5Cores_v2/"
+
+OUTPUTDIRPARENT="./output_debugging_online_20Clients_32F_10Q/"
+OUTPUTDIRPARENT="./output_debugging_online_20Clients_32F_10Q_s/"
+
+OUTPUTDIRPARENT="./output_debugging_online_40Clients_16F_10Q_s/"
+
+OUTPUTDIRPARENT="./output_debugging_online_40Clients_16F_10Q_allLong/"
+
+OUTPUTDIRPARENT="./output_debugging_online_20Clients_32F_10Q_4P_t1/"
+
+OUTPUTDIRPARENT="./output_debugging_online_20Clients_16F_10Q_4P_t1/"
+
+OUTPUTDIRPARENT="./allResults/20Clients_16F_10Q_4P_long/"
+
+OUTPUTDIRPARENT="./allResults/20Clients_16F_5Q_2P/"
+
+OUTPUTDIRPARENT="./allResults/20Clients_16F_10Q_4P_priority/"
+
 WORKLOADTYPE="priority"
 WORKLOADTYPE="priBal"
 WORKLOADTYPE="linux"
 WORKLOADTYPE="balance"
 WORKLOADTYPE="priBal"
 WORKLOADTYPE="priSmall"
-WORKLOADTYPE="dynamic"
+WORKLOADTYPE="online"
 
 
 
@@ -64,12 +100,13 @@ startStack() {
 initConcurrency=${LOAD}
 
 title="STARTSTACK_${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${initConcurrency},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-OUTDIR="${OUTPUTDIRPARENT}/STARTSTACK/${WORKLOADTYPE}/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${initConcurrency}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/STARTSTACK/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${initConcurrency}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift ${SRVCORESHIFT} ${ClientList} --servercores ${SRVCORES} \
---serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES}  --packet ${PACKETSIZE} --concurrency ${initConcurrency} \
--I 1 -l 5 -H ${SERVERNAME} -T ${SERVERIP} -c ${ECHO_SERVER} ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
+ --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES}  --packet ${PACKETSIZE} --concurrency ${initConcurrency} \
+-I 1 -l 5 -H ${SERVERNAME} -T ${SERVERIP} -c ${ECHO_SERVER} ${UDP_TEST_NAME} \
+ --totalClients ${CLIENTCOUNT}  --clientPortShift ${CLIENTPORTSHIFT} \
 -t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
 
 
@@ -87,16 +124,17 @@ fi
 #exit 0
 }
 
-check_working_dummy() {
+doShortRun() {
 
-local dummyRT=30
-local title="DUMMY_${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-local OUTDIR="${OUTPUTDIRPARENT}/DUMMY/${WORKLOADTYPE}/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+
+local title="SHORT_${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+local OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/SHORT/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift ${SRVCORESHIFT}  ${ClientList} --servercores ${SRVCORES} \
---serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES} --packet ${PACKETSIZE} --concurrency ${LOAD} \
--I 1 -l ${dummyRT} -H ${SERVERNAME} -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
+ --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES} --packet ${PACKETSIZE} --concurrency ${LOAD} \
+-I 1 -l ${DUMMYRT} -H ${SERVERNAME} -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} \
+ --totalClients ${CLIENTCOUNT}  --clientPortShift ${CLIENTPORTSHIFT} \
 -t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
 
 if [ "${UDP_TEST_NAME}" == "udp_rr" ];
@@ -116,17 +154,28 @@ fi
 
 
 getData() {
+local prefix=$1
+local startReportFile="$2"
+local startReportFileOption=""
+if [ ! "${startReportFile}" == "" ] ;
+then
+startReportFileOption="--report-start-run  ${startReportFile}"
+    echo "Report start time enabled enabled: ${startReportFileOption}"
+else
+    echo "Report start time not enabled"
+fi
 
-local title="${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-local OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+local title="${prefix}_${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+local OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/${prefix}/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 REPEAT=1
 ./netperf-wrapper -d 0 --udp --serverCoreShift ${SRVCORESHIFT}  ${ClientList} --servercores ${SRVCORES} \
---serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES} --packet ${PACKETSIZE} --concurrency ${LOAD} \
--I ${REPEAT} -l 50 -H ${SERVERNAME} -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} --totalClients ${CLIENTCOUNT} \
--t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
-
+ --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES} --packet ${PACKETSIZE} --concurrency ${LOAD} \
+-I ${REPEAT} -l ${REALRT} -H ${SERVERNAME} -T ${SERVERIP} -c noServer ${UDP_TEST_NAME} \
+ --totalClients ${CLIENTCOUNT}  --clientPortShift ${CLIENTPORTSHIFT}   ${startReportFileOption} \
+-t ${title} -o ${OUTDIR} -L  ${OUTDIR}/${title}.runlog
+#-t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
 
 if [ "${UDP_TEST_NAME}" == "udp_rr" ];
 then
@@ -158,6 +207,7 @@ ClientList="-C ziger1 -C sbrinz1"
 
 ClientList="-C ziger2 -C sbrinz2"
 ClientList="-C ziger2 "
+ClientList="-C ziger1 -C sbrinz1 -C sbrinz2"
 ClientList="-C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2"
 
 ######################
@@ -184,12 +234,12 @@ SERVERIP=10.113.4.95
 #SERVERIP=10.113.4.26
 
 ######################
-UDP_TEST_NAME="memcached_rr"
-SRVCORESHIFT=0
-
-######################
 UDP_TEST_NAME="udp_rr"
 SRVCORESHIFT=5
+
+######################
+UDP_TEST_NAME="memcached_rr"
+SRVCORESHIFT=0
 
 ######################
 PACKETSIZE=64
@@ -199,7 +249,7 @@ PACKETSIZE=1024
 
 LOAD=1
 LOAD=4
-LOAD=32
+LOAD=2
 ######################
 
 HWQUEUE=8
@@ -208,18 +258,26 @@ HWQUEUE=10
 ######################
 
 SRVCORES=8
-SRVCORES=10
+# Giving one less as memcached will start one extra thread for queue-0
 SRVCORES=5
+SRVCORES=9
 ######################
 
 
 CLIENTCOUNT=32
-CLIENTCOUNT=10
 CLIENTCOUNT=2
 CLIENTCOUNT=8
 CLIENTCOUNT=20
 CLIENTCOUNT=40
 CLIENTCOUNT=4
+CLIENTCOUNT=10
+
+CLIENTPORTSHIFT=0
+
+# Runtimes for dummy and real runs
+DUMMYRT=10
+REALRT=50
+
 ######################
 
 set_echo_test() {
@@ -251,6 +309,8 @@ show_usage() {
         echo "           -c <n> -->  client count (n clients)"
         echo "           -l <n> -->  load (n concurrent sessions per client)"
         echo "           -s <n> -->  n server cores/threads"
+        echo "           -m S/D -->  Mixed run (sending extra HP and LP while big run is happening)"
+        echo "                         with static or dynamic setup"
         echo "           -S     -->  start stack"
         echo "           -d     -->  dummy run"
         echo "           -r     -->  Real run"
@@ -271,17 +331,19 @@ fi
 
 OPTTEST="no"
 
-while getopts ":c:l:s:SdhxXrbt:" opt; do
+while getopts ":c:l:s:SdhxXrbm:t:T" opt; do
   case $opt in
     t)
         echo "Setting up test $OPTARG"
         OPTTEST="yes"
         if [ "$OPTARG" == "E" ] ;
         then
-            set_echo_test
+            UDP_TEST_NAME="udp_rr"
+            #set_echo_test
         elif [ "$OPTARG" == "M" ] ;
         then
-            set_memcached_test
+            UDP_TEST_NAME="memcached_rr"
+            #set_memcached_test
         else
             echo "Error: Invalid test name given"
             show_usage
@@ -289,29 +351,29 @@ while getopts ":c:l:s:SdhxXrbt:" opt; do
         fi
       ;;
     c)
-        if [ "$OPTTEST" == "yes" ] ;
-        then
-            echo "ERROR: clientcount is hardcoded by -t option, so you can't change it!"
-            exit 1
-        fi
+#        if [ "$OPTTEST" == "yes" ] ;
+#        then
+#            echo "ERROR: clientcount is hardcoded by -t option, so you can't change it!"
+#            exit 1
+#        fi
         echo "Setting client-count to $OPTARG (instead of default $CLIENTCOUNT)"
         CLIENTCOUNT=$OPTARG
       ;;
     l)
-        if [ "$OPTTEST" == "yes" ] ;
-        then
-            echo "ERROR: load is hardcoded by -t option, so you can't change it!"
-            exit 1
-        fi
+#        if [ "$OPTTEST" == "yes" ] ;
+#        then
+#            echo "ERROR: load is hardcoded by -t option, so you can't change it!"
+#            exit 1
+#        fi
         echo "Setting load to $OPTARG (instead of default $LOAD)"
         LOAD=$OPTARG
       ;;
     s)
-        if [ "$OPTTEST" == "yes" ] ;
-        then
-            echo "ERROR: servercores are hardcoded by -t option, so you can't change it!"
-            exit 1
-        fi
+ #       if [ "$OPTTEST" == "yes" ] ;
+ #       then
+ #           echo "ERROR: servercores are hardcoded by -t option, so you can't change it!"
+ #           exit 1
+ #       fi
         echo "Setting server-cores/threads to $OPTARG (instead of default $SRVCORES)"
         SRVCORES=$OPTARG
         HWQUEUE=${SRVCORES}
@@ -319,11 +381,30 @@ while getopts ":c:l:s:SdhxXrbt:" opt; do
     S)
         RUNSTACK="yes"
       ;;
+    m)
+        MIXEDRUN="yes"
+        if [ "$OPTARG" == "S" ] ;
+        then
+            WORKLOADTYPE="MixedRunStatic"
+        elif [ "$OPTARG" == "D" ] ;
+        then
+            WORKLOADTYPE="MixedRunDynamic"
+        else
+            echo "Error: Invalid mix name"
+            show_usage
+            exit 1
+        fi
+      ;;
+    T)
+        TOGETHER="yes"
+      ;;
     d)
         RUNDUMMY="yes"
       ;;
     b)
         RUNBOTH="yes"
+        echo "This is currently disabled!"
+        exit 1
       ;;
     r)
         RUNREAL="yes"
@@ -403,12 +484,12 @@ if [ "${RUNDUMMY}" == "yes" ] ; then
 
         set_memcached_test
         echo "Starting first server ${UDP_TEST_NAME} for dummyRun"
-        check_working_dummy 2>&1 > deleteme_memcached_dummy_out.txt &
+        doShortRun 2>&1 > deleteme_memcached_dummy_out.txt &
         ######################
 
         set_echo_test
         echo "Starting second server ${UDP_TEST_NAME} for dummyRun"
-        check_working_dummy 2>&1 > deleteme_echo_dummy_out.txt &
+        doShortRun 2>&1 > deleteme_echo_dummy_out.txt &
 
         echo "waiting for benchmark to finish"
         wait
@@ -430,7 +511,7 @@ if [ "${RUNDUMMY}" == "yes" ] ; then
         set -x
         set -e
         WORKLOADTYPE="SingleRun"
-        check_working_dummy
+        doShortRun
         set +x
         set +e
     fi
@@ -448,12 +529,12 @@ if [ "${RUNREAL}" == "yes" ] ; then
 
         set_memcached_test
         echo "Starting first server ${UDP_TEST_NAME} for realrun"
-        getData 2>&1 > deleteme_memcached_out.txt &
+        getData "LONG" 2>&1 > deleteme_memcached_out.txt &
 
         ######################
         set_echo_test
         echo "Starting second server ${UDP_TEST_NAME} for realrun"
-        getData 2>&1 > deleteme_echo_out.txt &
+        getData "LONG" 2>&1 > deleteme_echo_out.txt &
 
         echo "waiting for benchmark to finish"
         wait
@@ -476,7 +557,7 @@ if [ "${RUNREAL}" == "yes" ] ; then
         WORKLOADTYPE="SingleRun"
         set -x
         set -e
-        getData
+        getData "LONG"
         set +x
         set +e
     fi
@@ -484,6 +565,116 @@ if [ "${RUNREAL}" == "yes" ] ; then
     set +x
     set +e
 fi
+
+
+if [ "${MIXEDRUN}" == "yes" ] ; then
+    echo "Assuming that stack is already running, doing mixed run"
+
+    #WORKLOADTYPE="MixedRun"
+    REALRT=130
+    echo "Starting big set of clients for the load for test ${UDP_TEST_NAME}"
+
+    rm -f deleteme_longrun_startTime.txt
+    getData "LONG" "./deleteme_longrun_startTime.txt"  2>&1 | tee deleteme_mixed_bigrun_out.txt &
+
+    fcountTries=1
+
+    while true;
+    do
+        if [ -f deleteme_longrun_startTime.txt ] ;
+        then
+        isStart=`cat deleteme_longrun_startTime.txt | grep ": Start run$" | wc -l`
+        if [ "${isStart}" == 1 ] ;
+        then
+            echo "Bigrun has started running"
+            break
+        fi
+        fi
+        #echo "Still waiting for Bigrun to actually start running: ${fcountTries}. sleeping for a second..."
+        sleep 1
+        fcountTries=`expr 1 + ${fcountTries}`
+    done
+
+    ######################
+
+    sleep 10
+    echo "Running single LP client"
+    # TODO: specify different port used by clients
+    ClientList="-C ziger2 "
+    CLIENTPORTSHIFT="3000"
+    CLIENTCOUNT=1
+    REALRT=50
+    getData "SHORTLP" 2>&1 | tee deleteme_LP_shortrun_out.txt
+
+    sleep 10
+
+    echo "Running single HP client"
+    # TODO: specify different port used by clients
+    ClientList="-C ziger2 "
+    CLIENTPORTSHIFT="-${LOAD}"
+    CLIENTCOUNT=1
+    REALRT=50
+    getData "SHORTHP" 2>&1 | tee deleteme_HP_shortrun_out.txt
+
+    echo "waiting for benchmark to finish"
+    wait
+    echo "done with benchmarking"
+fi
+
+if [ "${TOGETHER}" == "yes" ] ; then
+    echo "Assuming that stack is already running, doing mixed run"
+
+    WORKLOADTYPE="TOGETHER"
+    REALRT=50
+    echo "Starting big set of clients for the load for test ${UDP_TEST_NAME}"
+
+    rm -f deleteme_longrun_startTime.txt
+    getData "LONG" "./deleteme_longrun_startTime.txt"  2>&1 | tee deleteme_mixed_bigrun_out.txt &
+
+    fcountTries=1
+
+    while true;
+    do
+        if [ -f deleteme_longrun_startTime.txt ] ;
+        then
+        isStart=`cat deleteme_longrun_startTime.txt | grep ": Start run$" | wc -l`
+        if [ "${isStart}" == 1 ] ;
+        then
+            echo "Bigrun has started running"
+            break
+        fi
+        fi
+        #echo "Still waiting for Bigrun to actually start running: ${fcountTries}. sleeping for a second..."
+        sleep 1
+        fcountTries=`expr 1 + ${fcountTries}`
+    done
+
+    ######################
+
+    #sleep 10
+    echo "Running single LP client"
+    # TODO: specify different port used by clients
+    ClientList="-C ziger1 "
+    CLIENTPORTSHIFT="3000"
+    CLIENTCOUNT=1
+    #REALRT=10
+    getData "SHORTLP" 2>&1 | tee deleteme_LP_shortrun_out.txt &
+    #sleep 5
+
+    echo "Running single HP client"
+    # TODO: specify different port used by clients
+    ClientList="-C ziger2 "
+    CLIENTPORTSHIFT="-${LOAD}"
+    CLIENTCOUNT=1
+    #REALRT=10
+    getData "SHORTHP" 2>&1 | tee deleteme_HP_shortrun_out.txt
+
+    echo "waiting for benchmark to finish"
+    wait
+    echo "done with benchmarking"
+fi
+
+
 
 
 
