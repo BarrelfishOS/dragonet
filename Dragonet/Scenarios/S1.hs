@@ -5,6 +5,7 @@ module Scenarios.S1 (
     , sortedRealFlows
     , real40Flows
     , sortFlows
+    , staticCost
 ) where
 
 import Dragonet.Flows(Flow (..), flowPred)
@@ -59,9 +60,14 @@ priorityCost'' goldRange fperQ = Search.priorityCost (isGoldFl goldRange) fperQ
 prioritySort'' goldRange = Search.prioritySort (isGoldFl goldRange)
 
 
+
 -- Using flow per queue as range for gold flows
 priorityCost' fperQ =  priorityCost'' fperQ fperQ
 prioritySort' fperQ =  prioritySort'' fperQ
+
+
+priorityQs = 4
+staticCost goldRange = Search.staticCost (isGoldFl goldRange) priorityQs
 
 -- Using 1 flow per queue as range for gold flows
 priorityCost = priorityCost'' 1 1

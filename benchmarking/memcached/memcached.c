@@ -5018,6 +5018,7 @@ int main (int argc, char **argv) {
           "S"   /* Sasl ON */
           "F"   /* Disable flush_all */
           "N:"   /* Use Dragonet network stack */
+          "Z:"   /* Use grouping in dragonet */
           "o:"  /* Extended generic options */
         ))) {
         switch (c) {
@@ -5066,6 +5067,12 @@ int main (int argc, char **argv) {
             use_dragonet_stack = 1;
             use_dragonet_stack_portmap = strdup(optarg);
             break;
+        case 'Z':
+
+             use_dragonet_grouping = ((int)atoi(optarg));
+            break;
+
+
 #endif // DRAGONET
         case 'c':
             settings.maxconns = atoi(optarg);
@@ -5293,7 +5300,7 @@ int main (int argc, char **argv) {
 #ifdef DRAGONET
     if (use_dragonet_stack) {
 
-        printf("memcached Dragonet\n");
+        printf("memcached Dragonet with grouping %d\n", use_dragonet_grouping);
         if (!udp_specified) {
             printf("Error: UDP port not specified\nAnd Dragonet currently "
                    "only works with UDP. Please specify UDP port with -U option");

@@ -59,14 +59,14 @@ static inline errval_t shm_chan_alloc_wrapper(
 //    struct shm_channel *chan = internal->tx;
     int tries = 0;
 
-    for(tries = 0;  tries < 3; ++tries) {
+    for(tries = 0;  tries < 10; ++tries) {
 
         err = shm_chan_alloc(chan, msg);
         if (err_is_fail(err)) {
-            printf("%s:%d:ERROR: shm_chan_alloc failed. err=%d, %s\n",
-                    __FILE__, __LINE__, err, err_str(err));
-            printf("Details of TX channel\n");
-            shm_chan_show(chan);
+            //printf("%s:%d:ERROR: shm_chan_alloc failed. err=%d, %s\n",
+            //        __FILE__, __LINE__, err, err_str(err));
+            //printf("Details of TX channel\n");
+            //shm_chan_show(chan);
             //printf("Details of RX channel\n");
             //shm_chan_show(&internal->rx);
 
@@ -74,20 +74,28 @@ static inline errval_t shm_chan_alloc_wrapper(
                 printf("This is transient error, and attempt %d, so trying again\n",
                         tries);
 
-                assert(err_is_ok(err));
+                shm_chan_show(chan);
+                //assert(err_is_ok(err));
+                if(tries > 3) {
                 sleep(1);
                 // this is transient error.  sleep for short time and and try again
+                }
             } else {
+                printf("%s:%d:ERROR: shm_chan_alloc failed. err=%d, %s\n",
+                    __FILE__, __LINE__, err, err_str(err));
+                printf("Details of TX channel\n");
+                shm_chan_show(chan);
+                printf("Details of RX channel\n");
                 printf("This is serious error, and attempt %d. giving up\n",
                         tries);
-                assert(err_is_ok(err));
+                //assert(err_is_ok(err));
                 return err;
             }
         } else {
             if (tries > 0) {
-                printf("shm_chan_alloc worked after %d tries. One of the entiy is slow!\n",
-                        tries);
-
+                //printf("shm_chan_alloc worked after %d tries. One of the entiy is slow!\n",
+                //        tries);
+                //shm_chan_show(chan);
             }
             return err;
         }

@@ -58,6 +58,8 @@ xht_t *new_flows_ht = NULL;
 // We have a thread list, and every thread gets client list
 
 int use_dragonet_stack = 0;
+int use_dragonet_grouping = 0;
+
 char *use_dragonet_stack_portmap = NULL;
 static struct cfg_udpep *all_flows_list = NULL;
 static int filter_count = 0;    // number of filters detected
@@ -76,7 +78,6 @@ bool ip_from_string(const char *ip, uint32_t *dst)
     return true;
 }
 */
-
 
 static void parse_flow(struct cfg_udpep *udp, char *str)
 {
@@ -554,6 +555,7 @@ void event_handle_loop_dn(void *dn_state)
 } // end function: event_handle_loop_dn
 #endif // 0
 
+static int unupdated_flows = 0;
 int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
 {
     myAssert(buff != NULL);
@@ -620,12 +622,18 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
 
             // Sending the flow to Dragonet for mapping
             struct dnal_socket_handle *binded_socket = dnt_state->dshList[0];
-            //dnal_flags_t dnal_flags = DNAL_FLAGS_MORE;
-            dnal_flags_t dnal_flags = 0;
+            ++unupdated_flows;
+            dnal_flags_t dnal_flags = DNAL_FLAGS_MORE;
+            if (unupdated_flows >= use_dragonet_grouping) {
+                // flag saying no more changes.
+                // This will force the stack to enforce the changes
+                dnal_flags = 0;
+            }
             send_flow_to_dragonet(binded_socket,
                     &new_flow,
-                    dnal_flags); // flag saying no more changes
+                    dnal_flags);
 
+/*
             //printf
             mmprint
                 ("[TID:%d], calling NOOP to enforce flows\n",
@@ -641,6 +649,7 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
 
             // Printing the flow table for debugging purposes
             //xht_print(new_flows_ht);
+*/
 
         } // end else: flow not present
     }
@@ -766,13 +775,13 @@ int dn_stack_init(uint16_t uport) {
 #endif // 0
 
 
-static int insert_flow_info(struct dn_thread_state *dn_tstate)
+static int insert_flow_info(struct dn_thread_state *dn_tstate, int threadCount)
 {
     myAssert(dn_tstate != NULL);
     dnal_flags_t dnal_flags = DNAL_FLAGS_MORE;
     struct cfg_thread *sel_thread_cfg = &th_cfg_list[dn_tstate->tindex];
     myAssert(sel_thread_cfg != NULL);
-
+    int already_forced = 0;
     //printf
     mmprint
         ("[state:%p], Trying to insert the flows\n", dn_tstate);
@@ -816,6 +825,25 @@ static int insert_flow_info(struct dn_thread_state *dn_tstate)
         struct dnal_socket_handle *binded_socket = dn_tstate->dshList[0];
         send_flow_to_dragonet(binded_socket, &new_flow, dnal_flags);
 
+#if 0
+
+        // NOTE: This is just an hack to force Dragonet stack to run graph reducer
+        // early and cache it.
+        // So, be careful with it.
+        if (i > 12) {
+            if (i > threadCount) {
+                if (already_forced == 0)
+                printf("There are enough flows %d to use all threads %d,"
+                        " forcing instantiation\n", i, threadCount);
+                // Tell Dragonet that you are done with sending flow information
+                err_expect_ok(dnal_noop(
+                            dn_tstate->daq, // application endpoint
+                            0               // flag saying no more changes
+                            ));
+                ++already_forced;
+            }
+        }
+#endif // 0
 
         udp->orig_socket = binded_socket;
         // mark that socket is set and ready
@@ -834,7 +862,7 @@ static int insert_flow_info(struct dn_thread_state *dn_tstate)
 } // end function: insert_flow_info
 
 
-int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
+int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate, int threadCount)
 {
     int ret = 0;
     char appName[50];
@@ -1029,7 +1057,7 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate)
             printf("[TID:%d], main thread, Sending flow information\n",  dn_tstate->tindex);
 
             // Insert the flows
-            insert_flow_info(dn_tstate);
+            insert_flow_info(dn_tstate, threadCount);
 
 #if DETECT_NEW_FLOWS
             // Printing the flow table for debugging purposes

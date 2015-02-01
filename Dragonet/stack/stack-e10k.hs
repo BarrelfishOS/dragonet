@@ -290,6 +290,7 @@ doRunStackE10k opts = do
 costFnL fPerq = [
       ("balance",  (\fpa nq qmap -> SE.balanceCost nq qmap, id))
     , ("priority", (S1.priorityCost', (S1.prioritySort' fPerq)))
+    , ("static",  (S1.staticCost, (id)))
  ]
 
 costFnParser = OA.str >>= doParse

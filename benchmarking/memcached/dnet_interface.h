@@ -97,6 +97,7 @@ struct dn_thread_state {
 };
 
 extern int use_dragonet_stack;
+extern int use_dragonet_grouping;
 extern char *use_dragonet_stack_portmap;
 
 // barrier set for number of worker thread
@@ -105,7 +106,7 @@ extern pthread_barrier_t        nthread_barrier;
 //int dn_stack_init_specific(char *slot_name, uint16_t uport);
 //int dn_stack_init(uint16_t uport);
 
-int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate);
+int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate, int threadCount);
 
 int register_callback_dn(void *dn_state, event_handler_fun_ptr fun, int fd,
         short which, void *arg);
