@@ -14,6 +14,7 @@ module Dragonet.Search (
   hardcodedSearch,
   balanceCost,
   priorityCost, prioritySort,
+  staticCost,
   CostQueueFn,
   SearchStIO, initSearchIO, runSearchIO,
   E10kOracleSt(..), initE10kOracle,
@@ -31,8 +32,10 @@ module Dragonet.Search (
 
   IncrConf,
 
+  incrSearchQmap, qmapStr_, qmapStr,
+
   test, test_incr, test_incr_add, test_incr_pravin_testcase,
-  test_incr_pravin_testcase_mixed, test_incr_var
+  test_incr_pravin_testcase_mixed
 ) where
 
 import qualified Dragonet.Configuration       as C
@@ -66,6 +69,7 @@ import qualified Data.Word as DW
 
 import qualified Control.Monad.ST        as ST
 
+
 import Control.Monad (forM, foldM)
 import qualified Data.HashTable.ST.Basic as HB
 import qualified Data.HashTable.Class    as H
@@ -80,6 +84,8 @@ import Util.XTimeIt (doTimeIt, dontTimeIt)
 putStrLnDbg x = putStrLn x
 putStrLnDbgN x = return ()
 --putStrLnDbgN x = putStrLn x
+
+sAddPr p str = L.unlines $ [ p ++ s | s <- L.lines str ]
 
 tr a b  = trace b a
 trN a b = a
@@ -1463,7 +1469,7 @@ doIncSearchGreedyFlows ic st flowsSt_ = do
                                                isJust mcc]
                 (keep, discard) = confJump oracle confS
                 (rmCcs, rmFlows_) = unzip discard
-                rmFlows = case catMaybes rmFlows_ of 
+                rmFlows = case catMaybes rmFlows_ of
                             [] -> error "JUMPED but no flows removed"
                             _  -> tr rmFlows_ $ "JUMP!"
                                       ++ "\nRemoved flows:\n"
@@ -1930,92 +1936,3 @@ test_incr_pravin_testcase = do
 --    return ()
 
 
-data TestIncrSearch = TestIncrSearch {
-      tisHpPort   :: Int
-    , tisBePort   :: Int
-    , tisHpCount  :: Int
-    , tisBeCount  :: Int
-    , tisFlowsSt  :: FL.FlowsSt
-}
-
-initTestIncrSearch = TestIncrSearch {
-      tisHpPort   = 6000
-    , tisBePort   = 1000
-    , tisHpCount  = 0
-    , tisBeCount  = 0
-    , tisFlowsSt  = FL.flowsStInit }
-
-data TestIncrSearchOp = TisAddHpFlows Int
-                      | TisAddBeFlows Int
-                      | TisRemFlows [Int]
-    deriving (Show)
-
-tisOpFlowsSt :: TestIncrSearch -> TestIncrSearchOp
-             -> (TestIncrSearch, FL.FlowsSt)
-
-tisOpFlowsSt tis (TisAddHpFlows x) = (tis', flst')
-    where hpPort = tisHpPort tis
-          hpFs = take x $ hpFlows_ hpPort
-          flst' = foldl FL.fsAddFlow (tisFlowsSt tis) hpFs
-          tis' = tis { tisHpPort = hpPort + x,
-                       tisFlowsSt = flst'}
-
-tisOpFlowsSt tis (TisAddBeFlows x) = (tis', flst')
-    where bePort = tisBePort tis
-          beFs = take x $ beFlows_ bePort
-          flst' = foldl FL.fsAddFlow (tisFlowsSt tis) beFs
-          tis' = tis { tisBePort = bePort + x,
-                       tisFlowsSt = flst'}
-
-tisOpFlowsSt tis (TisRemFlows []) = (tis, tisFlowsSt tis)
-tisOpFlowsSt tis (TisRemFlows (x:xs)) = tisOpFlowsSt tis' (TisRemFlows xs)
-    where flst = tisFlowsSt tis
-          flows = S.toList $ FL.fsCurrent flst
-          flow = flows !! x
-          flst' = FL.fsRemFlow flst flow
-          tis' = tis { tisFlowsSt = flst' }
-
-sAddPr p str = L.unlines $ [ p ++ s | s <- L.lines str ]
-
-tisDoOp ss tis op = do
-    let (st', flst) = tisOpFlowsSt tis op
-        st'' = st' { tisFlowsSt = FL.fsReset (tisFlowsSt st') }
-
-    (newSS, newSt, newConf) <- doTimeIt ("tisDoOp:" ++ (show op)) $ do
-        (conf, ic, ss') <- runIncrSearchIO ss flst
-        return (ss', st'', conf)
-
-    --putStrLn $ "tisDoOP result:\n" ++ (sAddPr "| " $ ppShow newConf)
-    --qmap <- ST.stToIO $ incrSearchQmap newSS
-    --putStrLn $ qmapStr qmap
-
-    return (newSS, newSt)
-
-
-test_incr_var = do
-    putStrLn $ "Running incremental search!"
-    prgU <- e10kU_simple
-    let nq = 10
-        hpPort   = 6000
-        bePort   = 1000
-        e10kOracle = initE10kOracle nq
-        pri = (priorityCost' nq, prioritySort')
-        bal = (balanceCost nq, id)
-        sta = (staticCost' nq, id)
-
-        fns = sta
-        params = initIncrSearchParams {  isOracle = e10kOracle
-                                       , isPrgU   = prgU
-                                       , isCostFn = fst fns
-                                       , isOrderFlows = snd fns}
-
-    ss0 <- initIncrSearchIO params
-    let tis0 = initTestIncrSearch
-
-    (ss1,tis1) <- tisDoOp ss0 tis0 $ TisAddBeFlows 500
-    (ss2,tis2) <- tisDoOp ss1 tis1 $ TisAddHpFlows 1
-    (ss3,tis3) <- tisDoOp ss2 tis2 $ TisRemFlows [250]
-    --qmap <- ST.stToIO $ incrSearchQmap ss2
-    --putStrLn $ qmapStr qmap
-
-    return ()

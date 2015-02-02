@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Dragonet.ProtocolGraph (
     Node(..),
     Edge(..),
@@ -49,6 +50,9 @@ import qualified Control.Monad.State as ST
 import Text.Show.Functions -- show instance for functions, so that ConfFunction
                            -- gets Show and we can derive Show for Node
 
+import GHC.Generics
+import qualified Control.DeepSeq as DS
+import Control.DeepSeq.Generics (genericRnf)
 
 -------------------------------------------------------------------------------
 -- Basic Types
@@ -224,8 +228,9 @@ data ConfValue =
     CVTuple [ConfValue] |
     CVEnum Int |
     CVTag Int ConfValue
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord, Show, Generic)
 
+instance DS.NFData ConfValue where rnf = genericRnf
 
 -------------------------------------------------------------------------------
 -- Helper Functions
