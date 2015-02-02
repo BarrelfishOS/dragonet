@@ -909,8 +909,15 @@ priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
 
 -- flows that match predicate get a static number of queues
 staticCost ::  (Flow -> Bool) -> Int -> Int -> QMap -> Cost
-staticCost isGold nGoldQs nq qmap = trN cost msg
+staticCost isGold nGoldQs' nq qmap = trN cost msg
     where
+          -- FIXME: Currenly hardcoding the logic of how many gold queues are
+          --        there based on total number of queues
+          nGoldQs
+            | nq == 5 = 2
+            | nq == 10 = 4
+            | otherwise = error ("no. of queues is non-standard" ++
+                    " (not 5 or 10). Given queues: " ++ (show nq))
           assignedGoldQsL = take nGoldQs $ allQueues nq -- static gold queues
           assignedGoldQsS = S.fromList assignedGoldQsL
 
@@ -1760,8 +1767,8 @@ test_incr_pravin_testcase_mixed = do
 
     putStrLn $ "Running incremental search usecase used for mixed benchmarking"
     prgU <- e10kU_simple
-    -- let nq = 10
-    let nq = 5
+    let nq = 10
+    --let nq = 5
         flowsPerGQ   = 16
         hpPort   = 6000
         bePort   = 1000
@@ -1831,6 +1838,7 @@ test_incr_pravin_testcase_mixed = do
                 ++ (showConf  e10kOracle conf)
         return (ss2,flst2)
 
+{-
     -- now add 1 HP client (16 HP flows)
     let n3 = 16
     (ss3,flst2) <- doTimeIt ("Add:" ++ (show n3) ++ " HP flow(s)") $ do
@@ -1841,7 +1849,8 @@ test_incr_pravin_testcase_mixed = do
         putStrLn $ "Configuration after adding second HP client: "
                 ++ (showConf  e10kOracle conf)
         return (ss3,flst2)
-
+-}
+    let ss3 = ss2
     qmap <- ST.stToIO $ incrSearchQmap ss3
     putStrLn $ qmapStr qmap
     --let flows = FM.fmFlows $ isFlowMapSt ss2

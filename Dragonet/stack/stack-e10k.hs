@@ -239,6 +239,7 @@ doRunStackE10kIncremental :: StackE10kOpts -> IO ()
 doRunStackE10kIncremental opts = do
     -- PRG (use simple graph. Hope this works!)
     (prgU,_) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl-simple.unicorn"
+    --(prgU,_) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl.unicorn"
     -- FIXME: Using full graph did not worked (atleast with incremental run)
     --prgH@(prgU,_) <- E10k.graphH
 

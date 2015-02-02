@@ -414,9 +414,9 @@ sudo ../benchmarking/memcached/memcached -N \
 ##################################################################
 
 ./scripts/pravin/wait_for_dragonet.sh 10 ${STACKNAME}
-#run_memcached_10_clients_2_load
+run_memcached_10_clients_2_load
 #run_memcached_10_clients_16_load
-run_memcached_20_clients_16_load
+#run_memcached_20_clients_16_load
 #run_memcached_5_clients_2_load
 #run_echo_for_5_cores
 #run_echo_for_4_cores_ziger2
