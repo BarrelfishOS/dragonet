@@ -916,6 +916,7 @@ staticCost isGold nGoldQs' nq qmap = trN cost msg
           nGoldQs
             | nq == 5 = 2
             | nq == 10 = 4
+--            | nq == 10 = 2  # for fancyecho as it will not have that many active flows
             | otherwise = error ("no. of queues is non-standard" ++
                     " (not 5 or 10). Given queues: " ++ (show nq))
           assignedGoldQsL = take nGoldQs $ allQueues nq -- static gold queues

@@ -45,6 +45,8 @@ isGoldFlv2 fPerApp FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip, flDstP
             | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
             | (sport < 8000) && (sport >= (8000 - fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
             | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
+            | (sport == 5000) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True        -- For fancyecho
+            | (sport == 5000) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True        -- For fancyecho
             | otherwise = False
 isGoldFlv2 _ _ = False
 
