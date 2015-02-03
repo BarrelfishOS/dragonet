@@ -82,7 +82,6 @@ OUTPUTDIRPARENT="./allResults/20Clients_16F_10Q_4P_long/"
 
 OUTPUTDIRPARENT="./allResults/20Clients_16F_5Q_2P/"
 
-OUTPUTDIRPARENT="./allResults/20Clients_16F_10Q_4P_priority/"
 
 WORKLOADTYPE="priority"
 WORKLOADTYPE="priBal"
@@ -92,22 +91,22 @@ WORKLOADTYPE="priBal"
 WORKLOADTYPE="priSmall"
 WORKLOADTYPE="online"
 
-
-
 startStack() {
 #./cleanupServer.sh
 
 initConcurrency=${LOAD}
 
-title="STARTSTACK_${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${initConcurrency},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/STARTSTACK/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${initConcurrency}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+title="ITest_${UDP_TEST_NAME},CONCUR_${initConcurrency},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/${DNCOSTFUNCTION}/STARTSTACK/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${initConcurrency}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift ${SRVCORESHIFT} ${ClientList} --servercores ${SRVCORES} \
  --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES}  --packet ${PACKETSIZE} --concurrency ${initConcurrency} \
 -I 1 -l 5 -H ${SERVERNAME} -T ${SERVERIP} -c ${ECHO_SERVER} ${UDP_TEST_NAME} \
  --totalClients ${CLIENTCOUNT}  --clientPortShift ${CLIENTPORTSHIFT} \
--t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
+ --dragonet-cost-function ${DNCOSTFUNCTION} \
+-t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog"
+#-t ${title} -o ${OUTDIR} -L  "${OUTDIR}/${title}.runlog" 2>&1 | tee "${OUTDIR}/${title}.output"
 
 
 if [ "${UDP_TEST_NAME}" == "udp_rr" ];
@@ -127,8 +126,8 @@ fi
 doShortRun() {
 
 
-local title="SHORT_${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-local OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/SHORT/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+title="STest_${UDP_TEST_NAME},CONCUR_${initConcurrency},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+local OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/${DNCOSTFUNCTION}/SHORT/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift ${SRVCORESHIFT}  ${ClientList} --servercores ${SRVCORES} \
@@ -165,8 +164,9 @@ else
     echo "Report start time not enabled"
 fi
 
-local title="${prefix}_${WORKLOADTYPE}_Test_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-local OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/${prefix}/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+title="LTest_${UDP_TEST_NAME},CONCUR_${initConcurrency},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+
+local OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/${DNCOSTFUNCTION}/${prefix}/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 REPEAT=1
@@ -209,42 +209,6 @@ ClientList="-C ziger2 -C sbrinz2"
 ClientList="-C ziger2 "
 ClientList="-C ziger1 -C sbrinz1 -C sbrinz2"
 ClientList="-C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2"
-
-######################
-
-NICTYPE="NIC_SF"
-ECHO_SERVER="memcached_onload"
-SERVERIP=10.113.4.195
-
-NICTYPE="NIC_SF"
-ECHO_SERVER="memcached_linux"
-SERVERIP=10.113.4.195
-
-NICTYPE="NIC_SF"
-ECHO_SERVER="llvmSF"
-SERVERIP=10.113.4.195
-
-NICTYPE="NIC_Intel"
-ECHO_SERVER="dpdk2"
-SERVERIP=10.113.4.95
-
-######################
-
-#SERVERNAME="sbrinz1"
-#SERVERIP=10.113.4.26
-
-######################
-UDP_TEST_NAME="udp_rr"
-SRVCORESHIFT=5
-
-######################
-UDP_TEST_NAME="memcached_rr"
-SRVCORESHIFT=0
-
-######################
-PACKETSIZE=64
-PACKETSIZE=1024
-
 ######################
 
 LOAD=1
@@ -261,6 +225,11 @@ SRVCORES=8
 # Giving one less as memcached will start one extra thread for queue-0
 SRVCORES=5
 SRVCORES=9
+######################
+
+######################
+
+OUTPUTDIRPARENT="./allResultsSmall/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
 ######################
 
 
@@ -308,7 +277,7 @@ show_usage() {
         echo "           -t E/M -->  Test type (E --> Echo server, M --> memcached)"
         echo "           -c <n> -->  client count (n clients)"
         echo "           -l <n> -->  load (n concurrent sessions per client)"
-        echo "           -s <n> -->  n server cores/threads"
+        echo "           -Q <n> -->  n hardware queues and server threads"
         echo "           -m S/D -->  Mixed run (sending extra HP and LP while big run is happening)"
         echo "                         with static or dynamic setup"
         echo "           -S     -->  start stack"
@@ -318,6 +287,8 @@ show_usage() {
         echo "           -x     -->  Cleanup involved machines"
         echo "           -X     -->  Delete output/log files"
         echo "           -h     -->  this help"
+        echo "           -T     -->  Run together"
+        echo "           -B     -->  Run Big"
         echo "Examples (starting stack): ${0} -c 4 -s 4 -C 4 S"
         exit 1
 }
@@ -329,9 +300,19 @@ then
     exit 1
 fi
 
+
+######################
+UDP_TEST_NAME="memcached_rr"
+SRVCORESHIFT=0
+
+######################
+UDP_TEST_NAME="udp_rr"
+SRVCORESHIFT=0
+
+
 OPTTEST="no"
 
-while getopts ":c:l:s:SdhxXrbm:t:T" opt; do
+while getopts ":c:l:Q:SdhxXrbm:t:TB" opt; do
   case $opt in
     t)
         echo "Setting up test $OPTARG"
@@ -368,15 +349,30 @@ while getopts ":c:l:s:SdhxXrbm:t:T" opt; do
         echo "Setting load to $OPTARG (instead of default $LOAD)"
         LOAD=$OPTARG
       ;;
-    s)
+    Q)
  #       if [ "$OPTTEST" == "yes" ] ;
  #       then
  #           echo "ERROR: servercores are hardcoded by -t option, so you can't change it!"
  #           exit 1
  #       fi
-        echo "Setting server-cores/threads to $OPTARG (instead of default $SRVCORES)"
-        SRVCORES=$OPTARG
-        HWQUEUE=${SRVCORES}
+
+        ISHWQUEUESET="yes"
+        HWQUEUE=10
+        SRVCORES=9
+        if [ "$OPTARG" == 10 ] ;
+        then
+            SRVCORES=10
+            HWQUEUE=10
+        elif [ "$OPTARG" == 5 ] ;
+        then
+            SRVCORES=5
+            HWQUEUE=5
+        else
+            echo "Error: Invalid hardware queues given $OPTARG"
+            show_usage
+            exit 1
+        fi
+        echo "Setting HWQs ${HWQUEUE} and server-cores/threads to $SRVCORES"
       ;;
     S)
         RUNSTACK="yes"
@@ -397,6 +393,9 @@ while getopts ":c:l:s:SdhxXrbm:t:T" opt; do
       ;;
     T)
         TOGETHER="yes"
+      ;;
+    B)
+        RUNBIG="yes"
       ;;
     d)
         RUNDUMMY="yes"
@@ -432,6 +431,75 @@ while getopts ":c:l:s:SdhxXrbm:t:T" opt; do
         ;;
   esac
 done
+
+######################
+
+if [ ! "${ISHWQUEUESET}" == "yes" ] ; then
+    echo "ERROR: No HW queues given"
+    show_usage
+    exit 1
+fi
+
+######################
+
+DNCOSTFUNCTION="priority"
+DNCOSTFUNCTION="balance"
+DNCOSTFUNCTION="static"
+
+######################
+
+NICTYPE="NIC_Intel"
+ECHO_SERVER="dpdk2"
+SERVERIP=10.113.4.95
+
+NICTYPE="NIC_SF"
+ECHO_SERVER="memcached_linux"
+SERVERIP=10.113.4.195
+
+NICTYPE="NIC_SF"
+ECHO_SERVER="llvmSF"
+SERVERIP=10.113.4.195
+
+NICTYPE="NIC_Intel"
+ECHO_SERVER="memcached_linux"
+SERVERIP=10.113.4.95
+
+NICTYPE="NIC_SF"
+ECHO_SERVER="memcached_onload"
+SERVERIP=10.113.4.195
+
+
+NICTYPE="NIC_SF"
+ECHO_SERVER="llvmSF"
+SERVERIP=10.113.4.195
+
+NICTYPE="NIC_SF"
+ECHO_SERVER="fancyEchoLinux"
+SERVERIP=10.113.4.195
+
+NICTYPE="NIC_SF"
+ECHO_SERVER="fancyEchoOnload"
+SERVERIP=10.113.4.195
+
+NICTYPE="NIC_Intel"
+ECHO_SERVER="dpdk2"
+SERVERIP=10.113.4.95
+
+######################
+
+#SERVERNAME="sbrinz1"
+#SERVERIP=10.113.4.26
+######################
+
+PACKETSIZE=64
+PACKETSIZE=1024
+
+######################
+
+OUTPUTDIRPARENT="./allResultsEchoServerSmall/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+OUTPUTDIRPARENT="./allResultsEchoServer/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+######################
+
 
 if [ "${RUNSTACK}" == "yes" ] ; then
     if [ "${RUNBOTH}" == "yes" ] ; then
@@ -608,13 +676,18 @@ if [ "${MIXEDRUN}" == "yes" ] ; then
 
     sleep 10
 
-    echo "Running single HP client"
-    # TODO: specify different port used by clients
-    ClientList="-C ziger2 "
-    CLIENTPORTSHIFT="-${LOAD}"
-    CLIENTCOUNT=1
-    REALRT=50
-    getData "SHORTHP" 2>&1 | tee deleteme_HP_shortrun_out.txt
+    if [ "${DNCOSTFUNCTION}" == "priority" ] ;
+    then
+        echo "Not running HP load as priority oracle does not support it yet"
+    else
+        echo "Running single HP client"
+        # TODO: specify different port used by clients
+        ClientList="-C ziger2 "
+        CLIENTPORTSHIFT="-${LOAD}"
+        CLIENTCOUNT=1
+        REALRT=50
+        getData "SHORTHP" 2>&1 | tee deleteme_HP_shortrun_out.txt
+    fi
 
     echo "waiting for benchmark to finish"
     wait
@@ -630,6 +703,7 @@ if [ "${TOGETHER}" == "yes" ] ; then
 
     rm -f deleteme_longrun_startTime.txt
     getData "LONG" "./deleteme_longrun_startTime.txt"  2>&1 | tee deleteme_mixed_bigrun_out.txt &
+
 
     fcountTries=1
 
@@ -661,21 +735,36 @@ if [ "${TOGETHER}" == "yes" ] ; then
     getData "SHORTLP" 2>&1 | tee deleteme_LP_shortrun_out.txt &
     #sleep 5
 
-    echo "Running single HP client"
-    # TODO: specify different port used by clients
-    ClientList="-C ziger2 "
-    CLIENTPORTSHIFT="-${LOAD}"
-    CLIENTCOUNT=1
-    #REALRT=10
-    getData "SHORTHP" 2>&1 | tee deleteme_HP_shortrun_out.txt
+    if [ "${DNCOSTFUNCTION}" == "priority" ] ;
+    then
+        echo "Not running HP load as priority oracle does not support it yet"
+    else
+
+        echo "Running single HP client"
+        # TODO: specify different port used by clients
+        ClientList="-C ziger2 "
+        CLIENTPORTSHIFT="-${LOAD}"
+        CLIENTCOUNT=1
+        #REALRT=10
+        getData "SHORTHP" 2>&1 | tee deleteme_HP_shortrun_out.txt
+    fi
 
     echo "waiting for benchmark to finish"
     wait
     echo "done with benchmarking"
 fi
 
+if [ "${RUNBIG}" == "yes" ] ; then
+    echo "Assuming that stack is already running, doing mixed run"
 
+    WORKLOADTYPE="RUNBIGALONE"
+    REALRT=50
+    echo "Starting big set of clients for the load for test ${UDP_TEST_NAME}"
 
+    rm -f deleteme_longrun_startTime.txt
+    getData "LONG" "./deleteme_longrun_startTime.txt"
+    echo "done with benchmarking"
+fi
 
 
 if [ "${DELETEFILES}" == "yes" ] ; then

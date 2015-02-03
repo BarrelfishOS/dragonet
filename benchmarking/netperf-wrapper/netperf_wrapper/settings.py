@@ -126,6 +126,7 @@ DEFAULT_SETTINGS = {
     'SERVER_ONLOAD_ENABLED' : False,
     'SERVER_ONLOAD_LATENCY' : False,
     'REPORT_START_RUN': '',
+    'DRAGONET_COST_FUNCTION' : '',
     #sudo onload --profile=latency --preload=/usr/lib64/libonload.so socat PIPE UDP-LISTEN:7,fork
     }
 
@@ -391,6 +392,9 @@ parser.add_option("-t", "--title-extra", action="store", type="string", dest="TI
 
 parser.add_option("--report-start-run", action="store", type="string", dest="REPORT_START_RUN",
                   help="Writes the exact start of benchmark time in given file")
+parser.add_option("--dragonet-cost-function", action="store", type="string", dest="DRAGONET_COST_FUNCTION",
+                  help="Cost function to be used by dragonet for starting stack. (balance, static, priority) ")
+#
 #
 parser.add_option("-q", "--servercores", action="store", type="int", dest="SERVER_CORES",
                   help="Number of cores to use in server")
@@ -768,6 +772,7 @@ def load():
                             TITLE=settings.TITLE,
                             NOTE=settings.NOTE,
                             SERVER_ONLOAD_LATENCY=settings.SERVER_ONLOAD_LATENCY,
+                            DRAGONET_COST_FUNCTION=settings.DRAGONET_COST_FUNCTION,
                             SERVER_ONLOAD_ENABLED=settings.SERVER_ONLOAD_ENABLED,
                             SERVER_ONLOAD_CMDLINE=settings.SERVER_ONLOAD_CMDLINE,
                             LENGTH=settings.LENGTH,
