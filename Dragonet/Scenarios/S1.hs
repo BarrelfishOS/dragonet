@@ -5,6 +5,7 @@ module Scenarios.S1 (
     , sortedRealFlows
     , real40Flows
     , sortFlows
+    , staticCost
 ) where
 
 import Dragonet.Flows(Flow (..), flowPred)
@@ -44,6 +45,8 @@ isGoldFlv2 fPerApp FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip, flDstP
             | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
             | (sport < 8000) && (sport >= (8000 - fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
             | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
+            | (sport == 5000) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True        -- For fancyecho
+            | (sport == 5000) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True        -- For fancyecho
             | otherwise = False
 isGoldFlv2 _ _ = False
 
@@ -59,9 +62,14 @@ priorityCost'' goldRange fperQ = Search.priorityCost (isGoldFl goldRange) fperQ
 prioritySort'' goldRange = Search.prioritySort (isGoldFl goldRange)
 
 
+
 -- Using flow per queue as range for gold flows
 priorityCost' fperQ =  priorityCost'' fperQ fperQ
 prioritySort' fperQ =  prioritySort'' fperQ
+
+
+priorityQs = 4
+staticCost goldRange = Search.staticCost (isGoldFl goldRange) priorityQs
 
 -- Using 1 flow per queue as range for gold flows
 priorityCost = priorityCost'' 1 1

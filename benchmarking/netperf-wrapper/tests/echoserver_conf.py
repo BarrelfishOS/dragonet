@@ -21,6 +21,42 @@ def flows_to_arg_fancyEcho(flows, listenPort, threads):
         ret = ret + ( "-t -q T%d " % (i))
     return ret
 
+def flows_to_arg_fancyEcho_linux_full(flows, listenPort, threads):
+
+    flowsPerThread = []
+    for tid in range(0, threads):
+        flowsPerThread.append([])
+
+    for fid in range(0, len(flows)) :
+        flowsPerThread[(fid % threads)].append(flows[fid])
+
+    ret = " "
+
+    for tid in range(0, len(flowsPerThread)):
+        ret = ret + ( "-a T%d " % (tid))
+        for i in range(0, len(flowsPerThread[tid])):
+            ret = ret + (" -f %s " % (flow2Str(flowsPerThread[tid][i])))
+
+    for tid in range(0, len(flowsPerThread)):
+        ret = ret + ( "-t -q T%d " % (tid))
+    print "fancyecho Linux args [%s]" % (ret)
+    return ret
+
+
+def flows_to_arg_fancyEcho_linux(flows, listenPort, threads):
+
+    ret = " "
+
+    for tid in range(0, threads):
+        ret = ret + ( "-a T%d -p %d " % (tid, listenPort))
+
+    for tid in range(0, threads):
+        ret = ret + ( "-t -q T%d " % (tid))
+
+    print "fancyecho Linux args [%s]" % (ret)
+    return ret
+
+
 def getClientPortList(clientList, startPort, noPorts=1) :
     portList = []
     for cl in range(0, len(clientList)):
@@ -93,7 +129,7 @@ def SRV_CMDS(name):
                           toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))
                       + " ./scripts/pravin/runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
                       + "./fancyEchoLinux %s " % (
-                             flows_to_arg_fancyEcho(FLOWS, SERVER_INITIAL_PORT, SERVER_CORES)),
+                             flows_to_arg_fancyEcho_linux(FLOWS, SERVER_INITIAL_PORT, SERVER_CORES)),
                         "sleep 2",
                         "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
                                     ],
@@ -105,7 +141,7 @@ def SRV_CMDS(name):
                                     "./ethtool_out_1", "./ethtool_out_2"),
                                 "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s 1000 | grep rx_packets " % (
                                     "./ethtool_out_1", "./ethtool_out_2"),
-                                "sudo killall fancyEchoLinux || true",
+#                                "sudo killall fancyEchoLinux || true",
                                  ],
                     "out_cmd" : [],
                 }
@@ -119,13 +155,13 @@ def SRV_CMDS(name):
                           toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))
                       + " ./scripts/pravin/runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
                       + "%s ./fancyEchoLinux %s " % (onload_prefix,
-                             flows_to_arg_fancyEcho(FLOWS, SERVER_INITIAL_PORT, SERVER_CORES)),
+                             flows_to_arg_fancyEcho_linux(FLOWS, SERVER_INITIAL_PORT, SERVER_CORES)),
                         "sleep 2",
                                     ],
                     "init_cmd" : [],
                     "exec_cmd" : "echo 'fancyEchoOnload should be already running'",
                     "kill_cmd" : [
-                                "sudo killall fancyEchoLinux || true",
+                                #"sudo killall fancyEchoLinux || true",
                                  ],
                     "out_cmd" : [],
                 }
@@ -142,7 +178,7 @@ def SRV_CMDS(name):
                           toCoreList2(range(0, SERVERS_INSTANCES*SERVER_CORES)))
                       + " ./scripts/pravin/runBetterBg.sh 1 ../benchmarking/micro ./fancyEchoLinux-out.log  "
                       + "./fancyEchoLinux %s " % (
-                             flows_to_arg_fancyEcho(FLOWS, SERVER_INITIAL_PORT, SERVER_CORES)),
+                             flows_to_arg_fancyEcho_linux(FLOWS, SERVER_INITIAL_PORT, SERVER_CORES)),
                         "sleep 2",
                         "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
                                     ],

@@ -396,6 +396,7 @@ static void *worker_libevent(void *arg) {
 }
 
 
+static int nthreads_copy = 0;
 /*
  * Processes an incoming "handle a new connection" item. This is called when
  * input arrives on the libevent wakeup pipe.
@@ -453,7 +454,7 @@ static void thread_libevent_process(int fd, short which, void *arg) {
                         // FIXME: set the port number to be used
                         c->thread->dn_tstate.listen_port_udp = settings.udpport;
                         //  NOTE: currently these two are directly set into stack init code
-                        ret = lowlevel_dn_stack_init(&c->thread->dn_tstate);
+                        ret = lowlevel_dn_stack_init(&c->thread->dn_tstate, nthreads_copy);
                         if (ret != SYS_ERR_OK) {
                             printf("Error: Dragonet: stack init failed\n");
                             exit(1);
@@ -821,6 +822,7 @@ void slab_stats_aggregate(struct thread_stats *stats, struct slab_stats *out) {
     }
 }
 
+
 /*
  * Initializes the thread subsystem, creating various worker threads.
  *
@@ -841,6 +843,7 @@ void thread_init(int nthreads, struct event_base *main_base) {
     cqi_freelist = NULL;
 
 
+    nthreads_copy = nthreads;
 #ifdef DRAGONET
 
 #if DETECT_NEW_FLOWS

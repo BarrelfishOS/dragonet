@@ -365,6 +365,39 @@ class MemaslapSumaryRunner(ProcessRunner):
 
         try:
             lines = output.split("\n")
+            ii = 0
+            while ii <  len(lines):
+                line = lines[ii]
+                ii = ii + 1
+
+                if line.strip() == "Total Statistics":
+                    keyline = re.sub(r'\s+', ',', lines[ii]).split(',')
+                    valline = re.sub(r'\s+', ',', lines[ii+1]).split(',')
+                    globline = re.sub(r'\s+', ',', lines[ii+2]).split(',')
+                    ii = ii + 3
+                    #print "total stats line found! keyline \n%s, value \n%s" % (
+                    #        keyline, valline)
+                    current_epoch = {}
+
+                    for kk in range(0, len(keyline)):
+                        curkey = keyline[kk].strip()
+                        if curkey != "" :
+                            if kk >= len (valline):
+                                print "Inconsistency in accessing element %d in keyline %s and valline %s" % (kk, keyline, valline)
+                                break
+                            if curkey != 'Type' :
+                                current_epoch[curkey] = [float(valline[kk]),  float(globline[kk])]
+                            else :
+                                current_epoch[curkey] = [valline[kk], globline[kk]]
+
+
+                    if 'timeline' in result.keys():
+                        result['timeline'].append(current_epoch)
+                    else :
+                        result['timeline'] = []
+                        result['timeline'].append(current_epoch)
+                    continue
+
             for line in lines:
                 parts = line.split(":")
                 key = parts[0].strip()
@@ -388,6 +421,8 @@ class MemaslapSumaryRunner(ProcessRunner):
                         if (k2 in summary_keys):
                             v2 = parts[i+1].strip().split(" ")[0]
                             cmd_output[k2] = v2.strip()
+
+            # done with all the lines
 
             if ("run time" in cmd_output.keys()) :
                 cmd_output['RT'] = float(cmd_output["run time"][:-1])

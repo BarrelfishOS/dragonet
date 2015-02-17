@@ -133,7 +133,7 @@ int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
 // "[,<remote-host>:<remote-port>]");
     snprintf(filterStr, sizeof(filterStr), "%s:%s:%d",
             "udp", localIPStr, localport1);
-    printf("The created Listen filter is [%s]\n", filterStr);
+    dprint("The created Listen filter is [%s]\n", filterStr);
 
     ef_filter_spec filter_spec;
     if(filter_parse(&filter_spec, filterStr) != 0) {
@@ -145,17 +145,23 @@ int alloc_filter_listen_ipv4(struct dragonet_sf_queue *sfq, int protocol,
     //dprint
     //printf
     snprintf(BIG_MSG_STR, sizeof(BIG_MSG_STR),
-        "%s:%s:%d:[####-- IMP --####] [vq:%p, vis:%p], [qid:%"PRIu8"], inserting listen filter proto [%d], "
-            "localip [%"PRIx32"][%s] localport[%"PRIx16"]\n",
-            __FILE__, __func__, __LINE__, sfq, vis, sfq->qid,
-            protocol, localip1, localIPStr, localport1);
+        "[qid:%"PRIu8"], listen filter proto [%d], "
+            "localip [%s] localport[%"PRIu16"]\n",
+            sfq->qid, protocol, localIPStr, localport1);
 
-    printf("%s", BIG_MSG_STR);
+
+    //printf
+    dprint
+        ("### %s:%s:%d:  [####-- IMP --####] %s",
+            __FILE__, __FUNCTION__, __LINE__,
+            BIG_MSG_STR);
+
+
 //    TRY(ef_filter_spec_set_ip4_local(&filter_spec, protocol, localip,
 //                localport));
     TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
-    //dprint
-    printf
+    dprint
+    //printf
         ("%s:%s:%d: [vq:%p], [qid:%"PRIu8"] done\n",
             __FILE__, __func__, __LINE__, sfq, sfq->qid);
     filter_manipulation_log(FILTER_MAN_FNAME, BIG_MSG_STR);
@@ -185,7 +191,7 @@ int alloc_filter_full_ipv4(struct dragonet_sf_queue *sfq, int protocol,
 // "[,<remote-host>:<remote-port>]");
     snprintf(filterStr, sizeof(filterStr), "%s:%s:%d,%s:%d",
             "udp", localIPStr, localport1, remoteIPStr, remoteport1);
-    printf("The created filter is [%s]\n", filterStr);
+    dprint("The created filter is [%s]\n", filterStr);
 
     ef_filter_spec filter_spec;
     if(filter_parse(&filter_spec, filterStr) != 0) {
@@ -197,21 +203,25 @@ int alloc_filter_full_ipv4(struct dragonet_sf_queue *sfq, int protocol,
     //dprint
     //printf
     snprintf(BIG_MSG_STR, sizeof(BIG_MSG_STR),
-        "%s:%s:%d: [####-- IMP --####] [vq:%p, vis:%p], [qid:%"PRIu8"] inserting full filter proto [%d], "
-            "localip [%"PRIx32"][%s] localport[%"PRIu16"], "
-            "RemoteIP [%"PRIx32"][%s] RemotePort[%"PRIu16"]\n",
-            __FILE__, __func__, __LINE__, sfq, vis, sfq->qid,
-            protocol, localip1, localIPStr, localport1,
-            remoteip1, remoteIPStr, remoteport1);
+        "Q: %"PRIu8", "
+            "sIP: [%s], sPort: [%"PRIu16"], "
+            "dIP: [%s], dPort: [%"PRIu16"]\n",
+            sfq->qid,
+            remoteIPStr, remoteport1,
+            localIPStr, localport1);
 
-    printf("%s", BIG_MSG_STR);
+    dprint
+        ("### %s:%s:%d:  [####-- IMP --####] %s",
+            __FILE__, __FUNCTION__, __LINE__,
+            BIG_MSG_STR);
+
 
 //    TRY(ef_filter_spec_set_ip4_full(&filter_spec, protocol,
 //                localip, localport, remoteip, remoteport));
 
     TRY(ef_vi_filter_add(&vis->vi, vis->dh, &filter_spec, NULL));
-    //dprint
-    printf
+    dprint
+    //printf
         ("%s:%s:%d: [vq:%p], [qid:%"PRIu8"] done\n",
             __FILE__, __func__, __LINE__, sfq, sfq->qid);
     filter_manipulation_log(FILTER_MAN_FNAME, BIG_MSG_STR);
@@ -269,8 +279,8 @@ bool sf_ctrl_5tuple_set(struct state *state,
     assert(sf_driver != NULL);
     q = sf_driver->queues + qi;
     assert(q->queue_handle != NULL);
-    //dprint
-    printf
+    //printf
+    dprint
         ("%s:%s:%d: [QID:%"PRIu8"], dragonet_nic = %p, "
             "sf_if = %p, (vq0 [%p, %p], [vq-%"PRIu8": %p, %p], "
             "######## setting up 5tuple filter\n",

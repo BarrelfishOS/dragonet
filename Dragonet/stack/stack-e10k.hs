@@ -239,6 +239,7 @@ doRunStackE10kIncremental :: StackE10kOpts -> IO ()
 doRunStackE10kIncremental opts = do
     -- PRG (use simple graph. Hope this works!)
     (prgU,_) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl-simple.unicorn"
+    --(prgU,_) <- E10k.graphH_ "Graphs/E10k/prgE10kImpl.unicorn"
     -- FIXME: Using full graph did not worked (atleast with incremental run)
     --prgH@(prgU,_) <- E10k.graphH
 
@@ -290,6 +291,7 @@ doRunStackE10k opts = do
 costFnL fPerq = [
       ("balance",  (\fpa nq qmap -> SE.balanceCost nq qmap, id))
     , ("priority", (S1.priorityCost', (S1.prioritySort' fPerq)))
+    , ("static",  (S1.staticCost, (id)))
  ]
 
 costFnParser = OA.str >>= doParse

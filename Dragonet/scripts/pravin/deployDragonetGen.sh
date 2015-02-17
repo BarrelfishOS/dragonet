@@ -72,11 +72,6 @@ ${SCRIPTDIR}/deployPrepare.sh
 
 EXTRAENV=""
 INITCMD=""
-if [ ${STACKNAME} == "stack-sf" ] ; then
-#sudo LD_PRELOAD=/lib/libciul.so.1.1.1 ./dist/build/${APPNAME}/${APPNAME} $@
-EXTRAENV="LD_PRELOAD=/lib/libciul.so.1.1.1"
-fi
-
 if [ ${STACKNAME} == "stack-dpdk" ] ; then
 echo "Using dpdk library"
 #EXTRAENV="LD_PRELOAD=/home/ubuntu/dragonet/dpdk-1.5.0r1/build/lib/libintel_dpdk.so"  # this does not work, causes seg-fault
@@ -93,6 +88,11 @@ RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN} dpdk ${CONC
 #RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN} dpdk  ${CONC} "
 fi
 
+if [ ${STACKNAME} == "stack-sf" ] ; then
+#sudo LD_PRELOAD=/lib/libciul.so.1.1.1 ./dist/build/${APPNAME}/${APPNAME} $@
+EXTRAENV="LD_PRELOAD=/lib/libciul.so.1.1.1"
+RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN} sf ${CONC} -i "
+fi
 
 echo "Using commandline $RUNCMD"
 case ${RUNTYPE} in

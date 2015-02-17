@@ -77,6 +77,7 @@ DEFAULT_SETTINGS = {
     'CLIENTS_CORECOUNT': {},
     'SERVER_CORES': 1,
     'CLIENT_CORES': 1,
+    'CLIENT_PORTS_SHIFT': 0,
     'HWQUEUES': 1,
     'TOTAL_CLIENTS': 0,
     'BRUST_SIZE': 1,
@@ -124,6 +125,8 @@ DEFAULT_SETTINGS = {
     'SERVER_ONLOAD_CMDLINE' : "",
     'SERVER_ONLOAD_ENABLED' : False,
     'SERVER_ONLOAD_LATENCY' : False,
+    'REPORT_START_RUN': '',
+    'DRAGONET_COST_FUNCTION' : '',
     #sudo onload --profile=latency --preload=/usr/lib64/libonload.so socat PIPE UDP-LISTEN:7,fork
     }
 
@@ -387,7 +390,12 @@ parser.add_option("-t", "--title-extra", action="store", type="string", dest="TI
 #parser.add_option("-b", "--brust", action="store", type="int", dest="BRUST_SIZE",
 #                  help="Number of concurrent transactions")
 
-
+parser.add_option("--report-start-run", action="store", type="string", dest="REPORT_START_RUN",
+                  help="Writes the exact start of benchmark time in given file")
+parser.add_option("--dragonet-cost-function", action="store", type="string", dest="DRAGONET_COST_FUNCTION",
+                  help="Cost function to be used by dragonet for starting stack. (balance, static, priority) ")
+#
+#
 parser.add_option("-q", "--servercores", action="store", type="int", dest="SERVER_CORES",
                   help="Number of cores to use in server")
 parser.add_option("--hwqueues", action="store", type="int", dest="HWQUEUES",
@@ -395,6 +403,10 @@ parser.add_option("--hwqueues", action="store", type="int", dest="HWQUEUES",
 
 parser.add_option("-Q", "--clientcores", action="store", type="int", dest="CLIENT_CORES",
                   help="Number of cores to use in client")
+
+parser.add_option("--clientPortShift", action="store", type="int", dest="CLIENT_PORTS_SHIFT",
+                  help="Shift in initial port number to be used by client")
+
 
 parser.add_option("--serverInstances", action="store", type="int", dest="SERVERS_INSTANCES",
                   help="Number of server instances")
@@ -745,6 +757,7 @@ def load():
                             CONCURRENCY = settings.CONCURRENCY,
                             TCONCURRENCY = settings.TCONCURRENCY,
                             CLIENT_CORES=settings.CLIENT_CORES,
+                            CLIENT_PORTS_SHIFT=settings.CLIENT_PORTS_SHIFT,
                             CLIENTS=settings.CLIENTS,
                             TOTAL_CLIENTS=settings.TOTAL_CLIENTS,
                             CLIENTS_IF=settings.CLIENTS_IF,
@@ -759,6 +772,7 @@ def load():
                             TITLE=settings.TITLE,
                             NOTE=settings.NOTE,
                             SERVER_ONLOAD_LATENCY=settings.SERVER_ONLOAD_LATENCY,
+                            DRAGONET_COST_FUNCTION=settings.DRAGONET_COST_FUNCTION,
                             SERVER_ONLOAD_ENABLED=settings.SERVER_ONLOAD_ENABLED,
                             SERVER_ONLOAD_CMDLINE=settings.SERVER_ONLOAD_CMDLINE,
                             LENGTH=settings.LENGTH,

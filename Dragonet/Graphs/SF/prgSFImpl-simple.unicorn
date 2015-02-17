@@ -1,10 +1,29 @@
-graph e10kPRG {
+graph SFPRG {
     cluster Rx {
-
         node L2EtherClassifyL3_ {
             port other[C5TupleFilter]
             predicate other "true"
         }
+
+/*
+        cluster L3IPv4 {
+
+            boolean Classified {
+                implementation SFL3IPv4Classified
+                attr "software"
+                port true false[]
+                constraint true "IPv4"
+                constraint false "!IPv4" }
+
+            node Checksum_ {
+                port out[ValidChecksum .C5TupleFilter] }
+
+            boolean ValidChecksum {
+                implementation SFL3IPv4ValidChecksum
+                attr "software"
+                port true false[] }
+        }
+*/
 
         config C5TupleFilter {
             type { (sip:   <UInt 32>,
@@ -12,33 +31,21 @@ graph e10kPRG {
                     proto: <Enum (TCP,UDP,SCP,OTHER)>,
                     sport: <UInt 16>,
                     dport: <UInt 16>,
-                    prio:  Int 1 7,
-                    queue: UInt 2) } <,128>
-            function config5tuple
-            port queues[Q0Valid Q1Valid Q2Valid Q3Valid Q4Valid Q5Valid Q6Valid Q7Valid Q8Valid Q9Valid Q10Valid]
-            port default[CFDirFilter] }
-
-        config CFDirFilter {
-            type { (sip:   UInt 32,
-                    dip:   UInt 32,
-                    proto: Enum (TCP,UDP,SCP,OTHER),
-                    sport: UInt 16,
-                    dport: UInt 16,
                     queue: UInt 2) }
-            function configFDir
+            function config5tuple
             port queues[Q0Valid Q1Valid Q2Valid Q3Valid Q4Valid Q5Valid Q6Valid Q7Valid Q8Valid Q9Valid Q10Valid]
             port default[ToDefaultQueue] }
 
         node ToDefaultQueue {
             port true [Q0Valid]
             predicate true "true"
-        }
+            }
 
         or Q0Valid {
             port true[Queue0]
             port false[] }
         node Queue0 {
-            implementation E10kRxQueue0
+            implementation SFRxQueue0
             attr "unproductive"
             attr "software"
             attr "init"
@@ -51,7 +58,7 @@ graph e10kPRG {
             port true[Queue1]
             port false[] }
         node Queue1 {
-            implementation E10kRxQueue1
+            implementation SFRxQueue1
             attr "unproductive"
             attr "software"
             attr "init"
@@ -64,7 +71,7 @@ graph e10kPRG {
             port true[Queue2]
             port false[] }
         node Queue2 {
-            implementation E10kRxQueue2
+            implementation SFRxQueue2
             attr "unproductive"
             attr "software"
             attr "init"
@@ -78,7 +85,7 @@ graph e10kPRG {
             port false[] }
 
         node Queue3 {
-            implementation E10kRxQueue3
+            implementation SFRxQueue3
             attr "unproductive"
             attr "software"
             attr "init"
@@ -93,7 +100,7 @@ graph e10kPRG {
             port false[] }
 
         node Queue4 {
-            implementation E10kRxQueue4
+            implementation SFRxQueue4
             attr "unproductive"
             attr "software"
             attr "init"
@@ -107,7 +114,7 @@ graph e10kPRG {
             port false[] }
 
         node Queue5 {
-            implementation E10kRxQueue5
+            implementation SFRxQueue5
             attr "unproductive"
             attr "software"
             attr "init"
@@ -121,7 +128,7 @@ graph e10kPRG {
             port false[] }
 
         node Queue6 {
-            implementation E10kRxQueue6
+            implementation SFRxQueue6
             attr "unproductive"
             attr "software"
             attr "init"
@@ -135,7 +142,7 @@ graph e10kPRG {
             port false[] }
 
         node Queue7 {
-            implementation E10kRxQueue7
+            implementation SFRxQueue7
             attr "unproductive"
             attr "software"
             attr "init"
@@ -149,7 +156,7 @@ graph e10kPRG {
             port false[] }
 
         node Queue8 {
-            implementation E10kRxQueue8
+            implementation SFRxQueue8
             attr "unproductive"
             attr "software"
             attr "init"
@@ -163,7 +170,7 @@ graph e10kPRG {
             port false[] }
 
         node Queue9 {
-            implementation E10kRxQueue9
+            implementation SFRxQueue9
             attr "unproductive"
             attr "software"
             attr "init"
@@ -177,7 +184,7 @@ graph e10kPRG {
             port false[] }
 
         node Queue10 {
-            implementation E10kRxQueue10
+            implementation SFRxQueue10
             attr "unproductive"
             attr "software"
             attr "init"
@@ -193,53 +200,55 @@ graph e10kPRG {
 
     cluster Tx {
         node Queue0 {
-            implementation E10kTxQueue0
+            implementation SFTxQueue0
             attr "sink"
             attr "software" }
         node Queue1 {
-            implementation E10kTxQueue1
+            implementation SFTxQueue1
             attr "sink"
             attr "software" }
         node Queue2 {
-            implementation E10kTxQueue2
+            implementation SFTxQueue2
             attr "sink"
             attr "software" }
         node Queue3 {
-            implementation E10kTxQueue3
+            implementation SFTxQueue3
             attr "sink"
             attr "software" }
         node Queue4 {
-            implementation E10kTxQueue4
+            implementation SFTxQueue4
             attr "sink"
             attr "software" }
         node Queue5 {
-            implementation E10kTxQueue5
+            implementation SFTxQueue5
             attr "sink"
             attr "software" }
         node Queue6 {
-            implementation E10kTxQueue6
+            implementation SFTxQueue6
             attr "sink"
             attr "software" }
         node Queue7 {
-            implementation E10kTxQueue7
+            implementation SFTxQueue7
             attr "sink"
             attr "software" }
         node Queue3 {
-            implementation E10kTxQueue3
+            implementation SFTxQueue3
             attr "sink"
             attr "software" }
         node Queue8 {
-            implementation E10kTxQueue8
+            implementation SFTxQueue8
             attr "sink"
             attr "software" }
         node Queue9 {
-            implementation E10kTxQueue9
+            implementation SFTxQueue9
             attr "sink"
             attr "software" }
         node Queue10 {
-            implementation E10kTxQueue10
+            implementation SFTxQueue10
             attr "sink"
             attr "software" }
 
     }
 }
+
+

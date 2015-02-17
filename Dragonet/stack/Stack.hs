@@ -161,9 +161,8 @@ ssMakeGraph ss args prgConf lbl xforms = do
         lpgC       = ssConfigureLpg ss args
         -- graph transformations
         debug :: O.DbgFunction ()
-        --debug = O.dbgDotfiles $ "out/graphs-fff/" ++ (show $ ssVersion ss)
-        debug = O.dbgDummy $ "will not be called!"
-        --dbg = O.dbgDummy lbl
+        debug = O.dbgDotfiles $ "out/graphs-fff/" ++ (show $ ssVersion ss)
+        --debug = O.dbgDummy $ "will not be called!"
         dbg    = debug lbl
         cfgPLA = stCfgPLA args
         pla    = (plAssign cfgPLA ss)

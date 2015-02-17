@@ -951,8 +951,16 @@ priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
 
 -- flows that match predicate get a static number of queues
 staticCost ::  (Flow -> Bool) -> Int -> Int -> QMap -> Cost
-staticCost isGold nGoldQs nq qmap = trN cost msg
+staticCost isGold nGoldQs' nq qmap = trN cost msg
     where
+          -- FIXME: Currenly hardcoding the logic of how many gold queues are
+          --        there based on total number of queues
+          nGoldQs
+            | nq == 5 = 2
+            | nq == 10 = 4
+--            | nq == 10 = 2  # for fancyecho as it will not have that many active flows
+            | otherwise = error ("no. of queues is non-standard" ++
+                    " (not 5 or 10). Given queues: " ++ (show nq))
           assignedGoldQsL = take nGoldQs $ allQueues nq -- static gold queues
           assignedGoldQsS = S.fromList assignedGoldQsL
 
@@ -1701,8 +1709,8 @@ test_normal_pravin = do
                                    , sCostFn = costFn
                                    , sOrderFlows = sortFn }
 
-        initHpNr = 3
-        initBeNr = 8
+        initHpNr = 32
+        initBeNr = (16 * 18)
         beFs = take initBeNr $ beFlows_ bePort
         hpFs = take initHpNr $ hpFlows_ hpPort
         flows = beFs ++ hpFs
@@ -1804,8 +1812,8 @@ test_incr_pravin_testcase_mixed = do
     putStrLn $ "Running incremental search usecase used for mixed benchmarking"
     prgU <- e10kU_simple
     let nq = 10
-        flowsPerGQ   = 32
-        -- initially 64 HP, 0 BE flows
+    --let nq = 5
+        flowsPerGQ   = 16
         hpPort   = 6000
         bePort   = 1000
         e10kOracle = initE10kOracle nq
@@ -1813,15 +1821,26 @@ test_incr_pravin_testcase_mixed = do
         balFn = balanceCost nq
         costFn = priFn
         sortFn = prioritySort'
+        pri = (priFn, prioritySort')
+        bal = (balFn, id)
+        myStaticCost = (staticCost isHp 4)
+        sta = (myStaticCost nq, id)
+        --fns = sta
+        fns = pri -- <-- priority does not work for 5 queues
+                  -- For 10 queues, search works, but there is flow remapping
+                  --    happening which is breaking the stack
+
         params = initIncrSearchParams {  isOracle = e10kOracle
                                        , isPrgU   = prgU
-                                       , isCostFn = costFn
-                                       , isOrderFlows = sortFn}
+                                       , isCostFn = fst fns
+                                       , isOrderFlows = snd fns}
 
     ss0 <- initIncrSearchIO params
 
-    let initHpNr = 64
-        initBeNr = 0
+    -- Initial load of 2 HP and 18 BF clients
+    --      each client with 16 flows
+    let initHpNr = (16 * 2)
+        initBeNr = (16 * 18)
     (ss1, flst) <- doTimeIt ("INIT:" ++ (show initBeNr) ++
                 " BE Flows ++ " ++ (show initHpNr) ++ " HP flow:") $ do
         let beFs = take initBeNr $ beFlows_ bePort
@@ -1834,17 +1853,49 @@ test_incr_pravin_testcase_mixed = do
     qmap <- ST.stToIO $ incrSearchQmap ss1
     putStrLn $ qmapStr qmap
 
-    -- now 64 HP, 10 BE flows
-    let n2 = 10
-    (ss2,flst2) <- doTimeIt ("Add:" ++ (show n2) ++ " LP flow(s)") $ do
+
+{-
+    -- Initial load of 2 HP and 18 BF clients
+    --      each client with 16 flows
+    (ss1', flst') <- doTimeIt ("INIT:" ++ (show 16) ++
+                " HP Flows ++ " ++ (show 16) ++ " BE flow:") $ do
+        let beFs' = take 16 $ beFlows_ bePort
+            hpFs' = take 16 $ hpFlows_ hpPort
+            flst0' = flAddedFlows hpFs'
+            flst1' = foldl FL.fsAddFlow flst0' beFs'
+        (conf, _, ss1') <- runIncrSearchIO ss1 flst1'
+        return (ss1', flst1')
+
+    qmap' <- ST.stToIO $ incrSearchQmap ss1'
+    putStrLn $ qmapStr qmap'
+-}
+
+
+    -- now add 1 BE client (16 BE flows)
+    let n2 = 16
+    (ss2,flst2) <- doTimeIt ("Add:" ++ (show n2) ++ " BE flow(s)") $ do
 
         let beFls = take n2 $ beFlows_ (bePort + initBeNr)
             flst2 = L.foldl FL.fsAddFlow (FL.fsReset flst) beFls
         (conf, _, ss2) <- runIncrSearchIO ss1 flst2
-        putStrLn $ "Configuration: " ++ (showConf  e10kOracle conf)
+        putStrLn $ "Configuration after adding first BE client: "
+                ++ (showConf  e10kOracle conf)
         return (ss2,flst2)
 
-    qmap <- ST.stToIO $ incrSearchQmap ss2
+{-
+    -- now add 1 HP client (16 HP flows)
+    let n3 = 16
+    (ss3,flst2) <- doTimeIt ("Add:" ++ (show n3) ++ " HP flow(s)") $ do
+
+        let hpFls = take n3 $ hpFlows_ (hpPort + initHpNr)
+            flst3 = L.foldl FL.fsAddFlow (FL.fsReset flst) hpFls
+        (conf, _, ss3) <- runIncrSearchIO ss2 flst3
+        putStrLn $ "Configuration after adding second HP client: "
+                ++ (showConf  e10kOracle conf)
+        return (ss3,flst2)
+-}
+    let ss3 = ss2
+    qmap <- ST.stToIO $ incrSearchQmap ss3
     putStrLn $ qmapStr qmap
     --let flows = FM.fmFlows $ isFlowMapSt ss2
     --putStrLn $ "Flows:\n" ++ (FL.flowsStr flows)

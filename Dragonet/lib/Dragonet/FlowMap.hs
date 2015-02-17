@@ -218,7 +218,7 @@ doUpdateFlowMap allFlows fm g node@(nid,fnode@(PG.FNode {})) = fm'
                         case fmGetFlow fm prevNid prevPort of
                             Left fs   -> fs
                             Right msg -> []
-                  otherwise -> error "Fnode with >1 pres"
+                  otherwise -> error $ ("Fnode with >1 pres" ++ (PG.nLabel fnode))
         flows = trN flows_ flowsMsg
         flowsMsg = "FLOWS FOR: " ++ (PG.nLabel fnode) ++ " " ++ (ppShow flows_)
 --
@@ -306,11 +306,11 @@ initFlowMapSt g = do
  where fm = initFlowMap [] g -- XXX: This call is not needed since flows are []
        -- Find the rxEntrynode to use when adding flows
        --((_,rxEntryNid,_,_),_) =  flowQueueStart
-       entryNodes = [nid | nid <- DGI.nodes g, length (DGI.pre g nid) == 0]
+       entryNodes = [nid | nid <- DGI.nodes g, length (PGU.preNE g nid) == 0]
        rxEntryNid = case filter (isNidRxNode g) entryNodes of
          [x] -> trN x $ "Entry node: " ++ PG.nLabel (fromJust $ DGI.lab g x)
-         []  -> error ("initFlowMapSt: no entry node found")
-         _   -> error "initFlowMapSt: more than one entry node found"
+         []  -> error $ "initFlowMapSt: no entry node found" ++ "g=" ++ (ppShow $ DGI.labNodes g)
+         _   -> error $ "initFlowMapSt: more than one entry node found" ++ "g=" ++ (ppShow $ DGI.labNodes g)
        lNodes = DGI.labNodes g
        -- Rx Queue nodes (we use those to calculate qmap)
        rxQNs = [(nid,qid) | (nid, nlbl) <- lNodes

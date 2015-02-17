@@ -119,7 +119,17 @@ class Aggregator(object):
         except KeyboardInterrupt:
             raise
 
-        pwLog("%s: Start run" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
+        startMsg="%s: Start run" % (datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
+        pwLog(startMsg)
+        # This is the time when we are certain that benchmark has started running
+        if settings.REPORT_START_RUN != "" :
+           f = open(settings.REPORT_START_RUN, "w")
+           f.write(startMsg)
+           f.close()
+        else:
+            print "Not reporting the start of the run"
+
+        #pwLog("%s: Start run" % datetime.now().strftime("%Y-%m-%d:%H:%M:%S"))
 
         #print "##############################"
         try:

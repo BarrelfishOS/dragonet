@@ -74,14 +74,29 @@ isRxQValidN i (_,n) =
     (nLabel n == "Q" ++ show i ++ "Valid") ||
         (nLabel n == "RxQ" ++ show i ++ "Valid")
 
-addCfgFun :: Node -> C.ConfFunction
+addCfgFun :: PG.Node -> C.ConfFunction
 addCfgFun n
     | l == "RxC5TupleFilter" = config5tuple
     | l == "RxCFDirFilterDel"   = configFDir
     | l == "RxQueues"        = configRxQueues
     | l == "TxQueues"        = configTxQueues -- not a real configuration, but helpful for building PRGs
     | otherwise = error $ "Unknown LPG CNode: '" ++ l ++ "'"
-    where l = nLabel n
+    where l = PG.nLabel n
+
+addIncrCfgFun :: PG.Node -> C.ConfFunction
+addIncrCfgFun n
+    | l == "RxC5TupleFilter" = incrConfig5tuple
+    | otherwise              = error $ "Unknown PRG CNode: '" ++ l ++ "'"
+    where l = PG.nLabel n
+
+addIncrCfgCounter :: PG.Node -> Int
+addIncrCfgCounter n
+    | l == "RxC5TupleFilter" = rx5tFilterTableSize
+    | otherwise              = error $ "Unknown PRG CNode: '" ++ l ++ "'"
+    where l = PG.nLabel n
+
+
+
 
 cfgEmpty = [
     ("RxC5TupleFilter", PG.CVList [])
@@ -92,6 +107,7 @@ rx5tFilterTableSize  = ftCount
 rx5tFilterTableFull cnf = case L.lookup "RxC5TupleFilter" cnf of
     Nothing            -> False
     Just (PG.CVList l) -> length l >= rx5tFilterTableSize
+
 
 
 -------------------------------------------------------------------------------
@@ -298,6 +314,74 @@ config5tuple _ _ inE outE cfg = do
             let fEdge = (n,queue $ c5tQueue c,Edge "false")
             --return ((n,Edge "false"), es ++ [inEdge,tEdge,fEdge])
             return ((n,Edge "false"), es ++ [inEdge,tEdge])
+
+
+--
+-- Configuring Filter nodes
+--
+
+-- configure filter node helper #1:
+--   get the node id of a specific queue from the out edges
+filterQueueNid :: [(PG.PGNode, PG.Edge)] -> QueueId -> DGI.Node
+filterQueueNid outEs qid = case L.find (isRxQValidN qid . fst) outEs of
+        Just ((x,_),_) -> x
+        Nothing        -> error errmsg
+    where errmsg = "filterQueueNid: no RxQValid for queue=" ++ (show qid)
+                 ++ " Does the queue exist?"
+
+-- configure filter node helper #2:
+--   get the node id of the default queue
+filterDefaultNid :: [(PG.PGNode, PG.Edge)] -> DGI.Node
+filterDefaultNid outEs = case L.find ((== "default") . PG.ePort . snd) outEs of
+      (Just ((x,_),_)) -> x
+      Nothing          -> error "filterDefaultNid: could not find default queue nid"
+
+
+
+-- adds a single filter incrementally (i.e., C-node is re-added)
+-- Notes:
+--  - filter nodes expect a single in edge
+doConfigFilterInc
+  ::  (C.ConfValue -> a) -- filter from conf value
+  ->  (a -> PG.Node)     -- get filter node
+  ->  (a -> QueueId)     -- get queue id for this filter
+  -> C.ConfFunction
+doConfigFilterInc parseConf mkFiltLabel getQueue
+                  _ (_, cnodeLabel_@(PG.CNode {}))
+                  (inE:[]) outEs cfg = do
+
+    let filter = parseConf cfg
+        count = PG.nIncrCounter cnodeLabel_
+        count' = count - 1
+        cnodeLabel = trN cnodeLabel_ ("IncrCounter=" ++ (ppShow count'))
+    -- add a filter node and a C-node node
+    (filterNid,_) <- C.confMNewNode $ mkFiltLabel filter
+    nextNid <- case count' of
+            0 -> return $ filterDefaultNid outEs
+            _ -> do (nid,_) <- C.confMNewNode
+                               $ cnodeLabel {PG.nIncrCounter = count'}
+                    return nid
+
+    let filterQNid = filterQueueNid outEs $ getQueue filter
+        ((inNid,_), inEdgeLabel) = inE
+        -- in edge
+        inEdge    = (inNid, filterNid, inEdgeLabel)
+        -- out edges to Queue OR node (we do  not include the false edge)
+        tEdgeOR   = (filterNid, filterQNid, PG.Edge "true")
+        fEdgeOR   = (filterNid, filterQNid, PG.Edge "false")
+        -- false edge to (new) CNode
+        nextIn   = (filterNid, nextNid, PG.Edge "false")
+        cnodeOuts = case count' of
+                0 -> []
+                _ -> [ (nextNid, xid, xedge) | ((xid,_),xedge) <- outEs ]
+        newEdges  = inEdge:tEdgeOR:nextIn:cnodeOuts
+    return newEdges
+
+-- incrementally configure a 5-tuple
+-- XXX: this does not consider 5-tuple priorities (The oracle does not generate
+-- 5t filters with priorities, so it's good for now)
+incrConfig5tuple :: C.ConfFunction
+incrConfig5tuple = doConfigFilterInc parse5t nodeL5Tuple c5tQueue
 
 
 
@@ -524,8 +608,10 @@ configTxQueues _ (_,cfgn) inE outE (CVInt qs) = do
             return $ prev ++ iE ++ oE ++ sE
 
 
-prepareConf :: PGraph -> PGraph
-prepareConf = C.replaceConfFunctions addCfgFun
+prepareConf :: PG.PGraph -> PG.PGraph
+prepareConf g = C.replaceIncrConf addIncrCfgCounter addIncrCfgFun $
+                C.replaceConfFunctions addCfgFun g
+
 
 ----
 -- Try to figure out at  which queue a flow will end up.

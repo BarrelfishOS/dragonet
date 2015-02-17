@@ -48,9 +48,9 @@ dragonet_container = {
 ORACLE = "hardcoded"
 ORACLE = "greedy"
 
-COSTFN = "priority"
-COSTFN = "balance"
-
+def get_dragonet_cost_function():
+    assert(SPECIAL_CLIENTS_COUNT != '')
+    return DRAGONET_COST_FUNCTION
 
 def get_stack_cmd(name):
     # Ugly hack to overload SERVER_CORESHIFT function to decide
@@ -64,9 +64,8 @@ def get_stack_cmd(name):
                 get_isolation_container(is_server=False, cores_needed=HWQUEUES))
             + " %s %d %s " % (
                 dragonet_container[name]['deploy_stack'],
-                HWQUEUES, COSTFN)
+                HWQUEUES, get_dragonet_cost_function())
             + " %s %d %d " % (ORACLE, CONCURRENCY,
                 len(client_names)))
     return cmd
-
 
