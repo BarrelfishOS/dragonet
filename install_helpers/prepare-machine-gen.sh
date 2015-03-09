@@ -8,39 +8,106 @@
 #wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo pt-key add -
 #sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1E9377A2BA9EF27F
 
+
+check_file_exists(){
+  local message
+  if [ -z "$1" ]
+  then
+    echo "-Parameter #1 is missing. Please try again.-"  # Or no parameter passed.
+    exit 1
+  fi
+  if [ -z "$2" ]
+  then
+    message="File"
+  else
+    message=$2
+  fi
+
+  if [ ! -f $1 ]
+  then
+    echo "$message $1 does not exist"
+    exit 1
+  fi
+}
+
+check_file_executable(){
+  local message
+  if [ -z "$1" ]
+  then
+    echo "-Parameter #1 is missing. Please try again.-"  # Or no parameter passed.
+    exit 1
+  fi
+  if [ -z "$2" ]
+  then
+    message="File"
+  else
+    message=$2
+  fi
+
+  if [ ! -x $1 ]
+  then
+    echo "$message $1 does not have execute permission"
+    exit 1
+  fi
+}
+
+check_dir_exists(){
+  local message
+  if [ -z "$1" ]
+  then
+    echo "-Parameter #1 is missing. Please try again.-"  # Or no parameter passed.
+    exit 1
+  fi
+  if [ -z "$2" ]
+  then
+    message="Directory"
+  else
+    message=$2
+  fi
+
+  if [ ! -d $1 ]
+  then
+    echo "$message $1 does not exist"
+    exit 1
+  fi
+}
+
+
+
+Z3LOCATION="/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/"
+
 install_base () {
 ## BASE: For both server and client ###################
 sudo apt-get update
 sudo apt-get install -y git build-essential vim
 sudo apt-get install -y autoconf automake
 sudo apt-get install -y libevent-dev
+sudo apt-get install -y htop
 }
-
 
 
 install_server_deps() {
-## For server:  ###################
-
-#sudo apt-get dist-upgrade -y
-sudo apt-get install -y clang-3.4 clang-3.4-doc libclang-common-3.4-dev libclang-3.4-dev libclang1-3.4 libclang1-3.4-dbg libllvm-3.4-ocaml-dev libllvm3.4 libllvm3.4-dbg lldb-3.4 llvm-3.4 llvm-3.4-dev llvm-3.4-doc llvm-3.4-examples llvm-3.4-runtime clang-modernize-3.4 clang-format-3.4 python-clang-3.4 lldb-3.4-dev
-
-sudo apt-get install -y ghc cabal-install zlib1g-dev g++-4.6 happy
-cabal update
-cabal install cabal-install
-export PATH="${HOME}/.cabal/bin:$PATH"
+    # For haskell part of the Dragonet
+    sudo apt-get install -y clang-3.4 clang-3.4-doc libclang-common-3.4-dev \
+    libclang-3.4-dev libclang1-3.4 libclang1-3.4-dbg libllvm-3.4-ocaml-dev  \
+    libllvm3.4 libllvm3.4-dbg lldb-3.4 llvm-3.4 llvm-3.4-dev llvm-3.4-doc   \
+    llvm-3.4-examples llvm-3.4-runtime clang-modernize-3.4 clang-format-3.4 \
+    python-clang-3.4 lldb-3.4-dev
 
 
-cd ${MYBASE}/dragonet/dpdk-1.5.0r1/
-./doConfig.sh
-make
 
-cd ${MYBASE}/dragonet/Dragonet/
-./prepare_sandbox.sh
-cabal build -j
+    sudo apt-get install -y ghc cabal-install zlib1g-dev g++-4.6 happy
+    sudo apt-get install -y ghc*-prof
 
-cd ${MYBASE}/dragonet/benchmarking/memcached/
-./autogen.sh && ./configure && make memcached
+    cd ${MYBASE}
+
+    cabal update
+    # NOTE: Using specific version of the cabal to avoid conflict with llvm-gen
+    # https://github.com/bscarlet/llvm-general/issues/122
+    #cabal install cabal-install
+    cabal install cabal-install-1.20.0.6
 }
+
 
 install_client_deps() {
 ##### for client side ####################
@@ -48,6 +115,7 @@ install_client_deps() {
 sudo apt-get install -y autoconf automake
 sudo apt-get install -y makeinfo
 
+check_dir_exists  ${MYBASE}/dragonet/benchmarking/netperf-2.6.0 "netperf codebase"
 cd ${MYBASE}/dragonet/benchmarking/netperf-2.6.0
 ./configure_compile.sh
 make
@@ -57,8 +125,16 @@ sudo make install
 sudo ln -s /usr/bin/aclocal /usr/bin/aclocal-1.13
 sudo ln -s /usr/bin/automake /usr/bin/automake-1.13
 
+check_dir_exists  ${MYBASE}/dragonet/benchmarking/libmemcached-1.0.18 "memaslap codebase"
 cd ../libmemcached-1.0.18/
 ./configure_install_dragonet.sh
+
+cd ${MYBASE}/dragonet/benchmarking/dstat
+sudo make install
+
+sudo apt-get install -y ethtool
+
+
 #automake --add-missing
 
 # Avoiding as installing this takes around 1G space!!!
@@ -71,6 +147,8 @@ cd ../libmemcached-1.0.18/
 #make compile
 
 }
+
+
 
 
 setup_work_env_pravin() {
@@ -115,24 +193,7 @@ install_useful_tools() {
     sudo apt-get install -y  python-numpy
 }
 
-
-old_installation() {
-    install_base
-#    get_repository
-#    install_server_deps
-#    install_client_deps
-#    setup_vim_pravin
-#    install_useful_tools
-}
-
-install_new_tools() {
-    sudo apt-get update
-    sudo apt-get install -y htop
-}
-
-
 get_repository () {
-    install_new_tools
     cd ${MYBASE}
     if [[ -d "dragonet" ]] ; then
         echo "dragonet already exists. You may want to delete it, or run without -g option" ;
@@ -147,21 +208,25 @@ get_repository () {
 
 
 install_dpdk() {
+    check_dir_exists ${MYBASE}/dragonet/dpdk-1.7.1/ "dpdk codebase"
     cd ${MYBASE}/dragonet/dpdk-1.7.1/
     ./doConfig.sh
 }
 
 install_openonload() {
+    check_dir_exists ${MYBASE}/dragonet/openonload-201310-u2/ "onload codebase"
     cd ${MYBASE}/dragonet/openonload-201310-u2/
     sudo ./scripts/onload_install
     sudo onload_tool reload
     sudo cp build/gnu_x86_64/lib/ciul/libciul.so.1.1.1 /lib/
 
     cd ${MYBASE}
-    setIPaddress.sh
+    #setIPaddress.sh
 }
 
 clean_prepare_Dragonet() {
+
+    check_dir_exists  ${MYBASE}/dragonet/Dragonet/ "Dragonet codebase"
     cd ${MYBASE}/dragonet/Dragonet/
 
     export PATH="${HOME}/.cabal/bin:$PATH"
@@ -173,29 +238,20 @@ clean_prepare_Dragonet() {
     echo "Preparing sandbox"
     ./prepare_sandbox.sh
 
-    # FIXME: make sure that the z3 library exists
+    check_dir_exists ${Z3LOCATION}  "z3 installation location"
 
-    cabal install z3 --extra-include-dirs=/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/include/ --extra-lib-dirs=/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/bin/
+    cabal install z3 --extra-include-dirs=${Z3LOCATION}/include/ --extra-lib-dirs=${Z3LOCATION}/bin/
 }
 
 
 install_Dragonet() {
 
-sudo apt-get install -y clang-3.4 clang-3.4-doc libclang-common-3.4-dev libclang-3.4-dev libclang1-3.4 libclang1-3.4-dbg libllvm-3.4-ocaml-dev libllvm3.4 libllvm3.4-dbg lldb-3.4 llvm-3.4 llvm-3.4-dev llvm-3.4-doc llvm-3.4-examples llvm-3.4-runtime clang-modernize-3.4 clang-format-3.4 python-clang-3.4 lldb-3.4-dev
+    check_dir_exists  ${HOME}/.cabal/bin  "Local cabal installation"
+    check_file_exists  ${HOME}/.cabal/bin/cabal  "local cabal binary"
 
-sudo apt-get install -y ghc cabal-install zlib1g-dev g++-4.6 happy
-sudo apt-get install -y ghc*-prof
-
-    cd ${MYBASE}
-
-    cabal update
-    cabal install cabal-install
     export PATH="${HOME}/.cabal/bin:$PATH"
-
     clean_prepare_Dragonet
-
-    #cabal build llvm-cgen llvm-cgen-e10k bench-echo llvm-cgen-sf
-    cabal build bench-fancyecho stack-dpdk stack-sf stack-e10k
+    cabal build bench-fancyecho stack-dpdk stack-sf
 }
 
 
@@ -204,43 +260,29 @@ install_memcached() {
     ./autogen.sh && ./configure && make memcached
 }
 
-install_memcached_client() {
-    cd ${MYBASE}/dragonet/benchmarking/libmemcached-1.0.18/
-    ./configure_install_dragonet.sh
-}
 
-install_others() {
-    cd ${MYBASE}/dragonet/benchmarking/netperf-2.6.0
-    ./configure_compile.sh
-    make
-    sudo make install
-    cd ${MYBASE}/dragonet/benchmarking/dstat
-    sudo make install
-}
-
-install_z3_related() {
-    cd ~/
+copy_and_install_z3() {
+    cd  "${MYBASE}"
     cp -r /cdrom/casper/mount/bin/z3Solver/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/ .
-    link_and_compile_z3
+    Z3LOCATION="${MYBASE}/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/"
+    link_z3
 }
 
-link_and_compile_z3() {
-    cd /usr/bin/
-    sudo ln -s /home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/bin/z3 z3
-    sudo cp ~/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/bin/libz3.so /lib/x86_64-linux-gnu/
 
-    install_Dragonet
+link_z3() {
+
+    check_file_exists ${Z3LOCATION}/bin/z3 "z3 executable"
+    check_file_exists ${Z3LOCATION}/bin/libz3.so "z3 library"
+
+    cd /usr/bin/
+    sudo ln -s ${Z3LOCATION}/bin/z3 z3
+    sudo cp ${Z3LOCATION}/bin/libz3.so /lib/x86_64-linux-gnu/
+#    install_Dragonet
 }
 
 install_server_related() {
-    #install_Dragonet
-    install_z3_related
+    install_Dragonet
     install_memcached
-}
-
-install_client_related() {
-    install_memcached_client
-    install_others
 }
 
 
@@ -267,48 +309,46 @@ install_spark_nfs() {
 show_usage() {
         echo "Please specify what you want to install"
         echo "Usage: ${0} [-g -s -c -o -d -v -i]"
-        echo "           -g -->  clone the git repository"
-        echo "           -i -->  install all tools"
+        echo "           -g -->  clone the git repository over ETHZ NFS"
+        echo "           -i -->  install all base tools"
+        echo "           -s -->  install server dependncy packages"
+        echo "           -c -->  install client dependncy packages, and tools"
+        echo "           -z -->  Copy z3 from ETHZ NFS"
+        echo "           -l -->  link and compile DN with z3"
         echo "           -d -->  install dpdk"
         echo "           -o -->  install onload"
-        echo "           -c -->  compile and install client side of dragonet"
-        echo "           -C -->  Clean and re-prepare Dragonet cabal setup"
-        echo "           -s -->  compile and install server side of dragonet"
-        echo "           -v -->  setup vim configuration (pravin's configuration)"
-        echo "           -z -->  install z3 related"
-        echo "           -l -->  Only link and compile DN with z3"
-        echo "           -p -->  install spark deps"
-        echo "           -r -->  refresh NFS mount for spark"
-        echo "Examples (installing everything): ${0} -g -d -o -c -s"
-        echo "Examples (installing minimal client):: ${0} -g -c"
+        echo "           -S -->  Compile and Install server side of dragonet"
+        echo "Examples (clone repo and z3 on eth network): ${0} -g -z"
+        echo "Examples (installing server): ${0} -i -s -d -o -S"
+        echo "Examples (installing client):: ${0} -i -c"
         exit 1
 }
 
-while getopts ":igcsdovzprlC" opt; do
+while getopts ":gisczldoSCv" opt; do
   case $opt in
-    i)
-        echo "-i was triggered, installing all tools"
-        INSTALLT="yes"
-        ;;
     g)
         echo "-g was triggered, cloning git repo"
         CLONE="yes"
       ;;
+    i)
+        echo "-i was triggered, install base tools"
+        INSTALLT="yes"
+        ;;
     c)
-        echo "-c was triggered, compiling client side"
-        CLIENTCOMPILE="yes"
+        echo "-c was triggered, installing clientside tools"
+        CLIENTDEPS="yes"
       ;;
     s)
         echo "-s was triggered, compiling server side"
+        SERVERDEPS="yes"
+      ;;
+    S)
+        echo "-S was triggered, Compiling server side of Dragonet"
         SERVERCOMPILE="yes"
       ;;
     d)
         echo "-d was triggered, setting for compilation of dpdk code"
         DPDK="yes"
-      ;;
-    C)
-        echo "-C Clean preparing cabal installation for Dragonet "
-        CABALCLEANPREPARE="yes"
       ;;
     o)
         echo "-o was triggered, setting for compilation of openonload code"
@@ -318,23 +358,14 @@ while getopts ":igcsdovzprlC" opt; do
         echo "-v was triggered, setting up pravin's vim configuration"
         VIMSETUP="yes"
       ;;
-    p)
-        echo "-p was triggered, setting up spark deps"
-        SPARKSETUP="yes"
-      ;;
-    r)
-        echo "-r was triggered, refreshing spark nfs mount by remounting it"
-        REFRESHNFS="yes"
-      ;;
     z)
         echo "-z was triggered, setting up z3"
         Z3SETUP="yes"
       ;;
     l)
-        echo "-z was triggered, setting up z3"
-        Z3LINKCOMPILE="yes"
+        echo "-l was triggered, linking z3"
+        Z3LINK="yes"
       ;;
-
     \?)
         echo "Invalid option: -$OPTARG" >&2
         show_usage
@@ -348,11 +379,10 @@ while getopts ":igcsdovzprlC" opt; do
   esac
 done
 
-
 MYBASE="$HOME"
 
 if [ "${INSTALLT}" == "yes" ] ; then
-install_new_tools
+install_base
 fi
 
 if [ "${CLONE}" == "yes" ] ; then
@@ -361,6 +391,21 @@ if [ "${CLONE}" == "yes" ] ; then
 else
     echo "Skipping cloning of Dragonet repository"
 fi
+
+if [ "${CLIENTDEPS}" == "yes" ] ; then
+    echo "Installing clientside"
+    install_client_deps
+else
+    echo "Skipping Installing clientside"
+fi
+
+if [ "${SERVERDEPS}" == "yes" ] ; then
+    echo "Installing server deps"
+    install_server_deps
+else
+    echo "Skipping Installing server deps"
+fi
+
 
 if [ "${OPENONLOAD}" == "yes" ] ; then
     echo "Installing openonload driver"
@@ -374,6 +419,20 @@ if [ "${DPDK}" == "yes" ] ; then
     install_dpdk
 else
     echo "Skipping Installing dpdk driver"
+fi
+
+if [ "${Z3SETUP}" == "yes" ] ; then
+    echo "Installing z3 setup"
+    copy_and_install_z3
+else
+    echo "Skipping Installing z3 setup"
+fi
+
+if [ "${Z3LINK}" == "yes" ] ; then
+    echo "Linking z3 and compiling dragonet with it"
+    link_z3
+else
+    echo "Linking z3 and compiling it"
 fi
 
 if [ "${SERVERCOMPILE}" == "yes" ] ; then
@@ -398,30 +457,8 @@ else
     echo "Skipping Refreshing Spark NFS mount"
 fi
 
-if [ "${Z3SETUP}" == "yes" ] ; then
-    echo "Installing z3 setup"
-    install_z3_related
-else
-    echo "Skipping Installing z3 setup"
-fi
-
-if [ "${Z3LINKCOMPILE}" == "yes" ] ; then
-    echo "Linking z3 and compiling dragonet with it"
-    link_and_compile_z3
-else
-    echo "Linking z3 and compiling it"
-fi
-
 if [ "${CABALCLEANPREPARE}" == "yes" ] ; then
     clean_prepare_Dragonet
-fi
-
-
-if [ "${CLIENTCOMPILE}" == "yes" ] ; then
-    echo "Compiling Dragonet client side"
-    install_client_related
-else
-    echo "Skipping Compiling Dragonet client side"
 fi
 
 if [ "${VIMSETUP}" == "yes" ] ; then

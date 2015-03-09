@@ -1,0 +1,371 @@
+# Dragonet #
+This file explains how to install and use Dragonet system.
+
+
+## Installing Server ##
+
+System Requirements:
+ - OS: Linux x86_64 system with kernel version 3.13 or above
+ - All the instructions here assume Ubuntu based system.
+   We have tested them on Ubuntu-14.04 system in our internal setup.
+
+Hardware requirements:
+ - We assume that one of the following 10G NIC is present
+   - Intel i82599 10Gb NIC
+   - Solarflare SFC9020 10Gb NIC
+
+We have provided helper script to simplify the installation of the
+Dragonet dependencies in `dragonet/install_helpers/prepare-machine-gen.sh`
+script.  This script shows help and few usage examples when run with `-h`
+option.
+
+### Installing Z3 ###
+
+Z3 is a high performance SAT solver that we are using in Dragonet for
+constraint solving.  You will have to download this manually and make
+sure that it is availble on the server.
+
+We are using `z3-4.3.2.24961dc5f166-x64-ubuntu-13.10` in our setup, and can
+be downloaded from following location:
+http://z3.codeplex.com/downloads/get/882800
+
+Other versions of Z3 should also work, but we haven't tested them.
+
+Z3 homepage:
+http://z3.codeplex.com/
+
+Once you copy the unzipped z3 folder on the server, provide the path
+of this location to the install helper script by modifying the "Z3LOCATION"
+variable in `prepare-machine-gen.sh` script.  The script will use this
+path to create necessary links to the z3 binary and library.
+
+
+
+### Copy of the code ###
+
+You need to copy the whole "dragonet" repository in both server and client
+machines.  We propose that you clone or copy the repository directly into
+the home directory of the user which will be used for running servers and
+clients.  This user is assumed to have sudo access.  In our setup, we
+are using a user "ubuntu" and the code repository is located at
+"${HOME}/dragonet".  We recommend using this type of the path for keeping
+the copy of the dragonet.
+
+In case your path is different, you need to edit "MYBASE" variable in the
+`prepare-machine-gen.sh`  script.
+
+
+### Installing the server Dependencies ###
+
+Once you have Z3 and the dragonet codebase copied, you can install the
+serverside dependencies with following command ::
+
+```
+./dragonet/install_helpers/prepare-machine-gen.sh -l -i -s
+```
+
+The above command will :
+ * `-l`: Link the z3 related binaries and libraries
+ * `-i`: Install base packages
+ * `-s`: Install server related packages and tools.  This will include
+           all the Haskell dependencies and new version of tool cabal.
+
+After installing these tools, you need to add newer version of cabal in
+your path.  You can do this by appending following line in your `${HOME}/.bashrc`
+
+export PATH="${HOME}/.cabal/bin:$PATH"
+
+You can restart your bash shell, and make sure that proper cabal is used
+by default.
+
+
+### Make sure you have properly linked kernel source code ###
+
+We need to install the dpdk driver for Intel 82599 10GbE NIC and/or
+onload driver for Solarflare SFC9020 NIC.  Both of these will compile
+kernel modules which depend and having a local copy of kernel source
+code for currently running kernel at proper location.  You can find
+instructions about howto get and install proer kernel source-code
+and header files for your kernel version on Internet.
+
+
+### Installing dpdk and onload driver ###
+
+You can install dpdk and/or onload driver in your system with following
+commands.  Keep in mind that these installation may depend on having
+proper hardware in your machine, so we recommend installing only those
+drivers for which you have hardware in your machine.
+
+```
+./dragonet/install_helpers/prepare-machine-gen.sh -d -o
+```
+
+ * `-d`: Compile dpdk modules, assuming you have Intel 82599 10GbE NIC
+ * `-o`: Compile onload modules, assuming you have Solarflare SFC9020 NIC
+
+
+### Installing Dragonet ###
+
+By now you have installed all the dependencies and tools.  Now you can compile
+and install the Dragonet code.  This can be done by following command:
+
+```
+./dragonet/install_helpers/prepare-machine-gen.sh -S
+```
+
+This will compile and install Dragonet stack and memcached server.
+You can verify that everything went proper by making sure the presense
+of following file:
+
+ - `dragonet/Dragonet/dist/build/bench-fancyecho/bench-fancyecho`
+ - `dragonet/Dragonet/dist/build/stack-sf/stack-sf`
+ - `dragonet/Dragonet/dist/build/stack-dpdk/stack-dpdk`
+
+### Configuring NICs ###
+
+This step is needed to make sure that NIC is configured to be used with
+Dragonet network stack.  It involves configuring the NIC itstelf,
+and providing information about the NIC to Dragonet.
+
+#### Configuring dpdk ####
+
+The dpdk driver needs you to perform certain steps in order to move
+the NIC from Linux kernel driver to dpdk driver.  The
+`dragonet/dpdk-1.7.1/README_DRAGONET.rst` file will provide further
+information on how to configure the NIC for dpdk.
+
+
+Essentially, it boils down to running following two commands:
+
+
+```
+cd dragonet/dpdk-1.7.1
+sudo ./tools/setup.sh dragonet
+./dragonet_bind_ethernet.sh eth7 | tee if_info.txt
+```
+
+Here, eth7 is the interface which will be used by Dragonet to send
+and receive the packets.
+
+Make sure that you copy down the IP address and the MAC address
+of the interface you want to use.   All these values are available in
+the output of `dragonet_bind_ethernet.sh` command.
+From this point onwards the eth7 interface will be invisible to the linux
+network stack, and will be only available to the dpdk stack.
+
+##### Providing information to Dragonet #####
+
+Currently Dragonet has hardcoded values for MAC address
+and the IP address to be used for the NIC interface.  You need to
+edit couple of defines in the file
+`dragonet/Dragonet/c_impl/dpdkDrv/packetRxTx.c` with values based on
+your interface.  Note that the values are in network order, so edit them
+accordingly.  The examples in the code should help you with it.
+ - `CONFIG_LOCAL_MAC`
+ - `CONFIG_LOCAL_IP`
+
+You also need to modify the value of server IP address for Intel NIC in file
+`dragonet/Dragonet/Scenarios/S3.hs`.  The variable holding the value
+of Intel NIC IP address is `asiagoIntel_server`.
+
+Once the modifications are done, you need to recompile the stack with
+following command:
+
+```
+cd dragonet/Dragonet
+cabal clean
+cabal build stack-dpdk
+```
+
+
+
+#### Configuring onload ####
+
+Configuring onload to use with Dragonet is relatively easy.  Just make sure
+that you have compiled and installed all the required tools with
+`prepare-machine-gen.sh -o` option (should have been done as part of
+the "Installing dpdk and onload driver").
+
+After above installation you will notice that the name of interface is
+changed from "ethX" to something of a format "pXXXpX" (eg: "p786p1").
+You may have to reconfigure the interface as the old IP configuration
+might have been lost after this step.
+
+The onload driver works in collaboration with Linux kernel network stack,
+hence you will see the device to be present in Linux network stack as well
+when you are using onload and Dragonet.
+
+
+##### Providing information to Dragonet #####
+
+Currently Dragonet has hardcoded values for interface name, MAC address
+and the IP address to be used for the NIC interface.  You need to
+edit folowing defines in a file
+`dragonet/Dragonet/c_impl/onloadDrv/efvi_sfw.h` with values based on
+your interface.  Note that the values are in network order, so edit them
+accordingly.  The examples in the code should help you with it.
+ - `IFNAME`
+ - `CONFIG_LOCAL_MAC_sf`
+ - `CONFIG_LOCAL_IP_sf`
+
+You also need to modify the value of server IP address for SF NIC in file
+`dragonet/Dragonet/Scenarios/S3.hs`.  The variable holding the value
+of Solarflare NIC IP address is `asiagoSF_server`.
+
+Once the modifications are done, you need to recompile the stack with
+following command:
+
+```
+cd dragonet/Dragonet
+cabal clean
+cabal build stack-sf
+```
+
+
+#### Providing information about client machines ####
+
+Few of the Dragonet usecases needs information about the IP addresses
+of the client machines which will be used for the load generation.
+This is specifically needed for the priority workload where Dragonet
+needs to know about which clients are high priority and which clients
+are low priority.  This list of client IP addresses is in the file
+`dragonet/Dragonet/Scenarios/S3.hs` and is maintained in a variable
+named `getClientList_real`.   We tend to keep this list sorted based
+on which clients are high priority and which are low priority.
+
+It is fine if you miss some clients in this list,
+if they are low priority, but Dragonet needs to know about high priority
+clients.
+
+Another location where you will need to provide information about the
+high priority client is in the `dragonet/Dragonet/Scenarios/S1.hs` file.
+Essentially you need to replace the current high priority clients
+("10.113.4.57" and "10.113.4.51") with your own pair of high priority clients.
+
+You need to rebuild the stacks after modifying information about priority
+clients.  Here is a command which will rebuild everything needed:
+
+```
+cd dragonet/Dragonet
+cabal build bench-fancyecho stack-sf stack-e10k
+```
+
+## Running Dragonet stack ##
+
+Once the dragonet stack is compiled, it can be deployed with following
+helper script.
+
+For dpdk stack (on Intel 82599 NIC):
+```
+cd dragonet/Dragonet
+./scripts/pravin/deployDragonetGen.sh fg dpdk 4 balance
+```
+
+For sf stack (on solarflare SFC9020 NIC):
+```
+cd dragonet/Dragonet
+./scripts/pravin/deployDragonetGen.sh fg sf 4 balance
+```
+
+### Verifying that Dragonet is running properly ###
+
+The easiest way to verify that if the dragonet stack is
+running properly or not is to ping it from a remote machine.
+
+Here is a typical ping before running the Dragonet stack.
+```
+ubuntu@ziger2:~$ sudo ping 10.113.4.195
+PING 10.113.4.195 (10.113.4.195) 56(84) bytes of data.
+64 bytes from 10.113.4.195: icmp_seq=1 ttl=64 time=0.244 ms
+64 bytes from 10.113.4.195: icmp_seq=2 ttl=64 time=0.136 ms
+64 bytes from 10.113.4.195: icmp_seq=3 ttl=64 time=0.127 ms
+64 bytes from 10.113.4.195: icmp_seq=4 ttl=64 time=0.138 ms
+^C
+--- 10.113.4.195 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 2997ms
+rtt min/avg/max/mdev = 0.127/0.161/0.244/0.048 ms
+```
+
+Note that the TTL values are 64 here (default for Linux network stack).
+Following is the ping output when Dragonet stack was controlling the
+same interface on server:
+
+```
+ubuntu@ziger2:~$ sudo ping -c 5 10.113.4.195
+PING 10.113.4.195 (10.113.4.195) 56(84) bytes of data.
+64 bytes from 10.113.4.195: icmp_seq=1 ttl=17 time=0.057 ms
+64 bytes from 10.113.4.195: icmp_seq=2 ttl=17 time=0.044 ms
+64 bytes from 10.113.4.195: icmp_seq=3 ttl=17 time=0.048 ms
+64 bytes from 10.113.4.195: icmp_seq=4 ttl=17 time=0.042 ms
+64 bytes from 10.113.4.195: icmp_seq=5 ttl=17 time=0.045 ms
+
+--- 10.113.4.195 ping statistics ---
+5 packets transmitted, 5 received, 0% packet loss, time 3999ms
+rtt min/avg/max/mdev = 0.042/0.047/0.057/0.006 ms
+```
+
+Note that the the TTL values here are 17 instead of 64.  This is
+because Dragonet stack is programmed to return 17 as TTL value
+so that any packet sent out by Dragonet can be distinguished easily.
+
+If you don't see this TTL value, then you can assume that something
+is wrong on the server-side deployment, or that you are pinging the
+wrong interface.
+
+
+
+## Client installation ##
+
+On client side, installation is little simpler.  You just need to get
+the copy of the code.  We have copied the instructions from
+server installation section about getting the code here.
+
+### Copy of the code ###
+
+You need to copy the whole "dragonet" repository in both server and client
+machines.  We propose that you clone or copy the repository directly into
+the home directory of the user which will be used for running servers and
+clients.  This user is assumed to have sudo access.  In our setup, we
+are using a user "ubuntu" and the code repository is located at
+"${HOME}/dragonet".  We recommend using this type of the path for keeping
+the copy of the dragonet.
+
+In case your path is different, you need to edit "MYBASE" variable in the
+`prepare-machine-gen.sh`  script.
+
+
+### Installing the client side ###
+
+The client side can be installed with following command:
+
+```
+./dragonet/install_helpers/prepare-machine-gen.sh -i -c
+```
+
+To make sure that your installation is correct and that your clients will
+use correct load-generator tools,  just run memaslap command and make sure
+that `-z` or `--sports` commandline option is shown:
+
+```
+$ memaslap
+
+    -z, --sports=
+            Starting port to be used by client connections. Defualt 0, means pick any
+
+```
+
+# Running the benchmarks #
+
+Once you have installed everything on both server and client side,
+and verified that Dragonet stack is working with pings, then you can
+use the scripts available in `dragonet/benchmarking/netperf-wrapper/` for
+running the benchmarks.  These are the harness scripts which are to be
+run from the separate controller machine and these scripts can
+ - Connect to the server machine, start dragonet stack, start the application
+ - Connect to the client machines, start the load generators
+ - Collect all the results, store them in json format for later plotting
+ - Cleanup the server and clients
+
+You will find more information about how-to run the benchmarks in
+`dragonet/benchmarking/netperf-wrapper/README_DRAGONET.rst` file.
+

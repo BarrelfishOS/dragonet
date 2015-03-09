@@ -97,7 +97,7 @@ setup_target()
 		fi
 	fi
 	if [ "$QUIT" == "0" ] ; then
-		#make $TF install T=${RTE_TARGET}
+		make $TF install T=${RTE_TARGET}
                 echo "skipping installation as it is assumed to be already done"
 	fi
 	echo "------------------------------------------------------------------------------"

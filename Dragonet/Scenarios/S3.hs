@@ -107,7 +107,7 @@ asiagoSF_server = DM.fromJust $ IP4.ipFromString
                 "10.113.4.195"   -- Using asiago SF as server
 
 asiagoIntel_server = DM.fromJust $ IP4.ipFromString
-                "10.113.4.95"   -- Using asiago SF as server
+                "10.113.4.95"   -- Using asiago Intel as server
 
 generateFlowsWrapper serverIP fperApp clcount = generateFlows serverIP srvPort  clients_ip_addr clientStartPort fperApp
     where
