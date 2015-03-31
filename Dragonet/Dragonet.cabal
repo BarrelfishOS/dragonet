@@ -138,7 +138,7 @@ executable stack-sf
                         ../openonload-201310-u2/src/include/
     default-language:   Haskell2010
 
-executable stack-e10k
+executable stack-e10k-base
     hs-source-dirs:     ., stack
     main-is:            stack-e10k.hs
     build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
@@ -164,33 +164,7 @@ executable stack-e10k
     default-language:   Haskell2010
 
 
-executable stack-dpdk
-    hs-source-dirs:     ., stack
-    main-is:            stack-dpdk.hs
-    build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
-                        llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
-                        transformers, pretty-show
-    ghc-options:        -threaded -L../dpdk-1.7.1/build/lib/ -ldpdk_driver -lintel_dpdk -lpthread -ldl -lrt -rdynamic
-    --ghc-options:        -threaded -L../dpdk-1.7.1/build/lib/ -lintel_dpdk -lpthread -ldl -lrt -rdynamic
-	                -- -lrt needed for clock_gettime
-	                -- -ldl needed for dlopen and friends
-    C-sources:          stack/Runner/dyn_remote_client.c,
-                        c_impl/dpdkDrv/filterMgmt.c,
-                        c_impl/dpdkDrv/dpdk_backend.c
-    Include-dirs:       c_impl/include,
-                        c_impl/dpdkDrv/include
-    CC-options:         -Wall -Wno-unused-function
-    x-helpers-files:    llvm-dyn-helpers.bc,
-                        llvm-helpers-dpdk.bc
-    x-helpers-makefile: Makefile.llvm-helpers
-    x-helpers-includes: c_impl/include,
-                        lib/Dragonet/Pipelines,
-                        ../external/bulktransfer/lib/include,
-                        c_impl/e10k/include
-    default-language:   Haskell2010
-
-
-executable stack-dpdk2
+executable stack-e10k-dpdk
     hs-source-dirs:     ., stack
     main-is:            stack-e10k.hs
     build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
