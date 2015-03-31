@@ -44,14 +44,14 @@ type DbgFunction a = String -> DbgFunSingle a
 type CostFunction a = PL.PLGraph -> (a, String)
 
 makeGraph ::
-       Sem.Helpers           -- | Semantics helpers combined
-    -> PG.PGraph             -- | Unconfigured PRG
-    -> PG.PGraph             -- | Configured LPG
+       Sem.Helpers           -- ^ Semantics helpers combined
+    -> PG.PGraph             -- ^ Unconfigured PRG
+    -> PG.PGraph             -- ^ Configured LPG
     -> [PG.PGraph
-        -> PG.PGraph]        -- | Implementation transforms
-    -> (PG.PGNode -> String) -- | Assign nodes to pipelines
-    -> DbgFunSingle a        -- | Debugging function
-    -> C.Configuration       -- | Configuration to apply
+        -> PG.PGraph]        -- ^ Implementation transforms
+    -> (PG.PGNode -> String) -- ^ Assign nodes to pipelines
+    -> DbgFunSingle a        -- ^ Debugging function
+    -> C.Configuration       -- ^ Configuration to apply
     -> IO PL.PLGraph
 makeGraph helpers prg lpg implTransforms pla debug cfg = do
     -- Configure graph
@@ -60,13 +60,13 @@ makeGraph helpers prg lpg implTransforms pla debug cfg = do
     makeGraph' helpers prgC lpg Emb.embeddingRxTx implTransforms pla debug
 
 makeGraph' ::
-       Sem.Helpers                           -- | Semantics helpers combined
-    -> PG.PGraph                             -- | Configured PRG
-    -> PG.PGraph                             -- | Configured LPG
-    -> (PG.PGraph -> PG.PGraph -> PG.PGraph) -- | embedding algorithm
-    -> [PG.PGraph -> PG.PGraph]              -- | Implementation transforms
-    -> (PG.PGNode -> String)                 -- | Assign nodes to pipelines
-    -> DbgFunSingle a                        -- | Debugging function
+       Sem.Helpers                           -- ^ Semantics helpers combined
+    -> PG.PGraph                             -- ^ Configured PRG
+    -> PG.PGraph                             -- ^ Configured LPG
+    -> (PG.PGraph -> PG.PGraph -> PG.PGraph) -- ^ embedding algorithm
+    -> [PG.PGraph -> PG.PGraph]              -- ^ Implementation transforms
+    -> (PG.PGNode -> String)                 -- ^ Assign nodes to pipelines
+    -> DbgFunSingle a                        -- ^ Debugging function
     -> IO PL.PLGraph
 makeGraph' helpers prgC lpg embed_fn implTransforms pla debug = do
     -- Embed graph
@@ -98,14 +98,14 @@ makeGraph' helpers prgC lpg embed_fn implTransforms pla debug = do
 -- given unconfigured prg, lpg, configurations and cost function, it will
 --      pick best configuration, apply it, and return the configured prg
 optimize :: Ord a => Show a =>
-       Sem.Helpers                     -- | Semantics helpers combined
-    -> PG.PGraph                       -- | Unconfigured PRG
-    -> PG.PGraph                       -- | Configured LPG
-    -> [PG.PGraph -> PG.PGraph]        -- | Implementation transforms
-    -> (String -> PG.PGNode -> String) -- | Assign nodes to pipelines
-    -> DbgFunction a                   -- | Debugging function
-    -> CostFunction a                  -- | Cost function
-    -> [(String,C.Configuration)]      -- | Configurations to evaluate
+       Sem.Helpers                     -- ^ Semantics helpers combined
+    -> PG.PGraph                       -- ^ Unconfigured PRG
+    -> PG.PGraph                       -- ^ Configured LPG
+    -> [PG.PGraph -> PG.PGraph]        -- ^ Implementation transforms
+    -> (String -> PG.PGNode -> String) -- ^ Assign nodes to pipelines
+    -> DbgFunction a                   -- ^ Debugging function
+    -> CostFunction a                  -- ^ Cost function
+    -> [(String,C.Configuration)]      -- ^ Configurations to evaluate
     -> IO (PL.PLGraph, (String,C.Configuration), PG.PGraph)
 
 optimize hs prg lpg implTransforms pla dbg cf cfgs = do

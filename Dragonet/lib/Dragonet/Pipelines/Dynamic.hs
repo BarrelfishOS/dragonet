@@ -69,15 +69,15 @@ diff old new = (old `UM.minusL` new, new `UM.minusL` old)
  -      * updates the connection queues if the pipeline already exists
  -}
 run ::
-    -- | Initial context (currently its always 'initialContext')
-    DynContext ->
-    -- | Function to create connector node to connect two pipelines
-    (PL.Pipeline -> PL.Pipeline -> (PLI.POutput,PLI.PInput)) ->
-    -- | Function to create pipeline threads
-    (PL.PLabel -> IO DynPipeline) ->
-    -- | Pipelined graph
-    PL.PLGraph ->
-    IO ()
+       DynContext
+    -- ^ Initial context (currently its always 'initialContext')
+    -> (PL.Pipeline -> PL.Pipeline -> (PLI.POutput,PLI.PInput))
+    -- ^ Function to create connector node to connect two pipelines
+    -> (PL.PLabel -> IO DynPipeline)
+    -- ^ Function to create pipeline threads
+    -> PL.PLGraph
+    -- ^ Pipelined graph
+    -> IO ()
 run ctx pconn pcreate plg = do
         PLI.runPipelines' pconn pinit plg
         return ()

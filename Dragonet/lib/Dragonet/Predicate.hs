@@ -914,8 +914,9 @@ computePredFnode__ = do
               Just e  -> return e         -- there *is* a spawn predicate
               Nothing -> return PredTrue  -- this should probably be false, but it currently breaks some cases
          | ndeps > 1   = error $ "F-nodes have at most one incoming edge. Offending node:`" ++ (nLabel $ snd dst) ++ "'"
-         -- | isSpawnTarget gr dst = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat it as an OR?)
-         -- recurse
+         {-
+         | isSpawnTarget gr dst = error "NYI: both normal and spawn edges" -- combines normal and spawn edges (treat it as an OR?)
+         -}
          | otherwise   = do
               let dep0 = deps !! 0
               dep_pred <- depGetPred dep0

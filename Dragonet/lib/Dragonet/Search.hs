@@ -147,10 +147,10 @@ class (C.ConfChange cc) => OracleSt o cc | o -> cc where
     -- | 'flowConfChanges' returns a list of configuration changes for a
     -- flow. Note that the list may be empty, if there are no available
     -- configuration changes that map to the given flow.
-    flowConfChanges :: o -- | Oracle
-                    -> C.Configuration -- | Current configuration
-                    -> Flow -- | New flow to consider
-                    -> [cc] -- | A set of configuration changes
+    flowConfChanges :: o -- ^ Oracle
+                    -> C.Configuration -- ^ Current configuration
+                    -> Flow -- ^ New flow to consider
+                    -> [cc] -- ^ A set of configuration changes
 
     -- stupid name, but threading the state allows for some tricks
     flowConfChangesS :: o
@@ -671,15 +671,14 @@ searchGreedyFlows st flows = searchGreedyFlows_ st x0 flows
  -          'O(nq) * O(cost-functions)'
  -}
 searchGreedyFlows_ :: (OracleSt o a)
-                   -- | Current state of search algorithm
                    => SearchSt s o a
-                   -- | Configuration buit till now for already configured flows
+                   -- ^ Current state of search algorithm
                    -> (C.Configuration, [Flow], QMap)
-                   -- | Flows for which configuration should be checked
+                   -- ^ Configuration buit till now for already configured flows
                    -> [Flow]
-                   -- | Final configuration
+                   -- ^ Flows for which configuration should be checked
                    -> ST.ST s C.Configuration
-
+                   -- ^ Final configuration
 {-|
  - Terminating condidtion for recursion: when there are no more flows left,
  -  use the configuration built till now as solution configuration.
@@ -925,7 +924,7 @@ priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
             -- we should not have non-gold exclusive queues
             | goldNonExcl > 0 = CostReject $ (fromIntegral goldNonExcl)
             -- we should have enough queues for the best effort class
-            -- | beNeeded > 0 = CostReject $ (fromIntegral beNeeded)
+            -- beNeeded > 0 = CostReject $ (fromIntegral beNeeded)
             -- penalize needing more be queues, but do not reject solution
             -- (it just means we have some slack for gold flows)
             | beNeeded > 0 = CostVal $ 100*(fromIntegral beNeeded) + balBe

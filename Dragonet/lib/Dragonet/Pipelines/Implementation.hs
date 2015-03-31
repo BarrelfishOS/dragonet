@@ -76,12 +76,12 @@ newtype GraphHandle = GraphHandle (Ptr GraphHandle)
  -  (including proper connector nodes)
  -}
 getPLIs ::
-    -- | Function to generate connector node between two pipelines
        (Pipeline -> Pipeline -> (POutput,PInput))
-    -- | Pipeline graph to be executed
+       -- ^ Function to generate connector node between two pipelines
     -> PLGraph
-    -- | Returns list of PipelineImpl (one for each pipeline)
+        -- ^ Pipeline graph to be executed
     -> [PipelineImpl]
+        -- ^ Returns list of PipelineImpl (one for each pipeline)
 getPLIs qconf g = map n2pi $ DGI.labNodes g
     where
         inConf p n' = (plLabel p',snd $ qconf p' p)
@@ -96,18 +96,18 @@ getPLIs qconf g = map n2pi $ DGI.labNodes g
 {-|
  - Generates separate implementation graph for each pipeline with connector
  - nodes, and calls a initialization function for each of the pipeline.
+ - Should give queue implementation for queue between first and second
+ - pipeline
  -}
 runPipelines' ::
-    -- Should give queue implementation for queue between first and second
-    -- pipeline
-    -- | Function to generate connector node between two pipelines
-    (Pipeline -> Pipeline -> (POutput,PInput)) ->
-    -- | function to initialize a pipeline
-    (PipelineImpl -> IO a) ->
-    -- | Pipeline graph to be executed
-    PLGraph ->
-    -- | Side-effects and returns answer (FIXME: which is ignored in `Pipelines/Dymamic.hs:run`!!)
-    IO [a]
+    (Pipeline -> Pipeline -> (POutput,PInput))
+     -- ^ Function to generate connector node between two pipelines
+    -> (PipelineImpl -> IO a)
+     -- ^ function to initialize a pipeline
+    -> PLGraph
+    -- ^ Pipeline graph to be executed
+    -> IO [a]
+    -- ^ Side-effects and returns answer (FIXME: which is ignored in `Pipelines/Dymamic.hs:run`!!)
 runPipelines' qconf prun plg = do
     let plis = getPLIs qconf plg
     -- execute pipeline-initialization function for each pipeline
