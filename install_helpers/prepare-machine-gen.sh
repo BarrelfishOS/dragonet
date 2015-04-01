@@ -1,3 +1,7 @@
+#!/bin/bash
+#
+# Dragonet setup helper script
+#
 
 #sudo cat >>/etc/apt/sources.list << EOF
 #deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu precise main
@@ -8,6 +12,21 @@
 #wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo pt-key add -
 #sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1E9377A2BA9EF27F
 
+[ -z ${DRAGONET_BASE} ]      && DRAGONET_BASE="$HOME"
+[ -z ${Z3LOCATION}    ]      && Z3LOCATION="${DRAGONET_BASE}/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10"
+[ -z ${DRAGONET_CABAL_DIR} ] && DRAGONET_CABAL_DIR="${DRAGONET_BASE}/dragonet-cabal"
+
+DRAGONET_SOURCE="${DRAGONET_BASE}/dragonet"
+DRAGONET_GIT="/cdrom/casper/mount/repository/dragonet"
+
+SYSTEM_CABAL=cabal
+DRAGONET_CABAL=${DRAGONET_CABAL_DIR}/bin/cabal
+
+DRAGONET_DPDK=$DRAGONET_SOURCE/dpdk-1.7.1
+DRAGONET_ONLOAD=$DRAGONET_SOURCE/openonload-201310-u2
+
+echo "Dragonet base   : $DRAGONET_BASE"
+echo "Dragonet source : $DRAGONET_SOURCE"
 
 check_file_exists(){
   local message
@@ -72,40 +91,60 @@ check_dir_exists(){
   fi
 }
 
-
-
-Z3LOCATION="/home/ubuntu/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/"
+do_if_yes() {
+    [ -z "$3" ] && echo "do_if_yes requires 3 arguments" && exit 1
+    if [ "$1" == "yes" ]; then
+       echo "DO  : $2"
+       $3
+    else
+       echo "SKIP: $2"
+    fi
+}
 
 install_base () {
 ## BASE: For both server and client ###################
-sudo apt-get update
-sudo apt-get install -y git build-essential vim
-sudo apt-get install -y autoconf automake
-sudo apt-get install -y libevent-dev
-sudo apt-get install -y htop
+   sudo apt-get update
+   # KK: removed vim, htop, and libevent-dev
+   sudo apt-get install -y git build-essential autoconf automake
+}
+
+install_dragonet_cabal() {
+    # Dragonet-specific cabal-install
+    # NOTE: Using specific version of the cabal to avoid conflict with llvm-gen
+    # https://github.com/bscarlet/llvm-general/issues/122
+    ${SYSTEM_CABAL} update
+    ${SYSTEM_CABAL} install --prefix=${DRAGONET_CABAL_DIR} cabal-install-1.20.0.6
+    if [ $? != 0]; then
+        echo "Dragonet cabal-install installation failed"
+        exit 1
+    fi
+
+    check_dir_exists ${Z3LOCATION} "z3 installation location"
+    link_z3
+
+    echo "Preparing sandbox"
+    #export PATH="${HOME}/.cabal/bin:$PATH"
+    check_dir_exists  ${DRAGONET_SOURCE}/Dragonet/ "Dragonet codebase"
+    cd ${DRAGONET_SOURCE}/Dragonet/
+    PATH="${DRAGONET_CABAL_DIR}/bin":$PATH ./prepare_sandbox.sh
 }
 
 
-install_server_deps() {
-    # For haskell part of the Dragonet
+install_server_packets() {
     sudo apt-get install -y clang-3.4 clang-3.4-doc libclang-common-3.4-dev \
     libclang-3.4-dev libclang1-3.4 libclang1-3.4-dbg libllvm-3.4-ocaml-dev  \
     libllvm3.4 libllvm3.4-dbg lldb-3.4 llvm-3.4 llvm-3.4-dev llvm-3.4-doc   \
     llvm-3.4-examples llvm-3.4-runtime clang-modernize-3.4 clang-format-3.4 \
     python-clang-3.4 lldb-3.4-dev
 
-
-
     sudo apt-get install -y ghc cabal-install zlib1g-dev g++-4.6 happy
     sudo apt-get install -y ghc*-prof
+}
 
-    cd ${MYBASE}
-
-    cabal update
-    # NOTE: Using specific version of the cabal to avoid conflict with llvm-gen
-    # https://github.com/bscarlet/llvm-general/issues/122
-    #cabal install cabal-install
-    cabal install cabal-install-1.20.0.6
+install_server_deps() {
+    install_base
+    install_server_packets
+    install_dragonet_cabal
 }
 
 
@@ -115,8 +154,8 @@ install_client_deps() {
 sudo apt-get install -y autoconf automake
 sudo apt-get install -y makeinfo
 
-check_dir_exists  ${MYBASE}/dragonet/benchmarking/netperf-2.6.0 "netperf codebase"
-cd ${MYBASE}/dragonet/benchmarking/netperf-2.6.0
+check_dir_exists  ${DRAGONET_SOURCE}/benchmarking/netperf-2.6.0 "netperf codebase"
+cd ${DRAGONET_SOURCE}/benchmarking/netperf-2.6.0
 ./configure_compile.sh
 make
 sudo make install
@@ -125,11 +164,11 @@ sudo make install
 sudo ln -s /usr/bin/aclocal /usr/bin/aclocal-1.13
 sudo ln -s /usr/bin/automake /usr/bin/automake-1.13
 
-check_dir_exists  ${MYBASE}/dragonet/benchmarking/libmemcached-1.0.18 "memaslap codebase"
+check_dir_exists  ${DRAGONET_SOURCE}/benchmarking/libmemcached-1.0.18 "memaslap codebase"
 cd ../libmemcached-1.0.18/
 ./configure_install_dragonet.sh
 
-cd ${MYBASE}/dragonet/benchmarking/dstat
+cd ${DRAGONET_SOURCE}/benchmarking/dstat
 sudo make install
 
 sudo apt-get install -y ethtool
@@ -139,11 +178,11 @@ sudo apt-get install -y ethtool
 
 # Avoiding as installing this takes around 1G space!!!
 #sudo apt-get install asciidoc
-#cd ${MYBASE}/dragonet/benchmarking/dstat
+#cd ${DRAGONET_SOURCE}/benchmarking/dstat
 #sudo make install
 
 # FIXME: Currently not present in pipelines-02 branch
-#cd ${MYBASE}/dragonet/benchmarking/latencyBench/
+#cd ${DRAGONET_SOURCE}/benchmarking/latencyBench/
 #make compile
 
 }
@@ -193,78 +232,60 @@ install_useful_tools() {
     sudo apt-get install -y  python-numpy
 }
 
-get_repository () {
-    cd ${MYBASE}
-    if [[ -d "dragonet" ]] ; then
-        echo "dragonet already exists. You may want to delete it, or run without -g option" ;
+clone_repository () {
+    if [[ -d ${DRAGONET_SOURCE} ]] ; then
+        echo "Dragonet source (${DRAGONET_GIT}) already exists. You may want to delete it, or run without -g option";
         exit 1
     fi
-    git clone /cdrom/casper/mount/repository/dragonet
-    cd dragonet
+    git clone ${DRAGONET_GIT} ${DRAGONET_SOURCE}
+    cd ${DRAGONET_SOURCE}
     git checkout master
-    #git checkout execmodel
-    #git checkout kkourt-nsdi15
 }
 
 
 install_dpdk() {
-    check_dir_exists ${MYBASE}/dragonet/dpdk-1.7.1/ "dpdk codebase"
-    cd ${MYBASE}/dragonet/dpdk-1.7.1/
+    check_dir_exists ${DRAGONET_DPDK} "dpdk codebase"
+    cd ${DRAGONET_DPDK}
     ./doConfig.sh
 }
 
 install_openonload() {
-    check_dir_exists ${MYBASE}/dragonet/openonload-201310-u2/ "onload codebase"
-    cd ${MYBASE}/dragonet/openonload-201310-u2/
+    # Note: There seems to be some capability for onload to be installed on a
+    # separate directory by setting $i_prefix. However, this might not work
+    # well with things like /etc/modprobe.d/*.conf for configuring the onload
+    # kernel modules. Having to handle this seems not trivial, so we use sudo
+    # to install it on /
+    check_dir_exists ${DRAGONET_ONLOAD} "onload codebase"
+    cd ${DRAGONET_ONLOAD}
     sudo ./scripts/onload_install
     sudo onload_tool reload
-    sudo cp build/gnu_x86_64/lib/ciul/libciul.so.1.1.1 /lib/
 
-    cd ${MYBASE}
-    #setIPaddress.sh
-}
-
-clean_prepare_Dragonet() {
-
-    check_dir_exists  ${MYBASE}/dragonet/Dragonet/ "Dragonet codebase"
-    cd ${MYBASE}/dragonet/Dragonet/
-
-    export PATH="${HOME}/.cabal/bin:$PATH"
-
-    echo "Cleaning up old installation"
-    rm -rf ./dist
-    rm -rf .cabal_sandbox
-
-    echo "Preparing sandbox"
-    ./prepare_sandbox.sh
-
-    check_dir_exists ${Z3LOCATION}  "z3 installation location"
-
-    cabal install z3 --extra-include-dirs=${Z3LOCATION}/include/ --extra-lib-dirs=${Z3LOCATION}/bin/
+    # No need to use this, see Dragonet.cabal
+    #sudo cp build/gnu_x86_64/lib/ciul/libciul.so.1.1.1 /lib/
 }
 
 
 install_Dragonet() {
 
-    check_dir_exists  ${HOME}/.cabal/bin  "Local cabal installation"
-    check_file_exists  ${HOME}/.cabal/bin/cabal  "local cabal binary"
+    check_file_exists  $DRAGONET_CABAL "Dragonet cabal file"
+    check_dir_exists  ${DRAGONET_SOURCE} "Dragonet codebase"
 
-    export PATH="${HOME}/.cabal/bin:$PATH"
-    clean_prepare_Dragonet
-    cabal build bench-fancyecho stack-dpdk stack-sf
+    cd $DRAGONET_SOURCE/Dragonet
+    $DRAGONET_CABAL build bench-fancyecho
+    $DRAGONET_CABAL build stack-e10k-base
+    [ -f $DRAGONET_DPDK/build/lib/libintel_dpdk.so ] && $DRAGONET_CABAL build stack-e10k-dpdk
+    [ -f $DRAGONET_ONLOAD/build/gnu_x86_64/lib/ciul/libciul.so ] && $DRAGONET_CABAL build stack-sf
 }
 
 
 install_memcached() {
-    cd ${MYBASE}/dragonet/benchmarking/memcached/
+    cd ${DRAGONET_SOURCE}/benchmarking/memcached/
     ./autogen.sh && ./configure && make memcached
 }
 
 
 copy_and_install_z3() {
-    cd  "${MYBASE}"
-    cp -r /cdrom/casper/mount/bin/z3Solver/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/ .
-    Z3LOCATION="${MYBASE}/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10/"
+    cp -av /cdrom/casper/mount/bin/z3Solver/z3-4.3.2.24961dc5f166-x64-ubuntu-13.10 ${Z3LOCATION}
     link_z3
 }
 
@@ -273,11 +294,17 @@ link_z3() {
 
     check_file_exists ${Z3LOCATION}/bin/z3 "z3 executable"
     check_file_exists ${Z3LOCATION}/bin/libz3.so "z3 library"
+    check_dir_exists  ${DRAGONET_SOURCE} "Dragonet codebase"
 
-    cd /usr/bin/
-    sudo ln -s ${Z3LOCATION}/bin/z3 z3
-    sudo cp ${Z3LOCATION}/bin/libz3.so /lib/x86_64-linux-gnu/
-#    install_Dragonet
+    # link it to the source so that cabal can find it
+    # see Dragonet.cabal
+    rm -f ${DRAGONET_SOURCE}/z3
+    ln -s ${Z3LOCATION} $DRAGONET_SOURCE/z3
+
+    # No need to add it globally. See: Dragonet.cabal
+    #cd /usr/bin/
+    #sudo ln -s ${Z3LOCATION}/bin/z3 z3
+    #sudo cp ${Z3LOCATION}/bin/libz3.so /lib/x86_64-linux-gnu/
 }
 
 install_server_related() {
@@ -311,8 +338,8 @@ show_usage() {
         echo "Usage: ${0} [-g -s -c -o -d -v -i]"
         echo "           -g -->  clone the git repository over ETHZ NFS"
         echo "           -i -->  install all base tools"
-        echo "           -s -->  install server dependncy packages"
-        echo "           -c -->  install client dependncy packages, and tools"
+        echo "           -s -->  install server dependencies"
+        echo "           -c -->  install client dependencies"
         echo "           -z -->  Copy z3 from ETHZ NFS"
         echo "           -l -->  link and compile DN with z3"
         echo "           -d -->  install dpdk"
@@ -320,7 +347,7 @@ show_usage() {
         echo "           -S -->  Compile and Install server side of dragonet"
         echo "Examples (clone repo and z3 on eth network): ${0} -g -z"
         echo "Examples (installing server): ${0} -i -s -d -o -S"
-        echo "Examples (installing client):: ${0} -i -c"
+        echo "Examples (installing client): ${0} -i -c"
         exit 1
 }
 
@@ -379,68 +406,16 @@ while getopts ":gisczldoSCv" opt; do
   esac
 done
 
-MYBASE="$HOME"
+do_if_yes "$INSTALLT" "Install base packages" install_base
+do_if_yes "$CLONE" "CLone Dragonet git repo"  clone_repository
+do_if_yes "$CLIENTDEPS" "Install client packages" install_client_deps
+do_if_yes "$SERVERDEPS" "Install server packages" install_server_deps
+do_if_yes "$OPENONLOAD" "Install OpenOnload driver" install_openonload
+do_if_yes "$DPDK" "Install DPDK driver" install_dpdk
+do_if_yes "$Z3SETUP" "Install Z3" copy_and_install_z3
+do_if_yes "$SERVERCOMPILE" "Compiler Dragonet stack/server programs"  install_server_related
+do_if_yes "$Z3LINK"  "Link Z3" link_z3
 
-if [ "${INSTALLT}" == "yes" ] ; then
-install_base
-fi
-
-if [ "${CLONE}" == "yes" ] ; then
-    echo "cloning Dragonet repository"
-    get_repository
-else
-    echo "Skipping cloning of Dragonet repository"
-fi
-
-if [ "${CLIENTDEPS}" == "yes" ] ; then
-    echo "Installing clientside"
-    install_client_deps
-else
-    echo "Skipping Installing clientside"
-fi
-
-if [ "${SERVERDEPS}" == "yes" ] ; then
-    echo "Installing server deps"
-    install_server_deps
-else
-    echo "Skipping Installing server deps"
-fi
-
-
-if [ "${OPENONLOAD}" == "yes" ] ; then
-    echo "Installing openonload driver"
-    install_openonload
-else
-    echo "Skipping Installing openonload driver"
-fi
-
-if [ "${DPDK}" == "yes" ] ; then
-    echo "Installing dpdk driver"
-    install_dpdk
-else
-    echo "Skipping Installing dpdk driver"
-fi
-
-if [ "${Z3SETUP}" == "yes" ] ; then
-    echo "Installing z3 setup"
-    copy_and_install_z3
-else
-    echo "Skipping Installing z3 setup"
-fi
-
-if [ "${Z3LINK}" == "yes" ] ; then
-    echo "Linking z3 and compiling dragonet with it"
-    link_z3
-else
-    echo "Linking z3 and compiling it"
-fi
-
-if [ "${SERVERCOMPILE}" == "yes" ] ; then
-    echo "Compiling Dragonet server side"
-    install_server_related
-else
-    echo "Skipping Compiling Dragonet server side"
-fi
 
 if [ "${SPARKSETUP}" == "yes" ] ; then
     echo "Installing spark setup"
@@ -457,13 +432,8 @@ else
     echo "Skipping Refreshing Spark NFS mount"
 fi
 
-if [ "${CABALCLEANPREPARE}" == "yes" ] ; then
-    clean_prepare_Dragonet
-fi
-
 if [ "${VIMSETUP}" == "yes" ] ; then
     echo "Copying vim setup"
     #setup_vim_pravin
     setup_work_env_pravin
 fi
-

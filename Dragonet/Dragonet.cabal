@@ -87,6 +87,7 @@ executable opt-test
     main-is:            testOptimization.hs
     build-depends:      Dragonet, base, smtLib, fgl, directory, containers,
                         pretty-show
+    ghc-options:        -optl-Wl,-rpath,../z3/bin
     default-language:   Haskell2010
 
 executable stack-tap
@@ -95,7 +96,7 @@ executable stack-tap
     build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
                         llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
                         transformers, pretty-show
-    ghc-options:        -threaded
+    ghc-options:        -threaded -optl-Wl,-rpath,../z3/bin
     C-sources:          stack/Runner/dyn_remote_client.c
     Include-dirs:       c_impl/include,
                         c_impl/e10k/include
@@ -108,36 +109,6 @@ executable stack-tap
                         ../external/bulktransfer/lib/include
     default-language:   Haskell2010
 
-executable stack-sf
-    hs-source-dirs:     ., stack
-    main-is:            stack-sf.hs
-    build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
-                        llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
-                        transformers, pretty-show, optparse-applicative >= 0.11
-    ghc-options:        -threaded -lciul -L/lib/
-    ghc-options:        -threaded
-    C-sources:          stack/Runner/dyn_remote_client.c,
---                        c_impl/onloadDrv/efdragonet.c,
-                        c_impl/onloadDrv/sf_control.c,
---                        c_impl/impl_sf.c,
---                        c_impl/implementation.c,
---                        stack/Runner/dyn_helpers.c,
-                        c_impl/onloadDrv/efvi_sfw.c
-    Include-dirs:       c_impl/include
-                        ../openonload-201310-u2/src/include/
-    CC-options:         -Wall -Wno-unused-function
-    extra-lib-dirs:     ../openonload-201310-u2/build/gnu_x86_64/lib/ciul/
---    extra-libraries:    ciul
-    x-helpers-files:    llvm-dyn-helpers.bc,
-                        llvm-helpers-sf.bc
-    x-helpers-makefile: Makefile.llvm-helpers
-    x-helpers-includes: c_impl/include,
-                        lib/Dragonet/Pipelines,
-                        ../external/bulktransfer/lib/include,
-                        c_impl/e10k/include,
-                        ../openonload-201310-u2/src/include/
-    default-language:   Haskell2010
-
 executable stack-e10k-base
     hs-source-dirs:     ., stack
     main-is:            stack-e10k.hs
@@ -145,6 +116,8 @@ executable stack-e10k-base
                         llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
                         transformers, pretty-show, optparse-applicative >= 0.11
     ghc-options:        -threaded
+                        -- Z3
+                        -optl-Wl,-rpath,../z3/bin
     C-sources:          stack/Runner/dyn_remote_client.c,
                         c_impl/e10k/e10k_card.c,
                         c_impl/e10k/e10k_phy.c,
@@ -170,10 +143,14 @@ executable stack-e10k-dpdk
     build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
                         llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
                         transformers, pretty-show, optparse-applicative >= 0.11
-    ghc-options:        -threaded -L../dpdk-1.7.1/build/lib/ -ldpdk_driver -lintel_dpdk -lpthread -ldl -lrt -rdynamic
-    --ghc-options:        -threaded -L../dpdk-1.7.1/build/lib/ -lintel_dpdk -lpthread -ldl -lrt -rdynamic
-	                -- -lrt needed for clock_gettime
-	                -- -ldl needed for dlopen and friends
+    ghc-options:        -threaded -lpthread
+                        -- -lrt needed for clock_gettime, -ldl for dlopen and friends
+                        -lrt -ldl
+                        -- DPDK
+                        -ldpdk_driver -lintel_dpdk
+                        -L../dpdk-1.7.1/build/lib/ -rdynamic  -optl-Wl,-rpath,../dpdk-1.7.1/build/lib/
+                        -- Z3
+                        -optl-Wl,-rpath,../z3/bin
     C-sources:          stack/Runner/dyn_remote_client.c,
                         c_impl/dpdkDrv/filterMgmt.c,
                         c_impl/dpdkDrv/dpdk_backend.c
@@ -189,6 +166,39 @@ executable stack-e10k-dpdk
                         c_impl/e10k/include
     default-language:   Haskell2010
 
+
+executable stack-sf
+    hs-source-dirs:     ., stack
+    main-is:            stack-sf.hs
+    build-depends:      Dragonet, base, smtLib, ReadArgs, fgl, containers, mtl, directory,
+                        llvm-general==3.4.2.*, llvm-general-pure==3.4.2.*, stm,
+                        transformers, pretty-show, optparse-applicative >= 0.11
+    ghc-options:        -threaded -L/lib/
+                        -- OpenOnlad
+                        -lciul -optl-Wl,-rpath,../openonload-201310-u2/build/gnu_x86_64/lib/ciul/
+                        -- Z3
+                        -optl-Wl,-rpath,../z3/bin
+    C-sources:          stack/Runner/dyn_remote_client.c,
+--                        c_impl/onloadDrv/efdragonet.c,
+                        c_impl/onloadDrv/sf_control.c,
+--                        c_impl/impl_sf.c,
+--                        c_impl/implementation.c,
+--                        stack/Runner/dyn_helpers.c,
+                        c_impl/onloadDrv/efvi_sfw.c
+    Include-dirs:       c_impl/include
+                        ../openonload-201310-u2/src/include/
+    CC-options:         -Wall -Wno-unused-function
+    extra-lib-dirs:     ../openonload-201310-u2/build/gnu_x86_64/lib/ciul/
+--    extra-libraries:    ciul
+    x-helpers-files:    llvm-dyn-helpers.bc,
+                        llvm-helpers-sf.bc
+    x-helpers-makefile: Makefile.llvm-helpers
+    x-helpers-includes: c_impl/include,
+                        lib/Dragonet/Pipelines,
+                        ../external/bulktransfer/lib/include,
+                        c_impl/e10k/include,
+                        ../openonload-201310-u2/src/include/
+    default-language:   Haskell2010
 
 
 executable stack-null
