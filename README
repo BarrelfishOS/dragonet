@@ -1,108 +1,129 @@
-# Dragonet #
-This file explains how to install and use Dragonet system.
+# Dragonet installation #
+
+How to install and use the Dragonet network stack.
+
+*DISCLAIMER*:
+In our setup, we boot the machines using an Ubuntu live CD and use the
+procedure described below to setup Dragonet.  Our installation scripts heavily
+(and sometimes liberally) use `sudo` and have not been tested in different
+environments than ours. We strongly suggest not running them in production
+machines and file-systems with useful data.
+
+In our setup we typically run the Dragonet on the server side, and use the
+Linux network stack for the clients.
 
 
-## Installing Server ##
+## Server installation ##
 
 System Requirements:
- - OS: Linux x86_64 system with kernel version 3.13 or above
+ - OS: Linux x86_64 system with kernel version 3.13 (later versions might work,
+   but we have not tested them)
  - All the instructions here assume Ubuntu based system.
    We have tested them on Ubuntu-14.04 system in our internal setup.
 
 Hardware requirements:
- - We assume that one of the following 10G NIC is present
-   - Intel i82599 10Gb NIC
-   - Solarflare SFC9020 10Gb NIC
+ - Dragonet supports two 10GbE NICs:
+   - Intel i82599
+   - Solarflare SFC9020
 
-We have provided helper script to simplify the installation of the
-Dragonet dependencies in `dragonet/install_helpers/prepare-machine-gen.sh`
-script.  This script shows help and few usage examples when run with `-h`
-option.
+### Dragonet Code ###
+
+First, you will need the Dragonet source code. The way we typically set it up is
+by creating a directory for Dragonet and checking out the code there.
+
+For example:
+
+::
+
+ mkdir /opt/dragonet
+ cd /opt/dragonet
+ git clone $GIT_URL dragonet
+
+Dragonet has multiple dependencies (ubuntu packets and Haskell cabal libraries
+for the most part). We provide the `install_helpers/prepare-machine-gen.sh`
+script to help install all the necessary dependencies.
+
+First, you need to set some variables in the script. If we assume that you use
+`/opt/dragonet` as described above, you need to set `DRAGONET_BASE` to
+`/opt/dragonet`.
+
+You can either directly execute the script or use it as a reference for the
+necessary steps.
+
+Dragonet has a number of drivers for the NIC:
+ - dpdk :
+ - sf   :
+ - tap  :
+ - e10k :
+ - null :
 
 ### Installing Z3 ###
 
-Z3 is a high performance SAT solver that we are using in Dragonet for
-constraint solving.  You will have to download this manually and make
-sure that it is availble on the server.
+We use the Z3 SAT solver (http://z3.codeplex.com/) in Dragonet. Hence, you will
+have to download and install it.  We are using
+`z3-4.3.2.24961dc5f166-x64-ubuntu-13.10` in our setup, which can be downloaded
+from following location: http://z3.codeplex.com/downloads/get/882800 Other
+versions of Z3 might also work, but we have not tested them.
 
-We are using `z3-4.3.2.24961dc5f166-x64-ubuntu-13.10` in our setup, and can
-be downloaded from following location:
-http://z3.codeplex.com/downloads/get/882800
+Make sure that the `Z3LOCATION` variable in the `prepare-machine-gen.sh` script
+is points to the Z3 directory.
 
-Other versions of Z3 should also work, but we haven't tested them.
-
-Z3 homepage:
-http://z3.codeplex.com/
-
-Once you copy the unzipped z3 folder on the server, provide the path
-of this location to the install helper script by modifying the "Z3LOCATION"
-variable in `prepare-machine-gen.sh` script.  The script will use this
-path to create necessary links to the z3 binary and library.
-
-
-
-### Copy of the code ###
-
-You need to copy the whole "dragonet" repository in both server and client
-machines.  We propose that you clone or copy the repository directly into
-the home directory of the user which will be used for running servers and
-clients.  This user is assumed to have sudo access.  In our setup, we
-are using a user "ubuntu" and the code repository is located at
-"${HOME}/dragonet".  We recommend using this type of the path for keeping
-the copy of the dragonet.
-
-In case your path is different, you need to edit "MYBASE" variable in the
-`prepare-machine-gen.sh`  script.
-
-
-### Installing the server Dependencies ###
+### Installing server dependencies ###
 
 Once you have Z3 and the dragonet codebase copied, you can install the
-serverside dependencies with following command ::
+serverside dependencies with following command:
 
 ```
-./dragonet/install_helpers/prepare-machine-gen.sh -l -i -s
+./dragonet/install_helpers/prepare-machine-gen.sh -s
 ```
 
 The above command will :
- * `-l`: Link the z3 related binaries and libraries
- * `-i`: Install base packages
- * `-s`: Install server related packages and tools.  This will include
-           all the Haskell dependencies and new version of tool cabal.
+ * Install necessary ubuntu packets
+ * Install `cabal-install` in `$DRAGONET_BASE/dragonet-cabal`
+ * Create a cabal sandbox (typically in `$DRAGONET_BASE/dragonet/Dragonet`) and
+   install the necessary packages there
+ * Create a symbolic link of `Z3LOCATION` in the top-level directory of the
+   Dragonet source code (typically `$DRAGONET_BASE/dragonet/z3`).
 
-After installing these tools, you need to add newer version of cabal in
-your path.  You can do this by appending following line in your `${HOME}/.bashrc`
+The `cabal` command mentioned in the next steps refers to the one residing in
+`$DRAGONET_BASE/dragonet-cabal/bin/cabal` so you will need to update your
+`$PATH` or call it explicitly.
 
-export PATH="${HOME}/.cabal/bin:$PATH"
+At this point you should be able to build basic Dragonet utilities, i.e., the
+ones that do not depend on specific drivers. For example you can build the
+Dragonet stack on top of a Linux TAP driver:
 
-You can restart your bash shell, and make sure that proper cabal is used
-by default.
+::
 
-
-### Make sure you have properly linked kernel source code ###
-
-We need to install the dpdk driver for Intel 82599 10GbE NIC and/or
-onload driver for Solarflare SFC9020 NIC.  Both of these will compile
-kernel modules which depend and having a local copy of kernel source
-code for currently running kernel at proper location.  You can find
-instructions about howto get and install proer kernel source-code
-and header files for your kernel version on Internet.
+ $ cd ${DRAGONET_BASE}/dragonet/Dragonet
+ $ cabal build stack-tap
 
 
-### Installing dpdk and onload driver ###
+### Installing DPDK and OnLoad Dragonet drivers. ###
 
-You can install dpdk and/or onload driver in your system with following
-commands.  Keep in mind that these installation may depend on having
-proper hardware in your machine, so we recommend installing only those
-drivers for which you have hardware in your machine.
+For doing more interesting things, however, you will need to build the DPDK (for
+the Intel i82599) or the OnLoad Dragonet driver (for the Solarflare SFC9020). We
+include (slightly modified) versions for these in our git tree.
+
+Both of these require building kernel modules which require having a local copy
+of the kernel source code. We use kernel 3.13 for our tests. Newer versions
+might (or might not) work.
+
+You can use `prepare-machine-gen.sh` to install DPDK and OpenOnload, which is
+essentially a wrapper for their respective installation scripts.
+
+
+For the DPDK driver:
 
 ```
-./dragonet/install_helpers/prepare-machine-gen.sh -d -o
+./dragonet/install_helpers/prepare-machine-gen.sh -d
 ```
 
- * `-d`: Compile dpdk modules, assuming you have Intel 82599 10GbE NIC
- * `-o`: Compile onload modules, assuming you have Solarflare SFC9020 NIC
+For the OnLoad Driver:
 
+```
+./dragonet/install_helpers/prepare-machine-gen.sh -o
+```
 
 ### Installing Dragonet ###
 
@@ -113,13 +134,34 @@ and install the Dragonet code.  This can be done by following command:
 ./dragonet/install_helpers/prepare-machine-gen.sh -S
 ```
 
-This will compile and install Dragonet stack and memcached server.
-You can verify that everything went proper by making sure the presense
-of following file:
+It will produce:
 
- - `dragonet/Dragonet/dist/build/bench-fancyecho/bench-fancyecho`
- - `dragonet/Dragonet/dist/build/stack-sf/stack-sf`
- - `dragonet/Dragonet/dist/build/stack-dpdk/stack-dpdk`
+ - `dragonet/Dragonet/dist/build/stack-dpdk/stack-e10k-base`: A version of the
+    Dragonet stack using the E10k card but without linking to the DPDK driver
+    (this is mostly for testing)
+
+ - `dragonet/Dragonet/dist/build/stack-dpdk/stack-e10k-dpdk`: Same as above, but
+    also including the DPDK driver if it was built.
+
+ - `dragonet/Dragonet/dist/build/stack-sf/stack-sf`: A version of the stack
+    using the OpenOnload driver, if the OpenOnload driver was built.
+
+ - `dragonet/Dragonet/dist/build/bench-fancyecho/bench-fancyecho`: A Dragonet
+   echo server useed for benchmarking
+
+ - A memcached server for Dragonet (`benchmarking/memcached`)
+
+
+You can also buld the first using cabal directly. For example:
+
+::
+ cd ${DRAGONET_BASE}/dragonet/Dragonet
+ ${DRAGONET_BASE}/dragonet-cabal/bin/cabal build stack-e10k-dpdk bench-fancyecho
+
+See `Dragonet.cabal` for more details.
+
+
+*TODO*: Update documentation below
 
 ### Configuring NICs ###
 
@@ -338,9 +380,7 @@ In case your path is different, you need to edit "MYBASE" variable in the
 
 The client side can be installed with following command:
 
-```
-./dragonet/install_helpers/prepare-machine-gen.sh -i -c
-```
+
 
 To make sure that your installation is correct and that your clients will
 use correct load-generator tools,  just run memaslap command and make sure
