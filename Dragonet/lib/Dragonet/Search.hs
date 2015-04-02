@@ -1,41 +1,61 @@
 {-# LANGUAGE RankNTypes, LiberalTypeSynonyms, ExistentialQuantification,
              GeneralizedNewtypeDeriving, MultiParamTypeClasses,
              ScopedTypeVariables, FunctionalDependencies #-}
--- Simple search functions
+
+-- NOTE: Some of the functions below are exported just for the purpose of
+-- documenting them.
 module Dragonet.Search (
-  SearchParams(..),
-  initSearchParams,
-  SearchSt(..),
-  initSearchSt,
-  runSearch,
-  OracleSt(..),
-  initSFOracle,
-  searchGreedyFlows,
-  hardcodedSearch,
+  -- * Cost Functions
+  Cost(..),
+  -- $cost
+  QMap, qmapStr_, qmapStr,
+  CostQueueFn, CostFn,
+  -- cost functions
+  dummyCost,
   balanceCost,
   priorityCost, prioritySort,
   staticCost,
-  CostQueueFn,
+  -- * Oracle
+  OracleSt(..),
+  oracleQueueJumpStack, oracleQueueJump,
+  -- * Search
+  runSearch,
+  SearchParams(..), initSearchParams,
+  SearchStrategy,
+  SearchSt(..), initSearchSt,
   SearchStIO, initSearchIO, runSearchIO,
+  -- * Search Strategies
+  searchGreedyFlows,
+  searchGreedyConf,
+  hardcodedSearch,
+  -- * Incremental search
+  -- $incsearch
+  runIncrSearch,
+  IncrSearchParams(..), initIncrSearchParams,
+  IncrConf(..),
+  IncrSearchSt(..), initIncrSearchSt,
+  IncrSearchStrategy,
+  incrSearchGreedyFlows,
+  IncrSearchStIO, initIncrSearchIO, runIncrSearchIO,
+  -- * QMap computation
+  -- $qmap
+  qMap, qMap_, flowQueue,
+  xQmap, yQmap, zQmap,
+  qMapIncremental, zQmapIncremental,
+  incrSearchQmap,
+  --
+  -- * E10k Oracle
   E10kOracleSt(..), initE10kOracle,
   E10kOracleHardCoded(..),
+  initSearchParamsE10k,
+  -- * SF Oracle
+  initSFOracle,
   SFOracleSt(..),
   SFOracleHardCoded(..),
-
-  initSearchParamsE10k,
   initSearchParamsSF,
-
-  IncrSearchParams(..),
-  initIncrSearchParams,
-  runIncrSearch,
-  IncrSearchStIO, initIncrSearchIO, runIncrSearchIO,
-
-  IncrConf,
-
-  incrSearchQmap, qmapStr_, qmapStr,
-
+  -- * Tests
   test, test_incr, test_incr_add, test_incr_pravin_testcase,
-  test_incr_pravin_testcase_mixed
+  test_incr_pravin_testcase_mixed,
 ) where
 
 import qualified Dragonet.Configuration       as C
@@ -81,66 +101,104 @@ import Text.Show.Pretty (ppShow)
 
 import Util.XTimeIt (doTimeIt, dontTimeIt)
 
-putStrLnDbg x = putStrLn x
-putStrLnDbgN x = return ()
---putStrLnDbgN x = putStrLn x
+-- | helper funciton for adding a prefix to each line
+sAddPr pre str = L.unlines $ [ pre ++ s | s <- L.lines str ]
 
-sAddPr p str = L.unlines $ [ p ++ s | s <- L.lines str ]
-
+-- | tracing function that uses
 tr a b  = trace b a
 trN a b = a
 
+-- | Generate a queue list based on the number of queues.
+-- We reserve queue 0 for as a catch-all queue, so it's not part of
 allQueues :: Int -> [QueueId]
---allQueues nq = [1..(nq-1)] ++ [0] :: [QueueId]
--- Not considering queue-0 here
 allQueues nq = [1..(nq-1)] :: [QueueId]
 
+-- |Generate a queue list based on the number of queues, starting from a given
+-- queue. The list will wrap-around.
+--
+-- For example:
+--
+-- >>> allQueues_ 5 10
+-- [6,7,8,9,1,2,3,4,5]
+--
+-- We reserve queue 0 for as a catch-all queue, so it's not part of the output
 allQueues_ :: Int -> Int -> [QueueId]
---allQueues_ start nq =  [(i + start) `mod` nq | i <- [0..(nq-1)]]
--- this does not allocate queue 0
 allQueues_ start nq = [ 1 + ((start+i) `mod` (nq-1)) | i <- [0..(nq-2)] ]
 
 
--- NB: due to ordering, costOK will always have the smaller value, and
--- costReject will always have the highest value.
--- NB: instead of using L.minimum we can implement a function that  can
--- short-circuit CostOK to save some iterations.
--- e.g., L.minimum $ CostOK:[CostVal $ 0.1 + i | i <- [1..]]
--- will never return
-data Cost = CostOK           |
-            CostVal Float    |
-            CostReject Float -- reject value allows to rate rejected solutions
+-- |Cost datatype. This is what cost functions return.
+--
+-- NB #1: We are using floats for ordering, but we could have a class using Ord
+-- datatypes for a more generic cost.
+--
+-- NB #2: due to ordering, 'costOK' will always have the smaller value, and
+-- 'costReject' will always have the highest value.
+--
+-- NB #3: TODO: instead of using L.minimum in the search (as we do now) we can
+-- implement a function that short-circuits 'CostOK' to save iterations.
+--
+-- For example:
+--
+-- > L.minimum $ CostOK:[CostVal $ 0.1 + i | i <- [1..]]
+--
+-- will never return in the current scheme
+data Cost = CostOK           -- ^ cost can be accepted immediately (min cost)
+          | CostVal Float    -- ^ normal (acceptable) cost
+          | CostReject Float -- ^ rejected cost (value allows to order rejected
+                             -- solutions). This is needed because it is
+                             -- possible to start the search with only rejected
+                             -- solutions
     deriving (Eq, Ord, Show)
 
+
+-- | is cost acceptable for a search (not if is CostReject)
+costAcceptable :: Cost -> Bool
+costAcceptable CostOK = True
+costAcceptable (CostVal _) = True
+costAcceptable (CostReject _) = False
+
+
+-- |Qmap is what user-defined cost functions typically operate on. It's a map of
+-- flows into queues.
 type QMap        = [(Flow, QueueId)]
---type QMap        = M.Map Flow QueueId
 
 qmapStr_ :: (Flow,QueueId) -> String
 qmapStr_ (f,q) = (flowStr f) ++ "-> Q" ++ (show q)
 
 qmapStr :: [(Flow,QueueId)] -> String
-qmapStr flows = "QMAP:\n" ++ L.intercalate "\n" [ "  " ++ qmapStr_ f | f <- flows ]
+qmapStr flows = "QMAP:\n" ++ L.intercalate "\n" [" " ++ qmapStr_ f | f <- flows]
 
+-- $cost
 -- There are two types of cost functions:
--- cost functions based on how flows are mapped into queues
---   User-defined cost functions use this form
-type CostQueueFn = QMap -> Cost
--- the basic form of a cost function for the search algorithms
-type CostFn a s = (C.ConfChange a)
-                => [Flow] -> C.Configuration -> a -> ST.ST s Cost
+--
+--     * user-defined cost functions ('CostQueueFn')
+--
+--     * cost functions used in the search algorithms ('CostFn')
+--
+--  Dragonet computes the necessary information to bridge these two.
 
+-- |user-defined cost function
+type CostQueueFn = QMap -> Cost
+
+-- |CostFn: cost functions used by search algorithms. They are defined as  ST.ST
+-- monads so that they to enable stateful datastructures (hashtables in
+-- particularly)
+type CostFn a s = (C.ConfChange a)
+         => [Flow] -- ^ a set of flows
+         -> C.Configuration -- ^ the current configuration
+         -> a -- ^ a confugration change
+         -> ST.ST s Cost -- return the cost
 
 {-|
-  Class 'OracleSt' is the NIC-specific implementation for an Oracle
-  It provides means to iterate the configuration space,
-  and means to initialize and show the configuration.
-  NOTE: (we will probably have to rethink the interface)
-  TODO: Understand what '|' means in class declaration --PS
-        see: https://www.haskell.org/haskellwiki/Functional_dependencies --AKK
+  An Oracle is a NIC-specific component used by the search. It encodes
+  NIC-specific information in a generic way. It is not strictly needed, but it
+  is essential for performance.
+
+  For understanding the class declaration, you might want to check
+  <https://www.haskell.org/haskellwiki/Functional_dependencies>
 -}
 class (C.ConfChange cc) => OracleSt o cc | o -> cc where
-    -- sometimes we have an oracle instance, so it's much easier to use it
-    -- to print a configuration that using C.showConfig
+    -- | show a configuration (for convinience, no need to specialize)
     showConf   :: o -> C.Configuration -> String
     showConf _ c = C.showConfig (undefined::cc) c
 
@@ -152,70 +210,44 @@ class (C.ConfChange cc) => OracleSt o cc | o -> cc where
                     -> Flow -- ^ New flow to consider
                     -> [cc] -- ^ A set of configuration changes
 
-    -- stupid name, but threading the state allows for some tricks
+    -- | Similar to `flowConfChanges` but provides the current configuration
+    -- state to the Oracle. This is  used in incremental search and mainly
+    -- for dealing with flow removal.
+    --
+    -- During the search, each configuration will be paired with a flow. We can
+    -- view the configuration state as @[(cc, Maybe Flow)]@. The @Maybe@ is used
+    -- to  indicate that while a configuration change is still part of the
+    -- configuration, its corresponding flow has been removed from the system.
+    -- When a flow is removed, we just change the state lazily by turning its
+    -- corresponding tuple into @(cc, Nothing)@.
+    --
+    -- This information is passed to the Oracle so that it can /repurpose/ the
+    -- nodes of this (unsued) configuration change. This is done via a special
+    -- class of @cc@s that operate by replacing the node label of the nodes
+    -- generated by an existing @cc@. See 'C.ConfChange' for more details.
     flowConfChangesS :: o
                      -> [(cc, Maybe  Flow)]
                      -> Flow
                      -> ([cc], o)
 
-    -- affected queues: used for incremental update of qmap
-    -- | Returns the queues that may get affected by this change.
-    -- | Note that it always includes the default queue as it will
-    -- | get affected as some traffic will stop appearing there.
+    -- | affectedQueues is used for incremental update of the 'QMap' It returns
+    -- the queues that may get affected by a given configuration change. Note
+    -- that it always includes the default queue.
+    --
+    -- also see: 'zQmapIncremental'
     affectedQueues  :: o -> C.Configuration -> cc -> [QueueId]
 
-    -- Perform a jump on the configuration input. It accepts the current
-    -- configuration and the flows that were configured.
-    -- It returns: A partition of the flows and configuration changes to keep,
-    -- and the flows and configurations to discard.
-    confJump :: o -> [(cc, Maybe Flow)] -> ([(cc, Maybe Flow)], [(cc, Maybe Flow)])
+    -- | Perform a jump on the configuration input. It accepts the current
+    -- configuration and the flows that were configured.  It returns: A
+    -- partition of the flows and configuration changes to keep, and the flows
+    -- and configurations to discard.
+    --  by default, it discards all configurations
+    confJump :: o -> [(cc, Maybe Flow)]
+             -> ([(cc, Maybe Flow)], [(cc, Maybe Flow)])
     confJump _ orig = ([], orig)
 
-{-|
- The class 'SearchParams' contains the search parameters
--}
-data SearchParams o a = (OracleSt o a) => SearchParams {
-    -- | The actual Oracle function
-      sOracle     :: o
-    -- | PRG graph of the underlying NIC which will be used for reasoning
-    , sPrgU       :: PG.PGraph
-    -- | A cost function to evaluate and compare different configurations.
-    -- |  function with minimum cost will be selected.  Example cost functions
-    -- |  are balance, priority, etc.
-    , sCostFn     :: CostQueueFn -- cost function
-    -- | Strategy about how and which configuation space should be selected
-    --      for evaluation.  Example strategies: greedy search, all space.
-    , sStrategy   :: SearchStrategy o a
-    -- | Order (sort) flows as a heuristic
-    , sOrderFlows :: [Flow] -> [Flow]
-}
-
-{-|
-  This is the type which will be used by other part of the code to
-  encapsulate everything about searching configuration space.
- -}
-type SearchStrategy o a = (OracleSt o a) =>
-  SearchSt s o a -> [Flow] -> ST.ST s C.Configuration
-
-
-flowConfs :: (C.ConfChange a, OracleSt o a)
-          => o -> C.Configuration -> Flow -> [C.Configuration]
-flowConfs x conf f = map (C.applyConfChange conf) changes
-    where changes = flowConfChanges x conf f
-
-flowsSingleConfChanges :: (C.ConfChange a, OracleSt o a)
-                       => o -> C.Configuration -> [Flow] -> [(Flow, a)]
-flowsSingleConfChanges x c flows = L.concat res
-   where res = [ [(f,cc) | cc <- flowConfChanges x c f ] | f <- flows]
-
-flowsSingleConfs :: (C.ConfChange a, OracleSt o a)
-                 => o -> C.Configuration -> [Flow] -> [(Flow, C.Configuration)]
-flowsSingleConfs x conf fs =
-    [(fl, C.applyConfChange conf change) | (fl,change) <- flowsSingleConfChanges x conf fs]
-
--- generic jump function that deallocates a queue
--- (this treats the configuration changes as a stack, where you can only remove
--- flows by popping)
+-- | generic jump function that deallocates a queue (this treats the
+-- configuration changes as a stack, where you can only remove flows by popping)
 oracleQueueJumpStack :: (C.ConfChange cc)
                 => (cc -> QueueId)
                 -> [(cc,Flow)] -- initial configuration
@@ -225,390 +257,30 @@ oracleQueueJumpStack ccQueue ts = L.splitAt splitIdx ts
           lastQ = getQ $ last ts -- last queue
           splitIdx = fromJust $ L.findIndex (\x -> getQ x == lastQ) ts
 
+-- | jump: remove flows from last queue
 oracleQueueJump :: (C.ConfChange cc)
                 => (cc -> QueueId)
                 -> [(cc,Flow)] -- initial configuration
                 -> ([(cc,Flow)], [(cc,Flow)]) -- keep, remove partition
-oracleQueueJump ccQueue ts = tr ret $ "oracleQueueJump removing flows from q=" ++ (show lastQ)
+oracleQueueJump ccQueue ts = tr ret msg
     where ret = L.partition ((/=lastQ) . getQ) ts
           getQ = ccQueue . fst
           lastQ = getQ $ last ts -- last queue
+          msg = "oracleQueueJump removing flows from q=" ++ (show lastQ)
 
 
--- ###################################### E10k Oracle ########################
--- E10K (simple for now) oracle
-data E10kOracleSt = E10kOracleSt {nQueues :: Int, startQ :: Int}
-e10kDefaultQ = 0
 
-initE10kOracle nq = E10kOracleSt { nQueues = nq, startQ = 0 }
-
-{-|
-  Making the type 'E10kOracleSt' member of class "Oracle state" to work as
-  as Oracle for Intel 82599 NIC.
-  It will provide a way to generate initial empty configuation, showing
-  configuration, and querying about affected queues from current configuration.
- -}
-instance OracleSt E10kOracleSt E10k.ConfChange where
-    {-|
-     - Basic implementation which suggests a putting current flow in all
-     - the queues, generating nQueue number of configurations.
-     - This implementation does not care for current state of queues,
-     -  and counts on cost-function to help in selecting proper queue.
-    -}
-    flowConfChanges  = e10kFlowConfChanges
-    flowConfChangesS = e10kFlowConfChangesS
-
-    -- QUESTION: Is it assumed that there will be only one operation in
-    --      conf change?
-    --affectedQueues E10kOracleSt { nQueues = nq } _ _ = allQueues nq
-    affectedQueues E10kOracleSt { nQueues = nq } conf (E10k.Insert5T c5t) =
-        [e10kDefaultQ, xq]
-        where xq = E10k.c5tQueue $ E10k.parse5t (snd c5t)
-    affectedQueues E10kOracleSt { nQueues = nq } conf (E10k.InsertFDir cFdir) =
-        [e10kDefaultQ, xq]
-        where xq = E10k.cfdtQueue $ E10k.parseFDT (snd cFdir)
-
-    --
-    --confJump o = e10kQueueJump
-
--- TODO: avoid symmetric allocation
--- TODO: smart-wildcard allocation if possible?
-e10kFlowConfChanges :: E10kOracleSt -> C.Configuration -> Flow
-                    -> [E10k.ConfChange]
-e10kFlowConfChanges E10kOracleSt {nQueues = nq} cnf fl
-    -- allocate 5-tuple filters first, if we can
-    | not rx5tFull  = [E10k.insert5tFromFl rx5tId fl q | q <- allQs]
-    | not rxCfdFull = catMaybes $ [E10k.insertFdirFromFl rxCfdId fl q | q <- allQs]
-    | otherwise     = []
-    where allQs = allQueues nq
-          rx5tFull  = E10k.rx5tFilterTableFull cnf
-          rx5tId    = E10k.rx5tFilterTableLen cnf
-          rxCfdFull = E10k.rxCfdFilterTableFull cnf
-          rxCfdId   = E10k.rxCfdFilterTableLen cnf
-
-
--- TODO: see above
-e10kFlowConfChangesS :: E10kOracleSt
-                     -> [(E10k.ConfChange, Maybe Flow)]
-                     -> Flow
-                     -> ([E10k.ConfChange], E10kOracleSt)
-e10kFlowConfChangesS o@(E10kOracleSt {nQueues = nq, startQ = startQ}) cnf fl
-    | not $ null replaced = trN (replaced', o') $ "ALLOCATED REPLACED FILTERS:\n"
-                                               ++ (sAddPr ". " $  ppShow $ map E10k.ccString replaced')
-                                               -- ++ "\n"
-                                               -- ++ "ALL:\n"
-                                               -- ++ sAddPr " :" (L.intercalate "\n" $ map (E10k.ccString . fst) unusedFs)
-    -- allocate 5-tuple filters first, if we can
-    | not rx5tFull  = (alloc5t, o')
-    | not rxCfdFull = (allocCfd, o')
-    | otherwise     = ([], o)
-    where allQs = allQueues_ startQ nq
-          o' =  o { startQ = (startQ + 1) `mod` nq}
-          conf = C.foldConfChanges $ map fst cnf
-          rx5tFull  = E10k.rx5tFilterTableFull conf
-          rx5tId    = E10k.rx5tFilterTableLen conf
-          alloc5t   = [E10k.insert5tFromFl rx5tId fl q | q <- allQs]
-          rxCfdFull = E10k.rxCfdFilterTableFull conf
-          rxCfdId   = E10k.rxCfdFilterTableLen conf
-          allocCfd  = catMaybes $ [E10k.insertFdirFromFl rxCfdId fl q | q <- allQs]
-
-          unusedFs  = filter (isNothing . snd) cnf
-          mMatching_ = L.find (E10k.flowMatchesCc fl . fst) unusedFs
-          mMatching = Nothing
-          -- Due to limitations:
-          --  - use only the matching if there is a match
-          --  - queue should be the same
-          replacedQs = S.fromList $ [ E10k.ccQueue cc | cc <- replaced ]
-          replacedMissingQs = (S.fromList allQs) `S.difference` replacedQs
-          replaced'
-            | not rx5tFull =  replaced
-                           ++ [E10k.insert5tFromFl rx5tId fl q | q <- S.toList replacedMissingQs]
-            | otherwise = replaced
-
-          replaced  = case mMatching of
-                        Just (cc, mflow) -> catMaybes
-                                         $ [E10k.replaceCcFromFl cc fl]
-                        Nothing -> catMaybes
-                                   $ [E10k.replaceCcFromFl cc fl
-                                     | (cc,mflow) <- unusedFs]
-
-e10kQueueJump :: [(E10k.ConfChange,Maybe Flow)] -- initial configuration
-              -> ([(E10k.ConfChange,Maybe Flow)], [(E10k.ConfChange, Maybe Flow)]) -- keep, remove partition
-e10kQueueJump ts = tr ret $ "e10kQueueJump removing flows from q=" ++ (show rmQ)
-    where ret = L.partition keepF ts
-          --rmQ = 5
-          rmQ = lastQ
-          -- remove non-5t filters, because otherwise the incremental flowmap
-          -- will not work
-          lastQ  = getQ $ last $ filter (isJust . snd) ts
-          firstQ = getQ $ head $ filter (isJust . snd) ts
-          getQ = E10k.ccQueue . fst
-          keepF :: (E10k.ConfChange, Maybe Flow) -> Bool
-          keepF (cc,fl) = ((E10k.ccQueue cc) /= rmQ) && (E10k.ccIs5t cc)
-
-myThird (_,_,x) = x
-mySnd (_,x,_) = x
-
--- E10K (simple for now) oracle
-newtype E10kOracleHardCoded = E10kOracleHardCoded {
-        nnHardcoded :: (Int, [(Flow, Int, Int)])
-                    -- (totalQueues, [(Flow, Qid, FilterType(1==fidr, 2 == Ftuple))])
-        }
-
-{-|
-  Making the type 'E10kOracleHardCoded' member of class "Oracle state" to work as
-  as Oracle for Intel 82599 NIC.
-  It will provide a way to generate initial empty configuation, showing
-  configuration, and querying about affected queues from current configuration.
- -}
-instance OracleSt E10kOracleHardCoded E10k.ConfChange where
-    {-|
-     - Basic implementation which suggests a putting current flow in presicely
-     - fixed queue based on initial hardcoded values.
-    -}
-    flowConfChanges E10kOracleHardCoded { nnHardcoded = (nq, tbl) } c fl = ans
-        where
-        -- perform a lookup of a flow in the hardcoded table
-        -- the lookup should give a filter type and queue-no.
-        -- return that.
-            f = filter (\(f, q, fil) -> f == fl) $ tbl
-            fId = 0 -- TODO: FIXME (proper filter id)
-            ans
-              | length(f) > 1 = error ("ERROR: there must be repeat flow, as more than one flow matches.")
-              | length(f) == 0 = []
-              | (myThird $ head f) == 1 = [E10k.InsertFDir $ (fId, fromJust $ E10k.mkFDirFromFl fl (mySnd $ head f))]
-              | (myThird $ head f) == 2 = [E10k.Insert5T   $ (fId, fromJust $ E10k.mkFDirFromFl fl (mySnd $ head f))]
-              | otherwise = error ("ERROR: wrong type of flow")
-
-    flowConfChangesS = error "E10kOracleHardCoded: NYI flowConfChangesS!"
-
-
---    emptyConf _ = e10kCfgEmpty -- ^ Creates initial empty configuration
---    showConf _  = e10kCfgStr -- ^ Converts conf to string
-
-    affectedQueues = error "E10kOracleHardCoded: NYI affectedQueues"
-    -- QUESTION: Is it assumed that there will be only one operation in
-    --      conf change?
-    -- affectedQueues E10kOracleHardCoded { nnQueues = nq } _ _ = allQueues nq
-    --affectedQueues E10kOracleHardCoded { nnHardcoded = nhw } conf (E10k.Insert5T c5t) =
-    --    [e10kDefaultQ, xq]
-    --    where xq = E10k.c5tQueue $ E10k.parse5t c5t
-    --affectedQueues E10kOracleHardCoded { nnHardcoded = nhw } conf (E10k.InsertFDir cFdir) =
-    --    [e10kDefaultQ, xq]
-    --    where xq = E10k.cfdtQueue $ E10k.parseFDT cFdir
-
--- ###################################### SF Oracle ########################
-
-
--- SF (simple for now) oracle
-data SFOracleSt = SFOracleSt {nQueuesSF :: Int, startQSF :: Int}
-sfDefaultQ = 0
-
-initSFOracle nq = SFOracleSt { nQueuesSF = nq, startQSF = 0 }
-
-{-|
-  Making the type 'SFOracleSt' member of class "Oracle state" to work as
-  as Oracle for Intel 82599 NIC.
-  It will provide a way to generate initial empty configuation, showing
-  configuration, and querying about affected queues from current configuration.
- -}
-instance OracleSt SFOracleSt SF.ConfChange where
-    {-|
-     - Basic implementation which suggests a putting current flow in all
-     - the queues, generating nQueue number of configurations.
-     - This implementation does not care for current state of queues,
-     -  and counts on cost-function to help in selecting proper queue.
-    -}
-    flowConfChanges = sfFlowConfChanges
-    flowConfChangesS = error "SFOracleSt: flowConfChangesS: NYI!"
-
-    -- QUESTION: Is it assumed that there will be only one operation in
-    --      conf change?
-    -- affectedQueues SFOracleSt { nQueuesSF = nq } _ _ = allQueues nq
-    affectedQueues SFOracleSt { nQueuesSF = nq } conf (SF.Insert5T c5t) =
-        [sfDefaultQ, xq]
-        where xq = SF.c5tQueue $ SF.parse5t c5t
-
-    --confJump o = oracleQueueJump SF.ccQueue
-
--- TODO: avoid symmetric allocation
--- TODO: smart-wildcard allocation if possible?
-sfFlowConfChanges :: SFOracleSt -> C.Configuration -> Flow
-                    -> [SF.ConfChange]
-sfFlowConfChanges SFOracleSt {nQueuesSF = nq} cnf fl
-    -- allocate 5-tuple filters first, if we can
-    | not rx5tFull  = [SF.insert5tFromFl fl q | q <- allQs]
-    | otherwise     = []
-    where allQs = allQueues nq
-          rx5tFull  = SF.rx5tFilterTableFull cnf
-
--- TODO: see above
-sfFlowConfChangesS :: SFOracleSt -> C.Configuration -> Flow
-                    -> ([SF.ConfChange], SFOracleSt)
-sfFlowConfChangesS o@(SFOracleSt {nQueuesSF = nq, startQSF = startQ}) cnf fl
-    -- allocate 5-tuple filters first, if we can
-    | not rx5tFull  = ([SF.insert5tFromFl fl q | q <- allQs], o')
-    | otherwise     = ([], o)
-    where allQs = allQueues_ startQ nq
-          o' =  o { startQSF = startQ + 1 `mod` nq}
-          rx5tFull  = SF.rx5tFilterTableFull cnf
-
--- SF (simple for now) oracle
-newtype SFOracleHardCoded = SFOracleHardCoded {
-        nnHardcodedSF :: (Int, [(Flow, Int, Int)])
-                    -- (totalQueues, [(Flow, Qid, FilterType(1==fidr, 2 == Ftuple))])
-        }
-
-{-|
-  Making the type 'SFOracleHardCoded' member of class "Oracle state" to work as
-  as Oracle for SF NIC.
-  It will provide a way to generate initial empty configuation, showing
-  configuration, and querying about affected queues from current configuration.
- -}
-instance OracleSt SFOracleHardCoded SF.ConfChange where
-    {-|
-     - Basic implementation which suggests a putting current flow in presicely
-     - fixed queue based on initial hardcoded values.
-    -}
-    flowConfChanges SFOracleHardCoded { nnHardcodedSF = (nq, tbl) } c fl = ans
-        where
-        -- perform a lookup of a flow in the hardcoded table
-        -- the lookup should give a filter type and queue-no.
-        -- return that.
-            f = filter (\(f, q, fil) -> f == fl) $ tbl
-
-            ans
-              | length(f) > 1 = error ("ERROR: there must be repeat flow, as more than one flow matches.")
-              | length(f) == 0 = []
-              | (myThird $ head f) == 1 = [SF.Insert5T $ SF.mk5TupleFromFl fl (mySnd $ head f)]
-              | otherwise = error ("ERROR: wrong type of flow")
-
-    flowConfChangesS = error "SFOracleHardCoded: flowConfChangesS: NYI!"
-
-    -- QUESTION: Is it assumed that there will be only one operation in
-    --      conf change?
-    -- affectedQueues SFOracleHardCoded { nnQueues = nq } _ _ = allQueues nq
-    affectedQueues SFOracleHardCoded { nnHardcodedSF = nhw } conf (SF.Insert5T c5t) =
-        [sfDefaultQ, xq]
-        where xq = SF.c5tQueue $ SF.parse5t c5t
-
-initSearchParamsSF nqueues = initSearchParams {sOracle = oracle}
-    where oracle = initSFOracle nqueues
-
--- ###################################### END: SF Oracle ########################
-
-initSearchParams :: (OracleSt o a) => SearchParams o a
-initSearchParams = SearchParams {
-      sOracle = undefined
-    , sPrgU   = undefined
-    , sCostFn = undefined
-    , sStrategy = searchGreedyFlows
-    , sOrderFlows = id
-}
-
-initSearchParamsE10k nqueues = initSearchParams {sOracle = oracle}
-    where oracle = initE10kOracle nqueues
-
-type FlowCache s      = HB.HashTable s (PG.NLabel, Flow) PG.NPort
-data SearchSt s o a = (OracleSt o a) => SearchSt {
-      sParams        :: SearchParams o a
-    , sFlowCache     :: FlowCache s
-}
-
--- initialize search state (add default values when applicable)
-initSearchSt :: (OracleSt o a) => SearchParams o a -> ST.ST s (SearchSt s o a)
-initSearchSt params = do
-    --h <- H.newSized 100000
-    h <- H.new
-    return $ SearchSt {
-          sParams     = params
-        , sFlowCache  = h
-    }
-
-
-type SearchStIO o a = SearchSt ST.RealWorld o a
-
-initSearchIO :: (OracleSt o a)
-              => SearchParams o a
-              -> IO (SearchStIO o a)
-initSearchIO params = ST.stToIO $ initSearchSt params
-
-runSearchIO :: (OracleSt o a)
-            => SearchStIO o a
-            -> [Flow]
-            -> IO C.Configuration
-runSearchIO st flows = ST.stToIO $ doSearch st flows
-
-
-{-|
- - Runs the given Oracle, on given set of flows, and returns the selected
- -  configuration
- -}
-runSearch :: (OracleSt o a) =>
-    SearchParams o a    -- ^ Oracle: in form of a group of all relevant parameters
-    -> [Flow]           -- ^ List of flows for which configuration is to be searched
-    -> C.Configuration  -- ^ Selected configuration
+-- | This is the simplest version of search. Callers cannot maintain state
+-- across different invocations.
+runSearch :: (OracleSt o a)
+   => SearchParams o a    -- ^ search paramaters
+   -> [Flow]              -- ^ current list of flows
+   -> C.Configuration     -- ^ confugration result
 runSearch params flows = ST.runST $ do
    st <- initSearchSt params
    doSearch st flows
 
-
--- NOTE: There is still some code around trying to compute qmap with
--- different ways:
---  - E10k.FlowQueue.flowQueue: old E10k-specific version of flowQueue
---  - yQmap and xQmap
-qMap_ :: (OracleSt o a) =>
-         SearchSt s o a -> PG.PGraph -> [Flow] -> ST.ST s QMap
-qMap_ st prgC flows = do
-    let flowC = sFlowCache st
-    qmap <- forM flows $ \fl -> do
-        q <- flowQueue flowC prgC fl
-        return (fl, q)
-    return qmap
-
-qMap :: (OracleSt o a)
-     => SearchSt s o a -> C.Configuration -> a -> [Flow] -> ST.ST s QMap
-qMap st conf confChange flows = do
-    let prgU = sPrgU $ sParams st
-        newConf = C.applyConfChange conf confChange
-        prgC = C.applyConfig newConf prgU
-    qMap_ st prgC flows
-
--- qmapHT :: QMap -> ST.ST s (HB.HashTable s Flow QueueId)
--- qmapHT qmap = H.fromList qmap
-
--- NOTE: This is not used, but is kept around for future reference
-qMapIncremental :: (OracleSt o a)
-                => SearchSt s o a -> C.Configuration -> a -> [Flow] -> QMap
-                -> ST.ST s (PG.PGraph, C.Configuration, QMap)
-qMapIncremental st conf confChange flows oldQmap_ = do
-    let prgU      = sPrgU $ sParams st
-        oracle    = sOracle $ sParams st
-        newConf   = C.applyConfChange conf confChange
-        prgC      = C.applyConfig newConf prgU
-        invalidQs = affectedQueues oracle conf confChange
-        flowC     = sFlowCache st
-        oldQmap   = M.fromList oldQmap_
-    qmap <- forM flows $ \fl -> do
-        q <- case M.lookup fl oldQmap of
-            Nothing -> flowQueue flowC prgC fl
-            Just oldQ  -> case oldQ `elem` invalidQs of
-                False -> return oldQ
-                True  -> flowQueue flowC prgC fl
-        return (fl, q)
-
-    {-
-    qmapCorrect <- qMap_ st prgC flows
-    let test = qmap == qmapCorrect
-        qmap' = case test of
-            True  -> qmap
-            False -> error $ "Incremental qmap failed"
-    -}
-
-    return (prgC, newConf, qmap)
-
-
--- main search function
+-- | main search function
 doSearch :: (OracleSt o a)
          => (SearchSt s o a)        -- ^ Current search state
          -> [Flow]                  -- ^ List of flows to evalaute
@@ -629,47 +301,102 @@ doSearch st flows = do
     return conf
 
 
--- hardcodedSearch: return same conf irrespective of the current flow
-hardcodedSearch :: forall o a. C.ConfChange a =>
-                C.Configuration
-            ->  SearchStrategy o a
-hardcodedSearch hardConf st [] = return $
-    [
-        ("RxC5TupleFilter", PG.CVList []),
-        ("RxCFDirFilter", PG.CVList [])
-    ]
-hardcodedSearch hardConf st fs = return $ hardConf
+-- | Search parameters. Defined by the user (see 'initSearchParams')
+data SearchParams o a = (OracleSt o a) => SearchParams {
+      sOracle     :: o -- ^ oracle
+    , sPrgU       :: PG.PGraph -- ^ Unconfigured PRG graph of the underlying NIC
+    , sCostFn     :: CostQueueFn -- ^ cost function
+    , sStrategy   :: SearchStrategy o a -- ^ how to search the conf space
+    , sOrderFlows :: [Flow] -> [Flow]
+    -- ^ Order flows as heuristic. The main search strategy we currently use is
+    -- a greedy search. Since it is not guranteed to always reach a good
+    -- solution, users can provide a flows sorting function, to guide the
+    -- search. In the non-incremental case sorting is applied before starting
+    -- the search.
+}
 
-{-
-            return $ trN confChanges_head msg
-        where
-        cnf0                = C.emptyConfig (undefined::a)
-        oracle              = sOracle $ sParams st
-        confChanges         = flowConfChanges oracle cnf0 $ head fs
-        newConf             = C.applyConfChange cnf0 confChanges
-        confChanges_head    = head confChanges
-        msg                 = "hardcodedSearch: returning same conf"
--}
--- searchGreedyFlows: examine one flow at a time. Depends on the ordering of
--- flows. We can use that as a heuristic
+-- | Wrapper to initialize 'SearchParams'
+-- sOracle, sPrgU, sCostFn need to be set by the user.
+-- The default sStrategy is 'searchGreedyFlows'.
+initSearchParams :: (OracleSt o a) => SearchParams o a
+initSearchParams = SearchParams {
+      sOracle = undefined
+    , sPrgU   = undefined
+    , sCostFn = undefined
+    , sStrategy = searchGreedyFlows
+    , sOrderFlows = id
+}
+
+-- | a way to search the configuration space
+--
+-- It is implemented as a ST Monad to allow for things like hashtables in the
+-- SearchST
+type SearchStrategy o a = (OracleSt o a)
+  => SearchSt s o a  -- ^ search state
+  -> [Flow] -- ^ current set of flows
+  -> ST.ST s C.Configuration -- ^ resulting configuration
+
+-- | Caching the port a flow will end up in a node. As a node representation we
+-- use the label, i.e., we assume that the nodes with the same label have the
+-- same predicate
+type FlowCache s      = HB.HashTable s (PG.NLabel, Flow) PG.NPort
+
+-- | State maintained by the search
+data SearchSt s o a = (OracleSt o a) => SearchSt {
+      sParams        :: SearchParams o a -- ^ search parametrs
+    , sFlowCache     :: FlowCache s -- ^ caching to avoid predicate computation
+}
+
+
+-- | initialize search state (add default values when applicable)
+initSearchSt :: (OracleSt o a)
+   => SearchParams o a
+   -> ST.ST s (SearchSt s o a)
+initSearchSt params = do
+    --h <- H.newSized 100000
+    h <- H.new
+    return $ SearchSt {
+          sParams     = params
+        , sFlowCache  = h
+    }
+
+-- 'SearchSt' IO Monad wrapper
+type SearchStIO o a = SearchSt ST.RealWorld o a
+
+-- 'initSearch' IO Monad wrapper
+initSearchIO :: (OracleSt o a)
+              => SearchParams o a
+              -> IO (SearchStIO o a)
+initSearchIO params = ST.stToIO $ initSearchSt params
+
+-- 'runSearch' IO Monad wrapper
+runSearchIO :: (OracleSt o a)
+            => SearchStIO o a
+            -> [Flow]
+            -> IO C.Configuration
+runSearchIO st flows = ST.stToIO $ doSearch st flows
+
+
+
+-- | greedy search strategy examine one flow at a time. Depends on the ordering
+-- of flows.
+--
+-- This search algorithm works as follows:
+--
+--  * Consider one flow at each step
+--
+--  * Use the oracle to get a set of possible configuration changes for this
+--    flow
+--
+--  * Evaluate all of these configurations and select the one that minimizes the
+--    cost function
+--
 searchGreedyFlows :: forall o a. C.ConfChange a => SearchStrategy o a
 searchGreedyFlows st flows = searchGreedyFlows_ st x0 flows
     where x0 = (cnf0, [], [])
           cnf0 = C.emptyConfig (undefined::a)
 
-{-|
- - Recursive search in configuration space where
- -      * We consider one flow at time, and find best configuration
- -          for that flow from current state.
- -      * Update current state by adding best configuration selected above
- -      * Recursively consider rest of the flow, but with updated current state
- -  Complexity of the algorithm
- -      * q == number of queues
- -      * n == number of flows
- -      * For every flow, we will evaluate 'O(q)' configurations
- -      * So, the overall complexity of [[searchGreedyFlows]] is
- -          'O(nq) * O(cost-functions)'
- -}
+-- | 'searchGreedyFlows' helper
 searchGreedyFlows_ :: (OracleSt o a)
                    => SearchSt s o a
                    -- ^ Current state of search algorithm
@@ -679,28 +406,19 @@ searchGreedyFlows_ :: (OracleSt o a)
                    -- ^ Flows for which configuration should be checked
                    -> ST.ST s C.Configuration
                    -- ^ Final configuration
-{-|
- - Terminating condidtion for recursion: when there are no more flows left,
- -  use the configuration built till now as solution configuration.
- -}
+-- | no more flows: terminate
 searchGreedyFlows_ st (cnf,_,_) [] = return $ trN cnf msg
     where msg = ("searchGreedyFlows_:" ++ (showConf oracle cnf))
           oracle = sOracle $ sParams st
-
-{-|
- - Process single flow on top of the flow list
- - And apply recursion for rest of the list, with updated configuration
- -}
+-- | operate on a single flow, and recurse
 searchGreedyFlows_ st (curCnf, curFlows, curQmap) (f:fs) = do
     let oracle      = sOracle $ sParams st
         costFn      = sCostFn $ sParams st
         prgU        = sPrgU $ sParams st
-
-        -- Configuration changes suggested by Oracle for adding single flow f
+        -- Configuration changes suggested by Oracle for adding a single flow
         confChanges  = case flowConfChanges oracle curCnf f of
-                [] -> error "Oracle did not return any configurations, bailing out"
+                [] -> error "Oracle did not return any confs, bailing out"
                 l  -> l
-
         newCurFs = xtr f:curFlows
         -- spew out a warning when processing the same flow more than once,
         -- because it might lead to problems. One example is that it breaks the
@@ -710,9 +428,7 @@ searchGreedyFlows_ st (curCnf, curFlows, curQmap) (f:fs) = do
             False -> id
             True ->  trace  ("Flow " ++ (flowStr f) ++ " was seen before!"
                              ++ " this might cause problems")
-
-
-    -- Finding out the costs for all the configurations suggested by Oracle
+    -- find out the costs for all the configurations suggested by Oracle
     conf_costs <- forM confChanges $ \cc -> do
         (prgC, newCnf, qmap) <- zQmapIncremental st curCnf cc newCurFs  curQmap
         return (newCnf, costFn qmap, qmap)
@@ -721,26 +437,29 @@ searchGreedyFlows_ st (curCnf, curFlows, curQmap) (f:fs) = do
                              ++ "\n COST:" ++ (show cost)
                              ++ "\n " ++ (qmapStr qmap) ++ "\n"
                            | (idx,(cnf,cost,qmap)) <- zip [1..] conf_costs]
-
-    -- selecting the configuration with minimum cost cost
+    -- select the configuration with the minimum cost
     let snd3 (_,x,_) = x
-        (best_cnf, lower_cost, qmap') =  L.minimumBy (compare `on` snd3) conf_costs
+        (best_cnf, lower_cost, qmap') = L.minimumBy (compare `on` snd3) conf_costs
         msg = "searchGreedyFlows_: step:"
             ++ (show $ length curFlows)
             -- ++ "\n" ++ msg_all_costs
             ++ "  => lower cost is " ++ (show lower_cost)
             ++ "\n=> SELECTED configuration is " ++ (showConf oracle best_cnf)
             ++ "\n"
-
-    -- Apply same stragegy for rest of the flows, but with modified running conf
+    -- recurse
     recurse <- searchGreedyFlows_ st (best_cnf, newCurFs, qmap') fs
     return $ trN recurse msg
 
--- searchGreedyConf :
---  examines all flows, and determines a single
---  configuration value. Removes the flow that is paired with the configuration
---  values and moves on. This can avoid some problems of the previous one
---  (it really depends on the cost function), but is more expensive.
+
+-- | 'searchGreedyConf': This is also a greedy search, but operates differently
+-- than 'searchGreedyFlows'.
+--
+--  At each step, examines all flows, and determines a single configuration
+--  value. Removes the flow that is paired with the configuration values and
+--  moves on. This can avoid some problems of 'searchGreedyFlows' (it really
+--  depends on the cost function), but is more expensive.
+--
+--  NB: Not very well tested.
 searchGreedyConf :: forall o a. C.ConfChange a => SearchStrategy o a
 searchGreedyConf st flows = searchGreedyConf_ st x0 flows
     where x0 = (cnf0, [])
@@ -782,28 +501,374 @@ searchGreedyConf_ st (curCnf, curFlows) flows = do
             ++ "\nALL CONFS"
     return $ trN recurse msg
 
+-- | hardcodedSearch: return same conf irrespective of the current flow
+hardcodedSearch :: forall o a. C.ConfChange a =>
+                C.Configuration
+            ->  SearchStrategy o a
+hardcodedSearch hardConf st [] = return $
+    [
+        ("RxC5TupleFilter", PG.CVList []),
+        ("RxCFDirFilter", PG.CVList [])
+    ]
+hardcodedSearch hardConf st fs = return $ hardConf
+
+-- $incsearch
 --
--- import Control.Parallel.Strategies as P
+-- Some notes on incremental search. There are two aspects of doing an
+-- incremental search:
+--
+--  1. incremental computation of the flow map.
+--
+--  2. incremental search from the previous solution when flows come/go.
+--
+-- For 2, instead of starting from @['Flow']@, we start from a previous solution
+-- and a set of added and a set of removed flows.
+--
+-- There several approaches for 2, which can be combined to build more complex
+-- strategies:
+--
+--  a) start with the previous configuration solution, and continue searching
+--     by adding the new flows. Note that this means that filters for deleted
+--     flows remain in the solution.
+--
+--  b) change solution, removing (Flow,cc) tuples that correspond to flows that
+--     are removed and start from the resulting solution and add the new flows.
+--     Note, that this might lead to weird solutions.
+--
+--  c) Find the largest relevant part of the solution. Something like:
+--     @L.takeWhile ( (f,cc) -> f `S.notMember` rmFlows )@. and start from that.
+--     In this case (contrarily to b) the starting solution from the search is
+--     one that we have arrived by actually evaluating a cost function, so in
+--     general it has better potential than the starting solution of b).
+--
+--  d) Do a NIC-specific /jump/ in the search. This jump should be a part of the
+--     oracle. One example of a jump is make a queue available. We can take
+--     multiple jumps to reach a better solution. An extreme case of a jump is
+--     to start from scratch
+--
+-- Note that we can use the CostReject, CostAccept distinction to decide if a
+-- solution is good enough or try another approach.
 
-nLabelNode :: PG.PGraph -> String -> PG.PGNode
-nLabelNode g l = case GH.filterNodesByL (\x -> (PG.nLabel x) == l) g of
-    []  -> error $ "nLabelnode: node" ++ l ++ "node found"
-    [x] -> x
-    _  -> error $ "nLabelnode: more that one " ++ l ++ "node found"
 
-nLabelPred :: PG.PGraph -> String -> [(PG.PGNode, PR.PredExpr)]
-nLabelPred g l = [ (n, PR.nodePred g n) | n <- nodes ]
-    where nodes = GH.filterNodesByL (\x -> (PG.nLabel x) == l) g
+-- | perform an incremental search
+runIncrSearch :: (OracleSt o a)
+    => IncrSearchParams o a -- ^ search parametrs
+    -> FL.FlowsSt -- ^ flow state changes
+    -> C.Configuration -- ^ resulting configuration
+runIncrSearch params flows = ST.runST $ do
+   st <- initIncrSearchSt params
+   (cnf, _, st') <- doIncrSearch st flows
+   return cnf
 
-nLabelSinglePred :: PG.PGraph -> String -> PR.PredExpr
-nLabelSinglePred g l = case nLabelPred g l of
-    [x] -> snd x
-    []  -> error "nLabelSinglePred: no node found"
-    _   -> error "more than one nodes found"
+-- | incremental search parameters
+data IncrSearchParams o cc = (OracleSt o cc) => IncrSearchParams {
+      isOracle     :: o -- ^ oracle
+    , isPrgU       :: PG.PGraph -- ^ unconfigured PRG for the NIC
+    , isCostFn     :: CostQueueFn -- ^ user-defined cost function
+    , isStrategy   :: IncrSearchStrategy o cc -- ^ incremental search strategy
+    , isOrderFlows :: [Flow] -> [Flow] -- ^ sorting flows
+}
 
-xQmap :: PG.PGraph -> [Flow] -> [(Flow, QueueId)]
+doIncrSearch :: (OracleSt o cc)
+         => (IncrSearchSt s o cc)
+         -> FL.FlowsSt
+         -> ST.ST s (C.Configuration, IncrConf cc, IncrSearchSt s o cc)
+doIncrSearch st flowsSt = do
+    let params = isParams st
+        costFn = isCostFn params
+        sortFn = isOrderFlows params
+        oracle = isOracle params
+        search = isStrategy params
+        prgU   = isPrgU params
+    (conf, ic, st) <- search st flowsSt
+    return (conf, ic, st)
+
+-- | incremental search strategy
+type IncrSearchStrategy o cc = (OracleSt o cc)
+    => IncrSearchSt s o cc -- ^ incremental search state
+    -> FL.FlowsSt -- ^ flows state changes
+    -> ST.ST s (C.Configuration, IncrConf cc, IncrSearchSt s o cc)
+    -- ^ returns: the final configuration, the incremental configuration
+    -- relative to the previous configuration and the current incremental search
+    -- state (can be used for the next search)
+
+
+-- | Notes on incremental configuration:
+--
+-- A configuration is a list of configuration changes @[cc]@
+--
+-- NB: The list is  a better model than a set, because order matters if we have
+-- packets that are matched by multiple filters.
+--
+-- To represent incremental configuration, We need a way to represent removal of
+-- ccs.  We can assume that @[cc]@ is a stack, and that we can remove ccs only
+-- from the top. This is not necessary: we can have arbitrary ways to remove ccs
+-- from the list.
+--
+-- Using a stack is simple, it works well with our search that essentially
+-- pushes ccs to the end of the list, and ultimately works well with NIC filter
+-- tables (i.e., you just remove entries from the bottom)
+--
+-- On the other hand, Removing arbitrary ccs (e.g., jumping by freeing a queue)
+-- needs to remove more ccs that it would normally not have to. A jump that
+-- frees a queue when a stack is used would have to iterate the list from the
+-- start and remove all elements after and including the first filter matching
+-- the queue it tries to remove.
+--
+-- In our current implementation we assume that we do not program multiple
+-- filters that match the same packet. In this case, ordering does not matter.
+-- We represent an incremental configuration as: @[cc]@ to add, @[cc]@ to
+-- remove.
+--
+-- XXX: move this to Configuration.hs
+data IncrConf cc = (C.ConfChange cc) => IncrConf {
+      icRmCCs  :: [cc] -- ^ configuration changes to add
+    , icAddCCs :: [cc] -- ^ configuration changes to remove
+}
+
+-- |
+initIncrConf :: (C.ConfChange cc) => IncrConf cc
+initIncrConf = IncrConf [] []
+
+-- ugh! :/
+instance Show (IncrConf cc) where
+    show IncrConf { icRmCCs = xrm, icAddCCs = xadd } = ret
+        where addedS :: [Char]
+              addedS = L.intercalate " \n" [ C.show cc | cc <- xadd]
+              rmS    = L.intercalate " \n" [ C.show cc | cc <- xrm ]
+              ret    = "IncrConf {icRmCCs=[\n" ++ rmS ++ "]\n"
+                               ++ "icAddCCs=[\n" ++ addedS ++ "]\n"
+
+-- | incremental search state
+data IncrSearchSt s o cc = (OracleSt o cc) => IncrSearchSt {
+          isParams     :: IncrSearchParams o cc -- ^ search parametrs
+        , isFlowMapSt  :: FM.FlowMapSt s cc
+        -- ^ incremental map is implemented by maintaing a flow map. This is
+        -- its state
+}
+
+-- | initialize incremental search params. Default strategy is
+-- 'incrSearchGreedyFlows'
+initIncrSearchParams :: (OracleSt o a) => IncrSearchParams o a
+initIncrSearchParams = IncrSearchParams {
+      isOracle = undefined
+    , isPrgU   = undefined
+    , isCostFn = undefined
+    , isStrategy = incrSearchGreedyFlows
+    , isOrderFlows = id
+}
+
+-- | IncrSearchSt IO Monad wrapper
+type IncrSearchStIO o cc = IncrSearchSt ST.RealWorld o cc
+
+-- | initIncrSearchSt IO Monad wrapper
+initIncrSearchIO :: (OracleSt o cc)
+              => IncrSearchParams o cc
+              -> IO (IncrSearchStIO o cc)
+initIncrSearchIO params = ST.stToIO $ initIncrSearchSt params
+
+-- | initialize search state (add default values when applicable)
+initIncrSearchSt :: (OracleSt o a)
+                 => IncrSearchParams o a -> ST.ST s (IncrSearchSt s o a)
+initIncrSearchSt params = do
+    fmSt <- FM.initFlowMapSt (isPrgU params)
+    return $ IncrSearchSt {
+          isParams     = params
+        , isFlowMapSt  = fmSt
+    }
+
+-- | runIncrSearch IO Monad wrapper
+runIncrSearchIO :: (OracleSt o cc)
+            => IncrSearchStIO o cc
+            -> FL.FlowsSt
+            -> IO (C.Configuration, IncrConf cc, IncrSearchStIO o cc)
+runIncrSearchIO st flows = ST.stToIO $ doIncrSearch st flows
+
+
+
+
+-- $qmap
+--
+-- To bridge 'CostQueueFn' and  'CostFn' Dragonet needs to compute 'QMap', i.e.,
+-- how flows are mapped into queues. This is where most time is spent in the
+-- search, so we try to optimize it
+--
+-- NOTE: There is still some code around trying to compute qmap with
+-- different ways:
+--  - E10k.FlowQueue.flowQueue: old E10k-specific version of flowQueue
+--  - yQmap and xQmap
+--  - ...
+--
+--  For incremental search, we actually use 'FM.FlowMapSt' for incremental
+--  implementation of 'QMap' so the code below is mainly for historic purposes.
+
+-- | compute 'QMap'
+-- This is fairly straightfoward. First, we configure the PRG. Afterwords, using
+-- the flow predicates, we iterate the graph for each flow and figure out at
+-- which queue each flow will end up.
+--
+-- We use 'FlowCache' to avoid predicate computation for nodes/flows we 've
+-- seen before.
+qMap :: (OracleSt o a)
+     => SearchSt s o a  -- ^ current search state
+     -> C.Configuration -- ^ current configuration
+     -> a               -- ^ configuration change
+     -> [Flow]          -- ^ set of flows
+     -> ST.ST s QMap    -- ^ resulting 'QMap'
+qMap st conf confChange flows = do
+    let prgU = sPrgU $ sParams st
+        newConf = C.applyConfChange conf confChange
+        prgC = C.applyConfig newConf prgU
+    qMap_ st prgC flows
+
+-- | helper for 'qMap'
+qMap_ :: (OracleSt o a)
+      => SearchSt s o a
+      -> PG.PGraph
+      -> [Flow]
+      -> ST.ST s QMap
+qMap_ st prgC flows = do
+    let flowC = sFlowCache st
+    qmap <- forM flows $ \fl -> do
+        q <- flowQueue flowC prgC fl
+        return (fl, q)
+    return qmap
+
+-- | compute which flow a queue will end up
+flowQueue :: FlowCache s     -- ^ flow cache
+          -> PG.PGraph       -- ^ configured PRG
+          -> Flow            -- ^ flow
+          -> ST.ST s QueueId -- ^ resulting queue
+flowQueue fc prgC flow = do
+    let flPred = flowPred flow
+        d0 = flowQueueStart prgC
+    doFlowQueue fc d0 (flow, flPred)
+
+sucPortCtx_ :: PG.PGraph -> PG.PGContext -> PG.NPort -> DGI.Node
+sucPortCtx_ g ctx port = fst next
+    where sucs = DGI.lsuc' ctx
+          sucsPort =  L.filter (\ (_,s) -> port == PGU.edgePort_ s) sucs
+          next = case sucsPort of
+                [x] -> x
+                []  -> error $ "Cannot find successor of node:" ++ nodeL ++
+                                " on port:" ++ port
+                xs  -> error $ "More than one successors on node:" ++ nodeL ++
+                               " for port:" ++ port ++
+                               " -> " ++  (show nextLs)
+          nodeL = PG.nLabel $ DGI.lab' ctx
+          nextLs = [ PG.nLabel n | (x,_) <- sucsPort
+                                 , let n = fromJust $ DGI.lab g x ]
+
+sucPortDecomp :: PG.PGGDecomp -> PG.NPort -> PG.PGGDecomp
+sucPortDecomp (ctx, g) port = ret
+    where next = sucPortCtx_ g ctx port
+          ret  = doMatch next g
+
+doMatch :: DGI.Node -> PG.PGraph -> PG.PGGDecomp
+doMatch nid g = case DGI.match nid g of
+    (Just ctx, g') -> (ctx, g')
+    (Nothing, _) -> error "doMatch failed"
+
+
+-- | find starting point for the graph
+flowQueueStart :: PG.PGraph -> PG.PGGDecomp
+flowQueueStart prgC = d1
+    where node0_ = "RxL2EtherClassifyL3_"
+          port0 = "other"
+          node0 = case GH.findNodeByL (\x -> (PG.nLabel x) == node0_) prgC of
+              Just x -> x
+              Nothing -> error $ "More than one matches for node:" ++ node0_
+          d0 :: PG.PGGDecomp
+          d0 = doMatch (fst node0) prgC
+          d1 = sucPortDecomp d0 port0
+
+
+-- | 'flowQueue' main  helper
+doFlowQueue :: FlowCache s
+            -> PG.PGGDecomp
+            -> (Flow, PR.PredExpr)
+            -> ST.ST s QueueId
+doFlowQueue fc d@(ctx, g) flowT
+    | Just q <- reachedQueue lnode = return $ trN q
+                                            $ "Flow:" ++ (flowStr $ fst flowT)
+                                            ++ " Reached Queue:" ++ (show q)
+    | otherwise = do
+          nextPort <- case node of
+                PG.FNode {} -> doFlowNextPortCache fc flowT (snd lnode)
+                -- In theory we need to determine the next port based on the
+                -- incoming port.  However, currently there is no way to
+                -- determine what are the "true" incoming edges, so we resort
+                -- into a hack where we always pick the "true" port as the
+                -- nextPort when encountering an ONode
+                PG.ONode {} -> return "true"
+          let d' = sucPortDecomp d nextPort
+          doFlowQueue fc d' flowT
+    where lnode = DGI.labNode' ctx
+          node = snd lnode
+          lbl = PG.nLabel node
+
+
+-- find next node port (use flow cache)
+doFlowNextPortCache :: FlowCache s            -- ^ flow cache
+                    -> (Flow, PR.PredExpr)    -- ^ the flow and its predicate
+                    -> PG.Node                -- ^ current node
+                    -> ST.ST s PG.NPort       -- ^ node port for the flow
+doFlowNextPortCache flowCache x@(fl, flPred) node = do
+    let key = (PG.nLabel node, fl)
+    ret <- H.lookup flowCache key
+    case ret of
+        Just x -> return $ trN x "HIT"
+        Nothing -> do
+            ret <- doFlowNextPort x node
+            H.insert flowCache key ret
+            return $ trN ret "MISS"
+
+-- | compute  next port for flow in a node
+doFlowNextPort :: (Flow, PR.PredExpr)  -- ^ the flow and its predicate
+                -> PG.Node             -- ^ node
+                -> ST.ST s PG.NPort    -- ^ node port for the flow
+doFlowNextPort (fl, flPred) node = return ret'
+    where nPreds = PG.nPredicates node
+          ret = doFlowQueueNextPort_ flPred nPreds
+          ret' = trN ret $ "Flow:" ++ (flowStr fl) ++
+                          " Node:"  ++ (PG.nLabel node) ++
+                          " Port:" ++ ret
+
+-- | find matching port, given the flow predicate and all port predicatesb
+doFlowQueueNextPort_ :: PR.PredExpr               -- ^ flow predicate
+                     -> [(PG.NPort, PR.PredExpr)] -- ^ port predicates
+                     -> PG.NPort                  -- ^ resulting port
+doFlowQueueNextPort_ flPred ((port,portPred_):rest) = ret
+    where sat     = isJust $ PR.dnfSAT andExpr
+          andExpr = (PR.buildAND bld) [portPred,flPred]
+          portPred = PR.predDoBuild bld portPred_
+          bld = PR.predBuildDNF
+          -- NB: we assume that each flow is assigned exclusively to a single
+          -- queue, so we return the first match
+          ret = case sat of
+                True  -> port -- found port
+                False -> doFlowQueueNextPort_ flPred rest -- recurse
+
+-- | determine if we reached a queue node in the graph
+reachedQueue :: PG.PGNode -> Maybe QueueId
+reachedQueue (_,PG.ONode {PG.nLabel = name}) = ret
+    where n = filter isDigit name
+          ret = case length n of
+                  0 -> Nothing
+                  _ -> case "RxQ" ++ n ++ "Valid" == name of
+                            True  -> Just $ read n
+                            False -> Nothing
+reachedQueue (_,PG.FNode {PG.nLabel = name})
+    | name == "RxToDefaultQueue" =  Just 0
+    | otherwise  = Nothing
+
+
+-- | 'xQmap' computes the combined predicates in the queue nodes of the graph,
+-- and checks satisfiability for each flow across all these predicates.
+xQmap :: PG.PGraph -> [Flow] -> QMap
 xQmap gr fls = qmap
     where flPreds = map flowPred fls
+          nQueues = 10 -- XXX: Hack
           allQs  = allQueues nQueues
           qNodes = [ nLabelNode gr $ rxQPref ++ (show i) | i <- allQs ]
           qPreds = PR.computePredMany gr qNodes
@@ -811,7 +876,6 @@ xQmap gr fls = qmap
           qmap   = [ (fl, qid) | (qid,qpred) <- zip allQs qPreds,
                                  (fl,flpred) <- zip fls flPreds,
                                   check (qid,qpred) (fl,flpred)]
-          nQueues = 10
           bld = PR.predBuildDNF
           check (qid,p1) (fl,p2) = trN sat msg
             where expr = PR.buildAND bld $ [p1,p2]
@@ -824,9 +888,10 @@ xQmap gr fls = qmap
                         "\nAND:     " ++ (ppShow expr) ++
                         "\nSAT:"      ++ (ppShow $ sat_)
 
--- This assumes that each flow is mapped on a single queue
--- (xQmap does not)
-yQmap :: PG.PGraph -> [Flow] -> [(Flow, QueueId)]
+-- | 'yQmap' is simlar to 'xQmap', but it assumes that each flow is mapped on a
+-- in a single queue. This allows for short-circuting the matching of flows
+-- against queue predicates
+yQmap :: PG.PGraph -> [Flow] -> QMap
 yQmap gr fls = qmap
     where flPreds = map flowPred fls
           allQs  = allQueues nQueues
@@ -859,280 +924,10 @@ yQmap gr fls = qmap
                         "\nSAT:"      ++ (ppShow $ sat_)
 
 
--- http://rosettacode.org/wiki/Standard_deviation#Haskell
-sd :: RealFloat a => [a] -> a
-sd l = sqrt $ sum (map ((^2) . subtract mean) l) / n
-  where n = L.genericLength l
-        mean = sum l / n
-
-balanceCost_ :: [QueueId] -> QMap -> Cost
-balanceCost_ allQs qmap = ret
-    where qLoad :: M.Map QueueId Integer
-          qList  =  [qId | (_,qId) <- qmap]
-          qLoad = L.foldl foldFn M.empty qList
-          foldFn :: M.Map QueueId Integer -> QueueId -> M.Map QueueId Integer
-          foldFn m qid = M.insertWith (+) qid 1 m
-
-          getQLoad :: QueueId -> Integer
-          getQLoad q = M.findWithDefault 0 q qLoad
-          load    = map getQLoad allQs
-          --maxLoad = maximum load
-          --minLoad = minimum load
-          --ret_     =  CostVal $ fromIntegral $ maxLoad - minLoad
-          ret_ = CostVal $ sd $ map fromIntegral load
-          ret = trN ret_ ("\nqlist" ++ (ppShow qList) ++ "\nLOAD:" ++ ppShow (load))
-
-dummyCost :: [(Flow, QueueId)] -> Cost
-dummyCost _ = CostVal 1.0
-
-balanceCost :: Int -> QMap -> Cost
-balanceCost nq fls = balanceCost_ (allQueues nq) fls
-
-prioritySort :: (Flow -> Bool) -> [Flow] -> [Flow]
-prioritySort isGold flows = let (hp,be) = L.partition isGold flows
-                           in hp ++ be
-
--- gold/best-effort priorities
-priorityCost :: (Flow -> Bool) -> Integer -> Int -> QMap -> Cost
-priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
-    where (goldFls, beFls) = L.partition (isGold . fst) qmap
-          goldQs = S.fromList $ [qid | (_,qid) <- goldFls]
-          beQs   = S.fromList $ [qid | (_,qid) <- beFls]
-          allQsL = allQueues nq
-          allQs  = S.fromList allQsL
-          restQs = allQs `S.difference` goldQs
-          goldQsExcl = goldQs `S.difference` beQs
-          beQsExcl   = beQs `S.difference` goldQs
-          msg = "---->\nqmap:\n" ++ (qmapStr qmap)
-                ++ "\ngoldQs:" ++ (ppShow goldQs)
-                ++ "\ngoldQsExcl:" ++ (ppShow goldQsExcl)
-                ++ "\ngoldNQs:" ++ (ppShow goldNQs)
-                ++ "\nbeQs:" ++ (ppShow beQs)
-                ++ "\ncost" ++ (ppShow cost)
-                ++ "\n<-----"
-          cost
-            -- no gold flows: just balance best-effort across all queues
-            | length goldFls == 0 = balanceCost_ (allQueues nq) beFls
-            -- no best effort flows: penalize extra queues and
-            -- balance gold across all queues
-            | length beFls   == 0 =
-                let CostVal bcost = balanceCost_ allQsL goldFls
-                    extraCost = if goldExtra > 0 then goldExtra else 0
-                in CostVal $ bcost + (fromIntegral extraCost)
-            -- we should have enough queues for the gold class
-            | goldNeeded  > 0 = CostReject $ 100*(fromIntegral goldNeeded)
-            -- we should not have non-gold exclusive queues
-            | goldNonExcl > 0 = CostReject $ (fromIntegral goldNonExcl)
-            -- we should have enough queues for the best effort class
-            -- beNeeded > 0 = CostReject $ (fromIntegral beNeeded)
-            -- penalize needing more be queues, but do not reject solution
-            -- (it just means we have some slack for gold flows)
-            | beNeeded > 0 = CostVal $ 100*(fromIntegral beNeeded) + balBe
-            -- if all is OK, it depends on how well the classes are balanced
-            | otherwise               = CostVal $ balGold + balBe
-
-          -- determine number of gold queues
-          goldNQs = (min $ nq -1)
-                   $ ceiling
-                   $ (toRational $ length goldFls) / (toRational goldFlowsPerQ)
-          goldNeeded = goldNQs - (S.size goldQsExcl)
-          -- gold non-exclusive queues
-          goldNonExcl = (S.size goldQs) - (S.size goldQsExcl)
-          goldExtra  = -goldNeeded
-          -- number of best effort queues
-          beNQs = min (nq - goldNQs) (length beFls)
-          beNeeded = beNQs - (S.size beQsExcl)
-
-          CostVal balGold = balanceCost_ (S.toList goldQs) goldFls
-          CostVal balBe   = balanceCost_ (S.toList restQs) beFls
-
-
-
--- flows that match predicate get a static number of queues
-staticCost ::  (Flow -> Bool) -> Int -> Int -> QMap -> Cost
-staticCost isGold nGoldQs' nq qmap = trN cost msg
-    where
-          -- FIXME: Currenly hardcoding the logic of how many gold queues are
-          --        there based on total number of queues
-          nGoldQs
-            | nq == 5 = 2
-            | nq == 10 = 4
---            | nq == 10 = 2  # for fancyecho as it will not have that many active flows
-            | otherwise = error ("no. of queues is non-standard" ++
-                    " (not 5 or 10). Given queues: " ++ (show nq))
-          assignedGoldQsL = take nGoldQs $ allQueues nq -- static gold queues
-          assignedGoldQsS = S.fromList assignedGoldQsL
-
-          assignedRestQsL = drop nGoldQs $ allQueues nq -- static rest queues
-          assignedRestQsS = S.fromList assignedRestQsL
-
-          (goldFls, restFls) = L.partition (isGold . fst) qmap
-
-          goldOK = and [ qid `S.member` assignedGoldQsS | (_,qid) <- goldFls ]
-          restOK = and [ qid `S.member` assignedRestQsS | (_,qid) <- restFls ]
-
-          CostVal balGold = balanceCost_ assignedGoldQsL goldFls
-          CostVal balRest = balanceCost_ assignedRestQsL restFls
-          msg = (qmapStr qmap) ++ " \n" ++ (show cost)
-          cost
-               | not goldOK = CostReject 1
-               | not restOK = CostReject 1
-               | length goldFls == 0 = CostVal balRest
-               | length restFls == 0 = CostVal balGold
-               | otherwise = CostVal $ balGold + balRest
-
-
----- greedy back-track search. Nothing is returned if no suitable configuration is
----- found
---data SearchGBSt = SearchGBSt {
---      -- this is actually a stack. The top of the list contains the last
---      -- endpoint we added, and the current configuration
---      sgbOptPath  :: [(Flow, C.Configuration)]
---    , sgbCostFn   :: CostFn
---    , sgbOrdEs    :: [Flow] -> [Flow]
---}
-----
----- initial state
---searchGBSt0 fn = SearchGBSt {
---      sgbOptPath  = []
---    , sgbCostFn   = fn
---    , sgbOrdEs    = id
---}
---
----- greedy back-track search. Nothing is returned if no suitable configuration is
--- found
---searchGBaddFL :: Int
---              -> SearchGBSt
---              -> [Flow]
---              -> Maybe (SearchGBSt, C.Configuration)
---searchGBaddFL nq st (f:fs) = error "foo"
---    where ret = case best_cost of
---                CostReject -> backtrack
---                _          -> onward
---
---          costF = sgbCostFn st
---          path  = sgbOptPath st
---          curConf = case length path of
---                      0 -> []
---                      _ -> snd $ head path
---          confs = flsAllConfs nq curConf [f]
---          conf_costs = [(cnf,costF cnf) | cnf <- confs]
---          (best_cnf,best_cost) = L.minimumBy (compare `on` snd) conf_costs
---
---          onward = case length fs of
---                      0 -> Just (onwardSt, best_cnf)
---                      _ -> searchGBaddFL onwardSt fs
---          onwardSt = st {sgbOptPath = (f, best_cnf):path }
---
---          -- backtrack
---          backtrack  = case (length path, same_order) of
---                        -- nowhere to go
---                        (0, _) -> Nothing
---                        -- if the order is the same we are doing the same thing
---                        -- again, so give up. Hopefully, this is enough to
---                        -- protect us from cycles
---                        (_, True)  -> Nothing
---                        (_, False) -> searchGBaddFL backSt backEs
---          backSt = st { sgbOptPath = (drop 1 path) }
---          backEs = (fst $ head path):fs
---          backEsReord = (sgbOrdEs st) backEs
---          same_order  = backEs == backEsReord
-
-
-reachedQueue :: PG.PGNode -> Maybe QueueId
-reachedQueue (_,PG.ONode {PG.nLabel = name}) = ret
-    where n = filter isDigit name
-          ret = case length n of
-                  0 -> Nothing
-                  _ -> case "RxQ" ++ n ++ "Valid" == name of
-                            True  -> Just $ read n
-                            False -> Nothing
-reachedQueue (_,PG.FNode {PG.nLabel = name})
-    | name == "RxToDefaultQueue" =  Just 0
-    | otherwise  = Nothing
-
-doFlowQueueNextPort__ :: PR.PredExpr -> [(PG.NPort, PR.PredExpr)] -> PG.NPort
-doFlowQueueNextPort__ flPred aa = tr (doFlowQueueNextPort_ flPred aa) (
-        "pred = [" ++ (show flPred) ++ "], list =[" ++ (show aa) ++ "]" )
-
-
-doFlowQueueNextPort_ :: PR.PredExpr -> [(PG.NPort, PR.PredExpr)] -> PG.NPort
-doFlowQueueNextPort_ flPred ((port,portPred_):rest) = ret
-    where sat     = isJust $ PR.dnfSAT andExpr
-          andExpr = (PR.buildAND bld) [portPred,flPred]
-          portPred = PR.predDoBuild bld portPred_
-          bld = PR.predBuildDNF
-          -- NB: we assume that each flow is assigned exclusively to a single
-          -- queue, so we return the first match
-          ret = case sat of
-                True  -> port
-                False -> doFlowQueueNextPort_ flPred rest
-
-doFlowNextPort :: (Flow, PR.PredExpr) -> PG.Node -> ST.ST s PG.NPort
-doFlowNextPort (fl, flPred) node = return ret'
-    where nPreds = PG.nPredicates node
-          ret = doFlowQueueNextPort_ flPred nPreds
-          ret' = trN ret $ "Flow:" ++ (flowStr fl) ++
-                          " Node:"  ++ (PG.nLabel node) ++
-                          " Port:" ++ ret
-
-doFlowNextPortCache :: FlowCache s
-                    -> (Flow, PR.PredExpr)
-                    -> PG.Node
-                    -> ST.ST s PG.NPort
-doFlowNextPortCache flowCache x@(fl, flPred) node = do
-    let key = (PG.nLabel node, fl)
-    ret <- H.lookup flowCache key
-    case ret of
-        Just x -> return $ trN x "HIT"
-        Nothing -> do
-            ret <- doFlowNextPort x node
-            H.insert flowCache key ret
-            return $ trN ret "MISS"
-
-
-doFlowQueue :: FlowCache s -> PG.PGGDecomp -> (Flow, PR.PredExpr)
-            -> ST.ST s QueueId
---doFlowQueue fc g (nid,node@(PG.FNode {PG.nLabel = lbl})) flowT
-doFlowQueue fc d@(ctx, g) flowT
-    | Just q <- reachedQueue lnode = return $ trN q
-                                            $ "Flow:" ++ (flowStr $ fst flowT)
-                                            ++ " Reached Queue:" ++ (show q)
-    | otherwise = do
-          nextPort <- case node of
-                PG.FNode {} -> doFlowNextPortCache fc flowT (snd lnode)
-                -- In theory we need to determine the next port based on the
-                -- incoming port.  However, currently there is no way to
-                -- determine what are the "true" incoming edges, so we resort
-                -- into a hack where we always pick the "true" port as the
-                -- nextPort when encountering an ONode
-                PG.ONode {} -> return "true"
-          let d' = sucPortDecomp d nextPort
-          doFlowQueue fc d' flowT
-    where lnode = DGI.labNode' ctx
-          node = snd lnode
-          lbl = PG.nLabel node
-
-flowQueue :: FlowCache s -> PG.PGraph -> Flow -> ST.ST s QueueId
-flowQueue fc prgC flow = do
-    let flPred = flowPred flow
-        d0 = flowQueueStart prgC
-    doFlowQueue fc d0 (flow, flPred)
-
-flowPortGroups :: FlowCache s -> PG.PGGDecomp -> [(Flow, PR.PredExpr)]
-     -> ST.ST s [(PG.NPort, [(Flow, PR.PredExpr)])]
-flowPortGroups fc d@(ctx, g) flowTs = do
-    -- [(Flow, PredExpr, PG.NPort)]
-    flowTPs <- forM flowTs $ \ flT@(fl,flPred) -> do
-        p <- doFlowNextPortCache fc flT (snd $ DGI.labNode' ctx)
-        return (fl, flPred, p)
-    let  t3 (_, _, p) = p
-         grouped :: [[(Flow, PR.PredExpr, PG.NPort)]]
-         grouped = L.groupBy ((==) `on` t3) flowTPs
-         ret = [ (t3 $ head l, [(f,p) | (f,p,_) <- l])  | l <- grouped]
-    return ret
-
-doZQmap :: FlowCache s -> PG.PGGDecomp -> [(Flow, PR.PredExpr)] -> ST.ST s QMap
+doZQmap :: FlowCache s
+        -> PG.PGGDecomp
+        -> [(Flow, PR.PredExpr)]
+        -> ST.ST s QMap
 doZQmap fc d@(ctx, g) flowTs
     | Just q <- reachedQueue lnode = return $ [(fl,q) | (fl,_) <- flowTs]
     | otherwise = do
@@ -1147,9 +942,33 @@ doZQmap fc d@(ctx, g) flowTs
           node = snd lnode
           lbl = PG.nLabel node
 
+-- | given a graph node, group flows based on which port they match
+flowPortGroups :: FlowCache s
+               -> PG.PGGDecomp
+               -> [(Flow, PR.PredExpr)]
+               -> ST.ST s [(PG.NPort, [(Flow, PR.PredExpr)])]
+flowPortGroups fc d@(ctx, g) flowTs = do
+    -- [(Flow, PredExpr, PG.NPort)]
+    flowTPs <- forM flowTs $ \ flT@(fl,flPred) -> do
+        p <- doFlowNextPortCache fc flT (snd $ DGI.labNode' ctx)
+        return (fl, flPred, p)
+    let  t3 (_, _, p) = p
+         grouped :: [[(Flow, PR.PredExpr, PG.NPort)]]
+         grouped = L.groupBy ((==) `on` t3) flowTPs
+         ret = [ (t3 $ head l, [(f,p) | (f,p,_) <- l])  | l <- grouped]
+    return ret
 
+-- | (yet) Another way to compute 'QMap'
+--
+-- This approach traverses the graph only once. It starts with all flows in the
+-- starting node. It groups flows based on which port they match. Then, it
+-- recursively traverses the graphs by following the port  with the matching
+-- flows. Recursion ends when a queue is reached.
 zQmap :: (OracleSt o a)
-    => SearchSt s o a -> C.Configuration -> a -> [Flow]
+    => SearchSt s o a
+    -> C.Configuration
+    -> a
+    -> [Flow]
     -> ST.ST s (PG.PGraph, C.Configuration, QMap)
 zQmap st conf confChange flows = do
     let prgU      = sPrgU $ sParams st
@@ -1161,20 +980,69 @@ zQmap st conf confChange flows = do
         -- flow tuple: (flow, flow predicate)
         flowTs    = [(fl, flowPred fl) | fl <- flows]
     qmap <- doZQmap flowC d0 flowTs
-
     {--
+     -- for sanity checks:
     qmapCorrect <- qMap_ st prgC flows
     let test = qmap == qmapCorrect
         qmap' = case test of
             True  -> qmap
             False -> error $ "Incremental qmap failed"
     --}
-
     return (prgC, newConf, qmap)
 
--- this is what we are currently using
+-- | Incremental QMap computation
+--
+-- This is an incremental computation of 'QMap' (NB: not an incremental search)
+-- because we use the old 'QMap' (i.e., the 'QMap' from the old configuration
+-- without the configuration change).
+--
+-- It depends on a NIC-specific facility (provided by 'OracleSt') where given a
+-- configuration change, the oracle tells us which queues are affected by this
+-- change ('affectedQueues').  We maintain the mappings for the unaffacted
+-- queues, and re-compute the mappings for the where on the affected queues
+-- using.
+qMapIncremental :: (OracleSt o a)
+                => SearchSt s o a
+                -> C.Configuration
+                -> a
+                -> [Flow]
+                -> QMap
+                -> ST.ST s (PG.PGraph, C.Configuration, QMap)
+qMapIncremental st conf confChange flows oldQmap_ = do
+    let prgU      = sPrgU $ sParams st
+        oracle    = sOracle $ sParams st
+        newConf   = C.applyConfChange conf confChange
+        prgC      = C.applyConfig newConf prgU
+        invalidQs = affectedQueues oracle conf confChange
+        flowC     = sFlowCache st
+        oldQmap   = M.fromList oldQmap_
+    qmap <- forM flows $ \fl -> do
+        q <- case M.lookup fl oldQmap of
+            Nothing -> flowQueue flowC prgC fl
+            Just oldQ  -> case oldQ `elem` invalidQs of
+                False -> return oldQ
+                True  -> flowQueue flowC prgC fl
+        return (fl, q)
+    {-
+    qmapCorrect <- qMap_ st prgC flows
+    let test = qmap == qmapCorrect
+        qmap' = case test of
+            True  -> qmap
+            False -> error $ "Incremental qmap failed"
+    -}
+    return (prgC, newConf, qmap)
+
+-- | This is what is currently used for 'searchGreedyFlows' (i.e., the default
+-- non-incremental search).
+--
+-- This is similar to 'qMapIncremental', but it uses 'zQmap' for the flows in
+-- the affected queues.
 zQmapIncremental :: (OracleSt o a)
-      => SearchSt s o a -> C.Configuration -> a -> [Flow] -> QMap
+      => SearchSt s o a   -- ^ search state
+      -> C.Configuration  -- ^ current configuration
+      -> a                -- ^ configuration change
+      -> [Flow]           -- ^ set of flows
+      -> QMap             -- ^ old queue map
       -> ST.ST s (PG.PGraph, C.Configuration, QMap)
 zQmapIncremental st conf confChange flows oldQmap_ = do
     let oracle    = sOracle $ sParams st
@@ -1195,237 +1063,26 @@ zQmapIncremental st conf confChange flows oldQmap_ = do
     return $ (prgC, conf, qmap0 ++ qmap)
 
 
-sucPortCtx_ :: PG.PGraph -> PG.PGContext -> PG.NPort -> DGI.Node
-sucPortCtx_ g ctx port = fst next
-    where sucs = DGI.lsuc' ctx
-          sucsPort =  L.filter (\ (_,s) -> port == PGU.edgePort_ s) sucs
-          next = case sucsPort of
-                [x] -> x
-                []  -> error $ "Cannot find successor of node:" ++ nodeL ++" on port:" ++ port
-                xs  -> error $ "More than one successors on node:" ++ nodeL ++
-                               " for port:" ++ port ++
-                               " -> " ++  (show nextLs)
-          nodeL = PG.nLabel $ DGI.lab' ctx
-          nextLs = [ PG.nLabel n | (x,_) <- sucsPort
-                                 , let n = fromJust $ DGI.lab g x ]
-
-sucPortDecomp :: PG.PGGDecomp -> PG.NPort -> PG.PGGDecomp
-sucPortDecomp (ctx, g) port = ret
-    where next = sucPortCtx_ g ctx port
-          ret  = doMatch next g
-
-doMatch :: DGI.Node -> PG.PGraph -> PG.PGGDecomp
-doMatch nid g = case DGI.match nid g of
-    (Just ctx, g') -> (ctx, g')
-    (Nothing, _) -> error "doMatch failed"
-
-flowQueueStart :: PG.PGraph -> PG.PGGDecomp
-flowQueueStart prgC = d1
-    where node0_ = "RxL2EtherClassifyL3_"
-          port0 = "other"
-          node0 = case GH.findNodeByL (\x -> (PG.nLabel x) == node0_) prgC of
-              Just x -> x
-              Nothing -> error $ "More than one matches for node:" ++ node0_
-          d0 :: PG.PGGDecomp
-          d0 = doMatch (fst node0) prgC
-          d1 = sucPortDecomp d0 port0
-
---------------------------------------------------------------------------------
--- Incremental search
--- [TODO: this file is getting too big]
---  Eventually, we should be using a list of ConfChange everywhere so that
---  we end up only applying in the driver the relevant configuration changes
---
--- There are two aspects of incremental search:
---  1. incremental computation of the flow map
---  2. incremental search from the previous solution
---
--- For 2, instead of starting from [Flow], we start from a previous solution and
--- a set of added and a set of removed flows.
---
--- A good way to represent a solution might be [(Flow,cc)]
---
--- There several approaches for 2, which can be combined to build more complex
--- strategies:
---
---  i) start with the previous solution, and continue searching by adding the
---  new flows. Note that this means that filters for deleted flows remain in the
---  solution.
---
---  ii) filter solution, removing (Flow,cc) tuples that correspond to flows that
---  are removed and start from the resulting solution and add the new flows.
---  Note, that this might lead to weird solutions.
---
---  iii) Find the largest relevant part of the solution. Something like:
---  L.takeWhile ( (f,cc) -> f `S.notMember` rmFlows ). and start from that In
---  this case (contrarily to ii) starting solution from the search is one that
---  we have arrived by actually evaluating a cost function, so in general it has
---  better potential than the starting solution of ii
---
--- iv) Do a nic-specific jump in the search. This `jump` should be a part of the
--- oracle. One example of a jump is make a queue available. We can take multiple
--- jumps to reach a better solution. An extreme case of a jump is to start from
--- scratch
---
--- Note that we can use the CostReject, CostAccept distinction to decide if a
--- solution is good enough or try another approach.
---------------------------------------------------------------------------------
-
-type IncrSearchStrategy o cc = (OracleSt o cc)
-    => IncrSearchSt s o cc
-    -> FL.FlowsSt
-    -> ST.ST s (C.Configuration, IncrConf cc, IncrSearchSt s o cc)
-
-
---  incremental search parameters
-data IncrSearchParams o cc = (OracleSt o cc) => IncrSearchParams {
-      isOracle     :: o
-    , isPrgU       :: PG.PGraph
-    , isCostFn     :: CostQueueFn
-    , isStrategy   :: IncrSearchStrategy o cc
-    , isOrderFlows :: [Flow] -> [Flow]
-}
-
--- incremental search state
-data IncrSearchSt s o cc = (OracleSt o cc) => IncrSearchSt {
-          isParams     :: IncrSearchParams o cc
-        -- incremental map is implemented by maintaing a flow map
-        -- here's its state
-        , isFlowMapSt  :: FM.FlowMapSt s cc
-}
-
-type IncrSearchStIO o cc = IncrSearchSt ST.RealWorld o cc
-
-
-initIncrSearchParams :: (OracleSt o a) => IncrSearchParams o a
-initIncrSearchParams = IncrSearchParams {
-      isOracle = undefined
-    , isPrgU   = undefined
-    , isCostFn = undefined
-    , isStrategy = incSearchGreedyFlows
-    , isOrderFlows = id
-}
-
-initIncrSearchIO :: (OracleSt o cc)
-              => IncrSearchParams o cc
-              -> IO (IncrSearchStIO o cc)
-initIncrSearchIO params = ST.stToIO $ initIncrSearchSt params
-
-
--- initialize search state (add default values when applicable)
-initIncrSearchSt :: (OracleSt o a) => IncrSearchParams o a -> ST.ST s (IncrSearchSt s o a)
-initIncrSearchSt params = do
-    fmSt <- FM.initFlowMapSt (isPrgU params)
-    return $ IncrSearchSt {
-          isParams     = params
-        , isFlowMapSt  = fmSt
-    }
-
-runIncrSearch :: (OracleSt o a) =>
-    IncrSearchParams o a
-    -> FL.FlowsSt
-    -> C.Configuration
-runIncrSearch params flows = ST.runST $ do
-   st <- initIncrSearchSt params
-   (cnf, _, st') <- doIncrSearch st flows
-   return cnf
-
-runIncrSearchIO :: (OracleSt o cc)
-            => IncrSearchStIO o cc
-            -> FL.FlowsSt
-            -> IO (C.Configuration, IncrConf cc, IncrSearchStIO o cc)
-runIncrSearchIO st flows = ST.stToIO $ doIncrSearch st flows
-
+-- | 'QMap' computation for incremental search. The mechanics for this are
+-- implemented using 'FM.FlowMapSt'
 incrSearchQmap :: (OracleSt o cc) => IncrSearchSt s o cc -> ST.ST s QMap
 incrSearchQmap st = FM.getRxQMap $ isFlowMapSt st
 
-doIncrSearch :: (OracleSt o cc)
-         => (IncrSearchSt s o cc)
-         -> FL.FlowsSt
-         -> ST.ST s (C.Configuration, IncrConf cc, IncrSearchSt s o cc)
-doIncrSearch st flowsSt = do
-    let params = isParams st
-        costFn = isCostFn params
-        sortFn = isOrderFlows params
-        oracle = isOracle params
-        search = isStrategy params
-        prgU   = isPrgU params
-    (conf, ic, st) <- search st flowsSt
-    return (conf, ic, st)
-
--- NB: This is not needed any more because we use sets for flows, but we keep it
--- around for future reference.
-checkUniqueFlows :: [Flow] -> [Flow]
-checkUniqueFlows flows = case unique of
-        False -> trace dup_msg flows
-        True  -> flows
-    where unique = (length flows) == (length $ L.nub flows)
-          dup_msg = "Duplicated flows in flow list:\n" ++ (ppShow flows) ++ " This might cause problems"
-
--- is cost acceptable for a search (not if is CostReject)
-costAcceptable :: Cost -> Bool
-costAcceptable CostOK = True
-costAcceptable (CostVal _) = True
-costAcceptable (CostReject _) = False
-
-
--- Notes on incremental configuration:
--- A configuration is a list of configuration changes [cc]
---
--- NB: The list seems to be a better model than a set, because order matters if
--- we have packets that are matched by multiple filters.
---
--- To represent incremental configuration, We need a way to represent removeal
--- of ccs.  We can assume that [cc] is a stack, and that we can remove ccs only
--- from the top. This is not necessary: we can have arbitrary ways to remove ccs
--- from the list.
---
--- Pros of using a stack:
---  -> simple
---  -> works well with our search that essentially pushes ccs to the list
---  -> works well with filter tables (i.e., you just remove entries from the
---     bottom)
--- Cons of using a stack:
---  -> Removing arbitrary ccs (e.g., jumping by freeing a queue) needs to
---     remove more ccs that it would normally have to. A jump that frees a queue
---     when a stack is used would have to iterate the list from the start and
---     remove all elements after and including the first filter matching the
---     queue it tries to remove.
---
--- In our current implementation we assume that we do not program multiple
--- filters that match the same packet. In this case, ordering does not matter.
--- We represent an incremental configuration as: [cc] to add, [cc] to remove.
--- XXX: move this to Configuration.hs
-data IncrConf cc = (C.ConfChange cc) => IncrConf {
-      icRmCCs  :: [cc]
-    , icAddCCs :: [cc]
-}
-
--- ugh! :/
-instance Show (IncrConf cc) where
-    show IncrConf { icRmCCs = xrm, icAddCCs = xadd } = ret
-        where addedS :: [Char]
-              addedS = L.intercalate " \n" [ C.show cc | cc <- xadd]
-              rmS    = L.intercalate " \n" [ C.show cc | cc <- xrm ]
-              ret    = "IncrConf {icRmCCs=[\n" ++ rmS ++ "]\n"
-                               ++ "icAddCCs=[\n" ++ addedS ++ "]\n"
-
-initIncrConf :: (C.ConfChange cc) => IncrConf cc
-initIncrConf = IncrConf [] []
-
-incSearchGreedyFlows :: forall s o cc. (C.ConfChange cc, OracleSt o cc)
-                     => IncrSearchSt s o cc
-                     -> FL.FlowsSt
-                     -> ST.ST s (C.Configuration, IncrConf cc, IncrSearchSt s o cc)
-incSearchGreedyFlows st flowsSt = do
+-- | incremental search strategy
+incrSearchGreedyFlows
+  :: forall s o cc. (C.ConfChange cc, OracleSt o cc)
+  => IncrSearchSt s o cc
+  -> FL.FlowsSt
+ -> ST.ST s (C.Configuration, IncrConf cc, IncrSearchSt s o cc)
+incrSearchGreedyFlows st flowsSt = do
     let ic0 = initIncrConf
     (ic', st') <- doIncSearchGreedyFlows ic0 st flowsSt
     let cnf' = C.foldConfChanges $ FM.fmGetCCs $ isFlowMapSt st'
         ret_ = (cnf', ic', st')
-        ret  = trN ret_ $ "incSearchGreedyFlows:" ++ (show ic')
+        ret  = trN ret_ $ "incrSearchGreedyFlows:" ++ (show ic')
     return ret
 
--- entry for search algorithm
+-- | entry for incremental search algorithm
 -- NB: the current (i.e., the last) solution is in flowmap
 doIncSearchGreedyFlows :: forall s o cc. (C.ConfChange cc, OracleSt o cc)
                      => IncrConf cc
@@ -1437,7 +1094,7 @@ doIncSearchGreedyFlows ic st flowsSt_ = do
         oracle    = isOracle params
         sortFn    = isOrderFlows params
 
-        flowsSt   = trN flowsSt_ ("==============> FLOWS ST:" ++ (ppShow flowsSt_))
+        flowsSt   = trN flowsSt_ ("=========> FLOWS ST:" ++ (ppShow flowsSt_))
         curFlows  = FL.fsCurrent flowsSt
         delFlows  = FL.fsRemoved flowsSt
         addFlows  = FL.fsAdded flowsSt
@@ -1446,19 +1103,19 @@ doIncSearchGreedyFlows ic st flowsSt_ = do
     (searchSt, searchFlows) <- case S.null delFlows of
            -- no removed flows, keep state as is and return new flows
            True -> do
-                      let flows = sortFn $ S.toList addFlows
-                      return $ trN (st, flows) "NO DELETED FLOWS"
+               let flows = sortFn $ S.toList addFlows
+               return $ trN (st, flows) "NO DELETED FLOWS"
            -- removed, rebuild the whole flow map
            False -> do -- removed flows
-                       --fm' <- FM.rebuildFlowMapSt (isFlowMapSt st) []
-                       fm' <- foldM FM.rmFlow (isFlowMapSt st) (S.toList delFlows)
-                       let st' = st {isFlowMapSt = fm'}
-                           flows = sortFn $ S.toList addFlows
-                       return $ trN (st', flows) "DELETED FLOWS"
+                fm' <- foldM FM.rmFlow (isFlowMapSt st) (S.toList delFlows)
+                let st' = st {isFlowMapSt = fm'}
+                    flows = sortFn $ S.toList addFlows
+                return $ trN (st', flows) "DELETED FLOWS"
     -- search
     let msg = "Search flows:\n" ++ (FL.flowsStr searchFlows)
              ++ "\nState flows:\n"
-             ++ (FL.flowsStr $ catMaybes $ map snd $ FM.fmCnfState $ isFlowMapSt searchSt)
+             ++ (FL.flowsStr $ catMaybes $ map snd
+                             $ FM.fmCnfState $ isFlowMapSt searchSt)
     (st', cost') <- case searchFlows of
                      [] -> return (searchSt, CostOK)
                      _  -> incSearchGreedyFlows_ searchSt (trN searchFlows msg)
@@ -1481,10 +1138,14 @@ doIncSearchGreedyFlows ic st flowsSt_ = do
                             _  -> tr rmFlows_ $ "JUMP!"
                                       ++ "\nRemoved flows:\n"
                                       ++ (FL.flowsStr $ catMaybes rmFlows_)
-            --fm' <- FM.rebuildFlowMapSt fm keep
+
             fm'_ <- foldM FM.rmFlow fm $ catMaybes rmFlows
-            let fm' = trN fm'_ $ " AFTER JUMP CnfSt: \n" ++ (sAddPr " >" $ ppShow $ FM.fmCnfState fm'_) ++ "\n"
-                              ++ "BEFORE JUMP CnfSt:\n" ++ (sAddPr " >" $ ppShow $ FM.fmCnfState fm)
+            let fm' = trN fm'_ $ " AFTER JUMP CnfSt: \n" ++
+                                 (sAddPr " >" $ ppShow $ FM.fmCnfState fm'_) ++
+                                 "\n" ++
+                                 "BEFORE JUMP CnfSt:\n" ++
+                                 (sAddPr " >" $ ppShow $ FM.fmCnfState fm)
+
             let st'_ = st { isFlowMapSt = fm' }
                 -- new flows state
                 flowsSt' = FL.FlowsSt {
@@ -1496,7 +1157,7 @@ doIncSearchGreedyFlows ic st flowsSt_ = do
                 st' = (trN st'_ $ "JUMP QMAP="++ (qmapStr qmap'))
             -- recurse
             case confS of
-                [] -> error "incSearchGreedyFlows: cannot find acceptable conf"
+                [] -> error "incrSearchGreedyFlows: cannot find acceptable conf"
                 _  -> doIncSearchGreedyFlows ic' st' flowsSt'
 
 -- returns:
@@ -1605,6 +1266,402 @@ incSearchQmap st cc flow = do
         st = trN st_ $ (C.showConfig (undefined::cc) (C.foldConfChanges $ ccs))
     qmap <- FM.getRxQMap st       -- get qmap
     return $ (qmap, st)
+
+
+flowConfs :: (C.ConfChange a, OracleSt o a)
+          => o -> C.Configuration -> Flow -> [C.Configuration]
+flowConfs x conf f = map (C.applyConfChange conf) changes
+    where changes = flowConfChanges x conf f
+
+flowsSingleConfChanges :: (C.ConfChange a, OracleSt o a)
+                       => o -> C.Configuration -> [Flow] -> [(Flow, a)]
+flowsSingleConfChanges x c flows = L.concat res
+   where res = [ [(f,cc) | cc <- flowConfChanges x c f ] | f <- flows]
+
+flowsSingleConfs :: (C.ConfChange a, OracleSt o a)
+                 => o -> C.Configuration -> [Flow] -> [(Flow, C.Configuration)]
+flowsSingleConfs x conf fs =
+    [(fl, C.applyConfChange conf change)
+     | (fl,change) <- flowsSingleConfChanges x conf fs]
+
+-- | E10K (simple for now) oracle
+data E10kOracleSt = E10kOracleSt {nQueues :: Int, startQ :: Int}
+e10kDefaultQ = 0
+
+initE10kOracle nq = E10kOracleSt { nQueues = nq, startQ = 0 }
+
+-- | implement oracle class for 'E10kOracleSt'
+instance OracleSt E10kOracleSt E10k.ConfChange where
+    flowConfChanges  = e10kFlowConfChanges
+    flowConfChangesS = e10kFlowConfChangesS
+
+    --affectedQueues E10kOracleSt { nQueues = nq } _ _ = allQueues nq
+    affectedQueues E10kOracleSt { nQueues = nq } conf (E10k.Insert5T c5t) =
+        [e10kDefaultQ, xq]
+        where xq = E10k.c5tQueue $ E10k.parse5t (snd c5t)
+    affectedQueues E10kOracleSt { nQueues = nq } conf (E10k.InsertFDir cFdir) =
+        [e10kDefaultQ, xq]
+        where xq = E10k.cfdtQueue $ E10k.parseFDT (snd cFdir)
+
+    --confJump o = e10kQueueJump
+
+-- TODO: avoid symmetric allocation
+-- TODO: smart-wildcard allocation if possible?
+e10kFlowConfChanges :: E10kOracleSt -> C.Configuration -> Flow
+                    -> [E10k.ConfChange]
+e10kFlowConfChanges E10kOracleSt {nQueues = nq} cnf fl
+    -- allocate 5-tuple filters first, if we can
+    | not rx5tFull  = [E10k.insert5tFromFl rx5tId fl q | q <- allQs]
+    | not rxCfdFull = catMaybes $ [E10k.insertFdirFromFl rxCfdId fl q | q <- allQs]
+    | otherwise     = []
+    where allQs = allQueues nq
+          rx5tFull  = E10k.rx5tFilterTableFull cnf
+          rx5tId    = E10k.rx5tFilterTableLen cnf
+          rxCfdFull = E10k.rxCfdFilterTableFull cnf
+          rxCfdId   = E10k.rxCfdFilterTableLen cnf
+
+
+-- TODO: see above
+e10kFlowConfChangesS :: E10kOracleSt
+                     -> [(E10k.ConfChange, Maybe Flow)]
+                     -> Flow
+                     -> ([E10k.ConfChange], E10kOracleSt)
+e10kFlowConfChangesS o@(E10kOracleSt {nQueues = nq, startQ = startQ}) cnf fl
+ -- can we replace existing filters?
+ | not $ null replaced = (replaced', o')
+ -- allocate 5-tuple filters first, if we can
+ | not rx5tFull  = (alloc5t, o')
+ | not rxCfdFull = (allocCfd, o')
+ | otherwise     = ([], o)
+ where allQs = allQueues_ startQ nq
+       -- allocate filters starting from a different queue each time
+       o' =  o { startQ = (startQ + 1) `mod` nq}
+       conf = C.foldConfChanges $ map fst cnf
+       rx5tFull  = E10k.rx5tFilterTableFull conf
+       rx5tId    = E10k.rx5tFilterTableLen conf
+       alloc5t   = [E10k.insert5tFromFl rx5tId fl q | q <- allQs]
+       rxCfdFull = E10k.rxCfdFilterTableFull conf
+       rxCfdId   = E10k.rxCfdFilterTableLen conf
+       allocCfd  = catMaybes $ [E10k.insertFdirFromFl rxCfdId fl q | q <- allQs]
+       -- try to find if there are unused filters, i.e., configuration
+       -- changes in the current state for which the correspnding flows have
+       -- been removed (this happens when we lazily remove flows)
+       unusedFs = filter (isNothing . snd) cnf
+       -- try to replace unused filters to use current flow
+       replaced = catMaybes $ [E10k.replaceCcFromFl cc fl | (cc,_) <- unusedFs]
+       -- The queue of the repalced filter needs to remain the same (replace
+       -- filters do not change the structure of the graph) For all queues
+       -- that are not covered by replaced filtres, generate 5t filters if
+       -- the 5t filter table is not full.
+       replacedQs = S.fromList $ [ E10k.ccQueue cc | cc <- replaced ]
+       replacedMissingQs = (S.fromList allQs) `S.difference` replacedQs
+       replaced'
+         | not rx5tFull =  replaced
+                        ++ [E10k.insert5tFromFl rx5tId fl q
+                           | q <- S.toList replacedMissingQs]
+         | otherwise = replaced
+
+e10kQueueJump
+ :: [(E10k.ConfChange,Maybe Flow)] -- ^ initial configuration
+ -> ([(E10k.ConfChange,Maybe Flow)], [(E10k.ConfChange, Maybe Flow)])
+    -- ^ keep and remove partition
+e10kQueueJump ts = tr ret $ "e10kQueueJump removing flows from q=" ++ (show rmQ)
+    where ret = L.partition keepF ts
+          --rmQ = 5
+          rmQ = lastQ
+          -- remove non-5t filters, because otherwise the incremental flowmap
+          -- will not work
+          lastQ  = getQ $ last $ filter (isJust . snd) ts
+          firstQ = getQ $ head $ filter (isJust . snd) ts
+          getQ = E10k.ccQueue . fst
+          keepF :: (E10k.ConfChange, Maybe Flow) -> Bool
+          keepF (cc,fl) = ((E10k.ccQueue cc) /= rmQ) && (E10k.ccIs5t cc)
+
+
+myThird (_,_,x) = x
+mySnd (_,x,_) = x
+
+-- | initSearchParams wrapper for E10k oracle
+initSearchParamsE10k nqueues = initSearchParams {sOracle = oracle}
+    where oracle = initE10kOracle nqueues
+
+-- | hardcoded E10k oracle
+newtype E10kOracleHardCoded = E10kOracleHardCoded {
+        nnHardcoded :: (Int, [(Flow, Int, Int)])
+    }
+
+{-|
+  Making the type 'E10kOracleHardCoded' member of class "Oracle state" to work
+  as as Oracle for Intel 82599 NIC.  It will provide a way to generate initial
+  empty configuation, showing configuration, and querying about affected queues
+  from current configuration.
+ -}
+instance OracleSt E10kOracleHardCoded E10k.ConfChange where
+    {-|
+     - Basic implementation which suggests a putting current flow in presicely
+     - fixed queue based on initial hardcoded values.
+    -}
+    flowConfChanges E10kOracleHardCoded { nnHardcoded = (nq, tbl) } c fl = ans
+        where
+        -- perform a lookup of a flow in the hardcoded table
+        -- the lookup should give a filter type and queue-no.
+        -- return that.
+            f = filter (\(f, q, fil) -> f == fl) $ tbl
+            fId = 0 -- TODO: FIXME (proper filter id)
+            ans
+              | length(f) > 1 = error ("ERROR: there must be repeat flow, as more than one flow matches.")
+              | length(f) == 0 = []
+              | (myThird $ head f) == 1 = [E10k.InsertFDir $ (fId, fromJust $ E10k.mkFDirFromFl fl (mySnd $ head f))]
+              | (myThird $ head f) == 2 = [E10k.Insert5T   $ (fId, fromJust $ E10k.mkFDirFromFl fl (mySnd $ head f))]
+              | otherwise = error ("ERROR: wrong type of flow")
+
+    flowConfChangesS = error "E10kOracleHardCoded: NYI flowConfChangesS!"
+    affectedQueues = error "E10kOracleHardCoded: NYI affectedQueues"
+
+-- ###################################### SF Oracle ########################
+
+
+-- SF (simple for now) oracle
+data SFOracleSt = SFOracleSt {nQueuesSF :: Int, startQSF :: Int}
+sfDefaultQ = 0
+
+initSFOracle nq = SFOracleSt { nQueuesSF = nq, startQSF = 0 }
+
+{-|
+  Making the type 'SFOracleSt' member of class "Oracle state" to work as
+  as Oracle for Intel 82599 NIC.
+  It will provide a way to generate initial empty configuation, showing
+  configuration, and querying about affected queues from current configuration.
+ -}
+instance OracleSt SFOracleSt SF.ConfChange where
+    {-|
+     - Basic implementation which suggests a putting current flow in all
+     - the queues, generating nQueue number of configurations.
+     - This implementation does not care for current state of queues,
+     -  and counts on cost-function to help in selecting proper queue.
+    -}
+    flowConfChanges = sfFlowConfChanges
+    flowConfChangesS = error "SFOracleSt: flowConfChangesS: NYI!"
+
+    -- affectedQueues SFOracleSt { nQueuesSF = nq } _ _ = allQueues nq
+    affectedQueues SFOracleSt { nQueuesSF = nq } conf (SF.Insert5T c5t) =
+        [sfDefaultQ, xq]
+        where xq = SF.c5tQueue $ SF.parse5t c5t
+
+    --confJump o = oracleQueueJump SF.ccQueue
+
+-- TODO: avoid symmetric allocation
+-- TODO: smart-wildcard allocation if possible?
+sfFlowConfChanges :: SFOracleSt -> C.Configuration -> Flow
+                    -> [SF.ConfChange]
+sfFlowConfChanges SFOracleSt {nQueuesSF = nq} cnf fl
+    -- allocate 5-tuple filters first, if we can
+    | not rx5tFull  = [SF.insert5tFromFl fl q | q <- allQs]
+    | otherwise     = []
+    where allQs = allQueues nq
+          rx5tFull  = SF.rx5tFilterTableFull cnf
+
+-- TODO: see above
+sfFlowConfChangesS :: SFOracleSt -> C.Configuration -> Flow
+                    -> ([SF.ConfChange], SFOracleSt)
+sfFlowConfChangesS o@(SFOracleSt {nQueuesSF = nq, startQSF = startQ}) cnf fl
+    -- allocate 5-tuple filters first, if we can
+    | not rx5tFull  = ([SF.insert5tFromFl fl q | q <- allQs], o')
+    | otherwise     = ([], o)
+    where allQs = allQueues_ startQ nq
+          o' =  o { startQSF = startQ + 1 `mod` nq}
+          rx5tFull  = SF.rx5tFilterTableFull cnf
+
+-- SF (simple for now) oracle
+newtype SFOracleHardCoded = SFOracleHardCoded {
+        nnHardcodedSF :: (Int, [(Flow, Int, Int)])
+                    -- (totalQueues, [(Flow, Qid, FilterType(1==fidr, 2 == Ftuple))])
+        }
+
+{-|
+  Making the type 'SFOracleHardCoded' member of class "Oracle state" to work as
+  as Oracle for SF NIC.
+  It will provide a way to generate initial empty configuation, showing
+  configuration, and querying about affected queues from current configuration.
+ -}
+instance OracleSt SFOracleHardCoded SF.ConfChange where
+    {-|
+     - Basic implementation which suggests a putting current flow in presicely
+     - fixed queue based on initial hardcoded values.
+    -}
+    flowConfChanges SFOracleHardCoded { nnHardcodedSF = (nq, tbl) } c fl = ans
+        where
+        -- perform a lookup of a flow in the hardcoded table
+        -- the lookup should give a filter type and queue-no.
+        -- return that.
+            f = filter (\(f, q, fil) -> f == fl) $ tbl
+
+            ans
+              | length(f) > 1 = error ("ERROR: there must be repeat flow, as more than one flow matches.")
+              | length(f) == 0 = []
+              | (myThird $ head f) == 1 = [SF.Insert5T $ SF.mk5TupleFromFl fl (mySnd $ head f)]
+              | otherwise = error ("ERROR: wrong type of flow")
+
+    flowConfChangesS = error "SFOracleHardCoded: flowConfChangesS: NYI!"
+
+    -- QUESTION: Is it assumed that there will be only one operation in
+    --      conf change?
+    -- affectedQueues SFOracleHardCoded { nnQueues = nq } _ _ = allQueues nq
+    affectedQueues SFOracleHardCoded { nnHardcodedSF = nhw } conf (SF.Insert5T c5t) =
+        [sfDefaultQ, xq]
+        where xq = SF.c5tQueue $ SF.parse5t c5t
+
+initSearchParamsSF nqueues = initSearchParams {sOracle = oracle}
+    where oracle = initSFOracle nqueues
+
+-- ###################################### END: SF Oracle ########################
+
+
+
+nLabelNode :: PG.PGraph -> String -> PG.PGNode
+nLabelNode g l = case GH.filterNodesByL (\x -> (PG.nLabel x) == l) g of
+    []  -> error $ "nLabelnode: node" ++ l ++ "node found"
+    [x] -> x
+    _  -> error $ "nLabelnode: more that one " ++ l ++ "node found"
+
+nLabelPred :: PG.PGraph -> String -> [(PG.PGNode, PR.PredExpr)]
+nLabelPred g l = [ (n, PR.nodePred g n) | n <- nodes ]
+    where nodes = GH.filterNodesByL (\x -> (PG.nLabel x) == l) g
+
+nLabelSinglePred :: PG.PGraph -> String -> PR.PredExpr
+nLabelSinglePred g l = case nLabelPred g l of
+    [x] -> snd x
+    []  -> error "nLabelSinglePred: no node found"
+    _   -> error "more than one nodes found"
+
+
+-- http://rosettacode.org/wiki/Standard_deviation#Haskell
+sd :: RealFloat a => [a] -> a
+sd l = sqrt $ sum (map ((^2) . subtract mean) l) / n
+  where n = L.genericLength l
+        mean = sum l / n
+
+balanceCost_ :: [QueueId] -> QMap -> Cost
+balanceCost_ allQs qmap = ret
+    where qLoad :: M.Map QueueId Integer
+          qList  =  [qId | (_,qId) <- qmap]
+          qLoad = L.foldl foldFn M.empty qList
+          foldFn :: M.Map QueueId Integer -> QueueId -> M.Map QueueId Integer
+          foldFn m qid = M.insertWith (+) qid 1 m
+
+          getQLoad :: QueueId -> Integer
+          getQLoad q = M.findWithDefault 0 q qLoad
+          load    = map getQLoad allQs
+          --maxLoad = maximum load
+          --minLoad = minimum load
+          --ret_     =  CostVal $ fromIntegral $ maxLoad - minLoad
+          ret_ = CostVal $ sd $ map fromIntegral load
+          ret = trN ret_ ("\nqlist" ++ (ppShow qList) ++ "\nLOAD:" ++ ppShow (load))
+
+-- | load-balancing cost funtion
+balanceCost :: Int -> QMap -> Cost
+balanceCost nq fls = balanceCost_ (allQueues nq) fls
+
+-- | dummy cost function (always returns 1)
+dummyCost :: [(Flow, QueueId)] -> Cost
+dummyCost _ = CostVal 1.0
+
+prioritySort :: (Flow -> Bool) -- ^ returns true for high-priority flows
+             -> [Flow]
+             -> [Flow]
+prioritySort isGold flows = let (hp,be) = L.partition isGold flows
+                           in hp ++ be
+
+-- | dynamic priority cost function (high-priortity/best-effort priorities)
+priorityCost :: (Flow -> Bool)  -- ^ returns true for HP flows
+             -> Integer -> Int -> QMap -> Cost
+priorityCost isGold goldFlowsPerQ nq qmap = trN cost msg
+    where (goldFls, beFls) = L.partition (isGold . fst) qmap
+          goldQs = S.fromList $ [qid | (_,qid) <- goldFls]
+          beQs   = S.fromList $ [qid | (_,qid) <- beFls]
+          allQsL = allQueues nq
+          allQs  = S.fromList allQsL
+          restQs = allQs `S.difference` goldQs
+          goldQsExcl = goldQs `S.difference` beQs
+          beQsExcl   = beQs `S.difference` goldQs
+          msg = "---->\nqmap:\n" ++ (qmapStr qmap)
+                ++ "\ngoldQs:" ++ (ppShow goldQs)
+                ++ "\ngoldQsExcl:" ++ (ppShow goldQsExcl)
+                ++ "\ngoldNQs:" ++ (ppShow goldNQs)
+                ++ "\nbeQs:" ++ (ppShow beQs)
+                ++ "\ncost" ++ (ppShow cost)
+                ++ "\n<-----"
+          cost
+            -- no gold flows: just balance best-effort across all queues
+            | length goldFls == 0 = balanceCost_ (allQueues nq) beFls
+            -- no best effort flows: penalize extra queues and
+            -- balance gold across all queues
+            | length beFls   == 0 =
+                let CostVal bcost = balanceCost_ allQsL goldFls
+                    extraCost = if goldExtra > 0 then goldExtra else 0
+                in CostVal $ bcost + (fromIntegral extraCost)
+            -- we should have enough queues for the gold class
+            | goldNeeded  > 0 = CostReject $ 100*(fromIntegral goldNeeded)
+            -- we should not have non-gold exclusive queues
+            | goldNonExcl > 0 = CostReject $ (fromIntegral goldNonExcl)
+            -- we should have enough queues for the best effort class
+            -- beNeeded > 0 = CostReject $ (fromIntegral beNeeded)
+            -- penalize needing more be queues, but do not reject solution
+            -- (it just means we have some slack for gold flows)
+            | beNeeded > 0 = CostVal $ 100*(fromIntegral beNeeded) + balBe
+            -- if all is OK, it depends on how well the classes are balanced
+            | otherwise               = CostVal $ balGold + balBe
+
+          -- determine number of gold queues
+          goldNQs = (min $ nq -1)
+                   $ ceiling
+                   $ (toRational $ length goldFls) / (toRational goldFlowsPerQ)
+          goldNeeded = goldNQs - (S.size goldQsExcl)
+          -- gold non-exclusive queues
+          goldNonExcl = (S.size goldQs) - (S.size goldQsExcl)
+          goldExtra  = -goldNeeded
+          -- number of best effort queues
+          beNQs = min (nq - goldNQs) (length beFls)
+          beNeeded = beNQs - (S.size beQsExcl)
+
+          CostVal balGold = balanceCost_ (S.toList goldQs) goldFls
+          CostVal balBe   = balanceCost_ (S.toList restQs) beFls
+
+
+
+-- | static cost function (flows that match predicate get a number of queues)
+staticCost ::  (Flow -> Bool) -> Int -> Int -> QMap -> Cost
+staticCost isGold nGoldQs' nq qmap = trN cost msg
+    where
+          -- FIXME: Currenly hardcoding the logic of how many gold queues are
+          --        there based on total number of queues
+          nGoldQs
+            | nq == 5 = 2
+            | nq == 10 = 4
+--            | nq == 10 = 2  # for fancyecho as it will not have that many active flows
+            | otherwise = error ("no. of queues is non-standard" ++
+                    " (not 5 or 10). Given queues: " ++ (show nq))
+          assignedGoldQsL = take nGoldQs $ allQueues nq -- static gold queues
+          assignedGoldQsS = S.fromList assignedGoldQsL
+
+          assignedRestQsL = drop nGoldQs $ allQueues nq -- static rest queues
+          assignedRestQsS = S.fromList assignedRestQsL
+
+          (goldFls, restFls) = L.partition (isGold . fst) qmap
+
+          goldOK = and [ qid `S.member` assignedGoldQsS | (_,qid) <- goldFls ]
+          restOK = and [ qid `S.member` assignedRestQsS | (_,qid) <- restFls ]
+
+          CostVal balGold = balanceCost_ assignedGoldQsL goldFls
+          CostVal balRest = balanceCost_ assignedRestQsL restFls
+          msg = (qmapStr qmap) ++ " \n" ++ (show cost)
+          cost
+               | not goldOK = CostReject 1
+               | not restOK = CostReject 1
+               | length goldFls == 0 = CostVal balRest
+               | length restFls == 0 = CostVal balGold
+               | otherwise = CostVal $ balGold + balRest
+
 
 -- Code for performing simple tests
 
