@@ -13,6 +13,7 @@ clean_machine() {
     commands_to_kill="${commands_to_kill} stack-e10k"
     commands_to_kill="${commands_to_kill} stack-dpdk"
     commands_to_kill="${commands_to_kill} stack-dpdk2"
+    commands_to_kill="${commands_to_kill} stack-e10k-dpdk"
     commands_to_kill="${commands_to_kill} fancyEchoLinux"
     commands_to_kill="${commands_to_kill} python2"
     echo "ssh ${mname} sudo killall -9 ${commands_to_kill}"

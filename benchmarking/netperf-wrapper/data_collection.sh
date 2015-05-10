@@ -209,6 +209,7 @@ ClientList="-C ziger2 -C sbrinz2"
 ClientList="-C ziger2 "
 ClientList="-C ziger1 -C sbrinz1 -C sbrinz2"
 ClientList="-C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2"
+ClientList="-C ziger1 -C sbrinz2"
 ######################
 
 LOAD=1
@@ -442,14 +443,18 @@ fi
 
 ######################
 
+##################################################################
+##################################################################
+##################################################################
+##################################################################
 DNCOSTFUNCTION="priority"
-DNCOSTFUNCTION="balance"
 DNCOSTFUNCTION="static"
+DNCOSTFUNCTION="balance"
 
 ######################
 
 NICTYPE="NIC_Intel"
-ECHO_SERVER="dpdk2"
+ECHO_SERVER="e10k-dpdk"
 SERVERIP=10.113.4.95
 
 NICTYPE="NIC_SF"
@@ -482,13 +487,13 @@ ECHO_SERVER="fancyEchoOnload"
 SERVERIP=10.113.4.195
 
 NICTYPE="NIC_Intel"
-ECHO_SERVER="dpdk2"
+ECHO_SERVER="e10k-dpdk"
 SERVERIP=10.113.4.95
 
-######################
+NICTYPE="NIC_SF"
+ECHO_SERVER="llvmSF"
+SERVERIP=10.113.4.195
 
-#SERVERNAME="sbrinz1"
-#SERVERIP=10.113.4.26
 ######################
 
 PACKETSIZE=64
@@ -496,9 +501,10 @@ PACKETSIZE=1024
 
 ######################
 
-OUTPUTDIRPARENT="./allResultsEchoServerSmall/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
-OUTPUTDIRPARENT="./allResultsEchoServer/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
-######################
+OUTPUTDIRPARENT="./debugSFissue/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+OUTPUTDIRPARENT="./debugMerge/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+##################################################################
+##################################################################
 
 
 if [ "${RUNSTACK}" == "yes" ] ; then
