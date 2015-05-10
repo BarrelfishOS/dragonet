@@ -278,6 +278,10 @@ bool sf_ctrl_5tuple_set(struct state *state,
     assert(qi < SF_MAX_QUEUES);
     assert(sf_driver != NULL);
     q = sf_driver->queues + qi;
+    if (q->queue_handle == NULL) {
+        dbg_printf("ERROR: [QID:%"PRIu8"] handle is NULL, queues = %p\n",
+                qi, sf_driver->queues);
+    }
     assert(q->queue_handle != NULL);
     //printf
     dprint

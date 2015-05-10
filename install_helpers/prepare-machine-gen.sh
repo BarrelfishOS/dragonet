@@ -114,7 +114,7 @@ install_dragonet_cabal() {
     # https://github.com/bscarlet/llvm-general/issues/122
     ${SYSTEM_CABAL} update
     ${SYSTEM_CABAL} install --prefix=${DRAGONET_CABAL_DIR} cabal-install-1.20.0.6
-    if [ $? != 0]; then
+    if [ $? != 0 ]; then
         echo "Dragonet cabal-install installation failed"
         exit 1
     fi

@@ -4,7 +4,7 @@ show_usage() {
     echo "USAGE: $0 <runtype> <stackname> <HWqueues> <cost-fn> <oracle> <concurrency> <clients>"
     echo "EXAMPLE: $0 fg tap 1 balanced greedy 0 0"
     echo "EXAMPLE: $0 bg sf 4 priority greedy 0 0"
-    echo "EXAMPLE: $0 strace e10k 10 priority greedy 0 0"
+    echo "EXAMPLE: $0 strace e10k-dpdk 10 priority greedy 0 0"
     echo "EXAMPLE: $0 gdb null 5 balanced greedy 0 0"
     echo "EXAMPLE: $0 fg dpdk 10 priority greedy 0 0"
     echo "EXAMPLE: $0 bg dpdk 10 priority hardcoded 4 40"
@@ -72,25 +72,24 @@ ${SCRIPTDIR}/deployPrepare.sh
 
 EXTRAENV=""
 INITCMD=""
-if [ ${STACKNAME} == "stack-dpdk" ] ; then
+if [ ${STACKNAME} == "stack-e10k-dpdk" ] ; then
 echo "Using dpdk library"
 #EXTRAENV="LD_PRELOAD=/home/ubuntu/dragonet/dpdk-1.5.0r1/build/lib/libintel_dpdk.so"  # this does not work, causes seg-fault
-INITCMD="export LD_LIBRARY_PATH=/home/ubuntu/dragonet/dpdk-1.7.1/build/lib/ "
+#INITCMD="export LD_LIBRARY_PATH=/home/ubuntu/dragonet/dpdk-1.7.1/build/lib/ "
 fi
 
 RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN}"
 RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN} ${ORACLE} ${CONC} ${CLIENTS}"
 
-if [ ${STACKNAME} == "stack-dpdk2" ] ; then
+if [ ${STACKNAME} == "stack-e10k-dpdk" ] ; then
 echo "Using dpdk library"
-INITCMD="export LD_LIBRARY_PATH=/home/ubuntu/dragonet/dpdk-1.7.1/build/lib/ "
 RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN} dpdk ${CONC} -i "
 #RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN} dpdk  ${CONC} "
 fi
 
 if [ ${STACKNAME} == "stack-sf" ] ; then
 #sudo LD_PRELOAD=/lib/libciul.so.1.1.1 ./dist/build/${APPNAME}/${APPNAME} $@
-EXTRAENV="LD_PRELOAD=/lib/libciul.so.1.1.1"
+#EXTRAENV="LD_PRELOAD=/lib/libciul.so.1.1.1"
 RUNCMD="./dist/build/${STACKNAME}/${STACKNAME} ${HWQUEUES} ${COSTFN} sf ${CONC} -i "
 fi
 

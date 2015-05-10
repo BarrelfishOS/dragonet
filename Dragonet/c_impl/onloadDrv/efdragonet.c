@@ -104,6 +104,35 @@ int alloc_filter_default(struct dragonet_sf_queue *sfq)
     return 1;
 } // end function: alloc_filter_default
 
+/*
+ * function to print more information about discarded packet
+ */
+static void handle_rx_discard(ef_event ev)
+{
+  int discard_type = EF_EVENT_RX_DISCARD_TYPE(ev);
+  switch( discard_type ) {
+  case EF_EVENT_RX_DISCARD_CSUM_BAD:
+        dbg_printf("discard type: EF_EVENT_RX_DISCARD_CSUM_BAD, %d\n", discard_type);
+    break;
+  case EF_EVENT_RX_DISCARD_MCAST_MISMATCH:
+        dbg_printf("discard type: EF_EVENT_RX_DISCARD_MCAST_MISMATCH, %d\n", discard_type);
+    break;
+  case EF_EVENT_RX_DISCARD_CRC_BAD:
+        dbg_printf("discard type: EF_EVENT_RX_DISCARD_CRC_BAD, %d\n", discard_type);
+    break;
+  case EF_EVENT_RX_DISCARD_TRUNC:
+        dbg_printf("discard type: EF_EVENT_RX_DISCARD_TRUNC, %d\n", discard_type);
+    break;
+  case EF_EVENT_RX_DISCARD_RIGHTS:
+        dbg_printf("discard type: EF_EVENT_RX_DISCARD_RIGHTS, %d\n", discard_type);
+    break;
+  case EF_EVENT_RX_DISCARD_OTHER:
+        dbg_printf("discard type: EF_EVENT_RX_DISCARD_OTHER, %d\n", discard_type);
+    break;
+  default:
+        dbg_printf("unknown discard type: %d\n", discard_type);
+  }
+}
 
 
 size_t get_packet_nonblocking(struct dragonet_sf_queue *sfq,  struct input **in)
@@ -160,16 +189,32 @@ size_t get_packet_nonblocking(struct dragonet_sf_queue *sfq,  struct input **in)
             ++sfq->evs_bufferd_rx_last;
 
 
-            /* This code does not handle jumbos. */
-            assert(EF_EVENT_RX_SOP(sfq->evs[idx]) != 0);
-            assert(EF_EVENT_RX_CONT(sfq->evs[idx]) == 0);
+            if(EF_EVENT_TYPE(sfq->evs[idx]) == EF_EVENT_TYPE_RX) {
+                // This is valid RX packet
 
-            pkt_buf_i = EF_EVENT_RX_RQ_ID(sfq->evs[idx]);
+                /* This code does not handle jumbos. */
+                assert(EF_EVENT_RX_SOP(sfq->evs[idx]) != 0);
+                assert(EF_EVENT_RX_CONT(sfq->evs[idx]) == 0);
+
+                pkt_buf_i = EF_EVENT_RX_RQ_ID(sfq->evs[idx]);
+                len = EF_EVENT_RX_BYTES(sfq->evs[idx]) - viff->frame_off;
+
+            } else if(EF_EVENT_TYPE(sfq->evs[idx]) == EF_EVENT_TYPE_RX_DISCARD) {
+                /* This code does not handle jumbos. */
+                assert(EF_EVENT_RX_DISCARD_SOP(sfq->evs[idx]) != 0);
+                assert(EF_EVENT_RX_DISCARD_CONT(sfq->evs[idx]) == 0);
+
+                pkt_buf_i = EF_EVENT_RX_DISCARD_RQ_ID(sfq->evs[idx]);
+                len = EF_EVENT_RX_DISCARD_BYTES(sfq->evs[idx]) - viff->frame_off;
+            } else {
+                dbg_printf("Invalid type event in RX path\n");
+                abort();
+            }
             pkt_buf = pkt_buf_from_id(viff, pkt_buf_i);
             // Every incoming packet should have n_refs set to 1.
             assert(pkt_buf->n_refs == 1);
             assert(pkt_buf->is_tx == 0);
-            len = EF_EVENT_RX_BYTES(sfq->evs[idx]) - viff->frame_off;
+
 
             copylen = len;
             if (len >  (*in)->len) {
@@ -229,15 +274,46 @@ size_t get_packet_nonblocking(struct dragonet_sf_queue *sfq,  struct input **in)
 
                     ++sfq->rx_event_count;
 
-                    dprint("status: %s:%s:%d: %d,RX event arrived, "
+                    dprint("%d,RX event arrived, "
                             "no events: %d, TX:%d, RX=%d, DROP=%d\n",
-                            __FILE__, __FUNCTION__, __LINE__,
                             sfq->event_count, sfq->no_event_count,
                             sfq->tx_event_count, sfq->rx_event_count,
                             sfq->tx_discard_event_count);
                     // NOTE: We are not returning packet in this call
                     //      but it will be returned in the next call to this function
                     break;
+
+                case EF_EVENT_TYPE_RX_DISCARD:
+
+                    // FIXME: Treating this packet as good one
+                    sfq->evs_rx_buffered_indexes[sfq->evs_bufferd_rx_total] = i;
+                    ++sfq->evs_bufferd_rx_total;
+                    assert(sfq->evs_bufferd_rx_total <= EF_VI_RX_BATCH);
+                    ++sfq->rx_event_count;
+
+
+                    ++sfq->tx_discard_event_count;
+                    if (sfq->tx_discard_event_count % 10 == 0) {
+                        dbg_printf("%d, no events: %d, TX:%d, RX=%d, DROP=%d\n",
+                            sfq->event_count, sfq->no_event_count,
+                            sfq->tx_event_count, sfq->rx_event_count,
+                            sfq->tx_discard_event_count);
+                    }
+
+#if 0
+                    pkt_buf = pkt_buf_from_id(viff,
+                                    EF_EVENT_RX_DISCARD_RQ_ID(sfq->evs[i]));
+                        //buf_details(pkt_buf, printbuf, sizeof(printbuf));
+                    dbg_printf("RX_DISCARD, before released, ref = %d\n",
+                                 pkt_buf->n_refs);
+                    handle_rx_discard(sfq->evs[i]);
+
+                    assert(pkt_buf->n_refs == 1);
+                    pkt_buf_release(pkt_buf);
+#endif // 0
+                    break;
+
+
 
                 case EF_EVENT_TYPE_TX:
                     ++sfq->tx_event_count;
@@ -263,24 +339,6 @@ size_t get_packet_nonblocking(struct dragonet_sf_queue *sfq,  struct input **in)
                             pkt_buf_release(pkt_buf);
                         }
                     } // end for:
-                    break;
-
-                case EF_EVENT_TYPE_RX_DISCARD:
-                    ++sfq->tx_discard_event_count;
-                    if (sfq->tx_discard_event_count % 10 == 0) {
-                        dprint("status: %s:%s:%d: %d, no events: %d, TX:%d, RX=%d, DROP=%d\n",
-                            __FILE__, __FUNCTION__, __LINE__,
-                            sfq->event_count, sfq->no_event_count, sfq->tx_event_count, sfq->rx_event_count,
-                            sfq->tx_discard_event_count);
-                    }
-                    pkt_buf = pkt_buf_from_id(viff,
-                                    EF_EVENT_RX_DISCARD_RQ_ID(sfq->evs[i]));
-                        //buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                    printf("%s:%s:%d: RX_DISCARD, before released, ref = %d\n",
-                                __FILE__, __func__, __LINE__, pkt_buf->n_refs);
-
-                    assert(pkt_buf->n_refs == 1);
-                    pkt_buf_release(pkt_buf);
                     break;
 
                 default:

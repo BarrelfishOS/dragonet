@@ -1441,7 +1441,7 @@ instance OracleSt SFOracleSt SF.ConfChange where
      -  and counts on cost-function to help in selecting proper queue.
     -}
     flowConfChanges = sfFlowConfChanges
-    flowConfChangesS = error "SFOracleSt: flowConfChangesS: NYI!"
+    flowConfChangesS = sfFlowConfChangesS
 
     -- affectedQueues SFOracleSt { nQueuesSF = nq } _ _ = allQueues nq
     affectedQueues SFOracleSt { nQueuesSF = nq } conf (SF.Insert5T c5t) =
@@ -1460,9 +1460,13 @@ sfFlowConfChanges SFOracleSt {nQueuesSF = nq} cnf fl
     | otherwise     = []
     where allQs = allQueues nq
           rx5tFull  = SF.rx5tFilterTableFull cnf
+          --rx5tId    = SF.rx5tFilterTableLen conf
+          --alloc5t   = [SF.insert5tFromFl rx5tId fl q | q <- allQs]
 
 -- TODO: see above
-sfFlowConfChangesS :: SFOracleSt -> C.Configuration -> Flow
+sfFlowConfChangesS :: SFOracleSt
+                    -> [(SF.ConfChange, Maybe Flow)]
+                    -> Flow
                     -> ([SF.ConfChange], SFOracleSt)
 sfFlowConfChangesS o@(SFOracleSt {nQueuesSF = nq, startQSF = startQ}) cnf fl
     -- allocate 5-tuple filters first, if we can
@@ -1470,7 +1474,9 @@ sfFlowConfChangesS o@(SFOracleSt {nQueuesSF = nq, startQSF = startQ}) cnf fl
     | otherwise     = ([], o)
     where allQs = allQueues_ startQ nq
           o' =  o { startQSF = startQ + 1 `mod` nq}
-          rx5tFull  = SF.rx5tFilterTableFull cnf
+          conf = C.foldConfChanges $ map fst cnf
+          rx5tFull  = SF.rx5tFilterTableFull conf
+
 
 -- SF (simple for now) oracle
 newtype SFOracleHardCoded = SFOracleHardCoded {

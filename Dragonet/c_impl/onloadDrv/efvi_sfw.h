@@ -302,7 +302,8 @@ int buf_details(struct pkt_buf* pkt_buf, char *buff, int l);
 
 // this one is connected via switch on asiago
 //#define IFNAME              "p801p1"
-#define IFNAME               "p786p1"
+#define IFNAME              "p802p1"
+//#define IFNAME               "p786p1"
 #define CONFIG_LOCAL_MAC_sf  0x644d07530f00ULL  // "00:0f:53:07:4d:64"
 #define CONFIG_LOCAL_IP_sf   0x0a7104c3         // "10.113.4.195"
 
