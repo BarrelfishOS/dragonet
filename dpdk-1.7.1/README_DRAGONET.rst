@@ -7,7 +7,31 @@ Dragonet ::
 
     ./doConfig.sh
     sudo ./tools/setup.sh dragonet
-    sudo ./dragonet_bind_ethernet.sh
+    sudo ./dragonet_bind_ethernet.sh <interface name>
+
+The Interface name here is the 82599 NIC interface which is to be moved
+from Kernel driver to uio driver which then can be used by Dragonet.
+
+-----------------------------------
+ETHZ machine-room specific hints
+-----------------------------------
+
+In ETHZ setup, you can get this interface name with following command ::
+
+    cat ${HOME}/minfo/used_if.log | grep "intel" | grep "switch" | cut -d',' -f1 | head -n1
+
+This uses `${HOME}/minfo/used_if.log` file to find out which NIC interfaces
+are connected to switch and which one are to be used.
+
+=========================
+Restoring kernel driver
+=========================
+
+In theory, you can use the `./tools/dpdk_nic_bind.py` tool to restore the
+NIC back to the kernel driver.  But it did not work for us on kernel version
+2 3.13.0 as it was triggering kernel bug which was causing dmesg log and
+then everything related to that particular interface stopped working (both
+in dpdk and in kernel).
 
 
 Now, following text explains these steps in more details
