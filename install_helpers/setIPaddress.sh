@@ -88,6 +88,12 @@ setIPaddr "00:0f:53:07:4d:64" "10.113.4.195" "babybel2" "sf1" "direct" "ziger2-s
 setIPaddr "00:0f:53:07:4d:65" "10.44.4.195" "babybel2" "sf2" "switch" "22" "" "cable-red"
 
 
+
+echo "for babybel4"
+setDHCPIPaddr "00:1e:67:ba:c4:98"  "10.110.4.98" "babybel4"
+setIPaddr  "00:1e:67:c2:10:18"  "10.22.4.98"  "babybel4" "intel1" "disconnected" "" "0000:04:00.0" ""
+setIPaddr  "00:1e:67:c2:10:19"  "10.113.4.98" "babybel4" "intel2" "switch" "" "0000:04:00.1" ""
+
 echo "for ziger2"
 setDHCPIPaddr "00:21:28:6B:98:a6" "10.110.4.57" "ziger2"
 setIPaddr "00:0f:53:07:48:d4" "10.113.4.57" "ziger2" "sf1" "switch" "" "" ""
