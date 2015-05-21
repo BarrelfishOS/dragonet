@@ -1,107 +1,15 @@
 #!/bin/bash
 
-OUTPUTDIRPARENT="./dpdk_test_deleteme/"
-OUTPUTDIRPARENT="./dpdk_test_memcached_test_10Q/"
-OUTPUTDIRPARENT="./dpdk_test_memcached_test1_5Q/"
-OUTPUTDIRPARENT="./output_runs_balance/"
-OUTPUTDIRPARENT="./output_runs_deletemev2/"
-OUTPUTDIRPARENT="./output_runs_posterV3/"
-OUTPUTDIRPARENT="./output_runs_8cores/"
-OUTPUTDIRPARENT="./output_runs_linuxTest/"
-OUTPUTDIRPARENT="./output_runs_linuxTest_deleteme/"
-
-# For debugging of dynamic connection detection
-OUTPUTDIRPARENT="./output_runs_dynamic_debug/"
-OUTPUTDIRPARENT="./output_runs_dynamic_debug3/"
-
-OUTPUTDIRPARENT="./output_runs_mixed_static/"
-OUTPUTDIRPARENT="./output_runs_mixed_static2/"
-OUTPUTDIRPARENT="./output_runs_mixed_static_priority/"
-
-OUTPUTDIRPARENT="./output_runs_mixed_static_priority_test/"
-OUTPUTDIRPARENT="./output_runs_mixed_static_balance_test/"
-
-OUTPUTDIRPARENT="./deleteme_output_runs_mixed_static_balance/"
-OUTPUTDIRPARENT="./deleteme_output_runs_mixed_static_priority5/"
-OUTPUTDIRPARENT="./deleteme_output_runs_mixed_static_priority6/"
-
-OUTPUTDIRPARENT="./deleteme_output_runs_mixed_static_priority7/"
-OUTPUTDIRPARENT="./deleteme_output_runs_mixed_static_balance7/"
-
-# Testing with disjoint client sets
-OUTPUTDIRPARENT="./deleteme_disjoint_clients_balance/"
-OUTPUTDIRPARENT="./deleteme_disjoint_clients_priority4/"
-
-# Fixed the issue of using old variables
-OUTPUTDIRPARENT="./deleteme_disjoint_clients_priority5/"
-
-# Aparantly there is still issue of gap in performance of two clients
-
-OUTPUTDIRPARENT="./deleteme_disjoint_clients_priority6/"
-
-OUTPUTDIRPARENT="./output_somewhat_working_priority/"
-OUTPUTDIRPARENT="./output_somewhat_working_balance_v4/"
-OUTPUTDIRPARENT="./output_somewhat_working_priority_v2/"
-OUTPUTDIRPARENT="./output_somewhat_working_balance_30clients/"
-
-OUTPUTDIRPARENT="./output_somewhat_working_priority_big3/"
-OUTPUTDIRPARENT="./output_somewhat_working_balance_big3/"
-OUTPUTDIRPARENT="./output_debugging_softfiltering_2/"
-
-# First results which worked for online setup
-OUTPUTDIRPARENT="./output_debugging_online/"
-OUTPUTDIRPARENT="./output_debugging_online2/"
-
-OUTPUTDIRPARENT="./output_debugging_online_automated/"
-OUTPUTDIRPARENT="./output_debugging_online_automated_v2/"
-OUTPUTDIRPARENT="./output_debugging_online_automated_v4/"
-OUTPUTDIRPARENT="./output_debugging_online_automated_v5/"
-OUTPUTDIRPARENT="./output_debugging_online_automated_v6/"
-
-
-
-OUTPUTDIRPARENT="./output_debugging_online_automated_10Q/"
-
-OUTPUTDIRPARENT="./output_debugging_online_automated_v7/"  # keep this one
-
-OUTPUTDIRPARENT="./output_debugging_online_20Clients_10Q_5Cores/"
-OUTPUTDIRPARENT="./output_debugging_online_20Clients_10Q_5Cores_v2/"
-
-OUTPUTDIRPARENT="./output_debugging_online_20Clients_32F_10Q/"
-OUTPUTDIRPARENT="./output_debugging_online_20Clients_32F_10Q_s/"
-
-OUTPUTDIRPARENT="./output_debugging_online_40Clients_16F_10Q_s/"
-
-OUTPUTDIRPARENT="./output_debugging_online_40Clients_16F_10Q_allLong/"
-
-OUTPUTDIRPARENT="./output_debugging_online_20Clients_32F_10Q_4P_t1/"
-
-OUTPUTDIRPARENT="./output_debugging_online_20Clients_16F_10Q_4P_t1/"
-
-OUTPUTDIRPARENT="./allResults/20Clients_16F_10Q_4P_long/"
-
-OUTPUTDIRPARENT="./allResults/20Clients_16F_5Q_2P/"
-
-
-WORKLOADTYPE="priority"
-WORKLOADTYPE="priBal"
-WORKLOADTYPE="linux"
-WORKLOADTYPE="balance"
-WORKLOADTYPE="priBal"
-WORKLOADTYPE="priSmall"
-WORKLOADTYPE="online"
 
 startStack() {
 #./cleanupServer.sh
 
-initConcurrency=${LOAD}
-
-title="ITest_${UDP_TEST_NAME},CONCUR_${initConcurrency},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
-OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/${DNCOSTFUNCTION}/STARTSTACK/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${initConcurrency}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
+local title="ITest_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+local OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/${DNCOSTFUNCTION}/STARTSTACK/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
 ./netperf-wrapper -d 0 --udp --serverCoreShift ${SRVCORESHIFT} ${ClientList} --servercores ${SRVCORES} \
- --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES}  --packet ${PACKETSIZE} --concurrency ${initConcurrency} \
+ --serverInstances 1 --hwqueues ${HWQUEUE} --clientcores ${CLIENTCORES}  --packet ${PACKETSIZE} --concurrency ${LOAD} \
 -I 1 -l 5 -H ${SERVERNAME} -T ${SERVERIP} -c ${ECHO_SERVER} ${UDP_TEST_NAME} \
  --totalClients ${CLIENTCOUNT}  --clientPortShift ${CLIENTPORTSHIFT} \
  --dragonet-cost-function ${DNCOSTFUNCTION} \
@@ -126,7 +34,7 @@ fi
 doShortRun() {
 
 
-title="STest_${UDP_TEST_NAME},CONCUR_${initConcurrency},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+local title="STest_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
 local OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/${DNCOSTFUNCTION}/SHORT/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
 
@@ -164,7 +72,7 @@ else
     echo "Report start time not enabled"
 fi
 
-title="LTest_${UDP_TEST_NAME},CONCUR_${initConcurrency},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
+local title="LTest_${UDP_TEST_NAME},CONCUR_${LOAD},PKT_${PACKETSIZE},${NICTYPE},SRV_${ECHO_SERVER},CLC_${CLIENTCOUNT}"
 
 local OUTDIR="${OUTPUTDIRPARENT}/${WORKLOADTYPE}/${DNCOSTFUNCTION}/${prefix}/HWQ_${HWQUEUE}/SRVCORE_${SRVCORES}/SRVSHIFT_${SRVCORESHIFT}/CLCORE_${CLIENTCORES}/Test_${UDP_TEST_NAME}/CONCUR_${LOAD}/PKT_${PACKETSIZE}/${NICTYPE}/SRV_${ECHO_SERVER}/"
 mkdir -p "${OUTDIR}"
@@ -189,28 +97,6 @@ then
 fi
 }
 
-######################
-SERVERNAME="babybel2"
-CLIENTCORES=1
-######################
-
-
-#ClientList="-C ziger1 -C ziger2 -C babybel3 -C gottardo -C appenzeller-e1000 -C sbrinz1 -C gruyere -C sbrinz2 "
-ClientList="-C ziger1 -C sbrinz1 "
-ClientList="-C appenzeller "
-ClientList="-C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2 -C gruyere -C appenzeller"
-
-ClientList="-C ziger1 -C ziger2 -C gruyere"
-ClientList="-C ziger1 -C ziger2"
-ClientList="-C sbrinz1 -C sbrinz2"
-ClientList="-C ziger1 -C sbrinz1"
-
-ClientList="-C ziger2 -C sbrinz2"
-ClientList="-C ziger2 "
-ClientList="-C ziger1 -C sbrinz1 -C sbrinz2"
-ClientList="-C ziger1 -C ziger2 -C sbrinz1 -C sbrinz2"
-ClientList="-C ziger1 -C sbrinz2"
-######################
 
 LOAD=1
 LOAD=4
@@ -230,10 +116,6 @@ SRVCORES=9
 
 ######################
 
-OUTPUTDIRPARENT="./allResultsSmall/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
-######################
-
-
 CLIENTCOUNT=32
 CLIENTCOUNT=2
 CLIENTCOUNT=8
@@ -245,7 +127,8 @@ CLIENTCOUNT=10
 CLIENTPORTSHIFT=0
 
 # Runtimes for dummy and real runs
-DUMMYRT=10
+DUMMYRT=30
+DUMMYRT=30
 REALRT=50
 
 ######################
@@ -257,7 +140,6 @@ set_echo_test() {
     UDP_TEST_NAME="udp_rr"
     LOAD=64
     CLIENTCOUNT=10
-    #ClientList="-C sbrinz1 -C sbrinz2 -C ziger1"
     ClientList="-C sbrinz1 -C sbrinz2"
 }
 
@@ -267,20 +149,80 @@ set_memcached_test() {
     UDP_TEST_NAME="memcached_rr"
     LOAD=32
     CLIENTCOUNT=2
-    ClientList="-C ziger1 -C ziger2"
-    #ClientList="-C ziger2 "
+    ClientList="-C sbrinz1 -C sbrinz2"
 }
 
+
+
+######################
+UDP_TEST_NAME="memcached_rr"
+SRVCORESHIFT=0
+
+######################
+UDP_TEST_NAME="udp_rr"
+SRVCORESHIFT=0
+
+######################
+PACKETSIZE=64
+PACKETSIZE=1024
+
+######################
+DNCOSTFUNCTION="priority"
+DNCOSTFUNCTION="static"
+DNCOSTFUNCTION="balance"
+
+######################
+
+NICTYPE="NIC_Intel"
+ECHO_SERVER="e10k-dpdk"
+SERVERIP=10.113.4.95
+
+NICTYPE="NIC_SF"
+ECHO_SERVER="llvmSF"
+SERVERIP=10.113.4.195
+
+NICTYPE="NIC_Intel"
+ECHO_SERVER="memcached_linux"
+SERVERIP=10.113.4.95
+
+NICTYPE="NIC_SF"
+ECHO_SERVER="memcached_onload"
+SERVERIP=10.113.4.195
+
+
+NICTYPE="NIC_SF"
+ECHO_SERVER="llvmSF"
+SERVERIP=10.113.4.195
+
+NICTYPE="NIC_SF"
+ECHO_SERVER="fancyEchoLinux"
+SERVERIP=10.113.4.195
+
+NICTYPE="NIC_SF"
+ECHO_SERVER="fancyEchoOnload"
+SERVERIP=10.113.4.195
+
+
+NICTYPE="NIC_SF"
+ECHO_SERVER="memcached_linux"
+SERVERIP=10.113.4.195
+
+
+
+######################
 
 show_usage() {
         echo "Please select what you want to run"
         echo "Usage: ${0} [-c -s -l]"
+        echo "           -N S/I -->  NIC type (S --> Solarflare, I --> Intel)"
+        echo "           -C S/B -->  Cost Function (S --> Static, B --> Balance)"
         echo "           -t E/M -->  Test type (E --> Echo server, M --> memcached)"
         echo "           -c <n> -->  client count (n clients)"
         echo "           -l <n> -->  load (n concurrent sessions per client)"
         echo "           -Q <n> -->  n hardware queues and server threads"
         echo "           -m S/D -->  Mixed run (sending extra HP and LP while big run is happening)"
         echo "                         with static or dynamic setup"
+        echo "           -p <n>  -->  packet size == n"
         echo "           -S     -->  start stack"
         echo "           -d     -->  dummy run"
         echo "           -r     -->  Real run"
@@ -288,7 +230,7 @@ show_usage() {
         echo "           -x     -->  Cleanup involved machines"
         echo "           -X     -->  Delete output/log files"
         echo "           -h     -->  this help"
-        echo "           -T     -->  Run together"
+        echo "           -T     -->  Run ADDDYNAMICFLOWS"
         echo "           -B     -->  Run Big"
         echo "Examples (starting stack): ${0} -c 4 -s 4 -C 4 S"
         exit 1
@@ -302,19 +244,43 @@ then
 fi
 
 
-######################
-UDP_TEST_NAME="memcached_rr"
-SRVCORESHIFT=0
-
-######################
-UDP_TEST_NAME="udp_rr"
-SRVCORESHIFT=0
-
-
 OPTTEST="no"
 
-while getopts ":c:l:Q:SdhxXrbm:t:TB" opt; do
+while getopts ":c:l:Q:p:SdhxXrbm:t:C:N:TB" opt; do
   case $opt in
+    N)
+        echo "Setting up the NIC type to $OPTARG"
+        if [ "$OPTARG" == "S" ] ;
+        then
+            NICTYPE="NIC_SF"
+            ECHO_SERVER="llvmSF"
+           # ECHO_SERVER="memcached_linux"
+            SERVERIP=10.113.4.195
+        elif [ "$OPTARG" == "I" ] ;
+        then
+            NICTYPE="NIC_Intel"
+            ECHO_SERVER="e10k-dpdk"
+            SERVERIP=10.113.4.95
+        else
+            echo "Error: Invalid NIC hardware name given"
+            show_usage
+            exit 1
+        fi
+      ;;
+    C)
+        echo "Setting up cost function to $OPTARG"
+        if [ "$OPTARG" == "S" ] ;
+        then
+            DNCOSTFUNCTION="static"
+        elif [ "$OPTARG" == "B" ] ;
+        then
+            DNCOSTFUNCTION="balance"
+        else
+            echo "Error: Invalid cost function given"
+            show_usage
+            exit 1
+        fi
+      ;;
     t)
         echo "Setting up test $OPTARG"
         OPTTEST="yes"
@@ -375,6 +341,20 @@ while getopts ":c:l:Q:SdhxXrbm:t:TB" opt; do
         fi
         echo "Setting HWQs ${HWQUEUE} and server-cores/threads to $SRVCORES"
       ;;
+    p)
+        if [ "$OPTARG" == 64 ] ;
+        then
+            PACKETSIZE=64
+        elif [ "$OPTARG" == 1024 ] ;
+        then
+            PACKETSIZE=1024
+        else
+            echo "Error: Invalid packet-size given $OPTARG"
+            echo "  Only 64 and 1024 are currently supported"
+            show_usage
+            exit 1
+        fi
+      ;;
     S)
         RUNSTACK="yes"
       ;;
@@ -393,10 +373,10 @@ while getopts ":c:l:Q:SdhxXrbm:t:TB" opt; do
         fi
       ;;
     T)
-        TOGETHER="yes"
+        ADDDYNAMICFLOWS="yes"
       ;;
     B)
-        RUNBIG="yes"
+        BIGSTABLE="yes"
       ;;
     d)
         RUNDUMMY="yes"
@@ -447,86 +427,39 @@ fi
 ##################################################################
 ##################################################################
 ##################################################################
-DNCOSTFUNCTION="priority"
-DNCOSTFUNCTION="static"
-DNCOSTFUNCTION="balance"
+######################
+SERVERNAME="babybel2"
+CLIENTCORES=1
+######################
+
+
+
+######################
+ClientList="-C sbrinz1 -C sbrinz2 -C ziger1 -C gruyere"
+######################
 
 ######################
 
-NICTYPE="NIC_Intel"
-ECHO_SERVER="e10k-dpdk"
-SERVERIP=10.113.4.95
+OUTPUTDIRPARENT="./debugSFresults_dbg_devBatch16/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+OUTPUTDIRPARENT="./trios15_results_v2/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+OUTPUTDIRPARENT="./trios15_results_linux/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+OUTPUTDIRPARENT="./trios15_results_stable_small/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+OUTPUTDIRPARENT="./trios15_results_stable2/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+OUTPUTDIRPARENT="./debug_3machines/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
 
-NICTYPE="NIC_SF"
-ECHO_SERVER="memcached_linux"
-SERVERIP=10.113.4.195
+OUTPUTDIRPARENT="./trios15_results_sfDeug/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
 
-NICTYPE="NIC_SF"
-ECHO_SERVER="llvmSF"
-SERVERIP=10.113.4.195
+OUTPUTDIRPARENT="./trios15_results_sf_bigmem8/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
 
-NICTYPE="NIC_Intel"
-ECHO_SERVER="memcached_linux"
-SERVERIP=10.113.4.95
+#### following location has good results !!!!!!
+        ## backed up at location ./trios15_results_improved_bak
+OUTPUTDIRPARENT="./trios15_results_improved/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
 
-NICTYPE="NIC_SF"
-ECHO_SERVER="memcached_onload"
-SERVERIP=10.113.4.195
-
-
-NICTYPE="NIC_SF"
-ECHO_SERVER="llvmSF"
-SERVERIP=10.113.4.195
-
-NICTYPE="NIC_SF"
-ECHO_SERVER="fancyEchoLinux"
-SERVERIP=10.113.4.195
-
-NICTYPE="NIC_SF"
-ECHO_SERVER="fancyEchoOnload"
-SERVERIP=10.113.4.195
-
-NICTYPE="NIC_Intel"
-ECHO_SERVER="e10k-dpdk"
-SERVERIP=10.113.4.95
-
-NICTYPE="NIC_SF"
-ECHO_SERVER="llvmSF"
-SERVERIP=10.113.4.195
-
-######################
-
-PACKETSIZE=64
-PACKETSIZE=1024
-
-######################
-
-OUTPUTDIRPARENT="./debugSFissue/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
-OUTPUTDIRPARENT="./debugMerge/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
 ##################################################################
 ##################################################################
 
 
 if [ "${RUNSTACK}" == "yes" ] ; then
-    if [ "${RUNBOTH}" == "yes" ] ; then
-        echo "Starting stack and first server"
-        set +x
-        set -e
-
-        WORKLOADTYPE="SRunSS"
-
-        ######################
-        set_memcached_test
-        echo "Starting first server ${UDP_TEST_NAME} with stack"
-        startStack 2>&1 | tee deleteme_memcached_stackstart_out.txt
-
-        ######################
-        set_echo_test
-        echo "Starting second server ${UDP_TEST_NAME} without stack"
-        startStack 2>&1 | tee deleteme_echo_stackstart_out.txt
-        set +x
-        set +e
-    else
 
         if [ "$OPTTEST" == "no" ] ;
         then
@@ -540,7 +473,6 @@ if [ "${RUNSTACK}" == "yes" ] ; then
         startStack
         set +x
         set +e
-    fi
 fi
 
 
@@ -548,162 +480,45 @@ if [ "${RUNDUMMY}" == "yes" ] ; then
 
     echo "Assuming that stack is already running, just running dummy for testing"
 
-    if [ "${RUNBOTH}" == "yes" ] ; then
-        set +x
-        set -e
-
-        WORKLOADTYPE="MixedRun"
-
-        ######################
-
-        set_memcached_test
-        echo "Starting first server ${UDP_TEST_NAME} for dummyRun"
-        doShortRun 2>&1 > deleteme_memcached_dummy_out.txt &
-        ######################
-
-        set_echo_test
-        echo "Starting second server ${UDP_TEST_NAME} for dummyRun"
-        doShortRun 2>&1 > deleteme_echo_dummy_out.txt &
-
-        echo "waiting for benchmark to finish"
-        wait
-        echo "done with benchmarking"
-        cat deleteme_echo_dummy_out.txt
-        cat deleteme_memcached_dummy_out.txt
-
-        set +x
-        set +e
-    else
-        if [ "$OPTTEST" == "no" ] ;
-        then
-            echo "ERROR: Test specific options are not set using '-t'"
-            exit 1
-        fi
-
-
-        echo "Running only one type: ${UDP_TEST_NAME}"
-        set -x
-        set -e
-        WORKLOADTYPE="SingleRun"
-        doShortRun
-        set +x
-        set +e
-    fi
-fi
-
-
-if [ "${RUNREAL}" == "yes" ] ; then
-    echo "Assuming that stack is already running, doing real run"
-    if [ "${RUNBOTH}" == "yes" ] ; then
-        set +x
-        set -e
-
-        WORKLOADTYPE="MixedRun"
-        ######################
-
-        set_memcached_test
-        echo "Starting first server ${UDP_TEST_NAME} for realrun"
-        getData "LONG" 2>&1 > deleteme_memcached_out.txt &
-
-        ######################
-        set_echo_test
-        echo "Starting second server ${UDP_TEST_NAME} for realrun"
-        getData "LONG" 2>&1 > deleteme_echo_out.txt &
-
-        echo "waiting for benchmark to finish"
-        wait
-        echo "done with benchmarking"
-
-        cat deleteme_echo_out.txt
-        cat deleteme_memcached_out.txt
-
-        set +x
-        set +e
-    else
-        if [ "$OPTTEST" == "no" ] ;
-        then
-            echo "ERROR: Test specific options are not set using '-t'"
-            exit 1
-        fi
-
-
-        echo "Running only one type: ${UDP_TEST_NAME}"
-        WORKLOADTYPE="SingleRun"
-        set -x
-        set -e
-        getData "LONG"
-        set +x
-        set +e
+    if [ "$OPTTEST" == "no" ] ;
+    then
+        echo "ERROR: Test specific options are not set using '-t'"
+        exit 1
     fi
 
+    echo "Running only one type: ${UDP_TEST_NAME}"
+    set -x
+    set -e
+    WORKLOADTYPE="SingleRun"
+    doShortRun
     set +x
     set +e
 fi
 
 
-if [ "${MIXEDRUN}" == "yes" ] ; then
-    echo "Assuming that stack is already running, doing mixed run"
+if [ "${RUNREAL}" == "yes" ] ; then
 
-    #WORKLOADTYPE="MixedRun"
-    REALRT=130
-    echo "Starting big set of clients for the load for test ${UDP_TEST_NAME}"
-
-    rm -f deleteme_longrun_startTime.txt
-    getData "LONG" "./deleteme_longrun_startTime.txt"  2>&1 | tee deleteme_mixed_bigrun_out.txt &
-
-    fcountTries=1
-
-    while true;
-    do
-        if [ -f deleteme_longrun_startTime.txt ] ;
-        then
-        isStart=`cat deleteme_longrun_startTime.txt | grep ": Start run$" | wc -l`
-        if [ "${isStart}" == 1 ] ;
-        then
-            echo "Bigrun has started running"
-            break
-        fi
-        fi
-        #echo "Still waiting for Bigrun to actually start running: ${fcountTries}. sleeping for a second..."
-        sleep 1
-        fcountTries=`expr 1 + ${fcountTries}`
-    done
-
-    ######################
-
-    sleep 10
-    echo "Running single LP client"
-    # TODO: specify different port used by clients
-    ClientList="-C ziger2 "
-    CLIENTPORTSHIFT="3000"
-    CLIENTCOUNT=1
-    REALRT=50
-    getData "SHORTLP" 2>&1 | tee deleteme_LP_shortrun_out.txt
-
-    sleep 10
-
-    if [ "${DNCOSTFUNCTION}" == "priority" ] ;
+    echo "Assuming that stack is already running, doing real long run run"
+    if [ "$OPTTEST" == "no" ] ;
     then
-        echo "Not running HP load as priority oracle does not support it yet"
-    else
-        echo "Running single HP client"
-        # TODO: specify different port used by clients
-        ClientList="-C ziger2 "
-        CLIENTPORTSHIFT="-${LOAD}"
-        CLIENTCOUNT=1
-        REALRT=50
-        getData "SHORTHP" 2>&1 | tee deleteme_HP_shortrun_out.txt
+        echo "ERROR: Test specific options are not set using '-t'"
+        exit 1
     fi
 
-    echo "waiting for benchmark to finish"
-    wait
-    echo "done with benchmarking"
+    echo "Running only one type: ${UDP_TEST_NAME}"
+    WORKLOADTYPE="SingleRun"
+    set -x
+    set -e
+    getData "LONG"
+    set +x
+    set +e
 fi
 
-if [ "${TOGETHER}" == "yes" ] ; then
-    echo "Assuming that stack is already running, doing mixed run"
+if [ "${MIXEDRUN}" == "yes" ] ; then
+    echo "Assuming that stack is already running, running a big run"
+    echo " and without waiting, starting LP and HP as soon as big run is running"
 
-    WORKLOADTYPE="TOGETHER"
+    WORKLOADTYPE="MixedRun"
     REALRT=50
     echo "Starting big set of clients for the load for test ${UDP_TEST_NAME}"
 
@@ -734,7 +549,7 @@ if [ "${TOGETHER}" == "yes" ] ; then
     #sleep 10
     echo "Running single LP client"
     # TODO: specify different port used by clients
-    ClientList="-C ziger1 "
+    ClientList="-C sbrinz1 "
     CLIENTPORTSHIFT="3000"
     CLIENTCOUNT=1
     #REALRT=10
@@ -748,7 +563,7 @@ if [ "${TOGETHER}" == "yes" ] ; then
 
         echo "Running single HP client"
         # TODO: specify different port used by clients
-        ClientList="-C ziger2 "
+        ClientList="-C sbrinz2 "
         CLIENTPORTSHIFT="-${LOAD}"
         CLIENTCOUNT=1
         #REALRT=10
@@ -760,11 +575,74 @@ if [ "${TOGETHER}" == "yes" ] ; then
     echo "done with benchmarking"
 fi
 
-if [ "${RUNBIG}" == "yes" ] ; then
-    echo "Assuming that stack is already running, doing mixed run"
+
+
+if [ "${ADDDYNAMICFLOWS}" == "yes" ] ; then
+    echo "Assuming that stack is already running"
+    echo " doing big run with additional LP and HP flow"
+
+    WORKLOADTYPE="ADDDYNAMICFLOWS"
+    REALRT=130
+    echo "Starting big set of clients for the load for test ${UDP_TEST_NAME}"
+
+    rm -f deleteme_longrun_startTime.txt
+    getData "LONG" "./deleteme_longrun_startTime.txt"  2>&1 | tee deleteme_mixed_bigrun_out.txt &
+
+    fcountTries=1
+
+    while true;
+    do
+        if [ -f deleteme_longrun_startTime.txt ] ;
+        then
+        isStart=`cat deleteme_longrun_startTime.txt | grep ": Start run$" | wc -l`
+        if [ "${isStart}" == 1 ] ;
+        then
+            echo "Bigrun has started running"
+            break
+        fi
+        fi
+        #echo "Still waiting for Bigrun to actually start running: ${fcountTries}. sleeping for a second..."
+        sleep 1
+        fcountTries=`expr 1 + ${fcountTries}`
+    done
+
+    ######################
+
+    sleep 10
+    echo "Running single LP client"
+    # TODO: specify different port used by clients
+    ClientList="-C sbrinz2 "
+    CLIENTPORTSHIFT="3000"
+    CLIENTCOUNT=1
+    REALRT=50
+    getData "SHORTLP" 2>&1 | tee deleteme_LP_shortrun_out.txt
+
+    sleep 10
+
+    if [ "${DNCOSTFUNCTION}" == "priority" ] ;
+    then
+        echo "Not running HP load as priority oracle does not support it yet"
+    else
+        echo "Running single HP client"
+        # TODO: specify different port used by clients
+        ClientList="-C sbrinz2 "
+        CLIENTPORTSHIFT="-${LOAD}"
+        CLIENTCOUNT=1
+        REALRT=50
+        getData "SHORTHP" 2>&1 | tee deleteme_HP_shortrun_out.txt
+    fi
+
+    echo "waiting for benchmark to finish"
+    wait
+    echo "done with benchmarking"
+fi
+
+
+if [ "${BIGSTABLE}" == "yes" ] ; then
+    echo "Assuming that stack is already running, doing a big-stable run"
 
     WORKLOADTYPE="RUNBIGALONE"
-    REALRT=50
+    REALRT=130
     echo "Starting big set of clients for the load for test ${UDP_TEST_NAME}"
 
     rm -f deleteme_longrun_startTime.txt

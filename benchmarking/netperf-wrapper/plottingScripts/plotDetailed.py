@@ -19,12 +19,12 @@ DEBUG = True
 
 
 def get_files(resultDir, workload, testType, concurrency, pktsize, nic,
-        clients, srvtype="*"):
+        clients):
 
     rlocation = "%s/%s/" % (resultDir, workload)
     pattern = "*%s*Test_%s_CONCUR_%s_PKT_%s_*%s_SRV_%s_CLC_%s*json*" % (
-            workload.title(), testType, concurrency, pktsize, nic, srvtype,
-            clients)
+            workload.title(), testType, concurrency, pktsize, nic,
+            '*',  clients)
 
     grep_pattern = ""
     if not os.path.isdir(rlocation):
@@ -78,12 +78,12 @@ metric_error = {
 def xticks_map(x):
     if x.startswith("dnet"):
         if "onlypriority" in x:
-            return "Load Balance\n(Only HP)"
+            return "LB\n(No BE)"
         if "prio" in x:
-            return "Priority"
+            return "PI"
             #return "Conque:Prio"
         else:
-            return "Load Balance\n(ALL)"
+            return "LB\n(HP+LP)"
             #return "Conque:Lb"
     elif x.startswith("linuxOnload"):
         return "Onload"
@@ -214,7 +214,7 @@ def plot_per_client(fnames, fids, pid, app, metric, client_class=None):
 def just_boxplot(fnames, fids, pid, app, metric, client_class=None, y_log_scale=None,
                  hp_clients=None):
     outputFileList = [
-            ( plot_save_location + pid + "-%s-%s.png" % (app,metric)),
+            #( plot_save_location + pid + "-%s-%s.png" % (app,metric)),
             ( plot_save_location + pid + "-%s-%s.pdf" % (app,metric)),
         ]
 
@@ -371,10 +371,6 @@ def just_boxplot(fnames, fids, pid, app, metric, client_class=None, y_log_scale=
     plt.close(fig)
 
 
-
-
-
-
 def plot_memcached():
 
     resultLocation = "./nsdi_data_local_copy/"
@@ -429,7 +425,7 @@ def plot_memcached_test(clients, concurrency, nic, resultLocation, pktsize, pref
         fnames = [fresults_memcached[fid] for fid in fids]
         #plot_per_client(fnames, fids, pprefix, "memaslap", metric)
         just_boxplot(fnames, fids, pprefix, "memaslap", metric,
-                #y_log_scale=True,
+                y_log_scale=True,
                 hp_clients=[0,1])
 
     for metric in ("TPS", "Total_Avg"):
@@ -438,15 +434,11 @@ def plot_memcached_test(clients, concurrency, nic, resultLocation, pktsize, pref
 
 only_show_files = False
 
-
-#        def plot_memcached_gen(clients, concurrency, nic,
-#                    config,
 def plot_memcached_priority_balance(clients, concurrency, nic,
-                priorityOnly,
-                priorityPath,
-                balancePath,
-                pktsize,
-                prefix=''):
+        priorityOnly,
+        priorityPath,
+        balancePath,
+        pktsize, prefix=''):
 
     titlePriorityOnly =  "dnet-onlypriority-%s-%s-1k-%d-%d-pkt-%d" % (
             prefix, nic, 2, concurrency, pktsize)
@@ -541,357 +533,10 @@ def forPoster():
             pktsize = 1024, prefix='Q5' )
 
 
-
-def plot_boxplot_gen(fids, pid, metric, config, y_log_scale = None):
-
-    outputFileList = [
-            ( plot_save_location + pid + "-%s.png" % (metric)),
-            #( plot_save_location + pid + "-%s.pdf" % (metric)),
-        ]
-
-    print "DOING: " + pid
-
-    colors = ["r", "b", "g"]
-    bwidth = .4
-
-#    f = gzip.open(fnames[0], 'r')
-#    j = json.load(f)
-#    clients = filter(lambda x : x.startswith("client"), j["results"]["1"].keys())
-#    nclients = len(clients)
-#    index = np.arange(nclients)
-#
-    fig = plt.figure(figsize=(4,2))
-    pidx = 0
-    idx = 0
-    kmetric = False
-    if metric == "TPS":
-        kmetric = True
-    xresults = {}
-    xresults_hp = {}
-    xresults_lp = {}
-
-    r = []
-    xlbls = []
-    for fid in fids:
-        fnames = config[fid]['flist']
-        print "for type %s, using following files:" % (fid)
-        PP.pprint(config[fid]['flist'])
-        fname = config[fid]['flist']
-
-        app = config[fid]['app']
-        hp_clients = config[fid]['highPrio']
-        title = config[fid]['title']
-
-        f = gzip.open(fname, 'r')
-        j = json.load(f)
-        results = j["results"]["1"]
-
-        clients =  filter(lambda x : x.startswith("client"), results.keys())
-        clients.sort(cmp=xcmp)
-        #print "sorted clients are "
-        #PP.pprint(clients)
-
-        client_ids = [clientId(c) for c in clients]
-
-        yvals = [float(get_result(results,  app, c,metric)) for c in clients ]
-        if kmetric:
-            yvals = [y/1000.0 for y in yvals]
-
-        xresults[fid] = yvals
-
-        if hp_clients is None:
-            r.append(yvals)
-
-            xlbls.append("%s" % (config[fid]['title']))
-
-        else:
-            yvals_hp = [ v for (c,v) in zip(client_ids, yvals) if c in hp_clients]
-            yvals_lp = [ v for (c,v) in zip(client_ids, yvals) if c not in hp_clients]
-            xresults_hp[fid] = yvals_hp
-            xresults_lp[fid] = yvals_lp
-            print "HP:", yvals_hp
-            print "LP:", yvals_lp
-
-            r.append(yvals_hp)
-            xlbls.append("%s\n(HP)" % (config[fid]['title']))
-
-            r.append(yvals_lp)
-            xlbls.append("%s\n(BE)" % (config[fid]['title']))
-
-        yerr  = None
-        if metric in metric_error:
-            error = metric_error[metric]
-            errs = [float(get_result(results,  app, c,error)) for c in clients]
-            yerr = [errs, errs]
-
-
-    ax2 = plt.subplot()
-    ax2.boxplot(r)
-#    if y_log_scale is not None:
-#        ax2.set_yscale('log')
-
-    ax2.tick_params(axis='both', which='major', labelsize=8)
-    ax2.set_xticklabels(xlbls)
-
-    #ax2.set_xlabel("all flows", fontsize=3)
-    if kmetric:
-        metric = "k" + metric
-
-    if metric in metric_units:
-        u = "(%s)" % metric_units[metric]
-    else:
-        u =""
-    ylabel = metric_expl.get(metric,metric) + u
-    ax2.set_ylabel(ylabel, fontsize=11)
-    ax2.set_ylim(ymin=0)
-
-    plt.grid()
-
-    for outputFile in outputFileList:
-        # Checking if the parent directory exists or not.
-        parentDir = os.path.dirname(outputFile)
-        #print "the parentdir for output file [%s] is %s" % (outputFile, parentDir)
-        if parentDir != '' :
-            if not os.path.isdir(parentDir):
-                os.makedirs(parentDir)
-        print "Saving plot in a file %s" % (outputFile)
-        #plt.savefig(outputFile, bbox_inches='tight')
-        plt.savefig(outputFile, bbox_inches='tight', dpi=300)
-        # To create cropped files
-        if outputFile[-4:] == ".pdf":
-            SP.check_output(["pdfcrop", outputFile])
-    plt.close(fig)
-
-
-def linuxNumbers():
-
-    #nic = "Intel"
-    nic = "SF"
-    pktsize = 1024
-    clients = 20
-    concurrency = 32
-
-    confsToPlot = {
-        "linux" : {
-            'title': "Linux",
-            'flist': get_files(
-                    resultDir = "./data/output_runs_linuxTest/balance/HWQ_5/",
-                    workload = "",
-                    testType = "memcached_rr",
-                    concurrency = concurrency,
-                    pktsize = pktsize,
-                    nic = nic,
-                    clients = clients,
-                    srvtype="memcached_linux"),
-            'app' : 'memaslap',
-            'highPrio' : None,
-           },
-
-        "onload" : {
-            'title': "UNet",
-            'flist': get_files(
-                    resultDir = "./data/output_runs_linuxTest/balance/HWQ_5/",
-                    workload = "",
-                    testType = "memcached_rr",
-                    concurrency = concurrency,
-                    pktsize = pktsize,
-                    nic = nic,
-                    clients = clients,
-                    srvtype="memcached_onload"),
-            'app' : 'memaslap',
-            'highPrio' : None,
-           },
-
-        "dnet-pr" : {
-            'title': "dnet-pr",
-            'flist': get_files(
-                    resultDir = "./data/output_runs_posterV3/priority/",
-                    workload = "",
-                    testType = "memcached_rr",
-                    concurrency = concurrency,
-                    pktsize = pktsize,
-                    nic = nic,
-                    clients = clients,
-                    srvtype="*"),
-            'app' : 'memaslap',
-            'highPrio' : [0, 1],
-           },
-
-
-        "dnet-pronly" : {
-            'title': "dnet-prOnly",
-            'flist': get_files(
-                    resultDir = "./data/output_runs_posterV3/priSmall/",
-                    workload = "",
-                    testType = "memcached_rr",
-                    concurrency = concurrency,
-                    pktsize = pktsize,
-                    nic = nic,
-                    clients = 2,
-                    srvtype="*"),
-            'app' : 'memaslap',
-            'highPrio' : None,
-           },
-
-        "dnet-bal" : {
-            'title': "Dragonet",
-            'flist': get_files(
-                    resultDir = "./data/output_runs_posterV3/balance/",
-                    workload = "",
-                    testType = "memcached_rr",
-                    concurrency = concurrency,
-                    pktsize = pktsize,
-                    nic = nic,
-                    clients = clients,
-                    srvtype="*"),
-            'app' : 'memaslap',
-            'highPrio' : None,
-           },
-    }
-
-
-
-
-
-    def plot_memcached(pprefix, metric, config):
-        #fids = sorted(config.keys())
-        #fids = ["linux", "onload", "dnet-pr", "dnet-pronly", "dnet-bal" ]
-        fids = ["linux", "onload", "dnet-bal"]
-
-        plot_boxplot_gen(fids, pprefix, metric, config, y_log_scale=False)
-
-    for metric in ("TPS", "Total_Avg"):
-        plot_memcached(
-            ("memcached-%s-pkt-%d-cl-%d-load-%d" % (nic, pktsize, clients, concurrency)),
-                metric, confsToPlot)
-
-    print "done with everything"
-
-
-def mixedWorkload():
-
-    nic = "Intel"
-    pktsize = 1024
-    concurrency = 16
-
-    clients = 20
-    baseDir="./data/output_debugging_online_20Clients_10Q_5Cores/"
-    baseDiroffline="./data/output_debugging_online_20Clients_10Q_5Cores_v2/"
-
-    clients = 20
-    baseDir="./data/output_debugging_online_automated_v7/"  # 5queue
-
-    clients = 40
-    baseDir="./data/output_debugging_online_40Clients_10Q/" # 10queue
-
-    clients = 20
-    concurrency = 32
-    baseDir="./data/output_debugging_online_20Clients_32F_10Q_s/"
-    myprefix="20Clients_32F_10Q_s_"
-
-    clients = 40
-    concurrency = 16
-    baseDir="./data/output_debugging_online_40Clients_16F_10Q_allLong/"
-    myprefix="allLong_40Clients_16F_10Q"
-
-    clients = 20
-    concurrency = 32
-    baseDir="./data/output_debugging_online_20Clients_32F_10Q_4P_t1/"
-    myprefix="4PQ_20Clients_32F_10Q"
-
-    clients = 20
-    concurrency = 16
-    baseDir="./data/output_debugging_online_20Clients_16F_10Q_4P_t1_s/"
-
-    clients = 20
-    concurrency = 16
-    caseName="20Clients_16F_10Q_4P"
-    baseDir="./data/allResults/%s/" % (caseName)
-
-    workloadType="MixedRun"
-    workloadType="TOGETHER"
-    workloadType="MixedRunStatic"
-    workloadType="MixedRunDynamic"
-
-    myprefix="%s_%s_" % (workloadType, caseName)
-
-    confsToPlot = {
-        "stable" : {
-            'title': "stable",
-            'flist': get_files(
-                    resultDir =  ("%s/%s/LONG/" % (baseDir, workloadType)),
-                    workload = "",
-                    testType = "memcached_rr",
-                    concurrency = concurrency,
-                    pktsize = pktsize,
-                    nic = nic,
-                    clients = clients,
-                    srvtype="*"),
-            'app' : 'memaslap',
-            'highPrio' : [0, 1],
-           },
-
-        "dynamicHP" : {
-            'title': "DynamicHP",
-            'flist': get_files(
-                    resultDir =  ("%s/%s/SHORTHP/" % (baseDir, workloadType)),
-                    workload = "",
-                    testType = "memcached_rr",
-                    concurrency = concurrency,
-                    pktsize = pktsize,
-                    nic = nic,
-                    clients = 1,
-                    srvtype="*"),
-            'app' : 'memaslap',
-            'highPrio' : None,
-           },
-
-
-
-        "dynamicLP" : {
-            'title': "DynamicLP",
-            'flist': get_files(
-                    resultDir =  ("%s/%s/SHORTLP/" % (baseDir, workloadType)),
-                    workload = "",
-                    testType = "memcached_rr",
-                    concurrency = concurrency,
-                    pktsize = pktsize,
-                    nic = nic,
-                    clients = 1,
-                    srvtype="*"),
-            'app' : 'memaslap',
-            'highPrio' : None,
-           },
-
-    }
-
-
-    def plot_memcached(pprefix, metric, config):
-        #fids = sorted(config.keys())
-        #fids = ["linux", "onload", "dnet-pr", "dnet-pronly", "dnet-bal" ]
-        #fids = ["stable", "dynamicHP", "dynamicHPoffline", "dynamicLPoffline", "dynamicLP"]
-        fids = ["stable", "dynamicHP", "dynamicLP"]
-
-        plot_boxplot_gen(fids, pprefix, metric, config, y_log_scale=False)
-
-    for metric in ("TPS", "Total_Avg"):
-        plot_memcached(
-            ("%s-memcached-%s-pkt-%d-cl-%d-load-%d" % (myprefix, nic, pktsize,
-                    clients, concurrency)),
-                metric, confsToPlot)
-
-    print "done with everything"
-
-
 if __name__ == "__main__":
     global plot_save_location
     #plot_save_location = "./memcachedPlots/"
     #memcachedPriorityResultsPaper()
-    #plot_save_location = "./memcachedLoadPlotsTest/"
-    #forPoster()
-    #plot_save_location = "./memcachedLoadPlotsLinux/"
-    #linuxNumbers()
-    #memcachedPriorityResultsPaper()
-    plot_save_location = "./memcachedLoadPlots_dumping_ground/"
-    mixedWorkload()
+    plot_save_location = "./memcachedLoadPlotsTest/"
+    forPoster()
 
