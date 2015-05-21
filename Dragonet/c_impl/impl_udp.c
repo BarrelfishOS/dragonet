@@ -33,7 +33,12 @@ node_out_t do_pg__RxL4UDPValidLength(struct ctx_RxL4UDPValidLength *context,
             ((udp_header_offset(*in)) + udp_hdr_pkt_length_read(*in)));
 }
 
+//#define ENABLE_UDP_CHECKSUM_FAILURE_NOTIFICATION        1
+
+#if     ENABLE_UDP_CHECKSUM_FAILURE_NOTIFICATION
 static uint64_t udp_checksum_failed = 0;
+#endif //  ENABLE_UDP_CHECKSUM_FAILURE_NOTIFICATION
+
 node_out_t do_pg__RxL4UDPValidChecksum(struct ctx_RxL4UDPValidChecksum *context,
         struct state *state, struct input **in)
 {
@@ -61,15 +66,17 @@ node_out_t do_pg__RxL4UDPValidChecksum(struct ctx_RxL4UDPValidChecksum *context,
     uint16_t checksum_final = ipv4_checksum_incremental_final(*in, off,
             (len - off), checksum_psudo_hdr);
 
+#if     ENABLE_UDP_CHECKSUM_FAILURE_NOTIFICATION
     if (checksum_final != 0) {
         ++udp_checksum_failed;
         // printing every 10th invalid checksum stats to
         //      reduce the fequency of prints
-        if (udp_checksum_failed % 10 == 0) {
+        if (udp_checksum_failed % 1000 == 0) {
             dbg_printf("ERROR: UDP checksum is invalid: %"PRIu16", count: %"PRIu64"\n",
                     checksum_final, udp_checksum_failed);
         }
     }
+#endif  //   ENABLE_UDP_CHECKSUM_FAILURE_NOTIFICATION
 
     //return PORT_BOOL((checksum_final == 0));
     return P_true;

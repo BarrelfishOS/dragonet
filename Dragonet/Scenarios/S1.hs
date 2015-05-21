@@ -25,12 +25,20 @@ import qualified Dragonet.Search as Search
 myFromMaybe (Just x) = x
 myFromMaybe _ = error "No IP address"
 
+--hpm1 = "10.113.4.51"  -- ziger1
+--hpm2 = "10.113.4.57"  -- ziger2
+
+hpm1 = "10.113.4.26"  -- sbrinz1
+hpm2 = "10.113.4.29"  -- sbrinz2
+
+
+
 goldFlPerQ = 1
 isGoldFlOld FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip} = ans
     where
         ans
-            | (sport == 8000) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
-            | (sport == 8000) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
+            | (sport == 8000) && (sip == (myFromMaybe $ IP4.ipFromString hpm1)) =  True
+            | (sport == 8000) && (sip == (myFromMaybe $ IP4.ipFromString hpm2)) =  True
             | otherwise = False
 isGoldFlOld _ = False
 
@@ -41,12 +49,12 @@ isGoldFlv2 fPerApp FlowUDPv4 {flSrcPort = Just sport, flSrcIp = Just sip, flDstP
         fpa = fromIntegral fPerApp
         ans
             -- This is essentially a hole to add a special HP flow later
-            | (sport < 8000) && (sport >= (8000 - fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
-            | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True
-            | (sport < 8000) && (sport >= (8000 - fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
-            | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True
-            | (sport == 5000) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.51")) =  True        -- For fancyecho
-            | (sport == 5000) && (sip == (myFromMaybe $ IP4.ipFromString "10.113.4.57")) =  True        -- For fancyecho
+            | (sport < 8000) && (sport >= (8000 - fpa)) && (sip == (myFromMaybe $ IP4.ipFromString hpm2)) =  True
+            | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString hpm2)) =  True
+            | (sport < 8000) && (sport >= (8000 - fpa)) && (sip == (myFromMaybe $ IP4.ipFromString hpm1)) =  True
+            | (sport >= 8000) && (sport < (8000 + fpa)) && (sip == (myFromMaybe $ IP4.ipFromString hpm1)) =  True
+            | (sport == 5000) && (sip == (myFromMaybe $ IP4.ipFromString hpm1)) =  True        -- For fancyecho
+            | (sport == 5000) && (sip == (myFromMaybe $ IP4.ipFromString hpm2)) =  True        -- For fancyecho
             | otherwise = False
 isGoldFlv2 _ _ = False
 

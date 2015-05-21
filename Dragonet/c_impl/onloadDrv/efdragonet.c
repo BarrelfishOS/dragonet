@@ -71,17 +71,14 @@
 #define LOGW(x)  do{ x; }while(0)
 #define LOGI(x)  do{}while(0)
 
-struct vi *alloc_queue(struct net_if *myif);
 
 size_t get_packet_nonblocking(struct dragonet_sf_queue *sfq,  struct input **in);
-size_t get_packet_blocking(struct dragonet_sf_queue *sfq, char *pkt_out,
-    size_t buf_len);
 void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len,
         uint8_t qi);
-struct vi *alloc_queue(struct net_if *myif)
+static struct vi *alloc_queue(struct net_if *myif, int id)
 {
     struct vi* vis;
-    vis = vi_alloc(0, myif, EF_VI_FLAGS_DEFAULT);
+    vis = vi_alloc(id, myif, EF_VI_FLAGS_DEFAULT);
     return vis;
 } // end function: alloc_queue
 
@@ -293,7 +290,7 @@ size_t get_packet_nonblocking(struct dragonet_sf_queue *sfq,  struct input **in)
 
 
                     ++sfq->tx_discard_event_count;
-                    if (sfq->tx_discard_event_count % 10 == 0) {
+                    if (sfq->tx_discard_event_count % 1000 == 0) {
                         dbg_printf("%d, no events: %d, TX:%d, RX=%d, DROP=%d\n",
                             sfq->event_count, sfq->no_event_count,
                             sfq->tx_event_count, sfq->rx_event_count,
@@ -355,176 +352,6 @@ size_t get_packet_nonblocking(struct dragonet_sf_queue *sfq,  struct input **in)
 } // end function: get_packet_nonblocking
 
 
-
-// FIXME: get rid of this function eventually
-size_t get_packet_blocking(struct dragonet_sf_queue *sfq, char *pkt_out,
-        size_t buf_len)
-{
-
-    assert(sfq != NULL);
-    struct vi *vif = sfq->queue_handle;
-    if (vif == NULL) {
-        dprint("%s:%s:%d:ERROR: vif == NULL\n", __FILE__, __func__, __LINE__);
-        return 0;
-    }
-
-    struct vi* viff;
-    int i, j, n, n_ev = 0;
-    int idx = 0;
-    int pkt_buf_i = 0;
-    int len = 0;
-    int copylen = 0;
-    int pkt_received = 0;
-    struct pkt_buf* pkt_buf;
-//    char printbuf[PRINTBUFSIZE]; // = {'\0'};
-    int pkt_received_count = 0;
-
-    while( 1 ) {
-        viff = vif;
-
-        // If there are already received packet,
-        // then pop one of them out and return.
-
-        if ( (sfq->evs_bufferd_rx_total - sfq->evs_bufferd_rx_last) > 0) {
-//            printf("Warning: returning already buffered packet: "
-//                    "%d from total %d packets\n",
-//                    sfq->evs_bufferd_rx_last, sfq->evs_bufferd_rx_total);
-
-            idx = sfq->evs_rx_buffered_indexes[sfq->evs_bufferd_rx_last];
-            ++sfq->evs_bufferd_rx_last;
-
-
-            /* This code does not handle jumbos. */
-            assert(EF_EVENT_RX_SOP(sfq->evs[idx]) != 0);
-            assert(EF_EVENT_RX_CONT(sfq->evs[idx]) == 0);
-
-            pkt_buf_i = EF_EVENT_RX_RQ_ID(sfq->evs[idx]);
-            pkt_buf = pkt_buf_from_id(viff, pkt_buf_i);
-            // Every incoming packet should have n_refs set to 1.
-            assert(pkt_buf->n_refs == 1);
-            assert(pkt_buf->is_tx == 0);
-            len = EF_EVENT_RX_BYTES(sfq->evs[idx]) - viff->frame_off;
-
-            copylen = len;
-            if (len > buf_len) {
-                copylen = buf_len;
-                dprint("buffer too small to copy full packet."
-                        "Ignoring  %d byte data\n", (len - copylen));
-            }
-            dprint("RX event: trying to copy %d bytes at location %p\n",
-                    copylen, pkt_out);
-            memcpy(pkt_out, RX_PKT_PTR(pkt_buf), copylen);
-            ++pkt_received_count;
-            pkt_buf_release(pkt_buf);
-
-
-            pkt_received = copylen;
-            ++sfq->refill_counter_local;
-            if (sfq->refill_counter_local >=  REFILL_BATCH_SIZE) {
-                vi_refill_rx_ring(viff, REFILL_BATCH_SIZE);
-                sfq->refill_counter_local = 0;
-            }
-
-            // FIXME: print the size of packet and qid
-            dprint
-                ("%s:%s:%d: [vq:%p], [qid:%"PRIu8"], packet received %d\n",
-                    __FILE__, __func__, __LINE__, sfq, sfq->qid,
-                    pkt_received);
-            return pkt_received;
-        } // end if: buffered packets
-
-        // OK, there are no bufferd packets, lets buffer some packets!
-        // starting new buffer cycle
-        sfq->evs_bufferd_rx_total = 0;
-        sfq->evs_bufferd_rx_last = 0;
-
-        //n_ev = ef_eventq_poll(&viff->vi, sfq->evs, sizeof(sfq->evs) / sizeof(sfq->evs[0]));
-        n_ev = ef_eventq_poll(&viff->vi, sfq->evs, EF_VI_RX_BATCH);
-        //++sfq->event_count;
-        if( n_ev <= 0 ) {
-            //++sfq->no_event_count;
-            continue;
-        }
-
-        //if (n_ev > 1) {
-        //    printf("WARNING: no. of events received = %d\n", n_ev);
-        //}
-
-        for( i = 0; i < n_ev; ++i ) {
-            switch( EF_EVENT_TYPE(sfq->evs[i]) ) {
-                case EF_EVENT_TYPE_RX:
-                    sfq->evs_rx_buffered_indexes[sfq->evs_bufferd_rx_total] = i;
-                    ++sfq->evs_bufferd_rx_total;
-                    assert(sfq->evs_bufferd_rx_total <= EF_VI_RX_BATCH);
-
-                    ++sfq->rx_event_count;
-
-                    dprint("status: %s:%s:%d: %d,RX event arrived, "
-                            "no events: %d, TX:%d, RX=%d, DROP=%d\n",
-                            __FILE__, __FUNCTION__, __LINE__,
-                            sfq->event_count, sfq->no_event_count,
-                            sfq->tx_event_count, sfq->rx_event_count,
-                            sfq->tx_discard_event_count);
-                    break;
-
-                case EF_EVENT_TYPE_TX:
-                    ++sfq->tx_event_count;
-                    dprint("status: %s:%s:%d: %d, no events: %d, TX:%d, "
-                            "RX=%d, DROP=%d\n",
-                            __FILE__, __FUNCTION__, __LINE__,
-                            sfq->event_count, sfq->no_event_count,
-                            sfq->tx_event_count, sfq->rx_event_count,
-                            sfq->tx_discard_event_count);
-                    dprint("TX event arrived\n");
-                    n = ef_vi_transmit_unbundle(&viff->vi, &sfq->evs[i], sfq->ids);
-                    for( j = 0; j < n; ++j ) {
-                        pkt_buf = pkt_buf_from_id(viff, TX_RQ_ID_PB(sfq->ids[j]));
-                        assert(pkt_buf->is_tx == 1);
-                        if (pkt_buf->n_refs != 1) {
-                            printf("tx_packet with ref id %d, instead of 1\n", (int) pkt_buf->n_refs);
-                            if (pkt_buf->n_refs > 1) {
-                                pkt_buf_release(pkt_buf);
-                                printf("WARNING: couldn't this buffer, so letting it leak with ref_count = %d\n",
-                                        (int) pkt_buf->n_refs);
-                            }
-                        } else {
-                            pkt_buf_release(pkt_buf);
-                        }
-                    } // end for:
-                    break;
-
-                case EF_EVENT_TYPE_RX_DISCARD:
-                    ++sfq->tx_discard_event_count;
-                    if (sfq->tx_discard_event_count % 10 == 0) {
-                        dprint("status: %s:%s:%d: %d, no events: %d, TX:%d, RX=%d, DROP=%d\n",
-                            __FILE__, __FUNCTION__, __LINE__,
-                            sfq->event_count, sfq->no_event_count, sfq->tx_event_count, sfq->rx_event_count,
-                            sfq->tx_discard_event_count);
-                    }
-                    pkt_buf = pkt_buf_from_id(viff,
-                                    EF_EVENT_RX_DISCARD_RQ_ID(sfq->evs[i]));
-                        //buf_details(pkt_buf, printbuf, sizeof(printbuf));
-                    printf("%s:%s:%d: RX_DISCARD, before released, ref = %d\n",
-                                __FILE__, __func__, __LINE__, pkt_buf->n_refs);
-
-                    assert(pkt_buf->n_refs == 1);
-                    pkt_buf_release(pkt_buf);
-                    break;
-
-                default:
-                    printf("ERROR: unexpected event type=%d\n",
-                            (int) EF_EVENT_TYPE(sfq->evs[i]));
-                    LOGE(fprintf(stderr, "ERROR: unexpected event type=%d\n",
-                                (int) EF_EVENT_TYPE(sfq->evs[i])));
-                    break;
-            } // end switch
-        } // end for : i
-
-    } // end while: infinite
-    return 0;
-} // end function: get_packet_blocking
-
-
 void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len,
         uint8_t qi)
 {
@@ -577,14 +404,13 @@ void send_packet(struct dragonet_sf_queue *sfq, char *pkt_tx, size_t len,
         /* TXQ is full.  A real app might consider implementing an overflow
          * queue in software.  We simply choose not to send.
          */
-        dprint("%s:%s:%d: send queue full, so not sending\n", __FILE__, __func__, __LINE__);
+        printf("%s:%s:%d: send queue full, so not sending\n", __FILE__, __func__, __LINE__);
         LOGW(fprintf(stderr, "WARNING: [%s] dropped send on queue %"PRIu8"\n",
                     vif->net_if->name, qi));
         assert(pkt_buf->n_refs == 1);
         pkt_buf_release(pkt_buf);
         return;
     }
-
 } // end function: send_packet
 
 void *init_and_alloc_default_queue(char *name)
@@ -624,7 +450,7 @@ void *init_and_alloc_default_queue(char *name)
     for (k = 0; k < SF_MAX_QUEUES; k++) {
         iq[k].sf = sf_nic;
         iq[k].populated = false;
-        iq[k].queue_handle = alloc_queue(sf_nic->sfif);
+        iq[k].queue_handle = alloc_queue(sf_nic->sfif, k);
         iq[k].qid = k;
         iq[k].evs_bufferd_rx_total = 0;
         iq[k].evs_bufferd_rx_last = 0;

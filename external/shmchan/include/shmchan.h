@@ -134,7 +134,8 @@ static inline errval_t shmchan_poll_(struct shm_channel  *chan,
         flags = prefix##slotflags(msg);                                        \
                                                                                \
         if ((*flags & SHM_FLAGS_TXDONE) != 0) {                                \
-            shmchan_show_(chan);                                               \
+            /* printf("alloc_failed\n"); */                                    \
+            /* shmchan_show_(chan); */                                         \
             return SHM_CHAN_NOSPACE;                                           \
         }                                                                      \
                                                                                \

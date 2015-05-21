@@ -100,8 +100,12 @@ static bool channel_poll(struct waitset_chanstate *wscs)
             abort();
     }
 
-    err_expect_ok(bulk_ll_channel_event_done(&chan->ll, &event, err));
-    return true;
+    errval_t e = bulk_ll_channel_event_done(&chan->ll, &event, err);
+    if (e == SYS_ERR_OK) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 static void channel_start_waitset(struct bulk_channel *chan)

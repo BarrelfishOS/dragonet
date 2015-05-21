@@ -42,6 +42,7 @@
 ** SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//#define             USELOCKS        1
 
 #ifndef __EFVI_SFW_H__
 #define __EFVI_SFW_H__
@@ -74,11 +75,6 @@
 #define EF_VI_RX_BATCH            16
 
 #define EF_VI_TRANSMIT_BATCH      64
-
-// No. of buffers reserved for TX operation
-//   This is an upper limit on how many outstanding TX operations can there be.
-//#define MAX_TX_BUFFERS            128
-#define MAX_TX_BUFFERS              256
 
 struct pkt_buf;
 
@@ -126,7 +122,9 @@ struct vi {
   int              tx_free_pkt_bufs_n;
   /* Introducing locks around free_pkt_bufs as we are using it in
    * multi-thread setup */
+#if USELOCKS
   pthread_mutex_t      vi_lock;
+#endif // USELOCKS
 };
 
 

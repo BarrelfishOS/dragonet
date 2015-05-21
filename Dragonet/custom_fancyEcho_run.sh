@@ -145,7 +145,7 @@ fi
 ##################################################################
 
 ./scripts/pravin/wait_for_dragonet.sh 5 ${STACKNAME}
-dpdk_debug_3_cores_test
+run_memcached_10_clients_2_load
 #sudo killall ${STACKNAME}
 exit 0
 ##################################################################

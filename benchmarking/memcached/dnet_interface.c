@@ -694,7 +694,7 @@ int recvfrom_dn(void *dn_state, uint8_t *buff, int bufsize)
 
 #if DETECT_NEW_FLOWS
             // showing flow stats
-            xht_print(new_flows_ht);
+            //xht_print(new_flows_ht);
 #endif // DETECT_NEW_FLOWS
 
     }
@@ -1061,7 +1061,7 @@ int lowlevel_dn_stack_init(struct dn_thread_state *dn_tstate, int threadCount)
 
 #if DETECT_NEW_FLOWS
             // Printing the flow table for debugging purposes
-            xht_print(new_flows_ht);
+            //xht_print(new_flows_ht);
 #endif // DETECT_NEW_FLOWS
 
             // The flow information is sent, now we call noop to actually

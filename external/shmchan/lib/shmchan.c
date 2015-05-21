@@ -76,6 +76,7 @@ void shmchan_show_(struct shm_channel *chan)
             " current = %zu, dataLoc = %p, isSender=%d, isCreator=%d\n",
                 chan, chan->name, chan->size,
                 chan->current, chan->data, chan->sender, chan->creator);
+
 } // end function:shmchan_show_
 
 errval_t shmchan_bind_(struct shm_channel *chan, const char *name,

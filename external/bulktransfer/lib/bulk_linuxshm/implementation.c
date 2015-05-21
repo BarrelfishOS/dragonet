@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <bulk_transfer/bulk_transfer.h>
 #include <bulk_transfer/bulk_linuxshm.h>
@@ -57,9 +58,9 @@ static inline errval_t shm_chan_alloc_wrapper(
     errval_t err;
 //    struct lsm_internal *internal = channel->impl_data;
 //    struct shm_channel *chan = internal->tx;
-    int tries = 0;
+    volatile uint64_t tries = 0;
 
-    for(tries = 0;  tries < 10; ++tries) {
+    for(tries = 0;  tries < 100000; ++tries) {
 
         err = shm_chan_alloc(chan, msg);
         if (err_is_fail(err)) {
@@ -71,13 +72,11 @@ static inline errval_t shm_chan_alloc_wrapper(
             //shm_chan_show(&internal->rx);
 
             if (err == SHM_CHAN_NOSPACE) {
-                printf("This is transient error, and attempt %d, so trying again\n",
-                        tries);
-
-                shm_chan_show(chan);
+                //printf("This is transient error, and attempt %d, so trying again\n", tries);
+                //shm_chan_show(chan);
                 //assert(err_is_ok(err));
                 if(tries > 3) {
-                sleep(1);
+                    //sleep(1);
                 // this is transient error.  sleep for short time and and try again
                 }
             } else {
@@ -86,22 +85,20 @@ static inline errval_t shm_chan_alloc_wrapper(
                 printf("Details of TX channel\n");
                 shm_chan_show(chan);
                 printf("Details of RX channel\n");
-                printf("This is serious error, and attempt %d. giving up\n",
-                        tries);
+                printf("This is serious error, and attempt %"PRIu64". giving up\n", tries);
                 //assert(err_is_ok(err));
                 return err;
             }
         } else {
-            if (tries > 0) {
-                //printf("shm_chan_alloc worked after %d tries. One of the entiy is slow!\n",
-                //        tries);
-                //shm_chan_show(chan);
+            if (tries > 1000) {
+                printf("shm_chan_alloc worked after %"PRIu64" tries. One of the entiy is slow!\n",
+                        tries);
+                shm_chan_show(chan);
             }
             return err;
         }
     } // end for: no. of tries
-    printf("shm_chan_alloc failed for %d times. giving up\n",
-                        tries);
+    printf("shm_chan_alloc failed for %"PRIu64" times. giving up\n", tries);
     return err;
 } // end function: shm_mem_alloc_wrapper
 
@@ -611,7 +608,7 @@ static errval_t op_release(struct bulk_ll_channel *channel,
 /*****************************************************************************/
 /* Incoming messages */
 
-static void done_status(struct lsm_internal  *internal,
+static errval_t done_status(struct lsm_internal  *internal,
                         struct bulk_ll_event *event,
                         errval_t              err)
 {
@@ -627,6 +624,7 @@ static void done_status(struct lsm_internal  *internal,
         shm_chan_show(&internal->tx);
         printf("Details of RX channel\n");
         shm_chan_show(&internal->rx);
+        return e;
     }
 
     err_expect_ok(e); // FIXME
@@ -636,10 +634,11 @@ static void done_status(struct lsm_internal  *internal,
     out->content.status.err = err;
 
     shm_chan_send(&internal->tx, out);
+    return SYS_ERR_OK;
 }
 
 
-static void done_bind(struct lsm_internal  *internal,
+static errval_t done_bind(struct lsm_internal  *internal,
                       struct bulk_ll_event *event,
                       errval_t              err)
 {
@@ -656,10 +655,10 @@ static void done_bind(struct lsm_internal  *internal,
         shm_chan_show(&internal->tx);
         printf("Details of RX channel\n");
         shm_chan_show(&internal->rx);
+        return e;
     }
 
-
-    err_expect_ok(e); // FIXME
+    //err_expect_ok(e); // FIXME
 
     out->type = SHM_MSG_BIND_DONE;
     out->content.bind_done.meta_size = internal->chan->meta_size;
@@ -669,6 +668,7 @@ static void done_bind(struct lsm_internal  *internal,
     out->content.bind_done.err = err;
 
     shm_chan_send(&internal->tx, out);
+    return SYS_ERR_OK;
 }
 
 static errval_t msg_bind(struct lsm_internal *internal,
@@ -676,7 +676,7 @@ static errval_t msg_bind(struct lsm_internal *internal,
                          struct bulk_ll_event *event)
 {
     errval_t err = SYS_ERR_OK;
-
+    errval_t e;
     debug_printf("msg_bind\n");
 
     if (msg->content.bind_request.role  == internal->chan->role) {
@@ -690,7 +690,8 @@ static errval_t msg_bind(struct lsm_internal *internal,
     return SYS_ERR_OK;
 
 out_err:
-    done_bind(internal, NULL, err);
+    e = done_bind(internal, NULL, err);
+    err_expect_ok(e);
     return BULK_TRANSFER_EVENTABORT;
 }
 
@@ -726,7 +727,7 @@ struct assign_event {
     uint32_t op;
 };
 
-static void done_assign(struct lsm_internal  *internal,
+static errval_t done_assign(struct lsm_internal  *internal,
                         struct bulk_ll_event *event,
                         errval_t              err)
 {
@@ -945,18 +946,18 @@ static errval_t op_event_done(struct bulk_ll_channel *channel,
     struct lsm_internal *internal = channel->impl_data;
     switch (event->type) {
         case BULK_LLEV_CHAN_BIND:
-            done_bind(internal, event, err);
+            return done_bind(internal, event, err);
             break;
 
         case BULK_LLEV_POOL_ASSIGN:
-            done_assign(internal, event, err);
+            return done_assign(internal, event, err);
             break;
 
         case BULK_LLEV_BUF_MOVE:
         case BULK_LLEV_BUF_PASS:
         case BULK_LLEV_BUF_COPY:
         case BULK_LLEV_BUF_RELEASE:
-            done_status(internal, event, err);
+            return done_status(internal, event, err);
             break;
 
     }

@@ -90,7 +90,9 @@ pkt_buf_free(struct pkt_buf* pkt_buf)
   struct vi* vi = pkt_buf->vi_owner;
   assert(pkt_buf->n_refs == 0);
 
-  pthread_mutex_lock(&vi->vi_lock);
+#if USELOCKS
+pthread_mutex_lock(&vi->vi_lock);
+#endif // USELOCKS
   if (pkt_buf->is_tx == 1) {
       pkt_buf->next = vi->tx_free_pkt_bufs;
       vi->tx_free_pkt_bufs = pkt_buf;
@@ -101,7 +103,9 @@ pkt_buf_free(struct pkt_buf* pkt_buf)
       ++vi->free_pkt_bufs_n;
   }
   assert(pkt_buf->n_refs == 0);
-  pthread_mutex_unlock(&vi->vi_lock);
+#if USELOCKS
+pthread_mutex_unlock(&vi->vi_lock);
+#endif // USELOCKS
 //  return pkt_buf;
 }
 
@@ -138,7 +142,9 @@ void vi_refill_rx_ring(struct vi* vi, int no_bufs)
   struct pkt_buf* pkt_buf;
   int i;
 
-  pthread_mutex_lock(&vi->vi_lock);
+#if USELOCKS
+pthread_mutex_lock(&vi->vi_lock);
+#endif // USELOCKS
   int freespace_hw = ef_vi_receive_space(&vi->vi);
   if( freespace_hw >= no_bufs &&
       vi->free_pkt_bufs_n >= no_bufs) {
@@ -170,7 +176,9 @@ void vi_refill_rx_ring(struct vi* vi, int no_bufs)
             __FILE__, __FUNCTION__, __LINE__,
             freespace_hw, vi->free_pkt_bufs_n,  no_bufs);
   }
-  pthread_mutex_unlock(&vi->vi_lock);
+#if USELOCKS
+pthread_mutex_unlock(&vi->vi_lock);
+#endif // USELOCKS
 }
 
 
@@ -179,11 +187,15 @@ void vi_refill_rx_ring(struct vi* vi, int no_bufs)
 struct pkt_buf* vi_get_free_pkt_buf(struct vi* vi)
 {
     struct pkt_buf* pkt_buf;
+#if USELOCKS
     pthread_mutex_lock(&vi->vi_lock);
+#endif // USELOCKS
 
     int free_pkt_bufs_n_copy = vi->free_pkt_bufs_n;
     if (free_pkt_bufs_n_copy <= 0) {
+#if USELOCKS
         pthread_mutex_unlock(&vi->vi_lock);
+#endif // USELOCKS
         printf("%s:%s:%d: dragonet out of packet buffers\n",
                 __FILE__, __FUNCTION__, __LINE__);
         assert(free_pkt_bufs_n_copy > 0);
@@ -194,7 +206,9 @@ struct pkt_buf* vi_get_free_pkt_buf(struct vi* vi)
     pkt_buf = vi->free_pkt_bufs;
     vi->free_pkt_bufs = vi->free_pkt_bufs->next;
     --vi->free_pkt_bufs_n;
+#if USELOCKS
     pthread_mutex_unlock(&vi->vi_lock);
+#endif // USELOCKS
 
     if (pkt_buf->n_refs != 0) {
         printf("%s:%s:%d: dragonet buffer leak: existing refs in new buff = %d\n",
@@ -212,11 +226,15 @@ struct pkt_buf* vi_get_free_pkt_buf(struct vi* vi)
 struct pkt_buf* vi_get_free_pkt_buf_tx(struct vi* vi)
 {
     struct pkt_buf* pkt_buf;
+#if USELOCKS
     pthread_mutex_lock(&vi->vi_lock);
+#endif // USELOCKS
 
     int free_pkt_bufs_n_copy = vi->tx_free_pkt_bufs_n;
     if (free_pkt_bufs_n_copy <= 0) {
+#if USELOCKS
         pthread_mutex_unlock(&vi->vi_lock);
+#endif // USELOCKS
         printf("%s:%s:%d: dragonet out of packet buffers for TX\n",
                 __FILE__, __FUNCTION__, __LINE__);
         assert(free_pkt_bufs_n_copy > 0);
@@ -227,7 +245,9 @@ struct pkt_buf* vi_get_free_pkt_buf_tx(struct vi* vi)
     pkt_buf = vi->tx_free_pkt_bufs;
     vi->tx_free_pkt_bufs =  pkt_buf->next;
     --vi->tx_free_pkt_bufs_n;
+#if USELOCKS
     pthread_mutex_unlock(&vi->vi_lock);
+#endif // USELOCKS
 
     if (pkt_buf->n_refs != 0) {
         printf("%s:%s:%d: dragonet buffer leak: existing refs in new tx buff = %d\n",
@@ -249,7 +269,9 @@ static void vi_init_pktbufs(struct vi* vi)
    * support.
    */
   int _2meg = (1 << 21);
-  int i, pbuf_size = ef_vi_receive_capacity(&vi->vi) * PKT_BUF_SIZE;
+  int i;
+  int pbuf_size = ef_vi_receive_capacity(&vi->vi) * PKT_BUF_SIZE;
+  pbuf_size =  2048 * PKT_BUF_SIZE;
   pbuf_size = ROUND_UP(pbuf_size, _2meg);
   pbuf_size *= 2;  // PS: Doubling the size so that there is more for TX side as well.
   TEST(posix_memalign(&vi->pkt_bufs, _2meg, pbuf_size) == 0);
@@ -307,9 +329,9 @@ static struct vi* __vi_alloc(int vi_id, struct net_if* net_if,
   vi->id = vi_id;
   vi->net_if = net_if;
 
-//  //vi->vi_lock = PTHREAD_MUTEX_INITIALIZER;
-  pthread_mutex_init(&vi->vi_lock, NULL);
-// //  pthread_mutex_lock(&vi->vi_lock);
+#if USELOCKS
+     pthread_mutex_init(&vi->vi_lock, NULL);
+#endif // USELOCKS
 
   TRY(ef_driver_open(&vi->dh));
   if( vi_set_instance < 0 ) {
@@ -326,7 +348,6 @@ static struct vi* __vi_alloc(int vi_id, struct net_if* net_if,
 
   vi_init_pktbufs(vi);
   vi_init_layout(vi, flags);
-// //  pthread_mutex_unlock(&vi->vi_lock);
 
     // Allocate buffers for TX side
   vi->tx_free_pkt_bufs = NULL;
@@ -402,6 +423,7 @@ int vi_send(struct vi* vi, struct pkt_buf* pkt_buf, int off, int len)
   ef_vi_transmit_push(&vi->vi);
   return rc;
 }
+
 
 /**********************************************************************/
 
@@ -631,7 +653,8 @@ struct net_if* net_if_alloc(int net_if_id, const char* name, int rss_set_size)
   net_if->ifindex = ifindex;
   if( ef_driver_open(&net_if->dh) < 0 )
     goto fail1;
-  if( ef_pd_alloc(&net_if->pd, net_if->dh, net_if->ifindex, EF_PD_DEFAULT) < 0 )
+  if( ef_pd_alloc(&net_if->pd, net_if->dh, net_if->ifindex,
+              EF_PD_DEFAULT) < 0 )
     goto fail2;
   net_if->vi_set_size = rss_set_size;
   if( rss_set_size > 0 )
