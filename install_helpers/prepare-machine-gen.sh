@@ -19,6 +19,9 @@
 DRAGONET_SOURCE="${DRAGONET_BASE}/dragonet"
 DRAGONET_GIT="/cdrom/casper/mount/repository/dragonet"
 
+# Used to link with existing repo so that no additional compilation will be needed
+DRAGONET_EXISTING_REPO="${DRAGONET_GIT}"
+
 SYSTEM_CABAL=cabal
 DRAGONET_CABAL=${DRAGONET_CABAL_DIR}/bin/cabal
 
@@ -242,6 +245,20 @@ clone_repository () {
     git checkout master
 }
 
+link_existing_repository () {
+    if [[ -d ${DRAGONET_SOURCE} ]] ; then
+        echo "Dragonet source (${DRAGONET_GIT}) already exists. You may want to delete it, or run without -g option";
+        exit 1
+    fi
+
+    if [[ ! -d ${DRAGONET_EXISTING_REPO} ]] ; then
+        echo "ERROR: Dragonet existing repo (${DRAGONET_EXISTING_REPO}) does not exists."
+        echo "Please check the path!";
+        exit 1
+    fi
+    ln -s ${DRAGONET_EXISTING_REPO} ${DRAGONET_SOURCE}
+}
+
 
 install_dpdk() {
     check_dir_exists ${DRAGONET_DPDK} "dpdk codebase"
@@ -335,8 +352,10 @@ install_spark_nfs() {
 
 show_usage() {
         echo "Please specify what you want to install"
-        echo "Usage: ${0} [-g -s -c -o -d -v -i]"
+        echo "Usage: ${0} [-g -L -s -c -o -d -v -i]"
         echo "           -g -->  clone the git repository over ETHZ NFS"
+        echo "           -L -->  Link to existing repo over ETHZ NFS"
+        echo "                     Useful for client side to avoid compilation"
         echo "           -i -->  install all base tools"
         echo "           -s -->  install server dependencies"
         echo "           -c -->  install client dependencies"
@@ -348,14 +367,19 @@ show_usage() {
         echo "Examples (clone repo and z3 on eth network): ${0} -g -z"
         echo "Examples (installing server): ${0} -i -s -d -o -S"
         echo "Examples (installing client): ${0} -i -c"
+        echo "Examples (installing client): ${0} -L"
         exit 1
 }
 
-while getopts ":gisczldoSCv" opt; do
+while getopts ":gisczldoSCvL" opt; do
   case $opt in
     g)
         echo "-g was triggered, cloning git repo"
         CLONE="yes"
+      ;;
+    L)
+        echo "-L was triggered, Linking to existing repo"
+        LINKREPO="yes"
       ;;
     i)
         echo "-i was triggered, install base tools"
@@ -408,6 +432,7 @@ done
 
 do_if_yes "$INSTALLT" "Install base packages" install_base
 do_if_yes "$CLONE" "CLone Dragonet git repo"  clone_repository
+do_if_yes "$LINKREPO" "Link to existing repo"  link_existing_repository
 do_if_yes "$CLIENTDEPS" "Install client packages" install_client_deps
 do_if_yes "$SERVERDEPS" "Install server packages" install_server_deps
 do_if_yes "$OPENONLOAD" "Install OpenOnload driver" install_openonload
