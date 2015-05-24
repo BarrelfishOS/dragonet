@@ -23,6 +23,7 @@ cd ${dirToRun}
 
 # actually executing the command
 nohup sudo ${cmd} "$@" > ${outputfile} 2>&1 < /dev/null &
+echo "$!" > server.pid
 
 # TODO: maybe I want to record the pid of command
 

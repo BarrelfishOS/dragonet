@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# check if server is running or dead
+
 SCRIPTDIR="./scripts/pravin/"
 set -x
 set -e
@@ -29,6 +31,8 @@ set -x
 set -e
 
 
+
+rm -f server.pid
 rm -f *.ready
 rm -f *.failed
 rm -f *.appready

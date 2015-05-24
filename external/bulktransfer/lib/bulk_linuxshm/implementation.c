@@ -75,8 +75,8 @@ static inline errval_t shm_chan_alloc_wrapper(
                 //printf("This is transient error, and attempt %d, so trying again\n", tries);
                 //shm_chan_show(chan);
                 //assert(err_is_ok(err));
-                if(tries > 3) {
-                    //sleep(1);
+                if((tries % 2000 == 0)) {
+                    sleep(1);
                 // this is transient error.  sleep for short time and and try again
                 }
             } else {
@@ -91,9 +91,9 @@ static inline errval_t shm_chan_alloc_wrapper(
             }
         } else {
             if (tries > 1000) {
-                printf("shm_chan_alloc worked after %"PRIu64" tries. One of the entiy is slow!\n",
-                        tries);
-                shm_chan_show(chan);
+                //printf("shm_chan_alloc worked after %"PRIu64" tries. One of the entiy is slow!\n",
+                //        tries);
+                //shm_chan_show(chan);
             }
             return err;
         }

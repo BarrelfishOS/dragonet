@@ -455,6 +455,13 @@ static void *run_thread(void *arg)
                         die("dup2() failed");
                     }
                 }
+
+                int optval = 0xfff;
+                if (setsockopt(dsh, SOL_SOCKET, SO_NO_CHECK,
+                            (void*)&optval, sizeof(optval)) == -1) {
+                    perror("setsockopt SO_UDPCHECKSUM_IN: ");
+                    printf("ERROR SETTING SO_NO_CHECK");
+                }
                 pthread_mutex_unlock(&cs->ep->mutex);
                 cs->opaque = (void *)(intptr_t)dsh;
                 cs->sockfd = dsh;
