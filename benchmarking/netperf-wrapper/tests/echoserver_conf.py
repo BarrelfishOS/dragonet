@@ -133,13 +133,15 @@ def SRV_CMDS(name):
                         "sleep 2",
                         "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
                                     ],
-                    "init_cmd" : [],
+                    "init_cmd" : [
+                        "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
+                        ],
                     "exec_cmd" : "echo 'fancyEchoLinux should be already running'",
                     "kill_cmd" : [
                                 "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_2"),
                                 "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s " % (
                                     "./ethtool_out_1", "./ethtool_out_2"),
-                                "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s 1000 | grep rx_packets " % (
+                                "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s 100 | grep rx_packets " % (
                                     "./ethtool_out_1", "./ethtool_out_2"),
 #                                "sudo killall fancyEchoLinux || true",
                                  ],
@@ -157,11 +159,19 @@ def SRV_CMDS(name):
                       + "%s ./fancyEchoLinux %s " % (onload_prefix,
                              flows_to_arg_fancyEcho_linux(FLOWS, SERVER_INITIAL_PORT, SERVER_CORES)),
                         "sleep 2",
+                      "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
                                     ],
-                    "init_cmd" : [],
+                    "init_cmd" : [
+                        "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_1"),
+                        ],
                     "exec_cmd" : "echo 'fancyEchoOnload should be already running'",
                     "kill_cmd" : [
-                                #"sudo killall fancyEchoLinux || true",
+                                "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_2"),
+                                "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s " % (
+                                    "./ethtool_out_1", "./ethtool_out_2"),
+                                "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s 100 | grep rx_packets " % (
+                                    "./ethtool_out_1", "./ethtool_out_2"),
+#                                "sudo killall fancyEchoLinux || true",
                                  ],
                     "out_cmd" : [],
                 }

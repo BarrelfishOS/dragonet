@@ -70,6 +70,8 @@ def SRV_CMDS(name):
                         + "sudo %s " % (
                             get_isolation_container(is_server=True,
                                 # giving an extra core for polling queue-0
+                                #    and one more for running solver (specifically for 9 queues)
+                                #cores_needed=((SERVERS_INSTANCES*SERVER_CORES) + 2)
                                 cores_needed=((SERVERS_INSTANCES*SERVER_CORES) + 1)
                                 #cores_needed=((SERVERS_INSTANCES*SERVER_CORES))
                                     ))
@@ -101,6 +103,8 @@ def SRV_CMDS(name):
                     "init_cmd" : [],
                     "exec_cmd" : "echo 'Server should already be running'" ,
                     "kill_cmd" : [
+
+                                "cd dragonet/Dragonet/ ; ls /proc/`cat server.pid`/cmdline",
                                 "tail dragonet/Dragonet/some.log",
                                 "tail dragonet/Dragonet/memcached-out.log",
                                 "cat dragonet/Dragonet/stack.filtready || true",
@@ -152,6 +156,8 @@ def SRV_CMDS(name):
                     "init_cmd" : [],
                     "exec_cmd" : "echo 'memcached should be already running'",
                     "kill_cmd" : [
+
+                       "cd dragonet/Dragonet/ ; ls /proc/`cat server.pid`/cmdline",
                        "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_2"),
                        "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s " % (
                            "./ethtool_out_1", "./ethtool_out_2"),
@@ -191,6 +197,7 @@ def SRV_CMDS(name):
                     "init_cmd" : [],
                     "exec_cmd" : "echo 'memcached should be already running'",
                     "kill_cmd" : [
+                       "cd dragonet/Dragonet/ ; ls /proc/`cat server.pid`/cmdline",
                        "cd dragonet/Dragonet/ ; ethtool -S %s | tee %s" % (SERVERS_IF[SERVERS[0]], "./ethtool_out_2"),
                        "cd dragonet/Dragonet/ ; ../benchmarking/netperf-wrapper/diff_stats.py %s %s " % (
                            "./ethtool_out_1", "./ethtool_out_2"),
@@ -269,9 +276,13 @@ def SRV_CMDS(name):
 
     if name == "noServer" :
         return {
-                    "init_cmd" : [],
+
+                    "init_cmd" : [
+                            " cd dragonet/Dragonet/ ; ls /proc/`cat server.pid`/cmdline",
+                        ],
                     "exec_cmd" : "echo 'test output'",
                     "kill_cmd" : [
+                                " cd dragonet/Dragonet/ ; ls /proc/`cat server.pid`/cmdline",
                                 "cat dragonet/Dragonet/stack.filtready || true",
                         ],
                     "out_cmd" : [],

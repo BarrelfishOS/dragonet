@@ -1,6 +1,8 @@
 #!/bin/bash
 
 
+set -e
+
 startStack() {
 #./cleanupServer.sh
 
@@ -213,10 +215,11 @@ SERVERIP=10.113.4.195
 
 show_usage() {
         echo "Please select what you want to run"
-        echo "Usage: ${0} [-c -s -l]"
+        echo "Usage: ${0} [-t -c -s -l]"
+        echo "           -t E/M -->  Test type (E --> Echo server, M --> memcached)"
+        echo "                        (this should be the first argument)"
         echo "           -N S/I -->  NIC type (S --> Solarflare, I --> Intel)"
         echo "           -C S/B -->  Cost Function (S --> Static, B --> Balance)"
-        echo "           -t E/M -->  Test type (E --> Echo server, M --> memcached)"
         echo "           -c <n> -->  client count (n clients)"
         echo "           -l <n> -->  load (n concurrent sessions per client)"
         echo "           -Q <n> -->  n hardware queues and server threads"
@@ -261,6 +264,56 @@ while getopts ":c:l:Q:p:SdhxXrbm:t:C:N:TB" opt; do
             NICTYPE="NIC_Intel"
             ECHO_SERVER="e10k-dpdk"
             SERVERIP=10.113.4.95
+        elif [ "$OPTARG" == "IL" ] ;
+        then
+            NICTYPE="NIC_Intel"
+            SERVERIP=10.113.4.95
+            if [ "${UDP_TEST_NAME}" == "udp_rr" ] ;
+            then
+                ECHO_SERVER="fancyEchoLinux"
+            elif [ "${UDP_TEST_NAME}" == "memcached_rr" ] ;
+            then
+                ECHO_SERVER="memcached_linux"
+            else
+                echo "ERROR: the test type is not set yet! (-t)"
+                echo "   make sure that it is the first option"
+                show_usage
+                exit 1
+            fi
+        elif [ "$OPTARG" == "SL" ] ;
+        then
+            NICTYPE="NIC_SF"
+            SERVERIP=10.110.4.95
+            SERVERIP=10.113.4.195
+            if [ "${UDP_TEST_NAME}" == "udp_rr" ] ;
+            then
+                ECHO_SERVER="fancyEchoLinux"
+            elif [ "${UDP_TEST_NAME}" == "memcached_rr" ] ;
+            then
+                ECHO_SERVER="memcached_linux"
+            else
+                echo "ERROR: the test type is not set yet! (-t)"
+                echo "   make sure that it is the first option"
+                show_usage
+                exit 1
+            fi
+
+        elif [ "$OPTARG" == "SO" ] ;
+        then
+            NICTYPE="NIC_SF"
+            SERVERIP=10.113.4.195
+            if [ "${UDP_TEST_NAME}" == "udp_rr" ] ;
+            then
+                ECHO_SERVER="fancyEchoOnload"
+            elif [ "${UDP_TEST_NAME}" == "memcached_rr" ] ;
+            then
+                ECHO_SERVER="memcached_onload"
+            else
+                echo "ERROR: the test type is not set yet! (-t)"
+                echo "   make sure that it is the first option"
+                show_usage
+                exit 1
+            fi
         else
             echo "Error: Invalid NIC hardware name given"
             show_usage
@@ -299,33 +352,15 @@ while getopts ":c:l:Q:p:SdhxXrbm:t:C:N:TB" opt; do
         fi
       ;;
     c)
-#        if [ "$OPTTEST" == "yes" ] ;
-#        then
-#            echo "ERROR: clientcount is hardcoded by -t option, so you can't change it!"
-#            exit 1
-#        fi
         echo "Setting client-count to $OPTARG (instead of default $CLIENTCOUNT)"
         CLIENTCOUNT=$OPTARG
       ;;
     l)
-#        if [ "$OPTTEST" == "yes" ] ;
-#        then
-#            echo "ERROR: load is hardcoded by -t option, so you can't change it!"
-#            exit 1
-#        fi
         echo "Setting load to $OPTARG (instead of default $LOAD)"
         LOAD=$OPTARG
       ;;
     Q)
- #       if [ "$OPTTEST" == "yes" ] ;
- #       then
- #           echo "ERROR: servercores are hardcoded by -t option, so you can't change it!"
- #           exit 1
- #       fi
 
-        ISHWQUEUESET="yes"
-        HWQUEUE=10
-        SRVCORES=9
         if [ "$OPTARG" == 10 ] ;
         then
             SRVCORES=10
@@ -334,6 +369,10 @@ while getopts ":c:l:Q:p:SdhxXrbm:t:C:N:TB" opt; do
         then
             SRVCORES=5
             HWQUEUE=5
+        elif [ "$OPTARG" == 9 ] ;
+        then
+            SRVCORES=9
+            HWQUEUE=9
         else
             echo "Error: Invalid hardware queues given $OPTARG"
             show_usage
@@ -413,16 +452,6 @@ while getopts ":c:l:Q:p:SdhxXrbm:t:C:N:TB" opt; do
   esac
 done
 
-######################
-
-if [ ! "${ISHWQUEUESET}" == "yes" ] ; then
-    echo "ERROR: No HW queues given"
-    show_usage
-    exit 1
-fi
-
-######################
-
 ##################################################################
 ##################################################################
 ##################################################################
@@ -440,20 +469,49 @@ ClientList="-C sbrinz1 -C sbrinz2 -C ziger1 -C gruyere"
 
 ######################
 
-OUTPUTDIRPARENT="./debugSFresults_dbg_devBatch16/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
-OUTPUTDIRPARENT="./trios15_results_v2/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
-OUTPUTDIRPARENT="./trios15_results_linux/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
-OUTPUTDIRPARENT="./trios15_results_stable_small/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
-OUTPUTDIRPARENT="./trios15_results_stable2/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
-OUTPUTDIRPARENT="./debug_3machines/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+#### following one are wrong results...
+OUTPUTDIRPARENT="./trios15_results_echoserver/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
 
-OUTPUTDIRPARENT="./trios15_results_sfDeug/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
 
-OUTPUTDIRPARENT="./trios15_results_sf_bigmem8/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+OUTPUTDIRPARENT="./echoserver_debug2/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+OUTPUTDIRPARENT="./echoserver_debug6/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+OUTPUTDIRPARENT="./echoserver_debug7/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
 
-#### following location has good results !!!!!!
+# this one is good run, but with 50 sec runtime
+OUTPUTDIRPARENT="./trios15_results_echoserver5/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+
+# this one is good run, and with 130 sec runtime
+OUTPUTDIRPARENT="./trios15_results_echoserver6/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+
+OUTPUTDIRPARENT="./trios15_results_memcachedLinux/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+OUTPUTDIRPARENT="./trios15_results_memcachedLinux2/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+
+OUTPUTDIRPARENT="./trios15_results_9Qs/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+
+OUTPUTDIRPARENT="./deleteme_testing/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+
+
+# this one is good run, and with 130 sec runtime
+#           backed up in   trios15_results_echoserver6_bak (has good SF results)
+OUTPUTDIRPARENT="./trios15_results_echoserver6/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+
+# this one is good run, and with 130 sec runtime
+#           backed up in   trios15_results_memcachedLinux2_bak (has good SF results)
+#           backed up again   trios15_results_memcachedLinux2_bak2 (has good SF results, and Intel Linux results)
+OUTPUTDIRPARENT="./trios15_results_memcachedLinux2/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+
+#### following location has good results for memcached !!!!!!
         ## backed up at location ./trios15_results_improved_bak
+        ## backed up at location ./trios15_results_improved_bak2  on May 24, 2015, 22:00
+        ## backed up at location ./trios15_results_improved_bak3  on May 24, 2015, 22:30   (delete this!)
+                # this backup contains a run which was only doing a bigRun and not dynamic addition one
 OUTPUTDIRPARENT="./trios15_results_improved/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+
+# based on above results, but trying to re-run Intel results
+OUTPUTDIRPARENT="./trios15_results_improved2/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
+
+
+OUTPUTDIRPARENT="./trios15_results_echoserver_big/B${PACKETSIZE}/${NICTYPE}_${DNCOSTFUNCTION}_${HWQUEUE}/"
 
 ##################################################################
 ##################################################################
@@ -469,10 +527,8 @@ if [ "${RUNSTACK}" == "yes" ] ; then
 
         echo "Running only one type: ${UDP_TEST_NAME}"
         set -x
-        set -e
         startStack
         set +x
-        set +e
 fi
 
 
@@ -488,11 +544,9 @@ if [ "${RUNDUMMY}" == "yes" ] ; then
 
     echo "Running only one type: ${UDP_TEST_NAME}"
     set -x
-    set -e
     WORKLOADTYPE="SingleRun"
     doShortRun
     set +x
-    set +e
 fi
 
 
@@ -508,9 +562,7 @@ if [ "${RUNREAL}" == "yes" ] ; then
     echo "Running only one type: ${UDP_TEST_NAME}"
     WORKLOADTYPE="SingleRun"
     set -x
-    set -e
     getData "LONG"
-    set +x
     set +e
 fi
 
@@ -574,7 +626,6 @@ if [ "${MIXEDRUN}" == "yes" ] ; then
     wait
     echo "done with benchmarking"
 fi
-
 
 
 if [ "${ADDDYNAMICFLOWS}" == "yes" ] ; then
@@ -642,6 +693,7 @@ if [ "${BIGSTABLE}" == "yes" ] ; then
     echo "Assuming that stack is already running, doing a big-stable run"
 
     WORKLOADTYPE="RUNBIGALONE"
+    REALRT=50
     REALRT=130
     echo "Starting big set of clients for the load for test ${UDP_TEST_NAME}"
 
