@@ -336,15 +336,10 @@ type SearchStrategy o a = (OracleSt o a)
   -> [Flow] -- ^ current set of flows
   -> ST.ST s C.Configuration -- ^ resulting configuration
 
--- | Caching the port a flow will end up in a node. As a node representation we
--- use the label, i.e., we assume that the nodes with the same label have the
--- same predicate
-type FlowCache s      = HB.HashTable s (PG.NLabel, Flow) PG.NPort
-
 -- | State maintained by the search
 data SearchSt s o a = (OracleSt o a) => SearchSt {
       sParams        :: SearchParams o a -- ^ search parametrs
-    , sFlowCache     :: FlowCache s -- ^ caching to avoid predicate computation
+    , sFlowCache     :: FM.FlowCache s -- ^ caching to avoid predicate computation
 }
 
 
@@ -699,8 +694,9 @@ runIncrSearchIO st flows = ST.stToIO $ doIncrSearch st flows
 --  - yQmap and xQmap
 --  - ...
 --
---  For incremental search, we actually use 'FM.FlowMapSt' for incremental
---  implementation of 'QMap' so the code below is mainly for historic purposes.
+-- For incremental search, we actually use 'FM.FlowMapSt' for incremental
+-- implementation of 'QMap' so the code below is mainly for historic purposes.
+-- Eventually, we might want to remove/move them.
 
 -- | compute 'QMap'
 -- This is fairly straightfoward. First, we configure the PRG. Afterwords, using
@@ -735,7 +731,7 @@ qMap_ st prgC flows = do
     return qmap
 
 -- | compute which flow a queue will end up
-flowQueue :: FlowCache s     -- ^ flow cache
+flowQueue :: FM.FlowCache s  -- ^ flow cache
           -> PG.PGraph       -- ^ configured PRG
           -> Flow            -- ^ flow
           -> ST.ST s QueueId -- ^ resulting queue
@@ -784,7 +780,7 @@ flowQueueStart prgC = d1
 
 
 -- | 'flowQueue' main  helper
-doFlowQueue :: FlowCache s
+doFlowQueue :: FM.FlowCache s
             -> PG.PGGDecomp
             -> (Flow, PR.PredExpr)
             -> ST.ST s QueueId
@@ -809,7 +805,7 @@ doFlowQueue fc d@(ctx, g) flowT
 
 
 -- find next node port (use flow cache)
-doFlowNextPortCache :: FlowCache s            -- ^ flow cache
+doFlowNextPortCache :: FM.FlowCache s         -- ^ flow cache
                     -> (Flow, PR.PredExpr)    -- ^ the flow and its predicate
                     -> PG.Node                -- ^ current node
                     -> ST.ST s PG.NPort       -- ^ node port for the flow
@@ -924,7 +920,7 @@ yQmap gr fls = qmap
                         "\nSAT:"      ++ (ppShow $ sat_)
 
 
-doZQmap :: FlowCache s
+doZQmap :: FM.FlowCache s
         -> PG.PGGDecomp
         -> [(Flow, PR.PredExpr)]
         -> ST.ST s QMap
@@ -943,7 +939,7 @@ doZQmap fc d@(ctx, g) flowTs
           lbl = PG.nLabel node
 
 -- | given a graph node, group flows based on which port they match
-flowPortGroups :: FlowCache s
+flowPortGroups :: FM.FlowCache s
                -> PG.PGGDecomp
                -> [(Flow, PR.PredExpr)]
                -> ST.ST s [(PG.NPort, [(Flow, PR.PredExpr)])]

@@ -1,12 +1,19 @@
 {-# LANGUAGE ExistentialQuantification,GeneralizedNewtypeDeriving,
              ScopedTypeVariables #-}
 module Dragonet.FlowMap (
+    -- * Introduction
+    -- $intro
+    -- * FlowMap
+    QMap,          -- exported for documentation purposes
+    FlowMap,       -- exported for documentation purposes
+    FlowCache,
     FlowMapSt(..),
     initFlowMapSt,
-    getRxQMap,
-    rmFlow,
+    --
     incrConfigure,
     rebuildFlowMapSt,
+    rmFlow,
+    getRxQMap,
     fmGetCCs, fmGetConf,
     strFM,strFlowMap
 ) where
@@ -45,36 +52,76 @@ trN a b = a
 
 defBld = PR.predBuildDNF
 
--- A Flowmap maps each node's port to a set of flows
+-- $intro
+--
+-- Search optimizes user-defined cost functions. These cost functions operate on
+-- a mapping of flows into queues ('QMap') The code here aims to incrementally
+-- compute 'QMap' as flows come and go.
+--
+-- Code operates on the 'FlowMapSt' state. The state maintains a partially
+-- configured PRG, which allows for /partial configuration/. In /normal/
+-- configuration a CNode is replaced with normal (non-CNode) nodes. In /partial/
+-- configuration a CNode is replaced with normal nodes /and/ a new CNode. A
+-- partially configured PRG can be fully configured by applying an empty config
+-- ('C.emptyConfig') at any point. See "Configuration" for more details.
+--
+-- In addition to the partially configured graph, the state maintains a
+-- 'FlowMap', i.e., for each node a mapping on how different flows map to
+-- different ports. The goal of the code here is to maintain a valid 'FlowMap'
+-- for each node and maintain as much information as possible when changes
+-- happen.
+
+
+-- |Qmap is what user-defined cost functions typically operate on. It's a map of
+-- flows into queues.
+--
+-- TODO: There is also one in Search.hs. Put them in a single file (e.g.,
+-- Cost.hs)
+type QMap        = [(Flow, QueueId)]
+
+-- | A 'FlowMap' maps each node's port to a set of flows
 --
 -- As a potential optimization, we might consider using:
 -- Data.IntMap and/or Data.Vector for this
-type FlowMap = M.Map DGI.Node [(PG.NPort, [Flow])] -- flow map
+type FlowMap = M.Map DGI.Node [(PG.NPort, [Flow])]
 
--- Flow map state.
+
+-- | Caching the port a flow will end up in a node. As a node representation we
+-- use the label, i.e., we assume that the nodes with the same label have the
+-- same predicate
+type FlowCache s = HB.HashTable s (PG.NLabel, Flow) PG.NPort
+
+-- | Flow map state.
 -- This essentially represents a solution: it includes a list of configuration
 -- changes and the registered flows.
-type FlowCache s = HB.HashTable s (PG.NLabel, Flow) PG.NPort
 data FlowMapSt s cc = (C.ConfChange cc) => FlowMapSt {
-      fmGraph        :: PG.PGraph -- graph (gets updated with every conf)
-    , fmOrigGraph    :: PG.PGraph -- fully unconfigured PRG
-    -- each configuration change typically corresponds to a new flow, and we
-    -- maintain this information here.
-    -- We can add ccs that are not associated with flows as (Just cc, Nothing)
-    -- and vice-versa
+      fmGraph        :: PG.PGraph -- ^ the partially configured PRG
+                                  --   (gets updated with every state change)
+    , fmOrigGraph    :: PG.PGraph -- ^ fully unconfigured PRG (initial state)
+
     , fmCnfState     :: [(Maybe cc, Maybe Flow)]
-    , fmFlowMap      :: FlowMap
-    , fmRxEntryNid   :: DGI.Node
-    , fmTxQueueNodes :: [(QueueId, DGI.Node)]
-    , fmRxQueueNodes :: [(QueueId, DGI.Node)]
-    , fmFlowCache    :: FlowCache s
+    -- ^ Configuration state. each configuration change typically corresponds to
+    -- a new flow, and we maintain this information here.  We can add ccs that
+    -- are not associated with flows as (Just cc, Nothing) and vice-versa.
+
+    , fmFlowMap      :: FlowMap  -- ^ current flow map
+    , fmFlowCache    :: FlowCache s -- ^ flow cache
+
+    -- caching some nodes so that we do not have to look for them every time
+    , fmRxEntryNid   :: DGI.Node -- ^ Entry node for the receive side
+    , fmTxQueueNodes :: [(QueueId, DGI.Node)] -- ^ Tx Queue nodes
+    , fmRxQueueNodes :: [(QueueId, DGI.Node)] -- ^ Rx Queue nodes
+
     , fmCCNodesMap   :: M.Map cc [(DGI.Node,PG.Node)]
-    -- incremental qmap
+    -- ^ This maps each configuration change to the nodes it created
+
+    -- for incremental qmap
     -- , fmQmapOld     :: QMap -- old qmap
     -- , fmQmapNewCc   :: [cc]
     -- , fmQmapNewFls  :: [Flow]
 }
 
+-- | provide a string for configuration state
 fmCnfStateStr_ :: (C.ConfChange cc) => (Maybe cc, Maybe Flow) -> String
 fmCnfStateStr_ (Just cc, Nothing) = "(" ++ (C.ccShow cc) ++ " [NO FLOW])"
 fmCnfStateStr_ (Just cc, Just fl) = "(" ++ (C.ccShow cc) ++ " [" ++ flowStr fl ++ "])"
@@ -89,7 +136,7 @@ fmSinkPort = ""
 -- FlowMap helpers
 --
 
--- get the set of flows for a (node,port) or an error string
+-- | get the set of flows for a (node,port) or an error string
 fmGetFlow :: FlowMap -> DGI.Node -> PG.NPort -> Either [Flow] String
 fmGetFlow fm nid port =
     case M.lookup nid fm of
@@ -100,7 +147,7 @@ fmGetFlow fm nid port =
     where noNodeMsg = "node does not exist in flow map"
           noPortMsg = "port:" ++ port ++ " does not exist in flow map"
 
--- helper for addFlowPort_
+-- | helper for addFlowPort_
 addFlowPort_ :: [(PG.NPort, [Flow])] -> PG.NPort -> Flow -> [(PG.NPort, [Flow])]
 addFlowPort_ [] port flow = [(port, [flow])]
 addFlowPort_ ((p,flows):xs) port flow
@@ -426,7 +473,8 @@ isNidRxNode :: PG.PGraph -> DGI.Node -> Bool
 isNidRxNode g nid = isRxNode_ nlbl
     where nlbl = fromJust $ DGI.lab g nid
 
--- Add an incremental configuration and an associated flow
+-- | Add an incremental configuration and an associated flow to the state. This
+-- is typically executed after a search step that considered a new flow.
 incrConfigure :: (C.ConfChange cc)
               => FlowMapSt s cc -> (cc, Maybe Flow) -> ST.ST s (FlowMapSt s cc)
 incrConfigure st (cc, mflow) =
@@ -726,9 +774,6 @@ fmDelFlow_ fm g (nid:nids) flow =
     --Nothing -> error $ "fmDelFlow_: mapping does not exist "
     --                ++ "for node:" ++ (PG.nLabel $ fromJust $ DGI.lab g nid)
 
-
--- just copy them for now. TODO: put them in a single file (e.g., Cost.hs)
-type QMap        = [(Flow, QueueId)]
 
 getRxQMap1 :: forall s cc. (C.ConfChange cc) => FlowMapSt s cc -> ST.ST s QMap
 getRxQMap1 st = do

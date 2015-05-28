@@ -244,8 +244,8 @@ type CGraph = PG.PGraph -- configured graph
 -- diffucult to provide, we can always just remove the argument, and let the
 -- caller figure it out.
 
--- partialy configuration:
---  we return the new un-configured graph and the new node frontier
+-- | partially configure a node.
+-- function returns the new partially configured graph and the new node frontier
 icPartiallyConfigure :: (ConfChange cc) => UGraph -> cc -> (UGraph, PG.ConfState)
 icPartiallyConfigure g cc = case ccIsReplace cc of
                             False -> applyConfigInc (incrConf cc) g

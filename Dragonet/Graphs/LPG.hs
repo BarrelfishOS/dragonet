@@ -56,7 +56,7 @@ configLPGUDPSockets _ _ inE outE cfg = concat <$> mapM addEndpoint
         hasL l n = l == PG.nLabel n
         findN ps l = (fst . fst) <$> L.find (hasL l . snd . fst) ps
         Just vN = findN inE "RxL4UDPValid"
-        Just vhN = findN inE "RxL4UDPValidHeaderLength"
+        --Just vhN = findN inE "RxL4UDPValidHeaderLength"
         -- ugly hack to support both lpg versions
         irN = case findN outE "TxL4UDPStart" of
             Just x  -> x
