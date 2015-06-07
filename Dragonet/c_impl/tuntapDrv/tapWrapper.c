@@ -1,3 +1,12 @@
+/*
+ * Copyright(c) 2012-2015, ETH Zurich. All rights reserved.
+ *
+ * Released under a dual BSD 3-clause/GPL 2 license. When using or
+ * redistributing this file, you may do so under either license.
+ *
+ * See LICENCE.Dragonet for details.
+ */
+
 // #############################################################
 // FIXME: following this the direct copy-paste from dragonet/Dragonet/Util/tap.c
 //          we need better way to reuse the code and avoid this ugly copy.
